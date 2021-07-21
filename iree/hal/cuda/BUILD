@@ -57,8 +57,6 @@ cc_library(
         ":dynamic_symbols",
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/base:logging",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/base/internal:flatcc",

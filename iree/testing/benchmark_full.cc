@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <utility>
@@ -101,7 +102,7 @@ static void iree_benchmark_run(const char* benchmark_name,
   state.impl = &benchmark_state;
   state.host_allocator = iree_allocator_system();
 
-  iree_status_t status = benchmark_def->run(&state);
+  iree_status_t status = benchmark_def->run(benchmark_def, &state);
   if (!iree_status_is_ok(status)) {
     auto status_str = StatusToString(status);
     iree_status_ignore(status);
@@ -158,6 +159,31 @@ void iree_benchmark_register(iree_string_view_t name,
 
 void iree_benchmark_initialize(int* argc, char** argv) {
   benchmark::Initialize(argc, argv);
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  // clang-format off
+  fprintf(stderr,
+"\x1b[31m"
+"===----------------------------------------------------------------------===\n"
+"\n"
+"         ██     ██  █████  ██████  ███    ██ ██ ███    ██  ██████\n"
+"         ██     ██ ██   ██ ██   ██ ████   ██ ██ ████   ██ ██\n"
+"         ██  █  ██ ███████ ██████  ██ ██  ██ ██ ██ ██  ██ ██   ███\n"
+"         ██ ███ ██ ██   ██ ██   ██ ██  ██ ██ ██ ██  ██ ██ ██    ██\n"
+"          ███ ███  ██   ██ ██   ██ ██   ████ ██ ██   ████  ██████\n"
+"\n"
+"===----------------------------------------------------------------------===\n"
+"\n"
+"Tracing is enabled and will skew your results!\n"
+"The timings involved here can an order of magnitude off due to the tracing\n"
+"time sampling, recording, and instrumentation overhead. Disable tracing with\n"
+"IREE_ENABLE_RUNTIME_TRACING=OFF and rebuild.\n"
+"\x1b[0m"
+"\n"
+  );
+  fflush(stderr);
+  // clang-format on
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 }
 
 void iree_benchmark_run_specified(void) { benchmark::RunSpecifiedBenchmarks(); }

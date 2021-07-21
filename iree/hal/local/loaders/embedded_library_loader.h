@@ -22,6 +22,7 @@ extern "C" {
 // all operating systems at the cost of some missing debugging/profiling
 // features.
 iree_status_t iree_hal_embedded_library_loader_create(
+    iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader);
 

@@ -10,9 +10,7 @@ if(NOT CMAKE_CROSSCOMPILING)
   set_target_properties(generate_embed_data PROPERTIES OUTPUT_NAME generate_embed_data)
 
   target_link_libraries(generate_embed_data
-    absl::flags
-    absl::flags_parse
-    absl::strings
+    iree::base::internal::flags
   )
 
   install(TARGETS generate_embed_data

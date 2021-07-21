@@ -10,6 +10,6 @@ package(
 
 cc_library(
     name = "impl_header_only",
-    textual_hdrs = ["src/vk_mem_alloc.h"],
-    includes = ["src"],
+    textual_hdrs = ["include/vk_mem_alloc.h"],
+    includes = ["include"],
 )

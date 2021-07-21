@@ -1,16 +1,15 @@
 vm.module @add_module {
-  vm.func @add(%arg0 : i32, %arg1 : i32) -> i32 {
+  vm.func @add_and_double(%arg0 : i32, %arg1 : i32) -> i32 attributes {noinline} {
     %0 = vm.add.i32 %arg0, %arg1 : i32
     %1 = vm.add.i32 %0, %0 : i32
     vm.return %1 : i32
   }
-  vm.export @add
+  vm.export @add_and_double
 
-  vm.func @add_call(%arg0: i32) -> i32 {
-    %0 = vm.call @add(%arg0, %arg0) : (i32, i32) -> i32
-    // TODO(simon-camp): use %0 as arguments when the call operation is properly implemented
-    %1 = vm.add.i32 %arg0, %arg0 : i32
+  vm.func @test_call(%arg0: i32) -> i32 {
+    %0 = vm.call @add_and_double(%arg0, %arg0) : (i32, i32) -> i32
+    %1 = vm.add.i32 %0, %0 : i32
     vm.return %1 : i32
   }
-  vm.export @add_call
+  vm.export @test_call
 }

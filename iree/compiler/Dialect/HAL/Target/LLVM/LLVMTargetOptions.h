@@ -41,6 +41,13 @@ struct LLVMTargetOptions {
   // Sanitizer Kind for CPU Kernels
   SanitizerKind sanitizerKind = SanitizerKind::kNone;
 
+  // Tool to use for linking (like lld). Acts as a prefix to the command line
+  // and can contain additional arguments.
+  std::string linkerPath;
+
+  // Tool to use for linking embedded ELFs specifically. Must be lld.
+  std::string embeddedLinkerPath;
+
   // Build for the IREE embedded platform-agnostic ELF loader.
   bool linkEmbedded = false;
 
@@ -51,6 +58,13 @@ struct LLVMTargetOptions {
 
   // True to keep linker artifacts for debugging.
   bool keepLinkerArtifacts = false;
+
+  // Build for IREE static library loading using this output path for
+  // a "{staticLibraryOutput}.o" object file and "{staticLibraryOutput}.h"
+  // header file.
+  //
+  // This option is incompatible with the linkEmbedded option.
+  std::string staticLibraryOutput;
 };
 
 // Returns LLVMTargetOptions struct intialized with the iree-llvm-* flags.

@@ -22,6 +22,10 @@ iree_status_t iree_hal_cuda_descriptor_set_layout_create(
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
 
+// Return the binding count for the given descriptor set layout.
+iree_host_size_t iree_hal_cuda_descriptor_set_layout_binding_count(
+    iree_hal_descriptor_set_layout_t* descriptor_set_layout);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

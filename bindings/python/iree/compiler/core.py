@@ -13,6 +13,7 @@ from enum import Enum
 import subprocess
 from typing import Any, Dict, List, Optional, Sequence, Union
 
+from .debugging import TempFileSaver
 from .tools import *
 
 __all__ = [
@@ -153,12 +154,13 @@ class CompilerOptions:
     self.enable_benchmark = enable_benchmark
 
 
-def build_compile_command_line(input_file: str,
+def build_compile_command_line(input_file: str, tfs: TempFileSaver,
                                options: CompilerOptions) -> List[str]:
   """Builds a command line for invoking the compiler.
 
   Args:
     input_file: The input file name.
+    tfs: TempFileSaver.
     options: Compiler options.
   Returns:
     List of strings of command line.
@@ -177,8 +179,10 @@ def build_compile_command_line(input_file: str,
     cl.append(f"--iree-hal-target-backends={target_backend}")
 
   # Output file.
-  if options.output_file:
-    cl.append(f"-o={options.output_file}")
+  output_file = tfs.alloc_optional("core-output.bin",
+                                   export_as=options.output_file)
+  if output_file:
+    cl.append(f"-o={output_file}")
 
   # Translation to perform.
   cl.append("--iree-mlir-to-vm-bytecode-module")
@@ -201,9 +205,10 @@ def build_compile_command_line(input_file: str,
     cl.append("--iree-vm-bytecode-module-strip-source-map")
   if options.strip_symbols:
     cl.append("--iree-vm-bytecode-module-strip-symbols")
-  if options.crash_reproducer_path:
-    cl.append(
-        f"--pass-pipeline-crash-reproducer={options.crash_reproducer_path}")
+  crash_reproducer_path = tfs.alloc_optional(
+      "core-reproducer.mlir", export_as=options.crash_reproducer_path)
+  if crash_reproducer_path:
+    cl.append(f"--pass-pipeline-crash-reproducer={crash_reproducer_path}")
   if options.enable_tflite_bindings:
     cl.append("--iree-tflite-bindings-support")
   if options.enable_benchmark:
@@ -223,12 +228,13 @@ def compile_file(input_file: str, **kwargs):
     Either a byte buffer of the compiled content or None if output_file
     was specified in the options.
   """
-  options = CompilerOptions(**kwargs)
-  cl = build_compile_command_line(input_file, options)
-  result = invoke_immediate(cl)
-  if options.output_file:
-    return None
-  return result
+  with TempFileSaver.implicit() as tfs:
+    options = CompilerOptions(**kwargs)
+    cl = build_compile_command_line(input_file, tfs, options)
+    result = invoke_immediate(cl)
+    if options.output_file:
+      return None
+    return result
 
 
 def compile_str(input_str: Union[str, bytes], **kwargs):
@@ -241,11 +247,12 @@ def compile_str(input_str: Union[str, bytes], **kwargs):
     Either a byte buffer of the compiled content or None if output_file
     was specified in the options.
   """
-  options = CompilerOptions(**kwargs)
-  cl = build_compile_command_line("-", options)
-  input_bytes = input_str.encode("utf-8") if isinstance(input_str,
-                                                        str) else input_str
-  result = invoke_immediate(cl, immediate_input=input_bytes)
-  if options.output_file:
-    return None
-  return result
+  with TempFileSaver.implicit() as tfs:
+    options = CompilerOptions(**kwargs)
+    cl = build_compile_command_line("-", tfs, options)
+    input_bytes = input_str.encode("utf-8") if isinstance(input_str,
+                                                          str) else input_str
+    result = invoke_immediate(cl, immediate_input=input_bytes)
+    if options.output_file:
+      return None
+    return result

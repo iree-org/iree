@@ -6,7 +6,11 @@
 
 #include "experimental/rocm/rocm_device.h"
 
-#include "experimental/rocm/api.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "experimental/rocm/context_wrapper.h"
 #include "experimental/rocm/descriptor_set_layout.h"
 #include "experimental/rocm/direct_command_buffer.h"
 #include "experimental/rocm/dynamic_symbols.h"
@@ -22,7 +26,7 @@
 // iree_hal_rocm_device_t
 //===----------------------------------------------------------------------===//
 
-typedef struct {
+typedef struct iree_hal_rocm_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 
@@ -144,13 +148,14 @@ static iree_hal_allocator_t *iree_hal_rocm_device_allocator(
 }
 
 static iree_status_t iree_hal_rocm_device_query_i32(
-    iree_hal_device_t *base_device, iree_string_view_t key,
-    int32_t *out_value) {
+    iree_hal_device_t *base_device, iree_string_view_t category,
+    iree_string_view_t key, int32_t *out_value) {
   // iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   *out_value = 0;
-  return iree_make_status(IREE_STATUS_NOT_FOUND,
-                          "unknown device configuration key value '%*.s'",
-                          (int)key.size, key.data);
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "unknown device configuration key value '%.*s :: %.*s'",
+      (int)category.size, category.data, (int)key.size, key.data);
 }
 
 static iree_status_t iree_hal_rocm_device_create_command_buffer(

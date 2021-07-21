@@ -6,6 +6,10 @@
 
 #include "iree/base/internal/file_io.h"
 
+#include "iree/base/config.h"
+
+#if IREE_FILE_IO_ENABLE
+
 #include <cstdlib>
 #include <cstring>
 #include <ostream>
@@ -14,7 +18,7 @@
 #include <utility>
 
 #include "iree/base/logging.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -72,3 +76,5 @@ TEST(FileIO, ReadWriteContents) {
 }  // namespace
 }  // namespace file_io
 }  // namespace iree
+
+#endif  // IREE_FILE_IO_ENABLE

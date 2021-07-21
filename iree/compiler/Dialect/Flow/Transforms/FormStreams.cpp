@@ -60,10 +60,10 @@ static inline bool usefulStreamWork(ArrayRef<Operation *> currentStreamOps) {
 // function CFG, create the streams, and then thread the streams through the CFG
 // to append additional stream work. For now, we just look at basic blocks and
 // cluster adjacent dispatches and flow ops together.
-class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
+class FormStreamsPass : public FormStreamsBase<FormStreamsPass> {
  public:
-  void runOnFunction() override {
-    for (auto &block : getFunction()) {
+  void runOnOperation() override {
+    for (auto &block : getOperation()) {
       auto streams = findStreamsInBlock(block);
       for (auto &streamOps : streams) {
         formStreamFragmentInBlock(block, std::move(streamOps));

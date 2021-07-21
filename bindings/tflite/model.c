@@ -10,7 +10,7 @@
 #include <string.h>
 
 #include "iree/base/tracing.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/vm/bytecode_module.h"
 
 static iree_status_t _TfLiteModelPrepareRuntime() {

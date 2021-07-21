@@ -38,6 +38,12 @@ class ConversionPass
                     IREE::VMVX::VMVXDialect, memref::MemRefDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-vmvx-conversion"; }
+
+  StringRef getDescription() const override {
+    return "Converts from various dialects to the VMVX dialect";
+  }
+
   void runOnOperation() override {
     auto *context = &getContext();
 
@@ -91,9 +97,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();
 }
 
-static PassRegistration<ConversionPass> pass(
-    "iree-vmvx-conversion",
-    "Converts from various dialects to the VMVX dialect");
+static PassRegistration<ConversionPass> pass;
 
 }  // namespace VMVX
 }  // namespace IREE

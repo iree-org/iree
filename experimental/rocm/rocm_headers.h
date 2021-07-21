@@ -11,6 +11,6 @@
 #error 32-bit not supported on ROCm
 #endif  // defined(IREE_PTR_SIZE_32)
 
-#include "hip/hip_runtime.h"
+#include "hip/hip_runtime.h"  // IWYU pragma: export
 
 #endif  // IREE_HAL_ROCM_ROCM_HEADERS_H_

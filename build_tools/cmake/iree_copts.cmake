@@ -5,20 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #-------------------------------------------------------------------------------
-# Abseil configuration
-#-------------------------------------------------------------------------------
-
-include(AbseilConfigureCopts)
-
-# By default Abseil strips string literals on mobile platforms, which means
-# we cannot run IREE binaries via command-line with proper options. Turn off
-# the stripping.
-# TODO(#3814): remove ABSL flags.
-if(ANDROID)
-  add_definitions(-DABSL_FLAGS_STRIP_NAMES=0)
-endif()
-
-#-------------------------------------------------------------------------------
 # C/C++ options as used within IREE
 #-------------------------------------------------------------------------------
 #
@@ -289,7 +275,7 @@ if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
-if(NOT ANDROID)
+if(NOT ANDROID AND ${IREE_ENABLE_THREADING})
   iree_select_compiler_opts(_IREE_PTHREADS_LINKOPTS
     CLANG_OR_GCC
       "-lpthread"
@@ -307,12 +293,8 @@ if(ANDROID)
 endif()
 
 iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
-  ALL
-    # TODO(benvanik): remove the ABSL usage here; we aren't abseil.
-    "${ABSL_DEFAULT_LINKOPTS}"
   CLANG_OR_GCC
     # Required by all modern software, effectively:
-    "-ldl"
     "-lm"
     ${_IREE_PTHREADS_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
@@ -327,9 +309,6 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 else()
   set(IREE_TARGET_GUI_LINKOPTS "")
 endif()
-
-# TODO(benvanik): remove the ABSL usage here; we aren't abseil.
-set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
 #-------------------------------------------------------------------------------
 # Size-optimized build flags
@@ -440,12 +419,8 @@ set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
 set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64;RISCV;NVPTX;AMDGPU"
     CACHE STRING "" FORCE)
 
-set(LLVM_ENABLE_PROJECTS "mlir" CACHE STRING "" FORCE)
+set(LLVM_ENABLE_PROJECTS "mlir;lld" CACHE STRING "" FORCE)
 set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
-
-if(IREE_USE_LINKER)
-  set(LLVM_USE_LINKER ${IREE_USE_LINKER} CACHE STRING "" FORCE)
-endif()
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
 # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
@@ -457,10 +432,6 @@ iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
 #-------------------------------------------------------------------------------
 
 if(IREE_ENABLE_EMITC)
-  set(EMITC_BUILD_EMBEDDED ON)
-  set(EMITC_ENABLE_HLO OFF)
-  set(EMITC_INCLUDE_TESTS OFF)
-
   add_definitions(-DIREE_HAVE_EMITC_DIALECT)
 endif()
 

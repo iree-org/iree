@@ -16,7 +16,6 @@
 #include <string>
 #include <type_traits>
 
-#include "iree/compiler/Conversion/init_conversions.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/tools/init_compiler_modules.h"
 #include "iree/tools/init_iree_dialects.h"
@@ -44,11 +43,6 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Translation.h"
 
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "emitc/InitDialect.h"
-#include "emitc/InitTranslation.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
-
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
                                                 llvm::cl::init("-"));
@@ -68,20 +62,13 @@ int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
   mlir::registerLLVMDialectTranslation(registry);
-#ifdef IREE_HAVE_EMITC_DIALECT
-  mlir::registerEmitCDialect(registry);
-#endif  // IREE_HAVE_EMITC_DIALECT
   mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerIreeDialects(registry);
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
   mlir::registerMlirTranslations();
-#ifdef IREE_HAVE_EMITC_DIALECT
-  mlir::registerEmitCTranslation();
-#endif  // IREE_HAVE_EMITC_DIALECT
   mlir::iree_compiler::registerIreeTranslations();
-  mlir::iree_compiler::registerLinalgToSPIRVPasses();
   // Make sure command line options are registered.
   (void)mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
 

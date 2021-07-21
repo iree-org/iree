@@ -14,6 +14,11 @@ if(NOT ${IREE_HAL_DRIVER_DYLIB})
   return()
 endif()
 
+# TODO(#4298): Separate HAL driver registration from threading.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 iree_cc_library(
   NAME
     registration

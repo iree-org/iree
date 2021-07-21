@@ -172,7 +172,9 @@ struct InsertImmutabilityPreservingStreamClones
         tiedOperand.replaceUsesWithIf(clonedOperand, [&](OpOperand &use) {
           Operation *user = use.getOwner();
           return !excludedOps.count(user) &&
-                 user->getBlock() == clonedOperand.getDefiningOp()->getBlock();
+                 user->getBlock() ==
+                     clonedOperand.getDefiningOp()->getBlock() &&
+                 clonedOperand.getDefiningOp()->isBeforeInBlock(user);
         });
         didClone = true;
       }
@@ -402,12 +404,12 @@ namespace {
 // shapex.ranked_dim(flow.dispatch.shape(%x), %const)
 // ``
 struct ConvertDimOfDispatchInputLoadToDispatchShape
-    : public OpRewritePattern<memref::DimOp> {
+    : public OpRewritePattern<tensor::DimOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(memref::DimOp op,
+  LogicalResult matchAndRewrite(tensor::DimOp op,
                                 PatternRewriter &rewriter) const override {
-    auto loadOp = op.memrefOrTensor().getDefiningOp<DispatchTensorLoadOp>();
+    auto loadOp = op.source().getDefiningOp<DispatchTensorLoadOp>();
     if (!loadOp) return failure();
 
     Optional<int64_t> constantIndex = op.getConstantIndex();
@@ -446,7 +448,7 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
         loadOp.strides().empty()) {
       return failure();
     }
-    rewriter.replaceOpWithNewOp<SubTensorOp>(
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
         loadOp, loadOp.source(), loadOp.getMixedOffsets(),
         loadOp.getMixedSizes(), loadOp.getMixedStrides());
     return success();
@@ -628,7 +630,7 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
 
 static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                                ShapedType rhsType, ValueRange rhsDynamicDims) {
-  if (lhsType.hasStaticShape() &&
+  if (lhsType.hasStaticShape() && rhsType.hasStaticShape() &&
       lhsType.getNumElements() == rhsType.getNumElements()) {
     // Static shape equivalence means we can fast-path the check.
     return true;

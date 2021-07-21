@@ -16,6 +16,14 @@ class ValueLivenessTestPass
     : public PassWrapper<ValueLivenessTestPass,
                          OperationPass<IREE::VM::FuncOp>> {
  public:
+  StringRef getArgument() const override {
+    return "test-iree-vm-value-liveness";
+  }
+
+  StringRef getDescription() const override {
+    return "Test pass used for liveness analysis";
+  }
+
   void runOnOperation() override {
     if (failed(ValueLiveness::annotateIR(getOperation()))) {
       signalPassFailure();
@@ -31,8 +39,7 @@ std::unique_ptr<OperationPass<IREE::VM::FuncOp>> createValueLivenessTestPass() {
 }  // namespace VM
 }  // namespace IREE
 
-static PassRegistration<ValueLivenessTestPass> pass(
-    "test-iree-vm-value-liveness", "Test pass used for liveness analysis");
+static PassRegistration<ValueLivenessTestPass> pass;
 
 }  // namespace iree_compiler
 }  // namespace mlir

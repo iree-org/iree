@@ -12,8 +12,8 @@ vm.module @buffer_ops {
   vm.rodata private @rodata_cmp_3xi32_b dense<[100, 201, 300]> : tensor<3xi32>
 
   // Compares some multi-element buffers. Note that comparisons are bytewise.
-  vm.export @test_compare
-  vm.func @test_compare() {
+  vm.export @test_compare attributes {emitc.exclude}
+  vm.func private @test_compare() {
     %rodata_a = vm.const.ref.rodata @rodata_cmp_3xi32_a : !vm.buffer
     %rodata_b = vm.const.ref.rodata @rodata_cmp_3xi32_b : !vm.buffer
     %rodata_a_dno = iree.do_not_optimize(%rodata_a) : !vm.buffer
@@ -32,8 +32,8 @@ vm.module @buffer_ops {
   }
 
   // Tests comparing an empty range, which should always be equal.
-  vm.export @test_compare_empty
-  vm.func @test_compare_empty() {
+  vm.export @test_compare_empty attributes {emitc.exclude}
+  vm.func private @test_compare_empty() {
     %rodata_a = vm.const.ref.rodata @rodata_cmp_3xi32_a : !vm.buffer
     %rodata_b = vm.const.ref.rodata @rodata_cmp_3xi32_b : !vm.buffer
     %rodata_a_dno = iree.do_not_optimize(%rodata_a) : !vm.buffer
@@ -53,8 +53,8 @@ vm.module @buffer_ops {
   //===--------------------------------------------------------------------===//
 
   // Tests allocating a buffer.
-  vm.export @test_alloc
-  vm.func @test_alloc() {
+  vm.export @test_alloc attributes {emitc.exclude}
+  vm.func private @test_alloc() {
     %c128 = vm.const.i32 128 : i32
     %buf = vm.buffer.alloc %c128 : !vm.buffer
     %buf_dno = iree.do_not_optimize(%buf) : !vm.buffer
@@ -67,8 +67,8 @@ vm.module @buffer_ops {
   }
 
   // Tests that zero-length buffers can be allocated.
-  vm.export @test_alloc_empty
-  vm.func @test_alloc_empty() {
+  vm.export @test_alloc_empty attributes {emitc.exclude}
+  vm.func private @test_alloc_empty() {
     %c0 = vm.const.i32 0 : i32
     %buf = vm.buffer.alloc %c0 : !vm.buffer
     %buf_dno = iree.do_not_optimize(%buf) : !vm.buffer
@@ -85,8 +85,8 @@ vm.module @buffer_ops {
   //===--------------------------------------------------------------------===//
 
   // Tests cloning a subrange of a buffer.
-  vm.export @test_clone
-  vm.func @test_clone() {
+  vm.export @test_clone attributes {emitc.exclude}
+  vm.func private @test_clone() {
     // Fetch source .rodata blob.
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
 
@@ -106,8 +106,8 @@ vm.module @buffer_ops {
   }
 
   // Tests cloning a zero-length buffer.
-  vm.export @test_clone_empty
-  vm.func @test_clone_empty() {
+  vm.export @test_clone_empty attributes {emitc.exclude}
+  vm.func private @test_clone_empty() {
     // Allocate source zero-length buffer.
     %c0 = vm.const.i32 0 : i32
     %buf0 = vm.buffer.alloc %c0 : !vm.buffer
@@ -127,8 +127,8 @@ vm.module @buffer_ops {
   }
 
   // Tests an out-of-bounds cloning subrange.
-  vm.export @fail_clone_out_of_range
-  vm.func @fail_clone_out_of_range() {
+  vm.export @fail_clone_out_of_range attributes {emitc.exclude}
+  vm.func private @fail_clone_out_of_range() {
     // Fetch source .rodata blob.
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %rodata_dno = iree.do_not_optimize(%rodata) : !vm.buffer
@@ -146,8 +146,8 @@ vm.module @buffer_ops {
   //===--------------------------------------------------------------------===//
 
   // Tests copying an entire buffer from one buffer to another.
-  vm.export @test_copy_full
-  vm.func @test_copy_full() {
+  vm.export @test_copy_full attributes {emitc.exclude}
+  vm.func private @test_copy_full() {
     // Fetch source .rodata blob.
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %rodata_length = vm.buffer.length %rodata : !vm.buffer -> i32
@@ -172,8 +172,8 @@ vm.module @buffer_ops {
   vm.rodata private @test_copy_partial_ref dense<[2]> : tensor<1xi32>
 
   // Tests copying a range of bytes from one buffer to another.
-  vm.export @test_copy_partial
-  vm.func @test_copy_partial() {
+  vm.export @test_copy_partial attributes {emitc.exclude}
+  vm.func private @test_copy_partial() {
     // Allocate target buffer.
     %c4 = vm.const.i32 4 : i32
     %buf = vm.buffer.alloc %c4 : !vm.buffer
@@ -194,8 +194,8 @@ vm.module @buffer_ops {
   }
 
   // Tests an out-of-bounds copy source.
-  vm.export @fail_copy_out_of_range_source_offset
-  vm.func @fail_copy_out_of_range_source_offset() {
+  vm.export @fail_copy_out_of_range_source_offset attributes {emitc.exclude}
+  vm.func private @fail_copy_out_of_range_source_offset() {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c128 = vm.const.i32 128 : i32
     %buf = vm.buffer.alloc %c128 : !vm.buffer
@@ -210,8 +210,8 @@ vm.module @buffer_ops {
   }
 
   // Tests an out-of-bounds copy source.
-  vm.export @fail_copy_out_of_range_source_length
-  vm.func @fail_copy_out_of_range_source_length() {
+  vm.export @fail_copy_out_of_range_source_length attributes {emitc.exclude}
+  vm.func private @fail_copy_out_of_range_source_length() {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c128 = vm.const.i32 128 : i32
     %buf = vm.buffer.alloc %c128 : !vm.buffer
@@ -227,8 +227,8 @@ vm.module @buffer_ops {
   }
 
   // Tests an out-of-bounds copy target.
-  vm.export @fail_copy_out_of_range_target_offset
-  vm.func @fail_copy_out_of_range_target_offset() {
+  vm.export @fail_copy_out_of_range_target_offset attributes {emitc.exclude}
+  vm.func private @fail_copy_out_of_range_target_offset() {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %rodata_length = vm.buffer.length %rodata : !vm.buffer -> i32
     %c8 = vm.const.i32 8 : i32
@@ -244,8 +244,8 @@ vm.module @buffer_ops {
   }
 
   // Tests an out-of-bounds copy target.
-  vm.export @fail_copy_out_of_range_target_length
-  vm.func @fail_copy_out_of_range_target_length() {
+  vm.export @fail_copy_out_of_range_target_length attributes {emitc.exclude}
+  vm.func private @fail_copy_out_of_range_target_length() {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c8 = vm.const.i32 8 : i32
     %buf = vm.buffer.alloc %c8 : !vm.buffer
@@ -266,8 +266,8 @@ vm.module @buffer_ops {
   vm.rodata private @test_fill_i16_ref dense<[0, 51966, 51966, 0]> : tensor<4xi16>
 
   // Tests filling a buffer with 16-bit values.
-  vm.export @test_fill_i16
-  vm.func @test_fill_i16() {
+  vm.export @test_fill_i16 attributes {emitc.exclude}
+  vm.func private @test_fill_i16() {
     // Allocate zeroed buffer.
     %c8 = vm.const.i32 8 : i32
     %buf = vm.buffer.alloc %c8 : !vm.buffer
@@ -292,8 +292,8 @@ vm.module @buffer_ops {
   vm.rodata private @test_fill_i16_misaligned_offset_ref dense<[0xCAFE, 0xCAFE, 0, 0]> : tensor<4xi16>
 
   // Tests that misaligned fill offsets will succeed but round down.
-  vm.export @test_fill_i16_misaligned_offset
-  vm.func @test_fill_i16_misaligned_offset() {
+  vm.export @test_fill_i16_misaligned_offset attributes {emitc.exclude}
+  vm.func private @test_fill_i16_misaligned_offset() {
     // Allocate zeroed buffer.
     %c8 = vm.const.i32 8 : i32
     %buf = vm.buffer.alloc %c8 : !vm.buffer
@@ -318,8 +318,8 @@ vm.module @buffer_ops {
   vm.rodata private @test_fill_i16_misaligned_length_ref dense<[0, 0, 0, 0]> : tensor<4xi16>
 
   // Tests that misaligned fill lengths will succeed but round down.
-  vm.export @test_fill_i16_misaligned_length
-  vm.func @test_fill_i16_misaligned_length() {
+  vm.export @test_fill_i16_misaligned_length attributes {emitc.exclude}
+  vm.func private @test_fill_i16_misaligned_length() {
     // Allocate zeroed buffer.
     %c8 = vm.const.i32 8 : i32
     %buf = vm.buffer.alloc %c8 : !vm.buffer
@@ -340,8 +340,8 @@ vm.module @buffer_ops {
   }
 
   // Tests that trying to fill .rodata will fail.
-  vm.export @fail_fill_i16_rodata
-  vm.func @fail_fill_i16_rodata() {
+  vm.export @fail_fill_i16_rodata attributes {emitc.exclude}
+  vm.func private @fail_fill_i16_rodata() {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
 
     // Permission denied:
@@ -359,8 +359,8 @@ vm.module @buffer_ops {
 
   vm.rodata private @test_load_i8_data dense<[0x00, 0x01, 0x7F, 0x80, 0xFF]> : tensor<5xui8>
 
-  vm.export @test_load_i8u
-  vm.func @test_load_i8u() {
+  vm.export @test_load_i8u attributes {emitc.exclude}
+  vm.func private @test_load_i8u() {
     %c0 = vm.const.i32 0 : i32
     %c1 = vm.const.i32 1 : i32
     %c2 = vm.const.i32 2 : i32
@@ -385,8 +385,8 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.export @test_load_i8s
-  vm.func @test_load_i8s() {
+  vm.export @test_load_i8s attributes {emitc.exclude}
+  vm.func private @test_load_i8s() {
     %c0 = vm.const.i32 0 : i32
     %c1 = vm.const.i32 1 : i32
     %c2 = vm.const.i32 2 : i32
@@ -413,8 +413,8 @@ vm.module @buffer_ops {
 
   vm.rodata private @test_load_i16_data dense<[0x0000, 0x0001, 0x7FFF, 0x8000, 0xFFFF]> : tensor<5xui16>
 
-  vm.export @test_load_i16u
-  vm.func @test_load_i16u() {
+  vm.export @test_load_i16u attributes {emitc.exclude}
+  vm.func private @test_load_i16u() {
     %c0 = vm.const.i32 0 : i32
     %c2 = vm.const.i32 2 : i32
     %c4 = vm.const.i32 4 : i32
@@ -439,8 +439,8 @@ vm.module @buffer_ops {
     vm.return
   }
 
-  vm.export @test_load_i16s
-  vm.func @test_load_i16s() {
+  vm.export @test_load_i16s attributes {emitc.exclude}
+  vm.func private @test_load_i16s() {
     %c0 = vm.const.i32 0 : i32
     %c2 = vm.const.i32 2 : i32
     %c4 = vm.const.i32 4 : i32
@@ -467,8 +467,8 @@ vm.module @buffer_ops {
 
   vm.rodata private @test_load_i32_data dense<[0x00000000, 0x00000001, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF]> : tensor<5xui32>
 
-  vm.export @test_load_i32
-  vm.func @test_load_i32() {
+  vm.export @test_load_i32 attributes {emitc.exclude}
+  vm.func private @test_load_i32() {
     %c0 = vm.const.i32 0 : i32
     %c4 = vm.const.i32 4 : i32
     %c8 = vm.const.i32 8 : i32
@@ -496,8 +496,8 @@ vm.module @buffer_ops {
   vm.rodata private @test_load_i32_unaligned_data dense<[0x00112233, 0x44556677, 0x8899AABB, 0xCCDDEEFF]> : tensor<4xui32>
 
   // Unaligned loads are not supported and offsets will be rounded down.
-  vm.export @test_load_i32_unaligned
-  vm.func @test_load_i32_unaligned() {
+  vm.export @test_load_i32_unaligned attributes {emitc.exclude}
+  vm.func private @test_load_i32_unaligned() {
     %rodata = vm.const.ref.rodata @test_load_i32_unaligned_data : !vm.buffer
 
     // Byte offset 5 rounded to byte offset 4 (element 1).
@@ -515,8 +515,8 @@ vm.module @buffer_ops {
 
   vm.rodata private @test_store_i8_ref dense<[0x00, 0x01, 0x7F, 0x80, 0xFF]> : tensor<5xui8>
 
-  vm.export @test_store_i8
-  vm.func @test_store_i8() {
+  vm.export @test_store_i8 attributes {emitc.exclude}
+  vm.func private @test_store_i8() {
     %ref = vm.const.ref.rodata @test_store_i8_ref : !vm.buffer
     %ref_dno = iree.do_not_optimize(%ref) : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i32
@@ -548,8 +548,8 @@ vm.module @buffer_ops {
 
   vm.rodata private @test_store_i16_ref dense<[0x0000, 0x0001, 0x7FFF, 0x8000, 0xFFFF]> : tensor<5xui16>
 
-  vm.export @test_store_i16
-  vm.func @test_store_i16() {
+  vm.export @test_store_i16 attributes {emitc.exclude}
+  vm.func private @test_store_i16() {
     %ref = vm.const.ref.rodata @test_store_i16_ref : !vm.buffer
     %ref_dno = iree.do_not_optimize(%ref) : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i32
@@ -581,8 +581,8 @@ vm.module @buffer_ops {
 
   vm.rodata private @test_store_i32_ref dense<[0x00000000, 0x00000001, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF]> : tensor<5xui32>
 
-  vm.export @test_store_i32
-  vm.func @test_store_i32() {
+  vm.export @test_store_i32 attributes {emitc.exclude}
+  vm.func private @test_store_i32() {
     %ref = vm.const.ref.rodata @test_store_i32_ref : !vm.buffer
     %ref_dno = iree.do_not_optimize(%ref) : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i32
@@ -613,8 +613,8 @@ vm.module @buffer_ops {
   }
 
   // Unaligned stores are not supported and offsets will be rounded down.
-  vm.export @test_store_i32_unaligned
-  vm.func @test_store_i32_unaligned() {
+  vm.export @test_store_i32_unaligned attributes {emitc.exclude}
+  vm.func private @test_store_i32_unaligned() {
     %c12 = vm.const.i32 12 : i32
     %buf = vm.buffer.alloc %c12 : !vm.buffer
     %buf_dno = iree.do_not_optimize(%buf) : !vm.buffer

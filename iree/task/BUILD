@@ -4,10 +4,22 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+# Task-based executor requires threading support.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+""",
+    inline = True,
 )
 
 cc_library(
@@ -36,6 +48,7 @@ cc_library(
         "task.c",
         "task_impl.h",
         "topology.c",
+        "topology_cpuinfo.c",
         "worker.c",
         "worker.h",
     ],
@@ -49,6 +62,7 @@ cc_library(
         "submission.h",
         "task.h",
         "topology.h",
+        "topology_cpuinfo.h",
         "tuning.h",
     ],
     deps = [
@@ -152,6 +166,17 @@ cc_test(
 cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
+    deps = [
+        ":task",
+        "//iree/base",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "topology_cpuinfo_test",
+    srcs = ["topology_cpuinfo_test.cc"],
     tags = [
         "noasan",  # TODO(benvanik): Does not work on machines with large numbers of cores.
     ],
@@ -160,6 +185,5 @@ cc_test(
         "//iree/base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
-        "@cpuinfo",
     ],
 )

@@ -24,7 +24,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-riscv@sha256:a09ff1e6ab65a436822894acf58ef6c4cbc523581960e918a07ddf4a46c8af95 \
+  gcr.io/iree-oss/cmake-riscv@sha256:95489593bc9b0cd325ce9c1a32b47389c01b174a5b8190a16d937d2e8828d384 \
   build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

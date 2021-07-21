@@ -8,7 +8,7 @@
 #include "bindings/python/iree/runtime/hal.h"
 #include "bindings/python/iree/runtime/status_utils.h"
 #include "bindings/python/iree/runtime/vm.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/drivers/init.h"
 
 namespace iree {

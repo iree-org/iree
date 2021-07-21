@@ -13,18 +13,19 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
-#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListOps.h"
+#include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/tools/init_xla_dialects.h"
 #include "iree_tf_compiler/MHLO/Passes.h"
 #include "iree_tf_compiler/TF/Passes.h"
-#include "iree_tf_compiler/dialect/tf_strings/ir/dialect.h"
-#include "iree_tf_compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
 #include "llvm/Support/InitLLVM.h"
+#include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
+#include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
@@ -33,15 +34,15 @@ int main(int argc, char **argv) {
   mlir::registerXLADialects(registry);
   registry.insert<mlir::iree_compiler::IREE::Flow::FlowDialect,
                   mlir::iree_compiler::IREE::HAL::HALDialect,
-                  mlir::iree_compiler::IREEDialect,
-                  mlir::iree_compiler::IREE::Strings::StringsDialect,
-                  mlir::iree_compiler::IREE::TensorList::TensorListDialect>();
-  registry.insert<mlir::iree_integrations::tf_strings::TFStringsDialect>();
-  registry
-      .insert<mlir::iree_integrations::tf_tensorlist::TFTensorListDialect>();
+                  mlir::iree_compiler::IREEDialect>();
 
+  // Select IREE input passes.
+  mlir::iree_compiler::registerCommonInputConversionPasses();
+  mlir::iree_compiler::registerMHLOConversionPasses();
+  mlir::iree_compiler::registerTOSAConversionPasses();
+
+  // TensorFlow integration passes.
   mlir::RegisterAllTensorFlowDialects(registry);
-  mlir::iree_integrations::TF::registerAllDialects(registry);
   mlir::iree_integrations::TF::registerAllPasses();
   mlir::iree_integrations::MHLO::registerAllPasses();
 
@@ -49,6 +50,19 @@ int main(int argc, char **argv) {
   mlir::registerCanonicalizerPass();
   mlir::registerCSEPass();
   mlir::registerInlinerPass();
+  mlir::registerRemoveShapeConstraintsPass();
+  mlir::registerSymbolDCEPass();
+
+  // Select TF passes.
+  mlir::registerExecutorGraphPruningPassPass();
+  mlir::registerTensorFlowShapeInferencePassPass();
+  mlir::registerTensorFlowOptimizePassPass();
+  mlir::TFDevice::registerDecomposeResourceOpsPassPass();
+
+  // Old style static registration based TF passes.
+  mlir::TF::CreateDeviceIndexSelectorPass();
+  mlir::TF::CreateGuaranteeAllFuncsOneUsePass();
+  mlir::TF::CreateTFFunctionalControlFlowToCFG();
 
   if (failed(MlirOptMain(argc, argv, "IREE-TF modular optimizer driver\n",
                          registry,

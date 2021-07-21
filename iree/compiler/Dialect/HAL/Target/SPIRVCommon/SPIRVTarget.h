@@ -9,7 +9,7 @@
 
 #include <string>
 
-#include "iree/compiler/Conversion/LinalgToSPIRV/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -24,9 +24,9 @@ class SPIRVTargetBackend : public TargetBackend {
  public:
   explicit SPIRVTargetBackend(SPIRVCodegenOptions options);
 
-  void declareTargetOpsForEnv(IREE::Flow::ExecutableOp sourceOp,
-                              IREE::HAL::ExecutableOp executableOp,
-                              spirv::TargetEnvAttr spvTargetEnv);
+  void declareVariantOpsForEnv(IREE::Flow::ExecutableOp sourceOp,
+                               IREE::HAL::ExecutableOp executableOp,
+                               spirv::TargetEnvAttr spvTargetEnv);
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override;
 

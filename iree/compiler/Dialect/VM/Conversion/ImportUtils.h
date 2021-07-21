@@ -43,9 +43,9 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
 // Automatically handles type conversion and special logic for variadic operands
 // and special types (such as ranked shape).
 template <typename T, typename Adaptor = typename T::Adaptor>
-LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
-                            TypeConverter &typeConverter,
-                            ConversionPatternRewriter &rewriter) {
+Optional<SmallVector<Value>> rewriteToCall(
+    T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
+    TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
   auto *operation = op.getOperation();
   bool isOpVariadic = importOp.isVariadic();
   OperationState state{
@@ -57,7 +57,7 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
   auto importType = importOp.getType();
   for (auto resultType : operation->getResultTypes()) {
     if (failed(typeConverter.convertType(resultType, state.types))) {
-      return failure();
+      return None;
     }
   }
 
@@ -69,7 +69,7 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
     if (auto attrValue = op->getAttr(inputName)) {
       auto flattenedAttrs = detail::rewriteAttrToOperands(
           op.getLoc(), attrValue, inputType, rewriter);
-      if (!flattenedAttrs) return failure();
+      if (!flattenedAttrs) return None;
       state.addOperands(*flattenedAttrs);
       if (importOp.isFuncArgumentVariadic(input.index())) {
         segmentSizes.push_back(flattenedAttrs->size() /
@@ -123,8 +123,7 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
   }
 
   auto *callOp = rewriter.createOperation(state);
-  rewriter.replaceOp(op, callOp->getResults());
-  return success();
+  return SmallVector<Value>(callOp->getResults());
 }
 
 // Utility for op to vm.call conversion.
@@ -141,8 +140,11 @@ class VMImportOpConversion : public OpConversionPattern<T> {
   LogicalResult matchAndRewrite(
       T op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    return rewriteToCall(op, Adaptor{operands}, importOp,
-                         *this->getTypeConverter(), rewriter);
+    auto results = rewriteToCall(op, Adaptor{operands}, importOp,
+                                 *this->getTypeConverter(), rewriter);
+    if (!results.hasValue()) return failure();
+    rewriter.replaceOp(op, results.getValue());
+    return success();
   }
 
  protected:

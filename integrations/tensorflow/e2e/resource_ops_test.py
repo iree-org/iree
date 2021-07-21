@@ -20,6 +20,14 @@ class ResourcesOpsModule(tf.Module):
   def add_assign(self, value):
     return self.counter.assign_add(value)
 
+  @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
+  def set_value(self, new_value):
+    self.counter.assign(new_value)
+
+  @tf.function(input_signature=[])
+  def get_value(self):
+    return self.counter
+
 
 class ResourcesOpsTest(tf_test_utils.TracedModuleTestCase):
 
@@ -33,6 +41,14 @@ class ResourcesOpsTest(tf_test_utils.TracedModuleTestCase):
       module.add_assign(np.array(9., dtype=np.float32))
 
     self.compare_backends(add_assign, self._modules)
+
+  def test_assign_get(self):
+
+    def assign_get(module):
+      module.set_value(np.array(9., dtype=np.float32))
+      return module.get_value()
+
+    self.compare_backends(assign_get, self._modules)
 
 
 def main(argv):

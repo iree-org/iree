@@ -11,7 +11,7 @@ is very preliminary. The description of this is not covered here.
 ## Input to the codegen pipeline
 
 The input to the code generation pipeline is the module within the
-`hal.executable.target` operation. Functions within this module that do __not__
+`hal.executable.variant` operation. Functions within this module that do __not__
 have `Visibility::Private` are the *entry point* functions of the dispatch
 region. These are the functions that are *invoked* by the IREE runtime. In
 addition, each dispatch region also contains a `hal.interface` operation that
@@ -22,7 +22,7 @@ region creation has grouped into a single region. Ideally the grouped operations
 are fused into a single kernel.
 
 ```mlir
-hal.executable.target "vulkan*" {
+hal.executable.variant "vulkan*" {
   module attributes {spv.target_env = ...} {
     func @main_ex_dispatch() {
       %c0 = constant 0 : index
@@ -52,7 +52,7 @@ hal.executable.target "vulkan*" {
 operation.
 
 ```mlir
-hal.executable.target "vulkan*" {
+hal.executable.variant "vulkan*" {
   module attributes {spv.target_env = ...} {
     func @main_ex_dispatch() {
       %c0 = constant 0 : index
@@ -373,7 +373,7 @@ func @main_ex_dispatch_0()
          {binding = @legacy_io::@arg0} : memref<32x24xf32>
   %2 = iree.placeholder for "interface buffer"
          {binding = @legacy_io::@arg1} : memref<24x16xf32>
-  linalg.fill(%0, %cst) : memref<32x16xf32>, f32
+  linalg.fill(%cst, %0) : f32, memref<32x16xf32>
   scf.parallel (%arg0, %arg1) = (%c0, %c0) to (%c32, %c16) step (%c8, %c8) {
     scf.for %arg2 = %c0 to %24 step %c4 {
       ...

@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "Builders.h"
     "ShapeDialect.h"
-    "ShapeInterface.h"
     "ShapeInterfaces.h.inc"
     "ShapeOps.h"
     "ShapeOps.h.inc"
@@ -25,12 +24,13 @@ iree_cc_library(
     "Builders.cpp"
     "Folders.cpp"
     "ShapeDialect.cpp"
-    "ShapeInterface.cpp"
     "ShapeInterfaces.cpp.inc"
     "ShapeOps.cpp"
     "ShapeOps.cpp.inc"
     "ShapeTypes.cpp"
   DEPS
+    ::ShapeInterfacesGen
+    ::ShapeOpsGen
     LLVMSupport
     MLIRControlFlowInterfaces
     MLIRIR

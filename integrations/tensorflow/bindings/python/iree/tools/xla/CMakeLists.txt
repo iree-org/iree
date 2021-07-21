@@ -4,11 +4,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(_srcs
+  "__init__.py"
+  "scripts/iree_import_xla/__main__.py"
+)
+
 iree_py_library(
   NAME
     xla
-  SRCS
-    "__init__.py"
+  SRCS ${_srcs}
   DEPS
     iree_tf_compiler_iree-import-xla
 )
@@ -23,6 +27,7 @@ iree_py_install_package(
   COMPONENT IreePythonPackage-tools-xla
   PACKAGE_NAME iree_tools_xla
   MODULE_PATH iree/tools/xla
+  FILES_MATCHING ${_srcs}
   DEPS
     iree_tf_compiler_iree-import-xla
 )

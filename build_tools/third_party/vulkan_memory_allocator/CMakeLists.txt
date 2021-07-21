@@ -14,7 +14,7 @@ external_cc_library(
   ROOT
     ${VMA_ROOT}
   HDRS
-    "src/vk_mem_alloc.h"
+    "include/vk_mem_alloc.h"
   INCLUDES
-    "${VMA_ROOT}/src/"
+    "${VMA_ROOT}/include/"
 )

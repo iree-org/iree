@@ -20,6 +20,8 @@ struct ROCMTargetOptions {
   std::string ROCMTargetChip;
   // Whether to try Linking to AMD Bitcodes
   bool ROCMLinkBC;
+  // AMD Bitcodes Directory
+  std::string ROCMBitcodeDir;
 };
 
 ROCMTargetOptions getROCMTargetOptionsFromFlags();
@@ -29,7 +31,8 @@ void registerROCMTargetBackends(
     std::function<ROCMTargetOptions()> queryOptions);
 
 // Links LLVM module to ROC Device Library Bit Code
-void LinkROCDLIfNecessary(llvm::Module *module, std::string targetChip);
+void LinkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
+                          std::string bitCodeDir);
 
 // Compiles ISAToHsaco Code
 std::string createHsaco(const std::string isa, StringRef name);

@@ -7,7 +7,8 @@
 #ifndef IREE_BINDINGS_PYTHON_IREE_RT_VM_H_
 #define IREE_BINDINGS_PYTHON_IREE_RT_VM_H_
 
-#include "absl/types/optional.h"
+#include <optional>
+
 #include "bindings/python/iree/runtime/binding.h"
 #include "bindings/python/iree/runtime/hal.h"
 #include "iree/base/api.h"
@@ -98,6 +99,7 @@ class VmVariantList {
   py::object GetAsList(int index);
   py::object GetAsNdarray(int index);
   py::object GetVariant(int index);
+  py::object GetAsSerializedTraceValue(int index);
 
  private:
   VmVariantList(iree_vm_list_t* list) : list_(list) {}
@@ -115,15 +117,21 @@ class VmInstance : public ApiRefCounted<VmInstance, iree_vm_instance_t> {
 
 class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
  public:
-  static VmModule FromFlatbufferBlob(py::buffer flatbuffer_blob);
+  static VmModule FromFlatbufferBlob(py::object flatbuffer_blob_object);
 
-  absl::optional<iree_vm_function_t> LookupFunction(
+  std::optional<iree_vm_function_t> LookupFunction(
       const std::string& name, iree_vm_function_linkage_t linkage);
 
   std::string name() const {
     auto name_sv = iree_vm_module_name(raw_ptr());
     return std::string(name_sv.data, name_sv.size);
   }
+
+  py::object get_stashed_flatbuffer_blob() { return stashed_flatbuffer_blob; }
+
+ private:
+  // If the module was created from a flatbuffer blob, we stash it here.
+  py::object stashed_flatbuffer_blob = py::none();
 };
 
 class VmContext : public ApiRefCounted<VmContext, iree_vm_context_t> {
@@ -132,7 +140,7 @@ class VmContext : public ApiRefCounted<VmContext, iree_vm_context_t> {
   // static, disallowing further module registration (and may be more
   // efficient).
   static VmContext Create(VmInstance* instance,
-                          absl::optional<std::vector<VmModule*>> modules);
+                          std::optional<std::vector<VmModule*>> modules);
 
   // Registers additional modules. Only valid for non static contexts (i.e.
   // those created without modules.

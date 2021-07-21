@@ -19,7 +19,7 @@ function cleanup() {
 
 echo "Creating test environment"
 rm -rf "${TEST_TMPDIR?}" # In case this wasn't cleaned up previously
-mkdir "${TEST_TMPDIR?}"
+mkdir -p "${TEST_TMPDIR?}"
 trap cleanup EXIT
 # Execute whatever we were passed.
 "$@"

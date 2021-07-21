@@ -46,6 +46,12 @@ class ConvertToHALPass
     registry.insert<StandardOpsDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-convert-to-hal"; }
+
+  StringRef getDescription() const override {
+    return "Convert input flow/std/etc dialects to the IREE HAL dialect.";
+  }
+
   void runOnOperation() override {
     auto *context = &getContext();
 
@@ -103,9 +109,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
   return std::make_unique<ConvertToHALPass>();
 }
 
-static PassRegistration<ConvertToHALPass> pass(
-    "iree-convert-to-hal",
-    "Convert input flow/std/etc dialects to the IREE HAL dialect.");
+static PassRegistration<ConvertToHALPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

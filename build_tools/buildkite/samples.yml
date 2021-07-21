@@ -1,0 +1,22 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+steps:
+  - label: "Test Colab notebooks"
+    commands:
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:be5465585706b620d6c722caa6237eafdfaa8dd11ce20db0981b979f2d3387b3 python3 colab/test_notebooks.py"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"
+
+  - label: "Test Samples"
+    commands:
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:be5465585706b620d6c722caa6237eafdfaa8dd11ce20db0981b979f2d3387b3 build_tools/testing/test_samples.sh"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"

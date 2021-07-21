@@ -6,8 +6,6 @@
 
 #include "bindings/python/iree/runtime/status_utils.h"
 
-#include "absl/strings/str_cat.h"
-
 namespace iree {
 namespace python {
 
@@ -36,12 +34,12 @@ pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
   char* iree_message;
   size_t iree_message_length;
   if (iree_status_to_string(status, &iree_message, &iree_message_length)) {
-    full_message = absl::StrCat(
-        message, ": ", absl::string_view(iree_message, iree_message_length));
+    full_message = std::string(message) + ": " +
+                   std::string(iree_message, iree_message_length);
     iree_allocator_free(iree_allocator_system(), iree_message);
   } else {
-    full_message = absl::StrCat(
-        message, ": ", iree_status_code_string(iree_status_code(status)));
+    full_message = std::string(message) + ": " +
+                   iree_status_code_string(iree_status_code(status));
   }
 
   PyErr_SetString(ApiStatusToPyExcClass(status), full_message.c_str());

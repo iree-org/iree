@@ -17,6 +17,11 @@ iree_cmake_extra_content(
 if(NOT ${IREE_HAL_DRIVER_DYLIB})
   return()
 endif()
+
+# TODO(#4298): Separate HAL driver registration from threading.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
 """,
     inline = True,
 )

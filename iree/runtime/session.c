@@ -13,7 +13,7 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/runtime/instance.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"

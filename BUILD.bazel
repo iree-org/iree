@@ -9,8 +9,6 @@
 # matching.
 #
 #  "@absl_py//absl/"
-#  "@com_google_absl//absl/"
-#  "@com_google_absl//absl/"
 #  "@bazel_skylib//"
 #  "@com_google_benchmark//"
 #  "@cpuinfo//"
@@ -20,10 +18,10 @@
 #  "@llvm-project//"
 #  "@mlir-hlo//"
 #  "@iree_pybind11//"
-#  "@renderdoc_api//"
 #  "@spirv_cross//"
 #  "@com_google_tracing_framework_cpp//"
 #  "@iree_vulkan_headers//"
+#  "@com_github_yaml_libyaml//"
 
 package(
     default_visibility = ["//visibility:public"],

@@ -106,7 +106,7 @@ func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_s
 // -----
 
 // TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
-//   - If there is no matching hal.executable.target then the executable will not be cached
+//   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
   hal.interface @interface0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -117,7 +117,7 @@ hal.executable @exe {
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2, set=0, binding=2, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @vmvx, filter="vmvx" {
+  hal.executable.variant @vmvx, target="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface0,
       ordinal = 0 : index,
@@ -143,9 +143,9 @@ hal.executable @exe {
 
 // CHECK: hal.variable @_executable_exe init(@_executable_exe_initializer) : !hal.executable
 // CHECK: func private @_executable_exe_initializer() -> !hal.executable {
-// CHECK:   %[[IN_DEV:.+]] = hal.ex.shared_device : !hal.device
-// CHECK:   %[[RET:.+]] = hal.device.switch<%[[IN_DEV]] : !hal.device> -> !hal.executable
-// CHECK:   #hal.device.match.id<"vmvx">(%[[DEV:.+]] = %[[IN_DEV]] : !hal.device) {
+// CHECK:   %[[DEV:.+]] = hal.ex.shared_device : !hal.device
+// CHECK:   %[[RET:.+]] = hal.device.switch<%[[DEV]] : !hal.device> -> !hal.executable
+// CHECK:   #hal.device.match.id<"vmvx"> {
 // CHECK:     %[[LAYOUT0:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
 // CHECK:     %[[LAYOUT0_2:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
 // CHECK:     %[[LAYOUT1:.+]] = hal.variable.load @_executable_layout_1 : !hal.executable_layout
@@ -156,7 +156,7 @@ hal.executable @exe {
 // CHECK-SAME:  : !hal.executable
 // CHECK:     hal.return %[[EXE]] : !hal.executable
 // CHECK:   },
-// CHECK:   #hal.match.always() {
+// CHECK:   #hal.match.always {
 // CHECK:     %[[NULL:.+]] = iree.null : !hal.executable
 // CHECK:     hal.return %[[NULL]] : !hal.executable
 // CHECK:   }

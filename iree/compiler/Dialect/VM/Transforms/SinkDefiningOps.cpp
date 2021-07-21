@@ -26,6 +26,12 @@ namespace VM {
 class SinkDefiningOpsPass
     : public PassWrapper<SinkDefiningOpsPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override { return "iree-vm-sink-defining-ops"; }
+
+  StringRef getDescription() const override {
+    return "Sinks defining ops with few uses to their use-sites.";
+  }
+
   void runOnOperation() override {
     for (auto funcOp : getOperation().getOps<FuncOp>()) {
       DominanceInfo domInfo(funcOp);
@@ -83,9 +89,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createSinkDefiningOpsPass() {
   return std::make_unique<SinkDefiningOpsPass>();
 }
 
-static PassRegistration<SinkDefiningOpsPass> pass(
-    "iree-vm-sink-defining-ops",
-    "Sinks defining ops with few uses to their use-sites.");
+static PassRegistration<SinkDefiningOpsPass> pass;
 
 }  // namespace VM
 }  // namespace IREE

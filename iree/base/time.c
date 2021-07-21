@@ -14,7 +14,9 @@
 #include "iree/base/target_platform.h"
 
 IREE_API_EXPORT iree_time_t iree_time_now(void) {
-#if defined(IREE_PLATFORM_WINDOWS)
+#if defined(IREE_TIME_NOW_FN)
+  IREE_TIME_NOW_FN
+#elif defined(IREE_PLATFORM_WINDOWS)
   // GetSystemTimePreciseAsFileTime requires Windows 8, add a fallback
   // (such as using std::chrono) if older support is needed.
   FILETIME system_time;
@@ -29,7 +31,7 @@ IREE_API_EXPORT iree_time_t iree_time_now(void) {
   li.QuadPart /= kFtToMicroSec;
   return li.QuadPart;
 #elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
-    defined(IREE_PLATFORM_LINUX)
+    defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_EMSCRIPTEN)
   struct timespec clock_time;
   clock_gettime(CLOCK_REALTIME, &clock_time);
   return clock_time.tv_nsec;

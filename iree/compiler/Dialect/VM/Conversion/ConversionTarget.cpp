@@ -12,6 +12,10 @@ namespace iree_compiler {
 // static
 std::pair<mlir::ModuleOp, mlir::ModuleOp>
 VMConversionTarget::nestModuleForConversion(mlir::ModuleOp outerModuleOp) {
+  if (isa<IREE::VM::ModuleOp>(outerModuleOp.getBody()->front())) {
+    // Already have a VM module; no need for the nesting.
+    return std::make_pair(outerModuleOp, outerModuleOp);
+  }
   auto innerModuleOp = dyn_cast<ModuleOp>(outerModuleOp.getBody()->front());
   if (!innerModuleOp) {
     innerModuleOp =

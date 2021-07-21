@@ -16,6 +16,14 @@ class RegisterAllocationTestPass
     : public PassWrapper<RegisterAllocationTestPass,
                          OperationPass<IREE::VM::FuncOp>> {
  public:
+  StringRef getArgument() const override {
+    return "test-iree-vm-register-allocation";
+  }
+
+  StringRef getDescription() const override {
+    return "Test pass used for register allocation";
+  }
+
   void runOnOperation() override {
     if (failed(RegisterAllocation::annotateIR(getOperation()))) {
       signalPassFailure();
@@ -32,9 +40,7 @@ createRegisterAllocationTestPass() {
 }  // namespace VM
 }  // namespace IREE
 
-static PassRegistration<RegisterAllocationTestPass> pass(
-    "test-iree-vm-register-allocation",
-    "Test pass used for register allocation");
+static PassRegistration<RegisterAllocationTestPass> pass;
 
 }  // namespace iree_compiler
 }  // namespace mlir

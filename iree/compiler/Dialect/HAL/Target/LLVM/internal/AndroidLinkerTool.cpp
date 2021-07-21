@@ -99,23 +99,6 @@ class AndroidLinkerTool : public LinkerTool {
         .str();
   }
 
-  LogicalResult configureModule(
-      llvm::Module *llvmModule,
-      ArrayRef<llvm::Function *> exportedFuncs) override {
-    for (auto &func : *llvmModule) {
-      // Enable frame pointers to ensure that stack unwinding works, e.g. in
-      // Tracy. In principle this could also be achieved by enabling unwind
-      // tables, but we tried that and that didn't work in Tracy (which uses
-      // libbacktrace), while enabling frame pointers worked.
-      // https://github.com/google/iree/issues/3957
-      func.addFnAttr("frame-pointer", "all");
-
-      // -ffreestanding-like behavior.
-      func.addFnAttr("no-builtins");
-    }
-    return success();
-  }
-
   Optional<Artifacts> linkDynamicLibrary(
       StringRef libraryName, ArrayRef<Artifact> objectFiles) override {
     Artifacts artifacts;

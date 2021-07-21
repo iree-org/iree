@@ -21,9 +21,9 @@ iree_cc_library(
     "driver_module.cc"
   DEPS
     iree::base
+    iree::base::cc
     iree::base::core_headers
     iree::base::internal::flags
-    iree::base::status
     iree::base::tracing
     iree::hal
     iree::hal::vulkan

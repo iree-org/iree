@@ -5,12 +5,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+from typing import Optional
+
 import json
 import logging
 
 import numpy as np
 
 from .binding import HalDevice, HalElementType, VmContext, VmFunction, VmVariantList
+from . import tracing
 
 __all__ = [
     "FunctionInvoker",
@@ -64,16 +67,19 @@ class FunctionInvoker:
       "_arg_descs",
       "_ret_descs",
       "_has_kwargs",
+      "_tracer",
   ]
 
   def __init__(self, vm_context: VmContext, device: HalDevice,
-               vm_function: VmFunction):
+               vm_function: VmFunction,
+               tracer: Optional[tracing.ContextTracer]):
     self._vm_context = vm_context
     # TODO: Needing to know the precise device to allocate on here is bad
     # layering and will need to be fixed in some fashion if/when doing
     # heterogenous dispatch.
     self._device = device
     self._vm_function = vm_function
+    self._tracer = tracer
     self._abi_dict = None
     self._arg_descs = None
     self._ret_descs = None
@@ -85,6 +91,10 @@ class FunctionInvoker:
     return self._vm_function
 
   def __call__(self, *args, **kwargs):
+    call_trace = None  # type: Optional[tracing.CallTrace]
+    if self._tracer:
+      call_trace = self._tracer.start_call(self._vm_function)
+
     # Initialize the capacity to our total number of args, since we should
     # be below that when doing a flat invocation. May want to be more
     # conservative here when considering nesting.
@@ -105,8 +115,14 @@ class FunctionInvoker:
     arg_list = VmVariantList(len(args))
     ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
     _merge_python_sequence_to_vm(inv, arg_list, args, self._arg_descs)
+    if call_trace:
+      call_trace.add_vm_list(arg_list, "args")
     self._vm_context.invoke(self._vm_function, arg_list, ret_list)
+    if call_trace:
+      call_trace.add_vm_list(ret_list, "results")
     returns = _extract_vm_sequence_to_python(inv, ret_list, ret_descs)
+    if call_trace:
+      call_trace.end_call()
     return_arity = len(returns)
     if return_arity == 1:
       return returns[0]
@@ -255,6 +271,10 @@ def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   t.push_buffer_view(inv.device, x, element_type)
 
 
+def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
+  return _ndarray_to_vm(inv, t, np.asarray(x), desc)
+
+
 PYTHON_TO_VM_CONVERTERS = {
     bool: _bool_to_vm,
     int: _int_to_vm,
@@ -318,6 +338,7 @@ ABI_TYPE_TO_DTYPE = {
     "i32": np.int32,
     "i64": np.int64,
     "f64": np.float64,
+    "i16": np.int16,
     "i1": np.bool_,
 }
 
@@ -341,9 +362,13 @@ DTYPE_TO_HAL_ELEMENT_TYPE = (
 )
 
 
+def _is_ndarray_descriptor(desc):
+  return desc and desc[0] == "ndarray"
+
+
 def _is_0d_ndarray_descriptor(desc):
   # Example: ["ndarray", "f32", 0]
-  return desc[0] == "ndarray" and desc[2] == 0
+  return desc and desc[0] == "ndarray" and desc[2] == 0
 
 
 def _cast_scalar_to_ndarray(inv: Invocation, x, desc):
@@ -356,7 +381,9 @@ def _cast_scalar_to_ndarray(inv: Invocation, x, desc):
   return dtype(x)
 
 
-def _raise_argument_error(inv: Invocation, summary: str, e: Exception = None):
+def _raise_argument_error(inv: Invocation,
+                          summary: str,
+                          e: Optional[Exception] = None):
   new_e = ValueError(f"Error passing argument: {summary} "
                      f"(while encoding argument {inv.summarize_arg_error()})")
   if e:
@@ -365,7 +392,9 @@ def _raise_argument_error(inv: Invocation, summary: str, e: Exception = None):
     raise new_e
 
 
-def _raise_return_error(inv: Invocation, summary: str, e: Exception = None):
+def _raise_return_error(inv: Invocation,
+                        summary: str,
+                        e: Optional[Exception] = None):
   new_e = ValueError(f"Error processing function return: {summary} "
                      f"(while decoding return {inv.summarize_return_error()})")
   if e:
@@ -386,10 +415,18 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
     inv.current_arg = py_value
     inv.current_desc = desc
     py_type = py_value.__class__
-    try:
-      converter = PYTHON_TO_VM_CONVERTERS[py_type]
-    except KeyError:
-      _raise_argument_error(inv, f"cannot map Python type to VM: {py_type}")
+
+    # For ndarray, we want to be able to handle array-like, so check for that
+    # explicitly (duck typed vs static typed).
+    if _is_ndarray_descriptor(desc):
+      converter = _ndarray_like_to_vm
+    else:
+      try:
+        converter = PYTHON_TO_VM_CONVERTERS[py_type]
+      except KeyError:
+        _raise_argument_error(
+            inv, f"cannot map Python type to VM: {py_type}"
+            f" (for desc {desc})")
     try:
       converter(inv, vm_list, py_value, desc)
     except Exception as e:

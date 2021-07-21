@@ -16,13 +16,21 @@ namespace HAL {
 
 class PropagateConstantWorkgroupInfoPass
     : public PassWrapper<PropagateConstantWorkgroupInfoPass,
-                         OperationPass<IREE::HAL::ExecutableTargetOp>> {
+                         OperationPass<IREE::HAL::ExecutableVariantOp>> {
  public:
-  void runOnOperation() override {
-    auto targetOp = getOperation();
+  StringRef getArgument() const override {
+    return "iree-hal-propagate-constant-workgroup-info";
+  }
 
-    SymbolTable targetSymbolTable(targetOp);
-    for (auto funcOp : targetOp.getInnerModule().getOps<FuncOp>()) {
+  StringRef getDescription() const override {
+    return "Propagates constant hal.interface.workgroup.* queries when known";
+  }
+
+  void runOnOperation() override {
+    auto variantOp = getOperation();
+
+    SymbolTable targetSymbolTable(variantOp);
+    for (auto funcOp : variantOp.getInnerModule().getOps<FuncOp>()) {
       auto entryPointOp =
           targetSymbolTable.lookup<IREE::HAL::ExecutableEntryPointOp>(
               funcOp.getName());
@@ -45,14 +53,12 @@ class PropagateConstantWorkgroupInfoPass
   }
 };
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableTargetOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createPropagateConstantWorkgroupInfoPass() {
   return std::make_unique<PropagateConstantWorkgroupInfoPass>();
 }
 
-static PassRegistration<PropagateConstantWorkgroupInfoPass> pass(
-    "iree-hal-propagate-constant-workgroup-info",
-    "Propagates constant hal.interface.workgroup.* queries when known");
+static PassRegistration<PropagateConstantWorkgroupInfoPass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

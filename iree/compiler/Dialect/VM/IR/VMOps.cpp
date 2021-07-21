@@ -122,6 +122,29 @@ LogicalResult FuncOp::verifyType() {
   return success();
 }
 
+void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
+  // TODO(benvanik): remove reflection attrs as a concept and use something more
+  // MLIRish like an attribute interface/dialect interface.
+  // DictionaryAttr is not very friendly for modification :/
+  auto existingAttr =
+      getOperation()->getAttrOfType<DictionaryAttr>("iree.reflection");
+  SmallVector<NamedAttribute> attrs(existingAttr.begin(), existingAttr.end());
+  bool didFind = false;
+  for (size_t i = 0; i < attrs.size(); ++i) {
+    if (attrs[i].first == name) {
+      attrs[i].second = value;
+      didFind = true;
+      break;
+    }
+  }
+  if (!didFind) {
+    attrs.push_back(NamedAttribute(Identifier::get(name, getContext()), value));
+    DictionaryAttr::sortInPlace(attrs);
+  }
+  getOperation()->setAttr("iree.reflection",
+                          DictionaryAttr::getWithSorted(getContext(), attrs));
+}
+
 static ParseResult parseExportOp(OpAsmParser &parser, OperationState *result) {
   FlatSymbolRefAttr functionRefAttr;
   if (failed(parser.parseAttribute(functionRefAttr, "function_ref",
@@ -564,7 +587,8 @@ static Attribute convertConstIntegerValue(Attribute value) {
   if (value.isa<UnitAttr>()) {
     return IntegerAttr::get(integerType, APInt(SZ, 1));
   } else if (auto v = value.dyn_cast<BoolAttr>()) {
-    return IntegerAttr::get(integerType, APInt(SZ, v.getValue() ? 1 : 0));
+    return IntegerAttr::get(integerType,
+                            APInt(SZ, v.getValue() ? 1 : 0, false));
   } else if (auto v = value.dyn_cast<IntegerAttr>()) {
     return IntegerAttr::get(integerType,
                             APInt(SZ, v.getValue().getLimitedValue()));
@@ -746,6 +770,7 @@ static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
+      failed(parser.parseOptionalAttrDict(result->attributes)) ||
       failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
     return failure();
   }
@@ -763,6 +788,11 @@ static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   }
 
   p.printSymbolName(op.sym_name());
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
+                              visibilityAttrName,
+                              "sym_name",
+                              "value",
+                          });
   p << ' ';
   p.printAttribute(op.value());
 }

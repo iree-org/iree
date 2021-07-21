@@ -25,7 +25,7 @@
 //    binding[1] = binding[0] + push_constant[0]
 static int dispatch_tile_a(
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id) {
+    const iree_hal_vec3_t* workgroup_id, void* local_memory) {
   const dispatch_tile_a_push_constants_t* push_constants =
       (const dispatch_tile_a_push_constants_t*)dispatch_state->push_constants;
   const float* src = ((const float*)dispatch_state->binding_ptrs[0]);
@@ -37,7 +37,7 @@ static int dispatch_tile_a(
 // Just another entry point.
 static int dispatch_tile_b(
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id) {
+    const iree_hal_vec3_t* workgroup_id, void* local_memory) {
   return 0;
 }
 
@@ -57,6 +57,17 @@ static const iree_hal_executable_dispatch_v0_t entry_points[2] = {
     dispatch_tile_a,
     dispatch_tile_b,
 };
+// Optional attributes for each dispatch function used by the runtime.
+// The table can be omitted if no attributes are non-zero. We don't use
+// local_memory in our dispatches here and don't need to specify the sizes.
+static const iree_hal_executable_dispatch_attrs_v0_t entry_attrs[2] = {
+    {
+        .local_memory_pages = 0,
+    },
+    {
+        .local_memory_pages = 0,
+    },
+};
 // Names for each entry point.
 static const char* entry_point_names[2] = {
     "dispatch_tile_a",
@@ -69,10 +80,19 @@ static const char* entry_point_tags[2] = {
 };
 static const iree_hal_executable_library_v0_t library = {
     .header = &header,
-    .entry_point_count = 2,
-    .entry_points = entry_points,
-    .entry_point_names = entry_point_names,
-    .entry_point_tags = entry_point_tags,
+    .imports =
+        {
+            .count = 0,
+            .symbols = NULL,
+        },
+    .exports =
+        {
+            .count = 2,
+            .ptrs = entry_points,
+            .attrs = entry_attrs,
+            .names = entry_point_names,
+            .tags = entry_point_tags,
+        },
 };
 
 // The primary access point to the executable: in a static library this is

@@ -11,8 +11,7 @@
 
 #include <cstdlib>
 
-#include "iree/compiler/Conversion/Passes.h"
-#include "iree/compiler/Conversion/init_conversions.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
 #include "iree/tools/init_iree_passes.h"
 #include "iree/tools/init_mlir_passes.h"
@@ -23,14 +22,9 @@ namespace iree_compiler {
 // Registers IREE core passes and other important passes to the global registry.
 inline void registerAllPasses() {
   registerAllIreePasses();
-  registerCommonConversionPasses();
-  registerConversionPasses();
+  registerCodegenPasses();
   registerMlirPasses();
   registerHALConversionPasses();
-  registerLinalgToSPIRVPasses();
-  registerLinalgToLLVMPasses();
-  registerLinalgToLinalgPasses();
-  registerVectorToLLVMPasses();
 }
 
 }  // namespace iree_compiler

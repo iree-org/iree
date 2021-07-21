@@ -10,6 +10,7 @@
 
 #include "iree/base/internal/prng.h"
 #include "iree/base/tracing.h"
+#include "iree/task/topology_cpuinfo.h"
 #include "iree/testing/gtest.h"
 
 namespace {
@@ -56,8 +57,9 @@ TEST(ExecutorTest, Any) {
   iree_task_executor_t* executor = NULL;
   iree_task_scheduling_mode_t scheduling_mode =
       IREE_TASK_SCHEDULING_MODE_RESERVED;
-  IREE_CHECK_OK(iree_task_executor_create(scheduling_mode, &topology, allocator,
-                                          &executor));
+  IREE_CHECK_OK(iree_task_executor_create(
+      scheduling_mode, &topology,
+      /*worker_local_memory_size=*/(64 * 1024), allocator, &executor));
   iree_task_topology_deinitialize(&topology);
 
   //

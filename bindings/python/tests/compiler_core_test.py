@@ -24,6 +24,10 @@ func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
 
 class CompilerTest(unittest.TestCase):
 
+  def setUp(self):
+    if "IREE_SAVE_TEMPS" in os.environ:
+      del os.environ["IREE_SAVE_TEMPS"]
+
   def testNoTargetBackends(self):
     with self.assertRaisesRegex(
         ValueError, "Expected a non-empty list for 'target_backends'"):
@@ -167,6 +171,42 @@ class CompilerTest(unittest.TestCase):
       _ = iree.compiler.compile_str(
           "I'm a little teapot but not a valid program",
           target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
+
+  def testExplicitTempFileSaver(self):
+    temp_dir = tempfile.TemporaryDirectory()
+    output_file = tempfile.NamedTemporaryFile("wt")
+    output_file.close()
+    with iree.compiler.TempFileSaver(temp_dir.name):
+      output = iree.compiler.compile_str(
+          SIMPLE_MUL_ASM,
+          input_type="mhlo",
+          output_file=output_file.name,
+          target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS)
+      self.assertIsNone(output)
+
+    # There should be an output file and a core-output.bin in the temp dir.
+    self.assertTrue(os.path.exists(output_file.name))
+    expected_temp_file = os.path.join(temp_dir.name, "core-output.bin")
+    self.assertTrue(os.path.exists(expected_temp_file))
+
+    # And they should have the same contents.
+    with open(output_file.name, "rb") as f:
+      output_contents = f.read()
+    with open(expected_temp_file, "rb") as f:
+      temp_contents = f.read()
+    self.assertEqual(temp_contents, output_contents)
+    temp_dir.cleanup()
+
+  def testEnvTempFileSaver(self):
+    temp_dir = tempfile.TemporaryDirectory()
+    os.environ["IREE_SAVE_TEMPS"] = temp_dir.name
+    with iree.compiler.TempFileSaver() as tfs:
+      self.assertTrue(tfs.retained)
+      self.assertEqual(tfs.retained_path, temp_dir.name)
+
+  def testTempFileSaverDisabled(self):
+    with iree.compiler.TempFileSaver() as tfs:
+      self.assertFalse(tfs.retained)
 
 
 if __name__ == "__main__":

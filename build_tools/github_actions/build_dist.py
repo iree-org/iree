@@ -39,6 +39,7 @@ a directory and:
 
   python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
   python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg
+  python ./main_checkout/build_tools/github_actions/build_dist.py py-pure-pkgs
   python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
@@ -116,8 +117,11 @@ def configure_bazel():
 def build_main_dist():
   """Builds the main distribution binaries.
 
-  Also builds the iree-install/python_packages/iree_compiler package, ready
-  for wheel building.
+  Also builds python packages associated with the full distribution:
+    - iree-install/python_packages/iree_compiler
+
+  Additional packages that are installable as part of a full build and do not
+  benefit from a more restricted build can be added here.
   """
   install_python_requirements()
 
@@ -165,6 +169,48 @@ def build_main_dist():
     for entry in dist_entries:
       print(f"Adding entry: {entry}")
       tf.add(os.path.join(INSTALL_DIR, entry), arcname=entry, recursive=True)
+
+
+def build_py_pure_pkgs():
+  """Performs a minimal build sufficient to produce pure python packages.
+
+  This installs the following packages:
+    - iree-install/python_packages/iree_jax
+
+  Since these are pure python packages, it is expected that they will be built
+  on a single examplar (i.e. Linux) distribution.
+  """
+  install_python_requirements()
+
+  # Clean up install and build trees.
+  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
+  remove_cmake_cache()
+
+  # CMake configure.
+  print("*** Configuring ***")
+  subprocess.run([
+      sys.executable,
+      CMAKE_CI_SCRIPT,
+      f"-B{BUILD_DIR}",
+      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
+      f"-DCMAKE_BUILD_TYPE=Release",
+      f"-DIREE_BUILD_COMPILER=OFF",
+      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
+      f"-DIREE_BUILD_SAMPLES=OFF",
+      f"-DIREE_BUILD_TESTS=OFF",
+  ],
+                 check=True)
+
+  print("*** Building ***")
+  subprocess.run([
+      sys.executable,
+      CMAKE_CI_SCRIPT,
+      "--build",
+      BUILD_DIR,
+      "--target",
+      "install-IreePythonPackage-jax",
+  ],
+                 check=True)
 
 
 def build_py_runtime_pkg():
@@ -362,6 +408,8 @@ if command == "main-dist":
   build_main_dist()
 elif command == "py-runtime-pkg":
   build_py_runtime_pkg()
+elif command == "py-pure-pkgs":
+  build_py_pure_pkgs()
 elif command == "py-xla-compiler-tools-pkg":
   build_py_xla_compiler_tools_pkg()
 elif command == "py-tflite-compiler-tools-pkg":

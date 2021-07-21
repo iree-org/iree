@@ -33,7 +33,6 @@ jobs:
         run: |
           echo "LLVM_SHA=$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
           echo "TF_SHA=$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
-          echo "LLVM_BAZEL_SHA=$(git submodule status third_party/llvm-bazel | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
           echo "MLIR_HLO_SHA=$(git submodule status third_party/mlir-hlo | awk '{print $1}' | cut -c -12)" >> $GITHUB_ENV
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v3
@@ -45,8 +44,6 @@ jobs:
           body: |
             Updates LLVM dependencies to match
             [${{ env.LLVM_SHA }}](https://github.com/llvm/llvm-project/commit/${{ env.LLVM_SHA }}).
-            - llvm-bazel to
-              [${{ env.LLVM_BAZEL_SHA }}](https://github.com/google/llvm-bazel/commit/${{ env.LLVM_BAZEL_SHA }})
             - TensorFlow to
             [${{ env.TF_SHA }}](https://github.com/tensorflow/tensorflow/commit/${{ env.TF_SHA }})
             - MLIR-HLO to

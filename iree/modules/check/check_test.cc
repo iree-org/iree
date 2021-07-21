@@ -10,15 +10,14 @@
 #include <cstdint>
 #include <vector>
 
-#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/logging.h"
-#include "iree/base/status.h"
+#include "iree/base/internal/span.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/hal/vmvx/registration/driver_module.h"
-#include "iree/modules/check/native_module.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/check/module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
@@ -49,7 +48,7 @@ class CheckTest : public ::testing::Test {
         iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     IREE_ASSERT_OK(
-        check_native_module_create(iree_allocator_system(), &check_module_))
+        iree_check_module_create(iree_allocator_system(), &check_module_))
         << "Native module failed to init";
   }
 
@@ -73,8 +72,8 @@ class CheckTest : public ::testing::Test {
     iree_vm_context_release(context_);
   }
 
-  void CreateInt32BufferView(absl::Span<const int32_t> contents,
-                             absl::Span<const int32_t> shape,
+  void CreateInt32BufferView(iree::span<const int32_t> contents,
+                             iree::span<const int32_t> shape,
                              iree_hal_buffer_view_t** out_buffer_view) {
     size_t num_elements = 1;
     for (int32_t dim : shape) {
@@ -95,8 +94,8 @@ class CheckTest : public ::testing::Test {
         &*out_buffer_view));
   }
 
-  void CreateFloat16BufferView(absl::Span<const uint16_t> contents,
-                               absl::Span<const int32_t> shape,
+  void CreateFloat16BufferView(iree::span<const uint16_t> contents,
+                               iree::span<const int32_t> shape,
                                iree_hal_buffer_view_t** out_buffer_view) {
     size_t num_elements = 1;
     for (int32_t dim : shape) {
@@ -118,8 +117,8 @@ class CheckTest : public ::testing::Test {
         IREE_HAL_ELEMENT_TYPE_FLOAT_16, &*out_buffer_view));
   }
 
-  void CreateFloat32BufferView(absl::Span<const float> contents,
-                               absl::Span<const int32_t> shape,
+  void CreateFloat32BufferView(iree::span<const float> contents,
+                               iree::span<const int32_t> shape,
                                iree_hal_buffer_view_t** out_buffer_view) {
     size_t num_elements = 1;
     for (int32_t dim : shape) {
@@ -140,8 +139,8 @@ class CheckTest : public ::testing::Test {
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, &*out_buffer_view));
   }
 
-  void CreateFloat64BufferView(absl::Span<const double> contents,
-                               absl::Span<const int32_t> shape,
+  void CreateFloat64BufferView(iree::span<const double> contents,
+                               iree::span<const int32_t> shape,
                                iree_hal_buffer_view_t** out_buffer_view) {
     size_t num_elements = 1;
     for (int32_t dim : shape) {

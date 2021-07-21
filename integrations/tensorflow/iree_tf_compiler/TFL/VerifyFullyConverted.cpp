@@ -28,6 +28,15 @@ class VerifyFullyConvertedPass
     registry.insert<mlir::TFL::TensorFlowLiteDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-tflite-verify-fully-converted";
+  }
+
+  StringRef getDescription() const override {
+    return "Verifies that all TFLite frontend ops were converted and none "
+           "remain";
+  }
+
   // Validates that no TFLite frontends ops are in the function.
   void runOnFunction() override {
     DenseSet<Operation *> illegalOps;
@@ -63,9 +72,7 @@ class VerifyFullyConvertedPass
   }
 };
 
-static PassRegistration<VerifyFullyConvertedPass> pass(
-    "iree-tflite-verify-fully-converted",
-    "Verifies that all TFLite frontend ops were converted and none remain");
+static PassRegistration<VerifyFullyConvertedPass> pass;
 
 std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass() {
   return std::make_unique<VerifyFullyConvertedPass>();

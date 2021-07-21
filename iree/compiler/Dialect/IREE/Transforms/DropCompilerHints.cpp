@@ -17,6 +17,14 @@ namespace IREE {
 class DropCompilerHintsPass
     : public PassWrapper<DropCompilerHintsPass, OperationPass<void>> {
  public:
+  StringRef getArgument() const override { return "iree-drop-compiler-hints"; }
+
+  StringRef getDescription() const override {
+    return "Deletes operations that have no runtime equivalent and are only "
+           "used in the compiler. This should be performed after all other "
+           "compiler passes.";
+  }
+
   void runOnOperation() override {
     // We can't use patterns and applyPatternsAndFoldGreedily because that
     // automatically does canonicalization.
@@ -31,10 +39,7 @@ std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass() {
   return std::make_unique<DropCompilerHintsPass>();
 }
 
-static PassRegistration<DropCompilerHintsPass> pass(
-    "iree-drop-compiler-hints",
-    "Deletes operations that have no runtime equivalent and are only used in "
-    "the compiler. This should be performed after all other compiler passes.");
+static PassRegistration<DropCompilerHintsPass> pass;
 
 }  // namespace IREE
 }  // namespace iree_compiler

@@ -60,14 +60,16 @@ functions in the compiled programs.
 
 1. Run the Colab notebook and download the `counter.mlir` and
    `counter_vmvx.vmfb` files it generates
-2. Compile the `iree_samples_variables_and_state` CMake target (see
-   [here](https://google.github.io/iree/building-from-source/getting-started/)
-   for general instructions on building using CMake)
+
+2. Build the `iree_samples_variables_and_state` CMake target (see
+    [here](https://google.github.io/iree/building-from-source/getting-started/)
+    for general instructions on building using CMake)
 
     ```
     cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo .
     cmake --build ../iree-build/ --target iree_samples_variables_and_state
     ```
+
 3. Run the sample binary:
 
    ```

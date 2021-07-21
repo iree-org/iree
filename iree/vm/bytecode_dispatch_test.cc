@@ -10,10 +10,8 @@
 // avoid defining the IR inline here so that we can run this test on platforms
 // that we can't run the full MLIR compiler stack on.
 
-#include "absl/strings/match.h"
-#include "absl/strings/str_replace.h"
 #include "iree/base/logging.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -29,9 +27,11 @@ struct TestParams {
 };
 
 std::ostream& operator<<(std::ostream& os, const TestParams& params) {
-  return os << absl::StrReplaceAll(params.module_file.name,
-                                   {{":", "_"}, {".", "_"}})
-            << "_" << params.function_name;
+  std::string name{params.module_file.name};
+  auto name_sv = iree_make_string_view(name.data(), name.size());
+  iree_string_view_replace_char(name_sv, ':', '_');
+  iree_string_view_replace_char(name_sv, '.', '_');
+  return os << name << "_" << params.function_name;
 }
 
 std::vector<TestParams> GetModuleTestParams() {
@@ -109,7 +109,7 @@ class VMBytecodeDispatchTest
 
 TEST_P(VMBytecodeDispatchTest, Check) {
   const auto& test_params = GetParam();
-  bool expect_failure = absl::StartsWith(test_params.function_name, "fail_");
+  bool expect_failure = test_params.function_name.find("fail_") == 0;
 
   iree_status_t status = RunFunction(test_params.function_name.c_str());
   if (iree_status_is_ok(status)) {

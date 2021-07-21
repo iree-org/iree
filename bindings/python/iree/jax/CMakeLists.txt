@@ -12,9 +12,20 @@ iree_py_library(
     "frontend.py"
 )
 
+# Only enable the tests if the XLA compiler is built.
+if(${IREE_BUILD_XLA_COMPILER})
 iree_py_test(
   NAME
     frontend_test
   SRCS
     "frontend_test.py"
+)
+endif()
+
+iree_py_install_package(
+  COMPONENT IreePythonPackage-jax
+  PACKAGE_NAME iree_jax
+  MODULE_PATH iree/jax
+  ADDL_PACKAGE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/README.md
 )

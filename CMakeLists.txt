@@ -5,11 +5,18 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 cmake_minimum_required(VERSION 3.13.4)
+
 # Do not set MSVC warning flags like /W3 by default (since 3.15):
 #   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
 if(POLICY CMP0092)
   cmake_policy(SET CMP0092 NEW)
 endif()
+
+# LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
+# CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
+# New in CMake 3.20. https://cmake.org/cmake/help/latest/policy/CMP0116.html
+set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(iree ASM C CXX)
@@ -37,12 +44,12 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
-option(IREE_BUILD_EMBEDDING_SAMPLES "Builds IREE embedding sample projects. The compiler needs to be available." OFF)
 
 option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
+option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
@@ -82,14 +89,11 @@ endif()
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
+option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disables old." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
-
-if(${IREE_BUILD_SAMPLES})
-  set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
-endif()
 
 if(${IREE_BUILD_COMPILER})
   set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
@@ -160,10 +164,15 @@ set(IREE_ALL_TARGET_BACKENDS
   VMVX
 )
 
-if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
-  set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
+if(${IREE_BUILD_COMPILER})
+  if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
+    set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
+  endif()
+  message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
+else()
+  set(IREE_TARGET_BACKENDS_TO_BUILD "" CACHE STRING "" FORCE)
+  message(STATUS "Compiler is disabled, building no target backends")
 endif()
-message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
 
 # Default every IREE_TARGET_BACKEND_* to OFF
 foreach(_backend ${IREE_ALL_TARGET_BACKENDS})
@@ -181,7 +190,6 @@ endforeach()
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
-  ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
 
 #-------------------------------------------------------------------------------
@@ -202,6 +210,55 @@ if(${IREE_ENABLE_CCACHE})
       set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
   endif()
 endif()
+
+
+#-------------------------------------------------------------------------------
+# IREE assertions
+# We don't love the way this is done, but we have to line it up with how LLVM
+# does it and not diverge, since all implementations and all header users must
+# have the same definition of NDEBUG.
+#
+# LLVM defaults LLVM_ENABLE_ASSERTIONS to ON for Debug builds only but then
+# conditions itself to only update flags if not building Debug. We just let
+# IREE_ENABLE_ASSERTIONS be not conditioned on anything and only update the
+# flags in appropriate build types.
+#
+# If IREE_ENABLE_ASSERTIONS is set ON manually, then
+#   - NDEBUG must be undefined
+#   - LLVM_ENABLE_ASSERTIONS is forced off in order to keep multiple parties
+#     from mucking with globals.
+#
+# Since CMake forces NDEBUG for !Debug builds, some surgery needs to be done
+# at the top level to avoid divergence.
+#-------------------------------------------------------------------------------
+
+option(IREE_ENABLE_ASSERTIONS "Force unset of NDEBUG compile option" OFF)
+
+# Filter -DNDEBUG from CMAKE_CXX_FLAGS_* and CMAKE_C_FLAGS_* (if
+# CMAKE_BUILD_TYPE is not Debug).
+function(iree_fix_ndebug)
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
+  if(IREE_ENABLE_ASSERTIONS AND NOT "${uppercase_CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+      # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
+      foreach (flags_var_to_scrub
+              CMAKE_CXX_FLAGS_${uppercase_CMAKE_BUILD_TYPE}
+              CMAKE_C_FLAGS_${uppercase_CMAKE_BUILD_TYPE})
+          set(original_flags "${${flags_var_to_scrub}}")
+          string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
+                  altered_flags "${original_flags}")
+          if(NOT "${original_flags}" STREQUAL "${altered_flags}")
+            message(STATUS
+              "IREE_ENABLE_ASSERTIONS force disabled NDEBUG for ${flags_var_to_scrub}: '${original_flags}' -> '${altered_flags}'")
+            set(${flags_var_to_scrub} "${altered_flags}" PARENT_SCOPE)
+          endif()
+      endforeach()
+
+      # Make sure that LLVM doesn't add its own logic for assertion disabling.
+      # We'd like to make sure that we are not dueling over globals.
+      set(LLVM_ENABLE_ASSERTIONS OFF PARENT_SCOPE)
+  endif()
+endfunction()
+iree_fix_ndebug()
 
 #-------------------------------------------------------------------------------
 # IREE utility definitions
@@ -276,17 +333,12 @@ endif()
 #-------------------------------------------------------------------------------
 
 # Disable LLVM's warnings.
-set(LLVM_ENABLE_ASSERTIONS OFF CACHE BOOL "don't use global flags /facepalm")
 set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
 
 # Adds bundled projects that must be included after the LLVM directory has
 # been added and within the scope of its settings (i.e. build type override,
 # etc).
 function(add_bundled_mlir_dependent_projects)
-  if(${IREE_ENABLE_EMITC})
-    add_subdirectory(third_party/mlir-emitc EXCLUDE_FROM_ALL)
-  endif()
-
   if(${IREE_BUILD_COMPILER})
     add_subdirectory(third_party/mlir-hlo EXCLUDE_FROM_ALL)
   endif()
@@ -378,16 +430,17 @@ endif()
 include(external_cc_library)
 include(flatbuffer_c_library)
 
-add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
-add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
+if(${IREE_ENABLE_THREADING})
+  add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+  add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+endif()
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
@@ -400,6 +453,10 @@ endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
+endif()
+
+if(${IREE_ENABLE_EMITC})
+  add_subdirectory(build_tools/third_party/mlir-emitc EXCLUDE_FROM_ALL)
 endif()
 
 if(${IREE_BUILD_TESTS})
@@ -448,7 +505,7 @@ add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_BENCHMARKS})
-  add_subdirectory(iree/benchmark)
+  add_subdirectory(benchmarks)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_ROCM})
@@ -474,10 +531,6 @@ endif()
 
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
-endif()
-
-if(${IREE_BUILD_EMBEDDING_SAMPLES} AND NOT ${IREE_BUILD_SAMPLES})
-  add_subdirectory(iree/samples/simple_embedding)
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_REMOTING})

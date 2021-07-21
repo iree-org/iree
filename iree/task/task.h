@@ -427,10 +427,10 @@ typedef iree_alignas(iree_max_align_t) struct {
   // TODO(benvanik): workgroup index to amortize calculating linear offsets.
   // (like gl_GlobalInvocationID)
 
-  // Incoherent memory shared across all invocations of the task.
-  // Aligned to at least the natural pointer size of the machine. Functions must
-  // use atomic operations to ensure proper memory ordering.
-  iree_byte_span_t shared_memory;
+  // Tile-local memory that is pinned to each worker ensuring no cache
+  // thrashing. Aligned to at least the natural pointer size of the machine.
+  // Contents are (today) undefined upon entry.
+  iree_byte_span_t local_memory;
 
   // Shared statistics counters for the dispatch slice.
   iree_task_dispatch_statistics_t* statistics;
@@ -453,11 +453,6 @@ typedef iree_alignas(iree_max_align_t) struct {
   // Bounded by IREE_TASK_DISPATCH_MAX_TILES_PER_SHARD_RESERVATION and a
   // reasonable number chosen based on the tile and shard counts.
   uint32_t tiles_per_reservation;
-
-  // Incoherent memory shared across all invocations of the task.
-  // Aligned to at least the natural pointer size of the machine. Functions must
-  // use atomic operations to ensure proper memory ordering.
-  iree_byte_span_t shared_memory;
 } iree_task_dispatch_shard_state_t;
 
 //==============================================================================
@@ -533,10 +528,10 @@ typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_t {
     const uint32_t* ptr;
   } workgroup_count;
 
-  // Optional transient shared memory size to allocate and pass into the
-  // iree_task_context_t::shared_memory of each invocation of the task
-  // closure.
-  uint32_t shared_memory_size;
+  // Optional transient shared memory size in bytes to allocate and pass into
+  // the iree_task_tile_context_t::local_memory of each invocation of the
+  // dispatch closure.
+  uint32_t local_memory_size;
 
   // Statistics storage used for aggregating counters across all slices.
   iree_task_dispatch_statistics_t statistics;
@@ -607,10 +602,10 @@ typedef iree_alignas(iree_max_align_t) struct {
   // per-invocation workgroup_xyz and workgroup_size to compute offsets/indices.
   uint32_t workgroup_count[3];
 
-  // Incoherent memory shared across all invocations of the task.
-  // Aligned to at least the natural pointer size of the machine. Functions must
-  // use atomic operations to ensure proper memory ordering.
-  iree_byte_span_t shared_memory;
+  // Optional transient shared memory size in bytes to allocate and pass into
+  // the iree_task_tile_context_t::local_memory of each invocation of the
+  // dispatch closure.
+  uint32_t local_memory_size;
 
   // Shared statistics counters for the entire dispatch. References the storage
   // held in the parent iree_task_dispatch_t.

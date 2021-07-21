@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
 
-#include "iree/compiler/Conversion/LinalgToLLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
@@ -39,8 +39,13 @@ ROCMTargetOptions getROCMTargetOptionsFromFlags() {
       llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<std::string> clROCMBitcodeDir(
+      "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
+      llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
+
   targetOptions.ROCMTargetChip = clROCMTargetChip;
   targetOptions.ROCMLinkBC = clROCMLinkBC;
+  targetOptions.ROCMBitcodeDir = clROCMBitcodeDir;
 
   return targetOptions;
 }
@@ -64,7 +69,6 @@ class ROCMTargetBackend final : public TargetBackend {
   ROCMTargetBackend(ROCMTargetOptions options) : options_(std::move(options)) {}
 
   std::string name() const override { return "rocm"; }
-  std::string filter_pattern() const override { return "rocm"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
@@ -76,7 +80,7 @@ class ROCMTargetBackend final : public TargetBackend {
   }
 
   LogicalResult serializeExecutable(
-      iree_compiler::IREE::HAL::ExecutableTargetOp targetOp,
+      iree_compiler::IREE::HAL::ExecutableVariantOp variantOp,
       OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
@@ -87,11 +91,11 @@ class ROCMTargetBackend final : public TargetBackend {
     // intermediate code/binary files), and at runtime (loaded
     // libraries/symbols/etc).
     auto libraryName =
-        targetOp->getParentOfType<iree_compiler::IREE::HAL::ExecutableOp>()
+        variantOp->getParentOfType<iree_compiler::IREE::HAL::ExecutableOp>()
             .getName()
             .str();
 
-    ModuleOp innerModuleOp = targetOp.getInnerModule();
+    ModuleOp innerModuleOp = variantOp.getInnerModule();
 
     // Remove all the functions that are not part of the ROCM kernel.
     // TODO: Find a better solution to handle this.
@@ -108,8 +112,8 @@ class ROCMTargetBackend final : public TargetBackend {
     auto llvmModule =
         mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
     if (!llvmModule) {
-      return targetOp.emitError() << "failed to translate the MLIR LLVM "
-                                     "dialect to the native llvm::Module";
+      return variantOp.emitError() << "failed to translate the MLIR LLVM "
+                                      "dialect to the native llvm::Module";
     }
 
     std::vector<std::array<int32_t, 3>> workgroupSizes;
@@ -135,12 +139,12 @@ class ROCMTargetBackend final : public TargetBackend {
       const llvm::Target *target =
           llvm::TargetRegistry::lookupTarget("", triple, error);
       if (target == nullptr) {
-        return targetOp.emitError() << "cannot initialize target triple";
+        return variantOp.emitError() << "cannot initialize target triple";
       }
       targetMachine.reset(
           target->createTargetMachine(triple.str(), targetChip, {}, {}, {}));
       if (targetMachine == nullptr) {
-        return targetOp.emitError() << "cannot initialize target machine";
+        return variantOp.emitError() << "cannot initialize target machine";
       }
     }
 
@@ -151,7 +155,8 @@ class ROCMTargetBackend final : public TargetBackend {
 
     // Link module to Device Library
     if (options_.ROCMLinkBC)
-      LinkROCDLIfNecessary(llvmModule.get(), options_.ROCMTargetChip);
+      LinkROCDLIfNecessary(llvmModule.get(), options_.ROCMTargetChip,
+                           options_.ROCMBitcodeDir);
 
     // Serialize hsaco kernel into the binary that we will embed in the
     // final flatbuffer.
@@ -162,7 +167,7 @@ class ROCMTargetBackend final : public TargetBackend {
         targetHSACO.size());
 
     auto entryPointNames = llvm::to_vector<8>(llvm::map_range(
-        targetOp.getBlock()
+        variantOp.getBlock()
             .getOps<iree_compiler::IREE::HAL::ExecutableEntryPointOp>(),
         [&](auto op) { return op.getName(); }));
     auto entryPointsRef = builder.createStringVec(entryPointNames);
@@ -183,7 +188,7 @@ class ROCMTargetBackend final : public TargetBackend {
 
     // Add the binary data to the target executable.
     executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(),
+        variantOp.getLoc(), variantOp.sym_name(),
         executableBuilder.getStringAttr("HSACO"),
         builder.getBufferAttr(executableBuilder.getContext()));
 

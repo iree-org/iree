@@ -14,6 +14,11 @@ package(
 
 iree_cmake_extra_content(
     content = """
+# TODO(#4298): Separate HAL driver registration from threading.
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
 if(${IREE_HAL_DRIVER_VMVX})
 """,
     inline = True,

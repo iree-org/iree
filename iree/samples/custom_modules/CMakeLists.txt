@@ -15,6 +15,23 @@ endif()
 
 iree_add_all_subdirs()
 
+iree_cc_library(
+  NAME
+    module
+  HDRS
+    "module.h"
+  SRCS
+    "module.cc"
+  DEPS
+    iree::base
+    iree::base::cc
+    iree::hal
+    iree::modules::hal
+    iree::vm
+    iree::vm::cc
+  PUBLIC
+)
+
 iree_bytecode_module(
   NAME
     custom_modules_test_module
@@ -26,7 +43,7 @@ iree_bytecode_module(
     iree_samples_custom_modules_dialect_custom-translate
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=dylib-llvm-aot"
+    "-iree-hal-target-backends=vmvx"
   PUBLIC
 )
 
@@ -37,7 +54,7 @@ iree_cc_test(
     "custom_modules_test.cc"
   DEPS
     ::custom_modules_test_module_c
-    ::native_module
+    ::module
     iree::base
     iree::base::logging
     iree::hal
@@ -48,24 +65,6 @@ iree_cc_test(
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc
-)
-
-iree_cc_library(
-  NAME
-    native_module
-  HDRS
-    "native_module.h"
-  SRCS
-    "native_module.cc"
-  DEPS
-    absl::span
-    iree::base
-    iree::base::status
-    iree::hal
-    iree::modules::hal
-    iree::vm
-    iree::vm::cc
-  PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

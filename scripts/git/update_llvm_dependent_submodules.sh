@@ -36,7 +36,6 @@ CMD="./scripts/git/update_to_llvm_syncpoint.py $@"
 bash -c "${CMD?}"
 
 LLVM_SHA="$(git submodule status third_party/llvm-project | awk '{print $1}' | cut -c -12)"
-LLVM_BAZEL_SHA="$(git submodule status third_party/llvm-bazel | awk '{print $1}' | cut -c -12)"
 TF_SHA="$(git submodule status third_party/tensorflow | awk '{print $1}' | cut -c -12)"
 MLIR_HLO_SHA="$(git submodule status third_party/mlir-hlo | awk '{print $1}' | cut -c -12)"
 
@@ -44,8 +43,6 @@ TITLE="Synchronize submodules with LLVM at llvm/llvm-project@${LLVM_SHA?}"
 BODY="$(cat <<-EOF
 Updates LLVM dependencies to match
 [${LLVM_SHA?}](https://github.com/llvm/llvm-project/commit/${LLVM_SHA?}).
-- llvm-bazel to
-  [${LLVM_BAZEL_SHA?}](https://github.com/google/llvm-bazel/commit/${LLVM_BAZEL_SHA?})
 - TensorFlow to
   [${TF_SHA?}](https://github.com/tensorflow/tensorflow/commit/${TF_SHA?})
 - MLIR-HLO to

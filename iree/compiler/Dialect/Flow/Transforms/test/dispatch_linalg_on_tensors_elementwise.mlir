@@ -3,8 +3,8 @@
 func @tile_generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x?xf32> {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %d0 = memref.dim %A, %c0 : tensor<?x?xf32>
-  %d1 = memref.dim %A, %c1 : tensor<?x?xf32>
+  %d0 = tensor.dim %A, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %A, %c1 : tensor<?x?xf32>
   %0 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
   %1 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -25,8 +25,8 @@ func @tile_generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   flow.dispatch.workgroups
 // CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[ARG1]], %[[D0]], %[[D1]])
 // CHECK-NEXT:     %[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
@@ -67,10 +67,10 @@ func @tile_4d_generic_op_alone
   %c1 = constant 1 : index
   %c2 = constant 2 : index
   %c3 = constant 3 : index
-  %d0 = memref.dim %A, %c0 : tensor<?x?x?x?xf32>
-  %d1 = memref.dim %A, %c1 : tensor<?x?x?x?xf32>
-  %d2 = memref.dim %A, %c2 : tensor<?x?x?x?xf32>
-  %d3 = memref.dim %A, %c3 : tensor<?x?x?x?xf32>
+  %d0 = tensor.dim %A, %c0 : tensor<?x?x?x?xf32>
+  %d1 = tensor.dim %A, %c1 : tensor<?x?x?x?xf32>
+  %d2 = tensor.dim %A, %c2 : tensor<?x?x?x?xf32>
+  %d3 = tensor.dim %A, %c3 : tensor<?x?x?x?xf32>
   %0 = linalg.init_tensor [%d0, %d1, %d2, %d3] : tensor<?x?x?x?xf32>
   %1 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
@@ -94,10 +94,10 @@ func @tile_4d_generic_op_alone
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //  CHECK-DAG:   %[[C2:.+]] = constant 2 : index
 //  CHECK-DAG:   %[[C3:.+]] = constant 3 : index
-//  CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
-//  CHECK-DAG:   %[[D2:.+]] = memref.dim %[[ARG0]], %[[C2]]
-//  CHECK-DAG:   %[[D3:.+]] = memref.dim %[[ARG0]], %[[C3]]
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[D3:.+]] = tensor.dim %[[ARG0]], %[[C3]]
 //      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D1]]]
 
 // -----
@@ -108,7 +108,7 @@ func @tile_4d_generic_op_alone
 func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1280] : tensor<1280xf32>
-  %1 = linalg.fill(%0, %cst) : tensor<1280xf32>, f32 -> tensor<1280xf32>
+  %1 = linalg.fill(%cst, %0) : f32, tensor<1280xf32> -> tensor<1280xf32>
   %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%arg0 : tensor<7x7x1280xf32>) outs(%1 : tensor<1280xf32>) {
   ^bb0(%arg1: f32, %arg2: f32):
     %3 = addf %arg1, %arg2 : f32
@@ -134,7 +134,7 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
 // CHECK-SAME:       sizes = [7, 7, %[[SIZE0]]]
 //      CHECK:     %[[SIZE1:.+]] = affine.min #[[SIZE_MAP1]](%[[IV]], %[[WG_SIZE0]])
 //      CHECK:     %[[INIT:.+]] = linalg.init_tensor [%[[SIZE1]]] : tensor<?xf32>
-// CHECK-NEXT:     %[[OUT:.+]] = linalg.fill(%[[INIT]]
+// CHECK-NEXT:     %[[OUT:.+]] = linalg.fill(%{{.*}}, %[[INIT]]
 //      CHECK:     %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[IN]] : tensor<7x7x?xf32>) outs(%[[OUT]] : tensor<?xf32>)
 //      CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG2]], {{.*}}

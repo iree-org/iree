@@ -26,10 +26,10 @@ flags.DEFINE_boolean('use_quantized_weights', False,
 
 MAX_SEQ_LENGTH = 384  # Max input sequence length used in mobilebert_squad.
 
-FILE_NAME = 'mobilebert_squad_savedmodels.tar.gz'
+FILE_NAME = 'mobilebert_squad_savedmodels'
 MODEL_URL = posixpath.join(
-    'https://storage.googleapis.com/cloud-tpu-checkpoints/mobilebert/',
-    FILE_NAME)
+    f'https://storage.googleapis.com/cloud-tpu-checkpoints/mobilebert/{FILE_NAME}.tar.gz'
+)
 
 
 class MobileBertSquadTest(tf_test_utils.TracedModuleTestCase):

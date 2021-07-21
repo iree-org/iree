@@ -75,8 +75,6 @@ ALL_SRCS = [
     "simple_stateful_test.py",
     "sliding_window_test.py",
     "space_to_batch_nd_test.py",
-    "strings_test.py",
-    "tensorlist_test.py",
 ]
 
 # keep sorted
@@ -101,8 +99,6 @@ LLVM_FAILING = [
     "broadcast_to_test.py",
     "broadcasting_test.py",
     "conv_transpose_test.py",
-    "dynamic_mlp_relu_test.py",
-    "dynamic_mlp_test.py",
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",

@@ -13,9 +13,9 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/main.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/vulkan/registration/driver_module.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -159,7 +159,7 @@ extern "C" int iree_main(int argc, char** argv) {
   }
 
   // Setup window
-  SDL_WindowFlags window_flags = (SDL_WindowFlags)(
+  SDL_WindowFlags window_flags = (SDL_WindowFlags)(  //
       SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
   SDL_Window* window = SDL_CreateWindow(
       "IREE Samples - Vulkan Inference GUI", SDL_WINDOWPOS_CENTERED,
@@ -338,9 +338,11 @@ extern "C" int iree_main(int argc, char** argv) {
                  << "'";
 
   vm::ref<iree_vm_list_t> main_function_inputs;
-  IREE_CHECK_OK(ParseToVariantList(iree_hal_device_allocator(iree_vk_device),
-                                   FLAG_function_inputs,
-                                   &main_function_inputs));
+  IREE_CHECK_OK(ParseToVariantList(
+      iree_hal_device_allocator(iree_vk_device),
+      iree::span<const std::string>{FLAG_function_inputs.data(),
+                                    FLAG_function_inputs.size()},
+      &main_function_inputs));
 
   const std::string window_title = std::string(FLAG_module_file);
   // --------------------------------------------------------------------------

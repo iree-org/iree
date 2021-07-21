@@ -14,6 +14,14 @@ namespace TF {
 class PrettifyDebugInfoPass
     : public PassWrapper<PrettifyDebugInfoPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-tf-prettify-debug-info";
+  }
+
+  StringRef getDescription() const override {
+    return "Simplifies TF debug info to make it easier to look at";
+  }
+
   void runOnOperation() override {
     // TODO: Finish algorithm for simplifying TF debug info.
     // auto moduleOp = getOperation();
@@ -30,9 +38,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createPrettifyDebugInfoPass() {
   return std::make_unique<PrettifyDebugInfoPass>();
 }
 
-static PassRegistration<PrettifyDebugInfoPass> modulePass(
-    "iree-tf-prettify-debug-info",
-    "Simplifies TF debug info to make it easier to look at");
+static PassRegistration<PrettifyDebugInfoPass> modulePass;
 
 }  // namespace TF
 }  // namespace iree_integrations

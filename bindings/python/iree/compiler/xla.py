@@ -14,8 +14,9 @@ import logging
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
 
-from .tools import find_tool, invoke_immediate, invoke_pipeline
 from .core import CompilerOptions, DEFAULT_TESTING_BACKENDS, build_compile_command_line
+from .debugging import TempFileSaver
+from .tools import find_tool, invoke_immediate, invoke_pipeline
 
 __all__ = [
     "compile_file",
@@ -89,12 +90,13 @@ class ImportOptions(CompilerOptions):
     self.save_temp_iree_input = save_temp_iree_input
 
 
-def build_import_command_line(input_path: str,
+def build_import_command_line(input_path: str, tfs: TempFileSaver,
                               options: ImportOptions) -> List[str]:
   """Builds a command line for invoking the import stage.
 
   Args:
     input_path: The input path.
+    tfs: TempFileSaver.
     options: Import options.
   Returns:
     List of strings of command line.
@@ -108,7 +110,9 @@ def build_import_command_line(input_path: str,
 
   if options.import_only and options.output_file:
     # Import stage directly outputs.
-    cl.append(f"-o={options.output_file}")
+    output_file = tfs.alloc_optional("xla-output.mlir",
+                                     export_as=options.output_file)
+    cl.append(f"-o={output_file}")
 
   # MLIR flags.
   if options.output_mlir_debuginfo:
@@ -117,8 +121,20 @@ def build_import_command_line(input_path: str,
     cl.append("--mlir-print-op-generic")
 
   # Save temps flags.
-  if options.save_temp_iree_input:
-    cl.append(f"--save-temp-iree-input={options.save_temp_iree_input}")
+  iree_input = tfs.alloc_optional("xla-iree-input.mlir",
+                                  export_as=options.save_temp_iree_input)
+  if iree_input:
+    cl.append(f"--save-temp-iree-input={iree_input}")
+
+  # Crash reproducer (locally qualified).
+  requested_crash_reproducer_path = options.crash_reproducer_path
+  if requested_crash_reproducer_path:
+    requested_crash_reproducer_path = (requested_crash_reproducer_path +
+                                       ".import-xla")
+  crash_reproducer_path = tfs.alloc_optional(
+      "xla-reproducer.mlir", export_as=requested_crash_reproducer_path)
+  if crash_reproducer_path:
+    cl.append(f"--pass-pipeline-crash-reproducer={crash_reproducer_path}")
 
   # Extra args.
   cl.extend(options.import_extra_args)
@@ -135,21 +151,22 @@ def compile_file(xla_file_path: str, **kwargs):
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
-  options = ImportOptions(**kwargs)
-  import_cl = build_import_command_line(xla_file_path, options)
-  if options.import_only:
-    # One stage tool pipeline.
-    result = invoke_immediate(import_cl)
+  with TempFileSaver.implicit() as tfs:
+    options = ImportOptions(**kwargs)
+    import_cl = build_import_command_line(xla_file_path, tfs, options)
+    if options.import_only:
+      # One stage tool pipeline.
+      result = invoke_immediate(import_cl)
+      if options.output_file:
+        return None
+      return result
+
+    # Full compilation pipeline.
+    compile_cl = build_compile_command_line("-", tfs, options)
+    result = invoke_pipeline([import_cl, compile_cl])
     if options.output_file:
       return None
     return result
-
-  # Full compilation pipeline.
-  compile_cl = build_compile_command_line("-", options)
-  result = invoke_pipeline([import_cl, compile_cl])
-  if options.output_file:
-    return None
-  return result
 
 
 def compile_str(xla_content: Union[bytes, str], **kwargs):
@@ -163,25 +180,27 @@ def compile_str(xla_content: Union[bytes, str], **kwargs):
     A bytes-like object with the compiled output or None if output_file=
     was specified.
   """
-  options = ImportOptions(**kwargs)
-  if isinstance(xla_content, str):
-    if options.import_format not in [
-        ImportFormat.TEXT_PROTO, ImportFormat.HLO_TEXT
-    ]:
-      raise ValueError("If passing a string, ImportFormat must be TEXT_PROTO")
-    xla_content = xla_content.encode("utf-8")
+  with TempFileSaver.implicit() as tfs:
+    options = ImportOptions(**kwargs)
+    if isinstance(xla_content, str):
+      if options.import_format not in [
+          ImportFormat.TEXT_PROTO, ImportFormat.HLO_TEXT
+      ]:
+        raise ValueError("If passing a string, ImportFormat must be TEXT_PROTO")
+      xla_content = xla_content.encode("utf-8")
 
-  import_cl = build_import_command_line("-", options)
-  if options.import_only:
-    # One stage tool pipeline.
-    result = invoke_immediate(import_cl, immediate_input=xla_content)
+    import_cl = build_import_command_line("-", tfs, options)
+    if options.import_only:
+      # One stage tool pipeline.
+      result = invoke_immediate(import_cl, immediate_input=xla_content)
+      if options.output_file:
+        return None
+      return result
+
+    # Full compilation pipeline.
+    compile_cl = build_compile_command_line("-", tfs, options)
+    result = invoke_pipeline([import_cl, compile_cl],
+                             immediate_input=xla_content)
     if options.output_file:
       return None
     return result
-
-  # Full compilation pipeline.
-  compile_cl = build_compile_command_line("-", options)
-  result = invoke_pipeline([import_cl, compile_cl], immediate_input=xla_content)
-  if options.output_file:
-    return None
-  return result

@@ -12,23 +12,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    event_pool
-  HDRS
-    "event_pool.h"
-  SRCS
-    "event_pool.c"
-  DEPS
-    iree::base
-    iree::base::core_headers
-    iree::base::internal
-    iree::base::internal::synchronization
-    iree::base::internal::wait_handle
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     executable_library
   HDRS
     "executable_library.h"
@@ -115,6 +98,27 @@ iree_cc_library(
     iree::base::internal::synchronization
     iree::base::tracing
     iree::hal
+  PUBLIC
+)
+
+if(NOT ${IREE_ENABLE_THREADING})
+  return()
+endif()
+
+iree_cc_library(
+  NAME
+    event_pool
+  HDRS
+    "event_pool.h"
+  SRCS
+    "event_pool.c"
+  DEPS
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::synchronization
+    iree::base::internal::wait_handle
+    iree::base::tracing
   PUBLIC
 )
 

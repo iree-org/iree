@@ -20,7 +20,7 @@ func @multi_result() {
           %1 = addi %arg0, %arg1 : i32
           %2 = muli %arg0, %arg1 : i32
           linalg.yield %1, %2 : i32, i32
-      } -> tensor<3x4xi32>, tensor<3x4xi32>
+      } -> (tensor<3x4xi32>, tensor<3x4xi32>)
   check.expect_eq_const(%0#0, dense<[
       [14, 16, 18, 20],
       [22, 24, 26, 28],

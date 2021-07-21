@@ -140,38 +140,32 @@ class VmTest(absltest.TestCase):
     logging.info("context: %s", context)
 
   def test_add_scalar_new_abi(self):
-    # TODO: Enable with new ABI.
-    return
     m = create_add_scalar_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("add_scalar")
-    finv = iree.runtime.FunctionInvoker(context, self.device, f)
+    finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
     result = finv(5, 6)
     logging.info("result: %s", result)
     self.assertEqual(result, 11)
 
   def test_synchronous_dynamic_shape_invoke_function_new_abi(self):
-    # TODO: Enable with new ABI.
-    return
     m = create_simple_dynamic_abs_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
-    finv = iree.runtime.FunctionInvoker(context, self.device, f)
+    finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
     arg0 = np.array([[-1., 2.], [3., -4.]], dtype=np.float32)
     result = finv(arg0)
     logging.info("result: %s", result)
     np.testing.assert_allclose(result, [[1., 2.], [3., 4.]])
 
   def test_synchronous_invoke_function_new_abi(self):
-    # TODO: Enable with new ABI.
-    return
     m = create_simple_static_mul_module()
     instance = iree.runtime.VmInstance()
     context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
-    finv = iree.runtime.FunctionInvoker(context, self.device, f)
+    finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     result = finv(arg0, arg1)

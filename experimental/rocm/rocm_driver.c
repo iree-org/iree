@@ -4,13 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stdint.h>
+#include <string.h>
+
 #include "experimental/rocm/api.h"
 #include "experimental/rocm/dynamic_symbols.h"
 #include "experimental/rocm/rocm_device.h"
 #include "experimental/rocm/status_util.h"
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api.h"
 
-typedef struct {
+typedef struct iree_hal_rocm_driver_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   // Identifier used for the driver in the IREE driver registry.

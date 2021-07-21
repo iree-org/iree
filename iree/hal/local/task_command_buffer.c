@@ -379,6 +379,22 @@ iree_status_t iree_hal_task_command_buffer_issue(
 }
 
 //===----------------------------------------------------------------------===//
+// iree_hal_task_command_buffer_t debug utilities
+//===----------------------------------------------------------------------===//
+
+static void iree_hal_task_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  // TODO(benvanik): tracy event stack.
+}
+
+static void iree_hal_task_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  // TODO(benvanik): tracy event stack.
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_execution_barrier
 //===----------------------------------------------------------------------===//
 
@@ -752,11 +768,13 @@ static iree_status_t iree_hal_cmd_dispatch_tile(
   // When we support imports we can populate those here based on what the
   // executable declared (as each executable may import a unique set of
   // functions).
-  state.imports = NULL;
+  state.import_thunk = cmd->executable->import_thunk;
+  state.imports = cmd->executable->imports;
 
   iree_status_t status = iree_hal_local_executable_issue_call(
       cmd->executable, cmd->ordinal, &state,
-      (const iree_hal_vec3_t*)tile_context->workgroup_xyz);
+      (const iree_hal_vec3_t*)tile_context->workgroup_xyz,
+      tile_context->local_memory);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -806,6 +824,15 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
                                 iree_task_make_dispatch_closure(
                                     iree_hal_cmd_dispatch_tile, (uintptr_t)cmd),
                                 workgroup_size, workgroup_count, &cmd->task);
+
+  // Tell the task system how much workgroup local memory is required for the
+  // dispatch; each invocation of the entry point will have at least as much
+  // scratch memory available during execution.
+  cmd->task.local_memory_size =
+      local_executable->dispatch_attrs
+          ? local_executable->dispatch_attrs[entry_point].local_memory_pages *
+                IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
+          : 0;
 
   // Copy only the push constant range used by the executable.
   uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
@@ -885,6 +912,8 @@ static const iree_hal_command_buffer_vtable_t
         .allowed_categories = iree_hal_task_command_buffer_allowed_categories,
         .begin = iree_hal_task_command_buffer_begin,
         .end = iree_hal_task_command_buffer_end,
+        .begin_debug_group = iree_hal_task_command_buffer_begin_debug_group,
+        .end_debug_group = iree_hal_task_command_buffer_end_debug_group,
         .execution_barrier = iree_hal_task_command_buffer_execution_barrier,
         .signal_event = iree_hal_task_command_buffer_signal_event,
         .reset_event = iree_hal_task_command_buffer_reset_event,

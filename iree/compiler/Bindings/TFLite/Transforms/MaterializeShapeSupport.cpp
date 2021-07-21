@@ -45,6 +45,14 @@ class MaterializeShapeSupportPass
     registry.insert<StandardOpsDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-tflite-materialize-shape-support";
+  }
+
+  StringRef getDescription() const override {
+    return "Materializes support functions for the tflite runtime bindings";
+  }
+
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
@@ -440,9 +448,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeShapeSupportPass() {
   return std::make_unique<MaterializeShapeSupportPass>();
 }
 
-static PassRegistration<MaterializeShapeSupportPass> pass(
-    "iree-tflite-materialize-shape-support",
-    "Materializes support functions for the tflite runtime bindings");
+static PassRegistration<MaterializeShapeSupportPass> pass;
 
 }  // namespace TFLite
 }  // namespace IREE

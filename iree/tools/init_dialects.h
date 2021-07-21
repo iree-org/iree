@@ -17,10 +17,6 @@
 #include "iree/tools/init_mlir_dialects.h"
 #include "iree/tools/init_xla_dialects.h"
 
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "emitc/InitDialect.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -29,10 +25,6 @@ inline void registerAllDialects(DialectRegistry &registry) {
   registerMlirDialects(registry);
   mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
-
-#ifdef IREE_HAVE_EMITC_DIALECT
-  mlir::registerEmitCDialect(registry);
-#endif  // IREE_HAVE_EMITC_DIALECT
 }
 
 }  // namespace iree_compiler

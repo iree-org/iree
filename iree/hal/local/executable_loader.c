@@ -8,10 +8,44 @@
 
 #include "iree/base/api.h"
 
+iree_status_t iree_hal_executable_import_provider_resolve(
+    const iree_hal_executable_import_provider_t import_provider,
+    iree_string_view_t symbol_name, void** out_fn_ptr) {
+  IREE_ASSERT_ARGUMENT(out_fn_ptr);
+  *out_fn_ptr = NULL;
+
+  // A `?` suffix indicates the symbol is weakly linked and can be NULL.
+  bool is_weak = false;
+  if (iree_string_view_ends_with(symbol_name, iree_make_cstring_view("?"))) {
+    is_weak = true;
+    symbol_name = iree_string_view_substr(symbol_name, 0, symbol_name.size - 1);
+  }
+
+  // Note that it's fine for there to be no registered provider if all symbols
+  // are weak.
+  if (import_provider.resolve == NULL) {
+    if (is_weak) return iree_ok_status();
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "no import provider registered for resolving "
+                            "executable imports (while try to resolve %.*s)",
+                            (int)symbol_name.size, symbol_name.data);
+  }
+
+  iree_status_t status =
+      import_provider.resolve(import_provider.self, symbol_name, out_fn_ptr);
+  if (!iree_status_is_ok(status) && is_weak) {
+    iree_status_ignore(status);  // ok to fail on weak symbols
+  }
+
+  return status;
+}
+
 void iree_hal_executable_loader_initialize(
-    const void* vtable, iree_hal_executable_loader_t* out_base_loader) {
+    const void* vtable, iree_hal_executable_import_provider_t import_provider,
+    iree_hal_executable_loader_t* out_base_loader) {
   iree_atomic_ref_count_init(&out_base_loader->ref_count);
   out_base_loader->vtable = vtable;
+  out_base_loader->import_provider = import_provider;
 }
 
 void iree_hal_executable_loader_retain(

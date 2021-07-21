@@ -8,11 +8,11 @@
 
 package org.tensorflow.lite;
 
+import android.support.annotation.NonNull;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import org.checkerframework.checker.nullness.qual.NonNull;
 
 /**
  * Main driver class for the IREE Java compatibility shim. Provides model

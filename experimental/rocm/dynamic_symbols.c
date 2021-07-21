@@ -6,7 +6,7 @@
 
 #include "experimental/rocm/dynamic_symbols.h"
 
-#include <stddef.h>
+#include <string.h>
 
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/target_platform.h"
@@ -29,7 +29,7 @@ static iree_status_t iree_hal_rocm_dynamic_symbols_resolve_all(
         syms->loader_library, kName, (void **)&syms->rocmSymbolName)); \
   }
 #define RC_PFN_STR_DECL(rocmSymbolName, ...) RC_PFN_DECL(rocmSymbolName, ...)
-#include "experimental/rocm/dynamic_symbol_tables.h"
+#include "experimental/rocm/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef RC_PFN_DECL
 #undef RC_PFN_STR_DECL
   return iree_ok_status();

@@ -6,8 +6,6 @@
 
 #include <utility>
 
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
@@ -28,8 +26,16 @@ class HoistInlinedRodataPass
                          OperationPass<IREE::VM::ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect>();
     registry.insert<IREE::VM::VMDialect>();
+  }
+
+  StringRef getArgument() const override {
+    return "iree-vm-hoist-inlined-rodata";
+  }
+
+  StringRef getDescription() const override {
+    return "Hoists inline vm.rodata.inline values to module-level constant "
+           "storage.";
   }
 
   void runOnOperation() override {
@@ -80,9 +86,7 @@ createHoistInlinedRodataPass() {
   return std::make_unique<HoistInlinedRodataPass>();
 }
 
-static PassRegistration<HoistInlinedRodataPass> pass(
-    "iree-vm-hoist-inlined-rodata",
-    "Hoists inline iree.byte_buffer values to module-level constant storage.");
+static PassRegistration<HoistInlinedRodataPass> pass;
 
 }  // namespace VM
 }  // namespace IREE

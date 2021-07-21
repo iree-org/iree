@@ -9,7 +9,6 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -42,6 +41,12 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
                     shape::ShapeDialect, StandardOpsDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-tf-convert-to-mhlo"; }
+
+  StringRef getDescription() const override {
+    return "Converts from TensorFlow to the XLA MHLO dialect";
+  }
+
  public:
   ConvertToMHLOPass() = default;
   ConvertToMHLOPass(const ConvertToMHLOPass &) {}
@@ -53,7 +58,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     // Lower TF Patterns must be separate from canonocalization patterns as
     // they are sometimes inversions of eachother.
     OwningRewritePatternList lowerTfPatterns(&getContext());
-    mlir::TF::PopulateLoweringTFPatterns(context, &lowerTfPatterns);
+    mlir::TF::PopulateTFLoweringBeforeHLOPatterns(context, &lowerTfPatterns);
 
     OwningRewritePatternList canonicalizePatterns(&getContext());
     for (auto *op : context->getRegisteredOperations()) {
@@ -70,6 +75,9 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     // Add TF->HLO legalization patterns.
     mhlo::PopulateLegalizeTfPatterns(context, &patterns);
 
+    // IREE Direct TF lowerings.
+    populateDirectLoweringPatterns(context, patterns);
+
     // TF::PopulateLoweringTFPatterns(context, &patterns);
 
     // ConstantLike op is convenient to create splat constants, but is
@@ -79,18 +87,35 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
 
     ConversionTarget target(*context);
     target.addLegalDialect<chlo::HloClientDialect>();
+    target.addLegalDialect<linalg::LinalgDialect>();
     target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
     target.addLegalDialect<shape::ShapeDialect>();
     target.addLegalDialect<tensor::TensorDialect>();
     target.addLegalOp<mlir::CallOp>();
     target.addLegalOp<mlir::tensor::CastOp>();
-    target.addLegalOp<mlir::memref::DimOp>();
+    target.addLegalOp<mlir::tensor::DimOp>();
 
     // TODO(suderman): Enable logicistic op for lowering once the op is
     // supported in IREE. Also, remove the numerically unstable ConvertSigmoidOp
     // pattern in the legalize-tf pass.
     target.addIllegalOp<mhlo::LogisticOp>();
+
+    // In general, IREE does not support DynamicBroadcastInDim ops that do not
+    // resolve to a static form. This excludes any TF2XLA expansions which
+    // we ultimately lack a linalg lowering for. Matches the corresponding
+    // condition in legalize_to_linalg.cc for this op.
+    target.addDynamicallyLegalOp<mhlo::DynamicBroadcastInDimOp>(
+        [](mhlo::DynamicBroadcastInDimOp op) {
+          if (auto t = op.operand()
+                           .getType()
+                           .template dyn_cast<RankedTensorType>()) {
+            if (t.hasStaticShape()) {
+              return true;
+            }
+          }
+          return false;
+        });
 
     DenseSet<Operation *> prevUnconvertedOps;
     DenseSet<Operation *> unconvertedOps;
@@ -146,9 +171,7 @@ std::unique_ptr<FunctionPass> createConvertToMHLOPass() {
   return std::make_unique<ConvertToMHLOPass>();
 }
 
-static PassRegistration<ConvertToMHLOPass> pass(
-    "iree-tf-convert-to-mhlo",
-    "Converts from TensorFlow to the XLA MHLO dialect");
+static PassRegistration<ConvertToMHLOPass> pass;
 
 }  // namespace TF
 }  // namespace iree_integrations

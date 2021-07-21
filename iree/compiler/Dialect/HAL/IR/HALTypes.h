@@ -15,7 +15,9 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeSupport.h"
@@ -24,7 +26,7 @@
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.h.inc"    // IWYU pragma: keep
-#include "iree/compiler/Dialect/HAL/IR/HALStructs.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/HAL/IR/HALStructs.h.inc"  // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -32,6 +34,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+#include "iree/compiler/Dialect/HAL/IR/HALAttrInterfaces.h.inc"  // IWYU pragma: export
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterfaces.h.inc"  // IWYU pragma: export
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.h.inc"  // IWYU pragma: export
 
@@ -170,5 +173,10 @@ using DescriptorSetBindingValue = std::tuple<Value, Value, Value, Value>;
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+// clang-format off: must be included after all LLVM/MLIR headers.
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/HAL/IR/HALAttrs.h.inc"  // IWYU pragma: keep
+// clang-format on
 
 #endif  // IREE_COMPILER_DIALECT_HAL_IR_HALTYPES_H_

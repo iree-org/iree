@@ -70,7 +70,7 @@ Include headers:
 // The VM bytecode and HAL modules will typically be included, along
 // with those for the specific HAL drivers your application uses.
 // Functionality extensions can be used via custom modules.
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/hal/dylib/registration/driver_module.h"
 #include "iree/vm/bytecode_module.h"
 ```

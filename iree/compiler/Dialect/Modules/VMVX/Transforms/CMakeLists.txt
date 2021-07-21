@@ -22,6 +22,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
+    MLIRAffineTransforms
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -40,10 +41,9 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorToSCF
-    iree::compiler::Conversion::Common
-    iree::compiler::Conversion::HLOToLinalg
-    iree::compiler::Conversion::LinalgToLLVM
-    iree::compiler::Conversion::PassHeaders
+    iree::compiler::Codegen::Common
+    iree::compiler::Codegen::LLVMCPU
+    iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::IREE::IR

@@ -6,17 +6,25 @@
 
 iree_add_all_subdirs()
 
-iree_cc_library(
-  NAME
-    native_deps
-  SRCS
+set(_NAME "iree-tflite-bindings")
+add_library(${_NAME} SHARED "")
+
+target_sources(${_NAME}
+  PRIVATE
     "interpreter_jni.cc"
     "tensor_jni.cc"
     "tensorflow_lite_jni.cc"
-  HDRS
-  DEPS
+)
+
+target_link_libraries(${_NAME}
+  PUBLIC
     iree::base
+    iree::base::logging
     bindings::tflite::shim
-  LINKOPTS
+)
+
+target_link_options(${_NAME}
+  INTERFACE
     "-landroid"
+    "-llog"
 )

@@ -155,20 +155,35 @@ iree_elf_call_p_ip PROC FRAME
   ret
 iree_elf_call_p_ip ENDP
 
-; int iree_elf_call_i_pp(const void* symbol_ptr, void* a0, void* a1)
-iree_elf_call_i_pp PROC FRAME
+; int iree_elf_call_i_p(const void* symbol_ptr, void* a0)
+iree_elf_call_i_p PROC FRAME
+  _sysv_interop_prolog
+
+  ; RCX = symbol_ptr
+  ; RDX = a0
+  mov rdi, rdx
+  call rcx
+
+  _sysv_interop_epilog
+  ret
+iree_elf_call_i_p ENDP
+
+; int iree_elf_call_i_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2)
+iree_elf_call_i_ppp PROC FRAME
   _sysv_interop_prolog
 
   ; RCX = symbol_ptr
   ; RDX = a0
   ; R8 = a1
+  ; R9 = a2
   mov rdi, rdx
   mov rsi, r8
+  mov rdx, r9
   call rcx
 
   _sysv_interop_epilog
   ret
-iree_elf_call_i_pp ENDP
+iree_elf_call_i_ppp ENDP
 
 _TEXT ENDS
 END

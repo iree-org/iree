@@ -18,6 +18,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "convert_to_mhlo.mlir",
+            "direct_lowering.mlir",
             "lower_global_tensors.mlir",
             "lower_global_tensors_complex.mlir",
             "lower_global_tensors_invalid.mlir",

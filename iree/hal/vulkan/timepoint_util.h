@@ -18,7 +18,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/util/intrusive_list.h"

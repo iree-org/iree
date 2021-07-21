@@ -28,8 +28,8 @@ cc_library(
     ],
     deps = [
         "//iree/base",
+        "//iree/base:cc",
         "//iree/base:core_headers",
-        "//iree/base:status",
         "//iree/base:tracing",
         "//iree/base/internal:flags",
         "//iree/hal",

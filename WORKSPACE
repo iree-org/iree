@@ -34,7 +34,7 @@ bazel_skylib_workspace()
 maybe(
     local_repository,
     name = "llvm_bazel",
-    path = "third_party/llvm-bazel/llvm-bazel",
+    path = "third_party/llvm-project/utils/bazel",
 )
 
 load("@llvm_bazel//:zlib.bzl", "llvm_zlib_disable")

@@ -53,7 +53,10 @@ void* iree_elf_call_p_i(const void* symbol_ptr, int a0);
 // void*(*)(int, void*)
 void* iree_elf_call_p_ip(const void* symbol_ptr, int a0, void* a1);
 
-// int(*)(void*, void*)
-int iree_elf_call_i_pp(const void* symbol_ptr, void* a0, void* a1);
+// int(*)(void*)
+int iree_elf_call_i_p(const void* symbol_ptr, void* a0);
+
+// int(*)(void*, void*, void*)
+int iree_elf_call_i_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2);
 
 #endif  // IREE_HAL_LOCAL_ELF_ARCH_H_

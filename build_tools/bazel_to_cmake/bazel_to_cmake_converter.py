@@ -126,29 +126,7 @@ def _convert_target(target):
   """Returns a list of targets that correspond to the specified Bazel target.
   Note that this must be a list because some targets have a one to many mapping.
   """
-  if target.startswith(":") and target.endswith(("_gen", "Gen")):
-    # Files created by gentbl have to be included as source and header files
-    # and not as a dependency. Adding these targets to the dependencies list,
-    # results in linkage failures if the library including the gentbl dep is
-    # marked as ALWAYSLINK.
-    # This drops deps in the local namespace ending with '_gen' and 'Gen'
-    target = [""]
-  elif not target.startswith(("//bindings", "//experimental", "//iree", ":")):
-    # External target, call helper method for special case handling.
-    target = bazel_to_cmake_targets.convert_external_target(target)
-  else:
-    # Bazel `:api`            -> CMake `::api`
-    # Bazel `//iree/base`     -> CMake `iree::base`
-    # Bazel `//iree/base:foo` -> CMake `iree::base::foo`
-    target = target.replace("//bindings", "bindings")  # bindings:api
-    # Support for experimental targets is best effort with no guarantees.
-    target = target.replace("//experimental",
-                            "experimental")  # experimental:api
-    target = target.replace("//iree", "iree")  # iree/base:foo
-    target = target.replace(":", "::")  # iree/base::foo or ::foo
-    target = target.replace("/", "::")  # iree::base
-    target = [target]
-  return target
+  return bazel_to_cmake_targets.convert_target(target)
 
 
 def _convert_single_target(target):
@@ -250,6 +228,9 @@ class BuildFileFunctions(object):
   def exports_files(self, *args, **kwargs):
     pass
 
+  def td_library(self, *args, **kwargs):
+    pass
+
   # Technically we could do something with a CMake equivalent but we have no use
   # case.
   def py_binary(self, *args, **kwargs):
@@ -260,13 +241,8 @@ class BuildFileFunctions(object):
     # attribute and pass them along to any targets that depend on the filegroup.
     # Cross-package dependencies and complicated globs could be hard to handle.
 
-    # We have a bunch of filegroups that just contain TD files. CMake doesn't
-    # model this at all, so we'll just hardcode this special case.
-    # TODO(gcmn): Handle this robustly
-    if name == "td_files":
-      return
-
     self._convert_unimplemented_function("filegroup", name)
+
 
   def sh_binary(self, name, **kwargs):
     self._convert_unimplemented_function("sh_binary", name)
@@ -497,7 +473,8 @@ class BuildFileFunctions(object):
                         td_file,
                         tbl_outs,
                         td_srcs=None,
-                        td_includes=None,
+                        deps=None,
+                        includes=None,
                         strip_include_prefix=None,
                         test=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -518,8 +495,9 @@ class BuildFileFunctions(object):
                         td_file,
                         tbl_outs,
                         td_srcs=None,
-                        td_includes=None,
-                        strip_include_prefix=None):
+                        includes=None,
+                        deps=None,
+                        test=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     tblgen_block = _convert_tblgen_block(tblgen)
     td_file_block = _convert_td_file_block(td_file)

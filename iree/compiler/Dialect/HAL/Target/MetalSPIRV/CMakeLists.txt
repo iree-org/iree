@@ -24,12 +24,13 @@ iree_cc_library(
   DEPS
     ::SPIRVToMSL
     MLIRAffine
-    MLIRGPU
+    MLIRGPUOps
     MLIRLinalg
     MLIRSPIRV
     MLIRSPIRVSerialization
     MLIRVector
-    iree::compiler::Conversion::Common
+    iree::compiler::Codegen::Common
+    iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::SPIRVCommon
     iree::compiler::Utils

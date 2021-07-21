@@ -28,6 +28,14 @@ static void splitFunctionIONames(StringAttr namesAttr,
 class ConvertModuleMetadataPass
     : public PassWrapper<ConvertModuleMetadataPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-tflite-convert-module-metadata";
+  }
+
+  StringRef getDescription() const override {
+    return "Converts TFLite attributes to IREE attributes on modules";
+  }
+
   void runOnOperation() override {
     // None currently handled.
   }
@@ -36,6 +44,14 @@ class ConvertModuleMetadataPass
 class ConvertFunctionMetadataPass
     : public PassWrapper<ConvertFunctionMetadataPass, OperationPass<FuncOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-tflite-convert-function-metadata";
+  }
+
+  StringRef getDescription() const override {
+    return "Converts TFLite attributes to IREE attributes on functions";
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
 
@@ -97,13 +113,8 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertFunctionMetadataPass() {
   return std::make_unique<ConvertFunctionMetadataPass>();
 }
 
-static PassRegistration<ConvertModuleMetadataPass> modulePass(
-    "iree-tflite-convert-module-metadata",
-    "Converts TFLite attributes to IREE attributes on modules");
-
-static PassRegistration<ConvertFunctionMetadataPass> funcPass(
-    "iree-tflite-convert-function-metadata",
-    "Converts TFLite attributes to IREE attributes on functions");
+static PassRegistration<ConvertModuleMetadataPass> modulePass;
+static PassRegistration<ConvertFunctionMetadataPass> funcPass;
 
 }  // namespace TFL
 }  // namespace iree_integrations

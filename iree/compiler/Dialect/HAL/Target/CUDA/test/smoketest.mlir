@@ -25,7 +25,7 @@ flow.executable @add_dispatch_0 {
 
 // PTX: .entry add_dispatch_0
 // PTX:   add.rn.f32
-// PTX:   sqrt.rn.f32
+// PTX:   sqrt
 
 //      CHECK:   hal.executable.binary @cuda attributes {
 // CHECK-SAME:     data = dense

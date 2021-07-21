@@ -6,12 +6,13 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
-#include "emitc/Dialect/EmitC/IR/EmitC.h"
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
@@ -21,6 +22,22 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
+// TODO(simon-camp): This is adapted in the CModuleTarget.
+static Optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
+                                               IREE::VM::FuncOp &funcOp) {
+  return std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName()) +
+         "_impl";
+}
+
+static Optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
+                                               IREE::VM::ImportOp &importOp) {
+  auto callingConvention = makeImportCallingConventionString(importOp);
+  if (!callingConvention.hasValue()) {
+    return None;
+  }
+  return std::string("call_") + callingConvention.getValue() + "_import";
+}
 
 template <typename SrcOpTy>
 Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
@@ -79,7 +96,8 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
 
 /// Generate two calls which resemble the IREE_RETURN_IF_ERROR macro. We need
 /// to split it here becasue we cannot produce a macro invocation with a
-/// function call as argument in emitc.
+/// function call as argument in emitc. Locally allocated refs will be released
+/// before the return.
 emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
                            StringAttr callee, ArrayAttr args,
                            ArrayAttr templateArgs, ArrayRef<Value> operands) {
@@ -103,6 +121,33 @@ emitc::CallOp failableCall(ConversionPatternRewriter &rewriter, Location loc,
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{callOp.getResult(0)});
   return callOp;
+}
+
+// TODO(simon-camp/marbre): Use this function throughout the conversions.
+Optional<std::string> getCType(Type type) {
+  if (auto iType = type.dyn_cast<IntegerType>()) {
+    switch (iType.getWidth()) {
+      case 32:
+      case 64:
+        return std::string("int") + std::to_string(iType.getWidth()) +
+               std::string("_t");
+    }
+  }
+
+  if (auto fType = type.dyn_cast<FloatType>()) {
+    switch (fType.getWidth()) {
+      case 32:
+        return std::string("float");
+      case 64:
+        return std::string("double");
+    }
+  }
+
+  if (auto oType = type.dyn_cast<emitc::OpaqueType>()) {
+    return std::string(oType.getValue());
+  }
+
+  return None;
 }
 
 SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
@@ -171,6 +216,139 @@ class CallOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
+class VMCallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
+  using OpConversionPattern<IREE::VM::CallOp>::OpConversionPattern;
+
+ private:
+  LogicalResult matchAndRewrite(
+      IREE::VM::CallOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto ctx = op.getContext();
+    auto loc = op.getLoc();
+
+    auto funcOp =
+        lookupSymbolRef<IREE::VM::CallOp, IREE::VM::FuncOp>(op, "callee");
+    auto importOp =
+        lookupSymbolRef<IREE::VM::CallOp, IREE::VM::ImportOp>(op, "callee");
+
+    assert(funcOp || importOp);
+    assert(!(funcOp && importOp));
+
+    auto moduleOp =
+        funcOp ? funcOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>()
+               : importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
+
+    const bool isImported = importOp != nullptr;
+
+    Optional<std::string> funcName = isImported
+                                         ? buildFunctionName(moduleOp, importOp)
+                                         : buildFunctionName(moduleOp, funcOp);
+
+    if (op.getNumResults() > 1) {
+      return op.emitError()
+             << "only internal calls with at most one result supported for now";
+    }
+
+    if (!funcName.hasValue()) {
+      return op.emitError() << "Couldn't build function name";
+    }
+
+    SmallVector<Value, 4> updatedOperands(operands.begin(), operands.end());
+
+    if (op.getNumResults() == 0) {
+      SmallVector<Attribute, 4> args;
+      if (!isImported) {
+        // The order is arguments, results, stack, state
+        args = indexSequence(updatedOperands.size(), ctx);
+        args.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+      } else {
+        int importOrdinal = 0;
+        // TODO(simon-camp): split into multiple EmitC ops
+        std::string importArg = std::string("&state->imports[") +
+                                std::to_string(importOrdinal) +
+                                std::string("]");
+        // The order is stack, import, arguments, results
+        args.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args.push_back(emitc::OpaqueAttr::get(ctx, importArg));
+
+        for (auto operandIndex : indexSequence(updatedOperands.size(), ctx)) {
+          args.push_back(operandIndex);
+        }
+      }
+
+      auto callOp = failableCall(
+          /*rewriter=*/rewriter,
+          /*location=*/loc,
+          /*callee=*/StringAttr::get(ctx, funcName.getValue()),
+          /*args=*/rewriter.getArrayAttr(args),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/updatedOperands);
+
+      rewriter.eraseOp(op);
+
+      return success();
+    }
+
+    Type resultType = op.getType(0);
+    Optional<std::string> cType = getCType(resultType);
+
+    if (!cType.hasValue()) {
+      return op.emitError() << "unable to emit C type";
+    }
+
+    if (op.getNumResults() == 1) {
+      std::string cPtrType = cType.getValue() + std::string("*");
+
+      auto constantOp = rewriter.replaceOpWithNewOp<emitc::ConstantOp>(
+          /*op=*/op,
+          /*resultType=*/resultType,
+          /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+
+      auto ptrOp = rewriter.create<emitc::ApplyOp>(
+          /*location=*/loc,
+          /*result=*/emitc::OpaqueType::get(ctx, cPtrType),
+          /*applicableOperator=*/StringAttr::get(ctx, "&"),
+          /*operand=*/constantOp.getResult());
+
+      updatedOperands.push_back(ptrOp.getResult());
+
+      SmallVector<Attribute, 4> args;
+      if (!isImported) {
+        // The order is arguments, results, stack, state
+        args = indexSequence(updatedOperands.size(), ctx);
+        args.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args.push_back(emitc::OpaqueAttr::get(ctx, "state"));
+      } else {
+        int importOrdinal = 0;
+        // TODO(simon-camp): split into multiple EmitC ops
+        std::string importArg = std::string("&state->imports[") +
+                                std::to_string(importOrdinal) +
+                                std::string("]");
+        // The order is stack, import, arguments, results
+        args.push_back(emitc::OpaqueAttr::get(ctx, "stack"));
+        args.push_back(emitc::OpaqueAttr::get(ctx, importArg));
+
+        for (auto operandIndex : indexSequence(updatedOperands.size(), ctx)) {
+          args.push_back(operandIndex);
+        }
+      }
+
+      auto callOp = failableCall(
+          /*rewriter=*/rewriter,
+          /*location=*/loc,
+          /*callee=*/StringAttr::get(ctx, funcName.getValue()),
+          /*args=*/rewriter.getArrayAttr(args),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/updatedOperands);
+
+      return success();
+    }
+
+    return failure();
+  }
+};
+
 template <typename CmpOpTy>
 class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
  public:
@@ -212,7 +390,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
 
     if (moveLhs) {
       rewriter.create<emitc::CallOp>(
-          /*loc=*/loc,
+          /*location=*/loc,
           /*type=*/TypeRange{},
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
@@ -223,7 +401,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
     // NOTE: If lhs and rhs alias we call release twice on the same argument.
     if (moveRhs) {
       rewriter.create<emitc::CallOp>(
-          /*loc=*/loc,
+          /*location=*/loc,
           /*type=*/TypeRange{},
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
@@ -275,7 +453,7 @@ class CompareRefNotZeroOpConversion
 
     if (move) {
       rewriter.create<emitc::CallOp>(
-          /*loc=*/loc,
+          /*location=*/loc,
           /*type=*/TypeRange{},
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
@@ -296,8 +474,8 @@ class ConstOpConversion : public OpRewritePattern<ConstOpTy> {
 
   LogicalResult matchAndRewrite(ConstOpTy constOp,
                                 PatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<emitc::ConstOp>(constOp, constOp.getType(),
-                                                constOp.value());
+    rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constOp, constOp.getType(),
+                                                   constOp.value());
     return success();
   }
 };
@@ -320,7 +498,7 @@ class ConstZeroOpConversion : public OpRewritePattern<ConstZeroOpTy> {
       return failure();
     }
 
-    rewriter.replaceOpWithNewOp<emitc::ConstOp>(constZeroOp, type, value);
+    rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constZeroOp, type, value);
     return success();
   }
 };
@@ -363,7 +541,7 @@ class ConstRefZeroOpConversion
         /*operands=*/ArrayRef<Value>{});
 
     rewriter.create<emitc::CallOp>(
-        /*loc=*/loc,
+        /*location=*/loc,
         /*type=*/TypeRange{},
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
         /*args=*/ArrayAttr{},
@@ -449,7 +627,7 @@ class ConstRefRodataOpConversion
 
     failableCall(
         /*rewriter=*/rewriter,
-        /*loc=*/loc,
+        /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_wrap_retain"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -613,7 +791,7 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
     if (failable) {
       auto callOp = failableCall(
           /*rewriter=*/rewriter,
-          /*loc=*/loc,
+          /*location=*/loc,
           /*callee=*/StringAttr::get(ctx, funcName),
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
@@ -692,7 +870,7 @@ class ListAllocOpConversion
       return failure();
     }
 
-    auto listOp = rewriter.create<emitc::ConstOp>(
+    auto listOp = rewriter.create<emitc::ConstantOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
         /*value=*/emitc::OpaqueAttr::get(ctx, "NULL"));
@@ -794,7 +972,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
       return getOp.emitOpError() << "element type not handled";
     }
 
-    auto valueOp = rewriter.create<emitc::ConstOp>(
+    auto valueOp = rewriter.create<emitc::ConstantOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t"),
         /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -918,7 +1096,7 @@ class ListGetRefOpConversion
 
     failableCall(
         /*rewriter=*/rewriter,
-        /*loc=*/loc,
+        /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_get_ref_retain"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -1014,7 +1192,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
 
     auto callOp = failableCall(
         /*rewriter=*/rewriter,
-        /*loc=*/loc,
+        /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_set_value"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -1080,7 +1258,7 @@ class ListSetRefOpConversion
 
     auto callOp = failableCall(
         /*rewriter=*/rewriter,
-        /*loc=*/loc,
+        /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_set_ref_retain"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -1101,6 +1279,8 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns,
                                VMAnalysisCache &vmAnalysisCache) {
   populatePreserveCompilerHintsPatterns(context, patterns);
+  // Calls
+  patterns.insert<VMCallOpConversion>(context);
 
   // Globals
   patterns.insert<
@@ -1190,9 +1370,21 @@ void populateVMToEmitCPatterns(MLIRContext *context,
       context, "vm_cmp_ne_ref", vmAnalysisCache);
   patterns.insert<CompareRefNotZeroOpConversion>(context, vmAnalysisCache);
 
+  // ExtF32: Globals
+  patterns.insert<
+      GlobalLoadOpConversion<IREE::VM::GlobalLoadF32Op, IREE::VM::GlobalF32Op>>(
+      context, "vm_global_load_f32");
+  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreF32Op,
+                                          IREE::VM::GlobalF32Op>>(
+      context, "vm_global_store_f32");
+
   // ExtF32: Native floating-point constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstF32Op>>(context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstF32ZeroOp>>(context);
+
+  // ExtF32: Conditional assignment
+  patterns.insert<CallOpConversion<IREE::VM::SelectF32Op>>(context,
+                                                           "vm_select_f32");
 
   // ExtF32: Native floating-point arithmetic
   patterns.insert<CallOpConversion<IREE::VM::AddF32Op>>(context, "vm_add_f32");
@@ -1234,6 +1426,16 @@ void populateVMToEmitCPatterns(MLIRContext *context,
   patterns.insert<CallOpConversion<IREE::VM::TanhF32Op>>(context,
                                                          "vm_tanh_f32");
 
+  // ExtF32: Casting and type conversion/emulation
+  patterns.insert<CallOpConversion<IREE::VM::CastSI32F32Op>>(context,
+                                                             "vm_cast_si32f32");
+  patterns.insert<CallOpConversion<IREE::VM::CastUI32F32Op>>(context,
+                                                             "vm_cast_ui32f32");
+  patterns.insert<CallOpConversion<IREE::VM::CastF32SI32Op>>(context,
+                                                             "vm_cast_f32si32");
+  patterns.insert<CallOpConversion<IREE::VM::CastF32UI32Op>>(context,
+                                                             "vm_cast_f32ui32");
+
   // ExtF32: Comparison ops
   patterns.insert<CallOpConversion<IREE::VM::CmpEQF32OOp>>(context,
                                                            "vm_cmp_eq_f32o");
@@ -1253,6 +1455,14 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                                             "vm_cmp_lte_f32u");
   patterns.insert<CallOpConversion<IREE::VM::CmpNaNF32Op>>(context,
                                                            "vm_cmp_nan_f32");
+
+  // ExtI64: Globals
+  patterns.insert<
+      GlobalLoadOpConversion<IREE::VM::GlobalLoadI64Op, IREE::VM::GlobalI64Op>>(
+      context, "vm_global_load_i64");
+  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreI64Op,
+                                          IREE::VM::GlobalI64Op>>(
+      context, "vm_global_store_i64");
 
   // ExtI64: Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI64Op>>(context);
@@ -1324,6 +1534,12 @@ class ConvertVMToEmitCPass
     registry.insert<mlir::emitc::EmitCDialect, IREEDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-convert-vm-to-emitc"; }
+
+  StringRef getDescription() const override {
+    return "Convert VM Ops to the EmitC dialect";
+  }
+
   void runOnOperation() override {
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter;
@@ -1352,18 +1568,20 @@ class ConvertVMToEmitCPass
     target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
     target.addLegalOp<IREE::VM::FuncOp>();
     target.addLegalOp<IREE::VM::ExportOp>();
+    target.addLegalOp<IREE::VM::ImportOp>();
 
     // Global ops
     target.addLegalOp<IREE::VM::GlobalI32Op>();
+    target.addLegalOp<IREE::VM::GlobalI64Op>();
+    target.addLegalOp<IREE::VM::GlobalF32Op>();
     target.addLegalOp<IREE::VM::RodataOp>();
 
     // Control flow ops
     target.addLegalOp<IREE::VM::BranchOp>();
-    target.addLegalOp<IREE::VM::CallOp>();
     target.addLegalOp<IREE::VM::CondBranchOp>();
     // Note: We translate the fail op to two function calls in the
     // end, but we can't simply convert it here because it is a
-    // terminator.
+    // terminator and an EmitC call is not.
     target.addLegalOp<IREE::VM::FailOp>();
     target.addLegalOp<IREE::VM::ReturnOp>();
 
@@ -1384,8 +1602,7 @@ createConvertVMToEmitCPass() {
 }  // namespace VM
 }  // namespace IREE
 
-static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass(
-    "iree-convert-vm-to-emitc", "Convert VM Ops to the EmitC dialect");
+static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass;
 
 }  // namespace iree_compiler
 }  // namespace mlir

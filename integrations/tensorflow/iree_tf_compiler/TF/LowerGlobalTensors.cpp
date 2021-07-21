@@ -169,6 +169,15 @@ class LowerGlobalTensors
                     iree_compiler::IREEDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-tf-saved-model-lower-global-tensors";
+  }
+
+  StringRef getDescription() const override {
+    return "Lowers tf_saved_model global tensors to IREE flow dialect "
+           "variables";
+  }
+
   void runOnOperation() override {
     if (failed(convertTFGlobalTensorsToFlowVariables(getOperation()))) {
       signalPassFailure();
@@ -180,9 +189,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerGlobalTensorsPass() {
   return std::make_unique<LowerGlobalTensors>();
 }
 
-static PassRegistration<LowerGlobalTensors> pass(
-    "iree-tf-saved-model-lower-global-tensors",
-    "Lowers tf_saved_model global tensors to IREE flow dialect variables");
+static PassRegistration<LowerGlobalTensors> pass;
 
 }  // namespace TF
 }  // namespace iree_integrations

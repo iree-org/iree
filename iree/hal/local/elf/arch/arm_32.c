@@ -134,9 +134,14 @@ void* iree_elf_call_p_ip(const void* symbol_ptr, int a0, void* a1) {
   return ((ptr_t)symbol_ptr)(a0, a1);
 }
 
-int iree_elf_call_i_pp(const void* symbol_ptr, void* a0, void* a1) {
-  typedef int (*ptr_t)(void*, void*);
-  return ((ptr_t)symbol_ptr)(a0, a1);
+int iree_elf_call_i_p(const void* symbol_ptr, void* a0) {
+  typedef int (*ptr_t)(void*);
+  return ((ptr_t)symbol_ptr)(a0);
+}
+
+int iree_elf_call_i_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2) {
+  typedef int (*ptr_t)(void*, void*, void*);
+  return ((ptr_t)symbol_ptr)(a0, a1, a2);
 }
 
 #endif  // IREE_ARCH_ARM_32

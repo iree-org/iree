@@ -14,34 +14,6 @@ endif()
 
 iree_cc_library(
   NAME
-    CallingConventionUtils
-  HDRS
-    "CallingConventionUtils.h"
-  SRCS
-    "CallingConventionUtils.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRSupport
-    iree::compiler::Dialect::VM::IR
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    ConstantEncodingUtils
-  HDRS
-    "ConstantEncodingUtils.h"
-  SRCS
-    "ConstantEncodingUtils.cpp"
-  DEPS
-    MLIRIR
-    MLIRSupport
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     init_targets
   HDRS
     "init_targets.h"

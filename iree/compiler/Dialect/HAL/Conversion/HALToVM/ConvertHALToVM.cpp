@@ -106,7 +106,14 @@ class ConvertHALToVMPass
     registry.insert<IREEDialect, IREE::VM::VMDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-convert-hal-to-vm"; }
+
+  StringRef getDescription() const override {
+    return "Convert the IREE HAL dialect to the IREE VM dialect";
+  }
+
   void runOnOperation() override {
+    if (getOperation().getBody()->empty()) return;
     auto *context = &getContext();
 
     VMConversionTarget conversionTarget(context);
@@ -146,12 +153,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass(
   return std::make_unique<ConvertHALToVMPass>(targetOptions);
 }
 
-static PassRegistration<ConvertHALToVMPass> pass(
-    "iree-convert-hal-to-vm",
-    "Convert the IREE HAL dialect to the IREE VM dialect", [] {
-      auto options = IREE::VM::getTargetOptionsFromFlags();
-      return std::make_unique<ConvertHALToVMPass>(options);
-    });
+static PassRegistration<ConvertHALToVMPass> pass([] {
+  auto options = IREE::VM::getTargetOptionsFromFlags();
+  return std::make_unique<ConvertHALToVMPass>(options);
+});
 
 }  // namespace iree_compiler
 }  // namespace mlir

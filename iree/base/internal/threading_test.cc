@@ -13,7 +13,7 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading_impl.h"  // to test the override list
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 

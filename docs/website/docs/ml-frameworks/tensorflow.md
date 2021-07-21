@@ -57,7 +57,8 @@ print(list(loaded_model.signatures.keys()))
     ["Missing serving signature in SavedModel"](#missing-serving-signature-in-savedmodel).
 
 Then you can import the model with `iree-import-tf`. You can read the options
-supported via `iree-import-tf -help`. Using [MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
+supported via `iree-import-tf -help`. Using
+[MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 as an example and assuming the serving signature is `predict`:
 
 ``` shell
@@ -69,7 +70,8 @@ iree-import-tf
 
 !!! tip
 
-    `iree-import-tf` is installed as `/path/to/python/site-packages/iree/tools/tf/iree-import-tf`.
+    `iree-import-tf` is installed as
+    `/path/to/python/site-packages/iree/tools/tf/iree-import-tf`.
     You can find out the full path to the `site-packages` directory via the
     `python -m site` command.
 
@@ -77,7 +79,8 @@ iree-import-tf
     and v2 if you see one of them gives an empty dump.
 
 Afterwards you can further compile the model in `iree_input.mlir` for
-[CPU](/backends/cpu-dylib/) or [GPU](/backends/gpu-vulkan/).
+[CPU](/deployment-configurations/cpu-dylib/) or
+[GPU](/deployment-configurations/gpu-vulkan/).
 
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
 
@@ -103,11 +106,13 @@ directory.
 
 ### Missing serving signature in SavedModel
 
-Sometimes SavedModels are exported without explicit [serving signatures](https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export).
+Sometimes SavedModels are exported without explicit
+[serving signatures](https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export).
 This happens by default for TensorFlow Hub SavedModels. However, serving
 signatures are required as entry points for IREE compilation flow. You
 can use Python to load and re-export the SavedModel to give it serving
-signatures. For example, for [MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification),
+signatures. For example, for
+[MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification),
 assuming we want the serving signature to be `predict` and operating on a
 224x224 RGB image:
 

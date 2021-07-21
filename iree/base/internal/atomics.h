@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 
 #ifdef __cplusplus
@@ -56,7 +57,13 @@ extern "C" {
 // int32_t or int64_t). This limits what we need to port and it's really all
 // that's needed anyway.
 
-#if defined(IREE_COMPILER_MSVC)
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
+// Atomics are disabled as we've forced ourselves into a fully thread-hostile
+// configuration. Used on bare-metal systems with single cores.
+#include "iree/base/internal/atomics_disabled.h"  // IWYU pragma: export
+
+#elif defined(IREE_COMPILER_MSVC)
 
 // Atomics using the Win32 Interlocked* APIs.
 #include "iree/base/internal/atomics_msvc.h"  // IWYU pragma: export

@@ -6,11 +6,13 @@
 
 #include "experimental/rocm/rocm_event.h"
 
-#include "experimental/rocm/status_util.h"
+#include <stddef.h>
+
+#include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
 // Dummy events for now, don't do anything.
-typedef struct {
+typedef struct iree_hal_rocm_event_t {
   iree_hal_resource_t resource;
   iree_hal_rocm_context_wrapper_t *context_wrapper;
 } iree_hal_rocm_event_t;

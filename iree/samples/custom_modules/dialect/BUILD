@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
-load("//build_tools/bazel:tblgen.bzl", "gentbl_cc_library")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -14,12 +14,17 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-filegroup(
+td_library(
     name = "td_files",
     srcs = enforce_glob(
         ["custom_ops.td"],
         include = ["*.td"],
     ),
+    deps = [
+        "//iree/compiler/Dialect/HAL/IR:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:StdOpsTdFiles",
+    ],
 )
 
 cc_library(
@@ -64,12 +69,7 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "custom_ops.td",
-    td_srcs = [
-        ":td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-        "//iree/compiler/Dialect/HAL/IR:td_files",
-        "@llvm-project//mlir:StdOpsTdFiles",
-    ],
+    deps = [":td_files"],
 )
 
 c_embed_data(
@@ -109,7 +109,6 @@ cc_binary(
     srcs = ["custom-translate-main.cc"],
     deps = [
         ":init_dialect",
-        "//iree/compiler/Conversion:init_conversions",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",

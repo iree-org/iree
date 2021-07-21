@@ -12,9 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/string_view.h"
-#include "absl/types/span.h"
-#include "iree/base/status.h"
+#include "iree/base/internal/span.h"
+#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
@@ -36,10 +35,7 @@ Status GetFileContents(const char* path, std::string* out_contents);
 // Uses descriptors in |descs| for type information and validation.
 // The returned variant list must be freed by the caller.
 Status ParseToVariantList(iree_hal_allocator_t* allocator,
-                          absl::Span<const absl::string_view> input_strings,
-                          iree_vm_list_t** out_list);
-Status ParseToVariantList(iree_hal_allocator_t* allocator,
-                          absl::Span<const std::string> input_strings,
+                          iree::span<const std::string> input_strings,
                           iree_vm_list_t** out_list);
 
 // Prints a variant list of VM scalars and buffers to |os|.
@@ -56,16 +52,6 @@ Status PrintVariantList(iree_vm_list_t* variant_list,
 // Creates the default device for |driver| in |out_device|.
 // The returned |out_device| must be released by the caller.
 Status CreateDevice(const char* driver_name, iree_hal_device_t** out_device);
-
-// Creates a hal module |driver| in |out_hal_module|.
-// The returned |out_module| must be released by the caller.
-Status CreateHalModule(iree_hal_device_t* device,
-                       iree_vm_module_t** out_module);
-
-// Loads a VM bytecode from an opaque string.
-// The returned |out_module| must be released by the caller.
-Status LoadBytecodeModule(absl::string_view module_data,
-                          iree_vm_module_t** out_module);
 
 }  // namespace iree
 

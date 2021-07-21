@@ -26,7 +26,8 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor);
 
 iree_status_t iree_task_executor_create(
     iree_task_scheduling_mode_t scheduling_mode,
-    const iree_task_topology_t* topology, iree_allocator_t allocator,
+    const iree_task_topology_t* topology,
+    iree_host_size_t worker_local_memory_size, iree_allocator_t allocator,
     iree_task_executor_t** out_executor) {
   iree_host_size_t worker_count = iree_task_topology_group_count(topology);
   if (worker_count > IREE_TASK_EXECUTOR_MAX_WORKER_COUNT) {
@@ -48,8 +49,19 @@ iree_status_t iree_task_executor_create(
   IREE_ASSERT_ARGUMENT(out_executor);
   *out_executor = NULL;
 
-  iree_host_size_t executor_size =
-      sizeof(iree_task_executor_t) + worker_count * sizeof(iree_task_worker_t);
+  // The executor is followed in memory by worker[] + worker_local_memory[].
+  // The whole point is that we don't want destructive sharing between workers
+  // so ensure we are aligned to at least the destructive interference size.
+  worker_local_memory_size = iree_host_align(
+      worker_local_memory_size, iree_hardware_destructive_interference_size);
+  iree_host_size_t executor_base_size =
+      iree_host_align(sizeof(iree_task_executor_t),
+                      iree_hardware_destructive_interference_size);
+  iree_host_size_t worker_list_size =
+      iree_host_align(worker_count * sizeof(iree_task_worker_t),
+                      iree_hardware_destructive_interference_size);
+  iree_host_size_t executor_size = executor_base_size + worker_list_size +
+                                   worker_count * worker_local_memory_size;
 
   iree_task_executor_t* executor = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -107,7 +119,11 @@ iree_status_t iree_task_executor_create(
   // (if the platform supports it) awaiting the first tasks getting scheduled.
   if (iree_status_is_ok(status)) {
     executor->worker_count = worker_count;
-    executor->workers = (iree_task_worker_t*)(executor + 1);
+    executor->workers =
+        (iree_task_worker_t*)((uint8_t*)executor + executor_base_size);
+    uint8_t* worker_local_memory =
+        (uint8_t*)executor->workers + worker_list_size;
+
     iree_task_affinity_set_t worker_idle_mask = 0;
     iree_task_affinity_set_t worker_live_mask = 0;
     iree_task_affinity_set_t worker_suspend_mask = 0;
@@ -122,8 +138,10 @@ iree_status_t iree_task_executor_create(
 
       iree_task_worker_t* worker = &executor->workers[i];
       status = iree_task_worker_initialize(
-          executor, i, iree_task_topology_get_group(topology, i), &seed_prng,
-          worker);
+          executor, i, iree_task_topology_get_group(topology, i),
+          iree_make_byte_span(worker_local_memory, worker_local_memory_size),
+          &seed_prng, worker);
+      worker_local_memory += worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
     iree_atomic_task_affinity_set_store(&executor->worker_live_mask,

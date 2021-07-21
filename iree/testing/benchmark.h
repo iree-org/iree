@@ -96,8 +96,10 @@ typedef enum iree_benchmark_unit_e {
   IREE_BENCHMARK_UNIT_NANOSECOND,
 } iree_benchmark_unit_t;
 
+typedef struct iree_benchmark_def_t iree_benchmark_def_t;
+
 // A benchmark case definition.
-typedef struct iree_benchmark_def_t {
+struct iree_benchmark_def_t {
   // IREE_BENCHMARK_FLAG_* bitmask controlling benchmark behavior and reporting.
   iree_benchmark_flags_t flags;
 
@@ -114,8 +116,9 @@ typedef struct iree_benchmark_def_t {
   // Runs the benchmark to completion.
   // Implementations must call iree_benchmark_keep_running in a loop until it
   // returns false.
-  iree_status_t (*run)(iree_benchmark_state_t* state);
-} iree_benchmark_def_t;
+  iree_status_t (*run)(const iree_benchmark_def_t* benchmark_def,
+                       iree_benchmark_state_t* benchmark_state);
+};
 
 // Registers a benchmark with the given definition.
 void iree_benchmark_register(iree_string_view_t name,

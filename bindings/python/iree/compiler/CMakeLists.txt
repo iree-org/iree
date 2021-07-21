@@ -10,6 +10,7 @@ iree_py_library(
   SRCS
     "__init__.py"
     "core.py"
+    "debugging.py"
     "tf.py"
     "tflite.py"
     "tools.py"
@@ -20,4 +21,6 @@ iree_py_install_package(
   COMPONENT IreePythonPackage-compiler
   PACKAGE_NAME iree_compiler
   MODULE_PATH iree/compiler
+  ADDL_PACKAGE_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/README.md
 )

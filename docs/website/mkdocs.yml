@@ -101,12 +101,14 @@ nav:
       - JAX: 'ml-frameworks/jax.md'
   - 'Deployment configurations':
       - CPU - Dylib: 'deployment-configurations/cpu-dylib.md'
+      - CPU - Bare-Metal: 'deployment-configurations/bare-metal.md'
       - GPU - Vulkan: 'deployment-configurations/gpu-vulkan.md'
   - 'Building from source':
       # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
       - 'building-from-source/getting-started.md'
       - Optional features: 'building-from-source/optional-features.md'
       - Android cross-compilation: 'building-from-source/android.md'
+      - RISC-V cross-compilation: 'building-from-source/riscv.md'
   - 'Bindings':
       - C API: 'bindings/c-api.md'
       - Python: 'bindings/python.md'

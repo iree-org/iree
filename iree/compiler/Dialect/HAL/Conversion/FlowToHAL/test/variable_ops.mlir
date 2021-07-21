@@ -61,3 +61,44 @@ func @fn() {
   flow.variable.store %0, @var_with_initializer : tensor<f32>
   return
 }
+
+// -----
+// Checks that the implicit cast allowing a buffer_view to store into a variable
+// that maps to a buffer is permitted.
+// CHECK-LABEL: hal.variable @var_with_buffer_view_store
+// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
+// CHECK: hal.variable.store %[[buffer]], @var_with_buffer_view_store : !hal.buffer
+flow.variable @var_with_buffer_view_store mutable dense<0.000000e+00> : tensor<f32>
+func @fn(%arg0: !hal.buffer_view) {
+  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<f32>
+  flow.variable.store %0, @var_with_buffer_view_store : tensor<f32>
+  return
+}
+
+// -----
+// Checks that stores are permitted for variables that do not dominate the
+// function containing a store.
+// CHECK-LABEL: func @store_var_out_of_order
+// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
+// CHECK: hal.variable.store %[[buffer]], @var_out_of_order : !hal.buffer
+func @store_var_out_of_order(%arg0: !hal.buffer_view) {
+  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<f32>
+  flow.variable.store %0, @var_out_of_order : tensor<f32>
+  return
+}
+flow.variable @var_out_of_order mutable dense<0.000000e+00> : tensor<f32>
+
+// -----
+// Checks that the implicit cast allowing a buffer_view to indirect store into
+// a variable that maps to a buffer is permitted.
+// CHECK-LABEL: hal.variable @var_indirect_with_buffer_view_store
+// CHECK: %[[ptr:.*]] = hal.variable.address @var_indirect_with_buffer_view_store : !iree.ptr<!hal.buffer>
+// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
+// CHECK: hal.variable.store.indirect %[[buffer]], %[[ptr]] : !hal.buffer -> !iree.ptr<!hal.buffer>
+flow.variable @var_indirect_with_buffer_view_store mutable : tensor<i32>
+func @fn(%arg0: !hal.buffer_view) {
+  %0 = flow.variable.address @var_indirect_with_buffer_view_store : !iree.ptr<tensor<i32>>
+  %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<i32>
+  flow.variable.store.indirect %1, %0 : tensor<i32> -> !iree.ptr<tensor<i32>>
+  return
+}

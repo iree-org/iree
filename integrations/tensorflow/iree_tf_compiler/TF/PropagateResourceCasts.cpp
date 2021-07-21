@@ -58,6 +58,14 @@ class PropagateResourceCastsPass
     registry.insert<mlir::TF::TensorFlowDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-tf-propagate-resource-casts";
+  }
+
+  StringRef getDescription() const override {
+    return "Propagates tf.resource type casts";
+  }
+
   void runOnOperation() override {
     auto operation = getOperation();
     for (auto func : operation.getOps<FuncOp>()) {
@@ -105,8 +113,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCastsPass() {
   return std::make_unique<PropagateResourceCastsPass>();
 }
 
-static PassRegistration<PropagateResourceCastsPass> pass(
-    "iree-tf-propagate-resource-casts", "Propagates tf.resource type casts");
+static PassRegistration<PropagateResourceCastsPass> pass;
 
 }  // namespace TF
 }  // namespace iree_integrations

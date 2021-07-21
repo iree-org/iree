@@ -16,17 +16,18 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/logging.h"
-#include "iree/base/status.h"
+#include "iree/base/status_cc.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
-#include "iree/modules/check/native_module.h"
-#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/check/module.h"
+#include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/tools/utils/vm_util.h"
 #include "iree/vm/api.h"
+#include "iree/vm/bytecode_module.h"
 
 // On Windows stdin defaults to text mode and will get weird line ending
 // expansion that will corrupt the input binary.
@@ -99,14 +100,18 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
   }
 
   iree_vm_module_t* input_module = nullptr;
-  IREE_RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
+      iree_make_const_byte_span((void*)module_data.data(), module_data.size()),
+      iree_allocator_null(), iree_allocator_system(), &input_module));
 
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));
   iree_vm_module_t* hal_module = nullptr;
-  IREE_RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
   iree_vm_module_t* check_module = nullptr;
-  check_native_module_create(iree_allocator_system(), &check_module);
+  IREE_RETURN_IF_ERROR(
+      iree_check_module_create(iree_allocator_system(), &check_module));
 
   std::array<iree_vm_module_t*, 3> modules = {hal_module, check_module,
                                               input_module};

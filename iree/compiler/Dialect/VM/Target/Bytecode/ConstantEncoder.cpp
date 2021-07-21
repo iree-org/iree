@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/ConstantEncoder.h"
 
-#include "iree/compiler/Dialect/VM/Target/ConstantEncodingUtils.h"
+#include "iree/compiler/Dialect/VM/Utils/ConstantEncoding.h"
 #include "llvm/Support/CRC.h"
 #include "mlir/IR/BuiltinTypes.h"
 

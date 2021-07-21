@@ -31,7 +31,8 @@ cc_library(
     ],
     deps = [
         "//iree/base/internal:flatcc",
-        "//iree/compiler/Conversion/LinalgToLLVMGPU",
+        "//iree/compiler/Codegen:PassHeaders",
+        "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
         "//iree/schemas:rocm_executable_def_c_fbs",

@@ -29,9 +29,10 @@ iree_cc_library(
     MLIRSPIRVConversion
     MLIRSPIRVSerialization
     MLIRSupport
-    iree::compiler::Conversion::CodegenUtils
-    iree::compiler::Conversion::Common
-    iree::compiler::Conversion::LinalgToSPIRV
+    iree::compiler::Codegen::Common
+    iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::SPIRV
+    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::IREE::IR

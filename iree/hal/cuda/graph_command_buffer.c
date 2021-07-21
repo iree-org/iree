@@ -14,6 +14,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/cuda_buffer.h"
 #include "iree/hal/cuda/dynamic_symbols.h"
+#include "iree/hal/cuda/executable_layout.h"
 #include "iree/hal/cuda/native_executable.h"
 #include "iree/hal/cuda/status_util.h"
 
@@ -162,6 +163,18 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_end(
   }
   command_buffer->graph = NULL;
   return iree_ok_status();
+}
+
+static void iree_hal_cuda_graph_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  // TODO(benvanik): tracy event stack.
+}
+
+static void iree_hal_cuda_graph_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  // TODO(benvanik): tracy event stack.
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_execution_barrier(
@@ -343,6 +356,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+  iree_host_size_t base_binding =
+      iree_hal_cuda_base_binding_index(executable_layout, set);
   // Convention with the compiler side. We map bindings to kernel argument.
   // We compact the bindings to get a dense set of arguments and keep them order
   // based on the binding index.
@@ -363,7 +378,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
         iree_hal_cuda_buffer_device_pointer(
             iree_hal_buffer_allocated_buffer(binding.buffer)) +
         iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
-    *((CUdeviceptr*)command_buffer->current_descriptor[i]) = device_ptr;
+    *((CUdeviceptr*)command_buffer->current_descriptor[i + base_binding]) =
+        device_ptr;
   }
   return iree_ok_status();
 }
@@ -435,6 +451,9 @@ const iree_hal_command_buffer_vtable_t
             iree_hal_cuda_graph_command_buffer_allowed_categories,
         .begin = iree_hal_cuda_graph_command_buffer_begin,
         .end = iree_hal_cuda_graph_command_buffer_end,
+        .begin_debug_group =
+            iree_hal_cuda_graph_command_buffer_begin_debug_group,
+        .end_debug_group = iree_hal_cuda_graph_command_buffer_end_debug_group,
         .execution_barrier =
             iree_hal_cuda_graph_command_buffer_execution_barrier,
         .signal_event = iree_hal_cuda_graph_command_buffer_signal_event,

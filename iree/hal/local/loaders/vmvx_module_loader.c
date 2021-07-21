@@ -23,15 +23,6 @@
 // iree_hal_vmvx_executable_t
 //===----------------------------------------------------------------------===//
 
-// Maximum size allowed for the scratchpad memory used by dispatches.
-// TODO(benvanik): allow this to be specified as a reflection attr on the entry
-// points. For now we aren't even generating any code using it so keep it 0.
-// #define IREE_VMVX_MAX_SCRATCHPAD_SIZE (64 * 1024)
-#define IREE_VMVX_MAX_SCRATCHPAD_SIZE 0
-
-// Maximum number of bytes we can allocate on the stack for scratchpad storage.
-#define IREE_VMVX_MAX_STACK_SCRATCHPAD_SIZE (16 * 1024)
-
 #define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
 
 typedef struct iree_hal_vmvx_executable_t {
@@ -90,21 +81,24 @@ static iree_status_t iree_hal_vmvx_executable_create(
   iree_hal_vmvx_executable_t* executable = NULL;
   iree_host_size_t total_size =
       sizeof(*executable) + entry_count * sizeof(*executable->entry_fns) +
+      entry_count * sizeof(*executable->base.dispatch_attrs) +
       executable_layout_count * sizeof(iree_hal_local_executable_layout_t);
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
+  iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs = NULL;
   if (iree_status_is_ok(status)) {
+    uint8_t* ptr = (uint8_t*)executable + sizeof(*executable) +
+                   entry_count * sizeof(*executable->entry_fns);
+    dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t*)ptr;
+    ptr += entry_count * sizeof(*executable->base.dispatch_attrs);
     iree_hal_local_executable_layout_t** executable_layouts_ptr =
-        (iree_hal_local_executable_layout_t**)(((uint8_t*)executable) +
-                                               sizeof(*executable) +
-                                               entry_count *
-                                                   sizeof(
-                                                       *executable->entry_fns));
+        (iree_hal_local_executable_layout_t**)ptr;
     iree_hal_local_executable_initialize(
         &iree_hal_vmvx_executable_vtable, executable_layout_count,
         executable_layouts, executable_layouts_ptr, host_allocator,
         &executable->base);
     executable->context = context;
+    executable->base.dispatch_attrs = dispatch_attrs;
     iree_vm_context_retain(executable->context);
 
     executable->entry_fn_count = entry_count;
@@ -116,6 +110,23 @@ static iree_status_t iree_hal_vmvx_executable_create(
       status = iree_hal_vmvx_executable_verify_entry_point(
           &executable->entry_fns[i]);
       if (!iree_status_is_ok(status)) break;
+    }
+  }
+
+  // Query the optional local workgroup size from each entry point.
+  if (iree_status_is_ok(status)) {
+    // TODO(benvanik): pack this more efficiently; this requires a lot of
+    // queries and instead could be a single packed table we can directly
+    // reference from the module. Module-level reflection attrs would help.
+    for (iree_host_size_t i = 0; i < executable->entry_fn_count; ++i) {
+      iree_string_view_t local_memory_str = iree_vm_function_reflection_attr(
+          &executable->entry_fns[i], iree_make_cstring_view("local_memory"));
+      uint32_t local_memory_size = 0;
+      if (!iree_string_view_is_empty(local_memory_str)) {
+        iree_string_view_atoi_uint32(local_memory_str, &local_memory_size);
+      }
+      local_memory_size /= IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE;
+      dispatch_attrs[i].local_memory_pages = (uint16_t)local_memory_size;
     }
   }
 
@@ -146,7 +157,7 @@ static void iree_hal_vmvx_executable_destroy(
 static iree_status_t iree_hal_vmvx_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id) {
+    const iree_hal_vec3_t* workgroup_id, iree_byte_span_t local_memory) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
 
@@ -177,9 +188,10 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       iree_vm_list_storage_size(&buffer_type, dispatch_state->binding_count);
   void* binding_list_storage = iree_alloca(binding_list_size);
   iree_vm_list_t* binding_list = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_list_initialize(
-      iree_make_byte_span(binding_list_storage, binding_list_size),
-      &buffer_type, dispatch_state->binding_count, &binding_list));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_list_initialize(
+              iree_make_byte_span(binding_list_storage, binding_list_size),
+              &buffer_type, dispatch_state->binding_count, &binding_list));
   iree_vm_list_retain(binding_list);  // for call
 
   // Map bindings into on-stack VMVX buffers.
@@ -198,33 +210,19 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
                             dispatch_state->binding_lengths[i]),
         iree_allocator_null(), binding_buffer);
     iree_vm_ref_t ref = {0};
-    IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-        binding_buffer, iree_vm_buffer_type_id(), &ref));
-    IREE_RETURN_IF_ERROR(iree_vm_list_push_ref_retain(binding_list, &ref));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_vm_ref_wrap_assign(binding_buffer, iree_vm_buffer_type_id(),
+                                    &ref));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_vm_list_push_ref_retain(binding_list, &ref));
   }
 
-  // Acquire scratchpad memory for the dispatch.
-  // If it's small enough we can take it from the stack.
-  // TODO(benvanik): pull size from entry reflection attr (cache on executable).
-  // TODO(benvanik): allocate the stack/interface/etc from this same buffer.
-  iree_host_size_t scratchpad_size = IREE_VMVX_MAX_SCRATCHPAD_SIZE;
-  iree_byte_span_t scratch_memory;
-  if (scratchpad_size == 0) {
-    scratch_memory = iree_make_byte_span(NULL, 0);
-  } else if (scratchpad_size <= IREE_VMVX_MAX_STACK_SCRATCHPAD_SIZE) {
-    scratch_memory =
-        iree_make_byte_span(iree_alloca(scratchpad_size), scratchpad_size);
-  } else {
-    scratch_memory.data_length = scratchpad_size;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(executable->base.host_allocator,
-                                               scratchpad_size,
-                                               (void**)&scratch_memory.data));
-  }
-  iree_vm_buffer_t scratchpad_buffer;
+  // Acquire workgroup local memory for the dispatch.
+  iree_vm_buffer_t local_memory_buffer;
   iree_vm_buffer_initialize(
       IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_HOST,
-      scratch_memory, iree_allocator_null(), &scratchpad_buffer);
-  iree_vm_buffer_retain(&scratchpad_buffer);  // for call
+      local_memory, iree_allocator_null(), &local_memory_buffer);
+  iree_vm_buffer_retain(&local_memory_buffer);  // for call
 
   // Map the push constant memory directly from the dispatch state.
   iree_vm_buffer_t constants_buffer;
@@ -240,7 +238,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   // know the exact format we can assume here.
   //
   //   func @entry(
-  //       %scratchpad: !vmvx.buffer,
+  //       %local_memory: !vmvx.buffer,
   //       %constants: !vmvx.buffer,
   //       %bindings: !iree.list<!vmvx.buffer>,
   //       %workgroup_x: index,
@@ -257,7 +255,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   // NOTE: this level of the VM ABI is supported - but may change in the future.
   // Users should prefer to use the invocation API that is more stable.
   struct {
-    iree_vm_ref_t scratchpad;
+    iree_vm_ref_t local_memory;
     iree_vm_ref_t constants;
     iree_vm_ref_t bindings;
     uint32_t workgroup_x;
@@ -270,10 +268,10 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
     uint32_t workgroup_count_y;
     uint32_t workgroup_count_z;
   } call_args = {
-      .scratchpad =
+      .local_memory =
           {
               .type = iree_vm_buffer_type_id(),
-              .ptr = &scratchpad_buffer,
+              .ptr = &local_memory_buffer,
               .offsetof_counter = 0,
           },
       .constants =
@@ -317,7 +315,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
 
   iree_vm_stack_deinitialize(stack);
 
-  iree_vm_buffer_deinitialize(&scratchpad_buffer);
+  iree_vm_buffer_deinitialize(&local_memory_buffer);
   iree_vm_buffer_deinitialize(&constants_buffer);
   iree_vm_list_deinitialize(binding_list);
   for (iree_host_size_t i = 0; i < dispatch_state->binding_count; ++i) {
@@ -367,8 +365,9 @@ iree_status_t iree_hal_vmvx_module_loader_create(
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*executable_loader), (void**)&executable_loader);
   if (iree_status_is_ok(status)) {
-    iree_hal_executable_loader_initialize(&iree_hal_vmvx_module_loader_vtable,
-                                          &executable_loader->base);
+    iree_hal_executable_loader_initialize(
+        &iree_hal_vmvx_module_loader_vtable,
+        iree_hal_executable_import_provider_null(), &executable_loader->base);
     executable_loader->host_allocator = host_allocator;
     executable_loader->instance = instance;
     iree_vm_instance_retain(executable_loader->instance);

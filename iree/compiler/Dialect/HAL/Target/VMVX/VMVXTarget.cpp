@@ -39,7 +39,6 @@ class VMVXTargetBackend final : public TargetBackend {
   VMVXTargetBackend(VMVXTargetOptions options) : options_(std::move(options)) {}
 
   std::string name() const override { return "vmvx"; }
-  std::string filter_pattern() const override { return "vmvx"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<VM::VMDialect, VMVX::VMVXDialect>();
@@ -71,10 +70,10 @@ class VMVXTargetBackend final : public TargetBackend {
     linkedExecutableOp.setVisibility(
         sourceExecutableOps.front().getVisibility());
 
-    // Add our VMVX hal.executable.target with an empty module.
+    // Add our VMVX hal.executable.variant with an empty module.
     builder.setInsertionPointToStart(linkedExecutableOp.getBody());
-    auto linkedTargetOp = builder.create<IREE::HAL::ExecutableTargetOp>(
-        moduleOp.getLoc(), name(), filter_pattern());
+    auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
+        moduleOp.getLoc(), name(), name());
     builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
     auto linkedModuleOp = builder.create<ModuleOp>(moduleOp.getLoc());
 
@@ -91,16 +90,32 @@ class VMVXTargetBackend final : public TargetBackend {
         builder);
   }
 
-  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+  LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
+    // Add reflection information used at runtime specific to the HAL interface.
+    SymbolTable symbolTable(variantOp.getInnerModule());
+    for (auto entryPointOp :
+         variantOp.getBlock().getOps<ExecutableEntryPointOp>()) {
+      auto funcOp =
+          symbolTable.lookup<IREE::VM::FuncOp>(entryPointOp.getName());
+
+      // Optionally entry points may specify that they require workgroup local
+      // memory. We fetch that value here and plumb it through so the runtime
+      // knows how much memory to reserve and pass in.
+      auto localMemorySizeAttr = entryPointOp.workgroup_local_memoryAttr();
+      if (localMemorySizeAttr) {
+        funcOp.setReflectionAttr("local_memory", localMemorySizeAttr);
+      }
+    }
+
     // Serialize the VM module to bytes and embed it directly.
     SmallVector<char> moduleData;
     {
       IREE::VM::BytecodeTargetOptions bytecodeOptions;
       llvm::raw_svector_ostream stream(moduleData);
-      if (failed(translateModuleToBytecode(targetOp.getInnerModule(),
+      if (failed(translateModuleToBytecode(variantOp.getInnerModule(),
                                            bytecodeOptions, stream))) {
-        return targetOp.emitOpError()
+        return variantOp.emitOpError()
                << "failed to serialize VM bytecode module";
       }
     }
@@ -113,7 +128,7 @@ class VMVXTargetBackend final : public TargetBackend {
     // NOTE: this snapshots the flatbuffer builder data at the time it is called
     // and future changes to the target op will not be observed.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        targetOp.getLoc(), targetOp.sym_name(),
+        variantOp.getLoc(), variantOp.sym_name(),
         executableBuilder.getStringAttr("VMVX"), bufferAttr);
     return success();
   }

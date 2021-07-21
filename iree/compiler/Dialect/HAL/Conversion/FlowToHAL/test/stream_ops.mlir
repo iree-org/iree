@@ -5,7 +5,7 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @vmvx, filter="vmvx" {
+  hal.executable.variant @vmvx, target="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index
@@ -149,7 +149,7 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Discard|Write"
   }
-  hal.executable.target @vmvx, filter="vmvx" {
+  hal.executable.variant @vmvx, target="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index
@@ -184,6 +184,23 @@ func @tensorReshapeToDispatch(%arg0 : tensor<4x4x2xf32>) -> tensor<4x4x1x2xf32> 
   }
   // CHECK: return %[[RET_BUF]]
   return %0 : tensor<4x4x1x2xf32>
+}
+
+// -----
+// CHECK-LABEL: @tensorReshapeWithTiedConstant
+// There is nothing to verify here except that correct IR is generated (if
+// constants are not handled properly, it will produce illegally ordered IR).
+func @tensorReshapeWithTiedConstant(%arg0: !hal.buffer_view) -> !hal.buffer_view {
+  %0 = hal.buffer_view.dim %arg0, 0 : index
+  %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?xf32>{%0}
+  %2 = flow.ex.stream.fragment(%1) : (tensor<?xf32>{%0}) -> tensor<4xf32> =
+      (%arg1: tensor<?xf32>) -> tensor<4xf32> {
+    %c4 = constant 4 : index
+    %4 = flow.tensor.reshape %arg1 : tensor<?xf32>{%c4} -> tensor<4xf32>
+    flow.return %4 : tensor<4xf32>
+  }
+  %3 = hal.tensor.cast %2 : tensor<4xf32> -> !hal.buffer_view
+  return %3 : !hal.buffer_view
 }
 
 // -----
@@ -251,7 +268,7 @@ hal.executable @ex0 {
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @vmvx, filter="vmvx" {
+  hal.executable.variant @vmvx, target="vmvx" {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index
@@ -310,7 +327,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @tgt, filter="dylib-llvm-aot" {
+  hal.executable.variant @tgt, target="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
       interface = @io,
       ordinal = 0 : index
@@ -354,7 +371,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @tgt, filter="dylib-llvm-aot" {
+  hal.executable.variant @tgt, target="dylib-llvm-aot" {
     hal.executable.entry_point @entry attributes {
       interface = @io,
       ordinal = 0 : index
@@ -372,6 +389,8 @@ func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: ind
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %2 = flow.ex.stream.fragment(%arg0, %arg1, %arg2, %c1024, %c512) : (tensor<7x?x24x?xf32>{%arg1, %arg2}, index, index, index, index) -> tensor<?x?x1024xf32>{%arg2, %arg1} =
       (%arg3: tensor<7x?x24x?xf32>, %arg4: index, %arg5: index, %arg6: index, %arg7: index) -> tensor<?x?x1024xf32> {
+    // CHECK: #hal.device.match.id<"dylib"> {
+
     //      CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]]
     // CHECK-SAME:   layout(%executable_layout : !hal.executable_layout)[%c0]
     // CHECK-SAME:   bindings([
@@ -382,15 +401,9 @@ func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: ind
     // CHECK-SAME:   offset(0)
     // CHECK-SAME:   values([%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}]) : i32, i32, i32, i32
 
-    // CHECK: #hal.device.match.id<"dylib*">(
-    // CHECK-SAME: %[[CMD_INNER:.+]] = %cmd : !hal.command_buffer,
-    // CHECK-SAME: %[[COUNT_X:.+]] = %c1024 : index,
-    // CHECK-SAME: %[[COUNT_Y:.+]] = %c512 : index,
-    // CHECK-SAME: %[[COUNT_Z:.+]] = %c512 : index
-
-    //      CHECK: hal.command_buffer.dispatch.symbol<%[[CMD_INNER]]
+    //      CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]]
     // CHECK-SAME:   target(@ex::@tgt::@entry)
-    // CHECK-SAME:   workgroups([%[[COUNT_X]], %[[COUNT_Y]], %[[COUNT_Z]]])
+    // CHECK-SAME:   workgroups([%c1024, %c512, %c512])
     %6 = flow.dispatch @ex::@entry[%arg6, %arg7, %arg7](%arg3, %arg4, %arg5, %arg5, %arg4) {
       hal.bindings = [
         #hal.ex.operand_buffer<"arg0", 0 : index>,
@@ -414,7 +427,7 @@ hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @wo1, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.target @tgt, filter="dylib-llvm-aot" {
+  hal.executable.variant @tgt, target="dylib-llvm-aot" {
     hal.executable.entry_point @pad_dispatch_0 attributes {
       interface = @interface_io,
       ordinal = 0 : index
@@ -428,7 +441,7 @@ hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @rw1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.target @tgt, filter="dylib-llvm-aot" {
+  hal.executable.variant @tgt, target="dylib-llvm-aot" {
     hal.executable.entry_point @pad_dispatch_1 attributes {
       interface = @interface_io,
       ordinal = 0 : index
@@ -448,10 +461,13 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
     %c9 = constant 9 : index
     %c3 = constant 3 : index
     %c1 = constant 1 : index
+
     //      CHECK: %[[LAYOUT0:.+]] = hal.executable_layout.lookup
     // CHECK-SAME:   layouts([
     // CHECK-SAME:     #hal.descriptor_set_layout_binding<0, "StorageBuffer", R>,
     // CHECK-SAME:     #hal.descriptor_set_layout_binding<1, "StorageBuffer", DW>
+
+    // CHECK: #hal.device.match.id<"dylib"> {
     //      CHECK: hal.command_buffer.push_descriptor_set
     // CHECK-SAME:   layout(%[[LAYOUT0]] : !hal.executable_layout)[%{{.+}}]
     // CHECK-SAME:   bindings([
@@ -463,10 +479,13 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
         #hal.ex.result_buffer<"wo1", 0 : index>
       ]
     } : (tensor<i32>) -> tensor<3x9xi32>
+
     //      CHECK: %[[LAYOUT1:.+]] = hal.executable_layout.lookup
     // CHECK-SAME:   layouts([
     // CHECK-SAME:     #hal.descriptor_set_layout_binding<0, "StorageBuffer", R>,
     // CHECK-SAME:     #hal.descriptor_set_layout_binding<1, "StorageBuffer", RW>
+
+    // CHECK: #hal.device.match.id<"dylib"> {
     //      CHECK: hal.command_buffer.push_descriptor_set
     // CHECK-SAME:   layout(%[[LAYOUT1]] : !hal.executable_layout)[%{{.+}}]
     // CHECK-SAME:   bindings([
@@ -483,14 +502,13 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
   return %0 : tensor<3x9xi32>
 }
 
-
 // -----
 
 // Test that when we copy a subspan of a large constant pool into a buffer,
 // we use the correct size.
 
-// CHECK-LABEL: func @clone_from_large_buffer_to_small_buffer
-func @clone_from_large_buffer_to_small_buffer(%input: tensor<2xi32>) -> tensor<7xi32> {
+// CHECK-LABEL: func @cloneFromLargeBufferToSmallBuffer
+func @cloneFromLargeBufferToSmallBuffer(%input: tensor<2xi32>) -> tensor<7xi32> {
   %1 = flow.ex.stream.fragment(%input) : (tensor<2xi32>) -> tensor<7xi32> =
       (%arg0: tensor<2xi32>) -> tensor<7xi32> {
     %c3 = constant 3 : index
@@ -508,3 +526,41 @@ func @clone_from_large_buffer_to_small_buffer(%input: tensor<2xi32>) -> tensor<7
 }
 
 hal.variable @_const_pool_splats : !hal.buffer attributes {sym_visibility = "private"}
+
+// -----
+
+// CHECK-LABEL: func @tensorSplat
+// CHECK-SAME: (%[[VALUE:.+]]: i32)
+func @tensorSplat(%value: i32) -> tensor<2x128xi32> {
+  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c1024}
+  %0 = flow.ex.stream.fragment(%value) : (i32) -> tensor<2x128xi32> =
+      (%arg0: i32) -> tensor<2x128xi32> {
+    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c1024] pattern(%[[VALUE]] : i32)
+    %1 = flow.tensor.splat %arg0 : tensor<2x128xi32>
+    flow.return %1 : tensor<2x128xi32>
+  }
+  return %0 : tensor<2x128xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @tensorSplatDynamic
+// CHECK-SAME: (%[[VALUE:.+]]: i8, %[[DIM:.+]]: index)
+func @tensorSplatDynamic(%value: i8, %dim: index) -> tensor<?x128xi8> {
+  // CHECK: %[[SIZE:.+]] = muli %[[DIM]], %c128 : index
+  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[SIZE]]}
+  %0 = flow.ex.stream.fragment(%value, %dim) : (i8, index) -> tensor<?x128xi8>{%dim} =
+      (%arg0: i8, %arg1: index) -> tensor<?x128xi8> {
+    //  CHECK-DAG: %[[B0:.+]] = zexti %[[VALUE]] : i8 to i32
+    //  CHECK-DAG: %[[B1:.+]] = shift_left %[[B0]], %c8
+    //  CHECK-DAG: %[[B2:.+]] = shift_left %[[B0]], %c16
+    //  CHECK-DAG: %[[B3:.+]] = shift_left %[[B0]], %c24
+    //  CHECK-DAG: %[[ORA:.+]] = or %[[B2]], %[[B3]]
+    //  CHECK-DAG: %[[ORB:.+]] = or %[[B1]], %[[ORA]]
+    //  CHECK-DAG: %[[PATTERN:.+]] = or %[[B0]], %[[ORB]]
+    // CHECK-NEXT: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %[[SIZE]]] pattern(%[[PATTERN]] : i32)
+    %1 = flow.tensor.splat %arg0 : tensor<?x128xi8>{%arg1}
+    flow.return %1 : tensor<?x128xi8>
+  }
+  return %0 : tensor<?x128xi8>
+}

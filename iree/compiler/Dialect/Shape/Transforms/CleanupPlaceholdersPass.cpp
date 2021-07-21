@@ -29,6 +29,14 @@ class CleanupTieShapePattern : public OpRewritePattern<Shape::TieShapeOp> {
 
 class CleanupShapePlaceholdersPass
     : public PassWrapper<CleanupShapePlaceholdersPass, FunctionPass> {
+  StringRef getArgument() const override {
+    return "iree-shape-cleanup-placeholders";
+  }
+
+  StringRef getDescription() const override {
+    return "Cleans up unnecessary shape placeholders.";
+  }
+
   void runOnFunction() override {
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<CleanupTieShapePattern>(&getContext());
@@ -44,9 +52,7 @@ std::unique_ptr<OperationPass<FuncOp>> createCleanupShapePlaceholdersPass() {
   return std::make_unique<Shape::CleanupShapePlaceholdersPass>();
 }
 
-static PassRegistration<Shape::CleanupShapePlaceholdersPass> pass(
-    "iree-shape-cleanup-placeholders",
-    "Cleans up unnecessary shape placeholders.");
+static PassRegistration<Shape::CleanupShapePlaceholdersPass> pass;
 
 }  // namespace Shape
 }  // namespace iree_compiler

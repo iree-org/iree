@@ -22,7 +22,8 @@ static int iree_task_worker_main(iree_task_worker_t* worker);
 iree_status_t iree_task_worker_initialize(
     iree_task_executor_t* executor, iree_host_size_t worker_index,
     const iree_task_topology_group_t* topology_group,
-    iree_prng_splitmix64_state_t* seed_prng, iree_task_worker_t* out_worker) {
+    iree_byte_span_t local_memory, iree_prng_splitmix64_state_t* seed_prng,
+    iree_task_worker_t* out_worker) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   out_worker->executor = executor;
@@ -34,6 +35,7 @@ iree_status_t iree_task_worker_initialize(
       executor->worker_count / IREE_TASK_EXECUTOR_MAX_THEFT_ATTEMPTS_DIVISOR;
   iree_prng_minilcg128_initialize(iree_prng_splitmix64_next(seed_prng),
                                   &out_worker->theft_prng);
+  out_worker->local_memory = local_memory;
 
   iree_task_worker_state_t initial_state = IREE_TASK_WORKER_STATE_RUNNING;
   if (executor->scheduling_mode &
@@ -183,12 +185,14 @@ static iree_status_t iree_task_worker_execute(
     }
     case IREE_TASK_TYPE_DISPATCH_SLICE: {
       IREE_RETURN_IF_ERROR(iree_task_dispatch_slice_execute(
-          (iree_task_dispatch_slice_t*)task, pending_submission));
+          (iree_task_dispatch_slice_t*)task, worker->local_memory,
+          pending_submission));
       break;
     }
     case IREE_TASK_TYPE_DISPATCH_SHARD: {
       IREE_RETURN_IF_ERROR(iree_task_dispatch_shard_execute(
-          (iree_task_dispatch_shard_t*)task, pending_submission));
+          (iree_task_dispatch_shard_t*)task, worker->local_memory,
+          pending_submission));
       break;
     }
     default:

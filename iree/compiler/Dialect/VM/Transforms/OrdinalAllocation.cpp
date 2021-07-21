@@ -34,6 +34,14 @@ namespace VM {
 class OrdinalAllocationPass
     : public PassWrapper<OrdinalAllocationPass, OperationPass<ModuleOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-vm-ordinal-allocation";
+  }
+
+  StringRef getDescription() const override {
+    return "Assigns ordinals to function and global symbols";
+  }
+
   void runOnOperation() override {
     Builder builder(&getContext());
 
@@ -117,9 +125,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createOrdinalAllocationPass() {
   return std::make_unique<OrdinalAllocationPass>();
 }
 
-static PassRegistration<OrdinalAllocationPass> pass(
-    "iree-vm-ordinal-allocation",
-    "Assigns ordinals to function and global symbols");
+static PassRegistration<OrdinalAllocationPass> pass;
 
 }  // namespace VM
 }  // namespace IREE

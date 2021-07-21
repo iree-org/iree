@@ -13,6 +13,9 @@
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
@@ -170,13 +173,14 @@ static void buildIREEVMTransformPassPipeline(
     case InputDialectOptions::Type::none:
       break;
     case InputDialectOptions::Type::tosa:
-      IREE::Flow::buildTOSAInputTransformPassPipeline(passManager);
+      buildTOSAInputConversionPassPipeline(passManager);
       break;
     case InputDialectOptions::Type::mhlo:
-      IREE::Flow::buildMHLOInputTransformPassPipeline(passManager);
+      buildMHLOInputConversionPassPipeline(passManager);
       break;
   }
 
+  buildCommonInputConversionPassPipeline(passManager);
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
@@ -248,23 +252,6 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
 // to an IREE VM C module.
 //
 // Exposed via the --iree-mlir-to-vm-c-module translation.
-static LogicalResult translateFromMLIRToVMCModule(
-    ModuleOp moduleOp, BindingOptions bindingOptions,
-    InputDialectOptions inputOptions,
-    IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions,
-    IREE::VM::CTargetOptions cTargetOptions, llvm::raw_ostream &output) {
-  auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
-                                      executableOptions, targetOptions);
-  if (failed(result)) {
-    return result;
-  }
-
-  // Serialize to c code.
-  return mlir::iree_compiler::IREE::VM::translateModuleToC(
-      moduleOp, cTargetOptions, output);
-}
-
 static LogicalResult translateFromMLIRToVMCModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
@@ -273,9 +260,14 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
   auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
   auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
   auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
-  return translateFromMLIRToVMCModule(moduleOp, bindingOptions, inputOptions,
-                                      halTargetOptions, vmTargetOptions,
-                                      cTargetOptions, output);
+  auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
+                                      halTargetOptions, vmTargetOptions);
+  if (failed(result)) {
+    return result;
+  }
+  // Serialize to c code.
+  return mlir::iree_compiler::IREE::VM::translateModuleToC(
+      moduleOp, cTargetOptions, output);
 }
 #endif  // IREE_HAVE_EMITC_DIALECT
 

@@ -8,8 +8,6 @@
 #define IREE_TOOLS_INIT_COMPILER_MODULES_H_
 
 #include "iree/compiler/Dialect/Modules/Check/IR/CheckDialect.h"
-#include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
-#include "iree/compiler/Dialect/Modules/TensorList/IR/TensorListDialect.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -17,9 +15,7 @@ namespace iree_compiler {
 // Add all the IREE compiler module dialects to the provided registry.
 inline void registerIreeCompilerModuleDialects(DialectRegistry &registry) {
   // clang-format off
-  registry.insert<IREE::Check::CheckDialect,
-                  IREE::Strings::StringsDialect,
-                  IREE::TensorList::TensorListDialect>();
+  registry.insert<IREE::Check::CheckDialect>();
   // clang-format on
 }
 

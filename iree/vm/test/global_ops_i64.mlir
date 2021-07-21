@@ -1,11 +1,11 @@
-vm.module @global_ops {
+vm.module @global_ops_i64 {
 
   //===--------------------------------------------------------------------===//
   // global.i64
   //===--------------------------------------------------------------------===//
 
-  vm.global.i64 @c42 42 : i64
-  vm.global.i64 @c107_mut mutable 107 : i64
+  vm.global.i64 @c42 42 : i64 attributes {sym_visibility = "private"}
+  vm.global.i64 @c107_mut mutable 107 : i64 attributes {sym_visibility = "private"}
   // TODO(simon-camp): Add test for initializer
 
   vm.export @test_global_load_i64

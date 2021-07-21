@@ -52,29 +52,11 @@ static SmallVector<Value, 4> getStaticShapeDims(Location loc,
   return shape;
 }
 
-// Returns an array of i32 values representing the shape of the |shapedValue|.
+// Returns an array of index values representing the shape of the |shapedValue|.
 static llvm::Optional<SmallVector<Value, 4>> getShapeDims(Location loc,
                                                           Value shapedValue,
                                                           OpBuilder &builder) {
-  ShapedType shapedType = shapedValue.getType().cast<ShapedType>();
-  if (shapedType.hasStaticShape()) {
-    return getStaticShapeDims(loc, shapedType, builder);
-  } else {
-    // Dynamic shape lookup.
-    Value rsValue = Shape::buildOrFindRankedShapeForValue(
-        loc, shapedValue, builder.getIndexType(), builder);
-    if (!rsValue) {
-      return llvm::None;
-    }
-    SmallVector<Value, 4> dims;
-    // Note that in the following, we require that the dims resolve
-    // to discrete SSA values, which in a stream, will be block args.
-    if (failed(Shape::getRankedDimsFromRankedShape(
-            loc, rsValue, /*createIntermediateOps=*/true, dims, builder))) {
-      return llvm::None;
-    }
-    return dims;
-  }
+  return Shape::buildOrFindDimsForValue(loc, shapedValue, builder);
 }
 
 Value getValueSize(Location loc, Value value, OpBuilder &builder) {
@@ -103,9 +85,8 @@ Value getValueSize(Location loc, Value value, OpBuilder &builder) {
   if (!elementType) return {};
   auto shape = IREE::HAL::getShapeDims(loc, value, builder);
   if (!shape) return {};
-  auto deviceValue = builder.createOrFold<IREE::HAL::ExSharedDeviceOp>(loc);
-  auto allocatorValue =
-      builder.createOrFold<IREE::HAL::DeviceAllocatorOp>(loc, deviceValue);
+  auto allocatorValue = builder.createOrFold<IREE::HAL::BufferAllocatorOp>(
+      loc, IREE::HAL::AllocatorType::get(builder.getContext()), value);
   return builder.createOrFold<IREE::HAL::AllocatorComputeSizeOp>(
       loc, allocatorValue, *shape, elementType.getValue());
 }

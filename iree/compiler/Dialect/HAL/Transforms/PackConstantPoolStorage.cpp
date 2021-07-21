@@ -30,6 +30,15 @@ class PackConstantPoolStoragePass
     registry.insert<IREE::HAL::HALDialect>();
   }
 
+  StringRef getArgument() const override {
+    return "iree-hal-pack-constant-pool-storage";
+  }
+
+  StringRef getDescription() const override {
+    return "Packs all constants in a hal.constant_pool into their possibly "
+           "target-dependent storage formats.";
+  }
+
   void runOnOperation() override {
     auto poolOp = getOperation();
     auto bufferConstraints = poolOp.buffer_constraints();
@@ -271,10 +280,7 @@ createPackConstantPoolStoragePass() {
   return std::make_unique<PackConstantPoolStoragePass>();
 }
 
-static PassRegistration<PackConstantPoolStoragePass> pass(
-    "iree-hal-pack-constant-pool-storage",
-    "Packs all constants in a hal.constant_pool into their possibly "
-    "target-dependent storage formats.");
+static PassRegistration<PackConstantPoolStoragePass> pass;
 
 }  // namespace HAL
 }  // namespace IREE

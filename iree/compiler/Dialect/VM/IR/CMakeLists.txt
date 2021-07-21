@@ -34,6 +34,11 @@ iree_cc_library(
     "VMStructs.cpp.inc"
     "VMTypes.cpp"
   DEPS
+    ::VMEnumsGen
+    ::VMOpEncoderGen
+    ::VMOpInterfaceGen
+    ::VMOpsGen
+    ::VMStructsGen
     LLVMSupport
     MLIRControlFlowInterfaces
     MLIRIR

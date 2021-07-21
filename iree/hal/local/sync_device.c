@@ -137,13 +137,14 @@ static iree_hal_allocator_t* iree_hal_sync_device_allocator(
 }
 
 static iree_status_t iree_hal_sync_device_query_i32(
-    iree_hal_device_t* base_device, iree_string_view_t key,
-    int32_t* out_value) {
+    iree_hal_device_t* base_device, iree_string_view_t category,
+    iree_string_view_t key, int32_t* out_value) {
   // iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   *out_value = 0;
-  return iree_make_status(IREE_STATUS_NOT_FOUND,
-                          "unknown device configuration key value '%*.s'",
-                          (int)key.size, key.data);
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "unknown device configuration key value '%.*s :: %.*s'",
+      (int)category.size, category.data, (int)key.size, key.data);
 }
 
 static iree_status_t iree_hal_sync_device_create_command_buffer(
@@ -154,8 +155,8 @@ static iree_status_t iree_hal_sync_device_create_command_buffer(
   // TODO(#4680): implement a non-inline command buffer that stores its commands
   // and can be submitted later on/multiple-times.
   return iree_hal_inline_command_buffer_create(
-      base_device, mode, command_categories, queue_affinity,
-      out_command_buffer);
+      mode, command_categories, queue_affinity,
+      iree_hal_device_host_allocator(base_device), out_command_buffer);
 }
 
 static iree_status_t iree_hal_sync_device_create_descriptor_set(

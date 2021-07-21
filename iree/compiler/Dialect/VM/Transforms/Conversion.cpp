@@ -86,6 +86,12 @@ class ConversionPass
                     math::MathDialect, AffineDialect, memref::MemRefDialect>();
   }
 
+  StringRef getArgument() const override { return "iree-vm-conversion"; }
+
+  StringRef getDescription() const override {
+    return "Converts from various dialects to the VM dialect";
+  }
+
   void runOnOperation() override {
     if (getOperation().getBody()->empty()) return;
 
@@ -162,7 +168,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
 }
 
 static PassRegistration<ConversionPass> pass(
-    "iree-vm-conversion", "Converts from various dialects to the VM dialect",
+
     [] {
       auto options = getTargetOptionsFromFlags();
       return std::make_unique<ConversionPass>(options);

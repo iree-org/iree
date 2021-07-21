@@ -7,8 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_TYPECONVERTER_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_TYPECONVERTER_H_
 
-#include "emitc/Dialect/EmitC/IR/EmitC.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {

@@ -41,7 +41,16 @@ class EmbeddedLinkerTool : public LinkerTool {
   using LinkerTool::LinkerTool;
 
   std::string getToolPath() const override {
-    // First check for setting the linker explicitly.
+    // Always try to use the tool specified for this exact configuration first.
+    // Hopefully some day soon we'll be able to statically link LLD in and call
+    // a C function to do the linking instead of needing a separate tool.
+    if (!targetOptions.embeddedLinkerPath.empty()) {
+      return targetOptions.embeddedLinkerPath;
+    }
+
+    // Fall back to check for setting the linker explicitly via environment
+    // variables or flags. Users may do this to use their own lld with custom
+    // architectures built in.
     auto toolPath = LinkerTool::getToolPath();
     if (!toolPath.empty()) return toolPath;
 
@@ -50,7 +59,8 @@ class EmbeddedLinkerTool : public LinkerTool {
     if (!toolPath.empty()) return toolPath;
 
     llvm::errs() << "LLD (ld.lld) not found on path; specify with the "
-                    "IREE_LLVMAOT_LINKER_PATH environment variable\n";
+                    "IREE_LLVMAOT_LINKER_PATH environment variable or "
+                    "-iree-llvm-linker-path=\n";
     return "";
   }
 
@@ -58,18 +68,8 @@ class EmbeddedLinkerTool : public LinkerTool {
       llvm::Module *llvmModule,
       ArrayRef<llvm::Function *> exportedFuncs) override {
     for (auto &func : *llvmModule) {
-      // Enable frame pointers to ensure that stack unwinding works.
-      func.addFnAttr("frame-pointer", "all");
-
-      // -ffreestanding-like behavior.
-      func.addFnAttr("no-builtins");
-
       // -fno-plt - prevent PLT on calls to imports.
       func.addFnAttr("nonlazybind");
-
-      // Our dispatches are all hot - that's kind of the point.
-      // This may favor more aggressive optimizations.
-      func.addFnAttr("hot");
     }
     return success();
   }
@@ -90,6 +90,13 @@ class EmbeddedLinkerTool : public LinkerTool {
 
     SmallVector<std::string, 8> flags = {
         getToolPath(),
+
+        // Forces LLD to act like gnu ld and produce ELF files.
+        // If not specified then lld tries to figure out what it is by progname
+        // (ld, ld64, link, etc).
+        // NOTE: must be first because lld sniffs argv[1]/argv[2].
+        "-flavor gnu",
+
         "-o " + artifacts.libraryFile.path,
     };
 
@@ -135,7 +142,18 @@ class EmbeddedLinkerTool : public LinkerTool {
     }
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine))) return llvm::None;
+    if (failed(runLinkCommand(commandLine))) {
+      // Ensure we save inputs if we fail so that the user can replicate the
+      // command themselves.
+      if (targetOptions.keepLinkerArtifacts) {
+        for (auto &objectFile : objectFiles) {
+          llvm::errs() << "linker input preserved: "
+                       << objectFile.outputFile->getFilename();
+          objectFile.outputFile->keep();
+        }
+      }
+      return llvm::None;
+    }
     return artifacts;
   }
 };

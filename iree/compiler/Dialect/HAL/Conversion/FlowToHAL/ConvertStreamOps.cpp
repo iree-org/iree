@@ -678,14 +678,12 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
 }
 
 // Records a dispatch using the given bindings attribute set populated by
-// the -iree-hal-materialize-interfaces2 pass.
-static void recordInterfaceBindings(Value device, Value commandBuffer,
-                                    IREE::Flow::DispatchOp &dispatchOp,
-                                    IREE::HAL::InterfaceOp &interfaceOp,
-                                    Value executableLayout,
-                                    ArrayAttr bindingsAttr,
-                                    StreamSchedulingState &schedulingState,
-                                    ConversionPatternRewriter &rewriter) {
+// the -iree-hal-materialize-interfaces pass.
+static void recordInterfaceBindings(
+    Value device, Value commandBuffer, IREE::Flow::DispatchOp &dispatchOp,
+    IREE::HAL::InterfaceOp &interfaceOp, Value executableLayout,
+    ArrayAttr bindingsAttr, StreamSchedulingState &schedulingState,
+    ConversionPatternRewriter &rewriter, OpBuilder &builder) {
   // Accumulate a potentially sparse set of push constants.
   // If we had canonicalizers for hal.command_buffer.push_constants then we
   // would instead just emit each constant individually and let that collapse
@@ -723,7 +721,7 @@ static void recordInterfaceBindings(Value device, Value commandBuffer,
       assert(bindingOp);
       assert(bindingOp.set().getSExtValue() == setOrdinal);
       auto storageBuffer = schedulingState.loadVariable(
-          IREE::HAL::BufferType::get(rewriter.getContext()),
+          IREE::HAL::BufferType::get(builder.getContext()),
           constantStorageAttr.storage(), rewriter);
       bindings.push_back(std::make_tuple(
           schedulingState.lookupOrCreateIndex(
@@ -760,15 +758,113 @@ static void recordInterfaceBindings(Value device, Value commandBuffer,
     }
   }
 
-  rewriter.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
+  builder.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
       dispatchOp.getLoc(), commandBuffer, executableLayout,
       schedulingState.lookupOrCreateIndex(setOrdinal, rewriter), bindings);
 
   if (!pushConstantValues.empty()) {
-    rewriter.create<IREE::HAL::CommandBufferPushConstantsOp>(
+    builder.create<IREE::HAL::CommandBufferPushConstantsOp>(
         dispatchOp.getLoc(), commandBuffer, executableLayout,
         rewriter.getIndexAttr(pushConstantBase), pushConstantValues);
   }
+}
+
+// Calculates the workgroup size (x, y, z). These are the dimension numbers
+// for a single workgroup.
+static std::array<Value, 3> calculateDispatchWorkgroupSize(
+    Location loc, IREE::HAL::ExecutableOp executableOp,
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
+    OpBuilder &builder) {
+  // When no workgroup size is specified we just assume [1,1,1].
+  // This yields a workgroup count that models the extents of the workload.
+  return {
+      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
+  };
+}
+
+static std::array<Value, 3> calculateDispatchWorkgroupCountFromRegion(
+    Location loc, IREE::HAL::ExecutableEntryPointOp entryPointOp,
+    ValueRange workload, OpBuilder &builder) {
+  Block *body = entryPointOp.getBlock();
+  BlockAndValueMapping bvm;
+  for (auto args : llvm::enumerate(workload)) {
+    bvm.map(body->getArgument(args.index()), args.value());
+  }
+  for (Operation &op : body->without_terminator()) {
+    builder.clone(op, bvm);
+  }
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  // Verifier of EntryPointOp checks that the return has 3 values.
+  SmallVector<Value, 4> count = llvm::to_vector<4>(llvm::map_range(
+      returnOp.operands(), [&bvm](Value v) { return bvm.lookup(v); }));
+  return {count[0], count[1], count[2]};
+}
+
+// Calculates the workgroup count (x, y, z) given the total N-dimensional
+// |workload| and specific |workgroupSize|.
+static std::array<Value, 3> calculateWorkloadWorkgroupCount(
+    Location loc, ValueRange workload,
+    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+  std::array<Value, 3> result;
+
+  auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
+  if (workload.size() <= 3) {
+    // 1-D to 3-D are easy (pad 2 to 0 dimensions) and divide by workgroup size.
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      Value workloadI = i < workload.size() ? workload[i] : constantOne;
+      workloadI = builder.createOrFold<mlir::SubIOp>(
+          loc,
+          builder.createOrFold<mlir::AddIOp>(loc, workloadI, workgroupSize[i]),
+          constantOne);
+      result[i] = builder.createOrFold<UnsignedDivIOp>(loc, workloadI,
+                                                       workgroupSize[i]);
+    }
+  } else {
+    // TODO(#4140): remapping of N-D to 3-D: this is not how you do this!
+    Value flatWorkload = constantOne;
+    for (auto workloadI : workload) {
+      flatWorkload = builder.createOrFold<MulIOp>(loc, flatWorkload, workloadI);
+    }
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      auto rounded = builder.createOrFold<mlir::SubIOp>(
+          loc,
+          builder.createOrFold<mlir::AddIOp>(loc, flatWorkload,
+                                             workgroupSize[i]),
+          constantOne);
+      auto workgroupCountI = builder.createOrFold<mlir::UnsignedDivIOp>(
+          loc, rounded, workgroupSize[i]);
+      result[i] = workgroupCountI;
+
+      // Multiply back out and subtract from invocations.
+      flatWorkload = builder.createOrFold<SubIOp>(
+          loc, flatWorkload,
+          builder.createOrFold<MulIOp>(loc, workgroupCountI, rounded));
+    }
+  }
+
+  return result;
+}
+
+// Calculates the workgroup count (x, y, z) for dispatching to the given
+// |entryPointOp|. The provided N-dimensional |workload| is the total number
+// of invocations required as calculated by the generic workload logic
+// (basically, number of output elements in tensors).
+static std::array<Value, 3> calculateDispatchWorkgroupCount(
+    Location loc, IREE::HAL::ExecutableOp executableOp,
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
+    OpBuilder &builder) {
+  Region *region = entryPointOp.getBody();
+  if (region) {
+    return calculateDispatchWorkgroupCountFromRegion(loc, entryPointOp,
+                                                     workload, builder);
+  }
+  auto workgroupSize = calculateDispatchWorkgroupSize(
+      loc, executableOp, entryPointOp, workload, builder);
+  return calculateWorkloadWorkgroupCount(loc, workload, workgroupSize, builder);
 }
 
 // Records a dispatch operation.
@@ -776,65 +872,127 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                     IREE::Flow::DispatchOp &dispatchOp,
                                     StreamSchedulingState &schedulingState,
                                     ConversionPatternRewriter &rewriter) {
+  auto loc = dispatchOp.getLoc();
+
   // Get the handle to the executable that is compatible with our device.
   auto executableOp =
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
           dispatchOp, dispatchOp.executable()));
 
-  IREE::HAL::TargetBackend::DispatchState dispatchState;
-  dispatchState.dispatchOp = dispatchOp;
-  dispatchState.executableOp = executableOp;
-  dispatchState.device = device;
-  dispatchState.commandBuffer = commandBuffer;
+  SmallVector<Value> workgroupCount;
   for (auto dim : dispatchOp.workgroup_count()) {
-    dispatchState.workgroupCount.push_back(rewriter.getRemappedValue(dim));
+    workgroupCount.push_back(rewriter.getRemappedValue(dim));
   }
-  // TODO(benvanik): support extended push constants.
-  dispatchState.basePushConstantOffset = 0;
 
   // Ask each target backend to record their dispatch logic.
-  IREE::HAL::DeviceSwitchRewriter switchRewriter(dispatchOp.getLoc(),
+  IREE::HAL::DeviceSwitchRewriter switchRewriter(loc,
                                                  /*resultTypes=*/TypeRange{},
                                                  device, rewriter);
-  for (auto targetOp :
-       executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
-    for (auto &targetBackend : IREE::HAL::matchTargetBackends(
-             {targetOp.target_backend_filter().str()})) {
-      auto entryPointOps =
-          targetOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
-      if (entryPointOps.empty()) {
-        return dispatchOp.emitOpError() << "need at least one entry point";
-      }
-      auto entryPointOp = *entryPointOps.begin();
-      auto interfaceOp =
-          dyn_cast<IREE::HAL::InterfaceOp>(SymbolTable::lookupSymbolIn(
-              executableOp, entryPointOp.interfaceAttr()));
-      auto executableLayout = schedulingState.lookupExecutableLayout(
-          IREE::HAL::ExecutableLayoutType::get(interfaceOp.getContext()),
-          interfaceOp.push_constantsAttr(),
-          interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
-
-      auto bindingsAttr = dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings");
-      assert(bindingsAttr);
-      recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
-                              executableLayout, bindingsAttr, schedulingState,
-                              rewriter);
-
-      dispatchState.entryPointOp = entryPointOp;
-      dispatchState.interfaceOp = interfaceOp;
-      dispatchState.executableLayout = executableLayout;
-      if (failed(targetBackend->recordDispatch(
-              dispatchOp.getLoc(), dispatchState, switchRewriter))) {
-        return dispatchOp.emitError()
-               << "unable to record dispatch for target backend "
-               << targetBackend->name();
-      }
+  for (auto variantOp :
+       executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>()) {
+    auto targetBackend = IREE::HAL::getTargetBackend(variantOp.target());
+    if (!targetBackend) {
+      return executableOp.emitError()
+             << "unregistered target backend '" << variantOp.target() << "'";
     }
+    auto entryPointOps =
+        variantOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
+    if (entryPointOps.empty()) {
+      return dispatchOp.emitOpError() << "need at least one entry point";
+    }
+    auto entryPointOp = *entryPointOps.begin();
+    auto interfaceOp =
+        dyn_cast<IREE::HAL::InterfaceOp>(SymbolTable::lookupSymbolIn(
+            executableOp, entryPointOp.interfaceAttr()));
+    auto executableLayout = schedulingState.lookupExecutableLayout(
+        IREE::HAL::ExecutableLayoutType::get(interfaceOp.getContext()),
+        interfaceOp.push_constantsAttr(),
+        interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
+
+    auto *region =
+        switchRewriter.addConditionRegion(IREE::HAL::DeviceMatchIDAttr::get(
+            loc.getContext(), targetBackend->deviceID()));
+    auto &entryBlock = region->front();
+    auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
+
+    auto bindingsAttr = dispatchOp->getAttrOfType<ArrayAttr>("hal.bindings");
+    assert(bindingsAttr);
+    recordInterfaceBindings(device, commandBuffer, dispatchOp, interfaceOp,
+                            executableLayout, bindingsAttr, schedulingState,
+                            rewriter, caseBuilder);
+
+    auto entryPointSymRef = caseBuilder.getSymbolRefAttr(
+        executableOp.getName(),
+        {caseBuilder.getSymbolRefAttr(entryPointOp->getParentOp()),
+         caseBuilder.getSymbolRefAttr(entryPointOp)});
+    auto caseWorkgroupCount = calculateDispatchWorkgroupCount(
+        loc, executableOp, entryPointOp, workgroupCount, caseBuilder);
+    caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
+        loc, commandBuffer, entryPointSymRef, caseWorkgroupCount[0],
+        caseWorkgroupCount[1], caseWorkgroupCount[2]);
+
+    caseBuilder.create<IREE::HAL::ReturnOp>(loc);
   }
   switchRewriter.build();
 
   // Full barriers for now as we aren't scheduling things in waves.
   recordFullExecutionBarrier(commandBuffer, dispatchOp.getLoc(), rewriter);
+  return success();
+}
+
+// Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte value.
+static Value splatFillPattern(Location loc, Value baseValue,
+                              OpBuilder &builder) {
+  switch (baseValue.getType().getIntOrFloatBitWidth()) {
+    case 8: {
+      // (v << 24) | (v << 16) | (v << 8) | v
+      auto b0 = builder.createOrFold<ZeroExtendIOp>(loc, baseValue,
+                                                    builder.getIntegerType(32));
+      auto c8 = builder.create<ConstantIntOp>(loc, 8, 32);
+      auto b1 = builder.createOrFold<ShiftLeftOp>(loc, b0, c8);
+      auto c16 = builder.create<ConstantIntOp>(loc, 16, 32);
+      auto b2 = builder.createOrFold<ShiftLeftOp>(loc, b0, c16);
+      auto c24 = builder.create<ConstantIntOp>(loc, 24, 32);
+      auto b3 = builder.createOrFold<ShiftLeftOp>(loc, b0, c24);
+      return builder.createOrFold<OrOp>(
+          loc, b0,
+          builder.createOrFold<OrOp>(loc, b1,
+                                     builder.createOrFold<OrOp>(loc, b2, b3)));
+    }
+    case 16: {
+      // (v << 16) | v
+      auto c16 = builder.create<ConstantIntOp>(loc, 16, 32);
+      auto b0 = builder.createOrFold<ZeroExtendIOp>(loc, baseValue,
+                                                    builder.getIntegerType(32));
+      auto b1 = builder.createOrFold<ShiftLeftOp>(loc, b0, c16);
+      return builder.createOrFold<OrOp>(loc, b0, b1);
+    }
+    case 32:
+      return baseValue;
+    default:
+      return {};  // Unsupported (so far)
+  }
+}
+
+static LogicalResult recordTensorSplat(Value device, Value commandBuffer,
+                                       IREE::Flow::TensorSplatOp &splatOp,
+                                       StreamSchedulingState &schedulingState,
+                                       ConversionPatternRewriter &rewriter) {
+  auto resultBuffer = schedulingState.lookupTensorBufferRange(splatOp.result());
+
+  auto pattern = splatFillPattern(splatOp.getLoc(), splatOp.value(), rewriter);
+  if (!pattern) {
+    return splatOp.emitError() << ">4 byte/non-byte-aligned fills are not yet "
+                                  "implemented (require special emulation)";
+  }
+
+  auto zeroOffset = schedulingState.lookupOrCreateIndex(0, rewriter);
+  rewriter.create<IREE::HAL::CommandBufferFillBufferOp>(
+      splatOp.getLoc(), commandBuffer, resultBuffer.buffer, zeroOffset,
+      resultBuffer.length, pattern);
+
+  // Full barriers for now as we aren't scheduling things.
+  recordFullExecutionBarrier(commandBuffer, splatOp.getLoc(), rewriter);
   return success();
 }
 
@@ -943,6 +1101,16 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
   return success();
 }
 
+static void hoistConstants(Block &streamBlock,
+                           ConversionPatternRewriter &rewriter) {
+  for (auto &op : streamBlock) {
+    if (isa<ConstantOp>(op)) {
+      auto newOp = rewriter.clone(op);
+      op.replaceAllUsesWith(newOp);
+    }
+  }
+}
+
 static LogicalResult recordStreamCommands(
     Value device, Value commandBuffer, Block &streamBlock,
     StreamSchedulingState &schedulingState,
@@ -951,6 +1119,11 @@ static LogicalResult recordStreamCommands(
     if (auto dispatchOp = dyn_cast<IREE::Flow::DispatchOp>(op)) {
       if (failed(recordDispatch(device, commandBuffer, dispatchOp,
                                 schedulingState, rewriter))) {
+        return failure();
+      }
+    } else if (auto splatOp = dyn_cast<IREE::Flow::TensorSplatOp>(op)) {
+      if (failed(recordTensorSplat(device, commandBuffer, splatOp,
+                                   schedulingState, rewriter))) {
         return failure();
       }
     } else if (auto cloneOp = dyn_cast<IREE::Flow::TensorCloneOp>(op)) {
@@ -971,7 +1144,9 @@ static LogicalResult recordStreamCommands(
     } else if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(op)) {
       // No-op; handled by the buffer allocation.
     } else if (isa<ConstantOp>(op)) {
-      // HACK: all this code is going away soon.
+      // Note that even though constants were hoisted early, they can be
+      // materialized as part of various conversions so do it again to get
+      // any new ones.
       auto newOp = rewriter.clone(op);
       op.replaceAllUsesWith(newOp);
     } else if (isa<IREE::HAL::ConstantSubspanOp>(op) ||
@@ -1009,6 +1184,12 @@ class ExStreamFragmentOpConversion
     // Map stream captures to their external buffers or SSA values.
     // This covers all of the live-in stream values.
     auto &entryBlock = streamOp.body().front();
+
+    // Since constants can be tied to shapes, which are used in the size
+    // computations below, and since they are just simple RAUW transforms
+    // if recording, just hoist them out first to make dominance work out.
+    hoistConstants(entryBlock, rewriter);
+
     for (int i = 0; i < adaptor.operands().size(); ++i) {
       auto streamValue = entryBlock.getArgument(i);
       auto bufferValue = adaptor.operands()[i];
