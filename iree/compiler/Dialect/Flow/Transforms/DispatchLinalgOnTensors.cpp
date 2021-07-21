@@ -1017,6 +1017,24 @@ static unsigned makeElementwiseOpsRootOps(FuncOp funcOp, unsigned numRoots) {
   return numRoots;
 }
 
+/// Sets fill op as root op if they are not part of any fusion groups yet.
+static unsigned makeFillOpsRootOps(FuncOp funcOp, unsigned numRoots) {
+  MLIRContext *context = funcOp.getContext();
+  OpBuilder builder(context);
+  for (Block &block : funcOp) {
+    auto fillOps = block.getOps<linalg::FillOp>();
+    for (linalg::FillOp fillOp : fillOps) {
+      Operation *op = fillOp.getOperation();
+      if (op->getAttrOfType<IntegerAttr>(kRootOpAttr) ||
+          op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr))
+        continue;
+      unsigned newGroup = numRoots++;
+      op->setAttr(kRootOpAttr, builder.getI64IntegerAttr(newGroup));
+    }
+  }
+  return numRoots;
+}
+
 /// For a given block partition the LinalgOps in the block into fusable
 /// groups. All analysis of what to fuse happens here. For now this is just
 /// hard-wiring from basic heuristic but this could be adapted to have 1) better
@@ -1092,6 +1110,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   unsigned numRoots = decideFusableLinalgOps(funcOp);
   makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
+  makeFillOpsRootOps(funcOp, numRoots);
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";

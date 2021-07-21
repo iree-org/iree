@@ -140,3 +140,23 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
 //      CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG2]], {{.*}}
 
 //      CHECK: return %[[REDUCE]]
+
+// -----
+
+func @tile_fill_op_alone(%A: tensor<?x?xf32>, %B: f32) -> tensor<?x?xf32> {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %d0 = tensor.dim %A, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %A, %c1 : tensor<?x?xf32>
+  %0 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
+  %1 = linalg.fill(%B, %0) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+
+// CHECK: #[[MULMAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//      CHECK: func @tile_fill_op_alone
+//      CHECK:   flow.dispatch.workgroups
+//      CHECK:     scf.for
+//      CHECK:       scf.for
+//      CHECK:         %[[RESULT:.*]] = linalg.fill
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]]
