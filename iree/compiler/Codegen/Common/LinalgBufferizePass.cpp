@@ -699,9 +699,9 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
 
   // Get the shape of the result
   Location loc = op->getLoc();
-  if (auto shapedOp = dyn_cast<InferShapedTypeOpInterface>(op)) {
-    SmallVector<SmallVector<Value>> resultShape;
-    if (failed(shapedOp.reifyReturnTypeShapesPerResultDim(b, resultShape))) {
+  if (auto shapedOp = dyn_cast<ReifyRankedShapedTypeOpInterface>(op)) {
+    ReifiedRankedShapedTypeDims resultShape;
+    if (failed(shapedOp.reifyResultShapes(b, resultShape))) {
       return nullptr;
     }
     for (auto shape : enumerate(resultShape[resultNum])) {
