@@ -275,6 +275,21 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
   return iree_ok_status();
 }
 
+static void IREE_API_PTR iree_hal_module_wrapped_buffer_release(void* self,
+                                                                void* ptr) {}
+static iree_status_t iree_hal_module_wrapped_buffer_allocator_ctl(
+    void* self, iree_allocator_command_t command, const void* params,
+    void** inout_ptr) {
+  switch (command) {
+    default:
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "misuse of free-only allocator");
+    case IREE_ALLOCATOR_COMMAND_FREE:
+      iree_vm_ref_object_release(self, iree_vm_buffer_get_descriptor());
+      return iree_ok_status();
+  }
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
                    iree_hal_module_state_t,                     //
                    riirii, r) {
@@ -286,8 +301,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &source));
   iree_vm_size_t offset = (iree_vm_size_t)args->i4;
   iree_vm_size_t length = (iree_vm_size_t)args->i5;
-
-  // TODO(benvanik): wrap when supported.
 
   iree_host_size_t buffer_length = source->data.data_length;
   if (length == -1) {
@@ -301,19 +314,62 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
         (offset + length - 1), buffer_length);
   }
 
-  iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(allocator, memory_types, buffer_usage,
-                                         length, &buffer),
-      "failed to allocate buffer of length %d", length);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status =
-      iree_hal_buffer_write_data(buffer, 0, source->data.data + offset, length);
+  // Not all HAL implementations support wrapping buffers, and of those that do
+  // some may only support it in special situations such as when the buffer is
+  // not DEVICE_VISIBLE. The generated module can query whether the wrapping is
+  // possible and decide to use alternative means of upload if it is not; we
+  // make no policy (other than validity) over what's best here.
+  iree_hal_buffer_compatibility_t compatibility =
+      iree_hal_allocator_query_buffer_compatibility(
+          allocator, memory_types, buffer_usage, IREE_HAL_BUFFER_USAGE_MAPPING,
+          buffer_length);
+  bool wrap_allowed = iree_all_bits_set(
+      compatibility, IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE);
+
+  iree_status_t status = iree_ok_status();
+  iree_hal_buffer_t* buffer = NULL;
+  if (wrap_allowed) {
+    // A `data_allocator` that will release the backing byte buffer when the HAL
+    // buffer wrapping it is released. This should keep the buffer live for the
+    // duration it is possibly in use by the HAL.
+    iree_allocator_t release_allocator = {
+        .self = source,
+        .ctl = iree_hal_module_wrapped_buffer_allocator_ctl,
+    };
+
+    // NOTE: we wait until after this wrap succeeds before we retain the backing
+    // byte buffer.
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_hal_allocator_wrap_buffer(
+            allocator, memory_types, IREE_HAL_MEMORY_ACCESS_READ,
+            buffer_usage | IREE_HAL_BUFFER_USAGE_CONSTANT,
+            iree_make_byte_span((uint8_t*)source->data.data + offset, length),
+            release_allocator, &buffer),
+        "failed to directly map buffer of length %d", length);
+
+    // Retain the backing byte buffer; it'll get released by
+    // iree_hal_module_wrapped_buffer_release when the HAL buffer is destroyed.
+    iree_vm_ref_object_retain(source, iree_vm_buffer_get_descriptor());
+  } else {
+    // Allocate a new HAL buffer and copy the contents into it.
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_hal_allocator_allocate_buffer(allocator, memory_types,
+                                           buffer_usage, length, &buffer),
+        "failed to allocate buffer of length %d", length);
+    status = iree_hal_buffer_write_data(buffer, 0, source->data.data + offset,
+                                        length);
+  }
+
   if (iree_status_is_ok(status)) {
     rets->r0 = iree_hal_buffer_move_ref(buffer);
   } else {
     iree_hal_buffer_release(buffer);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
