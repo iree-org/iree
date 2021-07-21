@@ -249,15 +249,16 @@ class CompiledModule(object):
     raise NotImplementedError()
 
   @classmethod
-  def create_from_signature_def_saved_model(cls,
-                                            saved_model_dir: str,
-                                            saved_model_tags: Set[str],
-                                            module_name: str,
-                                            backend_info: "BackendInfo",
-                                            exported_name: str,
-                                            input_names: Sequence[str],
-                                            output_names: Sequence[str],
-                                            artifacts_dir: Optional[str] = None):
+  def create_from_signature_def_saved_model(
+      cls,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      backend_info: "BackendInfo",
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: Optional[str] = None):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -388,15 +389,16 @@ class IreeCompiledModule(CompiledModule):
     return cls(module_name, backend_info, compiled_paths, vm_module, config)
 
   @classmethod
-  def create_from_signature_def_saved_model(cls,
-                                            saved_model_dir: str,
-                                            saved_model_tags: Set[str],
-                                            module_name: str,
-                                            backend_info: "BackendInfo",
-                                            exported_name: str,
-                                            input_names: Sequence[str],
-                                            output_names: Sequence[str],
-                                            artifacts_dir: Optional[str] = None):
+  def create_from_signature_def_saved_model(
+      cls,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      backend_info: "BackendInfo",
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: Optional[str] = None):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -530,15 +532,16 @@ class TfCompiledModule(CompiledModule):
     return cls(module_name, backend_info, constructor, exported_names)
 
   @classmethod
-  def create_from_signature_def_saved_model(cls,
-                                            saved_model_dir: str,
-                                            saved_model_tags: Set[str],
-                                            module_name: str,
-                                            backend_info: "BackendInfo",
-                                            exported_name: str,
-                                            input_names: Sequence[str],
-                                            output_names: Sequence[str],
-                                            artifacts_dir: Optional[str] = None):
+  def create_from_signature_def_saved_model(
+      cls,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      backend_info: "BackendInfo",
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: Optional[str] = None):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
@@ -827,15 +830,16 @@ class TfLiteCompiledModule(CompiledModule):
     return cls(module_name, backend_info, compiled_paths, interpreters)
 
   @classmethod
-  def create_from_signature_def_saved_model(cls,
-                                            saved_model_dir: str,
-                                            saved_model_tags: Set[str],
-                                            module_name: str,
-                                            backend_info: "BackendInfo",
-                                            exported_name: str,
-                                            input_names: Sequence[str],
-                                            output_names: Sequence[str],
-                                            artifacts_dir: Optional[str] = None):
+  def create_from_signature_def_saved_model(
+      cls,
+      saved_model_dir: str,
+      saved_model_tags: Set[str],
+      module_name: str,
+      backend_info: "BackendInfo",
+      exported_name: str,
+      input_names: Sequence[str],
+      output_names: Sequence[str],
+      artifacts_dir: Optional[str] = None):
     """Compile a SignatureDef SavedModel to the target backend in backend_info.
 
     Args:
