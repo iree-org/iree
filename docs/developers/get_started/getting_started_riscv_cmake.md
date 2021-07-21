@@ -79,7 +79,7 @@ $ cmake -G Ninja -B ../iree-build-riscv/ \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_ENABLE_MLIR=OFF \
   -DIREE_BUILD_SAMPLES=ON \
-  -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT}
+  -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
   .
 ```
 #### RISC-V 32-bit bare-metal target
@@ -207,7 +207,7 @@ $ ../iree-build-host/install/bin/iree-translate \
 Then run on the RISC-V QEMU:
 
 ```shell
-$ ${QEMU_BIN}} \
+$ ${QEMU_BIN} \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/iree/tools/iree-run-module --driver=dylib \
