@@ -55,7 +55,8 @@ static void populateTilingReductionPatterns(MLIRContext *context,
                            .setTileSizes(tileSizes);
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>>(
+                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
       context, tilingOptions,
       linalg::LinalgTransformationFilter(
           {Identifier::get(getWorkgroupMarker(), context)},
