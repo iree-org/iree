@@ -255,6 +255,12 @@ static bool isDispatchableOp(Operation *op) {
       !isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(op)) {
     return false;
   }
+
+  // Mark linalg.fill as non-dispatchable so that for those linalg.fill ops that
+  // cannot be fused together with some root op, they are left out of dispatch
+  // region formation, and to be picked up by DMA op conversion.
+  if (isa<linalg::FillOp>(op)) return false;
+
   return !isAlwaysClonedIntoDispatchOp(op);
 }
 
@@ -843,11 +849,10 @@ static bool areAllShapesEqual(ArrayRef<SmallVector<Value>> shapes) {
 static Optional<SmallVector<SmallVector<Value>>> getResultShapes(
     PatternRewriter &rewriter, Operation *op) {
   if (op->getNumResults() == 0) return llvm::None;
-  SmallVector<SmallVector<Value>> resultShapes;
+  ReifiedRankedShapedTypeDims resultShapes;
   // Check if the op implements the shape interface.
-  if (auto shapedOp = dyn_cast<InferShapedTypeOpInterface>(op)) {
-    if (failed(shapedOp.reifyReturnTypeShapesPerResultDim(rewriter,
-                                                          resultShapes))) {
+  if (auto shapedOp = dyn_cast<ReifyRankedShapedTypeOpInterface>(op)) {
+    if (failed(shapedOp.reifyResultShapes(rewriter, resultShapes))) {
       return llvm::None;
     }
     return resultShapes;
