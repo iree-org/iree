@@ -255,6 +255,12 @@ static bool isDispatchableOp(Operation *op) {
       !isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(op)) {
     return false;
   }
+
+  // Mark linalg.fill as non-dispatchable so that for those linalg.fill ops that
+  // cannot be fused together with some root op, they are left out of dispatch
+  // region formation, and to be picked up by DMA op conversion.
+  if (isa<linalg::FillOp>(op)) return false;
+
   return !isAlwaysClonedIntoDispatchOp(op);
 }
 
