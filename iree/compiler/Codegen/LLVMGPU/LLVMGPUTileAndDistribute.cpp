@@ -149,7 +149,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
                                      ArrayRef<Range> parallelLoopRanges) {
     SmallVector<std::array<int64_t, 3>, 2> staticRanges;
     bool hasDynamicRange = false;
-    // If the ranges are not constant fall back to naive disribution.
+    // If the ranges are not constant fall back to naive distribution.
     for (auto range : parallelLoopRanges) {
       auto cstOffset = range.offset.getDefiningOp<ConstantIndexOp>();
       auto cstSize = range.size.getDefiningOp<ConstantIndexOp>();
@@ -232,7 +232,7 @@ static Optional<Value> allocateWorkgroupMemory(
     OpBuilder &b, memref::SubViewOp subview,
     ArrayRef<Value> boundingSubViewSize, DataLayout &layout) {
   // In CUDA workgroup memory is represented by a global variable. Create a
-  // global variable and a memref.GetGlobalOp at the beginning of the funtion to
+  // global variable and a memref.GetGlobalOp at the beginning of the function to
   // get the memref.
   OpBuilder::InsertionGuard guard(b);
   FuncOp funcOp = subview->getParentOfType<FuncOp>();
