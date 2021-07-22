@@ -56,25 +56,16 @@ struct SpecialTerminatorOpCapture {
 
 // TODO(nicolasvasilache): Use some interface instead of op names directly.
 static bool hasDestructiveUpdateSubTensorUses(
-    Value v, SpecialTerminatorOpCapture &capture) {
-  SmallVector<tensor::ExtractSliceOp, 4> reads;
-  SmallVector<tensor::InsertSliceOp, 4> writes;
-  for (auto &u : v.getUses()) {
-    if (auto subTensorOp = dyn_cast<tensor::ExtractSliceOp>(u.getOwner())) {
-      reads.push_back(subTensorOp);
-      continue;
-    }
+    BlockArgument arg, SpecialTerminatorOpCapture &capture) {
+  SmallVector<Operation *> reads;
+  SmallVector<tensor::InsertSliceOp> writes;
+  for (OpOperand &u : arg.getUses()) {
     if (auto subTensorInsertOp =
             dyn_cast<tensor::InsertSliceOp>(u.getOwner())) {
       writes.push_back(subTensorInsertOp);
-      continue;
+    } else {
+      reads.push_back(u.getOwner());
     }
-    if (auto dimOp = dyn_cast<tensor::DimOp>(u.getOwner())) {
-      continue;
-    }
-    LLVM_DEBUG(llvm::dbgs() << "found non-destructive update pattern use: "
-                            << *(u.getOwner()) << "\n");
-    return false;
   }
   // For now, only allow exactly a single SubTensorInsertOp that must be
   // dominated by all SubTensorOp.
@@ -82,12 +73,11 @@ static bool hasDestructiveUpdateSubTensorUses(
   // Small local dominance computation.
   DominanceInfo domInfo(writes.front()->getParentOp());
   for (auto read : reads) {
-    LLVM_DEBUG(llvm::dbgs() << "read: " << *read.getOperation() << "\n");
-    if (!domInfo.properlyDominates(read.getOperation(), writes.front())) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "non-destructive use-def: " << *(read.getOperation())
-                 << " does not properly dominate "
-                 << *(writes.front().getOperation()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "read: " << *read << "\n");
+    if (!domInfo.properlyDominates(read, writes.front())) {
+      LLVM_DEBUG(llvm::dbgs() << "non-destructive use-def: " << *read
+                              << " does not properly dominate "
+                              << *(writes.front().getOperation()) << "\n");
       return false;
     }
   }
