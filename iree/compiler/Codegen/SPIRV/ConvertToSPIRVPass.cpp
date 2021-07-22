@@ -35,6 +35,7 @@
 #include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
@@ -50,39 +51,19 @@ namespace {
 // Resource utilities
 //===----------------------------------------------------------------------===//
 
-/// Gets a unique name for `originalName` in `moduleOp` to avoid symbol
-/// collision.
-std::string getUniqueNameInSymbolTable(ModuleOp moduleOp,
-                                       const std::string &originalName) {
-  // First check whether the original name is not used.
-  if (!SymbolTable::lookupSymbolIn(moduleOp, originalName)) return originalName;
-
-  SmallString<128> nameBuffer(originalName);
-  unsigned originalLength = nameBuffer.size();
-  unsigned index = 0;
-
-  // Iteratively try suffixes until we find one that isn't used.
-  do {
-    nameBuffer.resize(originalLength);
-    nameBuffer += '_';
-    nameBuffer += std::to_string(++index);
-  } while (SymbolTable::lookupSymbolIn(moduleOp, nameBuffer));
-  return nameBuffer.str().str();
-}
-
-/// Inserts a resource evariable of the given `type` into `block` and bind
-/// it to `set` and `binding`.
+/// Inserts a resource evariable of the given `type` at the beginning of
+/// `moduleOp`'s block via `symbolTable` and bind it to `set` and `binding`.
 spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
                                                unsigned set, unsigned binding,
                                                bool alias, ModuleOp moduleOp,
+                                               SymbolTable *symbolTable,
                                                OpBuilder::Listener *listener) {
-  auto builder = OpBuilder::atBlockBegin(moduleOp.getBody(), listener);
+  OpBuilder builder(moduleOp.getContext(), listener);
   std::string name = llvm::formatv("__resource_var_{0}_{1}_", set, binding);
-  name = getUniqueNameInSymbolTable(moduleOp, name);
-
   auto variable =
       builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
   if (alias) variable->setAttr("aliased", builder.getUnitAttr());
+  symbolTable->insert(variable, moduleOp.getBody()->begin());
   return variable;
 }
 
@@ -188,9 +169,11 @@ struct HALInterfaceBindingSubspanConverter final
     : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   HALInterfaceBindingSubspanConverter(
       TypeConverter &typeConverter, MLIRContext *context,
-      llvm::DenseSet<Operation *> &aliasedResources, PatternBenefit benefit = 1)
+      const llvm::DenseSet<Operation *> &aliasedResources,
+      SymbolTable *symbolTable, PatternBenefit benefit = 1)
       : OpConversionPattern(typeConverter, context, benefit),
-        aliasedResources(aliasedResources) {}
+        aliasedResources(aliasedResources),
+        symbolTable(symbolTable) {}
 
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceBindingSubspanOp interfaceOp,
@@ -211,7 +194,7 @@ struct HALInterfaceBindingSubspanConverter final
         interfaceOp.getLoc(), convertedType, setAndBinding.first,
         setAndBinding.second,
         aliasedResources.contains(interfaceOp.getOperation()), moduleOp,
-        rewriter.getListener());
+        symbolTable, rewriter.getListener());
 
     rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(interfaceOp, varOp);
     return success();
@@ -219,6 +202,7 @@ struct HALInterfaceBindingSubspanConverter final
 
  private:
   const llvm::DenseSet<Operation *> &aliasedResources;
+  SymbolTable *symbolTable;
 };
 
 /// Pattern to lower operations that become a no-ops at this level.
@@ -278,11 +262,12 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   auto targetAttr = spirv::lookupTargetEnv(moduleOp);
   SPIRVTypeConverter typeConverter(targetAttr);
+  OwningRewritePatternList patterns(&getContext());
   ScfToSPIRVContext scfToSPIRVContext;
 
-  OwningRewritePatternList patterns(&getContext());
   // Pull in GPU patterns to convert processor ID ops and loop ops.
   populateGPUToSPIRVPatterns(typeConverter, patterns);
+
   // Pull in SCF patterns to convert control flow ops.
   populateSCFToSPIRVPatterns(typeConverter, scfToSPIRVContext, patterns);
 
@@ -297,6 +282,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   // Pull in standard patterns to convert arithmetic ops and others.
   populateStandardToSPIRVPatterns(typeConverter, patterns);
+
   // Pull in standard patterns to convert tensor operations to SPIR-V. These are
   // primarily used to handle tensor-type constants and contain a
   // threshold. Only those constants that are below the threshold are converted
@@ -305,10 +291,14 @@ void ConvertToSPIRVPass::runOnOperation() {
   // region is converted.
   mlir::populateTensorToSPIRVPatterns(
       typeConverter, std::numeric_limits<int64_t>::max() / 8, patterns);
+
   // Pull in vector patterns to convert vector ops.
   mlir::populateVectorToSPIRVPatterns(typeConverter, patterns);
+
   // Pull in builtin func to spv.func conversion.
   populateBuiltinFuncToSPIRVPatterns(typeConverter, patterns);
+
+  // Add IREE HAL interface op conversions.
   patterns.insert<
       HALInterfaceLoadConstantConverter,
       HALInterfaceWorkgroupIdAndCountConverter<
@@ -316,10 +306,21 @@ void ConvertToSPIRVPass::runOnOperation() {
       HALInterfaceWorkgroupIdAndCountConverter<
           IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>>(
       typeConverter, context);
+
+  // Create a symbol table for the current module op. This must be done before
+  // starting conversion. The conversion framework has a deferred nature.
+  // Actions like replacing/deleting ops are just recorded instead of directly
+  // applied. So for function conversion, we will see both the original function
+  // and the new replacement function during conversion process. That causes an
+  // issue for creating symbol tables, which scans all symbols and errors out
+  // when duplicates are found. We should be fine here tough becuase we only use
+  // this symbol table to insert new SPIR-V global variables.
+  SymbolTable symbolTable(moduleOp);
   auto aliasedResources = getAliasedResources(moduleOp);
-  patterns.insert<HALInterfaceBindingSubspanConverter>(typeConverter, context,
-                                                       aliasedResources);
-  /// Fold operations as no-ops
+  patterns.insert<HALInterfaceBindingSubspanConverter>(
+      typeConverter, context, aliasedResources, &symbolTable);
+
+  /// Fold certain operations as no-ops:
   /// - linalg.reshape becomes a no-op since all memrefs are linearized in
   ///   SPIR-V.
   /// - tensor_to_memref can become a no-op since tensors are lowered to
@@ -334,6 +335,7 @@ void ConvertToSPIRVPass::runOnOperation() {
       SPIRVConversionTarget::get(targetAttr);
   // Disallow all other ops.
   target->markUnknownOpDynamicallyLegal([](Operation *) { return false; });
+
   SmallVector<FuncOp, 1> functions;
   for (FuncOp fn : moduleOp.getOps<FuncOp>()) {
     if (!fn.isPublic()) continue;
