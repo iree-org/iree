@@ -24,9 +24,9 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>} {
   // CHECK-LABEL: spv.module
-  // CHECK: spv.GlobalVariable @[[RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.GlobalVariable @[[ARG0:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.GlobalVariable @[[ARG1:.+]] bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @__resource_var_3_4_ bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @__resource_var_1_2__0 bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @__resource_var_1_2_ bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.func @resource_bindings_in_same_entry_func()
   func @resource_bindings_in_same_entry_func() {
     %c0 = constant 0 : index
