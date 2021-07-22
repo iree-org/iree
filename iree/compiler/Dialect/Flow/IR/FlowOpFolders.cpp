@@ -740,8 +740,7 @@ OpFoldResult TensorStoreOp::fold(ArrayRef<Attribute> operands) {
 }
 
 OpFoldResult TensorSplatOp::fold(ArrayRef<Attribute> operands) {
-  // TODO(benvanik): only fold when shape is constant.
-  if (operands[0]) {
+  if (operands.size() == 1 && operands.front()) {
     // Splat value is constant and we can fold the operation.
     return SplatElementsAttr::get(result().getType().cast<ShapedType>(),
                                   operands[0]);
