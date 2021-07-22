@@ -123,6 +123,7 @@ void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm,
                                    const SPIRVCodegenOptions &options) {
+  pm.nest<ModuleOp>().addPass(createInlinerPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
 
   WorkgroupMemoryAllocationFn allocationFn =
