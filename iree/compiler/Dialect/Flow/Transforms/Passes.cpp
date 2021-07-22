@@ -108,11 +108,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createInterchangeGenericOpsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createConvertToFlowTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/true));
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
-  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
