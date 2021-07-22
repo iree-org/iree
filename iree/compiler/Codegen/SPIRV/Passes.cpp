@@ -47,48 +47,24 @@ namespace iree_compiler {
 
 void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
                                     const SPIRVCodegenOptions &options) {
-  //===--------------------------------------------------------------------===//
-  // Initial clean up.
-  //===--------------------------------------------------------------------===//
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
 
   //===--------------------------------------------------------------------===//
-  // Tile Linalg on buffers.
-  //
-  // Pre-conditions:
-  //   - All Linalg ops have buffer semantics.
-  //
-  // Post-conditions:
-  //   - If there are multiple linalg operations in the dispatch region, they
-  //     are fused, using tile+fuse approach.
-  //     - The fused loops are distributed across workgroups.
-  //   - The operations that cannot be fused at buffer levels are split into
-  //     separate entry points.
-  //   - If there is a single linalg operation in the dispatch region, it is
-  //     tiled and the generated parallel loop distributed.
-  //     - The tiled linalg operation can be tiled again one or more times and
-  //       then vectorized.
-  //   - Otherwise:
-  //     - The Linalg op is kept untouched.
-  //
+  // Tiling, distribution, vectorization
   //===--------------------------------------------------------------------===//
 
   // flow.dispatch.workgroups performed abstract tiling and distribution. Make
   // them concrete now since we know the target and settings now.
   pm.addPass(createSPIRVConcretizeWorkgroupTilesPass(options));
-
+  // Tile and distribute to GPU subgroups/invocations and vectorize.
   pm.addPass(createSPIRVTileAndVectorizePass(options));
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
 
-  //===--------------------------------------------------------------------===//
-  // Map to GPU processor IDs.
-  //
-  // Post-conditions:
-  //   - loop.parallel ops are converted to loop.for ops and mapped to
-  //     workgroups.
-  //   - Linalg ops are converted to loop.for ops and mapped to workitems.
-  //===--------------------------------------------------------------------===//
+  // Handle ops that cannot go through the previous tiling, distribution, and
+  // vectorization flow. Only perform one level of distribution to map them to
+  // GPU global invocation IDs for distribution.
+  // TODO(antiagainst): Handle all the cases uniformly and remove this pass.
   pm.addPass(createSPIRVConvertToGPUPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createSPIRVVectorToGPUPass());
   pm.nest<ModuleOp>().addPass(createLowerAffinePass());
@@ -96,44 +72,48 @@ void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
   pm.nest<ModuleOp>().addPass(createCSEPass());
 
   //===--------------------------------------------------------------------===//
-  // Prepare stdandard ops for SPIR-V conversion.
-  //
-  // Post-conditions:
-  //   - Load/store on std.subview ops are converted into load/store on the
-  //     original buffers.
+  // Optimizations and cleanups
   //===--------------------------------------------------------------------===//
+
+  // Perform various vector-level cross-op optimizations like load-store
+  // forwarding, shape casting and casting op cancelling.
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+
+  // Fold load/store from/to subview ops into the original memref when possible.
+  // In SPIR-V we don't use memref descriptor so it's not possible to handle
+  // subview ops.
   pm.nest<ModuleOp>().addPass(memref::createFoldSubViewOpsPass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
+
+  // Turn scalar load/store from memrefs into vectorized ones if possible. This
+  // gives better memory access patterns, which is very important for perf.
   pm.nest<ModuleOp>().addPass(createSPIRVVectorizeLoadStore());
+  // Lower vector ops to SPIR-V cooperative matrix ops. This needs to be done
+  // before flattening memref because we still need the multi-dimension
+  // structure.
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(
       createSPIRVVectorToCooperativeMatrixPass());
+
+  // Perform optimizations that need to across the scf.for region boundary.
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createForOpCanonicalizationPass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
 
+  // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
+  // because we don't use upstream memref descriptors.
   pm.nest<ModuleOp>().addPass(createFlattenMemRefSubspanPass());
   pm.nest<ModuleOp>().addPass(createLowerAffinePass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());
 
   //===--------------------------------------------------------------------===//
-  // Final conversion to SPIR-V dialect.
-  //
-  // Post-conditions:
-  //   - All ops are converted to SPIR-V counterparts.
-  //   - spv.module ops are formed to hold all SPIR-V ops.
+  // SPIR-V conversions
   //===--------------------------------------------------------------------===//
+
+  // Finally convert everything to SPIR-V.
   pm.nest<ModuleOp>().addPass(createConvertToSPIRVPass());
 
-  //===--------------------------------------------------------------------===//
-  // SPIR-V dialect level conversions.
-  //
-  // Post-conditions:
-  //   - SPIR-V Entry point ops are inserted.
-  //   - Required version/extension/capability are deduced.
-  //===--------------------------------------------------------------------===//
   OpPassManager &spirvModulePM = pm.nest<ModuleOp>().nest<spirv::ModuleOp>();
   spirvModulePM.addPass(spirv::createLowerABIAttributesPass());
   spirvModulePM.addPass(createCanonicalizerPass());
@@ -143,13 +123,9 @@ void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm,
                                    const SPIRVCodegenOptions &options) {
-  //===--------------------------------------------------------------------===//
-  // Inline the impl dispatch function into the wrapper dispatch function.
-  //
-  // TODO(antiagainst): re-evaluate the inlining timing.
-  //===--------------------------------------------------------------------===//
   pm.nest<ModuleOp>().addPass(createInlinerPass());
   pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
+
   WorkgroupMemoryAllocationFn allocationFn =
       [](OpBuilder &builder, Location loc, ArrayRef<int64_t> staticShape,
          Type elementType, ArrayRef<Value> dynamicSizes) {
@@ -159,13 +135,6 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm,
       };
   addLinalgBufferizePasses(pm.nest<ModuleOp>(), allocationFn);
 
-  //===--------------------------------------------------------------------===//
-  // Convert Linalg ops to SPIR-V ops.
-  //
-  // Post-conditions:
-  //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
-  //   - The module contains the final spv.module ready for serialization.
-  //===--------------------------------------------------------------------===//
   buildLinalgToSPIRVPassPipeline(pm, options);
 }
 
