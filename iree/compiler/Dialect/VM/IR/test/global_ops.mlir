@@ -16,7 +16,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_store_i32
 vm.module @my_module {
-  vm.global.i32 @g0 mutable : i32
+  vm.global.i32 mutable @g0 : i32
   vm.func @global_store_i32(%arg0 : i32) {
     // CHECK: vm.global.store.i32 %arg0, @g0 : i32
     vm.global.store.i32 %arg0, @g0 : i32
@@ -42,7 +42,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_store_indirect_i32
 vm.module @my_module {
-  vm.global.i32 @g0 mutable : i32
+  vm.global.i32 mutable @g0 : i32
   vm.func @global_store_indirect_i32(%arg0 : i32) {
     // CHECK: %[[ADDR:.+]] = vm.global.address @g0 : !iree.ptr<i32>
     %0 = vm.global.address @g0 : !iree.ptr<i32>
@@ -68,7 +68,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_store_ref
 vm.module @my_module {
-  vm.global.ref @g0 mutable : !vm.ref<?>
+  vm.global.ref mutable @g0 : !vm.ref<?>
   vm.func @global_store_ref(%arg0 : !vm.ref<?>) {
     // CHECK: vm.global.store.ref %arg0, @g0 : !vm.ref<?>
     vm.global.store.ref %arg0, @g0 : !vm.ref<?>
@@ -94,7 +94,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_store_indirect_ref
 vm.module @my_module {
-  vm.global.ref @g0 mutable : !vm.ref<?>
+  vm.global.ref mutable @g0 : !vm.ref<?>
   vm.func @global_store_indirect_ref(%arg0 : !vm.ref<?>) {
     // CHECK: %[[ADDR:.+]] = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
     %0 = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>

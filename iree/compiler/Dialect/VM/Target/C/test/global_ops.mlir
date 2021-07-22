@@ -10,8 +10,8 @@ vm.module @global_ops {
   // CHECK-NEXT: iree_vm_function_t imports[0];
   // CHECK-NEXT: };
 
-  vm.global.i32 @c42 42 : i32
-  vm.global.i32 @c107_mut mutable 107 : i32
+  vm.global.i32 @c42 : i32 = 42 : i32
+  vm.global.i32 mutable @c107_mut : i32 = 107 : i32
 
   // Skip forward declarations
   // CHECK: DEFINE FUNCTIONS

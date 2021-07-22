@@ -1,11 +1,11 @@
 // RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
-// CHECK: vm.global.i32 @v_initialized_const 4 : i32
+// CHECK: vm.global.i32 @v_initialized_const = 4 : i32
 hal.variable @v_initialized_const = 4 : i32
 
 // -----
 
-// CHECK: vm.global.ref @v_initialized init(@initializer) : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref @v_initialized initializer(@initializer) : !vm.ref<!hal.buffer>
 hal.variable @v_initialized init(@initializer) : !hal.buffer
 func private @initializer() -> !hal.buffer
 
@@ -22,7 +22,7 @@ func @loaded() {
 
 // -----
 
-// CHECK: vm.global.ref @v_stored mutable : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref mutable @v_stored : !vm.ref<!hal.buffer>
 hal.variable @v_stored mutable : !hal.buffer
 // CHECK-LABEL: func @stored
 func @stored(%arg0 : !hal.buffer) {

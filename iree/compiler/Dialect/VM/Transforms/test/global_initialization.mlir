@@ -9,18 +9,18 @@ vm.module @initEmpty {
 
 // CHECK-LABEL: @initI32
 vm.module @initI32 {
-  // CHECK: vm.global.i32 @g0 mutable : i32
-  vm.global.i32 @g0 mutable init(@g0init) : i32
+  // CHECK: vm.global.i32 mutable @g0 : i32
+  vm.global.i32 mutable @g0 initializer(@g0init) : i32
   vm.func @g0init() -> i32 {
     %c123 = vm.const.i32 123 : i32
     vm.return %c123 : i32
   }
 
-  // CHECK: vm.global.i32 @g1 mutable : i32
-  vm.global.i32 @g1 mutable 123 : i32
+  // CHECK: vm.global.i32 mutable @g1 : i32
+  vm.global.i32 mutable @g1 = 123 : i32
 
-  // CHECK: vm.global.i32 @g2 mutable : i32
-  vm.global.i32 @g2 123 : i32
+  // CHECK: vm.global.i32 mutable @g2 : i32
+  vm.global.i32 @g2 = 123 : i32
 
   // CHECK: vm.func @__init() {
   // CHECK-NEXT:   %0 = vm.call @g0init()
@@ -37,15 +37,15 @@ vm.module @initI32 {
 
 // CHECK-LABEL: @initRef
 vm.module @initRef {
-  // CHECK: vm.global.ref @g0 mutable : !vm.ref<?>
-  vm.global.ref @g0 mutable init(@g0init) : !vm.ref<?>
+  // CHECK: vm.global.ref mutable @g0 : !vm.ref<?>
+  vm.global.ref mutable @g0 initializer(@g0init) : !vm.ref<?>
   vm.func @g0init() -> !vm.ref<?> {
     %null = vm.const.ref.zero : !vm.ref<?>
     vm.return %null : !vm.ref<?>
   }
 
-  // CHECK: vm.global.ref @g1 mutable : !vm.ref<?>
-  vm.global.ref @g1 mutable : !vm.ref<?>
+  // CHECK: vm.global.ref mutable @g1 : !vm.ref<?>
+  vm.global.ref mutable @g1 : !vm.ref<?>
 
   // CHECK: vm.global.ref @g2 : !vm.ref<?>
   vm.global.ref @g2 : !vm.ref<?>

@@ -27,38 +27,69 @@ namespace IREE {
 namespace VM {
 
 //===----------------------------------------------------------------------===//
-// Structural ops
+// custom<SymbolVisibility>($sym_visibility)
 //===----------------------------------------------------------------------===//
+// some.op custom<SymbolVisibility>($sym_visibility) $sym_name
+// ->
+// some.op @foo
+// some.op private @foo
 
-static ParseResult parseModuleOp(OpAsmParser &parser, OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
+static ParseResult parseSymbolVisibility(OpAsmParser &parser,
+                                         StringAttr &symVisibilityAttr) {
+  StringRef symVisibility;
+  parser.parseOptionalKeyword(&symVisibility, {"public", "private", "nested"});
+  if (!symVisibility.empty()) {
+    symVisibilityAttr = parser.getBuilder().getStringAttr(symVisibility);
   }
-
-  // Parse the module body.
-  auto *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ModuleOp::ensureTerminator(*body, parser.getBuilder(), result->location);
   return success();
 }
 
-static void printModuleOp(OpAsmPrinter &p, ModuleOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  p.printRegion(op.getBodyRegion(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/false);
+static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
+                                  StringAttr symVisibilityAttr) {
+  if (!symVisibilityAttr) return;
+  p << symVisibilityAttr.getValue();
 }
+
+//===----------------------------------------------------------------------===//
+// custom<TypeOrAttr>($type, $attr)
+//===----------------------------------------------------------------------===//
+// some.op custom<TypeOrAttr>($type, $attr)
+// ->
+// some.op : i32
+// some.op = 42 : i32
+
+static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
+                                   Attribute &attr) {
+  if (succeeded(parser.parseOptionalEqual())) {
+    if (failed(parser.parseAttribute(attr))) {
+      return parser.emitError(parser.getCurrentLocation())
+             << "expected attribute";
+    }
+    typeAttr = TypeAttr::get(attr.getType());
+  } else {
+    Type type;
+    if (failed(parser.parseColonType(type))) {
+      return parser.emitError(parser.getCurrentLocation()) << "expected type";
+    }
+    typeAttr = TypeAttr::get(type);
+  }
+  return success();
+}
+
+static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
+                            Attribute attr) {
+  if (attr) {
+    p << " = ";
+    p.printAttribute(attr);
+  } else {
+    p << " : ";
+    p.printAttribute(type);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Structural ops
+//===----------------------------------------------------------------------===//
 
 void ModuleOp::build(OpBuilder &builder, OperationState &result,
                      StringRef name) {
@@ -313,75 +344,6 @@ LogicalResult ImportOp::verifyType() {
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseGlobalOp(OpAsmParser &parser, OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes))) {
-    return failure();
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("mutable"))) {
-    result->addAttribute("is_mutable", UnitAttr::get(result->getContext()));
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("init"))) {
-    FlatSymbolRefAttr initializerAttr;
-    if (failed(parser.parseLParen()) ||
-        failed(parser.parseAttribute(initializerAttr, "initializer",
-                                     result->attributes)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  }
-
-  if (failed(parser.parseOptionalColon())) {
-    Attribute initialValueAttr;
-    if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
-                                     result->attributes))) {
-      return failure();
-    }
-    result->addAttribute("type", TypeAttr::get(initialValueAttr.getType()));
-  } else {
-    Type type;
-    if (failed(parser.parseType(type))) {
-      return failure();
-    }
-    result->addAttribute("type", TypeAttr::get(type));
-  }
-
-  return parser.parseOptionalAttrDictWithKeyword(result->attributes);
-}
-
-static void printGlobalOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ';
-  p.printSymbolName(
-      op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
-          .getValue());
-  if (op->getAttrOfType<UnitAttr>("is_mutable")) {
-    p << " mutable";
-  }
-  if (auto initializer = op->getAttrOfType<FlatSymbolRefAttr>("initializer")) {
-    p << " init(";
-    p.printSymbolName(initializer.getValue());
-    p << ')';
-  }
-  if (auto initialValue = op->getAttrOfType<IntegerAttr>("initial_value")) {
-    p << ' ';
-    p.printAttribute(initialValue);
-  } else {
-    p << " : ";
-    p.printType(op->getAttrOfType<TypeAttr>("type").getValue());
-  }
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
-                                         "sym_name",
-                                         "is_mutable",
-                                         "initializer",
-                                         "initial_value",
-                                         "type",
-                                     });
-}
 
 static LogicalResult verifyGlobalOp(Operation *op) {
   auto globalName =
@@ -749,52 +711,6 @@ void ConstF64ZeroOp::build(OpBuilder &builder, OperationState &result) {
 void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
                            Type objectType) {
   result.addTypes(objectType);
-}
-
-static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
-  // TODO(#4670): Share across ops or upstream a custom directive
-  StringRef visibility;
-  if (parser.parseOptionalKeyword(&visibility,
-                                  {"public", "private", "nested"})) {
-    parser.emitError(
-        parser.getCurrentLocation(),
-        "expected valid visibility specifier (public, private or nested)");
-    return failure();
-  }
-  StringAttr visibilityAttr = parser.getBuilder().getStringAttr(visibility);
-  result->attributes.push_back(parser.getBuilder().getNamedAttr(
-      SymbolTable::getVisibilityAttrName(), visibilityAttr));
-
-  StringAttr nameAttr;
-  Attribute valueAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
-    return failure();
-  }
-
-  return success();
-}
-
-static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
-  p << op.getOperationName() << ' ';
-
-  // TODO(#4670): Share across ops or upstream a custom directive
-  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
-  if (auto visibility = op->getAttrOfType<StringAttr>(visibilityAttrName)) {
-    p << visibility.getValue() << ' ';
-  }
-
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
-                              visibilityAttrName,
-                              "sym_name",
-                              "value",
-                          });
-  p << ' ';
-  p.printAttribute(op.value());
 }
 
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,

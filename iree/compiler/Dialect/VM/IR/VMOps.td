@@ -32,12 +32,20 @@ def VM_ModuleOp : VM_Op<"module", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     // TODO(benvanik): add compatibility and versioning attributes.
     OptionalAttr<VM_OrdinalCountsAttr>:$ordinal_counts
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    regions
+  }];
 
   // We need to ensure the block inside the region is properly terminated;
   // the auto-generated builders do not guarantee that.
@@ -247,13 +255,23 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
       VM_GlobalOpInterface,
     ])> {
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
     OptionalAttr<FlatSymbolRefAttr>:$initializer,
     OptionalAttr<attr_type>:$initial_value,
     OptionalAttr<VM_Ordinal>:$ordinal
   );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    (`mutable` $is_mutable^)?
+    $sym_name
+    attr-dict
+    (`initializer` `(` $initializer^ `)`)?
+    custom<TypeOrAttr>($type, $initial_value)
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -882,12 +900,17 @@ def VM_RodataOp : VM_Op<"rodata", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     ElementsAttr:$value,
     OptionalAttr<I64Attr>:$alignment,
     OptionalAttr<VM_Ordinal>:$ordinal,
     OptionalAttr<StrAttr>:$mime_type
   );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility) $sym_name attr-dict $value
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [

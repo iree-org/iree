@@ -4,8 +4,8 @@ vm.module @global_ops {
   // global.i32
   //===--------------------------------------------------------------------===//
 
-  vm.global.i32 @c42 42 : i32
-  vm.global.i32 @c107_mut mutable 107 : i32
+  vm.global.i32 private @c42 = 42 : i32
+  vm.global.i32 private mutable @c107_mut = 107 : i32
   // TODO(simon-camp): Add test for initializer
 
   vm.export @test_global_load_i32
