@@ -143,6 +143,19 @@ func @splatConstScalar() -> tensor<i32> {
 
 // -----
 
+// CHECK-LABEL: @splatDynamicShape
+//  CHECK-SAME: (%[[DIM0:.+]]: index, %[[DIM1:.+]]: index)
+func @splatDynamicShape(%dim0: index, %dim1: index) -> tensor<?x?xi32> {
+  // CHECK: %[[FOUR:.+]] = constant 4 : i32
+  %four = constant 4 : i32
+  // CHECK: %[[SPLAT:.+]] = flow.tensor.splat %[[FOUR]] : tensor<?x?xi32>{%[[DIM0]], %[[DIM1]]}
+  %1 = flow.tensor.splat %four : tensor<?x?xi32>{%dim0, %dim1}
+  // CHECK: return %[[SPLAT]]
+  return %1 : tensor<?x?xi32>
+}
+
+// -----
+
 // CHECK-LABEL: @cloneConst
 func @cloneConst() -> tensor<4xi32> {
   %0 = constant dense<[0, 1, 2, 3]> : tensor<4xi32>
