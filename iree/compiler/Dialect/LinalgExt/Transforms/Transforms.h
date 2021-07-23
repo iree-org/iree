@@ -25,9 +25,8 @@ struct TiledOp {
   SmallVector<Value> results;
 };
 
-/// Main entry point for tiling LinalgExtOps using TiledOpInterface.  If the
-/// `op` does not implement the `TiledOpInterface` returns a `TiledOp{}` value.
-FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, Operation *op, ValueRange dest,
+/// Main entry point for tiling LinalgExtOps using TiledOpInterface.
+FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TiledOpInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options);
 
 /// Base rewrite pattern to tile and distribute operations that implement the
@@ -43,7 +42,7 @@ struct TiledOpInterfaceBaseTilingPattern : public RewritePattern {
         filter(filter),
         options(options) {}
 
-  LogicalResult matchAndRewriteBase(Operation *op, ValueRange dest,
+  LogicalResult matchAndRewriteBase(TiledOpInterface tilableOp,
                                     PatternRewriter &rewriter,
                                     TiledOp &result) const;
 

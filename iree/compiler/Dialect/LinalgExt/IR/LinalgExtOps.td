@@ -29,6 +29,11 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
   let verifier = [{ return verify$cppClass(*this); }];
   let printer = [{ return print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
+  code extraLinalgExtOpClassDeclaration = [{
+    ValueRange getDestinationOperands() {
+      return outputs();
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -76,8 +81,8 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
     custom<LinalgExtOutsList>($outputs, type($outputs))
     $region (`->` type($results)^)?
   }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
-  let extraClassDeclaration = [{
     int64_t getIndexDepth() {
       return getInputOperand(1)
           ->get()
@@ -128,7 +133,8 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
 
 def LinalgExt_SortOp : LinalgExt_Op<"sort",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["getTiledImplementation", "generateScalarImplementation"]>]> {
+        ["getPartitionableLoops", "generateScalarImplementation",
+         "getTiledImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given
@@ -153,7 +159,7 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort",
     custom<LinalgExtOutsList>($outputs, type($outputs))
     $region (`->` type($results)^)?
   }];
-  let extraClassDeclaration = [{
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value operand(int index) {
       return outputs()[index];
     }

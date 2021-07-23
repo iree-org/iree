@@ -669,14 +669,7 @@ static SmallVector<unsigned> getPartitionedLoops(Operation *op) {
     return partitionedLoops;
   }
   if (auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op)) {
-    auto iteratorTypes = tilableOp.getLoopIteratorTypes();
-    for (auto en : llvm::enumerate(iteratorTypes)) {
-      if (en.value() == getParallelIteratorTypeName()) {
-        partitionedLoops.push_back(en.index());
-      }
-      if (partitionedLoops.size() == kNumMaxParallelDims) break;
-    }
-    return partitionedLoops;
+    return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
   }
   return {};
 }
@@ -859,7 +852,8 @@ struct TiledOpInterfacePattern
 
     linalg_ext::TiledOp tiledOp;
     LogicalResult tilingResult = Base::matchAndRewriteBase(
-        clonedOp, clonedOp.outputs(), rewriter, tiledOp);
+        cast<linalg_ext::TiledOpInterface>(clonedOp.getOperation()), rewriter,
+        tiledOp);
     if (failed(tilingResult)) {
       // GreedyPatternRewriter is not transactional and does not stop on
       // failure. Must explicitly delete on all failure paths.

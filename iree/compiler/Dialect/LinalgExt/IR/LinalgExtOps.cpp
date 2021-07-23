@@ -501,6 +501,21 @@ SmallVector<Range> SortOp::getLoopBounds(OpBuilder &builder) {
   return loopBounds;
 }
 
+SmallVector<unsigned> SortOp::getPartitionableLoops(
+    unsigned maxNumParallelDims) {
+  auto range = llvm::seq<unsigned>(0, getOperandRank());
+  SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+  partitionableLoops.erase(
+      std::next(partitionableLoops.begin(), getSortedDimension()));
+  if (partitionableLoops.size() > maxNumParallelDims) {
+    partitionableLoops.erase(
+        partitionableLoops.begin(),
+        std::next(partitionableLoops.begin(),
+                  partitionableLoops.size() - maxNumParallelDims));
+  }
+  return partitionableLoops;
+}
+
 Operation *SortOp::getTiledImplementation(
     OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes,
