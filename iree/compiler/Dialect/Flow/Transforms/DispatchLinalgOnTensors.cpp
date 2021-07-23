@@ -344,9 +344,8 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 // necessary across the boundary of regions without captures.
 static void pullInProducersInSameGroup(
     PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
-    linalg::OpOperandVector &tiledOpOperands,
-    ArrayRef<Value> untiledOpOperandsVal, ArrayRef<Operation *> tiledLoops,
-    int64_t groupNum) {
+    ArrayRef<Value> untiledOpOperandsVal, linalg::LinalgOp tiledOp,
+    ArrayRef<Operation *> tiledLoops, int64_t groupNum) {
   // Scoped within DispatchWorkgroupOp.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
@@ -372,7 +371,7 @@ static void pullInProducersInSameGroup(
         OpResult opResult = en.value().cast<OpResult>();
         auto maybeFusionInfo = linalg::fuseProducerOfTensor(
             rewriter, clonedOrigProducer->getResult(opResult.getResultNumber()),
-            *tiledOpOperands[en.index()]);
+            tiledOp->getOpOperand(en.index()));
         if (!maybeFusionInfo.hasValue()) {
           DEBUG_WITH_TYPE(DEBUG_TYPE, llvm::dbgs()
                                           << "failed to fuse with tensor\n");
@@ -389,14 +388,11 @@ static void pullInProducersInSameGroup(
       // producer's operands and pull them in if they are marked to be fused
       // into the current group.
       if (fusedProducer) {
-        linalg::OpOperandVector fusedProducerOpOperands =
-            fusedProducer.getInputAndOutputOperands();
         SmallVector<Value> origProducerOpOperands =
             cast<linalg::LinalgOp>(clonedOrigProducer)
                 .getInputAndOutputOperands();
-        pullInProducersInSameGroup(
-            rewriter, dispatchOp, fusedProducerOpOperands,
-            origProducerOpOperands, tiledLoops, groupNum);
+        pullInProducersInSameGroup(rewriter, dispatchOp, origProducerOpOperands,
+                                   fusedProducer, tiledLoops, groupNum);
       }
     }
   }
@@ -840,12 +836,10 @@ struct TileAndDistributeLinalgOpsPattern
     // Keep track of the tiledOpOperands for fusion.
     rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
 
-    linalg::OpOperandVector tiledOpOperands =
-        tiledLinalgOp.op.getInputAndOutputOperands();
     SmallVector<Value> clonedOpOperands =
         clonedLinalgOp.getInputAndOutputOperands();
-    pullInProducersInSameGroup(rewriter, dispatchOp, tiledOpOperands,
-                               clonedOpOperands, tiledLinalgOp.loops,
+    pullInProducersInSameGroup(rewriter, dispatchOp, clonedOpOperands,
+                               tiledLinalgOp.op, tiledLinalgOp.loops,
                                getRootNumber(clonedLinalgOp));
 
     removeRootOpAttribute(tiledLinalgOp.op);
@@ -1075,11 +1069,10 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     if (hasRootOpAttribute(op)) {
       auto clonedLinalgOp = dyn_cast<linalg::LinalgOp>(en.second);
       if (clonedLinalgOp) {
-        linalg::OpOperandVector opOperands =
+        SmallVector<Value> opOperandsVal =
             clonedLinalgOp.getInputAndOutputOperands();
-        SmallVector<Value> opOperandsVal = opOperands;
         pullInProducersInSameGroup(
-            rewriter, dispatchOp, opOperands, opOperandsVal,
+            rewriter, dispatchOp, opOperandsVal, clonedLinalgOp,
             /*tiledLoops=*/ArrayRef<Operation *>(), getRootNumber(op));
         removeRootOpAttribute(clonedLinalgOp);
       }
