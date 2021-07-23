@@ -22,3 +22,12 @@ steps:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
       - "queue=build"
+
+  - label: "Build the runtime through Emscripten"
+    commands:
+      - "./scripts/git/submodule_versions.py init"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-emscripten@sha256:8acad361d23cb586187c2ea29df3a1ab301b5283c3648beb328681d69ecd0ab0 ./build_tools/cmake/build_runtime_emscripten.sh"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"
