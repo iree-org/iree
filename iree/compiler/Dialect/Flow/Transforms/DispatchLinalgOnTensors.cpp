@@ -246,6 +246,9 @@ static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
 ///   linalg.init_tensor operations.
 
 static bool isRootOp(Operation *op) {
+  if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+    return false;
+  }
   return (isa<linalg::LinalgOp>(op) &&
           !isa<linalg::GenericOp, linalg::FillOp>(op)) ||
          isa<linalg_ext::LinalgExtOp>(op);
@@ -342,21 +345,20 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 static void pullInProducersInSameGroup(
     PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
     linalg::OpOperandVector &tiledOpOperands,
-    linalg::OpOperandVector &untiledOpOperands,
-    ArrayRef<Operation *> tiledLoops, int64_t groupNum) {
+    ArrayRef<Value> untiledOpOperandsVal, ArrayRef<Operation *> tiledLoops,
+    int64_t groupNum) {
   // Scoped within DispatchWorkgroupOp.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
-  for (auto en : llvm::enumerate(untiledOpOperands)) {
-    if (auto producer = en.value()->get().getDefiningOp<linalg::LinalgOp>()) {
+  for (auto en : llvm::enumerate(untiledOpOperandsVal)) {
+    if (auto producer = en.value().getDefiningOp<linalg::LinalgOp>()) {
       if (!isInFusionGroup(producer, groupNum)) continue;
       DEBUG_WITH_TYPE(DEBUG_TYPE,
                       llvm::dbgs() << "current producer: " << producer << "\n");
 
       Operation *clonedOrigProducer = rewriter.clone(*producer);
-      static_cast<PatternRewriterWithScopedReplaceOp &>(rewriter)
-          .replaceOpWithinScope(producer, clonedOrigProducer->getResults(),
-                                &dispatchOp.getRegion().front());
+      rewriter.replaceOpWithinBlock(producer, clonedOrigProducer->getResults(),
+                                    &dispatchOp.getRegion().front());
 
       linalg::LinalgOp fusedProducer;
       if (tiledLoops.empty()) {
@@ -367,7 +369,7 @@ static void pullInProducersInSameGroup(
       } else {
         // TODO: this is incorrect on general pattern failures, try pattern
         // within pattern.
-        OpResult opResult = en.value()->get().cast<OpResult>();
+        OpResult opResult = en.value().cast<OpResult>();
         auto maybeFusionInfo = linalg::fuseProducerOfTensor(
             rewriter, clonedOrigProducer->getResult(opResult.getResultNumber()),
             *tiledOpOperands[en.index()]);
@@ -389,7 +391,7 @@ static void pullInProducersInSameGroup(
       if (fusedProducer) {
         linalg::OpOperandVector fusedProducerOpOperands =
             fusedProducer.getInputAndOutputOperands();
-        linalg::OpOperandVector origProducerOpOperands =
+        SmallVector<Value> origProducerOpOperands =
             cast<linalg::LinalgOp>(clonedOrigProducer)
                 .getInputAndOutputOperands();
         pullInProducersInSameGroup(
@@ -840,7 +842,7 @@ struct TileAndDistributeLinalgOpsPattern
 
     linalg::OpOperandVector tiledOpOperands =
         tiledLinalgOp.op.getInputAndOutputOperands();
-    linalg::OpOperandVector clonedOpOperands =
+    SmallVector<Value> clonedOpOperands =
         clonedLinalgOp.getInputAndOutputOperands();
     pullInProducersInSameGroup(rewriter, dispatchOp, tiledOpOperands,
                                clonedOpOperands, tiledLinalgOp.loops,
@@ -869,6 +871,7 @@ struct TiledOpInterfacePattern
     auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op);
     auto linalgExtOp = dyn_cast<linalg_ext::LinalgExtOp>(op);
     if (!linalgExtOp || !tilableOp) return failure();
+    if (!hasRootOpAttribute(op)) return failure();
     if (hasOnlyDimUses(op)) return failure();
 
     SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
@@ -1074,10 +1077,10 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
       if (clonedLinalgOp) {
         linalg::OpOperandVector opOperands =
             clonedLinalgOp.getInputAndOutputOperands();
-
-        pullInProducersInSameGroup(rewriter, dispatchOp, opOperands, opOperands,
-                                   /*tiledLoops=*/ArrayRef<Operation *>(),
-                                   getRootNumber(op));
+        SmallVector<Value> opOperandsVal = opOperands;
+        pullInProducersInSameGroup(
+            rewriter, dispatchOp, opOperands, opOperandsVal,
+            /*tiledLoops=*/ArrayRef<Operation *>(), getRootNumber(op));
         removeRootOpAttribute(clonedLinalgOp);
       }
     }
