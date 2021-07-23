@@ -78,7 +78,7 @@ cmake -B ../iree-build-riscv/ \
   -DRISCV_CPU=rv64 \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_ENABLE_MLIR=OFF \
-  -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT}
+  -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
   .
 ```
 
@@ -157,7 +157,7 @@ iree/tools/iree-translate \
 Then run on the RISC-V QEMU:
 
 ```shell hl_lines="2 5"
-${QEMU_BIN}} \
+${QEMU_BIN} \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/iree/tools/iree-run-module \

@@ -454,23 +454,137 @@ def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
     HAL_DescriptorSetLayoutBindingAttr,
     "HAL descriptor set layout binding array attribute">;
 
-def HAL_ExecutableTargetAttr :
-    AttrDef<HAL_Dialect, "ExecutableTarget", []> {
-  let mnemonic = "executable.target";
-  let summary = [{Generic executable target specification.}];
+//===----------------------------------------------------------------------===//
+// Device and executable target specification
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceTargetAttr :
+    AttrDef<HAL_Dialect, "DeviceTarget", []> {
+  let mnemonic = "device.target";
+  let summary = [{generic device target specification}];
   let description = [{
-    Specifies how to compile an executable for a specific target backend.
+    Specifies the properties of a target runtime device.
+    Target devices are specified with a canonical identifier matching those used
+    by the runtime (such as `cpu`, `vulkan`, etc). Target devices may support
+    several target executable formats specified with `#hal.executable.target`.
+    An optional configuration dictionary allows for overriding backend defaults.
+
+    Example:
+    ```mlir
+    #hal.device.target<"cpu", {
+      executable_targets = [
+        #hal.executable.target<"llvm", "embedded-elf-arm_32">,
+        #hal.executable.target<"llvm", "embedded-elf-arm_64">,
+      ]
+    }>
+    ```
   }];
   let parameters = (ins
-    AttrParameter<"StringAttr", "">:$target,
+    AttrParameter<"StringAttr", "">:$deviceID,
     AttrParameter<"DictionaryAttr", "">:$configuration
   );
   let builders = [
-    AttrBuilder<(ins "StringRef":$target)>,
+    AttrBuilder<(ins "StringRef":$deviceID)>,
   ];
+
+  let extraClassDeclaration = [{
+    // Returns a symbol-compatible name that pseudo-uniquely identifies this
+    // target. Callers must perform deduplication when required.
+    std::string getSymbolNameFragment();
+
+    // Returns a hal.match.* expression tree that specifically matches this
+    // target device.
+    Attribute getMatchExpression();
+
+    // Returns the constraints defining buffer allocation and usage allowed on
+    // the device or the host defaults if none are defined.
+    BufferConstraintsAttr getBufferConstraints();
+
+    // Returns zero or more executable targets that this device supports.
+    SmallVector<ExecutableTargetAttr, 4> getExecutableTargets();
+
+    // Returns a list of target devices that may be active for the given
+    // operation. This will recursively walk parent operations until one with
+    // the `hal.device.targets` attribute is found.
+    static SmallVector<DeviceTargetAttr, 4> lookup(Operation *op);
+
+    // Returns a set of buffer constraints compatible with the host.
+    // These must only be used with device buffers when it is known that the
+    // device is local.
+    static BufferConstraintsAttr
+    getDefaultHostBufferConstraints(MLIRContext *context);
+
+    // Tries to find the min/max constraints on buffers across all target
+    // devices applicable to the given operation. If no target device specifies
+    // constraints then a generally acceptable default set with minimums will be
+    // returned.
+    //
+    // This can result in non-optimal constraints when multi-targeting wildly
+    // different device types and should only be used as a fallback.
+    static BufferConstraintsAttr
+    lookupConservativeBufferConstraints(Operation *op);
+
+    // Returns a list of all target executable configurations that may be
+    // required for the given operation.
+    static SmallVector<ExecutableTargetAttr, 4>
+    lookupExecutableTargets(Operation *op);
+  }];
 }
 
+def HAL_ExecutableTargetAttr :
+    AttrDef<HAL_Dialect, "ExecutableTarget", []> {
+  let mnemonic = "executable.target";
+  let summary = [{generic executable target specification}];
+  let description = [{
+    Specifies how to compile an executable for a specific target backend.
+    A backend is used to translate and serialize the executable into the final
+    form passed to the runtime. The format of the executable is a
+    target-specific value indicating the required runtime support to load the
+    deployed artifact. An optionally provided configuration dictionary overrides
+    backend-specific defaults.
+
+    Example:
+    ```mlir
+      // Produce a system-native ELF for x86-64 systems using the LLVM backend:
+      #hal.executable.target<"llvm", "system-elf-x86_64", {
+        triple = "x86_64-unknown-linux-elf",
+        cpu = "host",
+        cpu_features = "host",
+        abi = "lp32",
+        ...
+      }>
+    ```
+
+    The same compilation backend may be used to translate executables for
+    several different runtime devices. Likewise the same runtime device may use
+    one of many different executable targets. Assume an N:M mapping between the
+    two in all cases.
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$backend,
+    AttrParameter<"StringAttr", "">:$format,
+    AttrParameter<"DictionaryAttr", "">:$configuration
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$backend, "StringRef":$format)>,
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a symbol-compatible name that pseudo-uniquely identifies this
+    // target. Callers must perform deduplication when required.
+    std::string getSymbolNameFragment();
+
+    // Returns a hal.match.* expression tree that specifically matches a
+    // device that can load an executable of this target.
+    Attribute getMatchExpression();
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Experimental binding metadata
+//===----------------------------------------------------------------------===//
 // TODO(benvanik): drop this when we have a HAL dispatch abstraction.
+
 def HAL_ExConstantStorageAttr :
   IREE_StructAttr<"ex.constant_storage",
                   "ExConstantStorageAttr",
@@ -584,6 +698,9 @@ def HAL_DeviceMatchIDAttr :
     AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
       return $_get(pattern.getContext(), pattern);
     }]>,
+    AttrBuilderWithInferredContext<(ins "IREE::HAL::DeviceTargetAttr":$target), [{
+      return $_get(target.getContext(), target.getDeviceID());
+    }]>,
   ];
 }
 
@@ -662,6 +779,9 @@ def HAL_DeviceMatchExecutableFormatAttr :
     }]>,
     AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
       return $_get(pattern.getContext(), pattern);
+    }]>,
+    AttrBuilderWithInferredContext<(ins "IREE::HAL::ExecutableTargetAttr":$target), [{
+      return $_get(target.getContext(), target.getFormat());
     }]>,
   ];
 }

@@ -4,20 +4,20 @@
 
 // CHECK-LABEL: @global_i32_folds
 vm.module @global_i32_folds {
-  // CHECK: vm.global.i32 @g0 mutable 123 : i32
-  vm.global.i32 @g0 mutable init(@g0init) : i32
+  // CHECK: vm.global.i32 mutable @g0 = 123 : i32
+  vm.global.i32 mutable @g0 initializer(@g0init) : i32
   vm.func @g0init() -> i32 {
     %c123 = vm.const.i32 123 : i32
     vm.return %c123 : i32
   }
 
-  // CHECK: vm.global.i32 @g1 mutable : i32
-  vm.global.i32 @g1 mutable 0 : i32
+  // CHECK: vm.global.i32 mutable @g1 : i32
+  vm.global.i32 mutable @g1 = 0 : i32
   // CHECK: vm.global.i32 @g2 : i32
-  vm.global.i32 @g2 0 : i32
+  vm.global.i32 @g2 = 0 : i32
 
-  // CHECK: vm.global.i32 @g3 mutable : i32
-  vm.global.i32 @g3 mutable init(@g3init) : i32
+  // CHECK: vm.global.i32 mutable @g3 : i32
+  vm.global.i32 mutable @g3 initializer(@g3init) : i32
   vm.func @g3init() -> i32 {
     %c0 = vm.const.i32 0 : i32
     vm.return %c0 : i32
@@ -28,8 +28,8 @@ vm.module @global_i32_folds {
 
 // CHECK-LABEL: @global_ref_folds_null
 vm.module @global_ref_folds_null {
-  // CHECK: vm.global.ref @g0 mutable : !vm.ref<?>
-  vm.global.ref @g0 mutable init(@g0init) : !vm.ref<?>
+  // CHECK: vm.global.ref mutable @g0 : !vm.ref<?>
+  vm.global.ref mutable @g0 initializer(@g0init) : !vm.ref<?>
   vm.func @g0init() -> !vm.ref<?> {
     %null = vm.const.ref.zero : !vm.ref<?>
     vm.return %null : !vm.ref<?>
@@ -40,7 +40,7 @@ vm.module @global_ref_folds_null {
 
 // CHECK-LABEL: @global_load_i32_folds
 vm.module @global_load_i32_folds {
-  vm.global.i32 @g0 123 : i32
+  vm.global.i32 @g0 = 123 : i32
   // CHECK-LABEL: @inline_const_value
   vm.func @inline_const_value() -> i32 {
     // CHECK-NEXT: %c123 = vm.const.i32 123 : i32
@@ -49,7 +49,7 @@ vm.module @global_load_i32_folds {
     vm.return %g0 : i32
   }
 
-  vm.global.i32 @g1 mutable 123 : i32
+  vm.global.i32 mutable @g1 = 123 : i32
   // CHECK-LABEL: @ignore_nonconst_value
   vm.func @ignore_nonconst_value() -> i32 {
     // NOTE: ensure we don't inline non-constant values.
@@ -73,7 +73,7 @@ vm.module @global_load_ref_folds {
     vm.return %g0 : !vm.ref<?>
   }
 
-  vm.global.ref @g1 mutable : !vm.ref<?>
+  vm.global.ref mutable @g1 : !vm.ref<?>
   // CHECK-LABEL: @ignore_nonconst_value
   vm.func @ignore_nonconst_value() -> !vm.ref<?> {
     // NOTE: ensure we don't inline non-constant values.
@@ -88,7 +88,7 @@ vm.module @global_load_ref_folds {
 
 // CHECK-LABEL: @global_indirect_folds
 vm.module @global_indirect_folds {
-  vm.global.i32 @g0 mutable : i32
+  vm.global.i32 mutable @g0 : i32
 
   // CHECK-LABEL: @fold_load_i32
   vm.func @fold_load_i32() -> i32 {

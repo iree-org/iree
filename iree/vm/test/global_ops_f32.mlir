@@ -4,8 +4,8 @@ vm.module @global_ops_f32 {
   // global.f32
   //===--------------------------------------------------------------------===//
 
-  vm.global.f32 @c42 42.5 : f32 attributes {sym_visibility = "private"}
-  vm.global.f32 @c107_mut mutable 107.5 : f32 attributes {sym_visibility = "private"}
+  vm.global.f32 private @c42 = 42.5 : f32
+  vm.global.f32 private mutable @c107_mut = 107.5 : f32
   // TODO(simon-camp): Add test for initializer
 
   vm.export @test_global_load_f32

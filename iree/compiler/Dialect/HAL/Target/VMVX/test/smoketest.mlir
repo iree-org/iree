@@ -1,6 +1,17 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' %s | IreeFileCheck %s
 
 #map = affine_map<(d0) -> (d0)>
+
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"vmvx", {
+      executable_targets = [
+        #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+      ]
+    }>
+  ]
+} {
+
 flow.executable @add_dispatch_0 {
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 3 : index
@@ -21,13 +32,15 @@ flow.executable @add_dispatch_0 {
   }
 }
 
+}
+
 // CHECK-LABEL: hal.executable @add_dispatch_0
 //  CHECK-NEXT:   hal.interface @io {
 //  CHECK-NEXT:    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.variant @vmvx, target="vmvx" {
+//  CHECK-NEXT:   hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 //  CHECK-NEXT:     hal.executable.entry_point @entry attributes {
 //  CHECK-SAME:       interface = @io,
 //  CHECK-SAME:       ordinal = 0 : index

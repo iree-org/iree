@@ -75,6 +75,19 @@ class ROCMTargetBackend final : public TargetBackend {
     mlir::registerROCDLDialectTranslation(registry);
   }
 
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+    ;
+    configItems.emplace_back(b.getIdentifier("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
+  }
+
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
     buildLLVMGPUTransformPassPipeline(passManager, true);
   }
@@ -189,19 +202,40 @@ class ROCMTargetBackend final : public TargetBackend {
     // Add the binary data to the target executable.
     executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),
-        executableBuilder.getStringAttr("HSACO"),
+        variantOp.target().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
 
     return success();
   }
 
  private:
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    targetAttrs.push_back(getExecutableTarget(context));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::ExecutableTargetAttr::get(
+        context, b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
+        configAttr);
+  }
+
   ROCMTargetOptions options_;
 };
 
 void registerROCMTargetBackends(
     std::function<ROCMTargetOptions()> queryOptions) {
   getROCMTargetOptionsFromFlags();
+  // #hal.device.target<"rocm", ...
+  // #hal.executable.target<"rocm", ...
   static iree_compiler::IREE::HAL::TargetBackendRegistration registration(
       "rocm", [=]() {
         LLVMInitializeAMDGPUTarget();

@@ -36,9 +36,9 @@ iree_cc_library(
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::SPIRV
+    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::HAL::Target::SPIRVCommon
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils
     iree::compiler::Utils

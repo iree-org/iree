@@ -13,6 +13,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "AssignTargetDevices.cpp",
         "BenchmarkBatchDispatches.cpp",
         "CSEVariableLoads.cpp",
         "ConvertToHAL.cpp",
@@ -30,6 +31,7 @@ cc_library(
         "ResolveEntryPointOrdinals.cpp",
         "SerializeExecutables.cpp",
         "TranslateExecutableVariants.cpp",
+        "VerifyTargetEnvironment.cpp",
     ],
     hdrs = [
         "Passes.h",

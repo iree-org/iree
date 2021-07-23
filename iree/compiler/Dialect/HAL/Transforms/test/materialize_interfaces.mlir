@@ -1,4 +1,8 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces %s | IreeFileCheck %s
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
+  executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
+}>]} {
 
 // CHECK-LABEL: hal.executable @static_tiled_dispatch
 //  CHECK-NEXT: hal.interface @[[IO:.+]] {
@@ -6,7 +10,7 @@
 //  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @static_tiled_dispatch {
-  // CHECK-NEXT: hal.executable.variant @vmvx, target="vmvx" {
+  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index
@@ -46,7 +50,78 @@ func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
   return %0 : tensor<4x8xf32>
 }
 
+}
+
 // -----
+
+#device_target_vmvx = #hal.device.target<"vmvx", {
+  executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
+}>
+#device_target_cuda = #hal.device.target<"cuda", {
+  executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb">]
+}>
+module attributes {
+  hal.device.targets = [#device_target_vmvx, #device_target_cuda]
+} {
+
+// CHECK-LABEL: hal.executable @multi_target_ex
+//  CHECK-NEXT: hal.interface @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: }
+flow.executable @multi_target_ex {
+  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+  // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
+  // CHECK-SAME:     interface = @[[IO]],
+  // CHECK-SAME:     ordinal = 0 : index
+  // CHECK-SAME:   }
+  flow.dispatch.entry @entry attributes {
+    workgroup_rank = 2 : index
+  }
+  // CHECK-NEXT: module  {
+  module  {
+    // CHECK-NEXT: func @entry() {
+    func @entry(%arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
+      // CHECK-NEXT: %c0 = constant 0 : index
+      // CHECK-NEXT: %[[ARG:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B0]][%c0] : !flow.dispatch.tensor<readonly:8x4xf32>
+      // CHECK-NEXT: %[[RET:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B1]][%c0] : !flow.dispatch.tensor<writeonly:4x8xf32>
+
+      // CHECK-NEXT: %[[ARG_TILE:.+]] = flow.dispatch.tensor.load %[[ARG]]
+      %arg_tile = flow.dispatch.tensor.load %arg, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:8x4xf32> -> tensor<8x4xf32>
+      // CHECK-NEXT: %[[RET_TILE:.+]] = "test.sink"(%[[ARG_TILE]])
+      %ret_tile = "test.sink"(%arg_tile) : (tensor<8x4xf32>) -> tensor<4x8xf32>
+      // CHECK-NEXT: flow.dispatch.tensor.store %[[RET_TILE]], %[[RET]]
+      flow.dispatch.tensor.store %ret_tile, %ret, offsets=[], sizes=[], strides=[] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:4x8xf32>
+      return
+    }
+  }
+  //      CHECK: hal.executable.variant @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+  // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
+  // CHECK-SAME:     interface = @[[IO]],
+  // CHECK-SAME:     ordinal = 0 : index
+  // CHECK-SAME:   }
+}
+func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
+  %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
+      (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
+    %c1 = constant 1 : index
+    // CHECK: = flow.dispatch @multi_target_ex::@entry
+    // CHECK-SAME: hal.bindings = [
+    // CHECK-SAME:   #hal.ex.operand_buffer<"[[S0B0]]", 0 : index>,
+    // CHECK-SAME:   #hal.ex.result_buffer<"[[S0B1]]", 0 : index>]
+    %1 = flow.dispatch @multi_target_ex::@entry[%c1, %c1, %c1](%stream_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32>
+    flow.return %1 : tensor<4x8xf32>
+  }
+  return %0 : tensor<4x8xf32>
+}
+
+}
+
+// -----
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
+  executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
+}>]} {
 
 // CHECK-LABEL: hal.executable @dynamic_tiled_dispatch
 //  CHECK-NEXT: hal.interface @[[IO:.+]] attributes {push_constants = 4 : index} {
@@ -54,7 +129,7 @@ func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
 //  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @dynamic_tiled_dispatch {
-  // CHECK-NEXT: hal.executable.variant @vmvx, target="vmvx" {
+  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index
@@ -119,7 +194,13 @@ func @usage(%func_arg: tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
   return %0 : tensor<?x?x1024xf32>
 }
 
+}
+
 // -----
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
+  executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
+}>]} {
 
 // CHECK-LABEL: hal.executable @workgroup_infos
 //  CHECK-NEXT: hal.interface @[[IO:.+]] {
@@ -127,7 +208,7 @@ func @usage(%func_arg: tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
 //  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @workgroup_infos {
-  // CHECK-NEXT: hal.executable.variant @vmvx, target="vmvx" {
+  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
   // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index
@@ -158,7 +239,13 @@ flow.executable @workgroup_infos {
   }
 }
 
+}
+
 // -----
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
+  executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
+}>]} {
 
 // CHECK-LABEL: hal.executable @static_tied_result
 //  CHECK-NEXT: hal.interface @[[IO:.+]] {
@@ -166,7 +253,7 @@ flow.executable @workgroup_infos {
 //  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read|Write"
 //  CHECK-NEXT: }
 flow.executable @static_tied_result {
-  // CHECK-NEXT: hal.executable.variant @vmvx, target="vmvx" {
+  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
   // CHECK-NEXT:   hal.executable.entry_point @entry
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 2 : index
@@ -203,7 +290,13 @@ func @usage(%func_arg: tensor<8x4xf32>, %func_ret: tensor<4x8xf32>) -> tensor<4x
   return %0 : tensor<4x8xf32>
 }
 
+}
+
 // -----
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
+  executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
+}>]} {
 
 // CHECK-LABEL: hal.executable @constant_dispatch
 //  CHECK-NEXT: hal.interface @[[IO:.+]] {
@@ -214,7 +307,7 @@ func @usage(%func_arg: tensor<8x4xf32>, %func_ret: tensor<4x8xf32>) -> tensor<4x
 //  CHECK-NEXT:   hal.interface.binding @[[S0B4:.+]], set=0, binding=4, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @constant_dispatch {
-  // CHECK-NEXT: hal.executable.variant @vmvx, target="vmvx" {
+  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
   // CHECK-NEXT:   hal.executable.entry_point @entry
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 2 : index
@@ -290,4 +383,6 @@ func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
     flow.return %2 : tensor<4x8xf32>
   }
   return %0 : tensor<4x8xf32>
+}
+
 }

@@ -65,36 +65,77 @@ static LogicalResult setRootConfig(FuncOp entryPoint, linalg::GenericOp op) {
   return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
 }
 
-static LogicalResult setRootConfig(FuncOp entryPoint, linalg::MatmulOp op) {
-  IREE::HAL::DispatchLoweringPassPipeline passPipeline =
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize;
-  TileSizesListType tileSizes;
-  const int64_t numWarp = 2;
-  SmallVector<int64_t, 3> workgroupSize = {numWarp * cudaWarpSize, 1, 1};
-  // Currently just a basic tile size to enable tiling and vectorization.
-  // TODO: pick a more efficient tile size and tile at subgroup level.
-  SmallVector<int64_t, 4> ts = {2, 256, 4};
-  tileSizes.push_back(ts);  // Workgroup level.
-  tileSizes.push_back({});  // Subgroup level.
-  SmallVector<int64_t, 4> invocationLevelTs = {ts[0] / workgroupSize[1],
-                                               ts[1] / workgroupSize[0]};
-  tileSizes.push_back(invocationLevelTs);  // Thread level.
-  setConfig(tileSizes, op);
-  return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
+namespace {
+struct TileWorkgroupSizePair {
+  // How many scalar elements each workgroup should handle along each dimension.
+  std::array<int64_t, 3> tileSize;
+  std::array<int64_t, 3> workgroupSize;
+};
+}  // namespace
+
+/// Return the best combination of tile size and wg size. It will then used to
+/// pick the best size aligned with the shape dimension.
+static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair>& tileSizes) {
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 128, 4}, {32, 1, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
 }
 
-static LogicalResult setRootConfig(FuncOp entryPoint,
-                                   linalg::BatchMatmulOp op) {
+static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   IREE::HAL::DispatchLoweringPassPipeline passPipeline =
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize;
   TileSizesListType tileSizes;
-  const int64_t numWarp = 2;
-  SmallVector<int64_t, 3> workgroupSize = {numWarp * cudaWarpSize, 1, 1};
-  SmallVector<int64_t, 4> ts = {1, 2, 256, 4};
+  // Infer the MxN size of the matmul based on operands and indexing maps.
+  auto lhsShape = getUntiledShape(op.getInputOperand(0)->get());
+  auto rhsShape = getUntiledShape(op.getInputOperand(1)->get());
+  int64_t sizeM = -1;
+  int64_t sizeN = -1;
+  auto outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+  for (unsigned i = 0; i < lhsShape.size(); i++) {
+    if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
+        outputMap.getDimPosition(outputMap.getNumResults() - 2)) {
+      sizeM = lhsShape[i];
+      break;
+    }
+  }
+  for (unsigned i = 0; i < rhsShape.size(); i++) {
+    if (op.getTiedIndexingMap(op.getInputOperand(1)).getDimPosition(i) ==
+        outputMap.getDimPosition(outputMap.getNumResults() - 1))
+      sizeN = rhsShape[i];
+  }
+  // Default tile size and workgroup size.
+  int64_t tileX = 2;
+  int64_t tileY = 256;
+  SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  SmallVector<TileWorkgroupSizePair> tileSizeConfig;
+  // Query the best configuration.
+  getMatmulConfig(tileSizeConfig);
+  // Pick the best configuration where the original shape is aligned on the tile
+  // size.
+  for (TileWorkgroupSizePair& config : tileSizeConfig) {
+    if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
+      tileX = config.tileSize[0];
+      tileY = config.tileSize[1];
+      workgroupSize.assign(config.workgroupSize.begin(),
+                           config.workgroupSize.end());
+      break;
+    }
+  }
+  // Currently just a basic tile size to enable tiling and vectorization.
+  // TODO: pick a more efficient tile size and tile at subgroup level.
+  SmallVector<int64_t, 4> ts;
+  // Tile all the higher parallel dimension with a size of 1 and the 2 most
+  // inner dimension with the tileX/tileY size.
+  ts.append(op.getNumParallelLoops() - 2, 1);
+  ts.append({tileX, tileY});
+  // Tile all the reduction dimension with a size of 4.
+  ts.append(op.getNumReductionLoops(), 4);
   tileSizes.push_back(ts);  // Workgroup level.
   tileSizes.push_back({});  // Subgroup level.
-  SmallVector<int64_t, 4> invocationLevelTs = {ts[0], ts[1] / workgroupSize[1],
-                                               ts[2] / workgroupSize[0]};
+  // At the thread level only tile parallel loops.
+  SmallVector<int64_t, 4> invocationLevelTs(op.getNumParallelLoops() - 2, 1);
+  invocationLevelTs.append(
+      {tileX / workgroupSize[1], tileY / workgroupSize[0]});
   tileSizes.push_back(invocationLevelTs);  // Thread level.
   setConfig(tileSizes, op);
   return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
@@ -127,13 +168,11 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint,
 
 static LogicalResult setRootConfig(FuncOp entryPointFn,
                                    linalg::LinalgOp linalgOp) {
+  if (linalg::isaContractionOpInterface(linalgOp) &&
+      linalgOp.getNumParallelLoops() >= 2)
+    return setContractConfig(entryPointFn, linalgOp);
   if (auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation()))
     return setRootConfig(entryPointFn, genericOp);
-  if (auto matmul = dyn_cast<linalg::MatmulOp>(linalgOp.getOperation()))
-    return setRootConfig(entryPointFn, matmul);
-  if (auto batchMatmul =
-          dyn_cast<linalg::BatchMatmulOp>(linalgOp.getOperation()))
-    return setRootConfig(entryPointFn, batchMatmul);
   return setRootDefaultConfig(entryPointFn, linalgOp);
 }
 

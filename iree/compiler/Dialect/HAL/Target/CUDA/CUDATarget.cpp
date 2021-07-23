@@ -37,12 +37,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-CUDATargetOptions getCUDATargetOptionsFromFlags() {
-  CUDATargetOptions targetOptions;
-  // TODO: flags
-  return targetOptions;
-}
-
 static std::string translateModuleToISA(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
   std::string targetISA;
@@ -135,13 +129,26 @@ static std::string sanitizeNameForCuda(llvm::StringRef name) {
 
 class CUDATargetBackend final : public TargetBackend {
  public:
-  CUDATargetBackend(CUDATargetOptions options) : options_(std::move(options)) {}
+  CUDATargetBackend() = default;
 
   std::string name() const override { return "cuda"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);
+  }
+
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    configItems.emplace_back(b.getIdentifier("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
@@ -261,7 +268,7 @@ class CUDATargetBackend final : public TargetBackend {
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),
-        executableBuilder.getStringAttr("PTXE"),
+        variantOp.target().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.mime_typeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
@@ -270,18 +277,35 @@ class CUDATargetBackend final : public TargetBackend {
   }
 
  private:
-  CUDATargetOptions options_;
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    targetAttrs.push_back(getExecutableTarget(context));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::ExecutableTargetAttr::get(
+        context, b.getStringAttr("cuda"), b.getStringAttr("cuda-nvptx-fb"),
+        configAttr);
+  }
 };
 
-void registerCUDATargetBackends(
-    std::function<CUDATargetOptions()> queryOptions) {
-  getCUDATargetOptionsFromFlags();
+void registerCUDATargetBackends() {
+  // #hal.device.target<"cuda", ...
+  // #hal.executable.target<"cuda", ...
   static TargetBackendRegistration registration("cuda", [=]() {
     LLVMInitializeNVPTXTarget();
     LLVMInitializeNVPTXTargetMC();
     LLVMInitializeNVPTXTargetInfo();
     LLVMInitializeNVPTXAsmPrinter();
-    return std::make_unique<CUDATargetBackend>(queryOptions());
+    return std::make_unique<CUDATargetBackend>();
   });
 }
 

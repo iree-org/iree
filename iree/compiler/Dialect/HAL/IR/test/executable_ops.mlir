@@ -1,9 +1,11 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+
+#executable_target_format = #hal.executable.target<"backend", "format">
 
 // CHECK-LABEL: @ex
 hal.executable @ex {
-  // CHECK: hal.executable.variant @backend, target="backend"
-  hal.executable.variant @backend, target="backend" {
+  // CHECK: hal.executable.variant @backend, target = #executable_target_format
+  hal.executable.variant @backend, target = #executable_target_format {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : index
@@ -32,10 +34,12 @@ hal.executable @ex {
 
 // -----
 
+#executable_target_format = #hal.executable.target<"backend", "format">
+
 // CHECK-LABEL: @ex_with_workgroup_count_region
 hal.executable @ex_with_workgroup_count_region {
-  // CHECK: hal.executable.variant @backend, target="backend"
-  hal.executable.variant @backend, target="backend" {
+  // CHECK: hal.executable.variant @backend, target = #executable_target_format
+  hal.executable.variant @backend, target = #executable_target_format {
     // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : index
@@ -62,29 +66,6 @@ hal.executable @ex_with_workgroup_count_region {
     data = dense<1> : vector<128xi8>,
     // CHECK-SAME: format = "some_format"
     format = "some_format"
-  }
-}
-
-// -----
-
-// CHECK-LABEL: @ex_with_source
-hal.executable @ex_with_source {
-  // CHECK-NEXT: hal.executable.binary
-  hal.executable.binary @backend_binary attributes {
-    // CHECK-SAME: data = dense<1> : vector<128xi8>,
-    data = dense<1> : vector<128xi8>,
-    // CHECK-SAME: format = "some_format"
-    format = "some_format"
-  } {
-    // CHECK-NEXT: module {
-    module {
-      // CHECK-NEXT: func @dispatch0
-      func @dispatch0(%arg0: memref<4xf32>, %arg1: memref<4xf32>) attributes {
-          iree.executable.export,
-          iree.ordinal = 0 : index} {
-        return
-      }
-    }
   }
 }
 

@@ -23,6 +23,10 @@ namespace HAL {
 namespace {
 
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+  // TODO(benvanik): replace the global iree-hal-target-backends flag with this.
+  // ListOption<std::string> targets{
+  //     *this, "targets", llvm::cl::desc("One or more HAL devices to target."),
+  //     llvm::cl::ZeroOrMore};
   Option<bool> serializeExecutables{
       *this, "serialize-executables",
       llvm::cl::desc("Whether to serialize hal.executable.variant ops to "
@@ -50,9 +54,21 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    const TransformOptions &transformOptions) {
   passManager.addPass(createCanonicalizerPass());
 
+  // The HAL must know its targets early on in the process. This pass discovers/
+  // derives/specifies the target devices and annotates the module with that
+  // information. This allows subsequent passes to lookup which devices they are
+  // targeting.
+  if (!targetOptions.targets.empty()) {
+    // Today we just assign devices from parameters but we should instead be
+    // performing analysis at the flow level and then doing magic device
+    // database lookups here.
+    passManager.addPass(createAssignTargetDevicesPass(targetOptions.targets));
+  }
+  passManager.addPass(createVerifyTargetEnvironmentPass());
+
   // Handle large constants (weights/params/etc) first so that we can use the
   // resulting constant pools to determine the interfaces.
-  passManager.addPass(createIdentifyConstantPoolsPass(targetOptions));
+  passManager.addPass(createIdentifyConstantPoolsPass());
   passManager.addNestedPass<IREE::HAL::ConstantPoolOp>(
       createPackConstantPoolStoragePass());
   passManager.addPass(createMaterializeConstantPoolBuffersPass());
@@ -61,14 +77,16 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Each executable needs a hal.interface to specify how the host and device
   // comminucate across the ABI boundary.
-  passManager.addPass(createMaterializeInterfacesPass(targetOptions));
+  passManager.addPass(createMaterializeInterfacesPass());
 
+  // Translate each executable variant to its target IR form.
   passManager.nest<IREE::HAL::ExecutableOp>()
       .addNestedPass<IREE::HAL::ExecutableVariantOp>(
           createPropagateConstantWorkgroupInfoPass());
   passManager.nest<IREE::HAL::ExecutableOp>()
       .addNestedPass<IREE::HAL::ExecutableVariantOp>(
           createTranslateExecutableVariantsPass());
+  passManager.addPass(createVerifyTargetEnvironmentPass());
 
   // Convert supported input dialects (std, flow, etc) into the HAL dialect.
   passManager.addPass(createConvertToHALPass());
@@ -88,7 +106,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   //
   // NOTE: this works best if canonicalization/CSE has run such that the packed
   // sizes are as much as possible available as constants.
-  passManager.addNestedPass<FuncOp>(createPackAllocationsPass(targetOptions));
+  passManager.addNestedPass<FuncOp>(createPackAllocationsPass());
 
   // After all executables are translated and before resolving entry point
   // ordinals, we allow the backends to link executables together. For example,

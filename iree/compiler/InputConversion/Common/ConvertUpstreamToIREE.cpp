@@ -83,12 +83,39 @@ struct ConvertTensorCastPattern : public OpConversionPattern<tensor::CastOp> {
   }
 };
 
+struct ConvertTensorFromElementsPattern
+    : public OpConversionPattern<tensor::FromElementsOp> {
+  using OpConversionPattern<tensor::FromElementsOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      tensor::FromElementsOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+
+    if (shouldBeConverted(op)) {
+      SmallVector<Value> dimSizes(1);
+      dimSizes[0] = rewriter.create<ConstantIndexOp>(loc, 1);
+      rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
+          op, op.getType(), operands.front(), dimSizes);
+    }
+
+    return success();
+  }
+
+  // TODO: This pattern was mainly added to iron out some kinks specific to
+  // detensoring (see: https://github.com/google/iree/issues/1159). Do we need
+  // to expand this check for other uses?
+  static bool shouldBeConverted(tensor::FromElementsOp op) {
+    return op.getType().getDimSize(0) == 1;
+  }
+};
 }  // namespace
 
 void populateConvertUpstreamToIREEPatterns(MLIRContext *context,
                                            TypeConverter &typeConverter,
                                            OwningRewritePatternList &patterns) {
   patterns.add<ConvertTensorCastPattern>(typeConverter, context);
+  patterns.add<ConvertTensorFromElementsPattern>(typeConverter, context);
 }
 
 namespace {
@@ -114,6 +141,10 @@ void ConvertUpstreamToIREEPass::runOnOperation() {
 
   ConversionTarget target(*context);
   target.addIllegalOp<tensor::CastOp>();
+  target.addDynamicallyLegalOp<tensor::FromElementsOp>(
+      [](tensor::FromElementsOp op) {
+        return !ConvertTensorFromElementsPattern::shouldBeConverted(op);
+      });
 
   target.addLegalDialect<StandardOpsDialect>();
   target.addLegalDialect<tensor::TensorDialect>();

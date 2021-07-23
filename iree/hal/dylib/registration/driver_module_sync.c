@@ -55,8 +55,8 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_driver_create(
-        iree_make_cstring_view("dylib"), &default_params,
-        IREE_ARRAYSIZE(loaders), loaders, allocator, out_driver);
+        iree_make_cstring_view("cpu"), &default_params, IREE_ARRAYSIZE(loaders),
+        loaders, allocator, out_driver);
   }
 
   iree_hal_executable_loader_release(dylib_loader);

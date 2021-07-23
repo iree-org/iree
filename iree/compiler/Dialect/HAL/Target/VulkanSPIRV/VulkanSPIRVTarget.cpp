@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/Target/SPIRVCommon/SPIRVTarget.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
@@ -79,16 +79,23 @@ static spirv::TargetEnvAttr getSPIRVTargetEnv(
   return {};
 }
 
-class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
+class VulkanSPIRVTargetBackend : public TargetBackend {
  public:
   VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
-      : SPIRVTargetBackend(options.codegenOptions),
-        options_(std::move(options)) {}
+      : options_(std::move(options)) {}
 
   // NOTE: we could vary these based on the options such as 'vulkan-v1.1'.
   std::string name() const override { return "vulkan"; }
 
-  BufferConstraintsAttr queryBufferConstraints(MLIRContext *context) override {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<Vulkan::VulkanDialect, spirv::SPIRVDialect>();
+  }
+
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
     // Picked from here to start:
     // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=minStorageBufferOffsetAlignment&platform=android
     // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=maxStorageBufferRange&platform=android
@@ -97,23 +104,23 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     uint64_t minBufferOffsetAlignment = 256ull;
     uint64_t maxBufferRange = 128 * 1024 * 1024ull;
     uint64_t minBufferRangeAlignment = 16ull;
-    Builder b(context);
-    return BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
-                                      b.getIndexAttr(minBufferOffsetAlignment),
-                                      b.getIndexAttr(maxBufferRange),
-                                      b.getIndexAttr(minBufferRangeAlignment));
+    configItems.emplace_back(
+        b.getIdentifier("buffer_constraints"),
+        BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
+                                   b.getIndexAttr(minBufferOffsetAlignment),
+                                   b.getIndexAttr(maxBufferRange),
+                                   b.getIndexAttr(minBufferRangeAlignment)));
+
+    configItems.emplace_back(b.getIdentifier("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<Vulkan::VulkanDialect, spirv::SPIRVDialect>();
-  }
-
-  void declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
-                         IREE::HAL::ExecutableOp executableOp) override {
-    spirv::TargetEnvAttr spvTargetEnv =
-        getSPIRVTargetEnv(options_.vulkanTargetEnv, options_.vulkanTargetTriple,
-                          sourceOp.getContext());
-    declareVariantOpsForEnv(sourceOp, executableOp, spvTargetEnv);
+  void buildTranslationPassPipeline(OpPassManager &passManager) override {
+    buildSPIRVCodegenPassPipeline(passManager, options_.codegenOptions);
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
@@ -149,7 +156,7 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),
-        executableBuilder.getStringAttr("SPVE"),
+        variantOp.target().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.mime_typeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
@@ -157,7 +164,31 @@ class VulkanSPIRVTargetBackend : public SPIRVTargetBackend {
     return success();
   }
 
- protected:
+ private:
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    targetAttrs.push_back(getExecutableTarget(
+        context, getSPIRVTargetEnv(options_.vulkanTargetEnv,
+                                   options_.vulkanTargetTriple, context)));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context, spirv::TargetEnvAttr targetEnv) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    configItems.emplace_back(b.getIdentifier(spirv::getTargetEnvAttrName()),
+                             targetEnv);
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::ExecutableTargetAttr::get(
+        context, b.getStringAttr("vulkan"), b.getStringAttr("vulkan-spirv-fb"),
+        configAttr);
+  }
+
   VulkanSPIRVTargetOptions options_;
 };
 
@@ -167,7 +198,9 @@ void registerVulkanSPIRVTargetBackends(
   auto backendFactory = [=]() {
     return std::make_unique<VulkanSPIRVTargetBackend>(queryOptions());
   };
+  // #hal.device.target<"vulkan", ...
   static TargetBackendRegistration registration0("vulkan", backendFactory);
+  // #hal.executable.target<"vulkan-spirv", ...
   static TargetBackendRegistration registration1("vulkan-spirv",
                                                  backendFactory);
 }

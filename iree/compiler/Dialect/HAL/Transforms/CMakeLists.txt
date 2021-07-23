@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "AssignTargetDevices.cpp"
     "BenchmarkBatchDispatches.cpp"
     "CSEVariableLoads.cpp"
     "ConvertToHAL.cpp"
@@ -33,6 +34,7 @@ iree_cc_library(
     "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
     "TranslateExecutableVariants.cpp"
+    "VerifyTargetEnvironment.cpp"
   DEPS
     LLVMSupport
     MLIRAffineToStandard

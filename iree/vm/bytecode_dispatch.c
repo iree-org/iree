@@ -1479,7 +1479,8 @@ iree_status_t iree_vm_bytecode_dispatch(
       VM_DecStrAttr("message", &message);
       if (status_code != 0) {
         // TODO(benvanik): capture source information.
-        return iree_status_allocate(status_code, "<vm>", 0, message);
+        return iree_status_allocate_f(status_code, "<vm>", 0, "%.*s",
+                                      (int)message.size, message.data);
       }
     });
 
@@ -1827,7 +1828,6 @@ iree_status_t iree_vm_bytecode_dispatch(
         const float global_value =
             vm_global_load_f32(module_state->rwdata_storage.data, byte_offset);
         *value = global_value;
-        
       });
 
       DISPATCH_OP(EXT_F32, GlobalStoreF32, {

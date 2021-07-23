@@ -890,17 +890,18 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                                                  device, rewriter);
   for (auto variantOp :
        executableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>()) {
-    auto targetBackend = IREE::HAL::getTargetBackend(variantOp.target());
-    if (!targetBackend) {
-      return executableOp.emitError()
-             << "unregistered target backend '" << variantOp.target() << "'";
-    }
     auto entryPointOps =
         variantOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
-    if (entryPointOps.empty()) {
-      return dispatchOp.emitOpError() << "need at least one entry point";
+    auto entryPointIt =
+        llvm::find_if(entryPointOps, [&](IREE::HAL::ExecutableEntryPointOp op) {
+          return op.getName() == dispatchOp.entry_point().getLeafReference();
+        });
+    if (entryPointIt == entryPointOps.end()) {
+      return variantOp.emitError()
+             << "hal.executable.variant is missing the flow entry point for "
+             << dispatchOp.entry_point();
     }
-    auto entryPointOp = *entryPointOps.begin();
+    auto entryPointOp = *entryPointIt;
     auto interfaceOp =
         dyn_cast<IREE::HAL::InterfaceOp>(SymbolTable::lookupSymbolIn(
             executableOp, entryPointOp.interfaceAttr()));
@@ -909,9 +910,8 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
         interfaceOp.push_constantsAttr(),
         interfaceOp.getExecutableSetLayoutsAttr(), rewriter);
 
-    auto *region =
-        switchRewriter.addConditionRegion(IREE::HAL::DeviceMatchIDAttr::get(
-            loc.getContext(), targetBackend->deviceID()));
+    auto *region = switchRewriter.addConditionRegion(
+        variantOp.target().getMatchExpression());
     auto &entryBlock = region->front();
     auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
 
@@ -937,6 +937,62 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
 
   // Full barriers for now as we aren't scheduling things in waves.
   recordFullExecutionBarrier(commandBuffer, dispatchOp.getLoc(), rewriter);
+  return success();
+}
+
+// Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte value.
+static Value splatFillPattern(Location loc, Value baseValue,
+                              OpBuilder &builder) {
+  switch (baseValue.getType().getIntOrFloatBitWidth()) {
+    case 8: {
+      // (v << 24) | (v << 16) | (v << 8) | v
+      auto b0 = builder.createOrFold<ZeroExtendIOp>(loc, baseValue,
+                                                    builder.getIntegerType(32));
+      auto c8 = builder.create<ConstantIntOp>(loc, 8, 32);
+      auto b1 = builder.createOrFold<ShiftLeftOp>(loc, b0, c8);
+      auto c16 = builder.create<ConstantIntOp>(loc, 16, 32);
+      auto b2 = builder.createOrFold<ShiftLeftOp>(loc, b0, c16);
+      auto c24 = builder.create<ConstantIntOp>(loc, 24, 32);
+      auto b3 = builder.createOrFold<ShiftLeftOp>(loc, b0, c24);
+      return builder.createOrFold<OrOp>(
+          loc, b0,
+          builder.createOrFold<OrOp>(loc, b1,
+                                     builder.createOrFold<OrOp>(loc, b2, b3)));
+    }
+    case 16: {
+      // (v << 16) | v
+      auto c16 = builder.create<ConstantIntOp>(loc, 16, 32);
+      auto b0 = builder.createOrFold<ZeroExtendIOp>(loc, baseValue,
+                                                    builder.getIntegerType(32));
+      auto b1 = builder.createOrFold<ShiftLeftOp>(loc, b0, c16);
+      return builder.createOrFold<OrOp>(loc, b0, b1);
+    }
+    case 32:
+      return baseValue;
+    default:
+      return {};  // Unsupported (so far)
+  }
+}
+
+static LogicalResult recordTensorSplat(Value device, Value commandBuffer,
+                                       IREE::Flow::TensorSplatOp &splatOp,
+                                       StreamSchedulingState &schedulingState,
+                                       ConversionPatternRewriter &rewriter) {
+  auto resultBuffer = schedulingState.lookupTensorBufferRange(splatOp.result());
+
+  auto pattern = splatFillPattern(splatOp.getLoc(), splatOp.value(), rewriter);
+  if (!pattern) {
+    return splatOp.emitError() << ">4 byte/non-byte-aligned fills are not yet "
+                                  "implemented (require special emulation)";
+  }
+
+  auto zeroOffset = schedulingState.lookupOrCreateIndex(0, rewriter);
+  rewriter.create<IREE::HAL::CommandBufferFillBufferOp>(
+      splatOp.getLoc(), commandBuffer, resultBuffer.buffer, zeroOffset,
+      resultBuffer.length, pattern);
+
+  // Full barriers for now as we aren't scheduling things.
+  recordFullExecutionBarrier(commandBuffer, splatOp.getLoc(), rewriter);
   return success();
 }
 
@@ -1063,6 +1119,11 @@ static LogicalResult recordStreamCommands(
     if (auto dispatchOp = dyn_cast<IREE::Flow::DispatchOp>(op)) {
       if (failed(recordDispatch(device, commandBuffer, dispatchOp,
                                 schedulingState, rewriter))) {
+        return failure();
+      }
+    } else if (auto splatOp = dyn_cast<IREE::Flow::TensorSplatOp>(op)) {
+      if (failed(recordTensorSplat(device, commandBuffer, splatOp,
+                                   schedulingState, rewriter))) {
         return failure();
       }
     } else if (auto cloneOp = dyn_cast<IREE::Flow::TensorCloneOp>(op)) {

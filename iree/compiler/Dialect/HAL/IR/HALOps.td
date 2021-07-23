@@ -1850,14 +1850,14 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [
     %c2 = constant 2 : i32
     %device = ... : !hal.device
     %0 = hal.device.switch<%device : !hal.device> -> i32
-      #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
-        hal.return %c1a : i32
+      #hal.device.match.id<"vulkan-v1.?-*"> {
+        hal.return %c1 : i32
       },
-      #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
-        hal.return %c2a : i32
+      #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
+        hal.return %c2 : i32
       },
-      #hal.match.always(%c0a = %c0 : i32) {
-        hal.return %c0a : i32
+      #hal.match.always {
+        hal.return %c0 : i32
       }
     ```
   }];
@@ -2084,17 +2084,14 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
 
   let arguments = (ins
     StrAttr:$sym_name,
-    StrAttr:$target
-    // TODO(benvanik): add compatibility and versioning attributes.
-    // TODO(scotttodd): add linking / preserve_ordinals attribute(s) for targets
-    //                  with special linking requirements
+    HAL_ExecutableTargetAttr:$target
   );
 
   let regions = (region SizedRegion<1>:$body);
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "StringRef":$name, "StringRef":$target)>,
+    OpBuilder<(ins "StringRef":$name, "IREE::HAL::ExecutableTargetAttr":$target)>,
   ];
 
   let extraClassDeclaration = [{
@@ -2117,9 +2114,7 @@ def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
 }
 
 def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
-    IsolatedFromAbove,
     HasParent<"IREE::HAL::ExecutableOp">,
-    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableBinaryEndOp">,
     Symbol,
   ]> {
   let summary = [{compiled executable binary data}];
@@ -2136,8 +2131,6 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
     // TODO(benvanik): add compatibility and versioning attributes.
   );
 
-  let regions = (region SizedRegion<1>:$body);
-
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
@@ -2151,26 +2144,6 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
       "DenseIntElementsAttr":$data
     )>,
   ];
-
-  let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
-
-    llvm::Optional<::mlir::ModuleOp> getInnerModule() {
-      auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
-      if (moduleOps.empty()) return llvm::None;
-      return *moduleOps.begin();
-    }
-  }];
-
-  let verifier = [{ return verifyExecutableBinaryOp(*this); }];
-}
-
-def HAL_ExecutableBinaryEndOp : HAL_Op<"executable.binary_end", [
-    HasParent<"IREE::HAL::ExecutableBinaryOp">,
-    Terminator,
-  ]> {
-  let summary = [{terminator pseudo-op for the executable binary op}];
-  let assemblyFormat = "attr-dict";
 }
 
 def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
