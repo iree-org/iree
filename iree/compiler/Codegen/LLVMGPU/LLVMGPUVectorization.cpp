@@ -29,7 +29,17 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   // TODO(thomasraoux): Add lowering for vector.multireduce ops.
   auto filterReduction = [](Operation *op) {
     if (auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op)) {
-      if (genericOp.getNumReductionLoops() > 0) return failure();
+      auto linalgOp = cast<linalg::LinalgOp>(op);
+      // TODO(thomasraoux): Disable vectorization if the output indexing map has
+      // permutation to workaround a bug in MLIR core. This will be removed once
+      // the fix is integrated.
+      bool vectorizeContract =
+          linalg::isaContractionOpInterface(linalgOp) &&
+          compressUnusedDims(
+              linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0)))
+              .isIdentity();
+      if (!vectorizeContract && genericOp.getNumReductionLoops() > 0)
+        return failure();
     }
     return success();
   };

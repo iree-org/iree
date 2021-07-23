@@ -65,7 +65,7 @@ static LogicalResult setRootConfig(FuncOp entryPoint, linalg::GenericOp op) {
   return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
 }
 
-static LogicalResult setRootConfig(FuncOp entryPoint, linalg::MatmulOp op) {
+static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   IREE::HAL::DispatchLoweringPassPipeline passPipeline =
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize;
   TileSizesListType tileSizes;
@@ -73,28 +73,21 @@ static LogicalResult setRootConfig(FuncOp entryPoint, linalg::MatmulOp op) {
   SmallVector<int64_t, 3> workgroupSize = {numWarp * cudaWarpSize, 1, 1};
   // Currently just a basic tile size to enable tiling and vectorization.
   // TODO: pick a more efficient tile size and tile at subgroup level.
-  SmallVector<int64_t, 4> ts = {2, 256, 4};
+  SmallVector<int64_t, 4> ts;
+  // Tile all the higher parallel dimension with a size of 1 and the 2 most
+  // inner dimension with the tileX/tileY size.
+  ts.append(op.getNumParallelLoops() - 2, 1);
+  int64_t tileX = 2;
+  int64_t tileY = 256;
+  ts.append({tileX, tileY});
+  // Tile all the reduction dimension with a size of 4.
+  ts.append(op.getNumReductionLoops(), 4);
   tileSizes.push_back(ts);  // Workgroup level.
   tileSizes.push_back({});  // Subgroup level.
-  SmallVector<int64_t, 4> invocationLevelTs = {ts[0] / workgroupSize[1],
-                                               ts[1] / workgroupSize[0]};
-  tileSizes.push_back(invocationLevelTs);  // Thread level.
-  setConfig(tileSizes, op);
-  return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
-}
-
-static LogicalResult setRootConfig(FuncOp entryPoint,
-                                   linalg::BatchMatmulOp op) {
-  IREE::HAL::DispatchLoweringPassPipeline passPipeline =
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize;
-  TileSizesListType tileSizes;
-  const int64_t numWarp = 2;
-  SmallVector<int64_t, 3> workgroupSize = {numWarp * cudaWarpSize, 1, 1};
-  SmallVector<int64_t, 4> ts = {1, 2, 256, 4};
-  tileSizes.push_back(ts);  // Workgroup level.
-  tileSizes.push_back({});  // Subgroup level.
-  SmallVector<int64_t, 4> invocationLevelTs = {ts[0], ts[1] / workgroupSize[1],
-                                               ts[2] / workgroupSize[0]};
+  // At the thread level only tile parallel loops.
+  SmallVector<int64_t, 4> invocationLevelTs(op.getNumParallelLoops() - 2, 1);
+  invocationLevelTs.append(
+      {tileX / workgroupSize[1], tileY / workgroupSize[0]});
   tileSizes.push_back(invocationLevelTs);  // Thread level.
   setConfig(tileSizes, op);
   return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
@@ -127,13 +120,11 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint,
 
 static LogicalResult setRootConfig(FuncOp entryPointFn,
                                    linalg::LinalgOp linalgOp) {
+  if (linalg::isaContractionOpInterface(linalgOp) &&
+      linalgOp.getNumParallelLoops() >= 2)
+    return setContractConfig(entryPointFn, linalgOp);
   if (auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation()))
     return setRootConfig(entryPointFn, genericOp);
-  if (auto matmul = dyn_cast<linalg::MatmulOp>(linalgOp.getOperation()))
-    return setRootConfig(entryPointFn, matmul);
-  if (auto batchMatmul =
-          dyn_cast<linalg::BatchMatmulOp>(linalgOp.getOperation()))
-    return setRootConfig(entryPointFn, batchMatmul);
   return setRootDefaultConfig(entryPointFn, linalgOp);
 }
 
