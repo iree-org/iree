@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "assign_target_devices.mlir"
     "benchmark_batch_dispatches.mlir"
     "cse_variable_loads.mlir"
     "identify_constant_pools.mlir"
@@ -26,6 +27,7 @@ iree_lit_test_suite(
     "pack_constant_pool_storage.mlir"
     "propagate_constant_workgroup_info.mlir"
     "resolve_entry_point_ordinals.mlir"
+    "verify_target_environment.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

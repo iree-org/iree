@@ -11,8 +11,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -29,8 +27,7 @@ namespace HAL {
 class IdentifyConstantPoolsPass
     : public PassWrapper<IdentifyConstantPoolsPass, OperationPass<ModuleOp>> {
  public:
-  explicit IdentifyConstantPoolsPass(TargetOptions targetOptions)
-      : targetOptions_(targetOptions) {}
+  IdentifyConstantPoolsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::StandardOpsDialect>();
@@ -71,14 +68,9 @@ class IdentifyConstantPoolsPass
     }
 
     // Derive buffer constraints based on target backends.
-    auto bufferConstraints = computeConservativeBufferConstraints(
-        targetOptions_, moduleOp.getContext());
-    if (!bufferConstraints) {
-      moduleOp.emitWarning() << "no target backends provided buffer "
-                                "constraints; falling back to host default";
-      bufferConstraints =
-          TargetBackend::makeDefaultBufferConstraints(moduleOp.getContext());
-    }
+    auto bufferConstraints =
+        IREE::HAL::DeviceTargetAttr::lookupConservativeBufferConstraints(
+            moduleOp);
 
     SymbolTable moduleSymbolTable(moduleOp);
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
@@ -135,25 +127,6 @@ class IdentifyConstantPoolsPass
       });
     }
     return uses;
-  }
-
-  // Tries to find the min/max constraints on buffers across all target
-  // backends. This should really be done per pool based on the usage of the
-  // constants (if pool 0 is used by device A and pool 1 is used by device B
-  // then they should not need to have matching constraints).
-  BufferConstraintsAttr computeConservativeBufferConstraints(
-      const TargetOptions &targetOptions, MLIRContext *context) {
-    auto targetBackends = getTargetBackends(targetOptions.targets);
-    BufferConstraintsAttr attr = {};
-    for (auto &targetBackend : targetBackends) {
-      if (attr) {
-        attr = intersectBufferConstraints(
-            attr, targetBackend->queryBufferConstraints(context));
-      } else {
-        attr = targetBackend->queryBufferConstraints(context);
-      }
-    }
-    return attr;
   }
 
   // Makes a new hal.constant_pool containing the values of the given
@@ -297,18 +270,14 @@ class IdentifyConstantPoolsPass
     variableLoadOp.replaceAllUsesWith(loadOp.result());
     variableLoadOp.erase();
   }
-
-  TargetOptions targetOptions_;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass(
-    TargetOptions targetOptions) {
-  return std::make_unique<IdentifyConstantPoolsPass>(targetOptions);
+std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass() {
+  return std::make_unique<IdentifyConstantPoolsPass>();
 }
 
 static PassRegistration<IdentifyConstantPoolsPass> pass([] {
-  auto options = getTargetOptionsFromFlags();
-  return std::make_unique<IdentifyConstantPoolsPass>(options);
+  return std::make_unique<IdentifyConstantPoolsPass>();
 });
 
 }  // namespace HAL

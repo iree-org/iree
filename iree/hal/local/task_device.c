@@ -195,8 +195,19 @@ static iree_hal_allocator_t* iree_hal_task_device_allocator(
 static iree_status_t iree_hal_task_device_query_i32(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value) {
-  // iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   *out_value = 0;
+
+  if (iree_string_view_equal(category,
+                             iree_make_cstring_view("hal.executable.format"))) {
+    *out_value =
+        iree_hal_query_any_executable_loader_support(
+            device->loader_count, device->loaders, /*caching_mode=*/0, key)
+            ? 1
+            : 0;
+    return iree_ok_status();
+  }
+
   return iree_make_status(
       IREE_STATUS_NOT_FOUND,
       "unknown device configuration key value '%.*s :: %.*s'",

@@ -1,6 +1,17 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=dylib-llvm-aot %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline %s | IreeFileCheck %s
 
 #map = affine_map<(d0) -> (d0)>
+
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"dylib", {
+      executable_targets = [
+        #hal.executable.target<"llvm", "embedded-elf-x86_64">
+      ]
+    }>
+  ]
+} {
+
 flow.executable @add_dispatch_0 {
   flow.dispatch.entry @add_dispatch_0 attributes {
     workgroup_rank = 3 : index
@@ -21,6 +32,8 @@ flow.executable @add_dispatch_0 {
   }
 }
 
-// CHECK:       hal.executable.binary @llvm attributes {
+}
+
+// CHECK:       hal.executable.binary @embedded_elf_x86_64
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = "DLIB"
+// CHECK-SAME:     format = "embedded-elf-x86_64"

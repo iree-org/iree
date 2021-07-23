@@ -1,6 +1,17 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=rocm %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline %s | IreeFileCheck %s
 
 #map = affine_map<(d0) -> (d0)>
+
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"rocm", {
+      executable_targets = [
+        #hal.executable.target<"rocm", "rocm-hsaco-fb">
+      ]
+    }>
+  ]
+} {
+
 flow.executable @add_dispatch_0 {
   flow.dispatch.entry @add_dispatch_0 attributes {
     signature = (tensor<16xf32>, tensor<16xf32>) -> tensor<16xf32>,
@@ -22,6 +33,8 @@ flow.executable @add_dispatch_0 {
   }
 }
 
-//      CHECK:   hal.executable.binary @rocm attributes {
+}
+
+//      CHECK:   hal.executable.binary @rocm_hsaco_fb attributes {
 // CHECK-SAME:     data = dense
-// CHECK-SAME:     format = "HSACO"
+// CHECK-SAME:     format = "rocm-hsaco-fb"

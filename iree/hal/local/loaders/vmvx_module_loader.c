@@ -400,7 +400,7 @@ static bool iree_hal_vmvx_module_loader_query_support(
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format) {
   return iree_string_view_equal(executable_format,
-                                iree_make_cstring_view("VMVX"));
+                                iree_make_cstring_view("vmvx-bytecode-fb"));
 }
 
 static iree_status_t iree_hal_vmvx_module_loader_try_load(

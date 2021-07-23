@@ -413,6 +413,8 @@ Value BufferViewType::inferSizeFromValue(Location loc, Value value,
 
 BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
                                                  BufferConstraintsAttr rhs) {
+  if (!lhs) return rhs;
+  if (!rhs) return lhs;
   Builder b(lhs.getContext());
   return BufferConstraintsAttr::get(
       b.getIndexAttr(std::min(lhs.max_allocation_size().getSExtValue(),
@@ -607,22 +609,172 @@ void DescriptorSetLayoutBindingAttr::print(DialectAsmPrinter &p) const {
   os << ">";
 }
 
+//===----------------------------------------------------------------------===//
+// #hal.device.target
+//===----------------------------------------------------------------------===//
+
+// static
+DeviceTargetAttr DeviceTargetAttr::get(MLIRContext *context,
+                                       StringRef deviceID) {
+  // TODO(benvanik): query default configuration from the target backend.
+  return get(context, StringAttr::get(context, deviceID),
+             DictionaryAttr::get(context));
+}
+
+// static
+Attribute DeviceTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
+                                  Type type) {
+  auto b = p.getBuilder();
+  StringAttr deviceIDAttr;
+  DictionaryAttr configAttr;
+  // `<"device-id"`
+  if (failed(p.parseLess()) || failed(p.parseAttribute(deviceIDAttr))) {
+    return {};
+  }
+  // `, {config}`
+  if (succeeded(p.parseOptionalComma()) &&
+      failed(p.parseAttribute(configAttr))) {
+    return {};
+  }
+  // `>`
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(b.getContext(), deviceIDAttr, configAttr);
+}
+
+void DeviceTargetAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getMnemonic() << "<";
+  p.printAttribute(getDeviceID());
+  auto configAttr = getConfiguration();
+  if (configAttr && !configAttr.empty()) {
+    os << ", ";
+    p.printAttribute(configAttr);
+  }
+  os << ">";
+}
+
+std::string DeviceTargetAttr::getSymbolNameFragment() {
+  auto deviceName = getDeviceID().getValue().lower();
+  std::replace(deviceName.begin(), deviceName.end(), '-', '_');
+  return deviceName;
+}
+
+Attribute DeviceTargetAttr::getMatchExpression() {
+  return DeviceMatchIDAttr::get(*this);
+}
+
+BufferConstraintsAttr DeviceTargetAttr::getBufferConstraints() {
+  BufferConstraintsAttr constraintsAttr;
+  auto configAttr = getConfiguration();
+  if (configAttr) {
+    constraintsAttr =
+        configAttr.getAs<BufferConstraintsAttr>("buffer_constraints");
+  }
+  return constraintsAttr ? constraintsAttr
+                         : getDefaultHostBufferConstraints(getContext());
+}
+
+SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
+  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
+  auto configAttr = getConfiguration();
+  if (configAttr) {
+    auto targetsAttr = configAttr.getAs<ArrayAttr>("executable_targets");
+    if (targetsAttr) {
+      for (auto attr : targetsAttr.getValue()) {
+        resultAttrs.push_back(attr.dyn_cast<ExecutableTargetAttr>());
+      }
+    }
+  }
+  return resultAttrs;
+}
+
+// static
+SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
+    Operation *op) {
+  auto attrId = mlir::Identifier::get("hal.device.targets", op->getContext());
+  while (op) {
+    auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
+    if (targetsAttr) {
+      SmallVector<IREE::HAL::DeviceTargetAttr, 4> result;
+      for (auto targetAttr : targetsAttr) {
+        result.push_back(targetAttr.cast<IREE::HAL::DeviceTargetAttr>());
+      }
+      return result;
+    }
+    op = op->getParentOp();
+  }
+  return {};  // No devices found; let caller decide what to do.
+}
+
+// static
+BufferConstraintsAttr DeviceTargetAttr::getDefaultHostBufferConstraints(
+    MLIRContext *context) {
+  // Picked to represent what we kind of want on CPU today.
+  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferOffsetAlignment = 16ull;
+  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferRangeAlignment = 16ull;
+  Builder b(context);
+  return BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
+                                    b.getIndexAttr(minBufferOffsetAlignment),
+                                    b.getIndexAttr(maxBufferRange),
+                                    b.getIndexAttr(minBufferRangeAlignment));
+}
+
+// static
+BufferConstraintsAttr DeviceTargetAttr::lookupConservativeBufferConstraints(
+    Operation *op) {
+  BufferConstraintsAttr resultAttr = {};
+  for (auto targetAttr : IREE::HAL::DeviceTargetAttr::lookup(op)) {
+    auto configAttr = targetAttr.getConfiguration();
+    if (!configAttr) continue;
+    auto targetConstraintsAttr =
+        configAttr.getAs<BufferConstraintsAttr>("buffer_constraints");
+    if (!targetConstraintsAttr) continue;
+    resultAttr = intersectBufferConstraints(resultAttr, targetConstraintsAttr);
+  }
+  return resultAttr ? resultAttr
+                    : getDefaultHostBufferConstraints(op->getContext());
+}
+
+// static
+SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::lookupExecutableTargets(
+    Operation *op) {
+  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
+  for (auto deviceTargetAttr : lookup(op)) {
+    for (auto executableTargetAttr : deviceTargetAttr.getExecutableTargets()) {
+      if (!llvm::is_contained(resultAttrs, executableTargetAttr)) {
+        resultAttrs.push_back(executableTargetAttr);
+      }
+    }
+  }
+  return resultAttrs;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.executable.target
+//===----------------------------------------------------------------------===//
+
 // static
 ExecutableTargetAttr ExecutableTargetAttr::get(MLIRContext *context,
-                                               StringRef target) {
-  // TODO(benvanik): query from target backend.
-  return get(context, StringAttr::get(context, target),
-             DictionaryAttr::get(context));
+                                               StringRef backend,
+                                               StringRef format) {
+  return get(context, StringAttr::get(context, backend),
+             StringAttr::get(context, format), DictionaryAttr::get(context));
 }
 
 // static
 Attribute ExecutableTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
                                       Type type) {
   auto b = p.getBuilder();
-  StringAttr targetAttr;
+  StringAttr backendAttr;
+  StringAttr formatAttr;
   DictionaryAttr configurationAttr;
-  // `<"target"`
-  if (failed(p.parseLess()) || failed(p.parseAttribute(targetAttr))) {
+  // `<"backend", "format"`
+  if (failed(p.parseLess()) || failed(p.parseAttribute(backendAttr)) ||
+      failed(p.parseComma()) || failed(p.parseAttribute(formatAttr))) {
     return {};
   }
   // `, {config}`
@@ -634,19 +786,31 @@ Attribute ExecutableTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(b.getContext(), targetAttr, configurationAttr);
+  return get(b.getContext(), backendAttr, formatAttr, configurationAttr);
 }
 
 void ExecutableTargetAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
   os << getMnemonic() << "<";
-  p.printAttribute(getTarget());
+  p.printAttribute(getBackend());
+  os << ", ";
+  p.printAttribute(getFormat());
   auto config = getConfiguration();
   if (config && !config.empty()) {
     os << ", ";
     p.printAttribute(config);
   }
   os << ">";
+}
+
+std::string ExecutableTargetAttr::getSymbolNameFragment() {
+  auto format = getFormat().getValue().lower();
+  std::replace(format.begin(), format.end(), '-', '_');
+  return format;
+}
+
+Attribute ExecutableTargetAttr::getMatchExpression() {
+  return DeviceMatchExecutableFormatAttr::get(getContext(), getFormat());
 }
 
 //===----------------------------------------------------------------------===//

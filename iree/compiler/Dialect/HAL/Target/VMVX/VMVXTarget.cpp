@@ -28,20 +28,27 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-VMVXTargetOptions getVMVXTargetOptionsFromFlags() {
-  VMVXTargetOptions targetOptions;
-  // TODO(benvanik): flags.
-  return targetOptions;
-}
-
 class VMVXTargetBackend final : public TargetBackend {
  public:
-  VMVXTargetBackend(VMVXTargetOptions options) : options_(std::move(options)) {}
+  VMVXTargetBackend() = default;
 
   std::string name() const override { return "vmvx"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<VM::VMDialect, VMVX::VMVXDialect>();
+  }
+
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    configItems.emplace_back(b.getIdentifier("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
@@ -63,6 +70,9 @@ class VMVXTargetBackend final : public TargetBackend {
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     if (sourceExecutableOps.size() <= 1) return success();
 
+    // TODO(benvanik): rework linking to support multiple formats.
+    auto sharedTargetAttr = getExecutableTarget(builder.getContext());
+
     // Create our new "linked" hal.executable.
     std::string linkedExecutableName = llvm::formatv("{0}_linked", name());
     auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
@@ -73,7 +83,8 @@ class VMVXTargetBackend final : public TargetBackend {
     // Add our VMVX hal.executable.variant with an empty module.
     builder.setInsertionPointToStart(linkedExecutableOp.getBody());
     auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
-        moduleOp.getLoc(), name(), name());
+        moduleOp.getLoc(), sharedTargetAttr.getSymbolNameFragment(),
+        sharedTargetAttr);
     builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
     auto linkedModuleOp = builder.create<ModuleOp>(moduleOp.getLoc());
 
@@ -129,20 +140,30 @@ class VMVXTargetBackend final : public TargetBackend {
     // and future changes to the target op will not be observed.
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),
-        executableBuilder.getStringAttr("VMVX"), bufferAttr);
+        variantOp.target().getFormat(), bufferAttr);
     return success();
   }
 
  private:
-  VMVXTargetOptions options_;
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // This is where we would multiversion.
+    targetAttrs.push_back(getExecutableTarget(context));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    return IREE::HAL::ExecutableTargetAttr::get(context, "vmvx",
+                                                "vmvx-bytecode-fb");
+  }
 };
 
-void registerVMVXTargetBackends(
-    std::function<VMVXTargetOptions()> queryOptions) {
-  getVMVXTargetOptionsFromFlags();
-  static TargetBackendRegistration registration("vmvx", [=]() {
-    return std::make_unique<VMVXTargetBackend>(queryOptions());
-  });
+void registerVMVXTargetBackends() {
+  // #hal.device.target<"vmvx", ...
+  // #hal.executable.target<"vmvx", ...
+  static TargetBackendRegistration registration(
+      "vmvx", [=]() { return std::make_unique<VMVXTargetBackend>(); });
 }
 
 }  // namespace HAL

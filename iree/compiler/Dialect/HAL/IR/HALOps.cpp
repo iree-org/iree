@@ -1296,18 +1296,19 @@ static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
 //===----------------------------------------------------------------------===//
 
 void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
-                                StringRef symName, StringRef target) {
+                                StringRef symName,
+                                IREE::HAL::ExecutableTargetAttr target) {
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
-  state.addAttribute("target", builder.getStringAttr(target));
+  state.addAttribute("target", target);
 }
 
 static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
                                             OperationState *result) {
   auto *body = result->addRegion();
   StringAttr nameAttr;
-  StringAttr targetAttr;
+  IREE::HAL::ExecutableTargetAttr targetAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
@@ -1332,7 +1333,7 @@ static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
 static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
-  p << ", target=\"" << op.target() << "\"";
+  p << ", target = " << op.target();
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(), "target"});
@@ -1349,7 +1350,6 @@ static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
                                StringRef symName, StringRef format,
                                std::vector<uint8_t> data) {
-  ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
   state.addAttribute("format", builder.getStringAttr(format));
@@ -1363,7 +1363,6 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
                                StringRef symName, StringAttr format,
                                DenseIntElementsAttr data) {
-  ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
   state.addAttribute("format", format);
@@ -1372,7 +1371,6 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 
 static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
                                            OperationState *result) {
-  auto *body = result->addRegion();
   StringAttr nameAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
@@ -1380,14 +1378,6 @@ static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
-  OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
-  if (parseResult.hasValue() && failed(*parseResult)) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ExecutableBinaryOp::ensureTerminator(*body, parser.getBuilder(),
-                                       result->location);
   return success();
 }
 
@@ -1397,21 +1387,6 @@ static void printExecutableBinaryOp(OpAsmPrinter &p, ExecutableBinaryOp op) {
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  if (!op.body().empty()) {
-    p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                  /*printBlockTerminators=*/false);
-  }
-}
-
-static LogicalResult verifyExecutableBinaryOp(ExecutableBinaryOp op) {
-  // Zero or one ModuleOps allowed.
-  if (std::distance(op.getBlock().getOps<ModuleOp>().begin(),
-                    op.getBlock().getOps<ModuleOp>().end()) > 1) {
-    return op.emitOpError() << "expects zero or one nested std.module ops";
-  }
-
-  // TODO(benvanik): check export name conflicts.
-  return success();
 }
 
 //===----------------------------------------------------------------------===//

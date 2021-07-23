@@ -390,12 +390,21 @@ static void iree_hal_legacy_library_loader_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+#if defined(IREE_PLATFORM_APPLE)
+#define IREE_PLATFORM_DYLIB_TYPE "dylib"
+#elif defined(IREE_PLATFORM_WINDOWS)
+#define IREE_PLATFORM_DYLIB_TYPE "dll"
+#else
+#define IREE_PLATFORM_DYLIB_TYPE "elf"
+#endif  // IREE_PLATFORM_*
+
 static bool iree_hal_legacy_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format) {
-  return iree_string_view_equal(executable_format,
-                                iree_make_cstring_view("DLIB"));
+  return iree_string_view_equal(
+      executable_format,
+      iree_make_cstring_view("system-" IREE_PLATFORM_DYLIB_TYPE "-" IREE_ARCH));
 }
 
 static iree_status_t iree_hal_legacy_library_loader_try_load(
