@@ -133,7 +133,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @cuda, target="cuda" {
+  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
     module  {
       func @dot_dispatch_0() {
@@ -187,7 +187,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 }
 
 //   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.variant @cuda, target="cuda" {
+//         CHECK:   hal.executable.variant @cuda
 //         CHECK:   llvm.br
 // CHECK-COUNT-8:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //         CHECK:   llvm.br
