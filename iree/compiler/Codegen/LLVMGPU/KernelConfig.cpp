@@ -202,7 +202,8 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   linalg::LinalgOp rootOperation;
   // if there is more than one linalg op, look for the root one.
   for (linalg::LinalgOp op : llvm::reverse(linalgOps)) {
-    if (!isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op.getOperation())) {
+    if (!isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(
+            op.getOperation())) {
       rootOperation = op;
       break;
     }
