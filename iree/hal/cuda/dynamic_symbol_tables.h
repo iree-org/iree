@@ -25,6 +25,7 @@ CU_PFN_DECL(cuGraphInstantiate, CUgraphExec*, CUgraph, CUgraphNode*, char*,
             size_t)
 CU_PFN_DECL(cuGraphLaunch, CUgraphExec, CUstream)
 CU_PFN_DECL(cuInit, unsigned int)
+CU_PFN_DECL(cuMemAllocManaged, CUdeviceptr*, size_t, unsigned int)
 CU_PFN_DECL(cuMemAlloc, CUdeviceptr*, size_t)
 CU_PFN_DECL(cuMemFree, CUdeviceptr)
 CU_PFN_DECL(cuMemFreeHost, void*)
