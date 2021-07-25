@@ -130,40 +130,6 @@ static void removeFusionGroupsAttribute(Operation *op) {
 }
 
 namespace {
-/// PatternRewriter that allows replacing only a subset of uses.
-/// Since this only adds a method, it can just be static_cast'ed to when
-/// applying a rewrite.
-/// TODO(nicolasvasilache): upstream support for this is landing, rebase on that
-struct PatternRewriterWithScopedReplaceOp : public PatternRewriter {
-  void replaceOpWithinScope(Operation *op, ValueRange newValues, Block *block) {
-    // Notify the rewriter subclass that we're about to replace this root.
-    notifyRootReplaced(op);
-
-    assert(op->getNumResults() == newValues.size() &&
-           "incorrect # of replacement values");
-    bool erase = true;
-    SmallVector<Operation *, 4> ops;
-    SmallVector<Value, 4> operands, repls;
-    for (auto &use : op->getUses()) {
-      if (!block->getParentOp()->isProperAncestor(use.getOwner())) {
-        erase = false;
-        continue;
-      }
-      OpResult opResult = use.get().cast<OpResult>();
-      ops.push_back(use.getOwner());
-      operands.push_back(use.get());
-      repls.push_back(newValues[opResult.getResultNumber()]);
-    }
-    // Perform the actual replacements.
-    for (auto it : llvm::zip(ops, operands, repls))
-      std::get<0>(it)->replaceUsesOfWith(std::get<1>(it), std::get<2>(it));
-    if (erase) {
-      notifyOperationRemoved(op);
-      op->erase();
-    }
-  }
-};
-
 struct DispatchLinalgOnTensorsPass
     : public DispatchLinalgOnTensorsBase<DispatchLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
