@@ -95,56 +95,6 @@ OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
 }
 
 //===----------------------------------------------------------------------===//
-// Common methods from Linalg dialect.
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseLinalgExtOperandList(
-    OpAsmParser &parser, StringRef keyword,
-    SmallVectorImpl<OpAsmParser::OperandType> &values,
-    SmallVectorImpl<Type> &types) {
-  StringRef parsedKeyword;
-  if (succeeded(parser.parseOptionalKeyword(&parsedKeyword, {keyword}))) {
-    if (parser.parseLParen() || parser.parseOperandList(values) ||
-        parser.parseColonTypeList(types) || parser.parseRParen()) {
-      return failure();
-    }
-  }
-  return success();
-}
-
-static ParseResult parseLinalgExtInsList(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &values,
-    SmallVectorImpl<Type> &types) {
-  return parseLinalgExtOperandList(parser, "ins", values, types);
-}
-
-static ParseResult parseLinalgExtOutsList(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &values,
-    SmallVectorImpl<Type> &types) {
-  return parseLinalgExtOperandList(parser, "outs", values, types);
-}
-
-static void printLinalgExtOperandList(OpAsmPrinter &printer, Operation *op,
-                                      StringRef keyword, OperandRange values,
-                                      TypeRange types) {
-  if (!values.empty()) {
-    printer << keyword << "(";
-    printer.printOperands(values);
-    printer << " : " << types << ")";
-  }
-}
-
-static void printLinalgExtInsList(OpAsmPrinter &printer, Operation *op,
-                                  OperandRange values, TypeRange types) {
-  return printLinalgExtOperandList(printer, op, "ins", values, types);
-}
-
-static void printLinalgExtOutsList(OpAsmPrinter &printer, Operation *op,
-                                   OperandRange values, TypeRange types) {
-  return printLinalgExtOperandList(printer, op, "outs", values, types);
-}
-
-//===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
 
