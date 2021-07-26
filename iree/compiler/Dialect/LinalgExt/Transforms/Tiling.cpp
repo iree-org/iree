@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
@@ -229,7 +230,7 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
 
 FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options) {
-  SmallVector<Value> dest = tilableOp.getDestinationOperands();
+  ValueRange dest = tilableOp.getDestinationOperands();
   if (dest.empty()) {
     return static_cast<LogicalResult>(tilableOp.emitOpError(
         "cannot tile operation without destination operands"));
@@ -289,8 +290,8 @@ namespace {
 struct InsertSliceTiledOpInterface
     : public TiledOpInterface::ExternalModel<InsertSliceTiledOpInterface,
                                              tensor::InsertSliceOp> {
-  ValueRange getDestinationOperands(Operation *op) const {
-    return cast<tensor::InsertSliceOp>(op).dest();
+  SmallVector<Value> getDestinationOperands(Operation *op) const {
+    return {cast<tensor::InsertSliceOp>(op).dest()};
   }
 
   SmallVector<StringRef> getLoopIteratorTypes(Operation *op) const {
@@ -449,8 +450,8 @@ struct TiledOpInterfaceTilingPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                memref::MemRefDialect, StandardOpsDialect,
-                tensor::TensorDialect, scf::SCFDialect>();
+                linalg_ext::LinalgExtDialect, memref::MemRefDialect,
+                StandardOpsDialect, tensor::TensorDialect, scf::SCFDialect>();
   }
 
   LogicalResult initialize(MLIRContext *context) override;

@@ -30,8 +30,9 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
   let printer = [{ return print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
   code extraLinalgExtOpClassDeclaration = [{
-    ValueRange getDestinationOperands() {
-      return outputs();
+    SmallVector<Value> getDestinationOperands() {
+      SmallVector<Value> dest(outputs().begin(), outputs().end());
+      return dest;
     }
   }];
 }
@@ -77,8 +78,8 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
-    custom<LinalgExtOutsList>($outputs, type($outputs))
+    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
@@ -155,8 +156,8 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort",
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
     (`dimension` `(` $dimension^ `)`)?
-    attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
-    custom<LinalgExtOutsList>($outputs, type($outputs))
+    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{

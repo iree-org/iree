@@ -27,7 +27,7 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
           is the `outs` parameters. For `tensor.insert_slice`, it is
           the `dest` parameter.
         }],
-        /*retType=*/"ValueRange",
+        /*retType=*/"SmallVector<Value>",
         /*methodName=*/"getDestinationOperands",
         /*args=*/(ins),
         /*methodBody=*/"",
