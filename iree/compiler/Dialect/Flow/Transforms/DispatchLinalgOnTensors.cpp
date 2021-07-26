@@ -496,6 +496,7 @@ static void tryToTieOperandsAndResults(
     if (!storeOp) return nullptr;
 
     Operation *tieOp = storeOp.value().getDefiningOp();
+    if (!tieOp) return nullptr;
 
     // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
     // when it's available in MLIR core in some form.
@@ -507,7 +508,7 @@ static void tryToTieOperandsAndResults(
                                     .template getDefiningOp<
                                         IREE::Flow::DispatchTensorLoadOp>();
                   if (!loadOp) return nullptr;
-                  return loadOp.source().cast<BlockArgument>();
+                  return loadOp.source().dyn_cast<BlockArgument>();
                 })
             .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp>(
                 [&](auto linalgLikeOp) -> BlockArgument {
@@ -519,7 +520,7 @@ static void tryToTieOperandsAndResults(
                           .template getDefiningOp<
                               IREE::Flow::DispatchTensorLoadOp>();
                   if (!loadOp) return nullptr;
-                  return loadOp.source().template cast<BlockArgument>();
+                  return loadOp.source().template dyn_cast<BlockArgument>();
                 })
             .Default([&](Operation *) -> BlockArgument { return nullptr; });
 
@@ -1296,6 +1297,12 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs() << "\n--- After dispatch region creation ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures.
   if (funcOp
@@ -1320,6 +1327,12 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs() << "\n--- After dispatch op legalization ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   // Rewrite destructive updates and ensure no remaining store remains to the
   // full output.
   if (funcOp
@@ -1334,6 +1347,12 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           .wasInterrupted()) {
     signalPassFailure();
   }
+
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs() << "\n--- After rewriting destructive updates ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 
   // Now try to see if we can tie certain results to operands in order to
   // indicate sharing storage. This need to happen here because it needs to

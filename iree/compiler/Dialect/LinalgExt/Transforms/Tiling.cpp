@@ -230,7 +230,7 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
 
 FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options) {
-  ValueRange dest = tilableOp.getDestinationOperands();
+  SmallVector<Value> dest = tilableOp.getDestinationOperands();
   if (dest.empty()) {
     return static_cast<LogicalResult>(tilableOp.emitOpError(
         "cannot tile operation without destination operands"));
@@ -291,7 +291,9 @@ struct InsertSliceTiledOpInterface
     : public TiledOpInterface::ExternalModel<InsertSliceTiledOpInterface,
                                              tensor::InsertSliceOp> {
   SmallVector<Value> getDestinationOperands(Operation *op) const {
-    return {cast<tensor::InsertSliceOp>(op).dest()};
+    SmallVector<Value> dest;
+    dest.push_back(cast<tensor::InsertSliceOp>(op).dest());
+    return dest;
   }
 
   SmallVector<StringRef> getLoopIteratorTypes(Operation *op) const {
