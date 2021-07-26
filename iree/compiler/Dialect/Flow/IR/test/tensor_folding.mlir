@@ -411,3 +411,14 @@ func @propogateStaticShapeOfUpdate(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tens
   // CHECK: return %[[RESULT]]
   return %1 : tensor<?x?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @foldSplatLoadIntoPrimitive
+//  CHECK-SAME: (%[[arg0:.+]]: f32, %[[arg1:.+]]: index, %[[arg2:.+]]: index)
+func @foldSplatLoadIntoPrimitive(%arg0 : f32, %arg1 : index, %arg2 : index) -> f32 {
+  // CHECK-NEXT: return %[[arg0]] : f32
+  %0 = flow.tensor.splat %arg0 : tensor<4x4xf32>
+  %1 = flow.tensor.load %0[%arg1, %arg2] : tensor<4x4xf32>
+  return %1 : f32
+}

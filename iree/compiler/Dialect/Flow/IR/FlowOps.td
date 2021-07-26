@@ -822,6 +822,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
 
   // TODO(benvanik): canonicalize to slice+load if dims are known.
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
