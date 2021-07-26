@@ -910,7 +910,7 @@ func @scatter(
 // CHECK-SAME:             {__internal_linalg_transform__ = "workgroup"}
 // CHECK-SAME:             ins(%[[UPDATE_TILE]], %[[INDICES_TILE]] : tensor<?x?xf32>, tensor<?x1xi32>)
 // CHECK-SAME:             outs(%[[ORIGINAL]] : tensor<?x?xf32>)
-//      CHECK:         flow.dispatch.tensor.store %[[RESULT_TILE]], %[[ARG5]], offsets = [0, 0]
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT_TILE]], %[[ARG5]], offsets = [], sizes = [], strides = []
 //      CHECK:   return %[[RESULT]] : tensor<?x?xf32>
 
 // -----
@@ -1007,3 +1007,33 @@ func @sort_1d(%arg0: tensor<?xi32>, %arg1 : tensor<?xf32>)
 //      CHECK:     flow.return
 //      CHECK:   }
 //      CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : tensor<8xi32>)
+    -> tensor<8xi32>{
+  %cst = constant dense<[0, 9, 0, 10, 11, 0, 0, 12]> : tensor<8xi32>
+  %cst_0 = constant dense<[9, 10, 11, 12]> : tensor<4xi32>
+  %cst_1 = constant dense<[[1], [3], [4], [7]]> : tensor<4x1xi32>
+  %cst_2 = constant dense<0> : tensor<8xi32>
+  %0 = linalg_ext.scatter
+      ins(%arg0, %arg1 : tensor<4xi32>, tensor<4x1xi32>)
+      outs(%arg2 : tensor<8xi32>)  {
+    ^bb0(%arg3: i32, %arg4: i32):  // no predecessors
+      linalg_ext.yield %arg3 : i32
+    } -> tensor<8xi32>
+  return %0 : tensor<8xi32>
+}
+//      CHECK: func @scatter_static
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<4xi32>
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<4x1xi32>
+// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<8xi32>
+//      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+// CHECK-NEXT:     %[[ARG3:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:4xi32>
+// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:4x1xi32>
+// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readwrite:8xi32>
+//      CHECK:     scf.for %[[IV:.+]] = %{{.+}} to %{{.+}} step %{{.+}} {
+//      CHECK:       %[[SCATTER_TILE:.+]] = linalg_ext.scatter
+//      CHECK:       flow.dispatch.tensor.store %[[SCATTER_TILE]], %[[ARG5]], offsets = [], sizes = [], strides = []
+// CHECK-NEXT:     }
+//      CHECK:  return %[[RESULT]]

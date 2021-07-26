@@ -132,35 +132,12 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
   // If this is the innermost loop, then generated the tiled implementation of
   // the op by invoking the TiledOpInterface methods.
   if (loopDepth == tileSizes.size()) {
-    SmallVector<SmallVector<OpFoldResult, 4>> resultOffsets;
-    SmallVector<SmallVector<OpFoldResult, 4>> resultSizes;
-    Operation *tiledOp = tilableOp.getTiledImplementation(
-        builder, outputs, offsets, tileSizes, resultOffsets, resultSizes);
-    if (!tiledOp) {
+    TiledOp ret;
+    ret.op = tilableOp.getTiledImplementation(builder, outputs, offsets,
+                                              tileSizes, ret.results);
+    if (!ret.op) {
       return static_cast<LogicalResult>(
           tilableOp.emitOpError("failed to get tiled implementation"));
-    }
-    assert(tiledOp->getNumResults() == 0 ||
-           (resultOffsets.size() == tiledOp->getNumResults()));
-    TiledOp ret;
-    ret.op = tiledOp;
-
-    // If the operation has results, then the result of the tiled operation is
-    // to be inserted into the `initValues` and returned.
-    if (tiledOp->getNumResults()) {
-      SmallVector<Value> results;
-      auto oneAttr = builder.getI64IntegerAttr(1);
-      results.reserve(tiledOp->getNumResults());
-      for (auto en : llvm::enumerate(tiledOp->getResults())) {
-        Value result = en.value();
-        ArrayRef<OpFoldResult> offsets(resultOffsets[en.index()]);
-        ArrayRef<OpFoldResult> sizes(resultSizes[en.index()]);
-        SmallVector<OpFoldResult> strides(offsets.size(), oneAttr);
-        Value insert = builder.create<tensor::InsertSliceOp>(
-            loc, result, outputs[en.index()], offsets, sizes, strides);
-        results.push_back(insert);
-      }
-      std::swap(ret.results, results);
     }
     return ret;
   }
@@ -318,15 +295,13 @@ struct InsertSliceTiledOpInterface
     return loopBounds;
   }
 
-  Operation *getTiledImplementation(
-      Operation *op, OpBuilder &b, ValueRange outputs,
-      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
-      SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets,
-      SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultSizes) const {
-    // Compute a subtensor of the source based on the offsets.
+  Operation *getTiledImplementation(Operation *op, OpBuilder &b,
+                                    ValueRange outputs,
+                                    ArrayRef<OpFoldResult> offsets,
+                                    ArrayRef<OpFoldResult> sizes,
+                                    SmallVectorImpl<Value> &results) const {
     auto insertOp = cast<tensor::InsertSliceOp>(op);
-    auto opOffsets = insertOp.getMixedOffsets();
-    auto opSizes = insertOp.getMixedSizes();
+    // Compute a subtensor of the source based on the offsets.
     auto opStrides = insertOp.getMixedStrides();
     if (!llvm::all_of(opStrides, [&](OpFoldResult valueOrAttr) {
           return isValue(valueOrAttr, 1);
@@ -334,23 +309,22 @@ struct InsertSliceTiledOpInterface
       op->emitOpError("unable to tile operation with non-unit stride");
       return nullptr;
     }
-    // The operation returned is just a tensor.extract_slice of the source with
-    // the given offsets, sizes and strides. Setting the correct result offset
-    // will make the sure the tiling algorithm will insert this slice into the
-    // correct place in the destination.
-    // The result offset is just the offset passed in plus the offset specified
-    // in the op (since all strides are checked to be 1).
+    Location loc = insertOp.getLoc();
+    auto oneAttr = b.getI64IntegerAttr(1);
+    SmallVector<OpFoldResult> strides(offsets.size(), oneAttr);
+    auto extractSliceOp = b.create<tensor::ExtractSliceOp>(
+        loc, insertOp.source(), offsets, sizes, strides);
+
+    // The offsets for the insert is based on the op offsets plus the offsets of
+    // the loops passed in.
+    auto opOffsets = insertOp.getMixedOffsets();
+    auto opSizes = insertOp.getMixedSizes();
     unsigned offsetIndex = 0;
     ArrayRef<int64_t> sourceShape = insertOp.getSourceType().getShape();
     int64_t destRank = insertOp.getType().getRank();
-    resultOffsets.resize(1);
-    resultOffsets[0].resize(destRank);
-    resultSizes.resize(1);
-    resultSizes[0].resize(destRank);
-    Location loc = insertOp.getLoc();
+    SmallVector<OpFoldResult> resultOffsets(destRank);
+    SmallVector<OpFoldResult> resultSizes(destRank);
     auto zeroAttr = b.getI64IntegerAttr(0);
-    auto oneAttr = b.getI64IntegerAttr(1);
-    SmallVector<OpFoldResult> strides(offsets.size(), oneAttr);
     for (auto opOffset : llvm::enumerate(opOffsets)) {
       // Check for rank-reducing by checking that
       // 1) The corresponding opSize value is 1
@@ -358,29 +332,33 @@ struct InsertSliceTiledOpInterface
       // Then the opOffset is for the rank-reduced dimension. Skip.
       unsigned opOffsetIndex = opOffset.index();
       if (isValue(opSizes[opOffsetIndex], 1) && sourceShape[offsetIndex] != 1) {
-        resultOffsets[0][opOffsetIndex] = zeroAttr;
-        resultSizes[0][opOffsetIndex] = oneAttr;
+        resultOffsets[opOffsetIndex] = zeroAttr;
+        resultSizes[opOffsetIndex] = oneAttr;
         continue;
       }
       OpFoldResult opOffsetVal = opOffset.value();
       OpFoldResult offset = offsets[offsetIndex];
       if (opOffsetVal.is<Attribute>() && offset.is<Attribute>()) {
-        resultOffsets[0][opOffsetIndex] = b.getI64IntegerAttr(
+        resultOffsets[opOffsetIndex] = b.getI64IntegerAttr(
             *getConstantValue(opOffsetVal) + *getConstantValue(offset));
       } else {
         AffineMap map = AffineMap::get(
             1, 1, {b.getAffineDimExpr(0) + b.getAffineSymbolExpr(0)});
-        resultOffsets[0][opOffsetIndex] =
+        resultOffsets[opOffsetIndex] =
             b.create<AffineApplyOp>(loc, map,
                                     ValueRange{getValue(b, loc, offset),
                                                getValue(b, loc, opOffsetVal)})
                 .getResult();
       }
-      resultSizes[0][opOffsetIndex] = sizes[offsetIndex];
+      resultSizes[opOffsetIndex] = sizes[offsetIndex];
       offsetIndex++;
     }
-    return b.create<tensor::ExtractSliceOp>(loc, insertOp.source(), offsets,
-                                            sizes, strides);
+    SmallVector<OpFoldResult> resultStrides(destRank, oneAttr);
+    auto tiledInsertOp = b.create<tensor::InsertSliceOp>(
+        loc, extractSliceOp.result(), outputs[0], resultOffsets, resultSizes,
+        resultStrides);
+    results.push_back(tiledInsertOp.result());
+    return extractSliceOp;
   }
 };
 }  // namespace

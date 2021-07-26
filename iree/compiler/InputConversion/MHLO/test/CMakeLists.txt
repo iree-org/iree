@@ -15,8 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "broadcasting.mlir"
-    "convert_and_distribute_mhlo_to_linalg_ext.mlir"
     "convert_complex_to_real.mlir"
+    "convert_mhlo_to_linalg_ext.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
     "legalize_input_types.mlir"
