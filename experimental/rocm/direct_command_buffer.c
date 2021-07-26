@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "experimental/rocm/dynamic_symbols.h"
+#include "experimental/rocm/executable_layout.h"
 #include "experimental/rocm/native_executable.h"
 #include "experimental/rocm/rocm_buffer.h"
 #include "experimental/rocm/status_util.h"
@@ -283,6 +284,8 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
+  iree_host_size_t base_binding =
+      iree_hal_rocm_base_binding_index(executable_layout, set);
   // Convention with the compiler side. We map bindings to kernel argument.
   // We compact the bindings to get a dense set of arguments and keep them order
   // based on the binding index.
@@ -303,7 +306,8 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
         iree_hal_rocm_buffer_device_pointer(
             iree_hal_buffer_allocated_buffer(binding.buffer)) +
         iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
-    *((hipDeviceptr_t*)command_buffer->current_descriptor[i]) = device_ptr;
+    *((hipDeviceptr_t*)command_buffer->current_descriptor[i + base_binding]) =
+        device_ptr;
   }
   return iree_ok_status();
 }

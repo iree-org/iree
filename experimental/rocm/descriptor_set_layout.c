@@ -14,6 +14,7 @@
 typedef struct iree_hal_rocm_descriptor_set_layout_t {
   iree_hal_resource_t resource;
   iree_hal_rocm_context_wrapper_t *context;
+  iree_host_size_t binding_count;
 } iree_hal_rocm_descriptor_set_layout_t;
 
 extern const iree_hal_descriptor_set_layout_vtable_t
@@ -46,11 +47,19 @@ iree_status_t iree_hal_rocm_descriptor_set_layout_create(
     iree_hal_resource_initialize(&iree_hal_rocm_descriptor_set_layout_vtable,
                                  &descriptor_set_layout->resource);
     descriptor_set_layout->context = context;
+    descriptor_set_layout->binding_count = binding_count;
     *out_descriptor_set_layout =
         (iree_hal_descriptor_set_layout_t *)descriptor_set_layout;
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+iree_host_size_t iree_hal_rocm_descriptor_set_layout_binding_count(
+    iree_hal_descriptor_set_layout_t *base_descriptor_set_layout) {
+  iree_hal_rocm_descriptor_set_layout_t *descriptor_set_layout =
+      iree_hal_rocm_descriptor_set_layout_cast(base_descriptor_set_layout);
+  return descriptor_set_layout->binding_count;
 }
 
 static void iree_hal_rocm_descriptor_set_layout_destroy(
