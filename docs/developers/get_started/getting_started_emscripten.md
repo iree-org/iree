@@ -19,9 +19,9 @@ work is needed for this to be generally supported.
 Read https://emscripten.org/docs/getting_started/downloads.html and run
 
 ```
-ensdk\emsdk install latest
-ensdk\emsdk activate latest
-emsdk\emsdk_env.bat
+./emsdk install latest
+./emsdk activate latest
+source ./emsdk_env.sh
 ```
 
 ## Building IREE's Runtime with Emscripten
@@ -55,7 +55,7 @@ $ emcmake cmake -G Ninja -B ../iree-build-emscripten/ \
 Build:
 
 ```
-cmake --build ..\iree-build-emscripten\ \
+cmake --build ../iree-build-emscripten/ \
   --target iree_samples_simple_embedding_simple_embedding_vmvx_sync
 ```
 
