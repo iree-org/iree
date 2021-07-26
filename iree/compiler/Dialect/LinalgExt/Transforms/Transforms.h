@@ -30,6 +30,30 @@ struct TiledOp {
 FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, Operation *op, ValueRange dest,
                                    const linalg::LinalgTilingOptions &options);
 
+/// Base rewrite pattern to tile and distribute operations that implement the
+/// `TiledOpInterface`.
+/// Base pattern for tiling TiledOpInterfaceOps.
+struct TiledOpInterfaceBaseTilingPattern : public RewritePattern {
+  TiledOpInterfaceBaseTilingPattern(MLIRContext *context,
+                                    linalg::LinalgTilingOptions options,
+                                    linalg::LinalgTransformationFilter filter =
+                                        linalg::LinalgTransformationFilter(),
+                                    PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
+        filter(filter),
+        options(options) {}
+
+  LogicalResult matchAndRewriteBase(Operation *op, ValueRange dest,
+                                    PatternRewriter &rewriter,
+                                    TiledOp &result) const;
+
+ private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  linalg::LinalgTransformationFilter filter;
+  /// Options to control tiling;
+  linalg::LinalgTilingOptions options;
+};
+
 }  // namespace linalg_ext
 }  // namespace iree_compiler
 }  // namespace mlir

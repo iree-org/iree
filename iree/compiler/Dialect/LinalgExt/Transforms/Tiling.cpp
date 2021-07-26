@@ -380,27 +380,6 @@ struct InsertSliceTiledOpInterface
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Base pattern for tiling TiledOpInterfaceOps.
-struct TiledOpInterfaceBaseTilingPattern : public RewritePattern {
-  TiledOpInterfaceBaseTilingPattern(StringRef opName, MLIRContext *context,
-                                    linalg::LinalgTilingOptions options,
-                                    linalg::LinalgTransformationFilter filter =
-                                        linalg::LinalgTransformationFilter(),
-                                    PatternBenefit benefit = 1)
-      : RewritePattern(opName, benefit, context),
-        filter(filter),
-        options(options) {}
-
-  LogicalResult matchAndRewriteBase(Operation *op, ValueRange dest,
-                                    PatternRewriter &rewriter,
-                                    TiledOp &result) const;
-
- private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  linalg::LinalgTransformationFilter filter;
-  /// Options to control tiling;
-  linalg::LinalgTilingOptions options;
-};
 
 template <typename OpTy>
 struct LinalgExtTilingPattern : public TiledOpInterfaceBaseTilingPattern {
@@ -409,12 +388,12 @@ struct LinalgExtTilingPattern : public TiledOpInterfaceBaseTilingPattern {
                          linalg::LinalgTransformationFilter filter =
                              linalg::LinalgTransformationFilter(),
                          PatternBenefit benefit = 1)
-      : TiledOpInterfaceBaseTilingPattern(OpTy::getOperationName(), context,
-                                          options, filter, benefit) {}
+      : TiledOpInterfaceBaseTilingPattern(context, options, filter, benefit) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    auto linalgExtOp = cast<LinalgExtOp>(op);
+    auto linalgExtOp = dyn_cast<LinalgExtOp>(op);
+    if (!linalgExtOp) return failure();
     TiledOp tiledOp;
     // Check for failure.
     if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
@@ -440,13 +419,12 @@ struct InsertSliceTilingPattern : public TiledOpInterfaceBaseTilingPattern {
                            linalg::LinalgTransformationFilter filter =
                                linalg::LinalgTransformationFilter(),
                            PatternBenefit benefit = 1)
-      : TiledOpInterfaceBaseTilingPattern(
-            tensor::InsertSliceOp::getOperationName(), context, options, filter,
-            benefit) {}
+      : TiledOpInterfaceBaseTilingPattern(context, options, filter, benefit) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    tensor::InsertSliceOp insertSliceOp = cast<tensor::InsertSliceOp>(op);
+    auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(op);
+    if (!insertSliceOp) return failure();
     TiledOp tiledOp;
     // Check for failure.
     if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
