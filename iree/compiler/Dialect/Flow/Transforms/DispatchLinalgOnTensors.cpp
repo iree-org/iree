@@ -129,24 +129,6 @@ static void removeFusionGroupsAttribute(Operation *op) {
   op->removeAttr(kFusionGroupsAttr);
 }
 
-namespace {
-struct DispatchLinalgOnTensorsPass
-    : public DispatchLinalgOnTensorsBase<DispatchLinalgOnTensorsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, ShapeDialect, tensor::TensorDialect>();
-  }
-  DispatchLinalgOnTensorsPass() = default;
-  DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
-  void runOnOperation() override;
-
- private:
-  Statistic numDispatches{this, "number of dispatches",
-                          "Number of Flow dispatches created"};
-};
-}  // namespace
-
 //===----------------------------------------------------------------------===//
 // Utility methods
 //===----------------------------------------------------------------------===//
@@ -1178,6 +1160,25 @@ static unsigned decideFusableLinalgOps(FuncOp funcOp) {
   }
   return numRootOps;
 }
+
+namespace {
+/// Pass declaration.
+struct DispatchLinalgOnTensorsPass
+    : public DispatchLinalgOnTensorsBase<DispatchLinalgOnTensorsPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
+                scf::SCFDialect, ShapeDialect, tensor::TensorDialect>();
+  }
+  DispatchLinalgOnTensorsPass() = default;
+  DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
+  void runOnOperation() override;
+
+ private:
+  Statistic numDispatches{this, "number of dispatches",
+                          "Number of Flow dispatches created"};
+};
+}  // namespace
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
   FuncOp funcOp = getOperation();
