@@ -108,7 +108,20 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   iree_status_t status;
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    // Device local case.
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+      status =
+          CU_RESULT_TO_STATUS(allocator->context->syms,
+                              cuMemAllocManaged(&device_ptr, allocation_size,
+                                                CU_MEM_ATTACH_GLOBAL));
+      host_ptr = (void*)device_ptr;
+    } else {
+      // Device only.
+      status = CU_RESULT_TO_STATUS(allocator->context->syms,
+                                   cuMemAlloc(&device_ptr, allocation_size));
+    }
+  } else {
     unsigned int flags = CU_MEMHOSTALLOC_DEVICEMAP;
     if (!iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
       flags |= CU_MEMHOSTALLOC_WRITECOMBINED;
@@ -121,11 +134,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
           allocator->context->syms,
           cuMemHostGetDevicePointer(&device_ptr, host_ptr, /*flags=*/0));
     }
-  } else {
-    status = CU_RESULT_TO_STATUS(allocator->context->syms,
-                                 cuMemAlloc(&device_ptr, allocation_size));
   }
-
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_buffer_wrap(
         (iree_hal_allocator_t*)allocator, memory_type,
@@ -145,10 +154,11 @@ void iree_hal_cuda_allocator_free(iree_hal_allocator_t* base_allocator,
                                   iree_hal_memory_type_t memory_type) {
   iree_hal_cuda_allocator_t* allocator =
       iree_hal_cuda_allocator_cast(base_allocator);
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    CUDA_IGNORE_ERROR(allocator->context->syms, cuMemFreeHost(host_ptr));
-  } else {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     CUDA_IGNORE_ERROR(allocator->context->syms, cuMemFree(device_ptr));
+  } else {
+    // Host local.
+    CUDA_IGNORE_ERROR(allocator->context->syms, cuMemFreeHost(host_ptr));
   }
 }
 
