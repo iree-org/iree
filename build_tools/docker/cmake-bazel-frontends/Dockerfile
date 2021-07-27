@@ -20,7 +20,7 @@ COPY --from=gcr.io/iree-oss/bazel@sha256:5e52c7d43b6fdff35d884b8b8b92b1b6e2151d6
   /usr/bin/
 
 # Install tensorflow.
-RUN python3 -m pip install tf-nightly==2.6.0.dev20210527
+RUN python3 -m pip install tf-nightly==2.7.0.dev20210726
 
 # Install JAX.
 RUN python3 -m pip install --upgrade jax jaxlib flax

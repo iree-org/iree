@@ -9,7 +9,7 @@
 ################################################################################
 
 iree_add_all_subdirs()
-
+return()
 file(GLOB _GLOB_X_TEST_PY LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *_test.py)
 iree_e2e_cartesian_product_test_suite(
   NAME
