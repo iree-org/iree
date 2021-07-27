@@ -108,7 +108,19 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
   iree_status_t status;
   void *host_ptr = NULL;
   hipDeviceptr_t device_ptr = 0;
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    // Device local case.
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+      status = ROCM_RESULT_TO_STATUS(
+          allocator->context->syms,
+          hipMallocManaged(&device_ptr, allocation_size, hipMemAttachGlobal));
+      host_ptr = (void *)device_ptr;
+    } else {
+      // Device only.
+      status = ROCM_RESULT_TO_STATUS(allocator->context->syms,
+                                     hipMalloc(&device_ptr, allocation_size));
+    }
+  } else {
     unsigned int flags = hipHostMallocMapped;
     if (!iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
       flags |= hipHostMallocWriteCombined;
@@ -121,9 +133,6 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
           allocator->context->syms,
           hipHostGetDevicePointer(&device_ptr, host_ptr, /*flags=*/0));
     }
-  } else {
-    status = ROCM_RESULT_TO_STATUS(allocator->context->syms,
-                                   hipMalloc(&device_ptr, allocation_size));
   }
 
   if (iree_status_is_ok(status)) {
@@ -145,10 +154,11 @@ void iree_hal_rocm_allocator_free(iree_hal_allocator_t *base_allocator,
                                   iree_hal_memory_type_t memory_type) {
   iree_hal_rocm_allocator_t *allocator =
       iree_hal_rocm_allocator_cast(base_allocator);
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    ROCM_IGNORE_ERROR(allocator->context->syms, hipHostFree(host_ptr));
-  } else {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     ROCM_IGNORE_ERROR(allocator->context->syms, hipFree(device_ptr));
+  } else {
+    // Host local.
+    ROCM_IGNORE_ERROR(allocator->context->syms, hipHostFree(host_ptr));
   }
 }
 
