@@ -131,14 +131,7 @@ iree_status_t iree_elf_arch_apply_relocations(
 // Non-volatile:
 //   EBX, ESP, EBP, ESI, EDI
 //
-// Everything but Windows uses this convention (linux/bsd/mac/etc) and as such
-// we can just use nice little C thunks.
-
-#if defined(IREE_PLATFORM_WINDOWS)
-
-#error "TODO(#6554): need cdecl -> sysv ABI shims in x86_32_msvc.asm"
-
-#else
+// MSVC shares this convention for the default cdecl calls.
 
 void iree_elf_call_v_v(const void* symbol_ptr) {
   typedef void (*ptr_t)(void);
@@ -169,7 +162,5 @@ int iree_elf_thunk_i_p(const void* symbol_ptr, void* a0) {
   typedef int (*ptr_t)(void*);
   return ((ptr_t)symbol_ptr)(a0);
 }
-
-#endif  // IREE_PLATFORM_WINDOWS
 
 #endif  // IREE_ARCH_X86_32

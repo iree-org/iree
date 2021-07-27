@@ -93,14 +93,15 @@ iree_cc_library(
 
 # TODO(*): figure out how to make this work on Bazel+Windows.
 if(MSVC)
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "amd64.*|x86_64.*|AMD64.*")
+  # CMake + MASM does not work well and CMake ends up passing all our C/C++
+  # flags confusing MASM. We invoke MASM directly (ml.exe/ml64.exe) to keep it
+  # quiet.
+  if(MSVC_C_ARCHITECTURE_ID MATCHES 64 OR MSVC_CXX_ARCHITECTURE_ID MATCHES 64)
     set_source_files_properties(
       arch/x86_64_msvc.asm
       PROPERTIES
       LANGUAGE ASM_MASM
     )
-    # CMake + MASM does not work well and CMake ends up passing all our C/C++
-    # flags confusing MASM. We invoke MASM directly (ml64.exe) to keep it quiet.
     target_sources(iree_hal_local_elf_arch PRIVATE "arch/x86_64_msvc.obj")
     add_custom_command(
       OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/arch/x86_64_msvc.obj
