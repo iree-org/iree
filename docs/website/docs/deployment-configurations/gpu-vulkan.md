@@ -183,7 +183,7 @@ concrete values.
 [mlir]: https://mlir.llvm.org/
 [spirv]: https://www.khronos.org/registry/spir-v/
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
-[tf-import]: /frontends/tensorflow/
-[tflite-import]: /frontends/tensorflow-lite/
+[tf-import]: /ml-frameworks/tensorflow/
+[tflite-import]: /ml-frameworks/tensorflow-lite/
 [vulkan]: https://www.khronos.org/vulkan/
 [vulkan-sdk]: https://vulkan.lunarg.com/sdk/home/
