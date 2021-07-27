@@ -900,7 +900,7 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
     bool isTransfer() { return true; }
   }];
 
-  // TODO(benvanik): canonicalize splat+slice to smaller splat.
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
