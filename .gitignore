@@ -58,3 +58,6 @@ local.properties
 # Generated documentation files
 mkdocs/site/
 docs/website/site/
+
+# Temporary files
+iree/compiler/Dialect/HAL/Target/LLVM/librt/bin/librt.ll
