@@ -224,8 +224,8 @@ int main(int argc, char **argv) {
 
     iree_integrations::TF::buildTFImportPassPipeline(pm);
     if (failed(pm.run(*module))) {
-      llvm::errs()
-          << "Running iree-import-tf pass pipeline failed (see diagnostics)\n";
+      llvm::errs() << "Running iree-import-tf TF import pass pipeline failed "
+                      "(see diagnostics)\n";
       return 2;
     }
     if (!saveTempMidLevelImport.empty()) {
@@ -237,8 +237,8 @@ int main(int argc, char **argv) {
     applyPassManagerCLOptions(pm);
     iree_integrations::MHLO::buildMHLOImportPassPipeline(pm);
     if (failed(pm.run(*module))) {
-      llvm::errs()
-          << "Running iree-import-tf pass pipeline failed (see diagnostics)\n";
+      llvm::errs() << "Running iree-import-tf MHLO Import pass pipeline failed "
+                      "(see diagnostics)\n";
       return 2;
     }
   }
