@@ -1,3 +1,6 @@
+ Monday, July 19, 2021<br>
+ By Rob Suderman and Jenni Kilduff
+
 ## TFLite Support via TOSA
 
 IREE can now execute [TensorFlow Lite](https://www.tensorflow.org/lite)
@@ -5,17 +8,20 @@ IREE can now execute [TensorFlow Lite](https://www.tensorflow.org/lite)
 [TOSA](https://developer.mlplatform.org/w/tosa/), an open standard of common
 tensor operations, and a part of [MLIR](https://mlir.llvm.org/) core. TOSA’s
 high-level representation of tensor operations provides a common front-end for
-ingesting models from different front-ends. In this case we ingest a TFLite
-flatbuffer, compile it to TOSA IR which IREE takes as an input format to compile
-to its various backends.
+ingesting models from different frameworks. In this case we ingest a TFLite
+flatbuffer and compile it to TOSA IR, which IREE takes as an input format to
+compile to its various backends.
 
-![Compilation diagram](https://https://github.com/google/iree/tree/main/docs/website/docs/blog/2021-07-19-tflite-tosa-compilation-diagram.png?raw=true){ align=center }
+![Compilation diagram](./2021-07-19-tflite-tosa-compilation-diagram.png){ align=left }
 
-Executing TFLite on IREE provides an alternative execution environment to the
-TFLite runtime that can leverage IREE’s advantages, specifically multi-cpu and
-GPU architecture support using a lightweight execution environment. Having this
-compile-once-run-everywhere approach guarantees more consistent performance on a
-variety of clients without depending on client-side updates.
+Using TFLite as a frontend for IREE provides an alternative ingestion method for
+already existing models that could benefit from IREE’s design. This enables
+models already designed for on-device inference to have an alternative path for
+execution without requiring any additional porting, while benefiting from
+IREE’s improvements in buffer management, work dispatch system, and compact
+binary format. With continued improvements to IREE/MLIR’s compilation
+performance, more optimized versions can be compiled and distributed to target
+devices without an update to the clientside environment.
 
 Today, we have validated floating point support for a variety of models,
 including
