@@ -465,6 +465,25 @@ static iree_status_t iree_elf_module_parse_dynamic_tables(
   return iree_ok_status();
 }
 
+// Verifies that there are no dynamic imports in the module as we don't support
+// them yet.
+static iree_status_t iree_elf_module_verify_no_imports(
+    iree_elf_module_load_state_t* load_state, iree_elf_module_t* module) {
+  // NOTE: slot 0 is always the 0 placeholder.
+  for (iree_host_size_t i = 1; i < module->dynsym_count; ++i) {
+    const iree_elf_sym_t* sym = &module->dynsym[i];
+    if (sym->st_shndx == IREE_ELF_SHN_UNDEF) {
+      const char* symname = sym->st_name ? module->dynstr + sym->st_name : NULL;
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "ELF imports one or more symbols (trying "
+                              "'%s'); imports are not supported in the "
+                              "platform-agnostic loader",
+                              symname);
+    }
+  }
+  return iree_ok_status();
+}
+
 //==============================================================================
 // Relocation
 //==============================================================================
@@ -576,7 +595,11 @@ iree_status_t iree_elf_module_initialize_from_memory(
     status = iree_elf_module_parse_dynamic_tables(&load_state, out_module);
   }
 
-  // TODO(benvanik): imports would happen here.
+  // TODO(benvanik): imports would happen here. For now we just ensure there are
+  // no imports as otherwise things will fail with obscure messages later on.
+  if (iree_status_is_ok(status)) {
+    status = iree_elf_module_verify_no_imports(&load_state, out_module);
+  }
 
   // Apply relocations to the loaded pages.
   if (iree_status_is_ok(status)) {

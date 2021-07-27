@@ -180,40 +180,37 @@ namespace mlir {
 namespace iree_compiler {
 
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
-  linalg::LinalgOp rootOperation;
+  // TODO(ravishankarm): The following logic to get LinalgOps needs
+  // fixing.
+  // - Should be able to handle multiple entry points (so assert on single
+  //   funcop is unnecessary)
+  // - The funcOp itself cannot be handled if it doesnt have a single block. The
+  //   compilation logic here (which also sets the entry point configuration),
+  //   doesnt work when there is arbitrary control flow.
   auto funcOps = moduleOp.getOps<FuncOp>();
   assert(llvm::hasSingleElement(funcOps));
   FuncOp funcOp = *funcOps.begin();
   SmallVector<linalg::LinalgOp, 4> linalgOps;
   funcOp.walk([&](linalg::LinalgOp op) { linalgOps.push_back(op); });
+
   if (linalgOps.empty()) {
     return ::setTranslationInfo(
         funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
         {1, 1, 1});
   }
-  if (linalgOps.size() == 1) rootOperation = *linalgOps.begin();
+
+  linalg::LinalgOp rootOperation;
   // if there is more than one linalg op, look for the root one.
-  for (linalg::LinalgOp op : linalgOps) {
-    if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
-            linalg::ConvInputNHWCFilterHWCFOp,
-            linalg::DepthwiseConvInputNHWCFilterHWCOp,
-            linalg::ConvInputNHWCFilterHWCFOp,
-            linalg::DepthwiseConvInputNHWCFilterHWCFOp,
-            linalg::DepthwiseConvInputNHWCFilterHWCOp, linalg::PoolingNhwcMaxOp,
-            linalg::PoolingNhwcMinOp, linalg::PoolingNhwcSumOp>(
+  for (linalg::LinalgOp op : llvm::reverse(linalgOps)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(
             op.getOperation())) {
       rootOperation = op;
       break;
     }
   }
   if (!rootOperation) {
-    // If no named ops the dispatch region should have at exactly one generic op
-    // which is root operation.
-    assert(llvm::count_if(linalgOps, [](linalg::LinalgOp op) {
-             return isa<linalg::GenericOp>(op);
-           }) == 1);
-    for (linalg::LinalgOp op : linalgOps) {
-      if (isa<linalg::GenericOp>(op)) {
+    for (linalg::LinalgOp op : llvm::reverse(linalgOps)) {
+      if (isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op)) {
         rootOperation = op;
         break;
       }

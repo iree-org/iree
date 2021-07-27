@@ -25,10 +25,33 @@ struct TiledOp {
   SmallVector<Value> results;
 };
 
-/// Main entry point for tiling LinalgExtOps using TiledOpInterface.  If the
-/// `op` does not implement the `TiledOpInterface` returns a `TiledOp{}` value.
-FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, Operation *op, ValueRange dest,
+/// Main entry point for tiling LinalgExtOps using TiledOpInterface.
+FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TiledOpInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options);
+
+/// Base rewrite pattern to tile and distribute operations that implement the
+/// `TiledOpInterface`.
+/// Base pattern for tiling TiledOpInterfaceOps.
+struct TiledOpInterfaceBaseTilingPattern : public RewritePattern {
+  TiledOpInterfaceBaseTilingPattern(MLIRContext *context,
+                                    linalg::LinalgTilingOptions options,
+                                    linalg::LinalgTransformationFilter filter =
+                                        linalg::LinalgTransformationFilter(),
+                                    PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
+        filter(filter),
+        options(options) {}
+
+  LogicalResult matchAndRewriteBase(TiledOpInterface tilableOp,
+                                    PatternRewriter &rewriter,
+                                    TiledOp &result) const;
+
+ private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  linalg::LinalgTransformationFilter filter;
+  /// Options to control tiling;
+  linalg::LinalgTilingOptions options;
+};
 
 }  // namespace linalg_ext
 }  // namespace iree_compiler
