@@ -695,11 +695,33 @@ struct FlattenTensorReshapeChain : public OpRewritePattern<TensorReshapeOp> {
   }
 };
 
+// Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
+// primitive value for the splat op.
+struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
+  using OpRewritePattern<TensorLoadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceOp =
+        dyn_cast_or_null<TensorSplatOp>(loadOp.source().getDefiningOp());
+
+    if (!sourceOp) return failure();
+
+    rewriter.replaceOp(loadOp, sourceOp.value());
+    return success();
+  }
+};
+
 }  // namespace
 
 void TensorReshapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<FlattenTensorReshapeChain>(context);
+}
+
+void TensorLoadOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldSplatLoadIntoPrimitive>(context);
 }
 
 OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute> operands) {
