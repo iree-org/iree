@@ -9,20 +9,20 @@ working on your own applications.
 
 Common themes include:
 
-* give the compiler as much information as possible
-* give the compiler opportunities to batch work together or defer computation
-* keep compute devices saturated with work through pipelining
-* use dense math where possible, particular for inner loop bodies
-* limit synchronization points between devices like CPUs and GPUs
-* profile early and often, using the right tools for each level of granularity
+* Give the compiler as much information as possible
+* Give the compiler opportunities to batch work together or defer computation
+* Keep compute devices saturated with work through pipelining
+* Use dense math where possible, particularly for inner loop bodies
+* Limit synchronization points between devices like CPUs and GPUs
+* Profile early and often, using the right tools for each level of granularity
 
 ## Practices for model authoring
 
 ### Track state within your model when possible
 
-If your model is stateful, prefer to store that state directly within your
-program, rather than externalizing it through arguments and return values. By
-keeping state inside your program, the compiler is better able to reason about
+If your model is stateful prefer to store that state directly within your
+program rather than externalizing it through arguments and return values. By
+keeping state inside your program the compiler is better able to reason about
 it and function calls will have lower overhead.
 
 If you do externalize state, try to pack that state into a limited number of
