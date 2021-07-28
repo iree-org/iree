@@ -422,6 +422,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
             return success();
           })
           .Default([&](Operation *) { return failure(); });
+  if (failed(status)) return failure();
 
   if (scf::ForOp loopOp = dyn_cast<scf::ForOp>(outermostProducingOp))
     loopOp.walk(
