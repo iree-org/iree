@@ -42,10 +42,10 @@ cc_library(
 )
 
 cc_library(
-    name = "Common",
+    name = "TensorToFlow",
     srcs = [
+        "ConvertTensorToFlow.cpp",
         "Passes.cpp",
-        "TopLevelSCFToCFG.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -53,12 +53,9 @@ cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        "//iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//iree/compiler/Dialect/Flow/IR",
-        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",

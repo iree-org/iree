@@ -4,11 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/InputConversion/Common/PassDetail.h"
-#include "iree/compiler/InputConversion/Common/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
@@ -17,6 +16,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace Flow {
 
 namespace {
 
@@ -109,19 +110,32 @@ struct ConvertTensorFromElementsPattern
     return op.getType().getDimSize(0) == 1;
   }
 };
+
 }  // namespace
 
-void populateConvertUpstreamToIREEPatterns(MLIRContext *context,
-                                           TypeConverter &typeConverter,
-                                           OwningRewritePatternList &patterns) {
+void registerTensorToFlowPassPipelines() {
+  PassPipelineRegistration<> tensorToFlow(
+      "iree-tensor-to-flow", "Converts ops from tensor to flow dialects",
+      [](OpPassManager &passManager) {
+        buildTensorToFlowPassPipeline(passManager);
+      });
+}
+
+void buildTensorToFlowPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<FuncOp>(createConvertTensorToFlow());
+}
+
+void populateConvertTensorToFlowPatterns(MLIRContext *context,
+                                         TypeConverter &typeConverter,
+                                         OwningRewritePatternList &patterns) {
   patterns.add<ConvertTensorCastPattern>(typeConverter, context);
   patterns.add<ConvertTensorFromElementsPattern>(typeConverter, context);
 }
 
 namespace {
 
-struct ConvertUpstreamToIREEPass
-    : public ConvertUpstreamToIREEBase<ConvertUpstreamToIREEPass> {
+struct ConvertTensorToFlowPass
+    : public ConvertTensorToFlowBase<ConvertTensorToFlowPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<StandardOpsDialect, tensor::TensorDialect,
                     IREE::Flow::FlowDialect>();
@@ -132,12 +146,12 @@ struct ConvertUpstreamToIREEPass
 
 }  // namespace
 
-void ConvertUpstreamToIREEPass::runOnOperation() {
+void ConvertTensorToFlowPass::runOnOperation() {
   OwningRewritePatternList patterns(&getContext());
   MLIRContext *context = &getContext();
   TypeConverter typeConverter;
   typeConverter.addConversion([](Type t) { return t; });
-  populateConvertUpstreamToIREEPatterns(&getContext(), typeConverter, patterns);
+  populateConvertTensorToFlowPatterns(&getContext(), typeConverter, patterns);
 
   ConversionTarget target(*context);
   target.addIllegalOp<tensor::CastOp>();
@@ -156,9 +170,11 @@ void ConvertUpstreamToIREEPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertUpstreamToIREE() {
-  return std::make_unique<ConvertUpstreamToIREEPass>();
+std::unique_ptr<OperationPass<FuncOp>> createConvertTensorToFlow() {
+  return std::make_unique<ConvertTensorToFlowPass>();
 }
 
+}  // namespace Flow
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -201,6 +201,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Bindings::TFLite::Transforms
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
+      iree::compiler::Dialect::Flow::Conversion::TensorToFlow
       iree::compiler::Dialect::HAL::IR::HALDialect
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::IREE::IR
