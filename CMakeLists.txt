@@ -329,7 +329,7 @@ endif()
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_FOUND)
   execute_process(
-    COMMAND python scripts/git/check_submodule_init.py
+    COMMAND python3 scripts/git/check_submodule_init.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     RESULT_VARIABLE ret
   )

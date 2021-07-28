@@ -24,8 +24,8 @@ def run():
   for submodule in submodules:
     if (submodule.strip()[0] == "-"):
       print(
-          f"The git submodule '{submodule.split()[1]}' is not initialized. Please run `git submodule update --init`"
-      )
+          "The git submodule '%s' is not initialized. Please run `git submodule update --init`"
+          % (submodule.split()[1]))
       sys.exit(1)
 
 
