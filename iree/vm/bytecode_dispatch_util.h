@@ -169,6 +169,9 @@ static const int kRegSize = sizeof(uint16_t);
 // Each macro will increment the pc by the number of bytes read and as such must
 // be called in the same order the values are encoded.
 
+#define VM_AlignPC(pc, alignment) \
+  (pc) = ((pc) + ((alignment)-1)) & ~((alignment)-1)
+
 #define VM_DecConstI8(name) \
   OP_I8(0);                 \
   ++pc;
@@ -201,11 +204,16 @@ static const int kRegSize = sizeof(uint16_t);
   (out_str)->data = (const char*)&bytecode_data[pc + 2]; \
   pc += 2 + (out_str)->size;
 #define VM_DecBranchTarget(block_name) VM_DecConstI32(name)
-#define VM_DecBranchOperands(operands_name)                                   \
-  (const iree_vm_register_remap_list_t*)&bytecode_data[pc];                   \
-  pc +=                                                                       \
-      kRegSize + ((const iree_vm_register_list_t*)&bytecode_data[pc])->size * \
-                     2 * kRegSize;
+#define VM_DecBranchOperands(operands_name) \
+  VM_DecBranchOperandsImpl(bytecode_data, &pc)
+static inline const iree_vm_register_remap_list_t* VM_DecBranchOperandsImpl(
+    const uint8_t* IREE_RESTRICT bytecode_data, iree_vm_source_offset_t* pc) {
+  VM_AlignPC(*pc, kRegSize);
+  const iree_vm_register_remap_list_t* list =
+      (const iree_vm_register_remap_list_t*)&bytecode_data[*pc];
+  *pc = *pc + kRegSize + list->size * 2 * kRegSize;
+  return list;
+}
 #define VM_DecOperandRegI32(name)      \
   regs.i32[OP_I16(0) & regs.i32_mask]; \
   pc += kRegSize;
@@ -222,10 +230,16 @@ static const int kRegSize = sizeof(uint16_t);
   &regs.ref[OP_I16(0) & regs.ref_mask];                    \
   *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
   pc += kRegSize;
-#define VM_DecVariadicOperands(name)                  \
-  (const iree_vm_register_list_t*)&bytecode_data[pc]; \
-  pc += kRegSize +                                    \
-        ((const iree_vm_register_list_t*)&bytecode_data[pc])->size * kRegSize;
+#define VM_DecVariadicOperands(name) \
+  VM_DecVariadicOperandsImpl(bytecode_data, &pc)
+static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
+    const uint8_t* IREE_RESTRICT bytecode_data, iree_vm_source_offset_t* pc) {
+  VM_AlignPC(*pc, kRegSize);
+  const iree_vm_register_list_t* list =
+      (const iree_vm_register_list_t*)&bytecode_data[*pc];
+  *pc = *pc + kRegSize + list->size * kRegSize;
+  return list;
+}
 #define VM_DecResultRegI32(name)        \
   &regs.i32[OP_I16(0) & regs.i32_mask]; \
   pc += kRegSize;

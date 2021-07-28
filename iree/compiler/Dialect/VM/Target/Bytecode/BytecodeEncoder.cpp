@@ -148,7 +148,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodePrimitiveArrayAttr(DenseElementsAttr value) override {
-    if (value.getNumElements() > UINT16_MAX ||
+    if (value.getNumElements() > UINT16_MAX || failed(ensureAlignment(2)) ||
         failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";
     }
@@ -187,7 +187,9 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     // this list is small :)
     auto srcDstRegs = registerAllocation_->remapSuccessorRegisters(
         currentOp_, successorIndex);
-    (void)writeUint16(srcDstRegs.size());
+    if (failed(ensureAlignment(2)) || failed(writeUint16(srcDstRegs.size()))) {
+      return failure();
+    }
     for (auto srcDstReg : srcDstRegs) {
       if (failed(writeUint16(srcDstReg.first.encode())) ||
           failed(writeUint16(srcDstReg.second.encode()))) {
@@ -206,7 +208,10 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeOperands(Operation::operand_range values) override {
-    (void)writeUint16(std::distance(values.begin(), values.end()));
+    if (failed(ensureAlignment(2)) ||
+        failed(writeUint16(std::distance(values.begin(), values.end())))) {
+      return failure();
+    }
     for (auto it : llvm::enumerate(values)) {
       uint16_t reg = registerAllocation_
                          ->mapUseToRegister(it.value(), currentOp_, it.index())
@@ -224,7 +229,10 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeResults(Operation::result_range values) override {
-    (void)writeUint16(std::distance(values.begin(), values.end()));
+    if (failed(ensureAlignment(2)) ||
+        failed(writeUint16(std::distance(values.begin(), values.end())))) {
+      return failure();
+    }
     for (auto value : values) {
       uint16_t reg = registerAllocation_->mapToRegister(value).encode();
       if (failed(writeUint16(reg))) {
@@ -239,6 +247,15 @@ class V0BytecodeEncoder : public BytecodeEncoder {
       return llvm::None;
     }
     return std::move(bytecode_);
+  }
+
+  LogicalResult ensureAlignment(size_t alignment) {
+    size_t paddedSize = (bytecode_.size() + (alignment - 1)) & ~(alignment - 1);
+    size_t padding = paddedSize - bytecode_.size();
+    if (padding == 0) return success();
+    static const uint8_t kZeros[32] = {0};
+    if (padding > sizeof(kZeros)) return failure();
+    return writeBytes(kZeros, padding);
   }
 
  private:
@@ -348,6 +365,10 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     }
   }
 
+  if (failed(encoder.ensureAlignment(8))) {
+    funcOp.emitError() << "failed to pad function";
+    return llvm::None;
+  }
   auto bytecodeData = encoder.finish();
   if (!bytecodeData.hasValue()) {
     funcOp.emitError() << "failed to fixup and finish encoding";
