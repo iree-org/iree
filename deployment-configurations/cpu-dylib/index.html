@@ -931,8 +931,8 @@ CPU instructions.</p>
 <!-- TODO(??): vcpkg -->
 
 <h4 id="build-runtime-from-source">Build runtime from source<a class="headerlink" href="#build-runtime-from-source" title="Permanent link">&para;</a></h4>
-<p>Please make sure you have followed the <a href="/building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows and the <a href="/building-from-source/android/">Android cross-compilation</a>
+<p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
+to build IREE for Linux/Windows and the <a href="../../building-from-source/android/">Android cross-compilation</a>
 page for Android. The dylib HAL driver is compiled in by default on all
 platforms.</p>
 <!-- TODO(??): a way to verify dylib is compiled in and supported -->
@@ -958,8 +958,8 @@ You can find out the full path to the <code>site-packages</code> directory via t
 <code>python -m site</code> command.</p>
 </div>
 <h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">&para;</a></h4>
-<p>Please make sure you have followed the <a href="/building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows and the <a href="/building-from-source/android/">Android cross-compilation</a>
+<p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
+to build IREE for Linux/Windows and the <a href="../../building-from-source/android/">Android cross-compilation</a>
 page for Android. The dylib compiler backend is compiled in by default on all
 platforms.</p>
 <p>If you want to explicitly specify HAL drivers to support, you will need to add
@@ -975,7 +975,7 @@ corresponding framework's import tool to convert into a format (i.e.,
 <a href="https://mlir.llvm.org/">MLIR</a>) expected by main IREE compilers first.</p>
 <p>Using MobileNet v2 as an example, you can download the SavedModel with trained
 weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a> and convert it using IREE's
-<a href="/frontends/tensorflow/">TensorFlow importer</a>. Then,</p>
+<a href="../../ml-frameworks/tensorflow/">TensorFlow importer</a>. Then,</p>
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>In the build directory, run the following command:</p>
 <div class="highlight"><pre><span></span><code>iree/tools/iree-translate <span class="se">\</span>

@@ -851,6 +851,12 @@ or stored in the <code>SavedModel</code>
   iree-tools-tf-snapshot <span class="se">\</span>
   -f https://github.com/google/iree/releases
 </code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The TensorFlow package is currently only available on Linux and macOS. It
+is not available on Windows yet (see
+<a href="https://github.com/google/iree/issues/6417">this issue</a>).</p>
+</div>
 <h2 id="importing-models">Importing models<a class="headerlink" href="#importing-models" title="Permanent link">&para;</a></h2>
 <p>IREE compilers transform a model into its final deployable format in several
 sequential steps. The first step for a TensorFlow model is to use either the

@@ -783,6 +783,12 @@ a TensorFlow model to a .tflite flatbuffer.</p>
   iree-tools-tflite-snapshot <span class="se">\</span>
   -f https://github.com/google/iree/releases
 </code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The TensorFlow Lite package is currently only available on Linux and macOS.
+It is not available on Windows yet (see
+<a href="https://github.com/google/iree/issues/6417">this issue</a>).</p>
+</div>
 <h2 id="importing-models">Importing models<a class="headerlink" href="#importing-models" title="Permanent link">&para;</a></h2>
 <p>Fist, import the TFLite model to TOSA MLIR:</p>
 <div class="highlight"><pre><span></span><code>iree-import-tflite <span class="se">\</span>
