@@ -57,7 +57,7 @@ def ExportBenchmarkFuncs :
 
 def FormStreams :
     Pass<"iree-flow-form-streams", "FuncOp"> {
-  let summary = "Identifies dispatches that can be grouped into streams within functions.";
+  let summary = "Identifies dispatches that can be grouped into streams within functions";
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormStreamsPass()";
 }
 
@@ -75,7 +75,7 @@ def HoistUnstreamableOps :
 
 def InjectDispatchTracing :
     Pass<"iree-flow-inject-dispatch-tracing", "FuncOp"> {
-  let summary = "Injects dispatch region tracing.";
+  let summary = "Injects dispatch region tracing";
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
@@ -126,12 +126,6 @@ def PromoteTensorLoads :
     Pass<"iree-flow-promote-tensor-loads", "FuncOp"> {
   let summary = "Converts standard ops which match to flow.tensor.load (typically causing a read-back)";
   let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteTensorLoadsPass()";
-}
-
-def SimplifyVariableAccesses :
-    Pass<"iree-flow-simplify-variable-accesses", "FuncOp"> {
-  let summary = "Hoist loads and sinks stores to variables to decrease data dependency regions.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createSimplifyVariableAccessesPass()";
 }
 
 def StripAndSplatConstantVariables :

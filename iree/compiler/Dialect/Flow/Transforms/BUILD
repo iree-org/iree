@@ -53,7 +53,6 @@ cc_library(
         "Passes.cpp",
         "PromoteI1ToI8Pass.cpp",
         "PromoteTensorLoads.cpp",
-        "SimplifyVariableAccesses.cpp",
         "StripAndSplatConstantVariables.cpp",
         "TypeConverter.cpp",
     ],
