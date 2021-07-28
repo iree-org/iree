@@ -13,6 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <tuple>
+
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -51,15 +53,19 @@ namespace {
 // Resource utilities
 //===----------------------------------------------------------------------===//
 
-/// Inserts a resource evariable of the given `type` at the beginning of
+/// Map from hal.interface.binding.subspan ops to their corresponding
+/// spv.GlobalVariable ops.
+using InterfaceResourceMap =
+    llvm::DenseMap<Operation *, spirv::GlobalVariableOp>;
+
+/// Creates a resource evariable of the given `type` at the beginning of
 /// `moduleOp`'s block via `symbolTable` and bind it to `set` and `binding`.
-spirv::GlobalVariableOp insertResourceVariable(Location loc, Type type,
+spirv::GlobalVariableOp createResourceVariable(Location loc, Type type,
                                                unsigned set, unsigned binding,
                                                bool alias, ModuleOp moduleOp,
-                                               SymbolTable *symbolTable,
-                                               OpBuilder::Listener *listener) {
-  OpBuilder builder(moduleOp.getContext(), listener);
+                                               SymbolTable *symbolTable) {
   std::string name = llvm::formatv("__resource_var_{0}_{1}_", set, binding);
+  OpBuilder builder(moduleOp.getContext());
   auto variable =
       builder.create<spirv::GlobalVariableOp>(loc, type, name, set, binding);
   if (alias) variable->setAttr("aliased", builder.getUnitAttr());
@@ -74,35 +80,66 @@ std::pair<int32_t, int32_t> getInterfaceSetAndBinding(Operation *op) {
   return {bindingOp.set().getSExtValue(), bindingOp.binding().getSExtValue()};
 }
 
-/// Returns the set of resources that should be marked as aliased in SPIR-V.
-llvm::DenseSet<Operation *> getAliasedResources(ModuleOp module) {
-  llvm::DenseSet<Operation *> aliasedResources;
+/// Scans all hal.interface.binding.subspan ops in `module`, creates their
+/// corresponding spv.GlobalVariables when needed, and returns the map.
+/// The created variables need to have their types fixed later.
+InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
+  SymbolTable symbolTable(module);
+  InterfaceResourceMap interfaceToResourceVars;
 
-  for (FuncOp func : module.getOps<FuncOp>()) {
+  auto fns = llvm::to_vector<1>(module.getOps<FuncOp>());
+  for (FuncOp func : llvm::reverse(fns)) {
     // Collect all interface ops and their (set, binding) pairs in this
-    // function.
-    SmallVector<Operation *, 4> interfaceOps;
-    SmallVector<std::pair<uint32_t, uint32_t>, 4> setBindings;
-    llvm::DenseMap<std::pair<uint32_t, uint32_t>, unsigned> setBindingCount;
+    // function. Use SmallVector here for a deterministic order.
+    SmallVector<IREE::HAL::InterfaceBindingSubspanOp, 8> interfaceOps;
+    SmallVector<std::pair<uint32_t, uint32_t>, 8> setBindings;
+
+    // Use a map to see if we have different types for one (set, binding) pair,
+    // which will require creating multiple SPIR-V global variables.
+    llvm::DenseMap<std::pair<uint32_t, uint32_t>, llvm::DenseSet<Type>>
+        setBindingTypes;
+
     func.walk([&](Operation *op) {
-      if (isa<IREE::HAL::InterfaceBindingSubspanOp>(op)) {
-        interfaceOps.emplace_back(op);
-        setBindings.emplace_back(getInterfaceSetAndBinding(op));
-        ++setBindingCount[setBindings.back()];
-      }
+      auto interfaceOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
+      if (!interfaceOp || interfaceOp.use_empty()) return;
+      interfaceOps.emplace_back(interfaceOp);
+      setBindings.emplace_back(getInterfaceSetAndBinding(interfaceOp));
+      setBindingTypes[setBindings.back()].insert(interfaceOp.getType());
     });
 
-    // Perform analysis to determine whether we need to mark the resource as
-    // alias. This should happen when we have multiple resources binding to the
-    // same (set, binding) pair and they are used in the same function.
-    for (unsigned i = 0; i < interfaceOps.size(); ++i) {
-      if (setBindingCount[setBindings[i]] > 1) {
-        aliasedResources.insert(interfaceOps[i]);
+    // Keep track of created SPIR-V global variables. This allows us to
+    // deduplicate when possible to reduce generated SPIR-V blob size.
+    llvm::DenseMap<std::tuple<uint32_t, uint32_t, Type>,
+                   spirv::GlobalVariableOp>
+        resourceVars;
+
+    for (int i = interfaceOps.size() - 1; i >= 0; --i) {
+      auto interfaceOp = interfaceOps[i];
+      const auto &setBinding = setBindings[i];
+
+      auto key = std::make_tuple(setBinding.first, setBinding.second,
+                                 interfaceOp.getType());
+      auto var = resourceVars.lookup(key);
+      if (!var) {
+        // If we have multiple SPIR-V global variables bound to the same (set,
+        // binding) pair and they are used in the same function, those variables
+        // need to have alias decoration.
+        bool alias = setBindingTypes[setBindings[i]].size() > 1;
+
+        // We are using the interface op's type for creating the global
+        // variable. It's fine. The correctness boundary is the pass.
+        // We will fix it up during conversion so it won't leak.
+        var = createResourceVariable(
+            interfaceOp.getLoc(), interfaceOp.getType(), setBinding.first,
+            setBinding.second, alias, module, &symbolTable);
+        resourceVars[key] = var;
       }
+
+      interfaceToResourceVars[interfaceOp] = var;
     }
   }
 
-  return aliasedResources;
+  return interfaceToResourceVars;
 }
 
 }  // namespace
@@ -169,17 +206,19 @@ struct HALInterfaceBindingSubspanConverter final
     : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   HALInterfaceBindingSubspanConverter(
       TypeConverter &typeConverter, MLIRContext *context,
-      const llvm::DenseSet<Operation *> &aliasedResources,
-      SymbolTable *symbolTable, PatternBenefit benefit = 1)
+      const InterfaceResourceMap &interfaceToResourceVars,
+      PatternBenefit benefit = 1)
       : OpConversionPattern(typeConverter, context, benefit),
-        aliasedResources(aliasedResources),
-        symbolTable(symbolTable) {}
+        interfaceToResourceVars(interfaceToResourceVars) {}
 
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceBindingSubspanOp interfaceOp,
       ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto moduleOp = interfaceOp->template getParentOfType<ModuleOp>();
+    if (interfaceOp.use_empty()) {
+      rewriter.eraseOp(interfaceOp);
+      return success();
+    }
 
     Type resultType = interfaceOp.getOperation()->getResult(0).getType();
     Type convertedType = this->getTypeConverter()->convertType(resultType);
@@ -187,22 +226,18 @@ struct HALInterfaceBindingSubspanConverter final
       return interfaceOp.emitError()
              << "failed to convert SPIR-V type: " << resultType;
     }
-    auto setAndBinding = getInterfaceSetAndBinding(interfaceOp.getOperation());
 
-    // We always create a new resource variable for the interface.
-    spirv::GlobalVariableOp varOp = insertResourceVariable(
-        interfaceOp.getLoc(), convertedType, setAndBinding.first,
-        setAndBinding.second,
-        aliasedResources.contains(interfaceOp.getOperation()), moduleOp,
-        symbolTable, rewriter.getListener());
+    auto varOp = interfaceToResourceVars.lookup(interfaceOp);
+    // Fix up the variable's type.
+    varOp.typeAttr(TypeAttr::get(convertedType));
 
     rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(interfaceOp, varOp);
+
     return success();
   }
 
  private:
-  const llvm::DenseSet<Operation *> &aliasedResources;
-  SymbolTable *symbolTable;
+  const InterfaceResourceMap &interfaceToResourceVars;
 };
 
 /// Pattern to lower operations that become a no-ops at this level.
@@ -307,18 +342,12 @@ void ConvertToSPIRVPass::runOnOperation() {
           IREE::HAL::InterfaceWorkgroupCountOp, spirv::BuiltIn::NumWorkgroups>>(
       typeConverter, context);
 
-  // Create a symbol table for the current module op. This must be done before
-  // starting conversion. The conversion framework has a deferred nature.
-  // Actions like replacing/deleting ops are just recorded instead of directly
-  // applied. So for function conversion, we will see both the original function
-  // and the new replacement function during conversion process. That causes an
-  // issue for creating symbol tables, which scans all symbols and errors out
-  // when duplicates are found. We should be fine here tough becuase we only use
-  // this symbol table to insert new SPIR-V global variables.
-  SymbolTable symbolTable(moduleOp);
-  auto aliasedResources = getAliasedResources(moduleOp);
-  patterns.insert<HALInterfaceBindingSubspanConverter>(
-      typeConverter, context, aliasedResources, &symbolTable);
+  // Performs a prelimiary step to analyze all hal.interface.binding.subspan ops
+  // and create spv.GlobalVariables.
+  auto interfaceToResourceVars = createResourceVariables(moduleOp);
+  // For using use them in conversion.
+  patterns.insert<HALInterfaceBindingSubspanConverter>(typeConverter, context,
+                                                       interfaceToResourceVars);
 
   /// Fold certain operations as no-ops:
   /// - linalg.reshape becomes a no-op since all memrefs are linearized in
