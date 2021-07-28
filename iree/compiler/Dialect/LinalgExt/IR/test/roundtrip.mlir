@@ -280,3 +280,42 @@ func @scatter_update_slice_2D(
 //  CHECK-SAME:     outs(%[[ORIGINAL]]
 //       CHECK:     linalg_ext.yield %{{.+}} : i32
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
+    -> (tensor<1024xf32>, tensor<1024xf32>) {
+  %cst0 = constant 0 : index
+  %0:2 = linalg_ext.fft
+    ins(%cst0: index)
+    outs(%arg0, %arg1: tensor<1024xf32>, tensor<1024xf32>)
+  : tensor<1024xf32>, tensor<1024xf32>
+  return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
+}
+// CHECK-LABEL: func @fft_tensor(
+//  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[CST:.+]] = constant 0 : index
+//       CHECK:   %[[RES:.+]]:2 = linalg_ext.fft
+//  CHECK-SAME:     ins(%[[CST]] : index)
+//  CHECK-SAME:    outs(%[[REAL]], %[[IMAG]] : tensor<1024xf32>, tensor<1024xf32>)
+//  CHECK-SAME:   : tensor<1024xf32>, tensor<1024xf32>
+//       CHECK:   return %[[RES]]#0, %[[RES]]#1
+
+// -----
+
+func @fft_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>) {
+  %cst0 = constant 0 : index
+  linalg_ext.fft
+    ins(%cst0: index)
+    outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
+  return
+}
+// CHECK-LABEL: func @fft_memref(
+//  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[CST:.+]] = constant 0 : index
+//       CHECK:   linalg_ext.fft
+//  CHECK-SAME:     ins(%[[CST]] : index)
+//  CHECK-SAME:    outs(%[[REAL]], %[[IMAG]] : memref<1024xf32>, memref<1024xf32>)
+//       CHECK:   return

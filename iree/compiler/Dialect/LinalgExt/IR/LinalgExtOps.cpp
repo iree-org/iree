@@ -526,6 +526,65 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// FftOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyFftOp(FftOp op) {
+  auto length = op.getFftLength();
+  if (length == ShapedType::kDynamicSize) return failure();
+  // Expect to be a power of 2.
+  if (length & (length - 1)) return failure();
+  if (!op.getNumInputs() || !op.isScalar(op.getInputOperand(0))) {
+    return op.emitOpError("expected to carry `stage` input");
+  }
+  if (op.getNumOutputs() != 2) {
+    return op.emitOpError("expected outputs to be real and imag tensor/memref");
+  }
+  return success();
+}
+
+void FftOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  SmallVector<Value> inputBuffers = getInputBufferOperands();
+  SmallVector<Value> outputBuffers = getOutputBufferOperands();
+  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
+                 outputBuffers);
+}
+
+SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
+  // There are `rank-1` outer loops. The fft itselfs has two loops, one is for
+  // the stage, and another is merge step. Thus, there are `rank+1` in total.
+  SmallVector<StringRef> iteratorTypes(getOperandRank() + 1,
+                                       getParallelIteratorTypeName());
+  return iteratorTypes;
+}
+
+SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
+  SmallVector<Range> res;
+  Location loc = getLoc();
+  Value zero = builder.create<ConstantIndexOp>(loc, 0);
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  for (auto en : llvm::enumerate(getOperandShape().drop_back())) {
+    Value size;
+    if (en.value() == ShapedType::kDynamicSize) {
+      size = getDimValue(builder, loc, operand(), en.index());
+    } else {
+      size = builder.create<ConstantIndexOp>(loc, en.value());
+    }
+    res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/one});
+  }
+
+  Value size = builder.create<ConstantIndexOp>(loc, getFftLength());
+  Value stride = builder.create<ShiftLeftOp>(loc, one, getStage());
+  res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
+
+  Value halfStride = builder.create<SignedShiftRightOp>(loc, stride, one);
+  res.emplace_back(Range{/*offset=*/zero, halfStride, /*stride=*/one});
+  return res;
+}
+
 }  // namespace linalg_ext
 }  // namespace iree_compiler
 }  // namespace mlir

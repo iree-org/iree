@@ -22,21 +22,16 @@ namespace detail {
 LogicalResult verifyLinalgExtOpInterface(Operation *op) {
   LinalgExtOp linalgExtOp = cast<LinalgExtOp>(op);
   if (op->getNumResults()) {
-    for (auto en : llvm::enumerate(linalgExtOp.inputs())) {
-      if (!en.value().getType().isa<RankedTensorType>()) {
-        return linalgExtOp.emitOpError("expected `ins` operand #")
-               << en.index() << " to be of RankedTensorType";
-      }
+    if (!linalgExtOp.hasTensorSemantics()) {
+      return linalgExtOp.emitOpError(
+          "expected inputs and outputs to be RankedTensorType or scalar");
     }
+
     if (op->getNumResults() != linalgExtOp.outputs().size()) {
       return linalgExtOp.emitOpError(
           "expected number of outputs to be same as the number of results");
     }
     for (auto en : llvm::enumerate(op->getResultTypes())) {
-      if (!en.value().isa<RankedTensorType>()) {
-        return linalgExtOp.emitOpError("expected result #")
-               << en.index() << " to be of RankedTensorType";
-      }
       Type outputType = linalgExtOp.outputs()[en.index()].getType();
       if (en.value() != outputType) {
         return linalgExtOp.emitOpError("expected type of `outs` operand #")
@@ -45,10 +40,11 @@ LogicalResult verifyLinalgExtOpInterface(Operation *op) {
       }
     }
   } else {
-    for (auto en : llvm::enumerate(linalgExtOp.inputs())) {
-      if (!en.value().getType().isa<MemRefType>()) {
+    for (auto en : llvm::enumerate(linalgExtOp.getInputOperands())) {
+      if (!linalgExtOp.isScalar(en.value()) &&
+          !en.value()->get().getType().isa<MemRefType>()) {
         return linalgExtOp.emitOpError("expected `ins` operand #")
-               << en.index() << " to be of MemRefType";
+               << en.index() << " to be of MemRefType or scalar";
       }
     }
     for (auto en : llvm::enumerate(linalgExtOp.outputs())) {
