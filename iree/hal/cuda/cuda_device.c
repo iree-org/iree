@@ -105,16 +105,16 @@ static iree_status_t iree_hal_cuda_device_create_internal(
     CUstream stream, CUcontext context, iree_hal_cuda_dynamic_symbols_t* syms,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_cuda_device_t* device = NULL;
-  iree_host_size_t total_size = sizeof(*device) + identifier.size;
+  iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&device));
   memset(device, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_cuda_device_vtable, &device->resource);
   device->driver = driver;
   iree_hal_driver_retain(device->driver);
-  uint8_t* buffer_ptr = (uint8_t*)device + sizeof(*device);
-  buffer_ptr += iree_string_view_append_to_buffer(
-      identifier, &device->identifier, (char*)buffer_ptr);
+  iree_string_view_append_to_buffer(
+      identifier, &device->identifier,
+      (char*)device + iree_sizeof_struct(*device));
   device->device = cu_device;
   device->stream = stream;
   device->context_wrapper.cu_context = context;

@@ -139,7 +139,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   // (including the user-specified entry_arg).
   iree_thread_t* thread = NULL;
   iree_status_t status =
-      iree_allocator_malloc(allocator, sizeof(iree_thread_t), (void**)&thread);
+      iree_allocator_malloc(allocator, sizeof(*thread), (void**)&thread);
   if (!iree_status_is_ok(status)) {
     IREE_TRACE_ZONE_END(z0);
     return status;

@@ -92,19 +92,18 @@ iree_status_t iree_hal_task_device_create(
                                     iree_hal_task_device_check_params(params));
 
   iree_hal_task_device_t* device = NULL;
-  iree_host_size_t total_size =
-      sizeof(*device) + params->queue_count * sizeof(*device->queues) +
-      identifier.size + loader_count * sizeof(*device->loaders);
+  iree_host_size_t struct_size = sizeof(*device) +
+                                 params->queue_count * sizeof(*device->queues) +
+                                 loader_count * sizeof(*device->loaders);
+  iree_host_size_t total_size = struct_size + identifier.size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&device);
   if (iree_status_is_ok(status)) {
     memset(device, 0, total_size);
     iree_hal_resource_initialize(&iree_hal_task_device_vtable,
                                  &device->resource);
-    iree_string_view_append_to_buffer(
-        identifier, &device->identifier,
-        (char*)device + sizeof(*device) +
-            params->queue_count * sizeof(*device->queues));
+    iree_string_view_append_to_buffer(identifier, &device->identifier,
+                                      (char*)device + struct_size);
     device->host_allocator = host_allocator;
     iree_arena_block_pool_initialize(4096, host_allocator,
                                      &device->small_block_pool);
@@ -117,8 +116,9 @@ iree_status_t iree_hal_task_device_create(
 
     device->loader_count = loader_count;
     device->loaders =
-        (iree_hal_executable_loader_t**)((uint8_t*)device->identifier.data +
-                                         identifier.size);
+        (iree_hal_executable_loader_t**)((uint8_t*)device + sizeof(*device) +
+                                         params->queue_count *
+                                             sizeof(*device->queues));
     for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
       device->loaders[i] = loaders[i];
       iree_hal_executable_loader_retain(device->loaders[i]);

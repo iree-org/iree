@@ -32,8 +32,10 @@ iree_status_t iree_hal_heap_buffer_create(
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // NOTE: we want the buffer data to always be 16-byte aligned.
   iree_hal_heap_buffer_t* buffer = NULL;
-  iree_host_size_t header_size = iree_host_align(sizeof(*buffer), 16);
+  iree_host_size_t header_size =
+      iree_host_align(iree_sizeof_struct(*buffer), 16);
   iree_host_size_t total_size = header_size + allocation_size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&buffer);

@@ -51,17 +51,19 @@ static iree_status_t iree_hal_cuda_driver_create_internal(
     const iree_hal_cuda_driver_options_t* options,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   iree_hal_cuda_driver_t* driver = NULL;
-  iree_host_size_t total_size = sizeof(*driver) + identifier.size;
+  iree_host_size_t total_size = iree_sizeof_struct(*driver) + identifier.size;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&driver));
+
   iree_hal_resource_initialize(&iree_hal_cuda_driver_vtable, &driver->resource);
   driver->host_allocator = host_allocator;
   iree_string_view_append_to_buffer(
       identifier, &driver->identifier,
-      (char*)driver + total_size - identifier.size);
+      (char*)driver + iree_sizeof_struct(*driver));
   memcpy(&driver->default_params, default_params,
          sizeof(driver->default_params));
   driver->default_device_index = options->default_device_index;
+
   iree_status_t status =
       iree_hal_cuda_dynamic_symbols_initialize(host_allocator, &driver->syms);
   if (iree_status_is_ok(status)) {

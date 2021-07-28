@@ -47,9 +47,9 @@ iree_status_t iree_hal_task_driver_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_task_driver_t* driver = NULL;
-  iree_host_size_t total_size = sizeof(*driver) +
-                                loader_count * sizeof(*driver->loaders) +
-                                identifier.size;
+  iree_host_size_t struct_size =
+      sizeof(*driver) + loader_count * sizeof(*driver->loaders);
+  iree_host_size_t total_size = struct_size + identifier.size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&driver);
   if (iree_status_is_ok(status)) {
@@ -57,9 +57,8 @@ iree_status_t iree_hal_task_driver_create(
                                  &driver->resource);
     driver->host_allocator = host_allocator;
 
-    iree_string_view_append_to_buffer(
-        identifier, &driver->identifier,
-        (char*)driver + total_size - identifier.size);
+    iree_string_view_append_to_buffer(identifier, &driver->identifier,
+                                      (char*)driver + struct_size);
     memcpy(&driver->default_params, default_params,
            sizeof(driver->default_params));
 
