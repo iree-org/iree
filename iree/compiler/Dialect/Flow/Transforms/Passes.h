@@ -131,6 +131,10 @@ std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass();
 // Reorders blocks to hoist ops that cannot be put into streams.
 std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
 
+// Hoists loads and sinks stores to variables to decrease data dependency
+// regions.
+std::unique_ptr<OperationPass<FuncOp>> createSimplifyVariableAccessesPass();
+
 // TODO(benvanik): cross-function stream flows.
 
 // Inserts clones of constant values where they may be required.
