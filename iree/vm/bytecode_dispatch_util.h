@@ -153,34 +153,12 @@ static const int kRegSize = sizeof(uint16_t);
 
 // Bytecode data access macros for reading values of a given type from a byte
 // offset within the current function.
-#if defined(IREE_ENDIANNESS_LITTLE)
-#define OP_I8(i) bytecode_data[pc + (i)]
-#define OP_I16(i) *((uint16_t*)&bytecode_data[pc + (i)])
-#define OP_I32(i) *((uint32_t*)&bytecode_data[pc + (i)])
-#define OP_I64(i) *((uint64_t*)&bytecode_data[pc + (i)])
-#define OP_F32(i) *((float*)&bytecode_data[pc + (i)])
-#define OP_F64(i) *((double*)&bytecode_data[pc + (i)])
-#else
-#define OP_I8(i) bytecode_data[pc + (i)]
-#define OP_I16(i)                           \
-  ((uint16_t)bytecode_data[pc + 0 + (i)]) | \
-      ((uint16_t)bytecode_data[pc + 1 + (i)] << 8)
-#define OP_I32(i)                                     \
-  ((uint32_t)bytecode_data[pc + 0 + (i)]) |           \
-      ((uint32_t)bytecode_data[pc + 1 + (i)] << 8) |  \
-      ((uint32_t)bytecode_data[pc + 2 + (i)] << 16) | \
-      ((uint32_t)bytecode_data[pc + 3 + (i)] << 24)
-#define OP_I64(i)                                     \
-  ((uint64_t)bytecode_data[pc + 0 + (i)]) |           \
-      ((uint64_t)bytecode_data[pc + 1 + (i)] << 8) |  \
-      ((uint64_t)bytecode_data[pc + 2 + (i)] << 16) | \
-      ((uint64_t)bytecode_data[pc + 3 + (i)] << 24) | \
-      ((uint64_t)bytecode_data[pc + 4 + (i)] << 32) | \
-      ((uint64_t)bytecode_data[pc + 5 + (i)] << 40) | \
-      ((uint64_t)bytecode_data[pc + 6 + (i)] << 48) | \
-      ((uint64_t)bytecode_data[pc + 7 + (i)] << 56)
-#error "TODO: OP_F32 and OP_F64 for big endian systems"
-#endif  // IREE_ENDIANNESS_LITTLE
+#define OP_I8(i) iree_unaligned_load_le((uint8_t*)&bytecode_data[pc + (i)])
+#define OP_I16(i) iree_unaligned_load_le((uint16_t*)&bytecode_data[pc + (i)])
+#define OP_I32(i) iree_unaligned_load_le((uint32_t*)&bytecode_data[pc + (i)])
+#define OP_I64(i) iree_unaligned_load_le((uint64_t*)&bytecode_data[pc + (i)])
+#define OP_F32(i) iree_unaligned_load_le((float*)&bytecode_data[pc + (i)])
+#define OP_F64(i) iree_unaligned_load_le((double*)&bytecode_data[pc + (i)])
 
 //===----------------------------------------------------------------------===//
 // Utilities matching the tablegen op encoding scheme
