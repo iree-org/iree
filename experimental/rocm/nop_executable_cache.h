@@ -19,8 +19,8 @@ extern "C" {
 // This is useful to isolate pipeline caching behavior and verify compilation
 // behavior.
 iree_status_t iree_hal_rocm_nop_executable_cache_create(
-    iree_hal_rocm_context_wrapper_t *context, iree_string_view_t identifier,
-    iree_hal_executable_cache_t **out_executable_cache);
+    iree_hal_rocm_context_wrapper_t* context, iree_string_view_t identifier,
+    iree_hal_executable_cache_t** out_executable_cache);
 
 #ifdef __cplusplus
 }  // extern "C"

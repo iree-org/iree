@@ -17,14 +17,14 @@ extern "C" {
 
 // Creates the kernel arguments.
 iree_status_t iree_hal_rocm_executable_layout_create(
-    iree_hal_rocm_context_wrapper_t *context, iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t **set_layouts,
+    iree_hal_rocm_context_wrapper_t* context, iree_host_size_t set_layout_count,
+    iree_hal_descriptor_set_layout_t** set_layouts,
     iree_host_size_t push_constant_count,
-    iree_hal_executable_layout_t **out_executable_layout);
+    iree_hal_executable_layout_t** out_executable_layout);
 
 // Return the base binding index for the given set.
 iree_host_size_t iree_hal_rocm_base_binding_index(
-    iree_hal_executable_layout_t *executable_layout, uint32_t set);
+    iree_hal_executable_layout_t* executable_layout, uint32_t set);
 
 #ifdef __cplusplus
 }  // extern "C"

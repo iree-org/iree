@@ -27,7 +27,7 @@ typedef struct iree_hal_rocm_native_executable_function_t {
 
 typedef struct iree_hal_rocm_native_executable_t {
   iree_hal_resource_t resource;
-  iree_hal_rocm_context_wrapper_t *context;
+  iree_hal_rocm_context_wrapper_t* context;
   iree_host_size_t entry_count;
   hipModule_t module;
   iree_hal_rocm_native_executable_function_t entry_functions[];
@@ -36,23 +36,23 @@ typedef struct iree_hal_rocm_native_executable_t {
 extern const iree_hal_executable_vtable_t
     iree_hal_rocm_native_executable_vtable;
 
-static iree_hal_rocm_native_executable_t *iree_hal_rocm_native_executable_cast(
-    iree_hal_executable_t *base_value) {
+static iree_hal_rocm_native_executable_t* iree_hal_rocm_native_executable_cast(
+    iree_hal_executable_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_rocm_native_executable_vtable);
-  return (iree_hal_rocm_native_executable_t *)base_value;
+  return (iree_hal_rocm_native_executable_t*)base_value;
 }
 
 iree_status_t iree_hal_rocm_native_executable_create(
-    iree_hal_rocm_context_wrapper_t *context,
-    const iree_hal_executable_spec_t *executable_spec,
-    iree_hal_executable_t **out_executable) {
+    iree_hal_rocm_context_wrapper_t* context,
+    const iree_hal_executable_spec_t* executable_spec,
+    iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(executable_spec);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_rocm_native_executable_t *executable = NULL;
+  iree_hal_rocm_native_executable_t* executable = NULL;
 
   // TODO: Verify the flat buffer.
   iree_ROCMExecutableDef_table_t executable_def =
@@ -69,8 +69,8 @@ iree_status_t iree_hal_rocm_native_executable_create(
   iree_host_size_t total_size =
       sizeof(*executable) +
       entry_count * sizeof(iree_hal_rocm_native_executable_function_t);
-  iree_status_t status = iree_allocator_malloc(
-      context->host_allocator, total_size, (void **)&executable);
+  iree_status_t status = iree_allocator_malloc(context->host_allocator,
+                                               total_size, (void**)&executable);
   hipModule_t module = NULL;
   ROCM_RETURN_IF_ERROR(context->syms,
                        hipModuleLoadDataEx(&module, hsaco_image, 0, NULL, NULL),
@@ -78,7 +78,7 @@ iree_status_t iree_hal_rocm_native_executable_create(
 
   for (iree_host_size_t i = 0; i < entry_count; i++) {
     hipFunction_t function = NULL;
-    const char *entry_name = flatbuffers_string_vec_at(entry_points_vec, i);
+    const char* entry_name = flatbuffers_string_vec_at(entry_points_vec, i);
     ROCM_RETURN_IF_ERROR(context->syms,
                          hipModuleGetFunction(&function, module, entry_name),
                          "hipModuleGetFunction");
@@ -92,22 +92,22 @@ iree_status_t iree_hal_rocm_native_executable_create(
                                &executable->resource);
   executable->module = module;
   executable->context = context;
-  *out_executable = (iree_hal_executable_t *)executable;
+  *out_executable = (iree_hal_executable_t*)executable;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 hipFunction_t iree_hal_rocm_native_executable_for_entry_point(
-    iree_hal_executable_t *base_executable, int32_t entry_point) {
-  iree_hal_rocm_native_executable_t *executable =
+    iree_hal_executable_t* base_executable, int32_t entry_point) {
+  iree_hal_rocm_native_executable_t* executable =
       iree_hal_rocm_native_executable_cast(base_executable);
   return executable->entry_functions[entry_point].rocm_function;
 }
 
 iree_status_t iree_hal_rocm_native_executable_block_size(
-    iree_hal_executable_t *base_executable, int32_t entry_point, uint32_t *x,
-    uint32_t *y, uint32_t *z) {
-  iree_hal_rocm_native_executable_t *executable =
+    iree_hal_executable_t* base_executable, int32_t entry_point, uint32_t* x,
+    uint32_t* y, uint32_t* z) {
+  iree_hal_rocm_native_executable_t* executable =
       iree_hal_rocm_native_executable_cast(base_executable);
   *x = executable->entry_functions[entry_point].block_size_x;
   *y = executable->entry_functions[entry_point].block_size_y;
@@ -116,8 +116,8 @@ iree_status_t iree_hal_rocm_native_executable_block_size(
 }
 
 static void iree_hal_rocm_native_executable_destroy(
-    iree_hal_executable_t *base_executable) {
-  iree_hal_rocm_native_executable_t *executable =
+    iree_hal_executable_t* base_executable) {
+  iree_hal_rocm_native_executable_t* executable =
       iree_hal_rocm_native_executable_cast(base_executable);
   iree_allocator_t host_allocator = executable->context->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
