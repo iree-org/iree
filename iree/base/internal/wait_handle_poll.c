@@ -148,10 +148,10 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
   }
 
   iree_host_size_t user_handle_list_size =
-      capacity * sizeof(iree_wait_handle_t);
+      capacity * iree_sizeof_struct(iree_wait_handle_t);
   iree_host_size_t poll_fd_list_size = capacity * sizeof(struct pollfd);
-  iree_host_size_t total_size =
-      sizeof(iree_wait_set_t) + user_handle_list_size + poll_fd_list_size;
+  iree_host_size_t total_size = iree_sizeof_struct(iree_wait_set_t) +
+                                user_handle_list_size + poll_fd_list_size;
 
   iree_wait_set_t* set = NULL;
   IREE_RETURN_IF_ERROR(
@@ -161,7 +161,8 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
   iree_wait_set_clear(set);
 
   set->user_handles =
-      (iree_wait_handle_t*)((uint8_t*)set + sizeof(iree_wait_set_t));
+      (iree_wait_handle_t*)((uint8_t*)set +
+                            iree_sizeof_struct(iree_wait_set_t));
   set->poll_fds =
       (struct pollfd*)((uint8_t*)set->user_handles + user_handle_list_size);
 

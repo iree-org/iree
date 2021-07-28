@@ -761,9 +761,8 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
 
   iree_vm_bytecode_module_t* module = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(
-              allocator, sizeof(iree_vm_bytecode_module_t) + type_table_size,
-              (void**)&module));
+      z0, iree_allocator_malloc(allocator, sizeof(*module) + type_table_size,
+                                (void**)&module));
   module->allocator = allocator;
 
   iree_vm_FunctionDescriptor_vec_t function_descriptors =
@@ -782,8 +781,6 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->def = module_def;
 
   module->type_count = iree_vm_TypeDef_vec_len(type_defs);
-  module->type_table = (iree_vm_type_def_t*)((uint8_t*)module +
-                                             sizeof(iree_vm_bytecode_module_t));
   iree_status_t resolve_status =
       iree_vm_bytecode_module_resolve_types(type_defs, module->type_table);
   if (!iree_status_is_ok(resolve_status)) {

@@ -55,6 +55,20 @@ static inline iree_device_size_t iree_device_align(
   return (value + (alignment - 1)) & ~(alignment - 1);
 }
 
+// Returns the size of a struct padded out to iree_max_align_t.
+// This must be used when performing manual trailing allocation packing to
+// ensure the alignment requirements of the trailing data are satisified.
+//
+// NOTE: do not use this if using VLAs (`struct { int trailing[]; }`) - those
+// must precisely follow the normal sizeof(t) as the compiler does the padding
+// for you.
+//
+// Example:
+//  some_buffer_ptr_t* p = NULL;
+//  iree_host_size_t total_size = iree_sizeof_struct(*buffer) + extra_data_size;
+//  IREE_CHECK_OK(iree_allocator_malloc(allocator, total_size, (void**)&p));
+#define iree_sizeof_struct(t) iree_host_align(sizeof(t), iree_max_align_t)
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

@@ -81,6 +81,8 @@ typedef struct iree_hal_legacy_executable_t {
     const iree_hal_executable_library_header_t** header;
     const iree_hal_executable_library_v0_t* v0;
   } library;
+
+  iree_hal_local_executable_layout_t* layouts[];
 } iree_hal_legacy_executable_t;
 
 extern const iree_hal_local_executable_vtable_t
@@ -224,16 +226,13 @@ static iree_status_t iree_hal_legacy_executable_create(
   iree_hal_legacy_executable_t* executable = NULL;
   iree_host_size_t total_size =
       sizeof(*executable) +
-      executable_layout_count * sizeof(iree_hal_local_executable_layout_t);
+      executable_layout_count * sizeof(*executable->layouts);
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
-    iree_hal_local_executable_layout_t** executable_layouts_ptr =
-        (iree_hal_local_executable_layout_t**)(((uint8_t*)executable) +
-                                               sizeof(*executable));
     iree_hal_local_executable_initialize(
         &iree_hal_legacy_executable_vtable, executable_layout_count,
-        executable_layouts, executable_layouts_ptr, host_allocator,
+        executable_layouts, &executable->layouts[0], host_allocator,
         &executable->base);
     executable->def = executable_def;
   }

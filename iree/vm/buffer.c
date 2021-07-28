@@ -95,8 +95,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_create(
 
   // The actual buffer payload is prefixed with the buffer type so we need only
   // a single allocation.
-  iree_host_size_t prefix_size =
-      iree_host_align(sizeof(iree_vm_buffer_t), iree_max_align_t);
+  iree_host_size_t prefix_size = iree_sizeof_struct(**out_buffer);
   iree_host_size_t total_size = prefix_size + length;
 
   // Allocate combined [prefix | buffer] memory.
