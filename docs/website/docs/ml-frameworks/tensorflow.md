@@ -27,6 +27,11 @@ python -m pip install \
   -f https://github.com/google/iree/releases
 ```
 
+!!! warning
+    The TensorFlow package is currently only available on Linux and macOS. It
+    is not available on Windows yet (see
+    [this issue](https://github.com/google/iree/issues/6417)).
+
 ## Importing models
 
 IREE compilers transform a model into its final deployable format in several

@@ -411,3 +411,34 @@ func @propogateStaticShapeOfUpdate(%arg0 : tensor<?x?xf32>, %arg1 : f32) -> tens
   // CHECK: return %[[RESULT]]
   return %1 : tensor<?x?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @foldSplatLoadIntoPrimitive
+//  CHECK-SAME: (%[[arg0:.+]]: f32, %[[arg1:.+]]: index, %[[arg2:.+]]: index)
+func @foldSplatLoadIntoPrimitive(%arg0 : f32, %arg1 : index, %arg2 : index) -> f32 {
+  // CHECK-NEXT: return %[[arg0]] : f32
+  %0 = flow.tensor.splat %arg0 : tensor<4x4xf32>
+  %1 = flow.tensor.load %0[%arg1, %arg2] : tensor<4x4xf32>
+  return %1 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @foldSplatReshapeIntoSplat
+func @foldSplatReshapeIntoSplat(%arg0 : f32) -> tensor<16xf32> {
+  // CHECK-NEXT: %0 = flow.tensor.splat %arg0 : tensor<16xf32>
+  // CHECK-NEXT: return %0 : tensor<16xf32>
+  %0 = flow.tensor.splat %arg0 : tensor<4x4xf32>
+  %1 = flow.tensor.reshape %0 : tensor<4x4xf32> -> tensor<16xf32>
+  return %1 : tensor<16xf32>
+}
+
+// CHECK-LABEL: @foldSplatReshapeIntoSplatDynamic
+func @foldSplatReshapeIntoSplatDynamic(%arg0 : f32, %arg1 : index, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
+  // CHECK-NEXT: %0 = flow.tensor.splat %arg0 : tensor<?x?xf32>{%arg2, %arg3}
+  // CHECK-NEXT: return %0 : tensor<?x?xf32>
+  %0 = flow.tensor.splat %arg0 : tensor<?x4xf32>{%arg1}
+  %1 = flow.tensor.reshape %0 : tensor<?x4xf32>{%arg1} -> tensor<?x?xf32>{%arg2, %arg3}
+  return %1 : tensor<?x?xf32>
+}

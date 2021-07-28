@@ -13,9 +13,11 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/librt/librt.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/dylib_executable_def_builder.h"
+#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -30,11 +32,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-namespace {
+static constexpr char kQueryFunctionName[] =
+    "iree_hal_executable_library_query";
 
-constexpr char kQueryFunctionName[] = "iree_hal_executable_library_query";
-
-llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
+static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
@@ -46,7 +47,7 @@ llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   return llvm::None;
 }
 
-std::string guessModuleName(mlir::ModuleOp moduleOp) {
+static std::string guessModuleName(mlir::ModuleOp moduleOp) {
   std::string moduleName =
       moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
   if (!moduleName.empty()) return moduleName;
@@ -57,8 +58,6 @@ std::string guessModuleName(mlir::ModuleOp moduleOp) {
     return "llvm_module";
   }
 }
-
-}  // namespace
 
 class LLVMAOTTargetBackend final : public TargetBackend {
  public:
@@ -284,8 +283,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
              << options_.targetTriple << "'";
     }
 
-    // Emit object files.
-    SmallVector<Artifact, 4> objectFiles;
+    SmallVector<Artifact> objectFiles;
+
+    // Emit the base object file containing the bulk of our code.
+    // This must come first such that we have the proper library linking order.
     {
       // NOTE: today we just use a single object file, however if we wanted to
       // scale code generation and linking we'd want to generate one per
@@ -304,6 +305,16 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       os.flush();
       os.close();
       objectFiles.push_back(std::move(objectFile));
+    }
+
+    // Optionally append additional object files that provide functionality that
+    // may otherwise have been runtime-dynamic (like libc/libm calls).
+    // For now we only do this for embedded uses.
+    if (options_.linkEmbedded) {
+      if (failed(buildLibraryObjects(variantOp.getLoc(), targetMachine.get(),
+                                     objectFiles, context))) {
+        return variantOp.emitError() << "failed generating library objects";
+      }
     }
 
     // If we are keeping artifacts then let's also add the bitcode for easier
@@ -329,7 +340,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       // Copy the static object file to the specified output along with
       // generated header file.
       const std::string &libraryPath = options_.staticLibraryOutput;
-      const auto library_name = objectFiles[0].path;
       if (!outputStaticLibrary(libraryName, queryFunctionName, libraryPath,
                                objectFiles[0].path)) {
         return variantOp.emitError() << "static library generation failed";
@@ -504,6 +514,76 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // TODO(benvanik): pack in the LLVMTargetOptions into the config dict.
 
     return IREE::HAL::ExecutableTargetAttr::get(context, "llvm", format);
+  }
+
+  static void overridePlatformGlobal(llvm::Module &module, StringRef globalName,
+                                     uint32_t newValue) {
+    // NOTE: the global will not be defined if it is not used in the module.
+    auto *globalValue = module.getNamedGlobal(globalName);
+    if (!globalValue) return;
+    globalValue->setLinkage(llvm::GlobalValue::PrivateLinkage);
+    globalValue->setDSOLocal(true);
+    globalValue->setConstant(true);
+    globalValue->setInitializer(llvm::ConstantInt::get(
+        globalValue->getValueType(), APInt(32, newValue)));
+  }
+
+  // Builds an object file for the librt embedded runtime library.
+  // This is done per link operation so that we can match the precise target
+  // configuration. Since we (mostly) link once per user-level compilation
+  // this is fine today. If in the future we invoke the compiler for thousands
+  // of modules we'd want to (carefully) cache this.
+  LogicalResult buildLibraryObjects(Location loc,
+                                    llvm::TargetMachine *targetMachine,
+                                    SmallVector<Artifact> &objectFiles,
+                                    llvm::LLVMContext &context) {
+    assert(!objectFiles.empty() && "libraries must come after the base object");
+
+    // Load the generic bitcode file contents.
+    llvm::MemoryBufferRef bitcodeBufferRef(
+        llvm::StringRef(iree_compiler_librt_create()->data,
+                        iree_compiler_librt_create()->size),
+        "librt.bc");
+    auto bitcodeModuleValue = llvm::parseBitcodeFile(bitcodeBufferRef, context);
+    if (!bitcodeModuleValue) {
+      return mlir::emitError(loc)
+             << "failed to parse librt bitcode: "
+             << llvm::toString(bitcodeModuleValue.takeError());
+    }
+    auto bitcodeModule = std::move(bitcodeModuleValue.get());
+    bitcodeModule->setDataLayout(targetMachine->createDataLayout());
+    bitcodeModule->setTargetTriple(targetMachine->getTargetTriple().str());
+
+    // Inject target-specific flags.
+    // TODO(benvanik): move this entire function to another file that can do
+    // more complex logic cleanly. This is just an example.
+    overridePlatformGlobal(*bitcodeModule, "librt_platform_example_flag", 0u);
+
+    // Run the LLVM passes to optimize it for the current target.
+    if (failed(runLLVMIRPasses(options_, targetMachine, bitcodeModule.get()))) {
+      return mlir::emitError(loc)
+             << "failed to run librt LLVM-IR opt passes targeting '"
+             << options_.targetTriple << "'";
+    }
+
+    // Emit an object file we can pass to the linker.
+    std::string objectData;
+    if (failed(runEmitObjFilePasses(targetMachine, bitcodeModule.get(),
+                                    &objectData))) {
+      return mlir::emitError(loc)
+             << "failed to compile librt LLVM-IR module to an object file";
+    }
+
+    // Write the object file to disk with a similar name to the base file.
+    auto objectFile =
+        Artifact::createVariant(objectFiles.front().path, ".librt.o");
+    auto &os = objectFile.outputFile->os();
+    os << objectData;
+    os.flush();
+    os.close();
+    objectFiles.push_back(std::move(objectFile));
+
+    return success();
   }
 
   LLVMTargetOptions options_;

@@ -28,7 +28,8 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_heap_allocator_t* allocator = NULL;
-  iree_host_size_t total_size = sizeof(*allocator) + identifier.size;
+  iree_host_size_t total_size =
+      iree_sizeof_struct(*allocator) + identifier.size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&allocator);
   if (iree_status_is_ok(status)) {
@@ -37,7 +38,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
     allocator->host_allocator = host_allocator;
     iree_string_view_append_to_buffer(
         identifier, &allocator->identifier,
-        (char*)allocator + total_size - identifier.size);
+        (char*)allocator + iree_sizeof_struct(*allocator));
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 

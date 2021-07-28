@@ -47,7 +47,7 @@ iree_hal_cuda_graph_command_buffer_cast(iree_hal_command_buffer_t* base_value) {
   return (iree_hal_cuda_graph_command_buffer_t*)base_value;
 }
 
-iree_status_t iree_hal_cuda_graph_command_buffer_allocate(
+iree_status_t iree_hal_cuda_graph_command_buffer_create(
     iree_hal_cuda_context_wrapper_t* context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -136,7 +136,7 @@ iree_hal_cuda_graph_command_buffer_allowed_categories(
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
-  // nothing to do.
+  // Nothing to do.
   return iree_ok_status();
 }
 

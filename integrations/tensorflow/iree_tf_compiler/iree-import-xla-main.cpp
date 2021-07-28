@@ -100,6 +100,10 @@ int main(int argc, char **argv) {
   static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
                                              cl::value_desc("filename"),
                                              cl::init("-"));
+  static llvm::cl::opt<std::string> saveTempMhloInput(
+      "save-temp-mhlo-input",
+      llvm::cl::desc("Save the MHLO pipeline input IR to this file"),
+      llvm::cl::init(""));
   static llvm::cl::opt<std::string> saveTempIreeImport(
       "save-temp-iree-input",
       llvm::cl::desc("Save the resultant IR to this file (useful for saving an "
@@ -251,6 +255,11 @@ int main(int argc, char **argv) {
     return success();
   };
 
+  // Save temp output.
+  if (!saveTempMhloInput.empty()) {
+    if (failed(saveToFile(saveTempMhloInput))) return 10;
+  }
+
   // Run passes.
   PassManager pm(&context, PassManager::Nesting::Implicit);
   applyPassManagerCLOptions(pm);
@@ -264,8 +273,8 @@ int main(int argc, char **argv) {
       iree_integrations::MHLO::createEmitDefaultIREEABIPass());
 
   if (failed(pm.run(*module))) {
-    llvm::errs()
-        << "Running iree-xla-import pass pipeline failed (see diagnostics)\n";
+    llvm::errs() << "Running iree-xla-import MHLO import pass pipeline failed "
+                    "(see diagnostics)\n";
     return 2;
   }
 

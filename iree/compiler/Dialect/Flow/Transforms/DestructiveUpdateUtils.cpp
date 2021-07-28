@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -55,17 +56,28 @@ struct SpecialTerminatorOpCapture {
 };
 
 // TODO(nicolasvasilache): Use some interface instead of op names directly.
-static bool hasDestructiveUpdateSubTensorUses(
-    BlockArgument arg, SpecialTerminatorOpCapture &capture) {
+static bool hasDestructiveUpdateUses(BlockArgument arg,
+                                     SpecialTerminatorOpCapture &capture) {
   SmallVector<Operation *> reads;
-  SmallVector<tensor::InsertSliceOp> writes;
+  SmallVector<Operation *> writes;
   for (OpOperand &u : arg.getUses()) {
-    if (auto subTensorInsertOp =
-            dyn_cast<tensor::InsertSliceOp>(u.getOwner())) {
-      writes.push_back(subTensorInsertOp);
-    } else {
-      reads.push_back(u.getOwner());
-    }
+    TypeSwitch<Operation *, void>(u.getOwner())
+        .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp>(
+            [&](auto linalgLikeOp) {
+              if (linalgLikeOp.isOutputTensor(&u)) {
+                writes.push_back(linalgLikeOp);
+              } else {
+                reads.push_back(linalgLikeOp);
+              }
+            })
+        .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp sliceOp) {
+          if (sliceOp.dest() == u.get()) {
+            writes.push_back(sliceOp);
+          } else {
+            reads.push_back(sliceOp);
+          }
+        })
+        .Default([&](Operation *op) { reads.push_back(op); });
   }
   // For now, only allow exactly a single SubTensorInsertOp that must be
   // dominated by all SubTensorOp.
@@ -77,7 +89,7 @@ static bool hasDestructiveUpdateSubTensorUses(
     if (!domInfo.properlyDominates(read, writes.front())) {
       LLVM_DEBUG(llvm::dbgs() << "non-destructive use-def: " << *read
                               << " does not properly dominate "
-                              << *(writes.front().getOperation()) << "\n");
+                              << *(writes.front()) << "\n");
       return false;
     }
   }
@@ -133,8 +145,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
     // Case 2: multiple uses from an scf::ForOp then this must be used only by
     // SubTensorOp / SubTensorInsertOp with proper dominance.
     if (!regionArg.hasOneUse()) {
-      if (!hasDestructiveUpdateSubTensorUses(regionArg, capture))
-        return nullptr;
+      if (!hasDestructiveUpdateUses(regionArg, capture)) return nullptr;
       return returnValue;
     }
 
@@ -145,8 +156,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
     // Case 3a: Single use which is not an scf::ForOp, it may still be a
     // single SubTensor / SubTensorInsertOp.
     if (!innerForOp) {
-      if (!hasDestructiveUpdateSubTensorUses(regionArg, capture))
-        return nullptr;
+      if (!hasDestructiveUpdateUses(regionArg, capture)) return nullptr;
       return returnValue;
     }
 
@@ -216,31 +226,67 @@ static LogicalResult propagateSubTensorOp(OpBuilder &b,
   return success();
 }
 
-static LogicalResult rewriteSubTensorInsertInPlace(OpBuilder &b,
-                                                   tensor::InsertSliceOp op,
-                                                   Value target) {
-  LLVM_DEBUG(llvm::dbgs() << "RewriteSubTensorInsertInPlace: "
-                          << *(op.getOperation()) << "\n");
-  if (!op.getResult().hasOneUse()) {
-    return op.emitError("not a single use operation");
+template <typename OpTy>
+static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b,
+                                                     OpTy linalgLikeOp,
+                                                     Value target) {
+  LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
+                          << *linalgLikeOp.getOperation() << "\n");
+  if (!linalgLikeOp->hasOneUse()) {
+    return linalgLikeOp.emitError("not a single use operation");
   }
 
-  Operation *user = *(op.getResult().getUsers().begin());
-  if (isa<scf::YieldOp>(user)) {
-    auto dest = op.dest();
-    if (!dest.isa<BlockArgument>()) {
-      return op.emitError("dest is not a argument to the loop");
+  OpOperand &use = *(linalgLikeOp->use_begin());
+  if (isa<scf::YieldOp>(use.getOwner())) {
+    OpResult usedResult = use.get().cast<OpResult>();
+    Value dest =
+        linalgLikeOp.getOutputOperand(usedResult.getResultNumber())->get();
+    if (!dest || !dest.isa<BlockArgument>()) {
+      return linalgLikeOp.emitError("dest is not a argument to the loop");
     }
     OpBuilder::InsertionGuard g(b);
-    b.setInsertionPoint(op);
+    b.setInsertionPointAfter(linalgLikeOp);
 
     // Kills the SSA use-def chain.
-    op.replaceAllUsesWith(dest);
+    usedResult.replaceAllUsesWith(dest);
+
+    b.create<IREE::Flow::DispatchTensorStoreOp>(linalgLikeOp.getLoc(),
+                                                usedResult, target);
+
+    return success();
+  }
+  return failure();
+}
+
+/// Rewrites destructive in-place updates with the update operation being
+/// tensor.insert_slice.
+template <>
+LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
+    OpBuilder &b, tensor::InsertSliceOp insertSliceOp, Value target) {
+  LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
+                          << *insertSliceOp.getOperation() << "\n");
+  if (!insertSliceOp->hasOneUse()) {
+    return insertSliceOp.emitError("not a single use operation");
+  }
+
+  OpOperand &use = *(insertSliceOp->use_begin());
+  if (isa<scf::YieldOp>(use.getOwner())) {
+    OpResult usedResult = use.get().cast<OpResult>();
+    Value dest = insertSliceOp.dest();
+    if (!dest || !dest.isa<BlockArgument>()) {
+      return insertSliceOp.emitError("dest is not a argument to the loop");
+    }
+    OpBuilder::InsertionGuard g(b);
+    b.setInsertionPoint(insertSliceOp);
+
+    // Kills the SSA use-def chain.
+    usedResult.replaceAllUsesWith(dest);
 
     b.create<IREE::Flow::DispatchTensorStoreOp>(
-        op.getLoc(), op.source(), target, op.offsets(), op.sizes(),
-        op.strides(), op.static_offsets(), op.static_sizes(),
-        op.static_strides());
+        insertSliceOp->getLoc(), insertSliceOp.source(), target,
+        insertSliceOp.offsets(), insertSliceOp.sizes(), insertSliceOp.strides(),
+        insertSliceOp.static_offsets(), insertSliceOp.static_sizes(),
+        insertSliceOp.static_strides());
 
     return success();
   }
@@ -366,11 +412,17 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
                           << "\n");
 
   // Try to rewrite inplace.
-  if (failed(rewriteSubTensorInsertInPlace(
-          b, cast<tensor::InsertSliceOp>(capture.rootDestructiveUpdate),
-          target))) {
-    return failure();
-  }
+  auto status =
+      TypeSwitch<Operation *, LogicalResult>(capture.rootDestructiveUpdate)
+          .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp,
+                tensor::InsertSliceOp>([&](auto op) {
+            if (failed(rewriteDestructiveUpdateInPlace(b, op, target))) {
+              return failure();
+            }
+            return success();
+          })
+          .Default([&](Operation *) { return failure(); });
+  if (failed(status)) return failure();
 
   if (scf::ForOp loopOp = dyn_cast<scf::ForOp>(outermostProducingOp))
     loopOp.walk(
@@ -415,9 +467,9 @@ LogicalResult rewriteLinalgDestructiveUpdates(
                     capture.initValue = op.value();
                     Value sourceValue =
                         isADestructiveUpdatePattern(capture.initValue, capture);
-                    if (!sourceValue || !isa_and_nonnull<tensor::InsertSliceOp>(
-                                            capture.rootDestructiveUpdate))
+                    if (!sourceValue) {
                       return WalkResult::advance();
+                    }
                     if (failed(rewriteDestructiveUpdateInPlace(b, capture,
                                                                op.target()))) {
                       return WalkResult::interrupt();

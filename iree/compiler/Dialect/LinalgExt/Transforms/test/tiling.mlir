@@ -30,15 +30,11 @@ func @scatter_tiling(
 //  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     %[[INDEX_SLICE:.+]] = tensor.extract_slice %[[INDICES]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], 1]
-//   CHECK-DAG:     %[[SLICE_D0:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
-//   CHECK-DAG:     %[[SLICE_D1:.+]] = tensor.dim %[[ORIGINAL]], %[[C1]]
 //       CHECK:     %[[SCATTER_TILE:.+]] = linalg_ext.scatter
 //  CHECK-SAME:         __internal_linalg_transform__ = "tiling_output"
 //  CHECK-SAME:         ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
 //  CHECK-SAME:         outs(%[[INIT]]
-//       CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SCATTER_TILE]] into %[[INIT]][0, 0]
-//  CHECK-SAME:         [%[[SLICE_D0]], %[[SLICE_D1]]]
-//       CHECK:     scf.yield %[[YIELD]]
+//       CHECK:     scf.yield %[[SCATTER_TILE]]
 //       CHECK:   return %[[RESULT]]
 
 // -----
@@ -114,15 +110,11 @@ func @scatter_tiling_distribution(
 //  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     %[[INDEX_SLICE:.+]] = tensor.extract_slice %[[INDICES]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], 1]
-//   CHECK-DAG:     %[[SLICE_D0:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
-//   CHECK-DAG:     %[[SLICE_D1:.+]] = tensor.dim %[[ORIGINAL]], %[[C1]]
 //       CHECK:     %[[SCATTER_TILE:.+]] = linalg_ext.scatter
 //  CHECK-SAME:         __internal_linalg_transform__ = "distribute_output"
 //  CHECK-SAME:         ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
 //  CHECK-SAME:         outs(%[[INIT]]
-//       CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SCATTER_TILE]] into %[[INIT]][0, 0]
-//  CHECK-SAME:         [%[[SLICE_D0]], %[[SLICE_D1]]]
-//       CHECK:     scf.yield %[[YIELD]]
+//       CHECK:     scf.yield %[[SCATTER_TILE]]
 //       CHECK:   return %[[RESULT]]
 
 // -----
@@ -435,9 +427,9 @@ func @slice_insert(%source :tensor<?x?xf32>, %dest: tensor<?x?xf32>,
 // CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: index
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:[a-zA-Z0-9]+]] =
 //      CHECK:     %[[YIELD1:.+]] = scf.for %[[IV1:[a-zA-Z0-9]+]] =
+//      CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[IV0]], %[[IV1]]]
 //      CHECK:       %[[OFFSET0:.+]] = affine.apply #[[MAP2]](%[[IV0]])[%[[ARG2]]]
 //      CHECK:       %[[OFFSET1:.+]] = affine.apply #[[MAP2]](%[[IV1]])[%[[ARG3]]]
-//      CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[IV0]], %[[IV1]]]
 //      CHECK:       %[[UPDATE:.+]] = tensor.insert_slice %[[SLICE]]
 // CHECK-SAME:         into %{{.+}}[%[[OFFSET0]], %[[OFFSET1]]]
 //      CHECK:       scf.yield %[[UPDATE]]
@@ -466,9 +458,9 @@ func @slice_insert_rank_reduce(%source :tensor<?x?xf32>, %dest: tensor<?x?x?xf32
 // CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: index
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:[a-zA-Z0-9]+]] =
 //      CHECK:     %[[YIELD1:.+]] = scf.for %[[IV1:[a-zA-Z0-9]+]] =
+//      CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[IV0]], %[[IV1]]]
 //      CHECK:       %[[OFFSET0:.+]] = affine.apply #[[MAP2]](%[[IV0]])[%[[ARG2]]]
 //      CHECK:       %[[OFFSET1:.+]] = affine.apply #[[MAP2]](%[[IV1]])[%[[ARG3]]]
-//      CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[IV0]], %[[IV1]]]
 //      CHECK:       %[[UPDATE:.+]] = tensor.insert_slice %[[SLICE]]
 // CHECK-SAME:         into %{{.+}}[%[[OFFSET0]], 0, %[[OFFSET1]]]
 //      CHECK:       scf.yield %[[UPDATE]]

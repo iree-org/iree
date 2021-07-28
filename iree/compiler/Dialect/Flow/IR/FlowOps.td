@@ -85,7 +85,7 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [
   }];
 
   let arguments = (ins
-    FLOW_VariableRefAttr:$variable
+    Arg<FLOW_VariableRefAttr, "", [MemRead]>:$variable
   );
   let results = (outs
     AnyType:$result
@@ -135,7 +135,7 @@ def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
 
   let arguments = (ins
     AnyType:$value,
-    FLOW_VariableRefAttr:$variable
+    Arg<FLOW_VariableRefAttr, "", [MemWrite]>:$variable
   );
 
   let assemblyFormat = "$value `,` $variable attr-dict `:` type($value)";
@@ -822,6 +822,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
 
   // TODO(benvanik): canonicalize to slice+load if dims are known.
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
@@ -899,7 +900,7 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
     bool isTransfer() { return true; }
   }];
 
-  // TODO(benvanik): canonicalize splat+slice to smaller splat.
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 

@@ -360,8 +360,8 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
   // to expose this via a query_size function so that we could adjust the size
   // of our storage independent of the definition of the user module.
   iree_vm_native_module_t* module = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(iree_vm_native_module_t), (void**)&module));
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, sizeof(*module), (void**)&module));
 
   iree_status_t status = iree_vm_native_module_initialize(
       interface, module_descriptor, allocator, (iree_vm_module_t*)module);

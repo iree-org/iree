@@ -321,12 +321,12 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
       // TODO(benvanik): tune list growth for module count >> 4.
       new_capacity = context->list.capacity * 2;
     }
-    iree_vm_module_t** new_module_list;
+    iree_vm_module_t** new_module_list = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_allocator_malloc(context->allocator,
                                   sizeof(iree_vm_module_t*) * new_capacity,
                                   (void**)&new_module_list));
-    iree_vm_module_state_t** new_module_state_list;
+    iree_vm_module_state_t** new_module_state_list = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0,
         iree_allocator_malloc(context->allocator,

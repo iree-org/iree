@@ -24,20 +24,43 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>} {
   // CHECK-LABEL: spv.module
-  // CHECK: spv.GlobalVariable @__resource_var_3_4_ bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.GlobalVariable @__resource_var_1_2__0 bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.GlobalVariable @__resource_var_1_2_ bind(1, 2) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[ARG0:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[ARG1_0:.+]] bind(1, 3) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[ARG1_1:.+]] bind(1, 3) {aliased} : !spv.ptr<!spv.struct<(!spv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[RET0:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
   // CHECK: spv.func @resource_bindings_in_same_entry_func()
   func @resource_bindings_in_same_entry_func() {
     %c0 = constant 0 : index
+
+    // Same type
+    // CHECK: spv.mlir.addressof @[[ARG0]]
+    // CHECK: spv.mlir.addressof @[[ARG0]]
     %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32>
     %1 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32>
-    %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4x4xf32>
+
+    // Different type
+    // CHECK: spv.mlir.addressof @[[ARG1_0]]
+    // CHECK: spv.mlir.addressof @[[ARG1_1]]
+    %2 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4x4xf32>
+    %3 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4xvector<4xf32>>
+
+    // CHECK: spv.mlir.addressof @[[RET0]]
+    %4 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4x4xf32>
+
+    %5 = memref.load %0[%c0, %c0] : memref<4x4xf32>
+    %6 = memref.load %1[%c0, %c0] : memref<4x4xf32>
+
+    %7 = memref.load %2[%c0, %c0] : memref<4x4xf32>
+    %8 = memref.load %3[%c0] : memref<4xvector<4xf32>>
+
+    %9 = memref.load %4[%c0, %c0] : memref<4x4xf32>
+
     return
   }
 
   hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }
 }
@@ -46,18 +69,22 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>
 
 module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>} {
   // CHECK-LABEL: spv.module
-  // CHECK: spv.GlobalVariable @[[FUNC2_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.GlobalVariable @[[FUNC2_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-  // CHECK: spv.GlobalVariable @[[FUNC1_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
   // CHECK: spv.GlobalVariable @[[FUNC1_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[FUNC1_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[FUNC2_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+  // CHECK: spv.GlobalVariable @[[FUNC2_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
 
   // CHECK: spv.func @resource_bindings_in_entry_func1()
   func @resource_bindings_in_entry_func1() {
-    // CHECK: spv.mlir.addressof @[[FUNC1_ARG:.+]]
-    // CHECK: spv.mlir.addressof @[[FUNC1_RET:.+]]
+    // CHECK: spv.mlir.addressof @[[FUNC1_ARG]]
+    // CHECK: spv.mlir.addressof @[[FUNC1_RET]]
     %c0 = constant 0 : index
     %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32>
     %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4xvector<4xf32>>
+
+    %2 = memref.load %0[%c0, %c0] : memref<4x4xf32>
+    %3 = memref.load %1[%c0] : memref<4xvector<4xf32>>
+
     return
   }
 
@@ -66,8 +93,12 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>
     // CHECK: spv.mlir.addressof @[[FUNC2_ARG]]
     // CHECK: spv.mlir.addressof @[[FUNC2_RET]]
     %c0 = constant 0 : index
-    %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32>
-    %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4x4xf32>
+    %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32> // Same type as previous function
+    %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4x4xf32> // Different type as previous function
+
+    %2 = memref.load %0[%c0, %c0] : memref<4x4xf32>
+    %3 = memref.load %1[%c0, %c0] : memref<4x4xf32>
+
     return
   }
 
@@ -85,6 +116,11 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>
     %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<8x5xf32>
     %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<5xf32>
     %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<8x5xf32>
+
+    %3 = memref.load %0[%c0, %c0] : memref<8x5xf32>
+    %4 = memref.load %1[%c0] : memref<5xf32>
+    %5 = memref.load %2[%c0, %c0] : memref<8x5xf32>
+
     return
   }
   hal.interface @io attributes {sym_visibility = "private"} {
@@ -93,14 +129,17 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
+
+// Explicitly check the variable symbols
+
 // CHECK-LABEL: spv.module
-//   CHECK-DAG:   spv.GlobalVariable @[[RET0:.+]] bind(0, 2)
-//   CHECK-DAG:   spv.GlobalVariable @[[ARG1:.+]] bind(0, 1)
-//   CHECK-DAG:   spv.GlobalVariable @[[ARG0:.+]] bind(0, 0)
+//       CHECK:   spv.GlobalVariable @__resource_var_0_0_ bind(0, 0)
+//       CHECK:   spv.GlobalVariable @__resource_var_0_1_ bind(0, 1)
+//       CHECK:   spv.GlobalVariable @__resource_var_0_2_ bind(0, 2)
 //       CHECK:   spv.func
-//   CHECK-DAG:   %{{.+}} = spv.mlir.addressof @[[RET0]]
-//   CHECK-DAG:   %{{.+}} = spv.mlir.addressof @[[ARG0]]
-//   CHECK-DAG:   %{{.+}} = spv.mlir.addressof @[[ARG1]]
+//       CHECK:   %{{.+}} = spv.mlir.addressof @__resource_var_0_0_
+//       CHECK:   %{{.+}} = spv.mlir.addressof @__resource_var_0_1_
+//       CHECK:   %{{.+}} = spv.mlir.addressof @__resource_var_0_2_
 
 // -----
 

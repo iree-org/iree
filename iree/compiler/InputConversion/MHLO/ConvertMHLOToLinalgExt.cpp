@@ -47,51 +47,6 @@ static SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements) {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// Base classes.
-//===----------------------------------------------------------------------===//
-
-template <typename Derived, typename OpTy>
-struct ConvertToLinalgExtPattern : public OpConversionPattern<OpTy> {
-  using OpConversionPattern<OpTy>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      OpTy op, ArrayRef<Value> args,
-      ConversionPatternRewriter &rewriter) const final {
-    Value one = rewriter.create<ConstantIndexOp>(op.getLoc(), 1);
-    SmallVector<Value> workload(3, one);
-
-    // Gather the dynamic dimensions for all operands.
-    SmallVector<Value> operandDynamicDims;
-    for (Value arg : args) {
-      if (auto rt = arg.getType().dyn_cast<RankedTensorType>()) {
-        for (unsigned i = 0; i < rt.getRank(); ++i) {
-          if (!rt.isDynamicDim(i)) continue;
-          auto dim = rewriter.createOrFold<tensor::DimOp>(op.getLoc(), arg, i);
-          operandDynamicDims.push_back(dim);
-        }
-      }
-    }
-
-    auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-        op.getLoc(), workload, op->getResultTypes(),
-        /*result_dims=*/ValueRange{},
-        /*operands=*/args,
-        /*operand_dims=*/operandDynamicDims,
-        /*tied_operands=*/Derived::getTiedResultOperandIndices(args));
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
-      if (failed(Derived::lowerMHLOOp(dispatchOp, op, args, rewriter))) {
-        return failure();
-      }
-      rewriter.create<IREE::Flow::ReturnOp>(op.getLoc());
-    }
-    rewriter.replaceOp(op, dispatchOp.getResults());
-    return success();
-  }
-};
-
-//===----------------------------------------------------------------------===//
 // Region operations lowering.
 //===----------------------------------------------------------------------===//
 
@@ -131,32 +86,15 @@ struct LinalgExtRegionReturnOpConversion
 // SortOp
 //===----------------------------------------------------------------------===//
 
-struct SortOpConversion
-    : public ConvertToLinalgExtPattern<SortOpConversion, mhlo::SortOp> {
-  using ConvertToLinalgExtPattern<SortOpConversion,
-                                  mhlo::SortOp>::ConvertToLinalgExtPattern;
+struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
+  using OpConversionPattern<mhlo::SortOp>::OpConversionPattern;
 
-  static SmallVector<int64_t> getTiedResultOperandIndices(
-      ArrayRef<Value> args) {
-    return llvm::to_vector<4>(llvm::seq<int64_t>(0, args.size()));
-  }
-
-  static LogicalResult lowerMHLOOp(IREE::Flow::DispatchWorkgroupsOp dispatchOp,
-                                   mhlo::SortOp op, ArrayRef<Value> args,
-                                   ConversionPatternRewriter &rewriter) {
-    auto blockArgs = dispatchOp.getClosureBodyRegion().getArguments();
-    SmallVector<Value> initValues;
-    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-    for (auto it : llvm::zip(args, blockArgs)) {
-      auto argTy = std::get<0>(it).getType().cast<RankedTensorType>();
-      auto blockArg = std::get<1>(it);
-      initValues.push_back(
-          b.create<IREE::Flow::DispatchTensorLoadOp>(argTy, blockArg));
-    }
-
-    auto sortOp = b.create<linalg_ext::SortOp>(op.getResultTypes(),
-                                               /*inputs=*/ValueRange{},
-                                               initValues, op.dimensionAttr());
+  LogicalResult matchAndRewrite(
+      mhlo::SortOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const final {
+    auto sortOp = rewriter.create<linalg_ext::SortOp>(
+        op.getLoc(), op.getResultTypes(),
+        /*inputs=*/ValueRange{}, args, op.dimensionAttr());
     rewriter.inlineRegionBefore(op.comparator(), sortOp.region(),
                                 sortOp.region().begin());
     Region &region = sortOp.region();
@@ -169,12 +107,7 @@ struct SortOpConversion
     }
     rewriter.applySignatureConversion(&region, signature_converter);
 
-    for (auto it : llvm::zip(sortOp.getResults(), blockArgs)) {
-      auto value = std::get<0>(it);
-      auto target = std::get<1>(it);
-      b.create<IREE::Flow::DispatchTensorStoreOp>(value, target);
-    }
-
+    rewriter.replaceOp(op, sortOp->getResults());
     return success();
   }
 };
@@ -183,10 +116,8 @@ struct SortOpConversion
 // ScatterOp
 //===----------------------------------------------------------------------===//
 
-struct ScatterOpConversion
-    : public ConvertToLinalgExtPattern<ScatterOpConversion, mhlo::ScatterOp> {
-  using ConvertToLinalgExtPattern<ScatterOpConversion,
-                                  mhlo::ScatterOp>::ConvertToLinalgExtPattern;
+struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
+  using OpConversionPattern<mhlo::ScatterOp>::OpConversionPattern;
 
   /// Returns true if the `dimensionNumbers` from the mhlo.scatter op follows a
   /// canonical form:
@@ -275,28 +206,23 @@ struct ScatterOpConversion
     return success();
   }
 
-  static LogicalResult lowerMHLOOp(IREE::Flow::DispatchWorkgroupsOp dispatchOp,
-                                   mhlo::ScatterOp op, ArrayRef<Value> args,
-                                   ConversionPatternRewriter &rewriter) {
+  LogicalResult matchAndRewrite(
+      mhlo::ScatterOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const final {
     if (!hasCanonicalDimensionNumbers(op)) return failure();
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
     mhlo::ScatterOpAdaptor adaptor(args);
 
-    auto blockArgs = dispatchOp.getClosureBodyRegion().getArguments();
-    Value original = b.create<IREE::Flow::DispatchTensorLoadOp>(
-        adaptor.operand().getType().cast<RankedTensorType>(), blockArgs[0]);
-    Value indices = b.create<IREE::Flow::DispatchTensorLoadOp>(
-        adaptor.scatter_indices().getType().cast<RankedTensorType>(),
-        blockArgs[1]);
-    Value updates = b.create<IREE::Flow::DispatchTensorLoadOp>(
-        adaptor.updates().getType().cast<RankedTensorType>(), blockArgs[2]);
+    Value original = adaptor.operand();
+    Value indices = adaptor.scatter_indices();
+    Value updates = adaptor.updates();
 
     if (failed(collapseBatchDimsIfNeeded(indices, updates, b))) {
       return failure();
     }
-    auto scatterOp = b.create<linalg_ext::ScatterOp>(
-        op->getResultTypes(), ValueRange{updates, indices},
+    auto scatterOp = rewriter.create<linalg_ext::ScatterOp>(
+        op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
         ValueRange{original});
 
     rewriter.inlineRegionBefore(op.update_computation(), scatterOp.region(),
@@ -311,8 +237,7 @@ struct ScatterOpConversion
     signatureConverter.addInputs(0, argType);
     rewriter.applySignatureConversion(&region, signatureConverter);
 
-    b.create<IREE::Flow::DispatchTensorStoreOp>(scatterOp.getResult(0),
-                                                blockArgs[0]);
+    rewriter.replaceOp(op, scatterOp->getResults());
     return success();
   }
 };
@@ -321,9 +246,8 @@ struct ScatterOpConversion
 // Pass
 //===----------------------------------------------------------------------===//
 
-struct ConvertAndDistributeMHLOToLinalgExtPass
-    : public ConvertAndDistributeMHLOToLinalgExtBase<
-          ConvertAndDistributeMHLOToLinalgExtPass> {
+struct ConvertMHLOToLinalgExtPass
+    : public ConvertMHLOToLinalgExtBase<ConvertMHLOToLinalgExtPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg_ext::LinalgExtDialect, linalg::LinalgDialect,
                     IREE::Flow::FlowDialect, StandardOpsDialect,
@@ -354,9 +278,8 @@ struct ConvertAndDistributeMHLOToLinalgExtPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
-createConvertAndDistributeMHLOToLinalgExtPass() {
-  return std::make_unique<ConvertAndDistributeMHLOToLinalgExtPass>();
+std::unique_ptr<OperationPass<FuncOp>> createConvertMHLOToLinalgExtPass() {
+  return std::make_unique<ConvertMHLOToLinalgExtPass>();
 }
 
 }  // namespace iree_compiler

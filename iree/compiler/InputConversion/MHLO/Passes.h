@@ -34,9 +34,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass();
 
-/// Creates XLA-HLO to LinalgExt and Flow transformation pass.
-std::unique_ptr<OperationPass<FuncOp>>
-createConvertAndDistributeMHLOToLinalgExtPass();
+/// Creates XLA-HLO to LinalgExt pass.
+std::unique_ptr<OperationPass<FuncOp>> createConvertMHLOToLinalgExtPass();
 
 /// Creates XLA-HLO preprocessing transformation pass. In this pass we should
 /// have all mhlo -> mhlo transformations that are shared between all
