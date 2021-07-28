@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -61,7 +62,7 @@ static llvm::cl::opt<int> batchMatmulL2TileSize(
     "iree-codegen-llvm-batch-matmul-vector-size",
     llvm::cl::desc("linalg.batch_matmul vector tile size"), llvm::cl::init(4));
 
-static llvm::cl::opt<int> genericOpsWorkgroupTileSize(
+static llvm::cl::opt<int> defaultWorkgroupTileSize(
     "iree-codegen-llvm-generic-ops-workgroup-size",
     llvm::cl::desc(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
@@ -156,34 +157,53 @@ static LogicalResult setRootConfig(
   return success();
 }
 
-/// Legalized the tile sizes for the first-level of tiling
-/// (i.e. workgroup-level) to stay consistent with the distribution done at the
-/// Flow dialect level, where the last `kNumMaxParallelDims` of the outer
-/// parallel loops are distributed.
-static SmallVector<int64_t, 4> getTileSizesForWorkgroupDistribution(
-    int64_t numOuterParallelLoops, ArrayRef<int64_t> workgroupTileSizes) {
-  SmallVector<int64_t, 4> distributedTileSizes =
-      llvm::to_vector<4>(workgroupTileSizes);
-  for (int64_t i = 0; i < numOuterParallelLoops - kNumMaxParallelDims; i++) {
-    distributedTileSizes[i] = 0;
+/// Returns the loops that are partitioned during dispatch region formations, in
+/// order, i.e. starting from the outer-most to innermost.
+/// Note that this is the same method that is used at the Flow dispatch region
+/// formation to tile and distribute the ops.
+static SmallVector<unsigned> getPartitionedLoops(Operation *op) {
+  SmallVector<unsigned> partitionedLoops;
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    size_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
+    partitionedLoops =
+        llvm::to_vector<4>(llvm::seq<unsigned>(0, numOuterParallelLoops));
+    if (partitionedLoops.size() > kNumMaxParallelDims) {
+      partitionedLoops.erase(
+          partitionedLoops.begin(),
+          std::next(partitionedLoops.begin(),
+                    numOuterParallelLoops - kNumMaxParallelDims));
+    }
+    return partitionedLoops;
   }
-  return distributedTileSizes;
+  if (auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op)) {
+    return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
+  }
+  return {};
 }
 
 /// Sets the lowering configuration for dispatch region with root op being a
 /// generic op.
-static LogicalResult setRootConfig(FuncOp entryPointFn,
-                                   linalg::GenericOp genericOp) {
-  if (hasLoweringConfig(genericOp)) return success();
-  int64_t numOuterParallelLoops = getNumOuterParallelLoops(genericOp);
-  SmallVector<int64_t, 4> workgroupTileSizes(numOuterParallelLoops,
-                                             genericOpsWorkgroupTileSize);
-  workgroupTileSizes = getTileSizesForWorkgroupDistribution(
-      numOuterParallelLoops, workgroupTileSizes);
+static LogicalResult setDefaultRootConfig(FuncOp entryPointFn, Operation *op) {
+  if (hasLoweringConfig(op)) return success();
+  auto partitionedLoops = getPartitionedLoops(op);
+  if (partitionedLoops.empty()) {
+    // Return success without doing anything. Eventually default will be used.
+    return success();
+  }
+  unsigned maxDepth = partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSizes(maxDepth,
+                                             defaultWorkgroupTileSize);
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
+    if (!partitionedLoopsSet.count(dim)) {
+      workgroupTileSizes[dim] = 0;
+    }
+  }
   TileSizesListType tileSizes = {workgroupTileSizes};
   IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, ArrayRef<int64_t>{}, genericOp->getContext());
-  setLoweringConfig(genericOp, config);
+      buildConfigAttr(tileSizes, ArrayRef<int64_t>{}, op->getContext());
+  setLoweringConfig(op, config);
   return setTranslationInfo(
       entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization,
       getWorkloadPerWorkgroup(tileSizes[0]));
@@ -192,24 +212,24 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
 /// Finds the root operation in the given list of linalg operations and sets its
 /// configuration. Returns the root operation.
 static LogicalResult setRootConfig(FuncOp entryPointFn,
-                                   ArrayRef<linalg::LinalgOp> linalgOps) {
-  linalg::LinalgOp rootOp = nullptr;
-  for (auto linalgOp : linalgOps) {
-    if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
-    auto status =
-        TypeSwitch<Operation *, LogicalResult>(linalgOp.getOperation())
-            .Case<linalg::ContractionOpInterface>(
-                [&](auto op) { return setRootConfig(entryPointFn, op); })
-            .Default([](Operation *) { return success(); });
+                                   ArrayRef<Operation *> computeOps) {
+  Operation *rootOp = nullptr;
+  for (auto computeOp : computeOps) {
+    if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
+    auto status = TypeSwitch<Operation *, LogicalResult>(computeOp)
+                      .Case<linalg::ContractionOpInterface>([&](auto op) {
+                        return setRootConfig(entryPointFn, op);
+                      })
+                      .Default([](Operation *) { return success(); });
     if (failed(status)) {
       return status;
     }
-    if (hasLoweringConfig(linalgOp)) {
+    if (hasLoweringConfig(computeOp)) {
       if (rootOp) {
-        return linalgOp.emitError(
+        return computeOp->emitError(
             "unhandled multiple roots in dispatch region");
       }
-      rootOp = linalgOp;
+      rootOp = computeOp;
       continue;
     }
   }
@@ -217,19 +237,20 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
   // If no root operation found, check if the dispatch region contains a single
   // generic op and chose pipeline based on that.
   if (!rootOp) {
-    for (auto linalgOp : linalgOps) {
-      if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
-      auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
-      if (!genericOp) continue;
-      if (failed(setRootConfig(entryPointFn, genericOp))) {
+    for (auto computeOp : computeOps) {
+      if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
+      // Ignore fill ops. They never end up in their own dispatch, so are never
+      // root ops.
+      if (isa<linalg::FillOp>(computeOp)) continue;
+      if (failed(setDefaultRootConfig(entryPointFn, computeOp))) {
         return failure();
       }
-      if (hasLoweringConfig(genericOp)) {
+      if (hasLoweringConfig(computeOp)) {
         if (rootOp) {
-          return genericOp.emitError(
+          return computeOp->emitError(
               "unhandled multiple roots in dispatch region");
         }
-        rootOp = genericOp;
+        rootOp = computeOp;
         continue;
       }
     }
@@ -243,12 +264,12 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
-    SmallVector<linalg::LinalgOp, 4> linalgOps;
+    SmallVector<Operation *, 4> computeOps;
     SmallVector<Operation *, 4> tiledLoops;
     // If there are no linalg ops, not using Linalg based lowering.
-    if (succeeded(getLinalgOps(funcOp, linalgOps, tiledLoops)) &&
-        !linalgOps.empty()) {
-      if (failed(setRootConfig(funcOp, linalgOps))) {
+    if (succeeded(getComputeOps(funcOp, computeOps, tiledLoops)) &&
+        !computeOps.empty()) {
+      if (failed(setRootConfig(funcOp, computeOps))) {
         return failure();
       }
     }
