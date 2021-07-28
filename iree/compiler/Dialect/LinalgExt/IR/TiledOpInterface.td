@@ -85,6 +85,10 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
         /*desc=*/[{
           Generates a tiled version of the operation given the tile
           size for the loops.
+
+          Returns the tiled operation generated. If the operation has
+          tensor semantics then the result of the tiled values are to
+          be inserted into the `outputs` and return in `results`.
         }],
         /*retType=*/"Operation *",
         /*methodName=*/"getTiledImplementation",
@@ -93,8 +97,7 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
             "ValueRange ":$outputs,
             "ArrayRef<OpFoldResult> ":$offsets,
             "ArrayRef<OpFoldResult> ":$sizes,
-            "SmallVectorImpl<SmallVector<OpFoldResult, 4>> &":$resultOffsets,
-            "SmallVectorImpl<SmallVector<OpFoldResult, 4>> &":$resultSizes),
+            "SmallVectorImpl<Value> &":$results),
         /*methodBody=*/"",
         /*defaultImplementation=*/[{
           return nullptr;
