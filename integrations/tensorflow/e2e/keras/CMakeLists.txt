@@ -9,7 +9,7 @@
 ################################################################################
 
 iree_add_all_subdirs()
-
+return()
 file(GLOB _GLOB_X_TEST_PY LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *_test.py)
 file(GLOB _GLOB_KEYWORD_SPOTTING_STREAMING_TEST_PY LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS keyword_spotting_streaming_test.py)
 list(REMOVE_ITEM _GLOB_X_TEST_PY ${_GLOB_KEYWORD_SPOTTING_STREAMING_TEST_PY})

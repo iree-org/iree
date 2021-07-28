@@ -14,11 +14,18 @@ load(
     "@iree//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
     "iree_e2e_cartesian_product_test_suite",
 )
+load("@iree//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+# Keras tests are crashing the CI. These need to be pruned to a targetted set.
+iree_cmake_extra_content(
+    content = """return()""",
+    inline = True,
 )
 
 [
