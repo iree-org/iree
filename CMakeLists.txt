@@ -327,7 +327,7 @@ endif()
 #-------------------------------------------------------------------------------
 
 execute_process(
-  COMMAND python --version && python scripts/git/check_submodule_init.py
+  COMMAND !(python --version) || python scripts/git/check_submodule_init.py
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   RESULT_VARIABLE ret
 )
