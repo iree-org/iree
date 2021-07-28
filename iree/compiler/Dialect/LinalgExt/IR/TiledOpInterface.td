@@ -19,6 +19,22 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
   let methods = [
       InterfaceMethod<
         /*desc=*/[{
+          Returns the destination operands. For op with `memref`
+          operands, this is the result buffers. For op with `tensor`
+          operands, this is the operands that contain the initial
+          value for the result. These are "tied" to the result
+          buffers. For example, for a `LinalgOp`/`LinalgExt` ops, it
+          is the `outs` parameters. For `tensor.insert_slice`, it is
+          the `dest` parameter.
+        }],
+        /*retType=*/"SmallVector<Value>",
+        /*methodName=*/"getDestinationOperands",
+        /*args=*/(ins),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/"return ValueRange{};"
+      >,
+      InterfaceMethod<
+        /*desc=*/[{
           Returns a list of `StringRef`s that describe the number of
           loops and the iterator types of the operation. The list is
           expected to use
@@ -36,6 +52,34 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
         /*retTy=*/"SmallVector<Range>",
         /*methodName=*/"getLoopBounds",
         /*args=*/(ins "OpBuilder &":$b)
+      >,
+      InterfaceMethod<
+        /*desc=*/[{
+          Return the loops that are to be distributed given the
+          maximum amount of logical processor dimensions available.
+        }],
+        /*retTy=*/"SmallVector<unsigned>",
+        /*methodName=*/"getPartitionableLoops",
+        /*args=*/(ins "unsigned ":$maxNumParallelDims),
+        /*methodBody=*/"",
+        /*defaultImplementation=*/[{
+           SmallVector<unsigned> partitionableLoops;
+           auto interfaceOp = cast<TiledOpInterface>($_op.getOperation());
+           for (auto iteratorType :
+               llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
+             if (iteratorType.value() != getParallelIteratorTypeName()) {
+               break;
+             }
+             partitionableLoops.push_back(iteratorType.index());
+           }
+           if (partitionableLoops.size() > maxNumParallelDims) {
+             partitionableLoops.erase(
+               partitionableLoops.begin(),
+               std::next(partitionableLoops.begin(),
+                   partitionableLoops.size() - maxNumParallelDims));
+           }
+           return partitionableLoops;
+        }]
       >,
       InterfaceMethod<
         /*desc=*/[{

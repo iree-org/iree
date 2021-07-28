@@ -20,13 +20,20 @@ static const char* kCUDALoaderSearchNames[] = {
 #endif
 };
 
+#define concat(A, B) A B
+
+// Load CUDA entry points, prefer _v2 version if it exists.
 static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
     iree_hal_cuda_dynamic_symbols_t* syms) {
-#define CU_PFN_DECL(cudaSymbolName, ...)                              \
-  {                                                                   \
-    static const char* kName = #cudaSymbolName;                       \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(          \
-        syms->loader_library, kName, (void**)&syms->cudaSymbolName)); \
+#define CU_PFN_DECL(cudaSymbolName, ...)                                       \
+  {                                                                            \
+    static const char* kName = #cudaSymbolName;                                \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(                   \
+        syms->loader_library, kName, (void**)&syms->cudaSymbolName));          \
+    static const char* kNameV2 = concat(#cudaSymbolName, "_v2");               \
+    void* funV2;                                                               \
+    iree_dynamic_library_lookup_symbol(syms->loader_library, kNameV2, &funV2); \
+    if (funV2) syms->cudaSymbolName = funV2;                                   \
   }
 #include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL

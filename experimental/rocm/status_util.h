@@ -44,7 +44,7 @@ extern "C" {
 
 // Converts a hipError_t to a Status object.
 iree_status_t iree_hal_rocm_result_to_status(
-    iree_hal_rocm_dynamic_symbols_t *syms, hipError_t result, const char *file,
+    iree_hal_rocm_dynamic_symbols_t* syms, hipError_t result, const char* file,
     uint32_t line);
 
 #ifdef __cplusplus

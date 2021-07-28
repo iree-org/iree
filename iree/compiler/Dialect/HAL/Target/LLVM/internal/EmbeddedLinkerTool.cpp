@@ -80,7 +80,7 @@ class EmbeddedLinkerTool : public LinkerTool {
 
     // Create the shared object name; if we only have a single input object we
     // can just reuse that.
-    if (objectFiles.size() == 1) {
+    if (!objectFiles.empty()) {
       artifacts.libraryFile =
           Artifact::createVariant(objectFiles.front().path, "so");
     } else {

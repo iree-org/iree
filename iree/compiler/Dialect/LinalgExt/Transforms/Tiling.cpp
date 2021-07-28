@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
@@ -227,14 +228,17 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
   return innerReturnValue;
 }
 
-FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, Operation *op, ValueRange dest,
+FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options) {
-  TiledOpInterface tilableOp = dyn_cast<TiledOpInterface>(op);
-  if (!tilableOp) return TiledOp{};
+  SmallVector<Value> dest = tilableOp.getDestinationOperands();
+  if (dest.empty()) {
+    return static_cast<LogicalResult>(tilableOp.emitOpError(
+        "cannot tile operation without destination operands"));
+  }
 
   SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
   SmallVector<Value, 4> tileSizesVals =
-      options.tileSizeComputationFunction(b, op);
+      options.tileSizeComputationFunction(b, tilableOp);
   auto zeroAttr = b.getI64IntegerAttr(0);
 
   // The actual tile sizes used converts `Value` defined as constant 0, to a
@@ -252,7 +256,7 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, Operation *op, ValueRange dest,
 
   // Trivial early exit case of tile sizes being zero for all parallel loops.
   if (llvm::all_of(tileSizes, isUntiledLoop)) {
-    return TiledOp{op, {}, {}};
+    return TiledOp{tilableOp, {}, {}};
   }
 
   SmallVector<Range> loopBounds = tilableOp.getLoopBounds(b);
@@ -286,6 +290,12 @@ namespace {
 struct InsertSliceTiledOpInterface
     : public TiledOpInterface::ExternalModel<InsertSliceTiledOpInterface,
                                              tensor::InsertSliceOp> {
+  SmallVector<Value> getDestinationOperands(Operation *op) const {
+    SmallVector<Value> dest;
+    dest.push_back(cast<tensor::InsertSliceOp>(op).dest());
+    return dest;
+  }
+
   SmallVector<StringRef> getLoopIteratorTypes(Operation *op) const {
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
     return SmallVector<StringRef>(insertSliceOp.getSourceType().getRank(),
@@ -380,77 +390,25 @@ struct InsertSliceTiledOpInterface
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Base pattern for tiling TiledOpInterfaceOps.
-struct TiledOpInterfaceBaseTilingPattern : public RewritePattern {
-  TiledOpInterfaceBaseTilingPattern(StringRef opName, MLIRContext *context,
-                                    linalg::LinalgTilingOptions options,
-                                    linalg::LinalgTransformationFilter filter =
-                                        linalg::LinalgTransformationFilter(),
-                                    PatternBenefit benefit = 1)
-      : RewritePattern(opName, benefit, context),
-        filter(filter),
-        options(options) {}
-
-  LogicalResult matchAndRewriteBase(Operation *op, ValueRange dest,
-                                    PatternRewriter &rewriter,
-                                    TiledOp &result) const;
-
- private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  linalg::LinalgTransformationFilter filter;
-  /// Options to control tiling;
-  linalg::LinalgTilingOptions options;
-};
 
 template <typename OpTy>
-struct LinalgExtTilingPattern : public TiledOpInterfaceBaseTilingPattern {
-  LinalgExtTilingPattern(MLIRContext *context,
-                         linalg::LinalgTilingOptions options,
-                         linalg::LinalgTransformationFilter filter =
-                             linalg::LinalgTransformationFilter(),
-                         PatternBenefit benefit = 1)
-      : TiledOpInterfaceBaseTilingPattern(OpTy::getOperationName(), context,
-                                          options, filter, benefit) {}
+struct TiledOpInterfaceTilingPattern
+    : public TiledOpInterfaceBaseTilingPattern {
+  TiledOpInterfaceTilingPattern(MLIRContext *context,
+                                linalg::LinalgTilingOptions options,
+                                linalg::LinalgTransformationFilter filter =
+                                    linalg::LinalgTransformationFilter(),
+                                PatternBenefit benefit = 1)
+      : TiledOpInterfaceBaseTilingPattern(context, options, filter, benefit) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    auto linalgExtOp = cast<LinalgExtOp>(op);
+    auto tilableOp = dyn_cast<TiledOpInterface>(op);
+    if (!tilableOp) return failure();
     TiledOp tiledOp;
     // Check for failure.
     if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
-            op, linalgExtOp.outputs(), rewriter, tiledOp))) {
-      return failure();
-    }
-    // Check for do-nothing case.
-    if (!tiledOp.op) return failure();
-    if (tiledOp.op != op) {
-      if (tiledOp.results.empty()) {
-        rewriter.eraseOp(op);
-      } else {
-        rewriter.replaceOp(op, tiledOp.results);
-      }
-    }
-    return success();
-  }
-};
-
-struct InsertSliceTilingPattern : public TiledOpInterfaceBaseTilingPattern {
-  InsertSliceTilingPattern(MLIRContext *context,
-                           linalg::LinalgTilingOptions options,
-                           linalg::LinalgTransformationFilter filter =
-                               linalg::LinalgTransformationFilter(),
-                           PatternBenefit benefit = 1)
-      : TiledOpInterfaceBaseTilingPattern(
-            tensor::InsertSliceOp::getOperationName(), context, options, filter,
-            benefit) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    tensor::InsertSliceOp insertSliceOp = cast<tensor::InsertSliceOp>(op);
-    TiledOp tiledOp;
-    // Check for failure.
-    if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
-            insertSliceOp, insertSliceOp.dest(), rewriter, tiledOp))) {
+            op, rewriter, tiledOp))) {
       return failure();
     }
     // Check for do-nothing case.
@@ -468,14 +426,14 @@ struct InsertSliceTilingPattern : public TiledOpInterfaceBaseTilingPattern {
 }  // namespace
 
 LogicalResult TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
-    Operation *op, ValueRange dest, PatternRewriter &rewriter,
+    TiledOpInterface tilableOp, PatternRewriter &rewriter,
     TiledOp &result) const {
-  if (failed(filter.checkAndNotify(rewriter, op))) return failure();
-  if (failed(verifySupportedTilingOptions(rewriter, op, options))) {
+  if (failed(filter.checkAndNotify(rewriter, tilableOp))) return failure();
+  if (failed(verifySupportedTilingOptions(rewriter, tilableOp, options))) {
     return failure();
   }
 
-  FailureOr<TiledOp> res = tileInterfaceOp(rewriter, op, dest, options);
+  FailureOr<TiledOp> res = tileInterfaceOp(rewriter, tilableOp, options);
   if (failed(res)) return res;
   result = *res;
   if (result.op) {
@@ -494,8 +452,8 @@ struct TiledOpInterfaceTilingPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                memref::MemRefDialect, StandardOpsDialect,
-                tensor::TensorDialect, scf::SCFDialect>();
+                linalg_ext::LinalgExtDialect, memref::MemRefDialect,
+                StandardOpsDialect, tensor::TensorDialect, scf::SCFDialect>();
   }
 
   LogicalResult initialize(MLIRContext *context) override;
@@ -517,26 +475,25 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
   FuncOp funcOp = getOperation();
   MLIRContext *context = funcOp.getContext();
 
-  tensor::InsertSliceOp::attachInterface<InsertSliceTiledOpInterface>(*context);
-
   RewritePatternSet patterns(context);
-  patterns.add<LinalgExtTilingPattern<ScatterOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern<ScatterOp>,
+               TiledOpInterfaceTilingPattern<tensor::InsertSliceOp>>(
       context, linalg::LinalgTilingOptions().setTileSizes({10, 20}),
       linalg::LinalgTransformationFilter(
           Identifier::get("tiling_input", context),
           Identifier::get("tiling_output", context)));
-  patterns.add<LinalgExtTilingPattern<ScatterOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern<ScatterOp>>(
       context, linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{0}),
       linalg::LinalgTransformationFilter(
           Identifier::get("no_tiling_input", context),
           Identifier::get("no_tiling_output", context)));
 
-  patterns.add<LinalgExtTilingPattern<SortOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern<SortOp>>(
       context, linalg::LinalgTilingOptions().setTileSizes({0, 20}),
       linalg::LinalgTransformationFilter(
           Identifier::get("outer_reduce_input", context),
           Identifier::get("outer_reduce_output", context)));
-  patterns.add<LinalgExtTilingPattern<SortOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern<SortOp>>(
       context, linalg::LinalgTilingOptions().setTileSizes({10, 0, 0}),
       linalg::LinalgTransformationFilter(
           Identifier::get("inner_reduce_input", context),
@@ -561,21 +518,15 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
       DenseMap<StringRef,
                std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 
-  patterns
-      .add<LinalgExtTilingPattern<ScatterOp>, LinalgExtTilingPattern<SortOp>>(
-          context,
-          linalg::LinalgTilingOptions()
-              .setTileSizes(ArrayRef<int64_t>{10, 0, 30})
-              .setDistributionOptions(workgroupDistributionOptions),
-          linalg::LinalgTransformationFilter(
-              Identifier::get("distribute_input", context),
-              Identifier::get("distribute_output", context)));
-
-  patterns.add<InsertSliceTilingPattern>(
-      context, linalg::LinalgTilingOptions().setTileSizes({10, 20}),
+  patterns.add<TiledOpInterfaceTilingPattern<ScatterOp>,
+               TiledOpInterfaceTilingPattern<SortOp>>(
+      context,
+      linalg::LinalgTilingOptions()
+          .setTileSizes(ArrayRef<int64_t>{10, 0, 30})
+          .setDistributionOptions(workgroupDistributionOptions),
       linalg::LinalgTransformationFilter(
-          Identifier::get("tiling_input", context),
-          Identifier::get("tiling_output", context)));
+          Identifier::get("distribute_input", context),
+          Identifier::get("distribute_output", context)));
 
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();

@@ -89,5 +89,8 @@ iree_cc_library(
 if(${MSVC})
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "amd64.*|x86_64.*|AMD64.*")
     target_sources(iree_hal_local_elf_arch PRIVATE "arch/x86_64_msvc.asm")
+    set_source_files_properties(
+        arch/x86_64_msvc.asm
+        PROPERTIES LANGUAGE ASM_MASM)
   endif()
 endif()

@@ -48,6 +48,8 @@ cc_library(
         "nop_executable_cache.h",
         "status_util.c",
         "status_util.h",
+        "stream_command_buffer.c",
+        "stream_command_buffer.h",
     ],
     hdrs = [
         "api.h",
@@ -59,9 +61,11 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:arena",
         "//iree/base/internal:flatcc",
         "//iree/base/internal:synchronization",
         "//iree/hal",
+        "//iree/hal/utils:deferred_command_buffer",
         "//iree/schemas:cuda_executable_def_c_fbs",
     ],
 )

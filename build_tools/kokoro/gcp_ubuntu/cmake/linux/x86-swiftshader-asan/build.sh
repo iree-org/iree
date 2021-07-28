@@ -88,6 +88,7 @@ if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then
 fi
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
+  label_exclude_args+=("^uses_cuda_runtime$")
 fi
 if [[ "${IREE_VULKAN_F16_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
