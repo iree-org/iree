@@ -322,6 +322,20 @@ if(${IREE_BUILD_COMPILER} OR
 endif()
 
 #-------------------------------------------------------------------------------
+# Check if git submodules have been initialized.
+# This will only run if python/python3 is available
+#-------------------------------------------------------------------------------
+
+execute_process(
+  COMMAND python --version && python scripts/git/check_submodule_init.py
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  RESULT_VARIABLE ret
+)
+if(NOT ret EQUAL "0")
+  message(FATAL_ERROR "check_submodule_init.py failed with code: ${ret}")
+endif()
+
+#-------------------------------------------------------------------------------
 # MLIR/LLVM Dependency
 # We treat the LLVM dependency specially because we support several different
 # ways to use it:
