@@ -282,7 +282,7 @@ iree_run_binary_test(
   NAME
     "simple_embedding_cuda_test"
   LABELS
-    "uses_cuda_runtime"
+    "driver=cuda"
   TEST_BINARY
     ::simple_embedding_cuda
 )

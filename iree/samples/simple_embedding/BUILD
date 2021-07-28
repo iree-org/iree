@@ -303,7 +303,7 @@ iree_bytecode_module(
 run_binary_test(
     name = "simple_embedding_cuda_test",
     tags = [
-        "uses_cuda_runtime",
+        "driver=cuda",
     ],
     test_binary = ":simple_embedding_cuda",
 )
