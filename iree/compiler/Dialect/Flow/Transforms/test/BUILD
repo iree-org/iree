@@ -38,7 +38,6 @@ iree_lit_test_suite(
             "pad_tensor_to_tensor.mlir",
             "promote_i1_to_i8.mlir",
             "promote_tensor_loads.mlir",
-            "simplify_variable_accesses.mlir",
             "strip_and_splat_constant_variables.mlir",
             "transformation.mlir",
         ],
