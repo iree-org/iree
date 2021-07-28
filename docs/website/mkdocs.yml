@@ -73,6 +73,7 @@ copyright: Copyright &copy; 2021 The IREE Authors
 markdown_extensions:
   - abbr
   - admonition
+  - attr_list
   - footnotes
   - meta
   - pymdownx.details
@@ -115,3 +116,5 @@ nav:
       - TensorFlow Lite: 'bindings/tensorflow-lite.md'
   - 'Community':
       - Projects: 'community/projects.md'
+  - 'Blog':
+      - TFLite Suport via TOSA: 'blog/2021-07-19-tflite-tosa.md'
