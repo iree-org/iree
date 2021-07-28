@@ -59,7 +59,7 @@ iree_status_t iree_hal_cuda_buffer_wrap(
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
