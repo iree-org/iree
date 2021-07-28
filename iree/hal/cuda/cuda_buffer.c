@@ -95,7 +95,7 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
   if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
-    memset(data_ptr + local_byte_offset, 0xCD, local_byte_length);
+    memset(data_ptr, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
   *out_data_ptr = data_ptr;
