@@ -44,7 +44,6 @@ declare -a default_test_tag_filters=("-nokokoro" "-driver=metal")
 # We test on SwiftShader, which does not support this extension.
 default_test_tag_filters+=("-vulkan_uses_vk_khr_shader_float16_int8")
 # CUDA CI testing disabled until we setup a target for it.
-default_test_tag_filters+=("-uses_cuda_runtime")
 default_test_tag_filters+=("-driver=cuda")
 
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then

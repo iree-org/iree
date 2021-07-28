@@ -54,7 +54,6 @@ export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
-export IREE_CUDA_RUNTIME_DISABLE=${IREE_CUDA_RUNTIME_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
 # We test on SwiftShader, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
@@ -89,8 +88,6 @@ if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then
 fi
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
-fi
-if [[ "${IREE_CUDA_RUNTIME_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^uses_cuda_runtime$")
 fi
 if [[ "${IREE_VULKAN_F16_DISABLE?}" == 1 ]]; then
