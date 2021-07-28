@@ -87,7 +87,8 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
   SymbolTable symbolTable(module);
   InterfaceResourceMap interfaceToResourceVars;
 
-  for (FuncOp func : module.getOps<FuncOp>()) {
+  auto fns = llvm::to_vector<1>(module.getOps<FuncOp>());
+  for (FuncOp func : llvm::reverse(fns)) {
     // Collect all interface ops and their (set, binding) pairs in this
     // function. Use SmallVector here for a deterministic order.
     SmallVector<IREE::HAL::InterfaceBindingSubspanOp, 8> interfaceOps;
@@ -112,7 +113,7 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
                    spirv::GlobalVariableOp>
         resourceVars;
 
-    for (unsigned i = 0; i < interfaceOps.size(); ++i) {
+    for (int i = interfaceOps.size() - 1; i >= 0; --i) {
       auto interfaceOp = interfaceOps[i];
       const auto &setBinding = setBindings[i];
 
