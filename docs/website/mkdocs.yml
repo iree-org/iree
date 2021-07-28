@@ -117,4 +117,4 @@ nav:
   - 'Community':
       - Projects: 'community/projects.md'
   - 'Blog':
-      - TFLite Suport via TOSA: 'blog/2021-07-19-tflite-tosa.md'
+      - TFLite Support via TOSA: 'blog/2021-07-19-tflite-tosa.md'
