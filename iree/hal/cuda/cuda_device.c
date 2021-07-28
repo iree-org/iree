@@ -214,7 +214,7 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
         mode, command_categories, &device->block_pool,
         iree_hal_device_host_allocator(base_device), out_command_buffer);
   }
-  return iree_hal_cuda_graph_command_buffer_allocate(
+  return iree_hal_cuda_graph_command_buffer_create(
       &device->context_wrapper, mode, command_categories, queue_affinity,
       out_command_buffer);
 }

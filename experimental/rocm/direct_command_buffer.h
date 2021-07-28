@@ -30,7 +30,7 @@ typedef struct {
 } hip_launch_params;
 
 // Creates a rocm direct command buffer.
-iree_status_t iree_hal_rocm_direct_command_buffer_allocate(
+iree_status_t iree_hal_rocm_direct_command_buffer_create(
     iree_hal_rocm_context_wrapper_t *context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
