@@ -17,12 +17,11 @@ extern "C" {
 #endif  // __cplusplus
 
 // Creates a device that owns and manages its own CUcontext.
-iree_status_t iree_hal_cuda_device_create(iree_hal_driver_t* driver,
-                                          iree_string_view_t identifier,
-                                          iree_hal_cuda_dynamic_symbols_t* syms,
-                                          CUdevice device,
-                                          iree_allocator_t host_allocator,
-                                          iree_hal_device_t** out_device);
+iree_status_t iree_hal_cuda_device_create(
+    iree_hal_driver_t* driver, iree_string_view_t identifier,
+    const iree_hal_cuda_device_params_t* params,
+    iree_hal_cuda_dynamic_symbols_t* syms, CUdevice device,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 #ifdef __cplusplus
 }  // extern "C"
