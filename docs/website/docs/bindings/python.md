@@ -10,11 +10,16 @@ components:
 | `iree-tools-tf-snapshot`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
 | `iree-tools-tflite-snapshot` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
 | `iree-tools-xla-snapshot`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |
+| `iree-jax-snapshot`          | Tools for importing from [JAX](https://github.com/google/jax)               |
 
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-<!-- TODO(??): Which package for JAX? -->
+!!! warning
+    The TensorFlow, TensorFlow Lite, and XLA packages are currently only
+    available on Linux and macOS. They are not available on Windows yet (see
+    [this issue](https://github.com/google/iree/issues/6417)).
+
 <!-- TODO(??): API references for packages/modules -->
 <!-- TODO(??): at least link to source code and sample Colab notebooks for now -->
 <!-- TODO(??): link to frontend docs -->
