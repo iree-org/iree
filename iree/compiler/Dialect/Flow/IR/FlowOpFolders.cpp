@@ -712,6 +712,26 @@ struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
   }
 };
 
+struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
+  using OpRewritePattern<TensorSplatOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorSplatOp splatOp,
+                                PatternRewriter &rewriter) const override {
+    if (!splatOp.result().hasOneUse()) return failure();
+
+    auto reshapeOp = dyn_cast_or_null<TensorReshapeOp>(
+        splatOp.result().use_begin()->getOwner());
+    if (!reshapeOp) return failure();
+
+    rewriter.replaceOpWithNewOp<TensorSplatOp>(
+        reshapeOp, reshapeOp.result().getType(), splatOp.value(),
+        reshapeOp.result_dims());
+    rewriter.eraseOp(splatOp);
+
+    return success();
+  }
+};
+
 }  // namespace
 
 void TensorReshapeOp::getCanonicalizationPatterns(
@@ -759,6 +779,12 @@ OpFoldResult TensorStoreOp::fold(ArrayRef<Attribute> operands) {
     }
   }
   return {};
+}
+
+void TensorSplatOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  // TODO(benvanik): canonicalize splat+slice to smaller splat.
+  results.insert<FoldSplatReshapeIntoSplat>(context);
 }
 
 OpFoldResult TensorSplatOp::fold(ArrayRef<Attribute> operands) {
