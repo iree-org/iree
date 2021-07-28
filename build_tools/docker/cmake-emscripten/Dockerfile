@@ -28,8 +28,13 @@ ENV EM_CONFIG=${EMSDK}/.emscripten
 ENV EM_CACHE=${EM_DATA}/cache
 ENV EM_PORTS=${EM_DATA}/ports
 # Emscripten writes into its cache location (outside of the CMake build
-# directory). We need to grant broad write permissions to this directory to be
-# able to run our scripts under different users.
+# directory).
+# We can either
+#   (A) Grant broad write permissions to the cache directory to be able to run
+#       our scripts under different users.
+#   (B) Mount a user home directory when using the image.
+# Since (A) requires less configuration, we'll do that. If multiple tools would
+# want a user directory (like Bazel), we should switch to (B).
 # See https://github.com/emscripten-core/emsdk/issues/535
 RUN mkdir -p ${EM_CACHE} && chmod -R 777 ${EM_CACHE}
 
