@@ -124,11 +124,6 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
     bool isScalarUpdate() {
       return getUpdateSliceRank() == 0;
     }
-
-    void generateScalarUpdateLoopBody(OpBuilder & b, Location loc,
-                                      ValueRange ivs);
-    void generateSliceUpdateLoopBody(OpBuilder & b, Location loc,
-                                      ValueRange ivs);
   }];
 }
 

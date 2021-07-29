@@ -46,24 +46,40 @@ ArrayRef<int64_t> getUntiledShape(Value tiledView);
 ///   ...
 ///   scf.for ... {
 ///     ...
-///     linalg.
+///     filtered_op.
 ///     ...
-///     linalg.
+///     filtered_op.
 ///     ...
 ///   }
 /// }
 ///
-/// Returns the list of linalg operations in the functions. If there are no
+/// Returns the list of filtered operations in the functions. If there are no
 /// `scf.for` operations in the function return the linalg operations in the
 /// body of the function if it has a single basic block. Return failure in all
 /// other cases.
-///
+using RootOpFilteringFn = std::function<bool(Operation *)>;
+LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
+                             SmallVectorImpl<Operation *> &filteredOps,
+                             SmallVectorImpl<Operation *> &tiledLoops);
+
+/// Specialization of `getFilteredOps` for filtering `LinalgOp`s and
+/// `LinagExtOp`s.
+/// TODO(ravishankarm) This methods also adds the "workgroup" marker to all ops
+/// within the loop. The marker is the way to tie into rest of the
+/// codegen. Refactor the downstream passes and get rid of the markers once and
+/// for all.
+LogicalResult getComputeOps(FuncOp funcOp,
+                            SmallVectorImpl<Operation *> &computeOps,
+                            SmallVectorImpl<Operation *> &tiledLoops);
+
+/// ***Legacy method to be deprecated***
+/// Specialization of `getFilteredOps` for filtering `LinalgOp`s
 /// TODO(ravishankarm) This methods also adds the "workgroup" marker to all ops
 /// within the loop. The marker is the way to tie into rest of the
 /// codegen. Refactor the downstream passes and get rid of the markers once and
 /// for all.
 LogicalResult getLinalgOps(FuncOp funcOp,
-                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
+                           SmallVectorImpl<linalg::LinalgOp> &computeOps,
                            SmallVectorImpl<Operation *> &tiledLoops);
 
 }  // namespace iree_compiler

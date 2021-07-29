@@ -192,15 +192,21 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
 }
 
 SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
-  return {getParallelIteratorTypeName()};
+  SmallVector<StringRef> iteratorTypes(getUpdateType().getRank(),
+                                       getParallelIteratorTypeName());
+  return iteratorTypes;
 }
 
 SmallVector<Range> ScatterOp::getLoopBounds(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<ConstantIndexOp>(loc, 0);
   Value one = builder.create<ConstantIndexOp>(loc, 1);
-  Value ub = getDimValue(builder, loc, updates(), 0);
-  return {Range{zero, ub, one}};
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
+    Value ub = getDimValue(builder, loc, updates(), dim);
+    ranges.emplace_back(Range{zero, ub, one});
+  }
+  return ranges;
 }
 
 Operation *ScatterOp::getTiledImplementation(OpBuilder &builder,
@@ -208,29 +214,22 @@ Operation *ScatterOp::getTiledImplementation(OpBuilder &builder,
                                              ArrayRef<OpFoldResult> offsets,
                                              ArrayRef<OpFoldResult> sizes,
                                              SmallVectorImpl<Value> &results) {
-  assert(outputs.size() == 1 && offsets.size() == 1 && sizes.size() == 1);
+  assert(outputs.size() >= 1 && offsets.size() >= 1 && sizes.size() >= 1);
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
   auto oneAttr = builder.getI64IntegerAttr(1);
 
   // Slice of the updates.
   auto updateRank = getUpdateType().getRank();
-  SmallVector<OpFoldResult> updateOffsets(updateRank, zeroAttr);
-  SmallVector<OpFoldResult> updateSizes(updateRank, zeroAttr);
-  updateOffsets[0] = offsets[0];
-  updateSizes[0] = sizes[0];
-  for (auto dim : llvm::seq<int64_t>(1, updateRank)) {
-    updateSizes[dim] = getDim(builder, loc, updates(), dim);
-  }
   SmallVector<OpFoldResult> updateStrides(updateRank, oneAttr);
-  Value tiledUpdate = getSlice(builder, loc, updates(), updateOffsets,
-                               updateSizes, updateStrides);
+  Value tiledUpdate =
+      getSlice(builder, loc, updates(), offsets, sizes, updateStrides);
   assert(tiledUpdate && "failed to get slice of update");
 
   // Slice of indices.
   auto indicesRank = getIndicesType().getRank();
   SmallVector<OpFoldResult> indicesOffsets(indicesRank, zeroAttr);
-  SmallVector<OpFoldResult> indicesSizes(indicesRank, zeroAttr);
+  SmallVector<OpFoldResult> indicesSizes(indicesRank);
   indicesOffsets[0] = offsets[0];
   indicesSizes[0] = sizes[0];
   for (auto dim : llvm::seq<int64_t>(1, indicesRank)) {
@@ -241,32 +240,55 @@ Operation *ScatterOp::getTiledImplementation(OpBuilder &builder,
                                 indicesSizes, indicesStrides);
   assert(tiledIndices && "failed to get slice of indices");
 
+  // Slice of the original.
+  auto originalRank = getOriginalType().getRank();
+  SmallVector<OpFoldResult> originalOffsets(originalRank, zeroAttr);
+  SmallVector<OpFoldResult> originalSizes(originalRank);
+  for (auto dim : llvm::seq<int64_t>(0, originalRank - updateRank + 1)) {
+    originalSizes[dim] = getDim(builder, loc, original(), dim);
+  }
+  for (auto dim :
+       llvm::seq<int64_t>(originalRank - updateRank + 1, originalRank)) {
+    originalOffsets[dim] = offsets[dim - (originalRank - updateRank)];
+    originalSizes[dim] = sizes[dim - (originalRank - updateRank)];
+  }
+  SmallVector<OpFoldResult> originalStrides(originalRank, oneAttr);
+  Value tiledOriginal = getSlice(builder, loc, outputs[0], originalOffsets,
+                                 originalSizes, originalStrides);
+  assert(tiledOriginal && "failed to get slice of original tensor");
+
   SmallVector<Type> resultTypes;
   if (getNumResults()) {
-    resultTypes.push_back(getResultTypes()[0]);
+    resultTypes.push_back(tiledOriginal.getType());
   }
   Operation *tiledScatterOp =
       cast<LinalgExtOp>(getOperation())
           .clone(builder, loc, resultTypes,
-                 ValueRange{tiledUpdate, tiledIndices, outputs[0]});
-  if (getNumResults()) {
-    results.push_back(tiledScatterOp->getResult(0));
+                 ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
+  for (auto result : llvm::enumerate(tiledScatterOp->getResults())) {
+    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+        loc, result.value(), outputs[0], originalOffsets, originalSizes,
+        originalStrides);
+    results.push_back(insertSliceOp.getResult());
   }
   return tiledScatterOp;
 }
 
-void ScatterOp::generateScalarUpdateLoopBody(OpBuilder &b, Location loc,
-                                             ValueRange ivs) {
+LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
+                                                      Location loc,
+                                                      ValueRange ivs) {
   auto indexDepth = getIndexDepth();
   Value update = b.create<memref::LoadOp>(loc, updates(), ivs);
   SmallVector<Value> starts;
-  SmallVector<Value> loadIndices(ivs.begin(), ivs.end());
+  SmallVector<Value> loadIndices;
+  loadIndices.push_back(ivs.front());
   loadIndices.push_back(Value());
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
     loadIndices.back() = b.create<ConstantIndexOp>(loc, i);
     Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
     starts.push_back(b.create<IndexCastOp>(loc, b.getIndexType(), idx));
   }
+  starts.append(std::next(ivs.begin()), ivs.end());
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
 
   BlockAndValueMapping bvm;
@@ -281,73 +303,6 @@ void ScatterOp::generateScalarUpdateLoopBody(OpBuilder &b, Location loc,
   b.create<memref::StoreOp>(
       loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
       original(), starts);
-}
-
-void ScatterOp::generateSliceUpdateLoopBody(OpBuilder &b, Location loc,
-                                            ValueRange ivs) {
-  auto indexDepth = getIndexDepth();
-  Value one = b.create<ConstantIndexOp>(loc, 1);
-  Value update = b.create<memref::SubViewOp>(loc, updates(), ivs, one, one);
-  SmallVector<Value> starts;
-  SmallVector<Value> loadIndices(ivs.begin(), ivs.end());
-  loadIndices.push_back(Value());
-  for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
-    loadIndices.back() = b.create<ConstantIndexOp>(loc, i);
-    Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
-    starts.push_back(b.create<IndexCastOp>(loc, b.getIndexType(), idx));
-  }
-  SmallVector<Value> ones(indexDepth, one);
-  Value subview =
-      b.create<memref::SubViewOp>(loc, original(), starts, ones, ones);
-
-  auto nloops = getUpdateSliceRank();
-  SmallVector<AffineMap> maps;
-  {
-    SmallVector<AffineExpr> exprs(1, b.getAffineConstantExpr(0));
-    for (int i = 0; i < nloops; ++i) {
-      exprs.push_back(b.getAffineDimExpr(i));
-    }
-    maps.push_back(AffineMap::get(nloops, 0, exprs, b.getContext()));
-  }
-  {
-    SmallVector<AffineExpr> exprs(indexDepth, b.getAffineConstantExpr(0));
-    for (int i = 0; i < nloops; ++i) {
-      exprs.push_back(b.getAffineDimExpr(i));
-    }
-    maps.push_back(AffineMap::get(nloops, 0, exprs, b.getContext()));
-  }
-
-  SmallVector<StringRef> iterTypes(nloops, getParallelIteratorTypeName());
-  auto genericOp =
-      b.create<linalg::GenericOp>(loc, TypeRange{}, ValueRange{update},
-                                  ValueRange{subview}, maps, iterTypes);
-  {
-    OpBuilder::InsertionGuard guard(b);
-    auto *block = b.createBlock(&genericOp.region(), genericOp.region().end());
-    b.setInsertionPointToEnd(block);
-    BlockAndValueMapping bvm;
-    auto &srcBlock = region().front();
-    for (auto blockArg : srcBlock.getArguments()) {
-      bvm.map(blockArg, block->addArgument(blockArg.getType()));
-    }
-    for (auto &blockOp : srcBlock.without_terminator()) {
-      b.clone(blockOp, bvm);
-    }
-    b.create<linalg::YieldOp>(
-        loc, bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0)));
-  }
-}
-
-LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
-                                                      Location loc,
-                                                      ValueRange ivs) {
-  assert(ivs.size() == 1);
-
-  if (isScalarUpdate()) {
-    generateScalarUpdateLoopBody(b, loc, ivs);
-  } else {
-    generateSliceUpdateLoopBody(b, loc, ivs);
-  }
   return success();
 }
 
@@ -543,6 +498,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   }
   Value cond = bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0));
 
+  OpBuilder::InsertionGuard g(b);
   b.setInsertionPointToEnd(&region.front());
   b.create<scf::IfOp>(
       loc, TypeRange{}, cond,
@@ -566,6 +522,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
         }
         b.create<scf::YieldOp>(loc);
       });
+  b.create<scf::YieldOp>(loc);
   return success();
 }
 
