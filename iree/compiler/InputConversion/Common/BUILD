@@ -53,8 +53,8 @@ cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        "//iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/Flow/Transforms",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

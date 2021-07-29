@@ -12,50 +12,17 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-gentbl_cc_library(
-    name = "PassesIncGen",
-    tbl_outs = [
-        (
-            ["-gen-pass-decls"],
-            "Passes.h.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "Passes.td",
-    deps = [
-        "@llvm-project//mlir:PassBaseTdFiles",
-    ],
-)
-
-cc_library(
-    name = "PassHeaders",
-    hdrs = [
-        "PassDetail.h",
-        "Passes.h",
-        "Passes.h.inc",
-    ],
-    deps = [
-        ":PassesIncGen",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Transforms",
-    ],
-)
-
 cc_library(
     name = "TensorToFlow",
     srcs = [
         "ConvertTensorToFlow.cpp",
-        "Passes.cpp",
     ],
     hdrs = [
-        "Passes.h",
+        "ConvertTensorToFlow.h",
     ],
     deps = [
-        ":PassHeaders",
-        ":PassesIncGen",
         "//iree/compiler/Dialect/Flow/IR",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",

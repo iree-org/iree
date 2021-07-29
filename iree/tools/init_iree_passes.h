@@ -16,7 +16,6 @@
 
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
@@ -47,7 +46,6 @@ inline void registerAllIreePasses() {
 
   linalg_ext::registerLinalgExtPasses();
   IREE::Flow::registerFlowPasses();
-  IREE::Flow::registerTensorToFlowPassPipelines();
   IREE::HAL::registerHALPasses();
   IREE::registerTransformPasses();
   Shape::registerShapePasses();

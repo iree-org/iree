@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-tensor-to-flow %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-flow-convert-to-flow-tensor-ops-pass %s | IreeFileCheck %s
 
 // CHECK: func @tensor.from_elements__to__flow.tensor.splat(%[[arg0:.*]]: i8)
 func @tensor.from_elements__to__flow.tensor.splat(%arg0: i8) -> (i8) {
