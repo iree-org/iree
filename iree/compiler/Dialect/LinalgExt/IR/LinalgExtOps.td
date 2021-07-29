@@ -201,7 +201,7 @@ def LinalgExt_FftOp : LinalgExt_Op<"fft",
     `outs` `(` $outputs `:` type($outputs) `)`
     (`:` type($results)^)?
   }];
-  let extraClassDeclaration = [{
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value operand() {
       return outputs()[0];
     }

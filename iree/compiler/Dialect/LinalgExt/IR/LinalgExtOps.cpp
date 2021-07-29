@@ -558,6 +558,9 @@ SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
   // the stage, and another is merge step. Thus, there are `rank+1` in total.
   SmallVector<StringRef> iteratorTypes(getOperandRank() + 1,
                                        getParallelIteratorTypeName());
+  // TODO(hanchung): Mark the loop type as "parallel" after tiling is
+  // implemented.
+  iteratorTypes[0] = getReductionIteratorTypeName();
   return iteratorTypes;
 }
 
