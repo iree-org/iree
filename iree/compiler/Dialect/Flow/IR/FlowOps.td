@@ -85,7 +85,7 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [
   }];
 
   let arguments = (ins
-    FLOW_VariableRefAttr:$variable
+    Arg<FLOW_VariableRefAttr, "", [MemRead]>:$variable
   );
   let results = (outs
     AnyType:$result
@@ -135,7 +135,7 @@ def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
 
   let arguments = (ins
     AnyType:$value,
-    FLOW_VariableRefAttr:$variable
+    Arg<FLOW_VariableRefAttr, "", [MemWrite]>:$variable
   );
 
   let assemblyFormat = "$value `,` $variable attr-dict `:` type($value)";

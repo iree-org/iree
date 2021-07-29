@@ -65,9 +65,14 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
-  // Perform initial cleanup.
-  // NOTE: There is no principled reason to be doing this here. But also ensures
-  // some consistency at the tool boundary.
+  // Simplify flow.variable accesses early on; this can help with dispatch
+  // region formation as redundant store-loads are removed.
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createSimplifyVariableAccessesPass());
+
+  // Perform cleanup after variable simplification as more canonicalizers may be
+  // able to kick in.
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Replaces variables with !shapex.ranked_shape types with individual
@@ -169,9 +174,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Reorder blocks to increase the grouping of streamable ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createHoistUnstreamableOpsPass());
+
   // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
   // arbitrary ordering.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Clone constants that escape basic blocks until we have better analysis.
   passManager.addNestedPass<FuncOp>(
