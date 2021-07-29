@@ -56,22 +56,6 @@ struct SPIRVVectorToGPUPass
   void lowerVectorOps(FuncOp funcOp, MLIRContext *context);
 };
 
-class VectorToGPUConversionTarget : public ConversionTarget {
- public:
-  using ConversionTarget::ConversionTarget;
-
- protected:
-  // Standard operation are legal if they operate on scalars. We need to
-  // legalize operations on vectors.
-  bool isDynamicallyLegal(Operation *op) const override {
-    auto isVectorType = [](Type t) { return t.isa<VectorType>(); };
-    if (llvm::any_of(op->getResultTypes(), isVectorType) ||
-        llvm::any_of(op->getOperandTypes(), isVectorType))
-      return false;
-    return true;
-  }
-};
-
 void SPIRVVectorToGPUPass::tileAndVectorizeLinalgCopy(FuncOp funcOp,
                                                       MLIRContext *context) {
   // 1. Tile linalg and distribute it on invocations.

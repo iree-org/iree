@@ -40,34 +40,6 @@ static bool isIllegalType(Type type) {
   return false;
 }
 
-class F32ToF16ConversionTarget : public ConversionTarget {
- public:
-  using ConversionTarget::ConversionTarget;
-
- protected:
-  // Operations are legal if they don't contain any illegal type.
-  bool isDynamicallyLegal(Operation *op) const override {
-    if (auto varOp = dyn_cast<IREE::Flow::VariableOp>(op)) {
-      return !isIllegalType(varOp.type());
-    }
-    if (auto funcOp = dyn_cast<FuncOp>(op)) {
-      for (Type type : funcOp.getType().getInputs()) {
-        if (isIllegalType(type)) return false;
-      }
-      for (Type type : funcOp.getType().getResults()) {
-        if (isIllegalType(type)) return false;
-      }
-    }
-    for (Type type : op->getResultTypes()) {
-      if (isIllegalType(type)) return false;
-    }
-    for (Type type : op->getOperandTypes()) {
-      if (isIllegalType(type)) return false;
-    }
-    return true;
-  }
-};
-
 class FloatTypeConverter : public TypeConverter {
  public:
   static Type convertTensor(RankedTensorType type) {
@@ -163,8 +135,28 @@ struct DemoteF32ToF16Pass : public DemoteF32ToF16Base<DemoteF32ToF16Pass> {
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<GenericTypeConvert>(context, converter);
     populateFuncOpTypeConversionPattern(patterns, converter);
-    F32ToF16ConversionTarget target(*context);
-    target.markUnknownOpDynamicallyLegal();
+    ConversionTarget target(*context);
+    // Operations are legal if they don't contain any illegal type.
+    target.markUnknownOpDynamicallyLegal([](Operation *op) {
+      if (auto varOp = dyn_cast<IREE::Flow::VariableOp>(op)) {
+        return !isIllegalType(varOp.type());
+      }
+      if (auto funcOp = dyn_cast<FuncOp>(op)) {
+        for (Type type : funcOp.getType().getInputs()) {
+          if (isIllegalType(type)) return false;
+        }
+        for (Type type : funcOp.getType().getResults()) {
+          if (isIllegalType(type)) return false;
+        }
+      }
+      for (Type type : op->getResultTypes()) {
+        if (isIllegalType(type)) return false;
+      }
+      for (Type type : op->getOperandTypes()) {
+        if (isIllegalType(type)) return false;
+      }
+      return true;
+    });
     if (failed(applyFullConversion(moduleOp, target, std::move(patterns)))) {
       return signalPassFailure();
     }

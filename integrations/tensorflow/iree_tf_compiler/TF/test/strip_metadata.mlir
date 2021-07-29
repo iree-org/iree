@@ -9,7 +9,7 @@ module @tf_module attributes {tf.versions = {bad_consumers = [], min_consumer = 
   // CHECK-NOT: tf._user_specified_name
   // CHECK-NOT: tf._user_specified_name
   // CHECK-NOT: tf._input_shapes
-  func @multiply__2_2__i32__uniform(%arg0: tensor<2xi32> {tf._user_specified_name = "args_0"}, %arg1: tensor<2xi32> {tf._user_specified_name = "args_1"}) -> tensor<2xi32> attributes {iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I12!S9!k0_0k1_1R3!_0"}, tf._input_shapes = [#tf.shape<2>, #tf.shape<2>]} {
+  func @multiply__2_2__i32__uniform(%arg0: tensor<2xi32> {tf._user_specified_name = "args_0"}, %arg1: tensor<2xi32> {tf._user_specified_name = "args_1"}) -> tensor<2xi32> attributes {iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I12!S9!k0_0k1_1R3!_0"}, tf._input_shapes = [#tf_type.shape<2>, #tf_type.shape<2>]} {
     // CHECK-NEXT: mhlo.multiply
     %0 = mhlo.multiply %arg0, %arg1 : tensor<2xi32>
     return %0 : tensor<2xi32>

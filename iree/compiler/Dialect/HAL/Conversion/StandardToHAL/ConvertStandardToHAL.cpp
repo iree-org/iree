@@ -108,7 +108,6 @@ void setupStandardToHALLegality(MLIRContext *context,
   // We need to rewrite certain types on operands/results so use the default
   // dynamic legality checker to force any ops using such types to run through
   // our patterns.
-  conversionTarget.addDynamicallyLegalDialect<mlir::StandardOpsDialect>();
   conversionTarget.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
     return typeConverter.isSignatureLegal(op.getType()) &&
            typeConverter.isLegal(&op.getBody());
