@@ -111,11 +111,22 @@ struct ConvertToFlowTensorOpsPass
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
-    TypeConverter typeConverter;
-    typeConverter.addConversion([](Type t) { return t; });
     if (runBeforeDispatchRegionFormation) {
-      // TODO(scotttodd): populateConvertTensorToFlowPatterns, run conversion
-      populateConvertTensorToFlowPatterns(context, patterns, typeConverter);
+      // Run partial conversion using conversion patterns.
+      OwningRewritePatternList conversionPatterns(&getContext());
+      TypeConverter typeConverter;
+      typeConverter.addConversion([](Type t) { return t; });
+      populateConvertTensorToFlowPatterns(&getContext(), conversionPatterns,
+                                          typeConverter);
+      ConversionTarget target(*context);
+      setupTensorToFlowLegality(context, target, typeConverter);
+      if (failed(applyPartialConversion(getOperation(), target,
+                                        std::move(conversionPatterns)))) {
+        return signalPassFailure();
+      }
+
+      // Add rewrite (non-conversion) patterns.
+      populateTensorToFlowPatterns(context, patterns);
       patterns.insert<
           LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
           LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(

@@ -305,13 +305,31 @@ struct ConvertTensorFromElementsPattern
 
 }  // namespace
 
+void populateTensorToFlowPatterns(MLIRContext *context,
+                                  OwningRewritePatternList &patterns) {
+  patterns.insert<SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(
+      context);
+}
+
+void setupTensorToFlowLegality(MLIRContext *context,
+                               ConversionTarget &conversionTarget,
+                               TypeConverter &typeConverter) {
+  conversionTarget.addIllegalOp<tensor::CastOp>();
+  conversionTarget.addDynamicallyLegalOp<tensor::FromElementsOp>(
+      [](tensor::FromElementsOp op) {
+        return !ConvertTensorFromElementsPattern::shouldBeConverted(op);
+      });
+
+  conversionTarget.addLegalDialect<StandardOpsDialect>();
+  conversionTarget.addLegalDialect<tensor::TensorDialect>();
+  conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
+}
+
 void populateConvertTensorToFlowPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns,
                                          TypeConverter &typeConverter) {
   patterns.insert<ConvertTensorCastPattern, ConvertTensorFromElementsPattern>(
       typeConverter, context);
-  patterns.insert<SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(
-      context);
 }
 
 }  // namespace Flow

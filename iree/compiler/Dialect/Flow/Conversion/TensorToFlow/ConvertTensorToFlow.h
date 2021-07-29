@@ -16,6 +16,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+void populateTensorToFlowPatterns(MLIRContext *context,
+                                  OwningRewritePatternList &patterns);
+
+void setupTensorToFlowLegality(MLIRContext *context,
+                               ConversionTarget &conversionTarget,
+                               TypeConverter &typeConverter);
+
 void populateConvertTensorToFlowPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns,
                                          TypeConverter &typeConverter);
