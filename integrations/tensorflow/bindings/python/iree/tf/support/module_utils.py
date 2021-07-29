@@ -620,8 +620,7 @@ def tf_module_to_tflite_module_bytes(
   for method, method_name in zip(methods, method_names):
     logging.info("Attempting to convert '%s' to tflite...", method_name)
     try:
-      converter = tf.lite.TFLiteConverter.from_concrete_functions([method],
-                                                                  module_class)
+      converter = tf.lite.TFLiteConverter.from_concrete_functions([method])
       logging.info("...converted '%s' to tflite.", method_name)
       tflite_modules.append(converter.convert())
     except Exception as e:
