@@ -21,6 +21,11 @@ This gives a brief explanation of IREE specific CMake options and variables.
 
 Enables instrumented runtime tracing. Defaults to `OFF`.
 
+#### `IREE_ENABLE_COMPILER_TRACING`:BOOL
+
+Enables instrumented compiler tracing. This requires that
+`IREE_ENABLE_RUNTIME_TRACING` also be set. Defaults to `OFF`.
+
 #### `IREE_ENABLE_MLIR`:BOOL
 
 Enables MLIR/LLVM dependencies. Defaults to `ON`. MLIR/LLVM dependencies are
