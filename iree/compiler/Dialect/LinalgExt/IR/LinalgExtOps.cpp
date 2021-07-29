@@ -214,7 +214,7 @@ Operation *ScatterOp::getTiledImplementation(OpBuilder &builder,
                                              ArrayRef<OpFoldResult> offsets,
                                              ArrayRef<OpFoldResult> sizes,
                                              SmallVectorImpl<Value> &results) {
-  assert(outputs.size() == 1 && offsets.size() == 1 && sizes.size() == 1);
+  assert(outputs.size() >= 1 && offsets.size() >= 1 && sizes.size() >= 1);
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
   auto oneAttr = builder.getI64IntegerAttr(1);

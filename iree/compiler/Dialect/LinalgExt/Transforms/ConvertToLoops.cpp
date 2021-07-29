@@ -35,7 +35,7 @@ static LogicalResult lowerToLoopsImpl(OpBuilder &builder,
   if (loopDepth == loopRanges.size()) {
     return tilableOp.generateScalarImplementation(builder, loc, ivs);
   }
-  LogicalResult status = success(true);
+  LogicalResult status = success();
   builder.create<scf::ForOp>(
       loc, loopRanges[loopDepth].offset, loopRanges[loopDepth].size,
       loopRanges[loopDepth].stride, ValueRange{},
@@ -68,9 +68,8 @@ struct TiledOpInterfaceLowerToLoopsPattern : public RewritePattern {
     if (!tilableOp) {
       return failure();
     }
-    if (llvm::any_of(tilableOp->getOperands(), [&](Value v) {
-          return v.getType().isa<RankedTensorType>();
-        })) {
+    if (llvm::any_of(tilableOp->getResults(),
+                     [&](Value v) { return v.getType().isa<ShapedType>(); })) {
       return rewriter.notifyMatchFailure(
           tilableOp, "lower to loops needs to have tensor semantics");
     }
