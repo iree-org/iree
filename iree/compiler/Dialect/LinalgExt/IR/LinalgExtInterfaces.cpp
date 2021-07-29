@@ -40,18 +40,9 @@ LogicalResult verifyLinalgExtOpInterface(Operation *op) {
       }
     }
   } else {
-    for (auto en : llvm::enumerate(linalgExtOp.getInputOperands())) {
-      if (!linalgExtOp.isScalar(en.value()) &&
-          !en.value()->get().getType().isa<MemRefType>()) {
-        return linalgExtOp.emitOpError("expected `ins` operand #")
-               << en.index() << " to be of MemRefType or scalar";
-      }
-    }
-    for (auto en : llvm::enumerate(linalgExtOp.outputs())) {
-      if (!en.value().getType().isa<MemRefType>()) {
-        return linalgExtOp.emitOpError("expected `outs` operand #")
-               << en.index() << " to be of MemRefType";
-      }
+    if (!linalgExtOp.hasBufferSemantics()) {
+      return linalgExtOp.emitOpError(
+          "expected inputs and outputs to be MemRefType or scalar");
     }
   }
   return success();

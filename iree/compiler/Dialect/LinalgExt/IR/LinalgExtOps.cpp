@@ -97,16 +97,6 @@ OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
-
-void ScatterOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  SmallVector<Value> inputBuffers = getInputBufferOperands();
-  SmallVector<Value> outputBuffers = getOutputBufferOperands();
-  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
-                 outputBuffers);
-}
-
 static LogicalResult verifyScatterOp(ScatterOp op) {
   if (op.inputs().size() != 2) {
     return op.emitOpError("expected two input operands");
@@ -309,15 +299,6 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 //===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
-
-void SortOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  SmallVector<Value> inputBuffers = getInputBufferOperands();
-  SmallVector<Value> outputBuffers = getOutputBufferOperands();
-  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
-                 outputBuffers);
-}
 
 static LogicalResult verifySortOp(SortOp op) {
   if (op.getNumInputs()) {
@@ -533,8 +514,9 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
 static LogicalResult verifyFftOp(FftOp op) {
   auto length = op.getFftLength();
   if (length == ShapedType::kDynamicSize) return failure();
-  // Expect to be a power of 2.
-  if (length & (length - 1)) return failure();
+  if (length & (length - 1)) {
+    return op.emitOpError("only powers of 2 are handled currently");
+  }
   if (!op.getNumInputs() || !op.isScalar(op.getInputOperand(0))) {
     return op.emitOpError("expected to carry `stage` input");
   }
@@ -544,19 +526,11 @@ static LogicalResult verifyFftOp(FftOp op) {
   return success();
 }
 
-void FftOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  SmallVector<Value> inputBuffers = getInputBufferOperands();
-  SmallVector<Value> outputBuffers = getOutputBufferOperands();
-  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
-                 outputBuffers);
-}
-
 SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
-  // There are `rank-1` outer loops. The fft itselfs has two loops, one is for
-  // the stage, and another is merge step. Thus, there are `rank+1` in total.
-  SmallVector<StringRef> iteratorTypes(getOperandRank() + 1,
+  // There are `rank-1` outer loops. The fft itselfs has one loop for each
+  // stage, which handles the merge step -- taking two half size tensors and
+  // merge them into one tensor.
+  SmallVector<StringRef> iteratorTypes(getOperandRank(),
                                        getParallelIteratorTypeName());
   // TODO(hanchung): Mark the loop type as "parallel" after tiling is
   // implemented.
@@ -587,6 +561,20 @@ SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
   res.emplace_back(Range{/*offset=*/zero, halfStride, /*stride=*/one});
   return res;
 }
+
+#define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
+  void OP_NAME::getEffects(                                               \
+      SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> \
+          &effects) {                                                     \
+    SmallVector<Value> inputBuffers = getInputBufferOperands();           \
+    SmallVector<Value> outputBuffers = getOutputBufferOperands();         \
+    getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,   \
+                   outputBuffers);                                        \
+  }
+
+DEFINE_OP_GET_EFFECTS(ScatterOp)
+DEFINE_OP_GET_EFFECTS(SortOp)
+DEFINE_OP_GET_EFFECTS(FftOp)
 
 }  // namespace linalg_ext
 }  // namespace iree_compiler
