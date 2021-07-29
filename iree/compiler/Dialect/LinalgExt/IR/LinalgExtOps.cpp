@@ -556,9 +556,6 @@ SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
   Value size = builder.create<ConstantIndexOp>(loc, getFftLength());
   Value stride = builder.create<ShiftLeftOp>(loc, one, getStage());
   res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
-
-  Value halfStride = builder.create<SignedShiftRightOp>(loc, stride, one);
-  res.emplace_back(Range{/*offset=*/zero, halfStride, /*stride=*/one});
   return res;
 }
 
