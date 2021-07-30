@@ -97,16 +97,6 @@ OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
-
-void ScatterOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  SmallVector<Value> inputBuffers = getInputBufferOperands();
-  SmallVector<Value> outputBuffers = getOutputBufferOperands();
-  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
-                 outputBuffers);
-}
-
 static LogicalResult verifyScatterOp(ScatterOp op) {
   if (op.inputs().size() != 2) {
     return op.emitOpError("expected two input operands");
@@ -309,15 +299,6 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 //===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
-
-void SortOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  SmallVector<Value> inputBuffers = getInputBufferOperands();
-  SmallVector<Value> outputBuffers = getOutputBufferOperands();
-  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
-                 outputBuffers);
-}
 
 static LogicalResult verifySortOp(SortOp op) {
   if (op.getNumInputs()) {
@@ -525,6 +506,72 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   b.create<scf::YieldOp>(loc);
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// FftOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyFftOp(FftOp op) {
+  auto length = op.getFftLength();
+  if (length == ShapedType::kDynamicSize) return failure();
+  if (length & (length - 1)) {
+    return op.emitOpError("only powers of 2 are handled currently");
+  }
+  if (!op.getNumInputs() || !op.isScalar(op.getInputOperand(0))) {
+    return op.emitOpError("expected to carry `stage` input");
+  }
+  if (op.getNumOutputs() != 2) {
+    return op.emitOpError("expected outputs to be real and imag tensor/memref");
+  }
+  return success();
+}
+
+SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
+  // There are `rank-1` outer loops. The fft itselfs has one loop for each
+  // stage, which handles the merge step -- taking two half size tensors and
+  // merge them into one tensor.
+  SmallVector<StringRef> iteratorTypes(getOperandRank(),
+                                       getParallelIteratorTypeName());
+  // TODO(hanchung): Mark the loop type as "parallel" after tiling is
+  // implemented.
+  iteratorTypes[0] = getReductionIteratorTypeName();
+  return iteratorTypes;
+}
+
+SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
+  SmallVector<Range> res;
+  Location loc = getLoc();
+  Value zero = builder.create<ConstantIndexOp>(loc, 0);
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  for (auto en : llvm::enumerate(getOperandShape().drop_back())) {
+    Value size;
+    if (en.value() == ShapedType::kDynamicSize) {
+      size = getDimValue(builder, loc, operand(), en.index());
+    } else {
+      size = builder.create<ConstantIndexOp>(loc, en.value());
+    }
+    res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/one});
+  }
+
+  Value size = builder.create<ConstantIndexOp>(loc, getFftLength());
+  Value stride = builder.create<ShiftLeftOp>(loc, one, getStage());
+  res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
+  return res;
+}
+
+#define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
+  void OP_NAME::getEffects(                                               \
+      SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> \
+          &effects) {                                                     \
+    SmallVector<Value> inputBuffers = getInputBufferOperands();           \
+    SmallVector<Value> outputBuffers = getOutputBufferOperands();         \
+    getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,   \
+                   outputBuffers);                                        \
+  }
+
+DEFINE_OP_GET_EFFECTS(ScatterOp)
+DEFINE_OP_GET_EFFECTS(SortOp)
+DEFINE_OP_GET_EFFECTS(FftOp)
 
 }  // namespace linalg_ext
 }  // namespace iree_compiler
