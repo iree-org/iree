@@ -3,7 +3,7 @@
 This page details the optional features and build modes for the project.
 Most of these are controlled by various CMake options, sometimes requiring
 extra setup or preparation. Each section extends the basic build steps
-in the [getting started](../getting-started/) page.
+in the [getting started](./getting-started.md) page.
 
 ## Building Python Bindings
 
@@ -15,7 +15,7 @@ Python bindings for the following packages:
 | `import iree.compiler`     | IREE's generic compiler tools and helpers                                   |
 | `import iree.runtime`      | IREE's runtime, including CPU and GPU backends                              |
 
-Also see [instructions for installing pre-built binaries](../../bindings/python/).
+Also see [instructions for installing pre-built binaries](../bindings/python.md).
 
 **Pre-requisites:**
 
