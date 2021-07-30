@@ -73,10 +73,16 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 /// converts tile sizes of the first level into workgroup sizes.
 static SmallVector<int64_t, 3> getWorkloadPerWorkgroup(
     ArrayRef<int64_t> distributedTileSizes) {
-  if (distributedTileSizes.size() > kNumMaxParallelDims) {
-    distributedTileSizes = distributedTileSizes.take_back(kNumMaxParallelDims);
+  SmallVector<int64_t, 3> workgroupSizes;
+  for (auto ts : distributedTileSizes) {
+    if (ts) {
+      workgroupSizes.push_back(ts);
+    }
   }
-  return llvm::to_vector<3>(llvm::reverse(distributedTileSizes));
+  if (workgroupSizes.size() > kNumMaxParallelDims) {
+    workgroupSizes.resize(kNumMaxParallelDims);
+  }
+  return llvm::to_vector<3>(llvm::reverse(workgroupSizes));
 }
 
 /// Sets the translation info on the `hal.executable.entry_point` op
