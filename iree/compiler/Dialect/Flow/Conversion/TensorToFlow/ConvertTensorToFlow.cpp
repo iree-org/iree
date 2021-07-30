@@ -120,24 +120,20 @@ static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
   return dynamicDims;
 }
 
-/// Convert subtensor insert operation flow.tensor.update where possible.
-struct SubTensorInsertToTensorUpdate
-    : public OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+/// Convert tensor.insert_slice ops into flow.tensor.update ops where possible.
+struct ConvertTensorInsertSlicePattern
+    : public OpConversionPattern<tensor::InsertSliceOp> {
+  using OpConversionPattern<tensor::InsertSliceOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
-                                PatternRewriter &rewriter) const override {
-    if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
-      return failure();
+  LogicalResult matchAndRewrite(
+      tensor::InsertSliceOp insertOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!shouldBeConverted(insertOp)) {
+      return success();
     }
-    SmallVector<OpFoldResult, 4> offsets = insertOp.getMixedOffsets();
+
     SmallVector<OpFoldResult, 4> sizes = insertOp.getMixedSizes();
-    SmallVector<OpFoldResult, 4> strides = insertOp.getMixedStrides();
-    ArrayRef<int64_t> dstShape = insertOp.getType().getShape();
-    if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
-                                             dstShape)) {
-      return failure();
-    }
+
     Location loc = insertOp.getLoc();
     auto sourceDynamicDims = getDynamicValues(sizes);
     Value source = insertOp.source();
@@ -154,7 +150,7 @@ struct SubTensorInsertToTensorUpdate
           loc, sourceType, source, sourceDynamicDims, sourceDynamicDims);
     }
 
-    auto offsetVals = getAsValues(rewriter, loc, offsets);
+    auto offsetVals = getAsValues(rewriter, loc, insertOp.getMixedOffsets());
     Value dest = insertOp.dest();
     auto destDynamicDims = getDynamicDimValues(rewriter, loc, dest);
     rewriter.replaceOpWithNewOp<TensorUpdateOp>(
@@ -162,26 +158,38 @@ struct SubTensorInsertToTensorUpdate
         sourceDynamicDims, nullptr);
     return success();
   }
+
+  static bool shouldBeConverted(tensor::InsertSliceOp op) {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return false;
+    }
+    SmallVector<OpFoldResult, 4> offsets = op.getMixedOffsets();
+    SmallVector<OpFoldResult, 4> sizes = op.getMixedSizes();
+    SmallVector<OpFoldResult, 4> strides = op.getMixedStrides();
+    ArrayRef<int64_t> dstShape = op.getType().getShape();
+    if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
+                                             dstShape)) {
+      return false;
+    }
+    return true;
+  }
 };
 
-/// Convert subtensor operation to flow.tensor.slice where possible.
-struct SubTensorToTensorSlice
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+/// Convert tensor.extract_slice ops into flow.tensor.slice ops where possible.
+struct ConvertTensorExtractSlicePattern
+    : public OpConversionPattern<tensor::ExtractSliceOp> {
+  using OpConversionPattern<tensor::ExtractSliceOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
-                                PatternRewriter &rewriter) const override {
-    if (sliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
-      return failure();
+  LogicalResult matchAndRewrite(
+      tensor::ExtractSliceOp sliceOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!shouldBeConverted(sliceOp)) {
+      return success();
     }
+
     SmallVector<OpFoldResult, 4> offsets = sliceOp.getMixedOffsets();
     SmallVector<OpFoldResult, 4> sizes = sliceOp.getMixedSizes();
-    SmallVector<OpFoldResult, 4> strides = sliceOp.getMixedStrides();
-    ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
-    if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
-                                             srcShape)) {
-      return failure();
-    }
+
     Location loc = sliceOp.getLoc();
 
     ShapedType sourceType = sliceOp.getSourceType();
@@ -210,6 +218,21 @@ struct SubTensorToTensorSlice
     }
     rewriter.replaceOp(sliceOp, replacement);
     return success();
+  }
+
+  static bool shouldBeConverted(tensor::ExtractSliceOp op) {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return false;
+    }
+    SmallVector<OpFoldResult, 4> offsets = op.getMixedOffsets();
+    SmallVector<OpFoldResult, 4> sizes = op.getMixedSizes();
+    SmallVector<OpFoldResult, 4> strides = op.getMixedStrides();
+    ArrayRef<int64_t> srcShape = op.getSourceType().getShape();
+    if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
+                                             srcShape)) {
+      return false;
+    }
+    return true;
   }
 };
 
@@ -305,15 +328,17 @@ struct ConvertTensorFromElementsPattern
 
 }  // namespace
 
-void populateTensorToFlowPatterns(MLIRContext *context,
-                                  OwningRewritePatternList &patterns) {
-  patterns.insert<SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(
-      context);
-}
-
 void setupTensorToFlowLegality(MLIRContext *context,
                                ConversionTarget &conversionTarget,
                                TypeConverter &typeConverter) {
+  conversionTarget.addDynamicallyLegalOp<tensor::InsertSliceOp>(
+      [](tensor::InsertSliceOp op) {
+        return !ConvertTensorInsertSlicePattern::shouldBeConverted(op);
+      });
+  conversionTarget.addDynamicallyLegalOp<tensor::ExtractSliceOp>(
+      [](tensor::ExtractSliceOp op) {
+        return !ConvertTensorExtractSlicePattern::shouldBeConverted(op);
+      });
   conversionTarget.addIllegalOp<tensor::CastOp>();
   conversionTarget.addDynamicallyLegalOp<tensor::FromElementsOp>(
       [](tensor::FromElementsOp op) {
@@ -325,11 +350,13 @@ void setupTensorToFlowLegality(MLIRContext *context,
   conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
 }
 
-void populateConvertTensorToFlowPatterns(MLIRContext *context,
-                                         OwningRewritePatternList &patterns,
-                                         TypeConverter &typeConverter) {
-  patterns.insert<ConvertTensorCastPattern, ConvertTensorFromElementsPattern>(
-      typeConverter, context);
+void populateTensorToFlowPatterns(MLIRContext *context,
+                                  OwningRewritePatternList &patterns,
+                                  TypeConverter &typeConverter) {
+  patterns
+      .insert<ConvertTensorInsertSlicePattern, ConvertTensorExtractSlicePattern,
+              ConvertTensorCastPattern, ConvertTensorFromElementsPattern>(
+          typeConverter, context);
 }
 
 }  // namespace Flow

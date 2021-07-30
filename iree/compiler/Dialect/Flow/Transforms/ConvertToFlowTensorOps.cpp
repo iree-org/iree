@@ -112,21 +112,20 @@ struct ConvertToFlowTensorOpsPass
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
     if (runBeforeDispatchRegionFormation) {
-      // Run partial conversion using conversion patterns.
+      // Run partial conversion from tensor -> flow.tensor ops.
       OwningRewritePatternList conversionPatterns(&getContext());
       TypeConverter typeConverter;
       typeConverter.addConversion([](Type t) { return t; });
-      populateConvertTensorToFlowPatterns(&getContext(), conversionPatterns,
-                                          typeConverter);
       ConversionTarget target(*context);
       setupTensorToFlowLegality(context, target, typeConverter);
+      populateTensorToFlowPatterns(&getContext(), conversionPatterns,
+                                   typeConverter);
       if (failed(applyPartialConversion(getOperation(), target,
                                         std::move(conversionPatterns)))) {
         return signalPassFailure();
       }
 
-      // Add rewrite (non-conversion) patterns.
-      populateTensorToFlowPatterns(context, patterns);
+      // Rewrite linalg.tensor -> flow.tensor ops.
       patterns.insert<
           LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
           LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(

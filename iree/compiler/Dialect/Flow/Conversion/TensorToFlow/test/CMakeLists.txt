@@ -15,7 +15,9 @@ iree_lit_test_suite(
     lit
   SRCS
     "cast.mlir"
+    "extract_slice.mlir"
     "from_elements.mlir"
+    "insert_slice.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

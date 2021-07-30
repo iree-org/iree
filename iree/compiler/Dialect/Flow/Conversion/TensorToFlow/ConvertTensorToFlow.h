@@ -16,16 +16,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-void populateTensorToFlowPatterns(MLIRContext *context,
-                                  OwningRewritePatternList &patterns);
-
+// Adds op legality rules to |conversionTarget| to ensure certain incoming
+// tensor ops are removed during Tensor->Flow lowering.
 void setupTensorToFlowLegality(MLIRContext *context,
                                ConversionTarget &conversionTarget,
                                TypeConverter &typeConverter);
 
-void populateConvertTensorToFlowPatterns(MLIRContext *context,
-                                         OwningRewritePatternList &patterns,
-                                         TypeConverter &typeConverter);
+// Populates conversion patterns for Tensor->Flow.
+void populateTensorToFlowPatterns(MLIRContext *context,
+                                  OwningRewritePatternList &patterns,
+                                  TypeConverter &typeConverter);
 
 }  // namespace Flow
 }  // namespace IREE
