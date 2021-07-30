@@ -12,6 +12,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -557,6 +558,100 @@ SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
   Value stride = builder.create<ShiftLeftOp>(loc, one, getStage());
   res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
   return res;
+}
+
+// Generates FFT stage scalar implementation. This follows Cooley–Tukey FFT
+// algorithm. The pseudo reference code is:
+//   let s <- stage of linalg_ext.fft
+//   int m = 1 << s;
+//   int mh = m >> 1;
+//   for (int k = 0; k < n; k += m) {
+//     for (int j = 0; j < mh; ++j) {
+//       cplx w = exp(-2 * PI * j / m * I);
+//       cplx t = w * a[k + j + mh];
+//       cplx u = a[k + j];
+//       a[k + j] = u + t;
+//       a[k + j + mh] = u - t;
+//     }
+//   }
+LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                  ValueRange ivs) {
+  Value real = getReal();
+  Value imag = getImag();
+  Value stage = getStage();
+  Value one = b.create<ConstantIndexOp>(loc, 1);
+  Value wholeSize = b.create<ShiftLeftOp>(loc, one, stage);
+  Value halfSize = b.create<SignedShiftRightOp>(loc, wholeSize, one);
+
+  auto rank = getOperandRank();
+  SmallVector<Value> operands;
+  SmallVector<OpFoldResult> lhsIvs(ivs.begin(), ivs.end());
+  SmallVector<OpFoldResult> ones(rank, b.getIndexAttr(1));
+  SmallVector<OpFoldResult> sizes(rank, b.getIndexAttr(1));
+  sizes.back() = halfSize;
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, real, lhsIvs, sizes, ones));
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, imag, lhsIvs, sizes, ones));
+
+  SmallVector<OpFoldResult> rhsIvs(ivs.begin(), ivs.end());
+  rhsIvs.back() = b.create<AddIOp>(loc, ivs.back(), halfSize).getResult();
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, real, rhsIvs, sizes, ones));
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, imag, rhsIvs, sizes, ones));
+
+  SmallVector<AffineMap> maps(operands.size(), b.getMultiDimIdentityMap(rank));
+  // TODO(hanchung): Use getLoopIteratorTypes(), once tiling method is
+  // implemented.
+  SmallVector<StringRef> iterTypes(rank, getParallelIteratorTypeName());
+
+  auto f32Type = b.getF32Type();
+  auto indexToF32 = [](OpBuilder &builder, Location loc, Value v) -> Value {
+    v = builder.create<IndexCastOp>(loc, builder.getI32Type(), v);
+    return builder.create<SIToFPOp>(loc, builder.getF32Type(), v);
+  };
+
+  // We will need exp(-2 * PI * j / m * I), compute "-2 * PI / m" for imag part
+  // first.
+  Value coeff = b.create<ConstantFloatOp>(
+      loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
+  coeff = b.create<DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
+
+  b.create<linalg::GenericOp>(
+      loc, TypeRange{}, ValueRange{}, operands, maps, iterTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value lhsReal = args[0];
+        Value lhsImag = args[1];
+        Value rhsReal = args[2];
+        Value rhsImag = args[3];
+
+        // Compute "-2 * PI / m * j"
+        Value w = b.create<MulFOp>(
+            loc, coeff,
+            indexToF32(b, loc, b.create<linalg::IndexOp>(loc, rank - 1)));
+        Value wReal = b.create<math::CosOp>(loc, w);
+        Value wImag = b.create<math::SinOp>(loc, w);
+
+        // t = w * a[k + j + mh];
+        // ->  (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
+        Value xu = b.create<MulFOp>(loc, wReal, rhsReal);
+        Value yv = b.create<MulFOp>(loc, wImag, rhsImag);
+        Value xv = b.create<MulFOp>(loc, wReal, rhsImag);
+        Value yu = b.create<MulFOp>(loc, wImag, rhsReal);
+        Value tReal = b.create<SubFOp>(loc, xu, yv);
+        Value tImag = b.create<AddFOp>(loc, xv, yu);
+
+        // cplx u = a[k + j];
+        // a[k + j] = u + t;
+        // a[k + j + mh] = u - t;
+        Value r1 = b.create<AddFOp>(loc, lhsReal, tReal);
+        Value r2 = b.create<AddFOp>(loc, lhsImag, tImag);
+        Value r3 = b.create<SubFOp>(loc, lhsReal, tReal);
+        Value r4 = b.create<SubFOp>(loc, lhsImag, tImag);
+        b.create<linalg::YieldOp>(loc, ValueRange{r1, r2, r3, r4});
+      });
+  return success();
 }
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
