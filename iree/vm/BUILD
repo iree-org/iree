@@ -319,6 +319,13 @@ cc_library(
 )
 
 cc_library(
+    name = "ops_emitc",
+    hdrs = [
+        "ops_emitc.h",
+    ],
+)
+
+cc_library(
     name = "shims_emitc",
     hdrs = [
         "shims_emitc.h",

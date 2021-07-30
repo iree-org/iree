@@ -19,6 +19,11 @@ namespace iree_compiler {
 struct VMAnalysis {
   RegisterAllocation registerAllocation;
   ValueLiveness valueLiveness;
+
+  VMAnalysis(VMAnalysis &&) = default;
+  VMAnalysis &operator=(VMAnalysis &&) = default;
+  VMAnalysis(const VMAnalysis &) = delete;
+  VMAnalysis &operator=(const VMAnalysis &) = delete;
 };
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
