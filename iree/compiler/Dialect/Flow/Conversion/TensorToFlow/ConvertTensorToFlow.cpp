@@ -242,6 +242,10 @@ struct ConvertTensorCastPattern : public OpConversionPattern<tensor::CastOp> {
   LogicalResult matchAndRewrite(
       tensor::CastOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    if (!shouldBeConverted(op)) {
+      return success();
+    }
+
     auto loc = op.getLoc();
     Value input = operands.front();
     ShapedType inputType = input.getType().dyn_cast<ShapedType>();
@@ -297,6 +301,14 @@ struct ConvertTensorCastPattern : public OpConversionPattern<tensor::CastOp> {
 
     return success();
   }
+
+  static bool shouldBeConverted(tensor::CastOp op) {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return false;
+    }
+
+    return true;
+  }
 };
 
 struct ConvertTensorFromElementsPattern
@@ -322,6 +334,10 @@ struct ConvertTensorFromElementsPattern
   // detensoring (see: https://github.com/google/iree/issues/1159). Do we need
   // to expand this check for other uses?
   static bool shouldBeConverted(tensor::FromElementsOp op) {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return false;
+    }
+
     return op.getType().getDimSize(0) == 1;
   }
 };
@@ -339,7 +355,9 @@ void setupTensorToFlowLegality(MLIRContext *context,
       [](tensor::ExtractSliceOp op) {
         return !ConvertTensorExtractSlicePattern::shouldBeConverted(op);
       });
-  conversionTarget.addIllegalOp<tensor::CastOp>();
+  conversionTarget.addDynamicallyLegalOp<tensor::CastOp>([](tensor::CastOp op) {
+    return !ConvertTensorCastPattern::shouldBeConverted(op);
+  });
   conversionTarget.addDynamicallyLegalOp<tensor::FromElementsOp>(
       [](tensor::FromElementsOp op) {
         return !ConvertTensorFromElementsPattern::shouldBeConverted(op);
