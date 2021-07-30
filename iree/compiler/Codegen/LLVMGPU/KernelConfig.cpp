@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
@@ -14,56 +15,6 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
-
-static void setConfig(TileSizesListType tileSizes, Operation* op) {
-  IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, ArrayRef<int64_t>{}, op->getContext());
-  setLoweringConfig(op, config);
-}
-
-/// Sets the translation info on the `hal.executable.entry_point` op
-/// corresponding to the `entryPointFn`. Returns failure if a translation info
-/// is already set on the entry point op and is incompatible with what is being
-/// set.
-static LogicalResult setTranslationInfo(
-    FuncOp entryPointFn, IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workloadPerWorkgroup) {
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  auto translationInfo = buildTranslationInfo(
-      passPipeline, workloadPerWorkgroup, entryPointFn.getContext());
-  return setTranslationInfo(entryPointOp, translationInfo);
-}
-
-static LogicalResult setRootConfig(FuncOp entryPoint, linalg::GenericOp op) {
-  IREE::HAL::DispatchLoweringPassPipeline passPipeline =
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize;
-  std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-  TileSizesListType tileSizes;
-  size_t numLoops = getNumOuterParallelLoops(op);
-  if (numLoops == 0) {
-    // Pure reduction, we serialize the operation on a single thread.
-    // TODO: Use atomic to allow distributing reduction loops.
-    tileSizes.push_back({});
-    setConfig(tileSizes, op);
-    return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
-  }
-
-  workgroupSize = {cudaWarpSize, 1, 1};
-  // Pick a fixed tile size independent of the original shape.
-  // TODO(thomasraoux): Currently the original shape information is lost during
-  // tiling at the flow level. We need way to access it to be able to make a
-  // better choice of tile size.
-  int64_t lowerTs = 4 * cudaWarpSize;
-  SmallVector<int64_t, 4> ts;
-  ts.resize(numLoops, 1);
-  ts.back() = lowerTs;
-  tileSizes.push_back(ts);  // Workgroup level.
-  tileSizes.push_back({});  // Subgroup level.
-  ts.back() = lowerTs / cudaWarpSize;
-  tileSizes.push_back(ts);  // Thread level.
-  setConfig(tileSizes, op);
-  return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
-}
 
 namespace {
 struct TileWorkgroupSizePair {
@@ -75,15 +26,14 @@ struct TileWorkgroupSizePair {
 
 /// Return the best combination of tile size and wg size. It will then used to
 /// pick the best size aligned with the shape dimension.
-static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair>& tileSizes) {
+static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{16, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
 }
 
 static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
-  IREE::HAL::DispatchLoweringPassPipeline passPipeline =
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize;
+  if (getLoweringConfig(op)) return success();
   TileSizesListType tileSizes;
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape = getUntiledShape(op.getInputOperand(0)->get());
@@ -100,8 +50,10 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   }
   for (unsigned i = 0; i < rhsShape.size(); i++) {
     if (op.getTiedIndexingMap(op.getInputOperand(1)).getDimPosition(i) ==
-        outputMap.getDimPosition(outputMap.getNumResults() - 1))
+        outputMap.getDimPosition(outputMap.getNumResults() - 1)) {
       sizeN = rhsShape[i];
+      break;
+    }
   }
   // Default tile size and workgroup size.
   int64_t tileX = 2;
@@ -112,7 +64,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   getMatmulConfig(tileSizeConfig);
   // Pick the best configuration where the original shape is aligned on the tile
   // size.
-  for (TileWorkgroupSizePair& config : tileSizeConfig) {
+  for (TileWorkgroupSizePair &config : tileSizeConfig) {
     if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
       tileX = config.tileSize[0];
       tileY = config.tileSize[1];
@@ -137,90 +89,122 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   invocationLevelTs.append(
       {tileX / workgroupSize[1], tileY / workgroupSize[0]});
   tileSizes.push_back(invocationLevelTs);  // Thread level.
-  setConfig(tileSizes, op);
-  return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
 }
 
 // Basic default properties for linalg ops that haven't been tuned.
-static LogicalResult setRootDefaultConfig(FuncOp entryPoint,
-                                          linalg::LinalgOp op) {
+static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   IREE::HAL::DispatchLoweringPassPipeline passPipeline =
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute;
-  std::array<int64_t, 3> workgroupSize = {1, 1, 1};
   TileSizesListType tileSizes;
-  size_t numLoops = getNumOuterParallelLoops(op);
-  if (numLoops == 0) {
-    return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
+  SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+  if (partitionedLoops.empty()) {
+    tileSizes.push_back({});
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+        passPipeline, {1, 1, 1});
   }
 
-  workgroupSize = {cudaWarpSize, 1, 1};
-  int64_t lowerTs = 4 * cudaWarpSize;
-  SmallVector<int64_t, 4> ts;
-  ts.resize(numLoops, 1);
-  ts.back() = lowerTs;
-  tileSizes.push_back(ts);
-  tileSizes.push_back({});  // Subgroup level.
-  ts.back() = lowerTs / cudaWarpSize;
-  tileSizes.push_back(ts);  // Thread level.
-  setConfig(tileSizes, op);
-  return setTranslationInfo(entryPoint, passPipeline, workgroupSize);
+  size_t numLoops = partitionedLoops.back() + 1;
+
+  std::array<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
+  static constexpr unsigned vectorSize = 4;
+  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1),
+      threadTileSizes(numLoops, 1);
+  // Set all non-parallel loops to zero tile size.
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (!partitionedLoopsSet.count(depth)) {
+      workgroupTileSizes[depth] = 0;
+      threadTileSizes[depth] = 0;
+    }
+  }
+  // Set the inner most parallel loop to `lowerTs`.
+  for (int64_t depth = numLoops; depth > 0; depth--) {
+    if (partitionedLoopsSet.count(depth - 1)) {
+      workgroupTileSizes[depth - 1] = cudaWarpSize * vectorSize;
+      threadTileSizes[depth - 1] = vectorSize;
+      break;
+    }
+  }
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.push_back({});                                // Subgroup level.
+  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+      workgroupSize);
 }
 
-static LogicalResult setRootConfig(FuncOp entryPointFn,
-                                   linalg::LinalgOp linalgOp) {
-  if (linalg::isaContractionOpInterface(linalgOp) &&
-      linalgOp.getNumParallelLoops() >= 2)
-    return setContractConfig(entryPointFn, linalgOp);
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation()))
-    return setRootConfig(entryPointFn, genericOp);
-  return setRootDefaultConfig(entryPointFn, linalgOp);
+static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
+    if (linalg::isaContractionOpInterface(linalgOp) &&
+        linalgOp.getNumParallelLoops() >= 2) {
+      return setContractConfig(entryPointFn, linalgOp);
+    }
+  }
+  return setRootDefaultConfig(entryPointFn, computeOp);
 }
 
 namespace mlir {
 namespace iree_compiler {
 
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
-  // TODO(ravishankarm): The following logic to get LinalgOps needs
-  // fixing.
-  // - Should be able to handle multiple entry points (so assert on single
-  //   funcop is unnecessary)
-  // - The funcOp itself cannot be handled if it doesnt have a single block. The
-  //   compilation logic here (which also sets the entry point configuration),
-  //   doesnt work when there is arbitrary control flow.
-  auto funcOps = moduleOp.getOps<FuncOp>();
-  assert(llvm::hasSingleElement(funcOps));
-  FuncOp funcOp = *funcOps.begin();
-  SmallVector<linalg::LinalgOp, 4> linalgOps;
-  funcOp.walk([&](linalg::LinalgOp op) { linalgOps.push_back(op); });
+  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps =
+      getAllEntryPoints(moduleOp);
 
-  if (linalgOps.empty()) {
-    return ::setTranslationInfo(
-        funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-        {1, 1, 1});
-  }
-
-  linalg::LinalgOp rootOperation;
-  // if there is more than one linalg op, look for the root one.
-  for (linalg::LinalgOp op : llvm::reverse(linalgOps)) {
-    if (!isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(
-            op.getOperation())) {
-      rootOperation = op;
-      break;
+  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+    auto entryPointOp = entryPointOps.lookup(funcOp.getName());
+    if (!entryPointOp) continue;
+    if (getTranslationInfo(entryPointOp)) continue;
+    SmallVector<Operation *, 4> computeOps;
+    SmallVector<Operation *, 4> tiledLoops;
+    if (succeeded(getComputeOps(funcOp, computeOps, tiledLoops)) &&
+        !computeOps.empty()) {
     }
-  }
-  if (!rootOperation) {
-    for (linalg::LinalgOp op : llvm::reverse(linalgOps)) {
-      if (isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op)) {
+
+    if (computeOps.empty()) {
+      setTranslationInfo(
+          funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+          {1, 1, 1});
+      continue;
+    }
+
+    Operation *rootOperation = nullptr;
+    // Find the root operation. linalg.generic, linalg.fill and linalg.copy are
+    // not root operations if there are other compute operations present.
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (!isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op)) {
         rootOperation = op;
         break;
       }
     }
-  }
-  if (failed(setRootConfig(funcOp, rootOperation))) return failure();
-  IREE::HAL::LoweringConfig config = getLoweringConfig(rootOperation);
-  for (linalg::LinalgOp op : linalgOps) {
-    if (op == rootOperation) continue;
-    setLoweringConfig(op, config);
+
+    if (!rootOperation) {
+      for (Operation *op : llvm::reverse(computeOps)) {
+        if (isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op)) {
+          rootOperation = op;
+          break;
+        }
+      }
+    }
+
+    if (failed(setRootConfig(funcOp, rootOperation))) continue;
+    IREE::HAL::LoweringConfig config = getLoweringConfig(rootOperation);
+
+    // Propogate the configuration to the other ops.
+    // TODO(ravishankarm, thomasraoux): This is a very specific use (and
+    // fragile). In general, this should not be needed. Things are already tiled
+    // and distributed. The rest of the compilation must be structured to either
+    // use `TileAndFuse` or they are independent configurations that are
+    // determined based on the op.
+    for (auto op : computeOps) {
+      if (op == rootOperation) continue;
+      setLoweringConfig(op, config);
+    }
   }
   return success();
 }

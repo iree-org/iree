@@ -14,6 +14,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -143,6 +144,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     }
 
     executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
+    executableLoweringPipeline.addPass(createCanonicalizerPass());
     OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     if (!testLoweringConfiguration && passPipeline.hasValue()) {
       switch (passPipeline.getValue()) {

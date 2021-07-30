@@ -1,10 +1,12 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-tile-and-distribute))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass{test-lowering-configuration},iree-llvmgpu-tile-and-distribute))' %s | IreeFileCheck %s
 
 hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+  hal.executable.entry_point @add_dispatch_0 attributes {
+    interface = @io,
+    ordinal = 0 : index}
   module  {
-    func @add_dispatch_0() attributes {llvmgpu_workgroup_size = dense<[32, 1, 1]> : vector<3xi64>} {
+    func @add_dispatch_0() {
       %c0 = constant 0 : index
       %c1024 = constant 1024 : index
       %0 = hal.interface.binding.subspan @io::@ro0[%c0] : memref<1024xf32>
@@ -20,7 +22,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
         %6 = memref.subview %0[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
         %7 = memref.subview %1[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
         %8 = memref.subview %2[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
-        linalg.generic {lowering.config = {tileSizes = [[128], [], [4]]}, indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>, memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) outs(%8 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>, memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) outs(%8 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
         ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
           %9 = addf %arg1, %arg2 : f32
           linalg.yield %9 : f32
@@ -33,7 +35,6 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 }
 
 // CHECK-LABEL: func @add_dispatch_0()
-//  CHECK-SAME: llvmgpu_workgroup_size = dense<[32, 1, 1]>
 //      CHECK:    "gpu.thread_id"() {dimension = "x"}
 //      CHECK:    scf.for
 //      CHECK:      linalg.generic
@@ -42,9 +43,11 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 
 hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @dot_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : index}
+  hal.executable.entry_point @dot_dispatch_0 attributes {
+    interface = @legacy_io,
+    ordinal = 0 : index}
   module  {
-    func @dot_dispatch_0() attributes {llvmgpu_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
+    func @dot_dispatch_0() {
       %cst = constant 0.000000e+00 : f32
       %c0 = constant 0 : index
       %c1024 = constant 1024 : index
@@ -68,8 +71,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
           %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg1)[%workgroup_size_x]
           %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x1024xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
           %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<1024x1024xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
+          linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup"} : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+          linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
         }
       }
       return
@@ -85,37 +88,37 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 
 //   CHECK-LABEL: hal.executable @dot_dispatch_0
 //         CHECK:   hal.executable.variant @cuda
-//         CHECK:  memref.global "private" @{{.*}} : memref<4x256xf32, 3>
-//         CHECK:  memref.global "private" @{{.*}} : memref<2x4xf32, 3>
-//     CHECK-DAG:  %[[C1024:.+]] = constant 1024 : index
+//         CHECK:  memref.global "private" @{{.*}} : memref<4x128xf32, 3>
+//         CHECK:  memref.global "private" @{{.*}} : memref<16x4xf32, 3>
 //     CHECK-DAG:  %[[C0:.+]] = constant 0 : index
 //     CHECK-DAG:  %[[C1:.+]] = constant 1 : index
-//     CHECK-DAG:  %[[C2:.+]] = constant 2 : index
 //     CHECK-DAG:  %[[C4:.+]] = constant 4 : index
-//     CHECK-DAG:  %[[C256:.+]] = constant 256 : index
+//     CHECK-DAG:  %[[C16:.+]] = constant 16 : index
+//     CHECK-DAG:  %[[C128:.+]] = constant 128 : index
+//     CHECK-DAG:  %[[C1024:.+]] = constant 1024 : index
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
-//         CHECK:  gpu.barrier
-//         CHECK:  %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
-//         CHECK:  scf.for %[[IND:.+]] = %[[TIDX]] to %[[C2]] step %[[C2]] {
-//     CHECK-DAG:    %[[SRC:.+]] = memref.subview %{{.*}}[%[[IND]], 0] [1, 4] [1, 1] : memref<2x4xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
-//     CHECK-DAG:    %[[DST:.+]] = memref.subview %{{.*}}[%[[IND]], 0] [1, 4] [1, 1] : memref<2x4xf32, #{{.*}}, 3> to memref<1x4xf32, #{{.*}}, 3>
-//         CHECK:    linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x4xf32, #{{.*}}>, memref<1x4xf32, #{{.*}}, 3>
-//         CHECK:    }
-//         CHECK:  %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
-//         CHECK:  scf.for %[[IND0:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {
-//         CHECK:    scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
-//     CHECK-DAG:      %[[SRC:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 4] [1, 1] : memref<4x256xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
-//     CHECK-DAG:      %[[DST:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 4] [1, 1] : memref<4x256xf32, #{{.*}}, 3> to memref<1x4xf32, #{{.*}}, 3>
+//         CHECK:    gpu.barrier
+//         CHECK:    %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
+//         CHECK:    scf.for %[[IND:.+]] = %[[TIDX]] to %[[C16]] step %[[C16]] {
+//     CHECK-DAG:      %[[SRC:.+]] = memref.subview %{{.*}}[%[[IND]], 0] [1, 4] [1, 1] : memref<16x4xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
+//     CHECK-DAG:      %[[DST:.+]] = memref.subview %{{.*}}[%[[IND]], 0] [1, 4] [1, 1] : memref<16x4xf32, #{{.*}}, 3> to memref<1x4xf32, #{{.*}}, 3>
 //         CHECK:      linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x4xf32, #{{.*}}>, memref<1x4xf32, #{{.*}}, 3>
 //         CHECK:    }
-//         CHECK:  }
-//         CHECK:  gpu.barrier
-//         CHECK:  scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C2]] {
-//         CHECK:    scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
-//     CHECK-DAG:      %[[A:.+]] = memref.subview %17[%[[IND0]], 0] [2, 4] [1, 1] : memref<2x4xf32, #{{.*}}, 3> to memref<2x4xf32, #{{.*}}, 3>
-//     CHECK-DAG:      %[[B:.+]] = memref.subview %18[0, %[[IND1]]] [4, 4] [1, 1] : memref<4x256xf32, #{{.*}}, 3> to memref<4x4xf32, #{{.*}}, 3>
-//     CHECK-DAG:      %[[C:.+]] = memref.subview %11[%[[IND0]], %[[IND1]]] [2, 4] [1, 1] : memref<2x256xf32, #{{.*}}> to memref<2x4xf32, #{{.*}}>
-//         CHECK:      linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<2x4xf32, #{{.*}}, 3>, memref<4x4xf32, #{{.*}}, 3>) outs(%[[C]] : memref<2x4xf32, #{{.*}}>)
+//         CHECK:    %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
+//         CHECK:    scf.for %[[IND0:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {
+//         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C128]] step %[[C128]] {
+//     CHECK-DAG:        %[[SRC:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 4] [1, 1] : memref<4x128xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
+//     CHECK-DAG:        %[[DST:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 4] [1, 1] : memref<4x128xf32, #{{.*}}, 3> to memref<1x4xf32, #{{.*}}, 3>
+//         CHECK:        linalg.copy(%[[SRC]], %[[DST]]) {__internal_linalg_transform__ = "vectorize"} : memref<1x4xf32, #{{.*}}>, memref<1x4xf32, #{{.*}}, 3>
+//         CHECK:      }
+//         CHECK:    }
+//         CHECK:    gpu.barrier
+//         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C16]] step %[[C16]] {
+//         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C128]] step %[[C128]] {
+//     CHECK-DAG:        %[[A:.+]] = memref.subview %17[%[[IND0]], 0] [16, 4] [1, 1] : memref<16x4xf32, #{{.*}}, 3> to memref<16x4xf32, #{{.*}}, 3>
+//     CHECK-DAG:        %[[B:.+]] = memref.subview %18[0, %[[IND1]]] [4, 4] [1, 1] : memref<4x128xf32, #{{.*}}, 3> to memref<4x4xf32, #{{.*}}, 3>
+//     CHECK-DAG:        %[[C:.+]] = memref.subview %11[%[[IND0]], %[[IND1]]] [16, 4] [1, 1] : memref<16x128xf32, #{{.*}}> to memref<16x4xf32, #{{.*}}>
+//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<16x4xf32, #{{.*}}, 3>, memref<4x4xf32, #{{.*}}, 3>) outs(%[[C]] : memref<16x4xf32, #{{.*}}>)
 //         CHECK:    }
 //         CHECK:  }
 
@@ -124,9 +127,11 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 // Test that non aligned sizes compile correctly.
 hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
 hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
+  hal.executable.entry_point @dot_dispatch_1 attributes {
+    interface = @legacy_io,
+    ordinal = 0 : index}
   module  {
-    func @dot_dispatch_1() attributes {llvmgpu_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
+    func @dot_dispatch_1() {
       %c0 = constant 0 : index
       %c4 = constant 4 : index
       %c2 = constant 2 : index
@@ -151,8 +156,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
           %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg1)[%workgroup_size_x]
           %10 = memref.subview %1[0, %arg1] [3, %9] [1, 1] : memref<3x4xf32> to memref<3x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
           %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<2x4xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
-          linalg.fill(%cst, %11) {lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[2, 256, 4], [], [2, 4]]}} ins(%8, %10 : memref<?x3xf32, affine_map<(d0, d1)[s0] -> (d0 * 3 + s0 + d1)>>, memref<3x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>)
+          linalg.fill(%cst, %11) : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
+          linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : memref<?x3xf32, affine_map<(d0, d1)[s0] -> (d0 * 3 + s0 + d1)>>, memref<3x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>)
         }
       }
       return
@@ -189,9 +194,11 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
 hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @predict_dispatch_153 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @predict_dispatch_153 attributes {
+      interface = @io,
+      ordinal = 0 : index}
     module  {
-      func @predict_dispatch_153() attributes {llvmgpu_workgroup_size = dense<[32, 1, 1]> : vector<3xi64>} {
+      func @predict_dispatch_153() {
         %c0 = constant 0 : index
         %cst = constant 0x7FC00000 : f32
         %cst_0 = constant 0xFF800000 : f32
@@ -215,7 +222,10 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
     }
   }
 }
-
-//   CHECK-LABEL: hal.executable @reduction_dispatch
-//         CHECK: linalg.fill(%{{.*}}, %{{.*}}) : f32, memref<f32>
-//         CHECK: linalg.generic {{.*}} ins(%{{.*}} : memref<1000xf32>) outs(%{{.*}} : memref<f32>)
+//      CHECK: #[[CONFIG:.+]] = {tileSizes = {{\[}}[]{{\]}}}
+//      CHECK: hal.executable @reduction_dispatch
+//      CHECK: linalg.fill
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
+//      CHECK: linalg.generic
+// CHECK-SAME:     ins(%{{.*}} : memref<1000xf32>) outs(%{{.*}} : memref<f32>)
+// CHECK-SAME:     lowering.config = #[[CONFIG]]

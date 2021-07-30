@@ -62,6 +62,7 @@ iree_check_single_backend_test_suite(
             "reshape.mlir",
             "reverse.mlir",
             "rsqrt.mlir",
+            "scatter.mlir",
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
@@ -76,7 +77,6 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "round.mlir",
-            "scatter.mlir",
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],

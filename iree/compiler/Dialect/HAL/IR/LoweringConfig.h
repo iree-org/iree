@@ -59,14 +59,14 @@ IREE::HAL::TranslationInfo buildTranslationInfo(
 IREE::HAL::TranslationInfo getTranslationInfo(
     IREE::HAL::ExecutableEntryPointOp entryPointOp);
 
-/// Set the translate executable info with the entry point op. Returns a failure
-/// if these have already been set for the `entryPointOp` and are incompatible
-/// with what is being set.
+/// Set the translate executable info with the entry point op. Overwrites the
+/// existing attributes.
 // TODO(ravishankarm, benvanik): Eventually all the information needed for the
 // lowering will be consolidated into a single attribute with richer
 // information.
-LogicalResult setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
-                                 IREE::HAL::TranslationInfo translationInfo);
+void setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
+                        IREE::HAL::TranslationInfo translationInfo,
+                        ArrayRef<int64_t> workgroupSize = {});
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting the `hal.lowering.*` attributes that drive the
@@ -76,12 +76,8 @@ LogicalResult setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
 /// Returns the lowering configuration set for an operation.
 IREE::HAL::LoweringConfig getLoweringConfig(Operation *op);
 
-/// Returns true if an operation has a lowering configuration set.
-bool hasLoweringConfig(Operation *op);
-
-/// Sets the lowering configuration if one isnt already set and returns
-/// true. Returns false if a configuration already exists.
-bool setLoweringConfig(Operation *op, IREE::HAL::LoweringConfig config);
+/// Sets the lowering configuration, overwriting existing attribute values.
+void setLoweringConfig(Operation *op, IREE::HAL::LoweringConfig config);
 
 /// Removes the lowering configuration on the operation if it exists.
 void eraseLoweringConfig(Operation *op);

@@ -22,13 +22,10 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-static constexpr unsigned kMaxNumParallelDims = 3;
-
 namespace mlir {
 namespace iree_compiler {
 
 namespace {
-static size_t kMaxHALDimensions = 3;
 
 /// Sets the hal.interace.workgroup.size operation to the constant value passed
 /// in as `workloadPerWorkgroup`. The number of entries in
@@ -43,8 +40,8 @@ class SetWorkgroupSizePattern
                           PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit),
         workloadPerWorkgroup(llvm::to_vector<4>(
-            workloadPerWorkgroupRef.size() > kMaxHALDimensions
-                ? workloadPerWorkgroupRef.take_front(kMaxHALDimensions)
+            workloadPerWorkgroupRef.size() > kNumMaxParallelDims
+                ? workloadPerWorkgroupRef.take_front(kNumMaxParallelDims)
                 : workloadPerWorkgroupRef)) {}
 
   LogicalResult matchAndRewrite(
@@ -101,7 +98,7 @@ LogicalResult materializeStaticLaunchInformation(
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return failure();
   }
-  assert(workloadPerWorkgroup.size() <= kMaxNumParallelDims &&
+  assert(workloadPerWorkgroup.size() <= kNumMaxParallelDims &&
          "workloadPerWorkgroup size greater than max num parallel dims");
   WorkgroupCountRegionBuilder regionBuilder =
       [&workloadPerWorkgroup](
