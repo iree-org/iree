@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='func(iree-flow-insert-constant-clones)' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-flow-insert-constant-clones)' %s | IreeFileCheck %s
 
 // CHECK-LABEL: @function_return
 func @function_return() -> (tensor<8xf32>, i32) {
