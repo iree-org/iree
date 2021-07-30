@@ -48,6 +48,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
+            "linalg_ext_ops.mlir",
         ] + BACKEND_TESTS,
     ),
     data = [
