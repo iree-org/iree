@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/SymbolTable.h"
@@ -85,9 +86,9 @@ ArrayRef<int64_t> getUntiledShape(Value tiledView) {
       .Default([&](Type type) { return ArrayRef<int64_t>{}; });
 }
 
-LogicalResult getLinalgOps(FuncOp funcOp,
-                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
-                           SmallVectorImpl<Operation *> &tiledLoops) {
+LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
+                             SmallVectorImpl<Operation *> &filteredOps,
+                             SmallVectorImpl<Operation *> &tiledLoops) {
   Region &region = funcOp.body();
   if (!llvm::hasSingleElement(region)) {
     return funcOp.emitError("unable dispatch function with multiple blocks");
@@ -101,7 +102,60 @@ LogicalResult getLinalgOps(FuncOp funcOp,
     body = forOp.getBody();
     forOps = body->getOps<scf::ForOp>();
   }
-  linalgOps = llvm::to_vector<4>(body->getOps<linalg::LinalgOp>());
+  for (Operation &op : *body) {
+    if (filteringFn(&op)) {
+      filteredOps.push_back(&op);
+    }
+  }
+  return success();
+}
+
+LogicalResult getComputeOps(FuncOp funcOp,
+                            SmallVectorImpl<Operation *> &computeOps,
+                            SmallVectorImpl<Operation *> &tiledLoops) {
+  if (failed(getFilteredOps(
+          funcOp,
+          [](Operation *op) {
+            return isa<linalg::LinalgOp, linalg_ext::LinalgExtOp>(op);
+          },
+          computeOps, tiledLoops))) {
+    return failure();
+  }
+
+  // Propagate markers to all ops. If one of the ops has a marker all ops in
+  // this loop need to have marker since body of the loop maps to a workgroup.
+  // TODO(ravishankarm): Temporary WAR till a better story w.r.t markers is
+  // figured out.
+  Optional<StringRef> marker = llvm::None;
+  for (auto op : computeOps) {
+    if (hasMarker(op)) {
+      assert(!marker || marker.getValue() == getMarkerOrNull(op) &&
+                            "expected all markers within op to be the same");
+      marker = getMarkerOrNull(op);
+    }
+  }
+  if (marker.hasValue()) {
+    for (auto op : computeOps) {
+      setMarker(op, marker.getValue());
+    }
+  }
+  return success();
+}
+
+LogicalResult getLinalgOps(FuncOp funcOp,
+                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
+                           SmallVectorImpl<Operation *> &tiledLoops) {
+  {
+    SmallVector<Operation *> computeOps;
+    if (failed(getFilteredOps(
+            funcOp, [](Operation *op) { return isa<linalg::LinalgOp>(op); },
+            computeOps, tiledLoops))) {
+      return failure();
+    }
+    for (auto op : computeOps) {
+      linalgOps.push_back(cast<linalg::LinalgOp>(op));
+    }
+  }
 
   // Propagate markers to all ops. If one of the ops has a marker all ops in
   // this loop need to have marker since body of the loop maps to a workgroup.

@@ -48,6 +48,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
+            "linalg_ext_ops.mlir",
         ] + BACKEND_TESTS,
     ),
     data = [
@@ -61,7 +62,9 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_regression_linalg_ops_dylib-llvm-aot",
-    srcs = BACKEND_TESTS,
+    srcs = [
+        "linalg_ext_ops.mlir",
+    ] + BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",

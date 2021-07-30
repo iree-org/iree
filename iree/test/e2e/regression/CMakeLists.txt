@@ -38,6 +38,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_linalg_ops_dylib-llvm-aot
   SRCS
+    "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"

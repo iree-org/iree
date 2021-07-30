@@ -124,11 +124,6 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
     bool isScalarUpdate() {
       return getUpdateSliceRank() == 0;
     }
-
-    void generateScalarUpdateLoopBody(OpBuilder & b, Location loc,
-                                      ValueRange ivs);
-    void generateSliceUpdateLoopBody(OpBuilder & b, Location loc,
-                                      ValueRange ivs);
   }];
 }
 
@@ -180,6 +175,49 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort",
       }
       return sortedDim;
     }
+  }];
+}
+
+def LinalgExt_FftOp : LinalgExt_Op<"fft",
+    [DeclareOpInterfaceMethods<TiledOpInterface, []>]> {
+  let summary = "Fft operator";
+  let description = [{
+    Apply 1D FFT to innermost dim. This is an iterative FFT, not recurrsive.
+    Thus, the bit reversal is assumed applied on the input. The op carries an
+    input -- stage, which indicates the level of reduction loop in the
+    algorithm. It represents the computation body. For more details, see
+    "Data reordering, bit reversal, and in-place algorithms" section in
+    https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm
+
+    The size of innermost dim is expected to be a power of 2.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$inputs,
+                       Variadic<AnyShaped>:$outputs
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`:` type($results)^)?
+  }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value operand() {
+      return outputs()[0];
+    }
+    ShapedType getOperandType() {
+      return operand().getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType().getRank();
+    }
+    ArrayRef<int64_t> getOperandShape() {
+      return getOperandType().getShape();
+    }
+    int64_t getFftLength() {
+      return getOperandShape().back();
+    }
+    Value getStage() { return inputs()[0]; }
   }];
 }
 

@@ -16,112 +16,92 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace linalg_ext {
+
+/// Recursive method that lowers one dimension of the `TiledOpInterface` to
+/// scalar loops at a time.
+static LogicalResult lowerToLoopsImpl(OpBuilder &builder,
+                                      TiledOpInterface tilableOp,
+                                      ArrayRef<Range> loopRanges,
+                                      unsigned loopDepth,
+                                      SmallVectorImpl<Value> &ivs) {
+  Location loc = tilableOp.getLoc();
+  if (loopDepth == loopRanges.size()) {
+    return tilableOp.generateScalarImplementation(builder, loc, ivs);
+  }
+  LogicalResult status = success();
+  builder.create<scf::ForOp>(
+      loc, loopRanges[loopDepth].offset, loopRanges[loopDepth].size,
+      loopRanges[loopDepth].stride, ValueRange{},
+      [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
+        ivs.push_back(iv);
+        status = lowerToLoopsImpl(b, tilableOp, loopRanges, loopDepth + 1, ivs);
+        b.create<scf::YieldOp>(loc);
+      });
+  return status;
+}
+
+/// Main entry point for lowering `TiledOpInterface` op to loops.
+static LogicalResult lowerToLoops(OpBuilder &builder,
+                                  TiledOpInterface tilableOp) {
+  SmallVector<Range> loopBounds = tilableOp.getLoopBounds(builder);
+  SmallVector<Value> ivs;
+  return lowerToLoopsImpl(builder, tilableOp, loopBounds, 0, ivs);
+}
+
+/// Pattern rewriter hook to lower a `TiledOpInterface` to loops.
 namespace {
+struct TiledOpInterfaceLowerToLoopsPattern : public RewritePattern {
+  TiledOpInterfaceLowerToLoopsPattern(MLIRContext *context,
+                                      PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
 
-//===----------------------------------------------------------------------===//
-// SortOp
-//===----------------------------------------------------------------------===//
-
-struct BubbleSortConversion : public OpRewritePattern<linalg_ext::SortOp> {
-  using OpRewritePattern<linalg_ext::SortOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg_ext::SortOp op,
-                                PatternRewriter& rewriter) const final {
-    if (!op.hasBufferSemantics()) return failure();
-
-    auto arg0 = op.getOutputOperand(0);
-    Location loc = op.getLoc();
-    SmallVector<Value, 4> lbs, ubs, steps;
-    for (auto en : llvm::enumerate(op.getShape(arg0))) {
-      if (ShapedType::isDynamic(en.value())) {
-        ubs.push_back(
-            rewriter.create<memref::DimOp>(loc, arg0->get(), en.index()));
-      } else {
-        ubs.push_back(rewriter.create<ConstantIndexOp>(loc, en.value()));
-      }
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    auto tilableOp = dyn_cast<TiledOpInterface>(op);
+    if (!tilableOp) {
+      return failure();
     }
-    Value zero = rewriter.create<ConstantIndexOp>(loc, 0);
-    Value one = rewriter.create<ConstantIndexOp>(loc, 1);
-    lbs.append(op.getRank(arg0), zero);
-    steps.append(op.getRank(arg0), one);
-
-    bool fail = false;
-    mlir::scf::buildLoopNest(
-        rewriter, loc, lbs, ubs, steps, ValueRange{},
-        [&](OpBuilder& b, Location loc, ValueRange ivs, ValueRange iters) {
-          if (failed(op.generateScalarImplementation(b, loc, ivs))) {
-            fail = true;
-          }
-          b.create<scf::YieldOp>(loc);
-          return scf::ValueVector();
-        });
-    if (fail) return failure();
+    if (llvm::any_of(tilableOp->getResults(),
+                     [&](Value v) { return v.getType().isa<ShapedType>(); })) {
+      return rewriter.notifyMatchFailure(
+          tilableOp, "lower to loops needs to have tensor semantics");
+    }
+    if (failed(lowerToLoops(rewriter, tilableOp))) {
+      return failure();
+    }
     rewriter.eraseOp(op);
     return success();
   }
 };
-
-//===----------------------------------------------------------------------===//
-// ScatterOp
-//===----------------------------------------------------------------------===//
-
-struct ScatterConversion : public OpRewritePattern<linalg_ext::ScatterOp> {
-  using OpRewritePattern<linalg_ext::ScatterOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg_ext::ScatterOp op,
-                                PatternRewriter& rewriter) const final {
-    if (!op.hasBufferSemantics()) return failure();
-    auto updates = op.updates();
-    Location loc = op.getLoc();
-    Value zero = rewriter.create<ConstantIndexOp>(loc, 0);
-    Value one = rewriter.create<ConstantIndexOp>(loc, 1);
-    Value ub = rewriter.createOrFold<memref::DimOp>(loc, updates, zero);
-    bool fail = false;
-    rewriter.create<scf::ForOp>(
-        loc, zero, ub, one, ValueRange{},
-        [&](OpBuilder& b, Location loc, Value iv, ValueRange iters) {
-          if (failed(op.generateScalarImplementation(b, loc, iv))) {
-            fail = true;
-          }
-          b.create<scf::YieldOp>(loc);
-        });
-    if (fail) return failure();
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
+}  // namespace
 
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
 
+namespace {
 struct LinalgExtToLoopsPass
     : public LinalgExtToLoopsBase<LinalgExtToLoopsPass> {
-  void getDependentDialects(DialectRegistry& registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, StandardOpsDialect,
                     memref::MemRefDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
-    MLIRContext* context = &getContext();
+    MLIRContext *context = &getContext();
 
     OwningRewritePatternList patterns(context);
-    patterns.insert<BubbleSortConversion, ScatterConversion>(context);
-
-    ConversionTarget target(getContext());
-    target.addLegalDialect<linalg::LinalgDialect, memref::MemRefDialect,
-                           StandardOpsDialect, scf::SCFDialect>();
-    target.addIllegalDialect<linalg_ext::LinalgExtDialect>();
-
-    if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns)))) {
-      signalPassFailure();
+    patterns.insert<TiledOpInterfaceLowerToLoopsPattern>(context);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
     }
   }
 };

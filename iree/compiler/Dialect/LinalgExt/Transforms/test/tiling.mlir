@@ -13,28 +13,39 @@ func @scatter_tiling(
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-//       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
 //       CHECK: func @scatter_tiling(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 //  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
-//   CHECK-DAG:   %[[TILESIZE:.+]] = constant 10 : index
+//   CHECK-DAG:   %[[TILESIZEY:.+]] = constant 10 : index
+//   CHECK-DAG:   %[[TILESIZEX:.+]] = constant 20 : index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[UPDATES]], %[[C0]]
-//       CHECK:   %[[RESULT:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZE]]
-//  CHECK-SAME:       iter_args(%[[INIT:.+]] = %[[ORIGINAL]])
-//   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[TILESIZE]], %[[D0]]]
-//   CHECK-DAG:     %[[D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
-//       CHECK:     %[[UPDATE_SLICE:.+]] = tensor.extract_slice %[[UPDATES]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
-//       CHECK:     %[[INDEX_SLICE:.+]] = tensor.extract_slice %[[INDICES]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], 1]
-//       CHECK:     %[[SCATTER_TILE:.+]] = linalg_ext.scatter
-//  CHECK-SAME:         __internal_linalg_transform__ = "tiling_output"
-//  CHECK-SAME:         ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
-//  CHECK-SAME:         outs(%[[INIT]]
-//       CHECK:     scf.yield %[[SCATTER_TILE]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
+//       CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZEY]]
+//  CHECK-SAME:       iter_args(%[[INITY:.+]] = %[[ORIGINAL]])
+//   CHECK-DAG:     %[[USED_TILESIZEY:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[TILESIZEY]], %[[D0]]]
+//       CHECK:     %[[RESULT_INNER:.+]] = scf.for %[[IV1:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZEX]]
+//  CHECK-SAME:         iter_args(%[[INITX:.+]] = %[[INITY]])
+//       CHECK:       %[[USED_TILESIZEX:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[TILESIZEX]], %[[D1]]]
+//       CHECK:       %[[UPDATE_SLICE:.+]] = tensor.extract_slice %[[UPDATES]][%[[IV0]], %[[IV1]]]
+//  CHECK-SAME:           [%[[USED_TILESIZEY]], %[[USED_TILESIZEX]]]
+//       CHECK:       %[[INDEX_SLICE:.+]] = tensor.extract_slice %[[INDICES]][%[[IV0]], 0]
+//  CHECK-SAME:           [%[[USED_TILESIZEY]], 1]
+//       CHECK:       %[[SCATTER_DIM:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
+//       CHECK:       %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[INITX]][0, %[[IV1]]]
+//  CHECK-SAME:           [%[[SCATTER_DIM]], %[[USED_TILESIZEX]]]
+//       CHECK:       %[[SCATTER_TILE:.+]] = linalg_ext.scatter
+//  CHECK-SAME:           __internal_linalg_transform__ = "tiling_output"
+//  CHECK-SAME:           ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
+//  CHECK-SAME:           outs(%[[ORIGINAL_SLICE]]
+//       CHECK:       %[[YIELD:.+]] = tensor.insert_slice %[[SCATTER_TILE]] into %[[INITX]][0, %[[IV1]]]
+//  CHECK-SAME:           [%[[SCATTER_DIM]], %[[USED_TILESIZEX]]]
+//       CHECK:       scf.yield %[[YIELD]]
+//       CHECK:     scf.yield %[[RESULT_INNER]]
 //       CHECK:   return %[[RESULT]]
 
 // -----
@@ -52,26 +63,33 @@ func @scatter_tiling_memref(
     }
   return
 }
-//       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
 //       CHECK: func @scatter_tiling_memref(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: memref<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: memref<?x1xi32>
 //  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: memref<?x?xf32>
-//   CHECK-DAG:   %[[TILESIZE:.+]] = constant 10 : index
+//   CHECK-DAG:   %[[TILESIZEY:.+]] = constant 10 : index
+//   CHECK-DAG:   %[[TILESIZEX:.+]] = constant 20 : index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[UPDATES]], %[[C0]]
-//       CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZE]]
-//   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[TILESIZE]], %[[D0]]]
-//   CHECK-DAG:     %[[D1:.+]] = memref.dim %[[UPDATES]], %[[C1]]
-//       CHECK:     %[[UPDATE_SLICE:.+]] = memref.subview %[[UPDATES]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
-//       CHECK:     %[[INDEX_SLICE:.+]] = memref.subview %[[INDICES]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], 1]
-//       CHECK:     linalg_ext.scatter
-//  CHECK-SAME:         __internal_linalg_transform__ = "tiling_output"
-//  CHECK-SAME:         ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
-//  CHECK-SAME:         outs(%[[ORIGINAL]]
+//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[UPDATES]], %[[C1]]
+//       CHECK:   scf.for %[[IV0:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZEY]]
+//   CHECK-DAG:     %[[USED_TILESIZEY:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[TILESIZEY]], %[[D0]]]
+//       CHECK:     scf.for %[[IV1:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZEX]]
+//   CHECK-DAG:       %[[USED_TILESIZEX:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[TILESIZEX]], %[[D1]]]
+//       CHECK:       %[[UPDATE_SLICE:.+]] = memref.subview %[[UPDATES]][%[[IV0]], %[[IV1]]]
+//  CHECK-SAME:           [%[[USED_TILESIZEY]], %[[USED_TILESIZEX]]]
+//       CHECK:       %[[INDEX_SLICE:.+]] = memref.subview %[[INDICES]][%[[IV0]], 0]
+//  CHECK-SAME:           [%[[USED_TILESIZEY]], 1]
+//       CHECK:       %[[SCATTER_DIM:.+]] = memref.dim %[[ORIGINAL]], %[[C0]]
+//       CHECK:       %[[ORIGINAL_SLICE:.+]] = memref.subview %[[ORIGINAL]][0, %[[IV1]]
+//  CHECK-SAME:           [%[[SCATTER_DIM]], %[[USED_TILESIZEX]]]
+//       CHECK:       linalg_ext.scatter
+//  CHECK-SAME:           __internal_linalg_transform__ = "tiling_output"
+//  CHECK-SAME:           ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
+//  CHECK-SAME:           outs(%[[ORIGINAL_SLICE]]
 
 // -----
 
@@ -94,27 +112,31 @@ func @scatter_tiling_distribution(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 //  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[TILESIZE:.+]] = constant 10 : index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[UPDATES]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
 //   CHECK-DAG:   %[[ID:.+]] = flow.dispatch.workgroup.id[0]
 //   CHECK-DAG:   %[[COUNT:.+]] = flow.dispatch.workgroup.count[0]
 //   CHECK-DAG:   %[[OFFSET:.+]] = affine.apply #[[MAP0]]()[%[[ID]]]
 //   CHECK-DAG:   %[[STEP:.+]] = affine.apply #[[MAP0]]()[%[[COUNT]]]
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV:.+]] = %[[OFFSET]] to %[[D0]] step %[[STEP]]
 //  CHECK-SAME:       iter_args(%[[INIT:.+]] = %[[ORIGINAL]])
-//   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP1]](%[[IV]])[%[[TILESIZE]], %[[D0]]]
-//   CHECK-DAG:     %[[D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
+//       CHECK:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP1]](%[[IV]])[%[[TILESIZE]], %[[D0]]]
 //       CHECK:     %[[UPDATE_SLICE:.+]] = tensor.extract_slice %[[UPDATES]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     %[[INDEX_SLICE:.+]] = tensor.extract_slice %[[INDICES]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], 1]
+//       CHECK:     %[[D2:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
+//       CHECK:     %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[INIT]][0, 0]
+//  CHECK-SAME:         [%[[D2]], %[[D1]]]
 //       CHECK:     %[[SCATTER_TILE:.+]] = linalg_ext.scatter
-//  CHECK-SAME:         __internal_linalg_transform__ = "distribute_output"
-//  CHECK-SAME:         ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
-//  CHECK-SAME:         outs(%[[INIT]]
-//       CHECK:     scf.yield %[[SCATTER_TILE]]
+//  CHECK-SAME:        __internal_linalg_transform__ = "distribute_output"
+//  CHECK-SAME:        ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
+//  CHECK-SAME:        outs(%[[ORIGINAL_SLICE]]
+//       CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SCATTER_TILE]] into %[[INIT]][0, 0]
+//  CHECK-SAME:        [%[[D2]], %[[D1]]]
 //       CHECK:   return %[[RESULT]]
 
 // -----
