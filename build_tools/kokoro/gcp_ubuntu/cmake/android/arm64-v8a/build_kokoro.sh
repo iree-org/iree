@@ -24,7 +24,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-android@sha256:a152f0d006e237105f8ed9a7e041a6a235c1a69dc1e209383c81087c574b39bf \
+  gcr.io/iree-oss/cmake-android@sha256:7d780787608474301e74e1b5cc2a1bfd1304a79ed9e0774c7ed422c0e4a38625 \
   build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
