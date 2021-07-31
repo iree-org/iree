@@ -25,6 +25,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h"
+#include "mlir/Conversion/MathToSPIRV/MathToSPIRV.h"
+#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
@@ -315,8 +317,12 @@ void ConvertToSPIRVPass::runOnOperation() {
   // TODO(antiagainst): Use a lowering that uses specific SPIRV intrinsics.
   tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
 
-  // Pull in standard patterns to convert arithmetic ops and others.
+  // Pull in MemRef patterns to convert load/store ops.
+  populateMemRefToSPIRVPatterns(typeConverter, patterns);
+
+  // Pull in standard/math patterns to convert arithmetic ops and others.
   populateStandardToSPIRVPatterns(typeConverter, patterns);
+  populateMathToSPIRVPatterns(typeConverter, patterns);
 
   // Pull in standard patterns to convert tensor operations to SPIR-V. These are
   // primarily used to handle tensor-type constants and contain a

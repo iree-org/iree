@@ -27,7 +27,7 @@ namespace IREE {
 namespace HAL {
 
 static llvm::CodeGenOpt::Level passBuilderOptLevelToCodeGenOptLevel(
-    const llvm::PassBuilder::OptimizationLevel &level) {
+    const llvm::OptimizationLevel &level) {
   switch (level.getSpeedupLevel()) {
     case 0:
       return llvm::CodeGenOpt::None;
@@ -87,7 +87,7 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
     case SanitizerKind::kAddress: {
       passBuilder.registerOptimizerLastEPCallback(
           [](llvm::ModulePassManager &modulePassManager,
-             llvm::PassBuilder::OptimizationLevel Level) {
+             llvm::OptimizationLevel Level) {
             bool compileKernel = false;
             bool recover = false;
             bool useAfterScope = true;
@@ -105,7 +105,7 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
     } break;
   }
 
-  if (options.optLevel != llvm::PassBuilder::OptimizationLevel::O0) {
+  if (options.optLevel != llvm::OptimizationLevel::O0) {
     llvm::ModulePassManager modulePassManager;
     modulePassManager =
         passBuilder.buildPerModuleDefaultPipeline(options.optLevel);
