@@ -20,7 +20,7 @@ echo "Running pycheck against '${DIFF_TARGET?}'"
 if [[ "${DIFF_TARGET?}" = "all" ]]; then
   FILES=$(find -name "*\.py" -not -path "./third_party/*")
 else
-  FILES=$(git diff --diff-filter=d --name-only "${DIFF_TARGET?}" | grep '.*\.py')
+  FILES=$(git diff --diff-filter=d --name-only "${DIFF_TARGET?}" | grep '.*\.py\$')
 fi
 
 
@@ -43,6 +43,8 @@ function check_files() {
     echo
     return "${1?}"
   fi
+
+  echo "This is the list: '${@:2}'"
 
   # We disable import-error because pytype doesn't have access to bazel.
   # We disable pyi-error because of the way the bindings imports work.
