@@ -216,10 +216,10 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_copy_buffer(
 
   CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
-  target_offset += iree_hal_buffer_byte_offset(target_buffer);
+  /* target_offset += */ iree_hal_buffer_byte_offset(target_buffer);
   CUdeviceptr source_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(source_buffer));
-  source_offset += iree_hal_buffer_byte_offset(source_buffer);
+  /* source_offset += */ iree_hal_buffer_byte_offset(source_buffer);
   CUDA_RETURN_IF_ERROR(command_buffer->context->syms,
                        cuMemcpyAsync(target_device_buffer, source_device_buffer,
                                      length, command_buffer->stream),
