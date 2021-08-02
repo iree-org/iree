@@ -12,6 +12,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -90,8 +91,9 @@ namespace {
 struct LinalgExtToLoopsPass
     : public LinalgExtToLoopsBase<LinalgExtToLoopsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, StandardOpsDialect,
-                    memref::MemRefDialect, scf::SCFDialect>();
+    registry
+        .insert<linalg::LinalgDialect, StandardOpsDialect, math::MathDialect,
+                memref::MemRefDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {

@@ -179,7 +179,8 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort",
 }
 
 def LinalgExt_FftOp : LinalgExt_Op<"fft",
-    [DeclareOpInterfaceMethods<TiledOpInterface, []>]> {
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+        ["generateScalarImplementation"]>]> {
   let summary = "Fft operator";
   let description = [{
     Apply 1D FFT to innermost dim. This is an iterative FFT, not recurrsive.
@@ -218,6 +219,8 @@ def LinalgExt_FftOp : LinalgExt_Op<"fft",
       return getOperandShape().back();
     }
     Value getStage() { return inputs()[0]; }
+    Value getReal() { return outputs()[0]; }
+    Value getImag() { return outputs()[1]; }
   }];
 }
 
