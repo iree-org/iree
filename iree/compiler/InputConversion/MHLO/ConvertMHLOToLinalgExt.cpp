@@ -305,7 +305,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   LogicalResult matchAndRewrite(
       mhlo::FftOp op, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const final {
-        // Only handle 2^n fft length.
+    // Only handle 2^n fft length.
     mhlo::FftOpAdaptor adaptor(args);
     auto operandType = adaptor.operand().getType().dyn_cast<RankedTensorType>();
     if (!operandType || !operandType.hasStaticShape()) {
