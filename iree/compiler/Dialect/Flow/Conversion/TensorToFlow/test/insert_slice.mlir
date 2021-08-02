@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-convert-to-flow-tensor-ops-pass %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow-tensor-ops-pass %s | IreeFileCheck %s
 
 func @insert_slice_convert
     (%arg0 : tensor<?x24x48xf32>, %arg1 : tensor<1x4x48xf32>) ->
@@ -51,3 +51,20 @@ func @rank_reducing_insert_slice_trailing_unit_dims
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %{{.+}} : tensor<49x20xf32> -> tensor<1x49x20x1xf32>
 //       CHECK:   flow.tensor.update %[[RESHAPE]], %{{.+}}[%[[C0]], %[[C1]], %[[C0]], %[[C0]]] : tensor<1x49x20x1xf32> -> tensor<1x50x20x1xf32>
+
+
+// -----
+
+func @insert_slice_within_dispatch_workgroups_not_converted() -> tensor<f32> {
+  %x = constant 100 : index
+  %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<f32>) = () {
+    // CHECK: = tensor.insert_slice %[[source2:.+]] into %[[source1:.+]][4, 2, 0] [1, 4, 48] [1, 1, 1] : tensor<1x4x48xf32> into tensor<?x24x48xf32>
+    %1 = "test.source1"() : () -> (tensor<?x24x48xf32>)
+    %2 = "test.source2"() : () -> (tensor<1x4x48xf32>)
+    %3 = tensor.insert_slice %2 into %1[4, 2, 0] [1, 4, 48] [1, 1, 1] :
+        tensor<1x4x48xf32> into tensor<?x24x48xf32>
+    "test.sink"(%3) : (tensor<?x24x48xf32>) -> ()
+    flow.return
+  }
+  return %0 : tensor<f32>
+}

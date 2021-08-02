@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-convert-to-flow-tensor-ops-pass %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow-tensor-ops-pass %s | IreeFileCheck %s
 
 func @extract_slice1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
   %0 = tensor.extract_slice %arg0[2, 3, 4] [1, 1, 4] [1, 1, 1]
@@ -126,3 +126,18 @@ func @rank_reducing_extract_slice_trailing_unit_dims
 //   CHECK-DAG:   %[[C20:.+]] = constant 20 : index
 //       CHECK:   %[[extract_slice:.+]] = flow.tensor.slice %{{.+}}[%[[C0]], %[[C1]], %[[C0]], %[[C0]] for %[[C1]], %[[C49]], %[[C20]], %[[C1]]] : tensor<1x50x20x1xf32> -> tensor<1x49x20x1xf32>
 //       CHECK:   flow.tensor.reshape %[[extract_slice]] : tensor<1x49x20x1xf32> -> tensor<49x20xf32>
+
+// -----
+
+func @extract_slice_within_dispatch_workgroups_not_converted() -> tensor<f32> {
+  %x = constant 100 : index
+  %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<f32>) = () {
+    // CHECK: = tensor.extract_slice %[[source:.+]][2, 3, 4] [1, 1, 4] [1, 1, 1] : tensor<5x24x48xf32> to tensor<4xf32>
+    %1 = "test.source"() : () -> (tensor<5x24x48xf32>)
+    %2 = tensor.extract_slice %1[2, 3, 4] [1, 1, 4] [1, 1, 1]
+      : tensor<5x24x48xf32> to tensor<4xf32>
+    "test.sink"(%2) : (tensor<4xf32>) -> ()
+    flow.return
+  }
+  return %0 : tensor<f32>
+}

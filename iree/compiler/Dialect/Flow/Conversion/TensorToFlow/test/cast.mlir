@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-convert-to-flow-tensor-ops-pass %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow-tensor-ops-pass %s | IreeFileCheck %s
 
 func @static_tensor_cast_to_dynamic(%arg0: tensor<4x4xf32>) -> tensor<?x?xf32> {
   // CHECK-DAG: %[[C4:.*]] = constant 4 : index
@@ -26,4 +26,17 @@ func @dynamic_tensor_cast_to_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?x3xf32> 
   // CHECK: return %[[RESULT]]
   %0 = tensor.cast %arg0 : tensor<?x?xf32> to tensor<?x3xf32>
   return %0 : tensor<?x3xf32>
+}
+
+// -----
+func @tensor_cast_within_dispatch_workgroups_not_converted() -> tensor<f32> {
+  %x = constant 100 : index
+  %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<f32>) = () {
+    // CHECK: = tensor.cast %[[source:.+]] : tensor<4x4xf32> to tensor<?x?xf32>
+    %1 = "test.source"() : () -> (tensor<4x4xf32>)
+    %2 = tensor.cast %1 : tensor<4x4xf32> to tensor<?x?xf32>
+    "test.sink"(%2) : (tensor<?x?xf32>) -> ()
+    flow.return
+  }
+  return %0 : tensor<f32>
 }
