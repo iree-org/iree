@@ -74,6 +74,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "fft.mlir",  # TODO(GH-6604): Enable the test.
             "round.mlir",
             "scatter.mlir",
         ],
