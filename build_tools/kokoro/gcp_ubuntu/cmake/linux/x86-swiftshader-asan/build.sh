@@ -125,6 +125,6 @@ excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
 cd ${CMAKE_BUILD_DIR?}
 
 echo "Testing with ctest"
-ctest --output-on-failure \
+ctest --timeout 900 --output-on-failure \
   --label-exclude "^driver=cuda$|^driver=vulkan$" \
   --exclude-regex "${excluded_tests_regex?}"
