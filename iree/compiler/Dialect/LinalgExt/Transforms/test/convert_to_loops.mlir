@@ -419,7 +419,7 @@ func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
 // CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
 // CHECK:             linalg.generic
 // CHECK-SAME:          indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]], #[[MAP1]]]
-// CHECK-SAME:          iterator_types = ["parallel"]
+// CHECK-SAME:          iterator_types = ["parallel", "parallel"]
 // CHECK-SAME:          outs(%[[L_REAL_SLICE]], %[[L_IMAG_SLICE]], %[[R_REAL_SLICE]], %[[R_IMAG_SLICE]]
 //
 //                    The computation is bascially the same, and they are
