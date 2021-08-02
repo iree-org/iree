@@ -42,6 +42,10 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+/// Creates a pass to convert linalg convolution ops to the variants with
+/// better layouts for IREE.
+std::unique_ptr<OperationPass<FuncOp>> createChangeConv2DLayoutPass();
+
 /// Creates a pass to convert linalg convolution ops with 1x1 kernels into
 /// linalg.matmul
 std::unique_ptr<OperationPass<mlir::FuncOp>>
