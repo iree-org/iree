@@ -33,7 +33,7 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_D
 #      does not support Ubuntu 18.04.
 # This allows to share configuration with base CMake, but it also means we need
 # to MATCH the driver version between the host machine and the docker image.
-FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:66e9459de736df596c828a6c9429810a7e770ae6993b42952a1d51933145fb00 AS final
+FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:6384367aeb40c4ad18c5620c1663fb0c9f6210a3506e77bd85d43d937cf2fbee AS final
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
