@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='vm.module(iree-convert-vm-to-emitc)' %s | IreeFileCheck %s
 
 vm.module @my_module {
-  // CHECK-LABEL: vm.func @const_f32_zero
+  // CHECK-LABEL: @my_module_const_f32_zero
   vm.func @const_f32_zero() -> f32 {
     // CHECK: %[[ZERO:.+]] = "emitc.constant"() {value = 0.000000e+00 : f32} : () -> f32
     %zero = vm.const.f32.zero : f32
@@ -12,7 +12,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: vm.func @const_f32
+  // CHECK-LABEL: @my_module_const_f32
   vm.func @const_f32() {
     // CHECK-NEXT: %0 = "emitc.constant"() {value = 5.000000e-01 : f32} : () -> f32
     %0 = vm.const.f32 0.5 : f32
