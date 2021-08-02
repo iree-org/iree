@@ -153,12 +153,12 @@ static const int kRegSize = sizeof(uint16_t);
 
 // Bytecode data access macros for reading values of a given type from a byte
 // offset within the current function.
-#define OP_I8(i) iree_unaligned_load_le((uint8_t*)&bytecode_data[pc + (i)])
-#define OP_I16(i) iree_unaligned_load_le((uint16_t*)&bytecode_data[pc + (i)])
-#define OP_I32(i) iree_unaligned_load_le((uint32_t*)&bytecode_data[pc + (i)])
-#define OP_I64(i) iree_unaligned_load_le((uint64_t*)&bytecode_data[pc + (i)])
-#define OP_F32(i) iree_unaligned_load_le((float*)&bytecode_data[pc + (i)])
-#define OP_F64(i) iree_unaligned_load_le((double*)&bytecode_data[pc + (i)])
+#define OP_I8(i) iree_unaligned_load_le_u8((uint8_t*)&bytecode_data[pc + (i)])
+#define OP_I16(i) iree_unaligned_load_le_u16((uint16_t*)&bytecode_data[pc + (i)])
+#define OP_I32(i) iree_unaligned_load_le_u32((uint32_t*)&bytecode_data[pc + (i)])
+#define OP_I64(i) iree_unaligned_load_le_u64((uint64_t*)&bytecode_data[pc + (i)])
+#define OP_F32(i) iree_unaligned_load_le_f32((float*)&bytecode_data[pc + (i)])
+#define OP_F64(i) iree_unaligned_load_le_f64((double*)&bytecode_data[pc + (i)])
 
 //===----------------------------------------------------------------------===//
 // Utilities matching the tablegen op encoding scheme
