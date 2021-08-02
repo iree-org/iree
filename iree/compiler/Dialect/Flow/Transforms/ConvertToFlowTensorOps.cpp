@@ -110,7 +110,6 @@ struct ConvertToFlowTensorOpsPass
     FuncOp funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
-
     RewritePatternSet patterns(&getContext());
     if (runBeforeDispatchRegionFormation) {
       // Rewrite tensor -> flow.tensor ops.

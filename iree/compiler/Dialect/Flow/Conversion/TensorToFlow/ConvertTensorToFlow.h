@@ -9,14 +9,13 @@
 
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// Populates conversion patterns for Tensor->Flow.
+// Populates rewrite patterns for Tensor->Flow.
 void populateTensorToFlowPatterns(MLIRContext *context,
                                   OwningRewritePatternList &patterns);
 
