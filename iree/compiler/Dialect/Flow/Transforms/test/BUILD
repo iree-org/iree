@@ -17,6 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "change_conv2d_layout.mlir",
             "conv1x1_to_matmul.mlir",
             "conv2d_to_img2col.mlir",
             "convert_to_flow_tensor_ops_after.mlir",

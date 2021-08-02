@@ -93,6 +93,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       Shape::createExpandFunctionDynamicDimsPass());
 
   // Special case peephole optimizations.
+  passManager.addNestedPass<FuncOp>(createChangeConv2DLayoutPass());
   if (clEnable1x1ConvToMatmul) {
     passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
   }

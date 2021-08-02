@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "change_conv2d_layout.mlir"
     "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
     "convert_to_flow_tensor_ops_after.mlir"

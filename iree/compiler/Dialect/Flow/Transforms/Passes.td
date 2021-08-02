@@ -9,6 +9,12 @@
 
 include "mlir/Pass/PassBase.td"
 
+def ChangeConv2DLayout :
+    Pass<"iree-flow-change-conv2d-layout", "FuncOp"> {
+  let summary = "Change linalg convolution ops to variants with better layouts";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createChangeConv2DLayoutPass()";
+}
+
 def ConvertConv2D1x1ConvToMatmul :
     Pass<"iree-flow-convert-conv2d-1x1-to-matmul", "FuncOp"> {
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
