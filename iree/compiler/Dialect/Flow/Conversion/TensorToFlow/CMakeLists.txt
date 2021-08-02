@@ -21,7 +21,6 @@ iree_cc_library(
     MLIRIR
     MLIRStandard
     MLIRTensor
-    MLIRTransforms
     iree::compiler::Dialect::Flow::IR
   PUBLIC
 )

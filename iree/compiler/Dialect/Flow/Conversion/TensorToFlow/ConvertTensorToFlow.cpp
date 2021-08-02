@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -122,17 +121,23 @@ static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
 
 /// Convert tensor.insert_slice ops into flow.tensor.update ops where possible.
 struct ConvertTensorInsertSlicePattern
-    : public OpConversionPattern<tensor::InsertSliceOp> {
-  using OpConversionPattern<tensor::InsertSliceOp>::OpConversionPattern;
+    : public OpRewritePattern<tensor::InsertSliceOp> {
+  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(
-      tensor::InsertSliceOp insertOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!shouldBeConverted(insertOp)) {
-      return success();
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
+                                PatternRewriter &rewriter) const override {
+    if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
     }
 
+    SmallVector<OpFoldResult, 4> offsets = insertOp.getMixedOffsets();
     SmallVector<OpFoldResult, 4> sizes = insertOp.getMixedSizes();
+    SmallVector<OpFoldResult, 4> strides = insertOp.getMixedStrides();
+    ArrayRef<int64_t> dstShape = insertOp.getType().getShape();
+    if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
+                                             dstShape)) {
+      return failure();
+    }
 
     Location loc = insertOp.getLoc();
     auto sourceDynamicDims = getDynamicValues(sizes);
@@ -158,37 +163,27 @@ struct ConvertTensorInsertSlicePattern
         sourceDynamicDims, nullptr);
     return success();
   }
-
-  static bool shouldBeConverted(tensor::InsertSliceOp op) {
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
-      return false;
-    }
-    SmallVector<OpFoldResult, 4> offsets = op.getMixedOffsets();
-    SmallVector<OpFoldResult, 4> sizes = op.getMixedSizes();
-    SmallVector<OpFoldResult, 4> strides = op.getMixedStrides();
-    ArrayRef<int64_t> dstShape = op.getType().getShape();
-    if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
-                                             dstShape)) {
-      return false;
-    }
-    return true;
-  }
 };
 
 /// Convert tensor.extract_slice ops into flow.tensor.slice ops where possible.
 struct ConvertTensorExtractSlicePattern
-    : public OpConversionPattern<tensor::ExtractSliceOp> {
-  using OpConversionPattern<tensor::ExtractSliceOp>::OpConversionPattern;
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(
-      tensor::ExtractSliceOp sliceOp, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!shouldBeConverted(sliceOp)) {
-      return success();
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    if (sliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
     }
 
     SmallVector<OpFoldResult, 4> offsets = sliceOp.getMixedOffsets();
     SmallVector<OpFoldResult, 4> sizes = sliceOp.getMixedSizes();
+    SmallVector<OpFoldResult, 4> strides = sliceOp.getMixedStrides();
+    ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
+    if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
+                                             srcShape)) {
+      return failure();
+    }
 
     Location loc = sliceOp.getLoc();
 
@@ -219,38 +214,22 @@ struct ConvertTensorExtractSlicePattern
     rewriter.replaceOp(sliceOp, replacement);
     return success();
   }
-
-  static bool shouldBeConverted(tensor::ExtractSliceOp op) {
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
-      return false;
-    }
-    SmallVector<OpFoldResult, 4> offsets = op.getMixedOffsets();
-    SmallVector<OpFoldResult, 4> sizes = op.getMixedSizes();
-    SmallVector<OpFoldResult, 4> strides = op.getMixedStrides();
-    ArrayRef<int64_t> srcShape = op.getSourceType().getShape();
-    if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides,
-                                             srcShape)) {
-      return false;
-    }
-    return true;
-  }
 };
 
-struct ConvertTensorCastPattern : public OpConversionPattern<tensor::CastOp> {
-  using OpConversionPattern<tensor::CastOp>::OpConversionPattern;
+struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
+  using OpRewritePattern<tensor::CastOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(
-      tensor::CastOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!shouldBeConverted(op)) {
-      return success();
+  LogicalResult matchAndRewrite(tensor::CastOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
     }
 
     auto loc = op.getLoc();
-    Value input = operands.front();
+    Value input = op.getOperand();
     ShapedType inputType = input.getType().dyn_cast<ShapedType>();
     ShapedType resultType =
-        typeConverter->convertType(op.getType()).dyn_cast_or_null<ShapedType>();
+        op.getResult().getType().dyn_cast_or_null<ShapedType>();
     if (!inputType || !resultType || !inputType.hasRank() ||
         !resultType.hasRank()) {
       return rewriter.notifyMatchFailure(op, "not ranked shaped types");
@@ -301,80 +280,39 @@ struct ConvertTensorCastPattern : public OpConversionPattern<tensor::CastOp> {
 
     return success();
   }
-
-  static bool shouldBeConverted(tensor::CastOp op) {
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
-      return false;
-    }
-
-    return true;
-  }
 };
 
 struct ConvertTensorFromElementsPattern
-    : public OpConversionPattern<tensor::FromElementsOp> {
-  using OpConversionPattern<tensor::FromElementsOp>::OpConversionPattern;
+    : public OpRewritePattern<tensor::FromElementsOp> {
+  using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(
-      tensor::FromElementsOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(tensor::FromElementsOp op,
+                                PatternRewriter &rewriter) const override {
+    // TODO: This pattern was mainly added to iron out some kinks specific to
+    // detensoring (see: https://github.com/google/iree/issues/1159). Do we need
+    // to expand this check for other uses?
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>() ||
+        op.getType().getDimSize(0) != 1) {
+      return failure();
+    }
+
     auto loc = op.getLoc();
-
-    if (shouldBeConverted(op)) {
-      SmallVector<Value> dimSizes(1);
-      dimSizes[0] = rewriter.create<ConstantIndexOp>(loc, 1);
-      rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
-          op, op.getType(), operands.front(), dimSizes);
-    }
-
+    SmallVector<Value> dimSizes(1);
+    dimSizes[0] = rewriter.create<ConstantIndexOp>(loc, 1);
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
+        op, op.getType(), op.getOperand(0), dimSizes);
     return success();
-  }
-
-  // TODO: This pattern was mainly added to iron out some kinks specific to
-  // detensoring (see: https://github.com/google/iree/issues/1159). Do we need
-  // to expand this check for other uses?
-  static bool shouldBeConverted(tensor::FromElementsOp op) {
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
-      return false;
-    }
-
-    return op.getType().getDimSize(0) == 1;
   }
 };
 
 }  // namespace
 
-void setupTensorToFlowLegality(MLIRContext *context,
-                               ConversionTarget &conversionTarget,
-                               TypeConverter &typeConverter) {
-  conversionTarget.addDynamicallyLegalOp<tensor::InsertSliceOp>(
-      [](tensor::InsertSliceOp op) {
-        return !ConvertTensorInsertSlicePattern::shouldBeConverted(op);
-      });
-  conversionTarget.addDynamicallyLegalOp<tensor::ExtractSliceOp>(
-      [](tensor::ExtractSliceOp op) {
-        return !ConvertTensorExtractSlicePattern::shouldBeConverted(op);
-      });
-  conversionTarget.addDynamicallyLegalOp<tensor::CastOp>([](tensor::CastOp op) {
-    return !ConvertTensorCastPattern::shouldBeConverted(op);
-  });
-  conversionTarget.addDynamicallyLegalOp<tensor::FromElementsOp>(
-      [](tensor::FromElementsOp op) {
-        return !ConvertTensorFromElementsPattern::shouldBeConverted(op);
-      });
-
-  conversionTarget.addLegalDialect<StandardOpsDialect>();
-  conversionTarget.addLegalDialect<tensor::TensorDialect>();
-  conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
-}
-
 void populateTensorToFlowPatterns(MLIRContext *context,
-                                  OwningRewritePatternList &patterns,
-                                  TypeConverter &typeConverter) {
+                                  OwningRewritePatternList &patterns) {
   patterns
       .insert<ConvertTensorInsertSlicePattern, ConvertTensorExtractSlicePattern,
               ConvertTensorCastPattern, ConvertTensorFromElementsPattern>(
-          typeConverter, context);
+          context);
 }
 
 }  // namespace Flow
