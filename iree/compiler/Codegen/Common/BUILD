@@ -40,6 +40,7 @@ cc_library(
         "LinalgBufferizePass.cpp",
         "OptimizeVectorTransferPass.cpp",
         "SetNumWorkgroupsPass.cpp",
+        "ShapeToLLVMConversion.cpp",
         "VectorizeConv.cpp",
     ],
     deps = [
@@ -62,6 +63,8 @@ cc_library(
         "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:LLVMCommonConversion",
+        "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",

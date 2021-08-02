@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -94,6 +95,11 @@ createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 /// Co is a multiple of 4, and filter shape must be 1x1x4xCo.
 void populateLinalgToVectorVectorizeConvPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
+
+/// Populates `patterns` with conversions of Shape dialect to LLVM Dialect.
+void populateShapeToLLVMConversionPatterns(MLIRContext *context,
+                                           TypeConverter *converter,
+                                           OwningRewritePatternList &patterns);
 
 //------------------------------------------------------------------------------
 // LLVMCPU
