@@ -319,87 +319,83 @@ struct LLVMGPUTileAndDistributePass
     registry.insert<AffineDialect, gpu::GPUDialect>();
   }
   void runOnOperation() override {
-    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-    ModuleOp module = variantOp.getInnerModule();
+    MLIRContext *context = &getContext();
+    auto funcOp = getOperation();
+    if (!isEntryPoint(funcOp)) return;
 
-    MLIRContext *context = module->getContext();
-    for (FuncOp funcOp : module.getOps<FuncOp>()) {
-      if (!isEntryPoint(funcOp)) continue;
-      {
-        // Tile again at the workgroup level since redution dimension were
-        // ignored. Dimensions already tiled will be ignore since we tile to the
-        // same size.
-        OwningRewritePatternList wgTilingPatterns(context);
-        populateTilingReductionPatterns(context, wgTilingPatterns);
-        (void)applyPatternsAndFoldGreedily(funcOp, std::move(wgTilingPatterns));
-      }
-
-      {
-        RewritePatternSet wgTilingCanonicalizationPatterns =
-            linalg::getLinalgTilingCanonicalizationPatterns(context);
-        populateAffineMinSCFCanonicalizationPattern(
-            wgTilingCanonicalizationPatterns);
-        (void)applyPatternsAndFoldGreedily(
-            funcOp, std::move(wgTilingCanonicalizationPatterns));
-      }
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "After tile reductions:";
-        funcOp.dump();
-      });
-
-      {
-        OwningRewritePatternList promotionPatterns(&getContext());
-        populatePromotionPatterns(context, promotionPatterns);
-        (void)applyPatternsAndFoldGreedily(funcOp,
-                                           std::move(promotionPatterns));
-      }
-
-      {
-        RewritePatternSet promotionCanonicalization =
-            linalg::getLinalgTilingCanonicalizationPatterns(context);
-        (void)applyPatternsAndFoldGreedily(
-            funcOp, std::move(promotionCanonicalization));
-      }
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "After promotion:";
-        funcOp.dump();
-      });
-
-      {
-        auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-            getEntryPoint(funcOp).workgroup_size().getValue(),
-            [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-        // Apply last level of tiling and distribute to threads.
-        OwningRewritePatternList threadLevelTilingPatterns(context);
-        populateTilingToInvocationPatterns(context, threadLevelTilingPatterns,
-                                           workgroupSize);
-        populateTilingCopyToWorkgroupMemPatterns(
-            context, threadLevelTilingPatterns, workgroupSize);
-        (void)applyPatternsAndFoldGreedily(
-            funcOp, std::move(threadLevelTilingPatterns));
-      }
-      {
-        // Apply canonicalization patterns.
-        RewritePatternSet threadTilingCanonicalizationPatterns =
-            linalg::getLinalgTilingCanonicalizationPatterns(context);
-        populateAffineMinSCFCanonicalizationPattern(
-            threadTilingCanonicalizationPatterns);
-        (void)applyPatternsAndFoldGreedily(
-            funcOp, std::move(threadTilingCanonicalizationPatterns));
-      }
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "After tile and distribute to threads:";
-        funcOp.dump();
-      });
+    {
+      // Tile again at the workgroup level since redution dimension were
+      // ignored. Dimensions already tiled will be ignore since we tile to the
+      // same size.
+      OwningRewritePatternList wgTilingPatterns(context);
+      populateTilingReductionPatterns(context, wgTilingPatterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(wgTilingPatterns));
     }
+
+    {
+      RewritePatternSet wgTilingCanonicalizationPatterns =
+          linalg::getLinalgTilingCanonicalizationPatterns(context);
+      populateAffineMinSCFCanonicalizationPattern(
+          wgTilingCanonicalizationPatterns);
+      (void)applyPatternsAndFoldGreedily(
+          funcOp, std::move(wgTilingCanonicalizationPatterns));
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "After tile reductions:";
+      funcOp.dump();
+    });
+
+    {
+      OwningRewritePatternList promotionPatterns(&getContext());
+      populatePromotionPatterns(context, promotionPatterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
+    }
+
+    {
+      RewritePatternSet promotionCanonicalization =
+          linalg::getLinalgTilingCanonicalizationPatterns(context);
+      (void)applyPatternsAndFoldGreedily(funcOp,
+                                         std::move(promotionCanonicalization));
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "After promotion:";
+      funcOp.dump();
+    });
+
+    {
+      auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
+          getEntryPoint(funcOp).workgroup_size().getValue(),
+          [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+      // Apply last level of tiling and distribute to threads.
+      OwningRewritePatternList threadLevelTilingPatterns(context);
+      populateTilingToInvocationPatterns(context, threadLevelTilingPatterns,
+                                         workgroupSize);
+      populateTilingCopyToWorkgroupMemPatterns(
+          context, threadLevelTilingPatterns, workgroupSize);
+      (void)applyPatternsAndFoldGreedily(funcOp,
+                                         std::move(threadLevelTilingPatterns));
+    }
+    {
+      // Apply canonicalization patterns.
+      RewritePatternSet threadTilingCanonicalizationPatterns =
+          linalg::getLinalgTilingCanonicalizationPatterns(context);
+      populateAffineMinSCFCanonicalizationPattern(
+          threadTilingCanonicalizationPatterns);
+      (void)applyPatternsAndFoldGreedily(
+          funcOp, std::move(threadTilingCanonicalizationPatterns));
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "After tile and distribute to threads:";
+      funcOp.dump();
+    });
   }
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUTileAndDistributeToThreads() {
   return std::make_unique<LLVMGPUTileAndDistributePass>();
 }

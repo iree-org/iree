@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass{test-lowering-configuration},iree-llvmgpu-tile-and-distribute))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(module(func(iree-llvmgpu-tile-and-distribute))))' %s | IreeFileCheck %s
 
 #config = {tileSizes = [[2, 256, 4], [], [2, 4]]}
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">

@@ -31,85 +31,83 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
 
 void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   // Convert tensor to buffers.
-  addLinalgBufferizePasses(pm.nest<ModuleOp>(), gpuAllocationFunction);
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
-  pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
-  pm.addNestedPass<ModuleOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addPass(createLLVMGPUTileAndDistributeToThreads());
-  pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
-  pm.addNestedPass<ModuleOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistributeToThreads());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-      createLLVMGPURemoveSingleIterationLoopPass());
+  pm.addNestedPass<FuncOp>(createLLVMGPURemoveSingleIterationLoopPass());
 
   // Linalg -> vector
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createLLVMGPUVectorizationPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createLLVMGPUVectorizationPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   // Convert tensor to buffers.
-  addLinalgBufferizePasses(pm.nest<ModuleOp>(), gpuAllocationFunction);
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
 
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
-  pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
-  pm.addNestedPass<ModuleOp>(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addPass(createLLVMGPUTileAndDistributeToThreads());
-  pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
-  pm.addNestedPass<ModuleOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistributeToThreads());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-      createLLVMGPURemoveSingleIterationLoopPass());
+  pm.addNestedPass<FuncOp>(createLLVMGPURemoveSingleIterationLoopPass());
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
-  pm.addNestedPass<ModuleOp>(createLowerAffinePass());
-  pm.addNestedPass<ModuleOp>(createCanonicalizerPass());
-  pm.addNestedPass<ModuleOp>(createCSEPass());
+  pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // LinalgExt -> SCF
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
-      linalg_ext::createLinalgExtToLoopsPass());
+  pm.addNestedPass<FuncOp>(linalg_ext::createLinalgExtToLoopsPass());
 
   // Linalg -> SCF
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 
   // Handled tensor-type constants.
-  pm.addNestedPass<ModuleOp>(createTensorConstantBufferizePass());
-  pm.addNestedPass<ModuleOp>(createFoldTensorExtractOpPass());
+  pm.addPass(createTensorConstantBufferizePass());
+  pm.addPass(createFoldTensorExtractOpPass());
 
   // SCF -> STD
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createLowerToCFGPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createLowerToCFGPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
 
-  pm.addNestedPass<ModuleOp>(createLowerAffinePass());
+  pm.addPass(createLowerAffinePass());
 
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
-  pm.addNestedPass<ModuleOp>(createStripDebugInfoPass());
+  pm.addPass(createStripDebugInfoPass());
   if (useROCM) {
     // convert to ROCDL.
-    pm.addNestedPass<ModuleOp>(createConvertToROCDLPass());
+    pm.addPass(createConvertToROCDLPass());
   } else {
     // convert to NVVM.
-    pm.addNestedPass<ModuleOp>(createConvertToNVVMPass());
+    pm.addPass(createConvertToNVVMPass());
   }
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
+  OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//
   // Convert Linalg ops to LLVM+NVVM/ROCDL ops.
   //
@@ -117,7 +115,7 @@ void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
-  addLowerToLLVMGPUPasses(pm, useROCM);
+  addLowerToLLVMGPUPasses(nestedModulePM, useROCM);
 }
 
 }  // namespace iree_compiler

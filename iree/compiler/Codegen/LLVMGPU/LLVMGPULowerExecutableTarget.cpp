@@ -95,12 +95,13 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
   executableLoweringPipeline.addPass(createCanonicalizerPass());
   if (!testLoweringConfiguration && passPipeline.hasValue()) {
+    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     switch (*passPipeline) {
       case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute:
-        addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
+        addGPUSimpleDistributePassPipeline(nestedModulePM);
         break;
       case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize:
-        addGPUVectorizationPassPipeline(executableLoweringPipeline);
+        addGPUVectorizationPassPipeline(nestedModulePM);
         break;
       default:
         llvm_unreachable("Unsupported pipeline on GPU target.");

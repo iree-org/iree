@@ -145,8 +145,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
     executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
     executableLoweringPipeline.addPass(createCanonicalizerPass());
-    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     if (!testLoweringConfiguration && passPipeline.hasValue()) {
+      OpPassManager &nestedModulePM =
+          executableLoweringPipeline.nest<ModuleOp>();
       switch (passPipeline.getValue()) {
         case IREE::HAL::DispatchLoweringPassPipeline::CPUDefault:
           addCPUDefaultPassPipeline(nestedModulePM);
