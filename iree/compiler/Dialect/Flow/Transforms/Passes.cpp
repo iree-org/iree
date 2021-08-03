@@ -122,7 +122,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
   if (clEnableLinalgDetensorize) {
-    // NOTE: must run flow->tensor ops and canonicalization after detensorizing.
     passManager.addNestedPass<FuncOp>(mlir::createLinalgDetensorizePass());
   }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
