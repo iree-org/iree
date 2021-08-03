@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Tests for common transforms.
-
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
@@ -19,7 +17,10 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "top_level_scf_to_cfg.mlir",
+            "cast.mlir",
+            "extract_slice.mlir",
+            "from_elements.mlir",
+            "insert_slice.mlir",
         ],
         include = ["*.mlir"],
     ),

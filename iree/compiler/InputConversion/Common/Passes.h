@@ -27,15 +27,6 @@ void registerCommonConversionPassPipelines();
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<FuncOp>> createTopLevelSCFToCFGPass();
-std::unique_ptr<OperationPass<FuncOp>> createConvertUpstreamToIREE();
-
-//===----------------------------------------------------------------------===//
-// Patterns
-//===----------------------------------------------------------------------===//
-
-void populateConvertUpstreamToIREEPatterns(MLIRContext *context,
-                                           TypeConverter &typeConverter,
-                                           OwningRewritePatternList &patterns);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

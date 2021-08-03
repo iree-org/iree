@@ -65,6 +65,7 @@ cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
