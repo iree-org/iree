@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRLinalg
+    MLIRMath
     MLIRMemRef
     MLIRParser
     MLIRSCF
