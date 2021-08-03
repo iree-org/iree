@@ -59,6 +59,13 @@ static llvm::cl::opt<int> clLinalgOpsPaddingSize(
                    "flow-padding-size"),
     llvm::cl::init(4));
 
+// TODO(#1159): enable by default or remove this option once it works on
+//              a broader set of programs
+static llvm::cl::opt<bool> clEnableLinalgDetensorize(
+    "iree-flow-enable-linalg-detensorize",
+    llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -114,10 +121,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  if (clEnableLinalgDetensorize) {
+    passManager.addNestedPass<FuncOp>(mlir::createLinalgDetensorizePass());
+  }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createConvertToFlowTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/true));
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
