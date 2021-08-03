@@ -262,15 +262,16 @@ func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0)>
 // CHECK:      func @rfft_1d
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
-// CHECK-DAG:    %[[INDICES:.+]] = constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xindex>
+// CHECK-DAG:    %[[INDICES:.+]] = constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi32>
 // CHECK-DAG:    %[[INIT_TENSOR:.+]] = linalg.init_tensor [8] : tensor<8xf32>
 // CHECK:        %[[REORDERED:.+]] = linalg.generic
 // CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]]]
 // CHECK-SAME:     iterator_types = ["parallel"]
 // CHECK-SAME:     ins(%[[INDICES]]
 // CHECK-SAME:     outs(%[[INIT_TENSOR]]
-// CHECK:        ^bb0(%[[IDX:.+]]: index, %{{.+}}: f32):
-// CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[IDX]]] : tensor<8xf32>
+// CHECK:        ^bb0(%[[IDX:.+]]: i32, %{{.+}}: f32):
+// CHECK:          %[[IDXVAL:.+]] = index_cast %[[IDX]] : i32 to index
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[IDXVAL]]] : tensor<8xf32>
 // CHECK:          linalg.yield %[[LOAD]] : f32
 // CHECK:        %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<8xf32>
 // CHECK:        %[[C1:.+]] = constant 1 : index
@@ -303,16 +304,17 @@ func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>) {
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK:      func @rfft_2d
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
-// CHECK-DAG:    %[[INDICES:.+]] = constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xindex>
+// CHECK-DAG:    %[[INDICES:.+]] = constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi32>
 // CHECK-DAG:    %[[INIT_TENSOR:.+]] = linalg.init_tensor [4, 8] : tensor<4x8xf32>
 // CHECK:        %[[REORDERED:.+]] = linalg.generic
 // CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]]]
 // CHECK-SAME:     iterator_types = ["parallel", "parallel"]
 // CHECK-SAME:     ins(%[[INDICES]]
 // CHECK-SAME:     outs(%[[INIT_TENSOR]]
-// CHECK:        ^bb0(%[[IDX:.+]]: index, %{{.+}}: f32):
+// CHECK:        ^bb0(%[[IDX:.+]]: i32, %{{.+}}: f32):
 // CHECK:          %[[I:.+]] = linalg.index 0
-// CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[I]], %[[IDX]]] : tensor<4x8xf32>
+// CHECK:          %[[IDXVAL:.+]] = index_cast %[[IDX]] : i32 to index
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[I]], %[[IDXVAL]]] : tensor<4x8xf32>
 // CHECK:          linalg.yield %[[LOAD]] : f32
 // CHECK:        %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<4x8xf32>
 // CHECK:        %[[C1:.+]] = constant 1 : index

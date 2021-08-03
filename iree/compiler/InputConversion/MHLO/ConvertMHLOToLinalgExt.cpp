@@ -257,9 +257,9 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
       for (int j = 0; j < logn; ++j) {
         r |= ((i >> j) & 1) << (logn - j - 1);
       }
-      values.push_back(b.getIndexAttr(r));
+      values.push_back(b.getI32IntegerAttr(r));
     }
-    auto type = RankedTensorType::get({fftLength}, b.getIndexType());
+    auto type = RankedTensorType::get({fftLength}, b.getI32Type());
     return b.create<ConstantOp>(type, DenseIntElementsAttr::get(type, values));
   }
 
@@ -291,7 +291,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
           for (auto i : llvm::seq<unsigned>(0, rank - 1)) {
             ivs.push_back(b.create<linalg::IndexOp>(loc, i));
           }
-          ivs.push_back(args[0]);
+          ivs.push_back(b.create<IndexCastOp>(loc, args[0], b.getIndexType()));
           b.create<linalg::YieldOp>(
               loc, b.create<tensor::ExtractOp>(loc, real, ivs).getResult());
         });
