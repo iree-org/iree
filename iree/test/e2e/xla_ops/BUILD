@@ -44,7 +44,6 @@ iree_check_single_backend_test_suite(
             "dynamic_update_slice.mlir",
             "exponential.mlir",
             "exponential_minus_one.mlir",
-            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -75,6 +74,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "fft.mlir",  # TODO(GH-6604): Enable the test.
             "round.mlir",
             "scatter.mlir",
         ],
@@ -182,7 +182,6 @@ iree_check_single_backend_test_suite(
             "dynamic_update_slice.mlir",
             "exponential.mlir",
             "exponential_minus_one.mlir",
-            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -212,8 +211,9 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "fft.mlir",  # TODO(GH-6601): Eanble the test.
             "round.mlir",
-            "scatter.mlir",  # TODO(GH-6000): Enable the test.
+            "scatter.mlir",  # TODO(GH-6601): Enable the test.
             "sort.mlir",
         ],
     ),
@@ -276,9 +276,9 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",  # TODO(GH-5444): Enable the test.
+            "fft.mlir",  # TODO(GH-6388): Enable the test.
             "round.mlir",
-            "scatter.mlir",  # TODO(GH-6001): Enable the test.
+            "scatter.mlir",  # TODO(GH-6388): Enable the test.
             "sort.mlir",
         ],
     ),

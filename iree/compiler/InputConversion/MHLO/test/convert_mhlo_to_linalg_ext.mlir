@@ -248,3 +248,85 @@ func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
 // CHECK:             ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):  // no predecessors
 // CEECK:               linalg.yield %[[V1]]
 // CHECK:         return %[[SCATTER]]
+
+// -----
+
+func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
+  %0 = "mhlo.fft"(%input) {
+    fft_length = dense<8> : tensor<1xi64>, fft_type = "RFFT"
+  } : (tensor<8xf32>) -> tensor<5xcomplex<f32>>
+  %1 = "mhlo.real"(%0) : (tensor<5xcomplex<f32>>) -> tensor<5xf32>
+  %2 = "mhlo.imag"(%0) : (tensor<5xcomplex<f32>>) -> tensor<5xf32>
+  return %1, %2 : tensor<5xf32>, tensor<5xf32>
+}
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0)>
+// CHECK:      func @rfft_1d
+// CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[INDICES:.+]] = constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xindex>
+// CHECK-DAG:    %[[INIT_TENSOR:.+]] = linalg.init_tensor [8] : tensor<8xf32>
+// CHECK:        %[[REORDERED:.+]] = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]]]
+// CHECK-SAME:     iterator_types = ["parallel"]
+// CHECK-SAME:     ins(%[[INDICES]]
+// CHECK-SAME:     outs(%[[INIT_TENSOR]]
+// CHECK:        ^bb0(%[[IDX:.+]]: index, %{{.+}}: f32):
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[IDX]]] : tensor<8xf32>
+// CHECK:          linalg.yield %[[LOAD]] : f32
+// CHECK:        %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<8xf32>
+// CHECK:        %[[C1:.+]] = constant 1 : index
+// CHECK:        %[[R1:.+]]:2 = linalg_ext.fft
+// CHECK-SAME:     ins(%[[C1]]
+// CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
+// CHECK:        %[[C2:.+]] = constant 2 : index
+// CHECK:        %[[R2:.+]]:2 = linalg_ext.fft
+// CHECK-SAME:     ins(%[[C2]]
+// CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
+// CHECK:        %[[C3:.+]] = constant 3 : index
+// CHECK:        %[[R3:.+]]:2 = linalg_ext.fft
+// CHECK-SAME:     ins(%[[C3]]
+// CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
+// CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
+// CHECK:        %[[RES_IMAG:.+]] = tensor.extract_slice %[[R3]]#1[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
+// CHECK:        %{{.+}} = "mhlo.complex"(%[[RES_REAL]], %[[RES_IMAG]])
+
+// -----
+
+func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>) {
+  %0 = "mhlo.fft"(%input) {
+    fft_length = dense<8> : tensor<1xi64>, fft_type = "RFFT"
+  } : (tensor<4x8xf32>) -> tensor<4x5xcomplex<f32>>
+  %1 = "mhlo.real"(%0) : (tensor<4x5xcomplex<f32>>) -> tensor<4x5xf32>
+  %2 = "mhlo.imag"(%0) : (tensor<4x5xcomplex<f32>>) -> tensor<4x5xf32>
+  return %1, %2 : tensor<4x5xf32>, tensor<4x5xf32>
+}
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:      func @rfft_2d
+// CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[INDICES:.+]] = constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xindex>
+// CHECK-DAG:    %[[INIT_TENSOR:.+]] = linalg.init_tensor [4, 8] : tensor<4x8xf32>
+// CHECK:        %[[REORDERED:.+]] = linalg.generic
+// CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]]]
+// CHECK-SAME:     iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:     ins(%[[INDICES]]
+// CHECK-SAME:     outs(%[[INIT_TENSOR]]
+// CHECK:        ^bb0(%[[IDX:.+]]: index, %{{.+}}: f32):
+// CHECK:          %[[I:.+]] = linalg.index 0
+// CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[I]], %[[IDX]]] : tensor<4x8xf32>
+// CHECK:          linalg.yield %[[LOAD]] : f32
+// CHECK:        %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<4x8xf32>
+// CHECK:        %[[C1:.+]] = constant 1 : index
+// CHECK:        %[[R1:.+]]:2 = linalg_ext.fft
+// CHECK-SAME:     ins(%[[C1]]
+// CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
+// CHECK:        %[[C2:.+]] = constant 2 : index
+// CHECK:        %[[R2:.+]]:2 = linalg_ext.fft
+// CHECK-SAME:     ins(%[[C2]]
+// CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
+// CHECK:        %[[C3:.+]] = constant 3 : index
+// CHECK:        %[[R3:.+]]:2 = linalg_ext.fft
+// CHECK-SAME:     ins(%[[C3]]
+// CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
+// CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0, 0] [4, 5] [1, 1] : tensor<4x8xf32> to tensor<4x5xf32>
+// CHECK:        %[[RES_IMAG:.+]] = tensor.extract_slice %[[R3]]#1[0, 0] [4, 5] [1, 1] : tensor<4x8xf32> to tensor<4x5xf32>
+// CHECK:        %{{.+}} = "mhlo.complex"(%[[RES_REAL]], %[[RES_IMAG]])
