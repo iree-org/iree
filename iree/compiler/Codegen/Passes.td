@@ -187,6 +187,12 @@ def LLVMGPUVectorization :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
 }
 
+def LLVMGPUVectorLowering :
+    Pass<"iree-llvmgpu-vector-lowering", "FuncOp"> {
+  let summary = "Pass to lower Vector ops before conversion to LLVM.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
+}
+
 //------------------------------------------------------------------------------
 // SPIRV
 //------------------------------------------------------------------------------

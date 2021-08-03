@@ -49,6 +49,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createLLVMGPUVectorizationPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
@@ -91,6 +92,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
+  pm.addNestedPass<FuncOp>(createLLVMGPUVectorLoweringPass());
   pm.addPass(createLowerAffinePass());
 
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
