@@ -16,10 +16,10 @@
 #                                                                              #
 ################################################################################
 
-set(MOBILENETSSD_FP32_MODULE
-  "MobileNetSSD"                  # MODULE_NAME
+set(MOBILESSD_FP32_MODULE
+  "MobileSSD"                     # MODULE_NAME
   "fp32"                          # MODULE_TAGS
-  "https://storage.googleapis.com/iree-model-artifacts/MobileNetSSD.tar.gz" # MLIR_SOURCE
+  "https://storage.googleapis.com/iree-model-artifacts/MobileSSD-3554868.tar.gz" # MLIR_SOURCE
   "main"                          # ENTRY_FUNCTION
   "1x320x320x3xf32"               # FUNCTION_INPUTS
 )
