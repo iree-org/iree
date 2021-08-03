@@ -73,10 +73,21 @@ LogicalResult defineWorkgroupCountRegion(
   OpBuilder::InsertionGuard guard(builder);
   // Create the cloned operation but with a single region.
   builder.setInsertionPoint(entryPointOp);
+
   auto clonedOp = builder.create<IREE::HAL::ExecutableEntryPointOp>(
       loc, entryPointOp.sym_nameAttr(), entryPointOp.ordinalAttr(),
       entryPointOp.interfaceAttr(), entryPointOp.workgroup_sizeAttr(),
       entryPointOp.workgroup_local_memoryAttr(), 1);
+  // Copy over all attributes
+  for (auto attr : entryPointOp->getAttrs()) {
+    if (attr.first != entryPointOp.sym_nameAttrName() &&
+        attr.first != entryPointOp.ordinalAttrName() &&
+        attr.first != entryPointOp.interfaceAttrName() &&
+        attr.first != entryPointOp.workgroup_sizeAttrName() &&
+        attr.first != entryPointOp.workgroup_local_memoryAttrName()) {
+      clonedOp->setAttr(attr.first, attr.second);
+    }
+  }
   Region *region = clonedOp.getBody();
   Block *entryBlock = builder.createBlock(region);
   // Add 3 index arguments for the workload.

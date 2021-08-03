@@ -54,8 +54,7 @@ static void populateTilingReductionPatterns(
   auto tileSizesFn = [&](OpBuilder &builder,
                          Operation *op) -> SmallVector<Value, 4> {
     SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
-    IREE::HAL::LoweringConfig config = getLoweringConfig(op);
-    SmallVector<int64_t, 4> tileSizes = getTileSizes(config, 0);
+    SmallVector<int64_t, 4> tileSizes = getTileSizes(op, 0);
     Location loc = op->getLoc();
     auto tileSizesVal =
         llvm::to_vector<4>(llvm::map_range(tileSizes, [&](int64_t v) -> Value {
