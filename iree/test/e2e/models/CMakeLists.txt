@@ -19,7 +19,7 @@ iree_lit_test_suite(
     "fragment_000.mlir"
     "fullyconnected.mlir"
     "mnist_fake_weights.mlir"
-    "resnet_fake_weights.mlir"
+    "resnet50_fake_weights.mlir"
     "unidirectional_lstm.mlir"
   DATA
     iree::tools::IreeFileCheck
