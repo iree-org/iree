@@ -2580,6 +2580,30 @@ def VM_CastF32UI32Op :
   let hasFolder = 1;
 }
 
+def VM_BitcastI32F32Op :
+    VM_ConversionOp<I32, F32, "bitcast.i32.f32", VM_OPC_BitcastI32F32,
+                    [VM_ExtF32]> {
+  let summary = [{bitcast from a 32-bit integer to a 32-bit float-point value}];
+}
+
+def VM_BitcastF32I32Op :
+    VM_ConversionOp<F32, I32, "bitcast.f32.i32", VM_OPC_BitcastF32I32,
+                    [VM_ExtF32]> {
+  let summary = [{bitcast from a 32-bit float-point value to a 32-bit integer}];
+}
+
+def VM_BitcastI64F64Op :
+    VM_ConversionOp<I64, F64, "bitcast.i64.f64", VM_OPC_BitcastI64F64,
+                    [VM_ExtF64]> {
+  let summary = [{bitcast from a 64-bit integer to a 64-bit float-point value}];
+}
+
+def VM_BitcastF64I64Op :
+    VM_ConversionOp<F64, I64, "bitcast.f64.i64", VM_OPC_BitcastF64I64,
+                    [VM_ExtF64]> {
+  let summary = [{bitcast from a 64-bit float-point value to a 64-bit integer}];
+}
+
 //===----------------------------------------------------------------------===//
 // Native reduction (horizontal) arithmetic
 //===----------------------------------------------------------------------===//

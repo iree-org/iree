@@ -50,6 +50,8 @@ def VM_OPC_CastSI64F64           : VM_OPC<0x34, "CastSI64F64">;
 def VM_OPC_CastUI64F64           : VM_OPC<0x35, "CastUI64F64">;
 def VM_OPC_CastF64SI64           : VM_OPC<0x36, "CastF64SI64">;
 def VM_OPC_CastF64UI64           : VM_OPC<0x37, "CastF64UI64">;
+def VM_OPC_BitcastI64F64         : VM_OPC<0x38, "BitcastI64F64">;
+def VM_OPC_BitcastF64I64         : VM_OPC<0x39, "BitcastF64I64">;
 
 def VM_OPC_AtanF64               : VM_OPC<0x40, "AtanF64">;
 def VM_OPC_Atan2F64              : VM_OPC<0x41, "Atan2F64">;
@@ -124,6 +126,8 @@ def VM_ExtF64OpcodeAttr :
     VM_OPC_CastUI64F64,
     VM_OPC_CastF64SI64,
     VM_OPC_CastF64UI64,
+    VM_OPC_BitcastI64F64,
+    VM_OPC_BitcastF64I64,
 
     VM_OPC_AtanF64,
     VM_OPC_Atan2F64,

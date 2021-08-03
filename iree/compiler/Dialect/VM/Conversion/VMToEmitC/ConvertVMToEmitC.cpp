@@ -2118,6 +2118,10 @@ void populateVMToEmitCPatterns(MLIRContext *context,
       context, "vm_cast_f32si32");
   patterns.insert<GenericOpConversion<IREE::VM::CastF32UI32Op>>(
       context, "vm_cast_f32ui32");
+  patterns.insert<GenericOpConversion<IREE::VM::BitcastI32F32Op>>(
+      context, "vm_bitcast_i32f32");
+  patterns.insert<GenericOpConversion<IREE::VM::BitcastF32I32Op>>(
+      context, "vm_bitcast_f32i32");
 
   // ExtF32: Comparison ops
   patterns.insert<GenericOpConversion<IREE::VM::CmpEQF32OOp>>(context,

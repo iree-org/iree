@@ -44,6 +44,8 @@ def VM_OPC_CastSI32F32           : VM_OPC<0x30, "CastSI32F32">;
 def VM_OPC_CastUI32F32           : VM_OPC<0x31, "CastUI32F32">;
 def VM_OPC_CastF32SI32           : VM_OPC<0x32, "CastF32SI32">;
 def VM_OPC_CastF32UI32           : VM_OPC<0x33, "CastF32UI32">;
+def VM_OPC_BitcastI32F32         : VM_OPC<0x34, "BitcastI32F32">;
+def VM_OPC_BitcastF32I32         : VM_OPC<0x35, "BitcastF32I32">;
 
 def VM_OPC_AtanF32               : VM_OPC<0x40, "AtanF32">;
 def VM_OPC_Atan2F32              : VM_OPC<0x41, "Atan2F32">;
@@ -111,6 +113,8 @@ def VM_ExtF32OpcodeAttr :
     VM_OPC_CastUI32F32,
     VM_OPC_CastF32SI32,
     VM_OPC_CastF32UI32,
+    VM_OPC_BitcastI32F32,
+    VM_OPC_BitcastF32I32,
 
     VM_OPC_AtanF32,
     VM_OPC_Atan2F32,
