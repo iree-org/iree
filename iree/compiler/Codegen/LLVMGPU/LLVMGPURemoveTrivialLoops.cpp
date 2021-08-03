@@ -42,14 +42,12 @@ class LLVMGPURemoveSingleIterationLoopPass
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
     auto entryPointOp = getEntryPoint(funcOp);
+    Optional<ArrayAttr> workgroupSizeAttr = entryPointOp.workgroup_size();
+    if (!workgroupSizeAttr) return;
     std::array<int32_t, 3> workgroupSize;
-    if (Optional<ArrayAttr> workgroupSizeAttr = entryPointOp.workgroup_size()) {
-      for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
-        workgroupSize[it.index()] =
-            it.value().cast<IntegerAttr>().getValue().getZExtValue();
-      }
-    } else {
-      workgroupSize = {1, 1, 1};
+    for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
+      workgroupSize[it.index()] =
+          it.value().cast<IntegerAttr>().getValue().getZExtValue();
     }
     auto getThreadIdMinMax = [&workgroupSize](Value value,
                                               SmallVectorImpl<Value> &dims,

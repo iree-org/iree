@@ -8,7 +8,7 @@ hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
       ordinal = 0 : index,
       workgroup_size = [64: index, 1: index, 1:index]}
     module {
-      func @dispatch_0() attributes {llvmgpu_workgroup_size = dense<[64, 1, 1]> : vector<3xi64>} {
+      func @dispatch_0() {
         %c2 = constant 2 : index
         %c256 = constant 256 : index
         //     CHECK: %[[C250:.+]] = constant 250 : index

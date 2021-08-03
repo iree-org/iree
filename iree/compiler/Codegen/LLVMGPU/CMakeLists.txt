@@ -27,6 +27,7 @@ iree_cc_library(
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
   DEPS
+    LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
     MLIRGPUOps

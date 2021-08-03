@@ -37,6 +37,7 @@ cc_library(
         "//iree/compiler/Dialect/LinalgExt/IR",
         "//iree/compiler/Dialect/LinalgExt/Transforms",
         "//iree/compiler/Dialect/Shape/Transforms",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:GPUDialect",
