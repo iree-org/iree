@@ -260,7 +260,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
       values.push_back(b.getIndexAttr(r));
     }
     auto type = RankedTensorType::get({fftLength}, b.getIndexType());
-    return b.create<ConstantOp>(type, DenseFPElementsAttr::get(type, values));
+    return b.create<ConstantOp>(type, DenseIntElementsAttr::get(type, values));
   }
 
   static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
