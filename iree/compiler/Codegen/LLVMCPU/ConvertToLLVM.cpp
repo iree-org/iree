@@ -612,10 +612,6 @@ void ConvertToLLVMPass::runOnOperation() {
   options.dataLayout = llvm::DataLayout(targetDataLayout);
   options.overrideIndexBitwidth(options.dataLayout.getPointerSizeInBits());
   LLVMTypeConverter converter(&getContext(), options, &dataLayoutAnalysis);
-  // converter.addConversion([](Shape::RankedShapeType, SmallVectorImpl<Type> &)
-  // {
-  //   return success();
-  // });
 
   OwningRewritePatternList patterns(&getContext());
 
