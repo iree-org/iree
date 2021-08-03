@@ -1182,7 +1182,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   context->allowUnregisteredDialects(true);
 
   unsigned numRoots = decideFusableLinalgOps(funcOp);
-  makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
+  numRoots = makeElementwiseOpsRootOps<linalg::GenericOp>(funcOp, numRoots);
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
@@ -1263,10 +1263,14 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         // TODO(nicolavasilache): use refactored `getWorkgroupMarker()`
         linalg::LinalgTransformationFilter(
             ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
-
-    // Add canonicalization patterns.
-    linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+    // Run canonicalization patterns.
+    OwningRewritePatternList canonicalizationPattterns(&getContext());
+    linalg::populateLinalgTilingCanonicalizationPatterns(
+        canonicalizationPattterns);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPattterns));
   }
 
   // If elementwise operations are not tiled and distributed, the wont be marked
