@@ -69,7 +69,6 @@ iree_cc_library(
     MLIRTensor
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR

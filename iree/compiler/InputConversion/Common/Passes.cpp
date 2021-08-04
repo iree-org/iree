@@ -6,7 +6,6 @@
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -26,9 +25,7 @@ void registerCommonConversionPassPipelines() {
 
 // Common transformations to prepare input dialects for IREE.
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createConvertToFlowTensorOpsPass(
-          /*runBeforeDispatchRegionFormation=*/true));
+  passManager.addNestedPass<FuncOp>(createConvertUpstreamToIREE());
 }
 
 namespace {
