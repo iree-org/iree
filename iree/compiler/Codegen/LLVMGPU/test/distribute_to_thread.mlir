@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(module(func(iree-llvmgpu-tile-and-distribute))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-tile-and-distribute))))' %s | IreeFileCheck %s
 
 #config = {tileSizes = [[2, 256, 4], [], [2, 4]]}
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
@@ -13,8 +13,8 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
     interface = @legacy_io,
     ordinal = 0 : index,
     workgroup_size = [64 : index, 1 : index, 1 : index]}
-  module  {
-    func @dot_dispatch_0() {
+  builtin.module  {
+    builtin.func @dot_dispatch_0() {
       %cst = constant 0.000000e+00 : f32
       %c0 = constant 0 : index
       %c1024 = constant 1024 : index
@@ -114,8 +114,8 @@ hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
         passPipeline = 3 : i32,
         workloadPerWorkgroup = [256, 2]},
       workgroup_size = [64: index, 1: index, 1: index]}
-    module  {
-      func @dot_dispatch_1() {
+    builtin.module  {
+      builtin.func @dot_dispatch_1() {
         %c0 = constant 0 : index
         %c4 = constant 4 : index
         %c2 = constant 2 : index
@@ -189,8 +189,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
       ordinal = 0 : index,
       translation.info = {passPipeline = 2 : i32},
       workgroup_size = [1: index, 1: index, 1: index]}
-    module  {
-      func @predict_dispatch_153() {
+    builtin.module  {
+      builtin.func @predict_dispatch_153() {
         %c0 = constant 0 : index
         %cst = constant 0x7FC00000 : f32
         %cst_0 = constant 0xFF800000 : f32
