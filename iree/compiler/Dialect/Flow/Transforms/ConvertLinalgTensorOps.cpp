@@ -4,14 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
@@ -20,7 +18,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-convert-to-flow-tensor-ops"
+#define DEBUG_TYPE "iree-flow-convert-linalg-tensor-ops"
 
 namespace mlir {
 namespace iree_compiler {
@@ -29,7 +27,7 @@ namespace Flow {
 
 namespace {
 
-/// Generates `memref.dim` operations to get the dynamic sizes of a value `v`.
+/// Generates `tensor.dim` operations to get the dynamic sizes of a value `v`.
 static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
                                                  Value v) {
   SmallVector<Value, 4> dynamicDims;
@@ -92,19 +90,19 @@ struct LinalgFillToFlowTensorSplat final
   }
 };
 
-/// Converts operations that can map to flow.tensor.* operations.
-struct ConvertToFlowTensorOpsPass
-    : public ConvertToFlowTensorOpsBase<ConvertToFlowTensorOpsPass> {
-  ConvertToFlowTensorOpsPass(bool runBefore) {
+/// Converts linalg operations that can map to flow.tensor.* operations.
+struct ConvertLinalgTensorOpsPass
+    : public ConvertLinalgTensorOpsBase<ConvertLinalgTensorOpsPass> {
+  ConvertLinalgTensorOpsPass(bool runBefore) {
     runBeforeDispatchRegionFormation = runBefore;
   }
-  ConvertToFlowTensorOpsPass(const ConvertToFlowTensorOpsPass &that) {
+  ConvertLinalgTensorOpsPass(const ConvertLinalgTensorOpsPass &that) {
     runBeforeDispatchRegionFormation = that.runBeforeDispatchRegionFormation;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, memref::MemRefDialect,
-                    mlir::StandardOpsDialect>();
+    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
+                    linalg::LinalgDialect, mlir::StandardOpsDialect>();
   }
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
@@ -112,9 +110,6 @@ struct ConvertToFlowTensorOpsPass
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
     if (runBeforeDispatchRegionFormation) {
-      // Rewrite tensor -> flow.tensor ops.
-      populateTensorToFlowPatterns(&getContext(), patterns);
-      // Rewrite linalg.tensor -> flow.tensor ops.
       patterns.insert<
           LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
           LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(
@@ -130,9 +125,9 @@ struct ConvertToFlowTensorOpsPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass(
+std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgTensorOpsPass(
     bool runBeforeDispatchRegionFormation) {
-  return std::make_unique<ConvertToFlowTensorOpsPass>(
+  return std::make_unique<ConvertLinalgTensorOpsPass>(
       runBeforeDispatchRegionFormation);
 }
 

@@ -26,9 +26,7 @@ void registerCommonConversionPassPipelines() {
 
 // Common transformations to prepare input dialects for IREE.
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createConvertToFlowTensorOpsPass(
-          /*runBeforeDispatchRegionFormation=*/true));
+  passManager.addNestedPass<FuncOp>(IREE::Flow::createConvertTensorOpsPass());
 }
 
 namespace {
