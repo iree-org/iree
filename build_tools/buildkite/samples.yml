@@ -7,7 +7,7 @@
 steps:
   - label: "Test Colab notebooks"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:be5465585706b620d6c722caa6237eafdfaa8dd11ce20db0981b979f2d3387b3 python3 colab/test_notebooks.py"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:24aebb1f88f6c14550a70150e046ee618c1fae1d739a5dae736a5a7c77d6ee90 python3 colab/test_notebooks.py"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
@@ -15,7 +15,7 @@ steps:
 
   - label: "Test Samples"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:be5465585706b620d6c722caa6237eafdfaa8dd11ce20db0981b979f2d3387b3 build_tools/testing/test_samples.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:24aebb1f88f6c14550a70150e046ee618c1fae1d739a5dae736a5a7c77d6ee90 build_tools/testing/test_samples.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:

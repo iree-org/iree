@@ -25,7 +25,7 @@ Minimally, the following CMake flags must be specified:
 
 ## Python Setup
 
-Install [Python 3](https://www.python.org/downloads/) `>= 3.6` and
+Install [Python 3](https://www.python.org/downloads/) `>= 3.7` and
 [pip](https://pip.pypa.io/en/stable/installing/), if needed.
 
 > Note:<br>
