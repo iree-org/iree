@@ -233,6 +233,9 @@ createLLVMGPULowerExecutableTargetPass();
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass();
 
+/// Lower vector ops before convertion to LLVM.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();
+
 //------------------------------------------------------------------------------
 // SPIRV Passes
 //------------------------------------------------------------------------------

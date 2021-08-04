@@ -24,6 +24,7 @@ iree_cc_library(
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPURemoveTrivialLoops.cpp"
     "LLVMGPUTileAndDistribute.cpp"
+    "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
   DEPS
