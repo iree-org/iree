@@ -66,6 +66,11 @@ $ cmake \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   ... # other cmake arguments as usual
 ```
+
+For tracing the compiler, additionally set `IREE_ENABLE_COMPILER_TRACING` to
+`ON`. Compiler tracing is less stable, particularly on Linux with MLIR
+threading enabled (https://github.com/google/iree/issues/6404).
+
 ## Permissions issues
 
 The profiled application (i.e. the Tracy client) needs to have appropriate

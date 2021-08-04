@@ -88,7 +88,7 @@ func @tensorTypesF64(%arg0 : tensor<4x4xf64>) -> tensor<4x4xf64> {
 }
 
 // -----
-// expected-error@+1 {{'func' op unable to legalize type of input 0}}
+// expected-error@+1 {{'builtin.func' op unable to legalize type of input 0}}
 func @tensorUnrankedArg(%arg0 : tensor<*xi64>) -> tensor<*xi64> {
   return %arg0 : tensor<*xi64>
 }

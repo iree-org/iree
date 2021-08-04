@@ -29,6 +29,12 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
   let verifier = [{ return verify$cppClass(*this); }];
   let printer = [{ return print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
+  code extraLinalgExtOpClassDeclaration = [{
+    SmallVector<Value> getDestinationOperands() {
+      SmallVector<Value> dest(outputs().begin(), outputs().end());
+      return dest;
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -72,12 +78,12 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
-    custom<LinalgExtOutsList>($outputs, type($outputs))
+    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
   }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
-  let extraClassDeclaration = [{
     int64_t getIndexDepth() {
       return getInputOperand(1)
           ->get()
@@ -118,17 +124,13 @@ def LinalgExt_ScatterOp : LinalgExt_Op<"scatter",
     bool isScalarUpdate() {
       return getUpdateSliceRank() == 0;
     }
-
-    void generateScalarUpdateLoopBody(OpBuilder & b, Location loc,
-                                      ValueRange ivs);
-    void generateSliceUpdateLoopBody(OpBuilder & b, Location loc,
-                                      ValueRange ivs);
   }];
 }
 
 def LinalgExt_SortOp : LinalgExt_Op<"sort",
     [DeclareOpInterfaceMethods<TiledOpInterface,
-        ["getTiledImplementation", "generateScalarImplementation"]>]> {
+        ["getPartitionableLoops", "generateScalarImplementation",
+         "getTiledImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
     Based on XLA operation semantics, sorts the given `operands` at the given
@@ -149,11 +151,11 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort",
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
     (`dimension` `(` $dimension^ `)`)?
-    attr-dict custom<LinalgExtInsList>($inputs, type($inputs))
-    custom<LinalgExtOutsList>($outputs, type($outputs))
+    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
   }];
-  let extraClassDeclaration = [{
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value operand(int index) {
       return outputs()[index];
     }
@@ -173,6 +175,52 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort",
       }
       return sortedDim;
     }
+  }];
+}
+
+def LinalgExt_FftOp : LinalgExt_Op<"fft",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+        ["generateScalarImplementation"]>]> {
+  let summary = "Fft operator";
+  let description = [{
+    Apply 1D FFT to innermost dim. This is an iterative FFT, not recurrsive.
+    Thus, the bit reversal is assumed applied on the input. The op carries an
+    input -- stage, which indicates the level of reduction loop in the
+    algorithm. It represents the computation body. For more details, see
+    "Data reordering, bit reversal, and in-place algorithms" section in
+    https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm
+
+    The size of innermost dim is expected to be a power of 2.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$inputs,
+                       Variadic<AnyShaped>:$outputs
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`:` type($results)^)?
+  }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value operand() {
+      return outputs()[0];
+    }
+    ShapedType getOperandType() {
+      return operand().getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType().getRank();
+    }
+    ArrayRef<int64_t> getOperandShape() {
+      return getOperandType().getShape();
+    }
+    int64_t getFftLength() {
+      return getOperandShape().back();
+    }
+    Value getStage() { return inputs()[0]; }
+    Value getReal() { return outputs()[0]; }
+    Value getImag() { return outputs()[1]; }
   }];
 }
 

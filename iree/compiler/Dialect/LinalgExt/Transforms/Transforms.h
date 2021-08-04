@@ -25,10 +25,76 @@ struct TiledOp {
   SmallVector<Value> results;
 };
 
-/// Main entry point for tiling LinalgExtOps using TiledOpInterface.  If the
-/// `op` does not implement the `TiledOpInterface` returns a `TiledOp{}` value.
-FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, Operation *op, ValueRange dest,
+/// Main entry point for tiling LinalgExtOps using TiledOpInterface.
+FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TiledOpInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options);
+
+/// Base rewrite pattern to tile and distribute operations that implement the
+/// `TiledOpInterface`.
+/// Base pattern for tiling TiledOpInterfaceOps.
+struct TiledOpInterfaceBaseTilingPattern : public RewritePattern {
+  TiledOpInterfaceBaseTilingPattern(MLIRContext *context,
+                                    linalg::LinalgTilingOptions options,
+                                    linalg::LinalgTransformationFilter filter =
+                                        linalg::LinalgTransformationFilter(),
+                                    PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
+        filter(filter),
+        options(options) {}
+
+  TiledOpInterfaceBaseTilingPattern(StringRef opName, MLIRContext *context,
+                                    linalg::LinalgTilingOptions options,
+                                    linalg::LinalgTransformationFilter filter =
+                                        linalg::LinalgTransformationFilter(),
+                                    PatternBenefit benefit = 1)
+      : RewritePattern(opName, benefit, context),
+        filter(filter),
+        options(options) {}
+
+  LogicalResult matchAndRewriteBase(TiledOpInterface tilableOp,
+                                    PatternRewriter &rewriter,
+                                    TiledOp &result) const;
+
+ private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  linalg::LinalgTransformationFilter filter;
+  /// Options to control tiling;
+  linalg::LinalgTilingOptions options;
+};
+
+template <typename OpTy>
+struct TiledOpInterfaceTilingPattern
+    : public TiledOpInterfaceBaseTilingPattern {
+  TiledOpInterfaceTilingPattern(MLIRContext *context,
+                                linalg::LinalgTilingOptions options,
+                                linalg::LinalgTransformationFilter filter =
+                                    linalg::LinalgTransformationFilter(),
+                                PatternBenefit benefit = 1)
+      : TiledOpInterfaceBaseTilingPattern(OpTy::getOperationName(), context,
+                                          options, filter, benefit) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    auto tilableOp = dyn_cast<TiledOpInterface>(op);
+    if (!tilableOp) return failure();
+    TiledOp tiledOp;
+    // Check for failure.
+    if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
+            op, rewriter, tiledOp))) {
+      return failure();
+    }
+    // Check for do-nothing case.
+    if (!tiledOp.op) return failure();
+    if (tiledOp.op != op) {
+      if (tiledOp.results.empty()) {
+        rewriter.eraseOp(op);
+      } else {
+        rewriter.replaceOp(op, tiledOp.results);
+      }
+    }
+    return success();
+  }
+};
 
 }  // namespace linalg_ext
 }  // namespace iree_compiler

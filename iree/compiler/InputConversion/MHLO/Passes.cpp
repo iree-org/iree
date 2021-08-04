@@ -66,7 +66,7 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
 
   // Convert to Linalg. After this point, MHLO will be eliminated.
   passManager.addNestedPass<FuncOp>(
-      mlir::iree_compiler::createConvertAndDistributeMHLOToLinalgExtPass());
+      mlir::iree_compiler::createConvertMHLOToLinalgExtPass());
   passManager.addNestedPass<FuncOp>(
       mlir::iree_compiler::createMHLOToLinalgOnTensorsPass());
 

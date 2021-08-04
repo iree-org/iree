@@ -50,6 +50,7 @@ iree_cc_library(
     "Passes.cpp"
     "PromoteI1ToI8Pass.cpp"
     "PromoteTensorLoads.cpp"
+    "SimplifyVariableAccesses.cpp"
     "StripAndSplatConstantVariables.cpp"
     "TypeConverter.cpp"
   DEPS
@@ -68,9 +69,12 @@ iree_cc_library(
     MLIRTensor
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion

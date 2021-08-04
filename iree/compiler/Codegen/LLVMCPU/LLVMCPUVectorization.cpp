@@ -180,9 +180,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
                             context),
             Identifier::get(getWorkgroupL1TileMarker(), context)));
 
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
-      return signalPassFailure();
-    }
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));
   }
 
   // Second level of tiling. (workgroups memory -> vectors)
@@ -201,9 +199,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
             Identifier::get(getWorkgroupL1TileMarker(), context),
             Identifier::get(getVectorizeMarker(), context)));
 
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns)))) {
-      return signalPassFailure();
-    }
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns));
   }
 
   // Apply canonicalization.
@@ -229,10 +225,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         vectorizationPatterns, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
             Identifier::get(getVectorizeMarker(), context)));
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorizationPatterns)))) {
-      return signalPassFailure();
-    }
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(vectorizationPatterns));
   }
 
   // TODO: This should be a folding of Add into Contract in core but while they
@@ -247,10 +241,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
     RewritePatternSet vectorToAArch64AsmPatterns(context);
     populateVectorContractToAArch64InlineAsm(vectorToAArch64AsmPatterns,
                                              context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorToAArch64AsmPatterns)))) {
-      return signalPassFailure();
-    }
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(vectorToAArch64AsmPatterns));
   }
 
   // Apply vector specific operation lowering.
@@ -265,10 +257,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
             vectorTransformsOptions, context);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorContractLoweringPatterns)))) {
-      return signalPassFailure();
-    }
+    (void)applyPatternsAndFoldGreedily(
+        funcOp, std::move(vectorContractLoweringPatterns));
   }
 
   // Hosit hierarchical tiling indexing and other loop invariant transfer
@@ -286,10 +276,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
     linalg::hoistRedundantVectorTransfers(funcOp);
 
     memref::populateFoldSubViewOpPatterns(vectorToLoopsPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorToLoopsPatterns)))) {
-      return signalPassFailure();
-    }
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(vectorToLoopsPatterns));
   }
 }
 

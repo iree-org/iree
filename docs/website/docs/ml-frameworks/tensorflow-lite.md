@@ -24,6 +24,11 @@ python -m pip install \
   -f https://github.com/google/iree/releases
 ```
 
+!!! warning
+    The TensorFlow Lite package is currently only available on Linux and macOS.
+    It is not available on Windows yet (see
+    [this issue](https://github.com/google/iree/issues/6417)).
+
 ## Importing models
 
 Fist, import the TFLite model to TOSA MLIR:

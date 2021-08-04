@@ -67,7 +67,7 @@ typedef struct iree_vm_bytecode_module_t {
 
   // Type table mapping module type IDs to registered VM types.
   iree_host_size_t type_count;
-  iree_vm_type_def_t* type_table;
+  iree_vm_type_def_t type_table[];
 } iree_vm_bytecode_module_t;
 
 // A resolved and split import in the module state table.

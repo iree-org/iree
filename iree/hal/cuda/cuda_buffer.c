@@ -59,7 +59,7 @@ iree_status_t iree_hal_cuda_buffer_wrap(
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
@@ -95,7 +95,7 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
   if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
-    memset(data_ptr + local_byte_offset, 0xCD, local_byte_length);
+    memset(data_ptr, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
   *out_data_ptr = data_ptr;

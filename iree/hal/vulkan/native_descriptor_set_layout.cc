@@ -56,6 +56,7 @@ static iree_status_t iree_hal_vulkan_create_descriptor_set_layout(
 
   VkDescriptorSetLayoutBinding* native_bindings = NULL;
   if (binding_count > 0) {
+    // TODO(benvanik): avoid this allocation if possible (inline_array).
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(
         logical_device->host_allocator(),
         binding_count * sizeof(VkDescriptorSetLayoutBinding),

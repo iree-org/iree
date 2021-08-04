@@ -59,15 +59,27 @@ static llvm::cl::opt<int> clLinalgOpsPaddingSize(
                    "flow-padding-size"),
     llvm::cl::init(4));
 
+// TODO(#1159): enable by default or remove this option once it works on
+//              a broader set of programs
+static llvm::cl::opt<bool> clEnableLinalgDetensorize(
+    "iree-flow-enable-linalg-detensorize",
+    llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
-  // Perform initial cleanup.
-  // NOTE: There is no principled reason to be doing this here. But also ensures
-  // some consistency at the tool boundary.
+  // Simplify flow.variable accesses early on; this can help with dispatch
+  // region formation as redundant store-loads are removed.
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createSimplifyVariableAccessesPass());
+
+  // Perform cleanup after variable simplification as more canonicalizers may be
+  // able to kick in.
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Replaces variables with !shapex.ranked_shape types with individual
@@ -109,10 +121,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  if (clEnableLinalgDetensorize) {
+    passManager.addNestedPass<FuncOp>(mlir::createLinalgDetensorizePass());
+  }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createConvertToFlowTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/true));
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
@@ -169,9 +185,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Reorder blocks to increase the grouping of streamable ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createHoistUnstreamableOpsPass());
+
   // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
   // arbitrary ordering.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Clone constants that escape basic blocks until we have better analysis.
   passManager.addNestedPass<FuncOp>(

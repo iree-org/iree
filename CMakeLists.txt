@@ -36,6 +36,7 @@ endif()
 #-------------------------------------------------------------------------------
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
+option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
 option(IREE_ENABLE_MLIR "Enables MLIR/LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
@@ -319,6 +320,23 @@ include(iree_setup_toolchain)
 if(${IREE_BUILD_COMPILER} OR
    ${IREE_BUILD_PYTHON_BINDINGS})
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+endif()
+
+#-------------------------------------------------------------------------------
+# Check if git submodules have been initialized.
+# This will only run if python3 is available.
+#-------------------------------------------------------------------------------
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_FOUND)
+  execute_process(
+    COMMAND ${Python3_EXECUTABLE} scripts/git/check_submodule_init.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    RESULT_VARIABLE ret
+  )
+  if(NOT ret EQUAL "0")
+    message(FATAL_ERROR "check_submodule_init.py failed, see the logs above")
+  endif()
 endif()
 
 #-------------------------------------------------------------------------------

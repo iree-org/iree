@@ -1,5 +1,5 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='func(iree-llvmcpu-vectorization)'}))" -split-input-file %s | IreeFileCheck %s
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='func(iree-llvmcpu-vectorization{promote-workgroup-to-full-tiles}),cse'}))" -split-input-file %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization)'}))" -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization{promote-workgroup-to-full-tiles}),cse'}))" -split-input-file %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
 
 #config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
 hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {

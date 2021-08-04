@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
@@ -40,11 +41,13 @@ class LLVMGPURemoveSingleIterationLoopPass
           LLVMGPURemoveSingleIterationLoopPass> {
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
+    auto entryPointOp = getEntryPoint(funcOp);
+    Optional<ArrayAttr> workgroupSizeAttr = entryPointOp.workgroup_size();
+    if (!workgroupSizeAttr) return;
     std::array<int32_t, 3> workgroupSize;
-    for (auto it : llvm::enumerate(funcOp->getAttr("llvmgpu_workgroup_size")
-                                       .cast<DenseIntElementsAttr>()
-                                       .getIntValues())) {
-      workgroupSize[it.index()] = it.value().getZExtValue();
+    for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
+      workgroupSize[it.index()] =
+          it.value().cast<IntegerAttr>().getValue().getZExtValue();
     }
     auto getThreadIdMinMax = [&workgroupSize](Value value,
                                               SmallVectorImpl<Value> &dims,

@@ -28,10 +28,10 @@ func @entry() {
   %c1 = constant 1 : index
   %0 = memref.get_global @__constant_5xi32 : memref<5xi32>
   //      CHECK: %[[BINDING0_RAW:.+]] = iree.list.get %[[BINDINGS]][%c0] : !iree.list<memref<?xi8>>
-  // CHECK-NEXT: %[[BINDING0:.+]] = unrealized_conversion_cast %[[BINDING0_RAW]] : memref<?xi8> to memref<5xf32>
+  // CHECK-NEXT: %[[BINDING0:.+]] = builtin.unrealized_conversion_cast %[[BINDING0_RAW]] : memref<?xi8> to memref<5xf32>
   %1 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<5xf32>
   //      CHECK: %[[BINDING1_RAW:.+]] = iree.list.get %[[BINDINGS]][%c1] : !iree.list<memref<?xi8>>
-  // CHECK-NEXT: %[[BINDING1:.+]] = unrealized_conversion_cast %[[BINDING1_RAW]] : memref<?xi8> to memref<5xi32>
+  // CHECK-NEXT: %[[BINDING1:.+]] = builtin.unrealized_conversion_cast %[[BINDING1_RAW]] : memref<?xi8> to memref<5xi32>
   %2 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<5xi32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index

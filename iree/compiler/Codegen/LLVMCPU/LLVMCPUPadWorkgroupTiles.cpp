@@ -78,7 +78,7 @@ class MatmulWorkgroupTilesPadding : public OpRewritePattern<linalg::MatmulOp> {
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    if (!hasLoweringConfig(matmulOp)) return failure();
+    if (!getLoweringConfig(matmulOp)) return failure();
     auto loc = matmulOp.getLoc();
     auto lhs = matmulOp.getInputOperand(0)->get();
     auto rhs = matmulOp.getInputOperand(1)->get();

@@ -15,18 +15,19 @@ vm.module @control_flow_module {
     vm.return %0 : i32
   }
 }
-// CHECK: static iree_status_t control_flow_module_control_flow_test_impl(int32_t [[A:[^ ]*]], int32_t [[COND:[^ ]*]], int32_t *[[RESULT:[^ ]*]], iree_vm_stack_t* stack, control_flow_module_state_t* [[STATE:[^ ]*]]) {
-  // CHECK-NEXT: VARIABLE DECLARATIONS
-  // CHECK-NEXT: RESULTS
+// CHECK: static iree_status_t control_flow_module_control_flow_test(iree_vm_stack_t* v1, control_flow_module_t* v2, control_flow_module_state_t* v3, int32_t [[A:[^ ]*]], int32_t [[COND:[^ ]*]], int32_t* [[RESULT:[^ ]*]]) {
+  // CHECK-NEXT: int32_t [[COND_NZ:[^ ]*]];
+  // CHECK-NEXT: bool [[COND_BOOL:[^ ]*]];
   // CHECK-NEXT: int32_t [[B:[^ ]*]];
   // CHECK-NEXT: int32_t [[V0:[^ ]*]];
-  // CHECK-NEXT: BASIC BLOCK ARGUMENTS
+  // CHECK-NEXT: iree_status_t [[STATUS:[^ ]*]];
   // CHECK-NEXT: int32_t [[C:[^ ]*]];
   // CHECK-NEXT: int32_t [[D:[^ ]*]];
   // CHECK-NEXT: int32_t [[E:[^ ]*]];
-  // CHECK-NEXT: END VARIABLE DECLARATIONS
   // CHECK-NEXT: [[BB0:[^ ]*]]:
-  // CHECK-NEXT: if ([[COND]]) {
+  // CHECK-NEXT: [[COND_NZ]] = vm_cmp_nz_i32([[COND]]);
+  // CHECK-NEXT: [[COND_BOOL]] = EMITC_CAST([[COND_NZ]], bool);
+  // CHECK-NEXT: if ([[COND_BOOL]]) {
   // CHECK-NEXT: goto [[BB1:[^ ]*]];
   // CHECK-NEXT: } else {
   // CHECK-NEXT: goto [[BB2:[^ ]*]];
@@ -44,5 +45,6 @@ vm.module @control_flow_module {
   // CHECK-NEXT: goto [[BB4:[^ ]*]];
   // CHECK-NEXT: [[BB4]]:
   // CHECK-NEXT: [[V0]] = vm_add_i32([[D]], [[E]]);
-  // CHECK-NEXT: *[[RESULT]] = [[V0]];
-  // CHECK-NEXT: return iree_ok_status();
+  // CHECK-NEXT: EMITC_DEREF_ASSIGN([[RESULT]], [[V0]]);
+  // CHECK-NEXT: [[STATUS]] = iree_ok_status();
+  // CHECK-NEXT: return [[STATUS]];

@@ -46,10 +46,10 @@ cc_library(
     name = "MHLO",
     srcs = [
         "BroadcastingToLinalgPatterns.cpp",
-        "ConvertAndDistributeMHLOToLinalgExt.cpp",
         "ConvertComplexToReal.cpp",
         "ConvertMHLOToFlow.cpp",
         "ConvertMHLOToFlow.h",
+        "ConvertMHLOToLinalgExt.cpp",
         "LegalizeInputTypes.cpp",
         "MHLOToLinalgOnTensors.cpp",
         "MHLOToMHLOPreprocessing.cpp",

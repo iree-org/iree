@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/SymbolTable.h"
@@ -48,6 +49,79 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
   return entryPointOps;
 }
 
+void setTranslationInfo(FuncOp entryPointFn,
+                        IREE::HAL::DispatchLoweringPassPipeline passPipeline,
+                        ArrayRef<int64_t> workgroupSize) {
+  auto entryPointOp = getEntryPoint(entryPointFn);
+  auto translationInfo = buildTranslationInfo(
+      passPipeline, /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
+      entryPointFn.getContext());
+  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
+}
+
+SmallVector<unsigned> getPartitionedLoops(Operation *op) {
+  SmallVector<unsigned> partitionedLoops;
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    size_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
+    partitionedLoops =
+        llvm::to_vector<4>(llvm::seq<unsigned>(0, numOuterParallelLoops));
+    if (partitionedLoops.size() > kNumMaxParallelDims) {
+      partitionedLoops.erase(
+          partitionedLoops.begin(),
+          std::next(partitionedLoops.begin(),
+                    numOuterParallelLoops - kNumMaxParallelDims));
+    }
+    return partitionedLoops;
+  }
+  if (auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op)) {
+    return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
+  }
+  return {};
+}
+
+LogicalResult setOpConfigAndEntryPointFnTranslation(
+    FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
+    ArrayRef<int64_t> nativeVectorSize,
+    IREE::HAL::DispatchLoweringPassPipeline passPipeline,
+    ArrayRef<int64_t> workgroupSize) {
+  IREE::HAL::LoweringConfig config =
+      buildConfigAttr(tileSizes, nativeVectorSize, op->getContext());
+  setLoweringConfig(op, config);
+  auto partitionedLoops = getPartitionedLoops(op);
+  SmallVector<int64_t, 3> workloadPerWorkgroup;
+  if (!tileSizes.empty() && !tileSizes[0].empty() &&
+      !partitionedLoops.empty()) {
+    for (unsigned depth : partitionedLoops) {
+      if (depth >= tileSizes[0].size()) {
+        return op->emitOpError(
+                   "illegal configuration for lowering op, expect first level "
+                   "tile size to contain at least ")
+               << partitionedLoops.back() << " elements";
+      }
+      if (tileSizes[0][depth] == 0) {
+        return op->emitOpError("illegal to set tilesize of loop ")
+               << depth
+               << " to zero since it is set to be partitioned at the flow "
+                  "level";
+      }
+      workloadPerWorkgroup.push_back(tileSizes[0][depth]);
+    }
+    if (!workloadPerWorkgroup.empty()) {
+      workloadPerWorkgroup =
+          llvm::to_vector<3>(llvm::reverse(workloadPerWorkgroup));
+    }
+  }
+  auto entryPointOp = getEntryPoint(entryPointFn);
+  if (!entryPointOp) {
+    return entryPointFn.emitOpError(
+        "unable to find entry point op for entry point function");
+  }
+  IREE::HAL::TranslationInfo translationInfo = buildTranslationInfo(
+      passPipeline, workloadPerWorkgroup, entryPointOp->getContext());
+  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
+  return success();
+}
+
 /// Walk up the defs of the view, to get the untiled value. Either walks up
 /// `ViewOpInterface` op-chains or the `subtensor` op-chains.
 static Value getViewSource(Value view) {
@@ -85,9 +159,9 @@ ArrayRef<int64_t> getUntiledShape(Value tiledView) {
       .Default([&](Type type) { return ArrayRef<int64_t>{}; });
 }
 
-LogicalResult getLinalgOps(FuncOp funcOp,
-                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
-                           SmallVectorImpl<Operation *> &tiledLoops) {
+LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
+                             SmallVectorImpl<Operation *> &filteredOps,
+                             SmallVectorImpl<Operation *> &tiledLoops) {
   Region &region = funcOp.body();
   if (!llvm::hasSingleElement(region)) {
     return funcOp.emitError("unable dispatch function with multiple blocks");
@@ -101,7 +175,60 @@ LogicalResult getLinalgOps(FuncOp funcOp,
     body = forOp.getBody();
     forOps = body->getOps<scf::ForOp>();
   }
-  linalgOps = llvm::to_vector<4>(body->getOps<linalg::LinalgOp>());
+  for (Operation &op : body->getOperations()) {
+    if (filteringFn(&op)) {
+      filteredOps.push_back(&op);
+    }
+  }
+  return success();
+}
+
+LogicalResult getComputeOps(FuncOp funcOp,
+                            SmallVectorImpl<Operation *> &computeOps,
+                            SmallVectorImpl<Operation *> &tiledLoops) {
+  if (failed(getFilteredOps(
+          funcOp,
+          [](Operation *op) {
+            return isa<linalg::LinalgOp, linalg_ext::LinalgExtOp>(op);
+          },
+          computeOps, tiledLoops))) {
+    return failure();
+  }
+
+  // Propagate markers to all ops. If one of the ops has a marker all ops in
+  // this loop need to have marker since body of the loop maps to a workgroup.
+  // TODO(ravishankarm): Temporary WAR till a better story w.r.t markers is
+  // figured out.
+  Optional<StringRef> marker = llvm::None;
+  for (auto op : computeOps) {
+    if (hasMarker(op)) {
+      assert(!marker || marker.getValue() == getMarkerOrNull(op) &&
+                            "expected all markers within op to be the same");
+      marker = getMarkerOrNull(op);
+    }
+  }
+  if (marker.hasValue()) {
+    for (auto op : computeOps) {
+      setMarker(op, marker.getValue());
+    }
+  }
+  return success();
+}
+
+LogicalResult getLinalgOps(FuncOp funcOp,
+                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
+                           SmallVectorImpl<Operation *> &tiledLoops) {
+  {
+    SmallVector<Operation *> computeOps;
+    if (failed(getFilteredOps(
+            funcOp, [](Operation *op) { return isa<linalg::LinalgOp>(op); },
+            computeOps, tiledLoops))) {
+      return failure();
+    }
+    for (auto op : computeOps) {
+      linalgOps.push_back(cast<linalg::LinalgOp>(op));
+    }
+  }
 
   // Propagate markers to all ops. If one of the ops has a marker all ops in
   // this loop need to have marker since body of the loop maps to a workgroup.

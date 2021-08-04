@@ -22,7 +22,8 @@ struct PassTracing : public PassInstrumentation {
   PassTracing() {}
   ~PassTracing() override = default;
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_ENABLE_COMPILER_TRACING && \
+    IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   void runBeforePass(Pass *pass, Operation *op) override;
   void runAfterPass(Pass *pass, Operation *op) override;
   void runAfterPassFailed(Pass *pass, Operation *op) override;

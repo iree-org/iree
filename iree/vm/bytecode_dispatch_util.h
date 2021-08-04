@@ -153,34 +153,12 @@ static const int kRegSize = sizeof(uint16_t);
 
 // Bytecode data access macros for reading values of a given type from a byte
 // offset within the current function.
-#if defined(IREE_ENDIANNESS_LITTLE)
-#define OP_I8(i) bytecode_data[pc + (i)]
-#define OP_I16(i) *((uint16_t*)&bytecode_data[pc + (i)])
-#define OP_I32(i) *((uint32_t*)&bytecode_data[pc + (i)])
-#define OP_I64(i) *((uint64_t*)&bytecode_data[pc + (i)])
-#define OP_F32(i) *((float*)&bytecode_data[pc + (i)])
-#define OP_F64(i) *((double*)&bytecode_data[pc + (i)])
-#else
-#define OP_I8(i) bytecode_data[pc + (i)]
-#define OP_I16(i)                           \
-  ((uint16_t)bytecode_data[pc + 0 + (i)]) | \
-      ((uint16_t)bytecode_data[pc + 1 + (i)] << 8)
-#define OP_I32(i)                                     \
-  ((uint32_t)bytecode_data[pc + 0 + (i)]) |           \
-      ((uint32_t)bytecode_data[pc + 1 + (i)] << 8) |  \
-      ((uint32_t)bytecode_data[pc + 2 + (i)] << 16) | \
-      ((uint32_t)bytecode_data[pc + 3 + (i)] << 24)
-#define OP_I64(i)                                     \
-  ((uint64_t)bytecode_data[pc + 0 + (i)]) |           \
-      ((uint64_t)bytecode_data[pc + 1 + (i)] << 8) |  \
-      ((uint64_t)bytecode_data[pc + 2 + (i)] << 16) | \
-      ((uint64_t)bytecode_data[pc + 3 + (i)] << 24) | \
-      ((uint64_t)bytecode_data[pc + 4 + (i)] << 32) | \
-      ((uint64_t)bytecode_data[pc + 5 + (i)] << 40) | \
-      ((uint64_t)bytecode_data[pc + 6 + (i)] << 48) | \
-      ((uint64_t)bytecode_data[pc + 7 + (i)] << 56)
-#error "TODO: OP_F32 and OP_F64 for big endian systems"
-#endif  // IREE_ENDIANNESS_LITTLE
+#define OP_I8(i) iree_unaligned_load_le((uint8_t*)&bytecode_data[pc + (i)])
+#define OP_I16(i) iree_unaligned_load_le((uint16_t*)&bytecode_data[pc + (i)])
+#define OP_I32(i) iree_unaligned_load_le((uint32_t*)&bytecode_data[pc + (i)])
+#define OP_I64(i) iree_unaligned_load_le((uint64_t*)&bytecode_data[pc + (i)])
+#define OP_F32(i) iree_unaligned_load_le((float*)&bytecode_data[pc + (i)])
+#define OP_F64(i) iree_unaligned_load_le((double*)&bytecode_data[pc + (i)])
 
 //===----------------------------------------------------------------------===//
 // Utilities matching the tablegen op encoding scheme
@@ -190,6 +168,9 @@ static const int kRegSize = sizeof(uint16_t);
 //
 // Each macro will increment the pc by the number of bytes read and as such must
 // be called in the same order the values are encoded.
+
+#define VM_AlignPC(pc, alignment) \
+  (pc) = ((pc) + ((alignment)-1)) & ~((alignment)-1)
 
 #define VM_DecConstI8(name) \
   OP_I8(0);                 \
@@ -223,11 +204,16 @@ static const int kRegSize = sizeof(uint16_t);
   (out_str)->data = (const char*)&bytecode_data[pc + 2]; \
   pc += 2 + (out_str)->size;
 #define VM_DecBranchTarget(block_name) VM_DecConstI32(name)
-#define VM_DecBranchOperands(operands_name)                                   \
-  (const iree_vm_register_remap_list_t*)&bytecode_data[pc];                   \
-  pc +=                                                                       \
-      kRegSize + ((const iree_vm_register_list_t*)&bytecode_data[pc])->size * \
-                     2 * kRegSize;
+#define VM_DecBranchOperands(operands_name) \
+  VM_DecBranchOperandsImpl(bytecode_data, &pc)
+static inline const iree_vm_register_remap_list_t* VM_DecBranchOperandsImpl(
+    const uint8_t* IREE_RESTRICT bytecode_data, iree_vm_source_offset_t* pc) {
+  VM_AlignPC(*pc, kRegSize);
+  const iree_vm_register_remap_list_t* list =
+      (const iree_vm_register_remap_list_t*)&bytecode_data[*pc];
+  *pc = *pc + kRegSize + list->size * 2 * kRegSize;
+  return list;
+}
 #define VM_DecOperandRegI32(name)      \
   regs.i32[OP_I16(0) & regs.i32_mask]; \
   pc += kRegSize;
@@ -244,10 +230,16 @@ static const int kRegSize = sizeof(uint16_t);
   &regs.ref[OP_I16(0) & regs.ref_mask];                    \
   *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
   pc += kRegSize;
-#define VM_DecVariadicOperands(name)                  \
-  (const iree_vm_register_list_t*)&bytecode_data[pc]; \
-  pc += kRegSize +                                    \
-        ((const iree_vm_register_list_t*)&bytecode_data[pc])->size * kRegSize;
+#define VM_DecVariadicOperands(name) \
+  VM_DecVariadicOperandsImpl(bytecode_data, &pc)
+static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
+    const uint8_t* IREE_RESTRICT bytecode_data, iree_vm_source_offset_t* pc) {
+  VM_AlignPC(*pc, kRegSize);
+  const iree_vm_register_list_t* list =
+      (const iree_vm_register_list_t*)&bytecode_data[*pc];
+  *pc = *pc + kRegSize + list->size * kRegSize;
+  return list;
+}
 #define VM_DecResultRegI32(name)        \
   &regs.i32[OP_I16(0) & regs.i32_mask]; \
   pc += kRegSize;

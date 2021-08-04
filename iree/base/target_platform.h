@@ -30,6 +30,8 @@
 // IREE_ENDIANNESS_LITTLE
 // IREE_ENDIANNESS_BIG
 //
+// IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED (0/1)
+//
 // IREE_COMPILER_CLANG
 // IREE_COMPILER_GCC
 // IREE_COMPILER_GCC_COMPAT
@@ -136,6 +138,39 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 #else
 #error IREE endian detection needs to be set up for your compiler
 #endif  // __BYTE_ORDER__
+
+//==============================================================================
+// IREE_MEMORY_ACCESS_*
+//==============================================================================
+// Certain architectures have specific memory access requirements that require
+// user-mode code changes to work at all or work at reasonable performance.
+
+#if !defined(IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED)
+
+#if defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64)
+
+// Armv6‑M and Armv8-M (w/o the main extension) do not support unaligned access.
+// The -munaligned-access and -mno-unaligned-access flags control this.
+// https://www.keil.com/support/man/docs/armclang_ref/armclang_ref_sam1444138667173.htm
+#if !defined(__ARM_FEATURE_UNALIGNED)
+#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 1
+#else
+#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 0
+#endif  // !__ARM_FEATURE_UNALIGNED
+
+#elif defined(IREE_ARCH_RISCV_32) || defined(IREE_ARCH_RISCV_64)
+
+// Though unaligned access is part of the base spec it is allowed to be
+// implemented with trap handlers. Bare-metal systems likely won't have these
+// handlers and even on systems that do (linux) we don't want to be trapping for
+// every load/store.
+#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 1
+
+#endif  // IREE_ARCH_*
+
+#else
+#define IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED 0
+#endif  // !IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED
 
 //==============================================================================
 // IREE_COMPILER_*

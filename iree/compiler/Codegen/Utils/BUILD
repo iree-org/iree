@@ -25,6 +25,7 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/LinalgExt/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",

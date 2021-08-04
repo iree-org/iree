@@ -57,7 +57,7 @@ func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
 func @scatter_mixed_tensor_memref(
     %update : memref<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @+1 {{expected `ins` operand #0 to be of RankedTensorType}}
+  // expected-error @+1 {{expected inputs and outputs to be RankedTensorType or scalar}}
   %0 = linalg_ext.scatter
       ins(%update, %indices : memref<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
@@ -73,7 +73,7 @@ func @scatter_mixed_tensor_memref(
 func @scatter_mixed_tensor_memref(
     %update : tensor<?x?xf32>, %indices : memref<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @+1 {{expected `ins` operand #1 to be of RankedTensorType}}
+  // expected-error @+1 {{expected inputs and outputs to be RankedTensorType or scalar}}
   %0 = linalg_ext.scatter
       ins(%update, %indices : tensor<?x?xf32>, memref<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
@@ -105,7 +105,7 @@ func @scatter_extra_outputs(
 func @scatter_mixed_tensor_memref(
     %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : memref<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @+1 {{expected type of `outs` operand #0 'memref<?x?xf32>' to be same as result type 'tensor<?x?xf32>'}}
+  // expected-error @+1 {{expected inputs and outputs to be RankedTensorType or scalar}}
   %0 = linalg_ext.scatter
       ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : memref<?x?xf32>) {
@@ -121,7 +121,7 @@ func @scatter_mixed_tensor_memref(
 func @scatter_mixed_tensor_memref(
     %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> memref<?x?xf32> {
-  // expected-error @+1 {{expected result #0 to be of RankedTensorType}}
+  // expected-error @+1 {{expected type of `outs` operand #0 'tensor<?x?xf32>' to be same as result type 'memref<?x?xf32>'}}
   %0 = linalg_ext.scatter
       ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
@@ -137,7 +137,7 @@ func @scatter_mixed_tensor_memref(
 func @scatter_mixed_tensor_memref(
     %update : memref<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : memref<?x?xf32>) {
-  // expected-error @+1 {{expected `ins` operand #1 to be of MemRefType}}
+  // expected-error @+1 {{expected inputs and outputs to be MemRefType or scalar}}
   linalg_ext.scatter
     ins(%update, %indices : memref<?x?xf32>, tensor<?x1xi32>)
     outs(%original : memref<?x?xf32>) {
@@ -153,7 +153,7 @@ func @scatter_mixed_tensor_memref(
 func @scatter_mixed_tensor_memref(
     %update : memref<?x?xf32>, %indices : memref<?x1xi32>,
     %original : tensor<?x?xf32>) {
-  // expected-error @+1 {{expected `outs` operand #0 to be of MemRefType}}
+  // expected-error @+1 {{expected inputs and outputs to be MemRefType or scalar}}
   linalg_ext.scatter
     ins(%update, %indices : memref<?x?xf32>, memref<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {

@@ -695,11 +695,53 @@ struct FlattenTensorReshapeChain : public OpRewritePattern<TensorReshapeOp> {
   }
 };
 
+// Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
+// primitive value for the splat op.
+struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
+  using OpRewritePattern<TensorLoadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceOp =
+        dyn_cast_or_null<TensorSplatOp>(loadOp.source().getDefiningOp());
+
+    if (!sourceOp) return failure();
+
+    rewriter.replaceOp(loadOp, sourceOp.value());
+    return success();
+  }
+};
+
+struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
+  using OpRewritePattern<TensorSplatOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorSplatOp splatOp,
+                                PatternRewriter &rewriter) const override {
+    if (!splatOp.result().hasOneUse()) return failure();
+
+    auto reshapeOp = dyn_cast_or_null<TensorReshapeOp>(
+        splatOp.result().use_begin()->getOwner());
+    if (!reshapeOp) return failure();
+
+    rewriter.replaceOpWithNewOp<TensorSplatOp>(
+        reshapeOp, reshapeOp.result().getType(), splatOp.value(),
+        reshapeOp.result_dims());
+    rewriter.eraseOp(splatOp);
+
+    return success();
+  }
+};
+
 }  // namespace
 
 void TensorReshapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<FlattenTensorReshapeChain>(context);
+}
+
+void TensorLoadOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldSplatLoadIntoPrimitive>(context);
 }
 
 OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute> operands) {
@@ -737,6 +779,12 @@ OpFoldResult TensorStoreOp::fold(ArrayRef<Attribute> operands) {
     }
   }
   return {};
+}
+
+void TensorSplatOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  // TODO(benvanik): canonicalize splat+slice to smaller splat.
+  results.insert<FoldSplatReshapeIntoSplat>(context);
 }
 
 OpFoldResult TensorSplatOp::fold(ArrayRef<Attribute> operands) {

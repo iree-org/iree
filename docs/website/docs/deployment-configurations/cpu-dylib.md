@@ -131,11 +131,11 @@ concrete values.
 
 <!-- TODO(??): troubleshooting -->
 
-[android-cc]: /building-from-source/android/
-[get-started]: /building-from-source/getting-started/
+[android-cc]: ../building-from-source/android.md
+[get-started]: ../building-from-source/getting-started.md
 [iree-releases]: https://github.com/google/iree/releases/
 [llvm]: https://llvm.org/
 [mlir]: https://mlir.llvm.org/
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
-[tf-import]: /frontends/tensorflow/
-[tflite-import]: /frontends/tensorflow-lite/
+[tf-import]: ../ml-frameworks/tensorflow.md
+[tflite-import]: ../ml-frameworks/tensorflow-lite.md

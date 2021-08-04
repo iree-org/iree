@@ -166,7 +166,7 @@ IREE_API_EXPORT iree_status_t iree_vm_list_create(
     iree_allocator_t allocator, iree_vm_list_t** out_list) {
   iree_vm_list_t* list = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, sizeof(iree_vm_list_t), (void**)&list));
+      iree_allocator_malloc(allocator, sizeof(*list), (void**)&list));
   memset(list, 0, sizeof(*list));
   iree_atomic_ref_count_init(&list->ref_object.counter);
   list->allocator = allocator;

@@ -16,11 +16,15 @@ extern "C" {
 #endif  // __cplusplus
 
 iree_status_t iree_hal_rocm_descriptor_set_layout_create(
-    iree_hal_rocm_context_wrapper_t *context,
+    iree_hal_rocm_context_wrapper_t* context,
     iree_hal_descriptor_set_layout_usage_type_t usage_type,
     iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_layout_binding_t *bindings,
-    iree_hal_descriptor_set_layout_t **out_descriptor_set_layout);
+    const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
+
+// Return the binding count for the given descriptor set layout.
+iree_host_size_t iree_hal_rocm_descriptor_set_layout_binding_count(
+    iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 #ifdef __cplusplus
 }  // extern "C"

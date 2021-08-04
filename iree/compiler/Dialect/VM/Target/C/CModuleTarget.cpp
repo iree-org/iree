@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
-#include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Dialect/VM/Utils/ConstantEncoding.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Pass/PassManager.h"
@@ -23,15 +22,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
-
-static std::string buildFunctionName(IREE::VM::ModuleOp &moduleOp,
-                                     IREE::VM::FuncOp &funcOp,
-                                     bool implSuffix) {
-  std::string functionName =
-      std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
-
-  return implSuffix ? functionName + "_impl" : functionName;
-}
 
 static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
                                llvm::raw_ostream &output) {
@@ -96,7 +86,7 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   llvm::raw_ostream &output = emitter.ostream();
   std::string moduleName = moduleOp.getName().str();
 
-  output << "struct " << moduleName << "_t;\n";
+  output << "struct " << moduleName << "_t {};\n";
   output << "struct " << moduleName << "_state_t {\n";
 
   output << "iree_allocator_t allocator;\n";
@@ -119,44 +109,15 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   return success();
 }
 
-static LogicalResult printShim(IREE::VM::FuncOp &funcOp,
+static LogicalResult printShim(mlir::FuncOp &funcOp,
                                llvm::raw_ostream &output) {
-  auto callingConvention = makeCallingConventionString(funcOp);
+  StringAttr callingConvention =
+      funcOp.getOperation()->getAttr("calling_convention").cast<StringAttr>();
   if (!callingConvention) {
     return funcOp.emitError("Couldn't create calling convention string");
   }
   output << "call_" << callingConvention.getValue() << "_shim";
   return success();
-}
-
-static LogicalResult printFuncOpArguments(IREE::VM::FuncOp &funcOp,
-                                          mlir::emitc::CppEmitter &emitter) {
-  return mlir::emitc::interleaveCommaWithError(
-      funcOp.getArguments(), emitter.ostream(), [&](auto arg) -> LogicalResult {
-        if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType()))) {
-          return failure();
-        }
-        emitter.ostream() << " " << emitter.getOrCreateName(arg);
-        return success();
-      });
-}
-
-/// Function results get propagated through pointer arguments
-static LogicalResult printFuncOpResults(
-    IREE::VM::FuncOp &funcOp, mlir::emitc::CppEmitter &emitter,
-    SmallVector<std::string, 4> &resultNames) {
-  return mlir::emitc::interleaveCommaWithError(
-      llvm::zip(funcOp.getType().getResults(), resultNames), emitter.ostream(),
-      [&](std::tuple<Type, std::string> tuple) -> LogicalResult {
-        Type type = std::get<0>(tuple);
-        std::string resultName = std::get<1>(tuple);
-
-        if (failed(emitter.emitType(*funcOp.getOperation(), type))) {
-          return failure();
-        }
-        emitter.ostream() << " *" << resultName;
-        return success();
-      });
 }
 
 static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
@@ -178,328 +139,14 @@ static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-static LogicalResult translateOp(IREE::VM::BranchOp branchOp,
-                                 mlir::emitc::CppEmitter &emitter) {
-  auto &output = emitter.ostream();
-  Block &successor = *branchOp.getSuccessor();
-
-  for (auto pair :
-       llvm::zip(branchOp.getOperands(), successor.getArguments())) {
-    auto &operand = std::get<0>(pair);
-    auto &argument = std::get<1>(pair);
-    output << emitter.getOrCreateName(argument) << " = "
-           << emitter.getOrCreateName(operand) << ";\n";
-  }
-
-  output << "goto ";
-  if (!(emitter.hasBlockLabel(successor))) {
-    return branchOp.emitOpError() << "Unable to find label for successor block";
-  }
-  output << emitter.getOrCreateName(successor) << ";\n";
-  return success();
-}
-
-static LogicalResult translateOp(IREE::VM::CondBranchOp condBranchOp,
-                                 mlir::emitc::CppEmitter &emitter) {
-  llvm::raw_ostream &output = emitter.ostream();
-
-  Block &trueSuccessor = *condBranchOp.getTrueDest();
-  Block &falseSuccessor = *condBranchOp.getFalseDest();
-
-  output << "if (" << emitter.getOrCreateName(condBranchOp.getCondition())
-         << ") {\n";
-
-  // If condition is true.
-  for (auto pair : llvm::zip(condBranchOp.getTrueOperands(),
-                             trueSuccessor.getArguments())) {
-    auto &operand = std::get<0>(pair);
-    auto &argument = std::get<1>(pair);
-    output << emitter.getOrCreateName(argument) << " = "
-           << emitter.getOrCreateName(operand) << ";\n";
-  }
-
-  output << "goto ";
-  if (!(emitter.hasBlockLabel(trueSuccessor))) {
-    return condBranchOp.emitOpError()
-           << "Unable to find label for successor block";
-  }
-  output << emitter.getOrCreateName(trueSuccessor) << ";\n";
-  output << "} else {\n";
-  // If condition is false.
-  for (auto pair : llvm::zip(condBranchOp.getFalseOperands(),
-                             falseSuccessor.getArguments())) {
-    auto &operand = std::get<0>(pair);
-    auto &argument = std::get<1>(pair);
-    output << emitter.getOrCreateName(argument) << " = "
-           << emitter.getOrCreateName(operand) << ";\n";
-  }
-
-  output << "goto ";
-  if (!(emitter.hasBlockLabel(falseSuccessor))) {
-    return condBranchOp.emitOpError()
-           << "Unable to find label for successor block";
-  }
-  output << emitter.getOrCreateName(falseSuccessor) << ";\n";
-  output << "}\n";
-  return success();
-}
-
-static LogicalResult translateFailOp(IREE::VM::FailOp failOp,
-                                     mlir::emitc::CppEmitter &emitter,
-                                     bool hasRefs) {
-  llvm::raw_ostream &output = emitter.ostream();
-
-  auto status = failOp.status();
-
-  if (hasRefs) {
-    output << "VM_REF_ARRAY_RELEASE(local_refs);\n";
-  }
-
-  output << "return vm_fail_or_ok(" << emitter.getOrCreateName(status)
-         << ", iree_make_cstring_view(\"" << failOp.message() << "\"));\n";
-  return success();
-}
-
-static LogicalResult translateReturnOpToC(
-    IREE::VM::ReturnOp returnOp, mlir::emitc::CppEmitter &emitter,
-    SmallVector<std::string, 4> resultNames, bool hasRefs) {
-  llvm::raw_ostream &output = emitter.ostream();
-
-  for (std::tuple<Value, std::string> tuple :
-       llvm::zip(returnOp.getOperands(), resultNames)) {
-    Value operand = std::get<0>(tuple);
-    std::string resultName = std::get<1>(tuple);
-    output << "*" << resultName << " = " << emitter.getOrCreateName(operand)
-           << ";\n";
-  }
-
-  if (hasRefs) {
-    output << "VM_REF_ARRAY_RELEASE(local_refs);\n";
-  }
-
-  output << "return iree_ok_status();\n";
-
-  return success();
-}
-
-static LogicalResult translateOpToC(Operation &op,
-                                    mlir::emitc::CppEmitter &emitter,
-                                    SmallVector<std::string, 4> resultNames,
-                                    bool hasRefs) {
-  LogicalResult status =
-      llvm::TypeSwitch<Operation *, LogicalResult>(&op)
-          .Case<IREE::VM::BranchOp, IREE::VM::CondBranchOp>(
-              [&](auto op) { return translateOp(op, emitter); })
-          .Case<IREE::VM::FailOp>(
-              [&](auto op) { return translateFailOp(op, emitter, hasRefs); })
-          .Case<IREE::VM::ReturnOp>([&](auto op) {
-            return translateReturnOpToC(op, emitter, resultNames, hasRefs);
-          })
-          // Fall back to generic emitc printer
-          .Default([&](Operation *) {
-            return emitter.emitOperation(op, /*trailingSemicolon=*/true);
-          });
-
-  if (failed(status)) return failure();
-
-  return success();
-}
-
-static LogicalResult translateFunctionToC(IREE::VM::ModuleOp &moduleOp,
-                                          IREE::VM::FuncOp &funcOp,
-                                          mlir::emitc::CppEmitter &emitter,
-                                          bool declareOnly) {
-  std::string moduleName = moduleOp.getName().str();
-  emitc::CppEmitter::Scope scope(emitter);
-  llvm::raw_ostream &output = emitter.ostream();
-
-  // this function later gets wrapped with argument marshalling code
-  std::string functionName =
-      buildFunctionName(moduleOp, funcOp, /*implSuffix=*/true);
-
-  output << "static iree_status_t " << functionName << "(";
-
-  if (failed(printFuncOpArguments(funcOp, emitter))) {
-    return failure();
-  }
-
-  if (funcOp.getNumResults() > 0 && funcOp.getNumArguments() > 0) {
-    output << ", ";
-  }
-
-  SmallVector<std::string, 4> resultNames;
-  for (unsigned int idx = 0; idx < funcOp.getNumResults(); idx++) {
-    std::string resultName = "out" + std::to_string(idx);
-    resultNames.push_back(resultName);
-  }
-
-  if (failed(printFuncOpResults(funcOp, emitter, resultNames))) {
-    return failure();
-  }
-
-  if (funcOp.getNumArguments() + funcOp.getNumResults() > 0) {
-    output << ", ";
-  }
-
-  output << "iree_vm_stack_t* stack, ";
-
-  // TODO(simon-camp): We can't represent structs in emitc (yet maybe), so the
-  // struct argument name here must not be changed.
-  output << moduleName << "_state_t* state)";
-
-  if (declareOnly) {
-    output << ";\n";
-    return success();
-  }
-  output << " {\n";
-
-  // We forward declare all result variables except for the ones with RefType.
-  output << "// VARIABLE DECLARATIONS\n";
-  output << "// RESULTS\n";
-  for (auto &op : funcOp.getOps()) {
-    for (auto result : op.getResults()) {
-      if (result.getType().isa<IREE::VM::RefType>()) {
-        continue;
-      }
-      if (failed(emitter.emitVariableDeclaration(result,
-                                                 /*trailingSemicolon=*/true))) {
-        return op.emitError() << "Unable to declare result variable for op";
-      }
-    }
-  }
-  output << "// BASIC BLOCK ARGUMENTS\n";
-
-  auto &blocks = funcOp.getBlocks();
-  // Create label names for basic blocks.
-  for (auto &block : blocks) {
-    emitter.getOrCreateName(block);
-  }
-
-  // Emit variables for basic block arguments (omitting the first).
-  for (auto it = std::next(blocks.begin()); it != blocks.end(); ++it) {
-    Block &block = *it;
-    for (auto &arg : block.getArguments()) {
-      if (emitter.hasValueInScope(arg)) {
-        // This shouldn't happen
-        return failure();
-      }
-      if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType()))) {
-        return failure();
-      }
-      output << " " << emitter.getOrCreateName(arg) << ";\n";
-    }
-  }
-
-  output << "// END VARIABLE DECLARATIONS\n";
-
-  // We reuse the register allocation pass and emit an array for all Values with
-  // ref type instead of generating one variable per Value. This makes the
-  // deallocation process easier for us.
-
-  RegisterAllocation registerAllocation;
-  if (failed(registerAllocation.recalculate(funcOp))) {
-    return funcOp.emitOpError() << "unable to perform register allocation";
-  }
-
-  // TODO(simon-camp): We sometimes get a to high number of refs used. This may
-  // be because the IR is in a mixed state of VM and EmitC dialects and the
-  // register allocation pass doesn't handle the 'emitc.opaque' type correctly.
-  // We could either
-  //  - annotate the function with the correct number of refs in the
-  //    conversion or
-  //  - define the array in the conversion (which would need to be
-  //    done through a macro at the moment because array types are not handled
-  //    by EmitC).
-  const size_t numRefs = registerAllocation.getMaxRefRegisterOrdinal() + 1;
-  const bool hasRefs = numRefs > 0;
-
-  if (hasRefs) {
-    auto ref_initializers = SmallVector<StringRef, 4>{numRefs, "{0}"};
-    output << "iree_vm_ref_t local_refs[" << numRefs << "] = {"
-           << llvm::join(ref_initializers, ", ") << "};\n";
-  }
-
-  for (auto &block : blocks) {
-    // Only print a label if there is more than one block.
-    if (blocks.size() > 1) {
-      if (failed(emitter.emitLabel(block))) {
-        return funcOp.emitOpError() << "Unable to print label for basic block";
-      }
-    }
-    for (Operation &op : block.getOperations()) {
-      if (failed(
-              translateOpToC(op, emitter, resultNames, /*hasRefs=*/hasRefs))) {
-        return failure();
-      }
-    }
-  }
-
-  output << "}\n";
-
-  return success();
-}
-
 static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
                                             mlir::emitc::CppEmitter &emitter) {
   SymbolTable symbolTable(moduleOp);
   std::string moduleName = moduleOp.getName().str();
   llvm::raw_ostream &output = emitter.ostream();
 
-  // function wrapper
-  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
-    output << "static iree_status_t "
-           << buildFunctionName(moduleOp, funcOp,
-                                /*implSufffix=*/false)
-           << "("
-           << "iree_vm_stack_t* stack, " << moduleName << "_t* module, "
-           << moduleName << "_state_t* state";
-
-    if (funcOp.getNumArguments() > 0) {
-      output << ", ";
-    }
-
-    if (failed(printFuncOpArguments(funcOp, emitter))) {
-      return failure();
-    }
-
-    if (funcOp.getNumResults() > 0) {
-      output << ", ";
-    }
-
-    SmallVector<std::string, 4> resultNames;
-    for (unsigned int idx = 0; idx < funcOp.getNumResults(); idx++) {
-      std::string resultName = "out" + std::to_string(idx);
-      resultNames.push_back(resultName);
-    }
-
-    if (failed(printFuncOpResults(funcOp, emitter, resultNames))) {
-      return failure();
-    }
-    output << ") {\n"
-           << "return "
-           << buildFunctionName(moduleOp, funcOp,
-                                /*implSufffix=*/true)
-           << "(";
-
-    SmallVector<std::string, 4> argNames;
-    for (Value &argument : funcOp.getArguments()) {
-      std::string argName = emitter.getOrCreateName(argument).str();
-      argNames.push_back(argName);
-    }
-
-    for (std::string &resultName : resultNames) {
-      argNames.push_back(resultName);
-    }
-
-    argNames.push_back("stack");
-    argNames.push_back("state");
-
-    output << llvm::join(argNames, ", ");
-    output << ");\n}\n";
-  }
-
-  auto printCStringView = [](std::string s) -> std::string {
-    return "iree_make_cstring_view(\"" + s + "\")";
+  auto printCStringView = [](StringRef s) -> std::string {
+    return ("iree_make_cstring_view(\"" + s + "\")").str();
   };
 
   // exports
@@ -515,18 +162,20 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   });
 
   for (auto exportOp : exportOps) {
-    auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
+    StringRef funcName = exportOp.function_ref();
+    auto funcOp = symbolTable.lookup<mlir::FuncOp>(funcName);
     if (!funcOp) {
       return exportOp.emitError("Couldn't find referenced FuncOp");
     }
-    auto callingConvention = makeCallingConventionString(funcOp);
+    StringAttr callingConvention =
+        funcOp.getOperation()->getAttr("calling_convention").cast<StringAttr>();
     if (!callingConvention) {
       return exportOp.emitError(
           "Couldn't create calling convention string for referenced FuncOp");
     }
 
     // TODO(simon-camp): support function-level reflection attributes
-    output << "{" << printCStringView(exportOp.export_name().str()) << ", "
+    output << "{" << printCStringView(exportOp.export_name()) << ", "
            << printCStringView(callingConvention.getValue()) << ", 0, NULL},\n";
   }
   output << "};\n";
@@ -545,7 +194,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   });
 
   for (auto importOp : importOps) {
-    output << "{" << printCStringView(importOp.getName().str()) << "},\n";
+    output << "{" << printCStringView(importOp.getName()) << "},\n";
   }
   output << "};\n";
   output << "\n";
@@ -558,7 +207,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   // We only add exported functions to the table, as calls to internal functions
   // are directly mapped to C function calls of the generated implementation.
   for (auto exportOp : exportOps) {
-    auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
+    StringRef funcName = exportOp.function_ref();
+    auto funcOp = symbolTable.lookup<mlir::FuncOp>(funcName);
     if (!funcOp) {
       return exportOp.emitError("Couldn't find referenced FuncOp");
     }
@@ -569,9 +219,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
       return funcOp.emitError("Couldn't create calling convention string");
     }
     output << ", "
-           << "(iree_vm_native_function_target_t)"
-           << buildFunctionName(moduleOp, funcOp, /*implSufffix=*/false)
-           << "},\n";
+           << "(iree_vm_native_function_target_t)" << funcName << "},\n";
   }
   output << "};\n";
   output << "\n";
@@ -753,6 +401,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 
   printInclude("iree/vm/api.h");
   printInclude("iree/vm/ops.h");
+  printInclude("iree/vm/ops_emitc.h");
   printInclude("iree/vm/shims_emitc.h");
   printInclude("iree/vm/value.h");
   output << "\n";
@@ -772,28 +421,39 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     return failure();
   }
 
+  // translate functions
   output << "// DECLARE FUNCTIONS\n";
 
-  // forward declare functions
-  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
-    if (failed(translateFunctionToC(moduleOp, funcOp, emitter,
-                                    /*declareOnly=*/true))) {
-      return failure();
-    }
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    Operation *op = funcOp.getOperation();
+    if (op->hasAttr("emitc.static")) output << "static ";
 
-    output << "\n";
+    if (failed(emitter.emitTypes(*funcOp.getOperation(),
+                                 funcOp.getType().getResults())))
+      return failure();
+    output << " " << funcOp.getName();
+
+    output << "(";
+
+    bool error = false;
+    llvm::interleaveComma(
+        funcOp.getArguments(), output, [&](BlockArgument arg) {
+          if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType())))
+            error = true;
+        });
+    if (error) return failure();
+    output << ");\n";
   }
 
   output << "// DEFINE FUNCTIONS\n";
 
-  // translate functions
-  for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
-    if (failed(translateFunctionToC(moduleOp, funcOp, emitter,
-                                    /*declareOnly=*/false))) {
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    Operation *op = funcOp.getOperation();
+    if (op->hasAttr("emitc.static")) output << "static ";
+    if (failed(emitter.emitOperation(*funcOp.getOperation(),
+                                     /*trailingSemicolon=*/
+                                     false)))
       return failure();
-    }
-
-    output << "\n";
   }
 
   printSeparatingComment(output);
