@@ -29,6 +29,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRParser
     MLIRSPIRV
+    MLIRSPIRVModuleCombiner
     MLIRSPIRVSerialization
     MLIRSupport
     MLIRVector

@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -1485,6 +1486,15 @@ bool InterfaceOp::isEquivalentTo(InterfaceOp other) {
          });
 }
 
+llvm::hash_code InterfaceOp::getInterfaceHash() {
+  auto range = llvm::map_range(getBlock().getOps<InterfaceBindingOp>(),
+                               [](InterfaceBindingOp bindingOp) {
+                                 return bindingOp.getDescriptorHash();
+                               });
+  return llvm::hash_combine(
+      push_constants(), llvm::hash_combine_range(range.begin(), range.end()));
+}
+
 //===----------------------------------------------------------------------===//
 // hal.interface.binding
 //===----------------------------------------------------------------------===//
@@ -1535,6 +1545,13 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
                                          "type",
                                          "access",
                                      });
+}
+
+llvm::hash_code InterfaceBindingOp::getDescriptorHash() {
+  // Use the unwrapped attribute accessors so that we can have determinstic
+  // hashes. Hashing against the wrapped attributes are hashing against pointer
+  // values, which change per run.
+  return llvm::hash_combine(set(), binding(), type(), access());
 }
 
 //===----------------------------------------------------------------------===//

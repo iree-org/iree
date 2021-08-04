@@ -2272,6 +2272,10 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
     // Returns true if the all bindings in the interface match exactly those
     // in |other| (including order).
     bool isEquivalentTo(IREE::HAL::InterfaceOp other);
+
+    // Returns a hash for the interface, considering the push constant and
+    // all bindings.
+    llvm::hash_code getInterfaceHash();
   }];
 }
 
@@ -2311,6 +2315,12 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
     HAL_DescriptorTypeAttr:$type,
     HAL_MemoryAccessBitfieldAttr:$access
   );
+
+  let extraClassDeclaration = [{
+    /// Returns a hash for the descriptor, considering the set, binding,
+    /// type, and access.
+    llvm::hash_code getDescriptorHash();
+  }];
 }
 
 def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [

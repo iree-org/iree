@@ -47,6 +47,7 @@ cc_library(
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVModuleCombiner",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:VectorOps",
