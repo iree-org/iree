@@ -16,24 +16,29 @@ iree_cc_library(
   HDRS
     "FlowDialect.h"
     "FlowEnums.h.inc"
-    "FlowInterfaces.h.inc"
+    "FlowOpInterfaces.h.inc"
     "FlowOpUtils.h"
     "FlowOps.h"
     "FlowOps.h.inc"
+    "FlowTypeInterfaces.h.inc"
     "FlowTypes.h"
+    "FlowTypes.h.inc"
   SRCS
     "FlowDialect.cpp"
     "FlowEnums.cpp.inc"
-    "FlowInterfaces.cpp.inc"
     "FlowOpFolders.cpp"
+    "FlowOpInterfaces.cpp.inc"
     "FlowOpUtils.cpp"
     "FlowOps.cpp"
     "FlowOps.cpp.inc"
+    "FlowTypeInterfaces.cpp.inc"
     "FlowTypes.cpp"
+    "FlowTypes.cpp.inc"
   DEPS
     ::FlowEnumsGen
     ::FlowInterfacesGen
     ::FlowOpsGen
+    ::FlowTypesGen
     LLVMSupport
     MLIRIR
     MLIRInferTypeOpInterface
@@ -65,8 +70,10 @@ iree_tablegen_library(
   TD_FILE
     "FlowInterfaces.td"
   OUTS
-    -gen-op-interface-decls FlowInterfaces.h.inc
-    -gen-op-interface-defs FlowInterfaces.cpp.inc
+    -gen-op-interface-decls FlowOpInterfaces.h.inc
+    -gen-op-interface-defs FlowOpInterfaces.cpp.inc
+    -gen-type-interface-decls FlowTypeInterfaces.h.inc
+    -gen-type-interface-defs FlowTypeInterfaces.cpp.inc
 )
 
 iree_tablegen_library(
@@ -77,6 +84,18 @@ iree_tablegen_library(
   OUTS
     -gen-op-decls FlowOps.h.inc
     -gen-op-defs FlowOps.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    FlowTypesGen
+  TD_FILE
+    "FlowBase.td"
+  OUTS
+    -gen-attrdef-decls FlowAttrs.h.inc
+    -gen-attrdef-defs FlowAttrs.cpp.inc
+    -gen-typedef-decls FlowTypes.h.inc
+    -gen-typedef-defs FlowTypes.cpp.inc
 )
 
 iree_tablegen_doc(

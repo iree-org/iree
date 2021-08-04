@@ -9,15 +9,12 @@
 
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-
-#include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.h.inc"  // IWYU pragma: export
 
 class FlowDialect : public Dialect {
  public:
@@ -27,6 +24,9 @@ class FlowDialect : public Dialect {
   Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
                                  Location loc) override;
 
+  Attribute parseAttribute(DialectAsmParser &parser, Type type) const override;
+  void printAttribute(Attribute attr, DialectAsmPrinter &p) const override;
+
   Type parseType(DialectAsmParser &parser) const override;
   void printType(Type type, DialectAsmPrinter &p) const override;
 
@@ -34,6 +34,10 @@ class FlowDialect : public Dialect {
     return op && op->getDialect() &&
            op->getDialect()->getNamespace() == getDialectNamespace();
   }
+
+ private:
+  void registerAttributes();
+  void registerTypes();
 };
 
 }  // namespace Flow
