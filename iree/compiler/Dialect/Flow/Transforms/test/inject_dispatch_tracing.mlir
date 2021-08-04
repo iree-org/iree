@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='func(iree-flow-inject-dispatch-tracing)' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-flow-inject-dispatch-tracing)' %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @singleDispatch
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>)

@@ -42,7 +42,7 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     %c0_i8 = constant 0 : i8
     // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV
     %4 = vector.transfer_read %arg2[%c0, %c0], %c0_i32 {in_bounds = [true, true]} : memref<4096x4096xi32>, vector<16x16xi32>
-    // CHECK: %[[INIT:.+]] = unrealized_conversion_cast %[[C]] : !spv.coopmatrix<16x16xi32, Subgroup> to vector<16x16xi32>
+    // CHECK: %[[INIT:.+]] = builtin.unrealized_conversion_cast %[[C]] : !spv.coopmatrix<16x16xi32, Subgroup> to vector<16x16xi32>
     // CHECK: %[[LOOP:.+]] = scf.for
     // CHECK-SAME: iter_args(%[[ARG:.+]] = %[[INIT]])
     %5 = scf.for %arg3 = %c0 to %c4096 step %c32 iter_args(%arg4 = %4) -> (vector<16x16xi32>) {
@@ -50,14 +50,14 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
       %6 = vector.transfer_read %arg0[%c0, %arg3], %c0_i8 {in_bounds = [true, true]} : memref<4096x4096xi8>, vector<16x32xi8>
       // CHECK: %[[B:.+]] = spv.CooperativeMatrixLoadNV
       %7 = vector.transfer_read %arg1[%arg3, %c0], %c0_i8 {in_bounds = [true, true]} : memref<4096x4096xi8>, vector<32x16xi8>
-      // CHECK: %[[C1:.+]] = unrealized_conversion_cast %[[ARG]] : vector<16x16xi32> to !spv.coopmatrix<16x16xi32, Subgroup>
+      // CHECK: %[[C1:.+]] = builtin.unrealized_conversion_cast %[[ARG]] : vector<16x16xi32> to !spv.coopmatrix<16x16xi32, Subgroup>
       // CHECK: %[[R:.+]] = spv.CooperativeMatrixMulAddNV %[[A]], %[[B]], %[[C1]]
       %8 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} %6, %7, %arg4 : vector<16x32xi8>, vector<32x16xi8> into vector<16x16xi32>
-      // CHECK: %[[YIELD:.+]] = unrealized_conversion_cast %[[R]] : !spv.coopmatrix<16x16xi32, Subgroup> to vector<16x16xi32>
+      // CHECK: %[[YIELD:.+]] = builtin.unrealized_conversion_cast %[[R]] : !spv.coopmatrix<16x16xi32, Subgroup> to vector<16x16xi32>
       // CHECK: scf.yield %[[YIELD]]
       scf.yield %8 : vector<16x16xi32>
     }
-    // CHECK: %[[ACCv:.+]] = unrealized_conversion_cast %[[LOOP]] : vector<16x16xi32> to !spv.coopmatrix<16x16xi32, Subgroup>
+    // CHECK: %[[ACCv:.+]] = builtin.unrealized_conversion_cast %[[LOOP]] : vector<16x16xi32> to !spv.coopmatrix<16x16xi32, Subgroup>
     // CHECK: spv.CooperativeMatrixStoreNV %{{.*}}, %[[ACCv]], %{{.*}}, %{{.*}}
     vector.transfer_write %5, %arg2[%c0, %c0] : vector<16x16xi32>, memref<4096x4096xi32>
     return

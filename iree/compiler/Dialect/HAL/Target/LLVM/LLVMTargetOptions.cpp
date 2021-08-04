@@ -45,7 +45,7 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
 
   // LLVM -O3.
   // TODO(benvanik): add an option for this.
-  targetOptions.optLevel = llvm::PassBuilder::OptimizationLevel::O3;
+  targetOptions.optLevel = llvm::OptimizationLevel::O3;
   targetOptions.options.FloatABIType = llvm::FloatABI::Hard;
 
   return targetOptions;

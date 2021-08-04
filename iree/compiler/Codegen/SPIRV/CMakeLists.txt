@@ -43,7 +43,9 @@ iree_cc_library(
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRMathToSPIRV
     MLIRMemRef
+    MLIRMemRefToSPIRV
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF

@@ -1477,8 +1477,11 @@ bool InterfaceOp::isEquivalentTo(InterfaceOp other) {
   return push_constantsAttr() == other.push_constantsAttr() &&
          bindings.size() == otherBindings.size() &&
          llvm::all_of(llvm::zip(bindings, otherBindings), [](auto bindings) {
-           return OperationEquivalence::isEquivalentTo(std::get<0>(bindings),
-                                                       std::get<1>(bindings));
+           return OperationEquivalence::isEquivalentTo(
+               std::get<0>(bindings), std::get<1>(bindings),
+               OperationEquivalence::exactValueMatch,
+               OperationEquivalence::exactValueMatch,
+               OperationEquivalence::Flags::IgnoreLocations);
          });
 }
 
