@@ -40,26 +40,31 @@ cc_library(
     srcs = [
         "FlowDialect.cpp",
         "FlowEnums.cpp.inc",
-        "FlowInterfaces.cpp.inc",
         "FlowOpFolders.cpp",
+        "FlowOpInterfaces.cpp.inc",
         "FlowOpUtils.cpp",
         "FlowOps.cpp",
         "FlowOps.cpp.inc",
+        "FlowTypeInterfaces.cpp.inc",
         "FlowTypes.cpp",
+        "FlowTypes.cpp.inc",
     ],
     hdrs = [
         "FlowDialect.h",
         "FlowEnums.h.inc",
-        "FlowInterfaces.h.inc",
+        "FlowOpInterfaces.h.inc",
         "FlowOpUtils.h",
         "FlowOps.h",
         "FlowOps.h.inc",
+        "FlowTypeInterfaces.h.inc",
         "FlowTypes.h",
+        "FlowTypes.h.inc",
     ],
     deps = [
         ":FlowEnumsGen",
         ":FlowInterfacesGen",
         ":FlowOpsGen",
+        ":FlowTypesGen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "@llvm-project//llvm:Support",
@@ -97,11 +102,19 @@ gentbl_cc_library(
     tbl_outs = [
         (
             ["-gen-op-interface-decls"],
-            "FlowInterfaces.h.inc",
+            "FlowOpInterfaces.h.inc",
         ),
         (
             ["-gen-op-interface-defs"],
-            "FlowInterfaces.cpp.inc",
+            "FlowOpInterfaces.cpp.inc",
+        ),
+        (
+            ["-gen-type-interface-decls"],
+            "FlowTypeInterfaces.h.inc",
+        ),
+        (
+            ["-gen-type-interface-defs"],
+            "FlowTypeInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
@@ -123,6 +136,31 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowOps.td",
+    deps = [":td_files"],
+)
+
+gentbl_cc_library(
+    name = "FlowTypesGen",
+    tbl_outs = [
+        (
+            ["-gen-attrdef-decls"],
+            "FlowAttrs.h.inc",
+        ),
+        (
+            ["-gen-attrdef-defs"],
+            "FlowAttrs.cpp.inc",
+        ),
+        (
+            ["-gen-typedef-decls"],
+            "FlowTypes.h.inc",
+        ),
+        (
+            ["-gen-typedef-defs"],
+            "FlowTypes.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "FlowBase.td",
     deps = [":td_files"],
 )
 
