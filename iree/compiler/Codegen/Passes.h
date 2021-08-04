@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -94,6 +95,11 @@ createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 /// Co is a multiple of 4, and filter shape must be 1x1x4xCo.
 void populateLinalgToVectorVectorizeConvPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
+
+/// Populates `patterns` with conversions of Shape dialect to LLVM Dialect.
+void populateShapeToLLVMConversionPatterns(MLIRContext *context,
+                                           TypeConverter *converter,
+                                           OwningRewritePatternList &patterns);
 
 //------------------------------------------------------------------------------
 // LLVMCPU
@@ -193,11 +199,13 @@ void buildLLVMCPUCodegenPassPipeline(
 // LLVMGPU
 //------------------------------------------------------------------------------
 
-/// Lowering calling vectorization patterns.
+/// Lowering calling vectorization patterns. Expects pass manager to be a
+/// module-level pass manager.
 void addGPUVectorizationPassPipeline(OpPassManager &passManager);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
-/// will result in scalar operations.
+/// will result in scalar operations. Expects pass manager to be a module-level
+/// pass manager.
 void addGPUSimpleDistributePassPipeline(OpPassManager &passManager);
 
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via the
@@ -212,7 +220,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUTileAndDistributeToThreads();
 
 std::unique_ptr<OperationPass<FuncOp>>

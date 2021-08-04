@@ -129,15 +129,24 @@ class ROCMTargetBackend final : public TargetBackend {
                                       "dialect to the native llvm::Module";
     }
 
+    // Collect all the entry point names.
+    llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
+    for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+      entryPointOps[op.sym_name()] = op;
+    }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
       std::array<int32_t, 3> workgroup_size;
-      for (auto it : llvm::enumerate(func->getAttr("llvmgpu_workgroup_size")
-                                         .cast<DenseIntElementsAttr>()
-                                         .getIntValues())) {
-        workgroup_size[it.index()] = it.value().getZExtValue();
+      auto entryPointOp = entryPointOps[func.getName()];
+      if (Optional<ArrayAttr> workgroupSizeAttr =
+              entryPointOp.workgroup_size()) {
+        for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
+          workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
+        }
+      } else {
+        workgroup_size = {1, 1, 1};
       }
       workgroupSizes.push_back(workgroup_size);
       llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);

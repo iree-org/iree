@@ -10,10 +10,12 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,14 +33,25 @@ class LLVMGPULowerExecutableTargetPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect, linalg::LinalgDialect,
-                    vector::VectorDialect, gpu::GPUDialect>();
+                    linalg_ext::LinalgExtDialect, vector::VectorDialect,
+                    gpu::GPUDialect>();
   }
 
   LLVMGPULowerExecutableTargetPass() = default;
   LLVMGPULowerExecutableTargetPass(
-      const LLVMGPULowerExecutableTargetPass &pass) = default;
+      const LLVMGPULowerExecutableTargetPass &pass){};
 
   void runOnOperation() override;
+
+ private:
+  Option<bool> testLoweringConfiguration{
+      *this, "test-lowering-configuration",
+      llvm::cl::desc(
+          "Flag used for lit-testing the default configuration set for root "
+          "ops in hal.executable.variants. Defaults to false and is set to "
+          "true "
+          "for lit tests. Not for general usage"),
+      llvm::cl::init(false)};
 };
 }  // namespace
 
@@ -60,19 +73,12 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
       getAllEntryPoints(moduleOp);
   Optional<IREE::HAL::DispatchLoweringPassPipeline> passPipeline;
-  SmallVector<int64_t, 4> workloadPerWorkgroup;
   for (auto &it : entryPoints) {
     auto entryPointOp = it.second;
     if (IREE::HAL::TranslationInfo translationInfo =
             getTranslationInfo(entryPointOp)) {
       IREE::HAL::DispatchLoweringPassPipeline currPipeline =
           translationInfo.passPipeline().getValue();
-      if (ArrayAttr workloadPerWorkgroupAttr =
-              translationInfo.workloadPerWorkgroup()) {
-        workloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
-            workloadPerWorkgroupAttr,
-            [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-      }
       if (passPipeline) {
         if (currPipeline != passPipeline.getValue()) {
           moduleOp.emitError(
@@ -85,25 +91,21 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       passPipeline = currPipeline;
     }
   }
-  auto funcOps = moduleOp.getOps<FuncOp>();
-  FuncOp funcOp = *funcOps.begin();
-  // Attach the workgroup size as an attribute. This will be used when
-  // creating the flatbuffer.
-  funcOp->setAttr(
-      "llvmgpu_workgroup_size",
-      DenseElementsAttr::get<int64_t>(
-          VectorType::get(3, IntegerType::get(moduleOp.getContext(), 64)),
-          workloadPerWorkgroup));
 
-  switch (*passPipeline) {
-    case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute:
-      addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize:
-      addGPUVectorizationPassPipeline(executableLoweringPipeline);
-      break;
-    default:
-      llvm_unreachable("Unsupported pipeline on GPU target.");
+  executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
+  executableLoweringPipeline.addPass(createCanonicalizerPass());
+  if (!testLoweringConfiguration && passPipeline.hasValue()) {
+    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
+    switch (*passPipeline) {
+      case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute:
+        addGPUSimpleDistributePassPipeline(nestedModulePM);
+        break;
+      case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize:
+        addGPUVectorizationPassPipeline(nestedModulePM);
+        break;
+      default:
+        llvm_unreachable("Unsupported pipeline on GPU target.");
+    }
   }
 
   if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
