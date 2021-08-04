@@ -26,10 +26,10 @@ iree_cc_library(
     "Passes.cpp"
     "SPIRVConcretizeWorkgroupTiles.cpp"
     "SPIRVConvertToGPU.cpp"
+    "SPIRVCopyToWorkgroupMemory.cpp"
     "SPIRVFoldGPUProcessorIDUses.cpp"
     "SPIRVTileAndVectorize.cpp"
     "SPIRVVectorToCooperativeMatrix.cpp"
-    "SPIRVVectorToGPU.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
   DEPS
