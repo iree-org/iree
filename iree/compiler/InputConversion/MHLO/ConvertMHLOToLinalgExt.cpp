@@ -305,7 +305,8 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
                           realType, b.getF32FloatAttr(0.0).cast<Attribute>()))};
   }
 
-  static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b, int stage) {
+  static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b,
+                                              int stage) {
     constexpr std::complex<double> kI(0, 1);
     int m = 1 << stage;
     int mh = m >> 1;
