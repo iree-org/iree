@@ -99,8 +99,8 @@ func @inplaceDispatch(
   // CHECK: %[[OUTER_RET0:.+]] = flow.dispatch.workgroups[
   // CHECK-SAME: %[[WORKGROUP_COUNT_X]], %[[WORKGROUP_COUNT_Y]]
   // CHECK-SAME: ](%[[ARG0]], %[[ARG1]])
-  // CHECK-SAME: : (tensor<?x4xf32>{%c128}, index) -> %arg0 =
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0, %arg1) : (tensor<?x4xf32>{%c128}, index) -> %arg0 =
+  // CHECK-SAME: : (tensor<?x4xf32>{%c128}, index) -> %arg0{%c128} =
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0, %arg1) : (tensor<?x4xf32>{%c128}, index) -> %arg0{%c128} =
   // CHECK-NEXT: (%[[INNER_ARG0:.+]]: !flow.dispatch.tensor<readwrite:?x4xf32>
   // CHECK-SAME:  %[[INNER_ARG1:.+]]: index) {
   (%arg0_capture: !flow.dispatch.tensor<readwrite:?x4xf32>, %arg1_capture: index) {
