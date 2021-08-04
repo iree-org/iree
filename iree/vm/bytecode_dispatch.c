@@ -1540,8 +1540,8 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Extension trampolines
     //===------------------------------------------------------------------===//
 
-    BEGIN_DISPATCH_PREFIX(PrefixExtI64, EXT_I64) {
 #if IREE_VM_EXT_I64_ENABLE
+    BEGIN_DISPATCH_PREFIX(PrefixExtI64, EXT_I64) {
       //===----------------------------------------------------------------===//
       // ExtI64: Globals
       //===----------------------------------------------------------------===//
@@ -1802,15 +1802,14 @@ iree_status_t iree_vm_bytecode_dispatch(
         IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
             &value, buffer, offset, 1, sizeof(uint64_t)));
       });
-
-#else
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
-#endif  // IREE_VM_EXT_I64_ENABLE
     }
     END_DISPATCH_PREFIX();
+#else
+    UNHANDLED_DISPATCH_PREFIX(PrefixExtI64, EXT_I64);
+#endif  // IREE_VM_EXT_I64_ENABLE
 
-    BEGIN_DISPATCH_PREFIX(PrefixExtF32, EXT_F32) {
 #if IREE_VM_EXT_F32_ENABLE
+    BEGIN_DISPATCH_PREFIX(PrefixExtF32, EXT_F32) {
       //===----------------------------------------------------------------===//
       // ExtF32: Globals
       //===----------------------------------------------------------------===//
@@ -2077,12 +2076,11 @@ iree_status_t iree_vm_bytecode_dispatch(
         IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
             &value, buffer, offset, 1, sizeof(float)));
       });
-
-#else
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
-#endif  // IREE_VM_EXT_F32_ENABLE
     }
     END_DISPATCH_PREFIX();
+#else
+    UNHANDLED_DISPATCH_PREFIX(PrefixExtF32, EXT_F32);
+#endif  // IREE_VM_EXT_F32_ENABLE
 
     DISPATCH_OP(CORE, PrefixExtF64,
                 { return iree_make_status(IREE_STATUS_UNIMPLEMENTED); });
