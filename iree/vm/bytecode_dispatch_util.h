@@ -329,7 +329,12 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
     VMCHECK(0);                                                             \
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unhandled opcode"); \
   }
-#define DISPATCH_UNHANDLED_EXT()
+#define UNHANDLED_DISPATCH_PREFIX(op_name, ext)                    \
+  _dispatch_CORE_##op_name : {                                     \
+    VMCHECK(0);                                                    \
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,             \
+                            "unhandled dispatch extension " #ext); \
+  }
 
 #define DISPATCH_OP(ext, op_name, body)                             \
   _dispatch_##ext##_##op_name : IREE_DISPATCH_LOG_OPCODE(#op_name); \
@@ -359,11 +364,11 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED, \
                             "unhandled core opcode");  \
   }
-#define DISPATCH_UNHANDLED_EXT                             \
-  () default : {                                           \
-    VMCHECK(0);                                            \
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,     \
-                            "unhandled extension opcode"); \
+#define UNHANDLED_DISPATCH_PREFIX(op_name, ext)                    \
+  case IREE_VM_OP_CORE_##op_name: {                                \
+    VMCHECK(0);                                                    \
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,             \
+                            "unhandled dispatch extension " #ext); \
   }
 
 #define DISPATCH_OP(ext, op_name, body) \

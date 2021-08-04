@@ -317,6 +317,11 @@ endif()
   # TODO(#898): add a dedicated size-constrained configuration.
 if(${IREE_SIZE_OPTIMIZED})
   iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
+    CLANG_OR_GCC
+      "-DIREE_STATUS_MODE=0"
+      "-DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
+      "-DIREE_VM_EXT_I64_ENABLE=0"
+      "-DIREE_VM_EXT_F32_ENABLE=0"
     MSVC_OR_CLANG_CL
       "/GS-"
       "/GL"
