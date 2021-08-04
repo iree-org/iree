@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "convert_upstream_to_iree.mlir"
     "top_level_scf_to_cfg.mlir"
   DATA
     iree::tools::IreeFileCheck
