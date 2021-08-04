@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cmath>
+#include <complex>
+
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
@@ -302,6 +305,22 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
                           realType, b.getF32FloatAttr(0.0).cast<Attribute>()))};
   }
 
+  static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b,
+                                              int stage) {
+    constexpr std::complex<double> kI(0, 1);
+    int m = 1 << stage;
+    int mh = m >> 1;
+    SmallVector<Attribute> real, imag;
+    for (auto i : llvm::seq<unsigned>(0, mh)) {
+      auto v = std::exp(-2 * M_PI * i / m * kI);
+      real.push_back(b.getF32FloatAttr(v.real()));
+      imag.push_back(b.getF32FloatAttr(v.imag()));
+    }
+    auto type = RankedTensorType::get({mh}, b.getF32Type());
+    return {b.create<ConstantOp>(type, DenseFPElementsAttr::get(type, real)),
+            b.create<ConstantOp>(type, DenseFPElementsAttr::get(type, imag))};
+  }
+
   LogicalResult matchAndRewrite(
       mhlo::FftOp op, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const final {
@@ -323,9 +342,12 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
         getBitReversalOrder(b, adaptor.operand(), fftLength);
     int lognPlus1 = std::log(fftLength) / std::log(2) + 1;
     for (auto s : llvm::seq<unsigned>(1, lognPlus1)) {
+      SmallVector<Value> inputs;
+      inputs.push_back(b.create<ConstantIndexOp>(s));
+      inputs.append(getCoeffConstants(b, s));
       auto fft = b.create<linalg_ext::FftOp>(
-          TypeRange{results[0].getType(), results[1].getType()},
-          ValueRange{b.create<ConstantIndexOp>(s)}, results);
+          TypeRange{results[0].getType(), results[1].getType()}, inputs,
+          results);
       results = fft.getResults();
     }
 
