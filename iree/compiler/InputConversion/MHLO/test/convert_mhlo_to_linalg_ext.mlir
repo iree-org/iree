@@ -275,16 +275,22 @@ func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK:          linalg.yield %[[LOAD]] : f32
 // CHECK:        %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<8xf32>
 // CHECK:        %[[C1:.+]] = constant 1 : index
+// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<1xf32>
+// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<1xf32>
 // CHECK:        %[[R1:.+]]:2 = linalg_ext.fft
-// CHECK-SAME:     ins(%[[C1]]
+// CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
 // CHECK:        %[[C2:.+]] = constant 2 : index
+// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<2xf32>
+// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<2xf32>
 // CHECK:        %[[R2:.+]]:2 = linalg_ext.fft
-// CHECK-SAME:     ins(%[[C2]]
+// CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
 // CHECK:        %[[C3:.+]] = constant 3 : index
+// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<4xf32>
+// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<4xf32>
 // CHECK:        %[[R3:.+]]:2 = linalg_ext.fft
-// CHECK-SAME:     ins(%[[C3]]
+// CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
 // CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
 // CHECK:        %[[RES_IMAG:.+]] = tensor.extract_slice %[[R3]]#1[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
@@ -318,16 +324,22 @@ func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>) {
 // CHECK:          linalg.yield %[[LOAD]] : f32
 // CHECK:        %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<4x8xf32>
 // CHECK:        %[[C1:.+]] = constant 1 : index
+// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<1xf32>
+// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<1xf32>
 // CHECK:        %[[R1:.+]]:2 = linalg_ext.fft
-// CHECK-SAME:     ins(%[[C1]]
+// CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
 // CHECK:        %[[C2:.+]] = constant 2 : index
+// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<2xf32>
+// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<2xf32>
 // CHECK:        %[[R2:.+]]:2 = linalg_ext.fft
-// CHECK-SAME:     ins(%[[C2]]
+// CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
 // CHECK:        %[[C3:.+]] = constant 3 : index
+// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<4xf32>
+// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<4xf32>
 // CHECK:        %[[R3:.+]]:2 = linalg_ext.fft
-// CHECK-SAME:     ins(%[[C3]]
+// CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
 // CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0, 0] [4, 5] [1, 1] : tensor<4x8xf32> to tensor<4x5xf32>
 // CHECK:        %[[RES_IMAG:.+]] = tensor.extract_slice %[[R3]]#1[0, 0] [4, 5] [1, 1] : tensor<4x8xf32> to tensor<4x5xf32>

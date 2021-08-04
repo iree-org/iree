@@ -521,6 +521,12 @@ static LogicalResult verifyFftOp(FftOp op) {
   if (!op.getNumInputs() || !op.isScalar(op.getInputOperand(0))) {
     return op.emitOpError("expected to carry `stage` input");
   }
+  if (op.getNumInputs() != 1) {
+    if (op.getNumInputs() != 3 || op.isScalar(op.getInputOperand(1)) ||
+        op.isScalar(op.getInputOperand(2))) {
+      return op.emitOpError("expected to carry real and imag coeff inputs");
+    }
+  }
   if (op.getNumOutputs() != 2) {
     return op.emitOpError("expected outputs to be real and imag tensor/memref");
   }
@@ -547,7 +553,7 @@ SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
   for (auto en : llvm::enumerate(getOperandShape().drop_back())) {
     Value size;
     if (en.value() == ShapedType::kDynamicSize) {
-      size = getDimValue(builder, loc, operand(), en.index());
+      size = getDimValue(builder, loc, getReal(), en.index());
     } else {
       size = builder.create<ConstantIndexOp>(loc, en.value());
     }
@@ -560,47 +566,10 @@ SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
   return res;
 }
 
-// Generates FFT stage scalar implementation. This follows Cooley–Tukey FFT
-// algorithm. The pseudo reference code is:
-//   let s <- stage of linalg_ext.fft
-//   int m = 1 << s;
-//   int mh = m >> 1;
-//   for (int k = 0; k < n; k += m) {
-//     for (int j = 0; j < mh; ++j) {
-//       cplx w = exp(-2 * PI * j / m * I);
-//       cplx t = w * a[k + j + mh];
-//       cplx u = a[k + j];
-//       a[k + j] = u + t;
-//       a[k + j + mh] = u - t;
-//     }
-//   }
-LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
-                                                  ValueRange ivs) {
-  Value real = getReal();
-  Value imag = getImag();
-  Value stage = getStage();
-  Value one = b.create<ConstantIndexOp>(loc, 1);
-  Value wholeSize = b.create<ShiftLeftOp>(loc, one, stage);
-  Value halfSize = b.create<SignedShiftRightOp>(loc, wholeSize, one);
-
+void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
+                                              ArrayRef<Value> operands,
+                                              Value wholeSize) {
   auto rank = getOperandRank();
-  SmallVector<Value> operands;
-  SmallVector<OpFoldResult> lhsIvs(ivs.begin(), ivs.end());
-  SmallVector<OpFoldResult> ones(rank, b.getIndexAttr(1));
-  SmallVector<OpFoldResult> sizes(rank, b.getIndexAttr(1));
-  sizes.back() = halfSize;
-  operands.push_back(
-      b.create<memref::SubViewOp>(loc, real, lhsIvs, sizes, ones));
-  operands.push_back(
-      b.create<memref::SubViewOp>(loc, imag, lhsIvs, sizes, ones));
-
-  SmallVector<OpFoldResult> rhsIvs(ivs.begin(), ivs.end());
-  rhsIvs.back() = b.create<AddIOp>(loc, ivs.back(), halfSize).getResult();
-  operands.push_back(
-      b.create<memref::SubViewOp>(loc, real, rhsIvs, sizes, ones));
-  operands.push_back(
-      b.create<memref::SubViewOp>(loc, imag, rhsIvs, sizes, ones));
-
   SmallVector<AffineMap> maps(operands.size(), b.getMultiDimIdentityMap(rank));
   // TODO(hanchung): Use getLoopIteratorTypes(), once tiling method is
   // implemented.
@@ -651,6 +620,98 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
         Value r4 = b.create<SubFOp>(loc, lhsImag, tImag);
         b.create<linalg::YieldOp>(loc, ValueRange{r1, r2, r3, r4});
       });
+}
+
+void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
+                                           ArrayRef<Value> operands) {
+  auto rank = getOperandRank();
+  SmallVector<AffineMap> maps;
+  // The size of coefficent buffer is epxected to match `2^(stage-1)`, which
+  // equals to the last dim of operands.
+  maps.append(
+      2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
+  maps.append(operands.size(), b.getMultiDimIdentityMap(rank));
+  // TODO(hanchung): Use getLoopIteratorTypes(), once tiling method is
+  // implemented.
+  SmallVector<StringRef> iterTypes(rank, getParallelIteratorTypeName());
+
+  b.create<linalg::GenericOp>(
+      loc, TypeRange{}, ValueRange{getRealCoeff(), getImagCoeff()}, operands,
+      maps, iterTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value wReal = args[0];
+        Value wImag = args[1];
+        Value lhsReal = args[2];
+        Value lhsImag = args[3];
+        Value rhsReal = args[4];
+        Value rhsImag = args[5];
+
+        // t = w * a[k + j + mh];
+        // ->  (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
+        Value xu = b.create<MulFOp>(loc, wReal, rhsReal);
+        Value yv = b.create<MulFOp>(loc, wImag, rhsImag);
+        Value xv = b.create<MulFOp>(loc, wReal, rhsImag);
+        Value yu = b.create<MulFOp>(loc, wImag, rhsReal);
+        Value tReal = b.create<SubFOp>(loc, xu, yv);
+        Value tImag = b.create<AddFOp>(loc, xv, yu);
+
+        // cplx u = a[k + j];
+        // a[k + j] = u + t;
+        // a[k + j + mh] = u - t;
+        Value r1 = b.create<AddFOp>(loc, lhsReal, tReal);
+        Value r2 = b.create<AddFOp>(loc, lhsImag, tImag);
+        Value r3 = b.create<SubFOp>(loc, lhsReal, tReal);
+        Value r4 = b.create<SubFOp>(loc, lhsImag, tImag);
+        b.create<linalg::YieldOp>(loc, ValueRange{r1, r2, r3, r4});
+      });
+}
+
+// Generates FFT stage scalar implementation. This follows Cooley–Tukey FFT
+// algorithm. The pseudo reference code is:
+//   let s <- stage of linalg_ext.fft
+//   int m = 1 << s;
+//   int mh = m >> 1;
+//   for (int k = 0; k < n; k += m) {
+//     for (int j = 0; j < mh; ++j) {
+//       cplx w = exp(-2 * PI * j / m * I);
+//       cplx t = w * a[k + j + mh];
+//       cplx u = a[k + j];
+//       a[k + j] = u + t;
+//       a[k + j + mh] = u - t;
+//     }
+//   }
+LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                  ValueRange ivs) {
+  Value real = getReal();
+  Value imag = getImag();
+  Value stage = getStage();
+  Value one = b.create<ConstantIndexOp>(loc, 1);
+  Value wholeSize = b.create<ShiftLeftOp>(loc, one, stage);
+  Value halfSize = b.create<SignedShiftRightOp>(loc, wholeSize, one);
+
+  auto rank = getOperandRank();
+  SmallVector<Value> operands;
+  SmallVector<OpFoldResult> lhsIvs(ivs.begin(), ivs.end());
+  SmallVector<OpFoldResult> ones(rank, b.getIndexAttr(1));
+  SmallVector<OpFoldResult> sizes(rank, b.getIndexAttr(1));
+  sizes.back() = halfSize;
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, real, lhsIvs, sizes, ones));
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, imag, lhsIvs, sizes, ones));
+
+  SmallVector<OpFoldResult> rhsIvs(ivs.begin(), ivs.end());
+  rhsIvs.back() = b.create<AddIOp>(loc, ivs.back(), halfSize).getResult();
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, real, rhsIvs, sizes, ones));
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, imag, rhsIvs, sizes, ones));
+
+  if (hasCoeff()) {
+    generateScalarImplWithCoeffBuf(b, loc, operands);
+  } else {
+    generateScalarImplWithoutCoeffBuf(b, loc, operands, wholeSize);
+  }
+
   return success();
 }
 
