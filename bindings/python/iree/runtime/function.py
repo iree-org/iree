@@ -69,7 +69,6 @@ class FunctionInvoker:
       "_named_arg_indices",
       "_max_named_arg_index",
       "_has_inlined_results",
-      "_has_kwargs",
       "_tracer",
   ]
 
@@ -86,7 +85,6 @@ class FunctionInvoker:
     self._abi_dict = None
     self._arg_descs = None
     self._ret_descs = None
-    self._has_kwargs = False
     self._has_inlined_results = False
     self._named_arg_indices: Dict[str, int] = {}
     self._max_named_arg_index: int = -1
@@ -107,19 +105,8 @@ class FunctionInvoker:
     inv = Invocation(self._device)
     ret_descs = self._ret_descs
 
-    # If kwargs are present, we treat those more as kwarg-only parameters (i.e.
-    # you cannot just arbitrarily use them to override positional arguments
-    # by name in the current implementation). If the backing ABI metadata
-    # declares support for kwargs, this will be done by having a final
-    # 'kwargs_sdict' arg descriptor, and we rewrite into this form.
-    # So we just append the kwargs dict to the args list and let decoding
-    # happen normally.
-    if self._has_kwargs:
-      # TODO: Remove all of this kwargs dict support after 9/2021
-      args = list(args)
-      args.append(kwargs if kwargs else dict())
-    elif kwargs:
-      # Marge keyword args in by name->position mapping.
+    # Merge keyword args in by name->position mapping.
+    if kwargs:
       args = list(args)
       len_delta = self._max_named_arg_index - len(args) + 1
       if len_delta > 0:
@@ -185,12 +172,6 @@ class FunctionInvoker:
         self._ret_descs, list):
       raise RuntimeError(
           f"Malformed function reflection metadata structure: {reflection}")
-
-    # See if kwargs are expected.
-    if self._arg_descs:
-      maybe_kwargs_desc = self._arg_descs[-1]
-      if maybe_kwargs_desc and maybe_kwargs_desc[0] == "sdict_kwargs":
-        self._has_kwargs = True
 
     # Post-process the arg descs to transform "named" records to just their
     # type, stashing the index.
@@ -263,7 +244,7 @@ def _list_or_tuple_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 
 def _dict_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   desc_type = desc[0]
-  if desc_type != "sdict" and desc_type != "sdict_kwargs":
+  if desc_type != "sdict":
     _raise_argument_error(inv, f"passed a dict but expected {desc_type}")
   # When decoding a dict, the desc object is like:
   # ['sdict', ['key0', [...value_type_0...]], ['key1', [...value_type_1...]]]]
