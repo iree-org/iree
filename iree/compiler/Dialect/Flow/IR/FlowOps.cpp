@@ -142,16 +142,10 @@ static ParseResult parseShapedOperandList(
   return success();
 }
 
-// Ties the |tiedResult| parsed operand back to a previously parsed operand.
-// The type and any dynamic dimensions of the operand will be used for the
-// result values and the operand index will be appended to |tiedOperandIndices|.
-static ParseResult tieOperand(
-    OpAsmParser::OperandType tiedResult, OpAsmParser &parser,
-    ArrayRef<OpAsmParser::OperandType> operands, TypeRange operandTypes,
-    ArrayRef<OpAsmParser::OperandType> operandDims,
-    SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
-    SmallVectorImpl<int64_t> &tiedOperandIndices) {
+// Finds the operand index in |operands| that |tiedResult| references.
+// Returns TiedOpInterface::kUntiedIndex if no operand is found.
+static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
+                               ArrayRef<OpAsmParser::OperandType> operands) {
   int64_t operandIndex = TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
     if (operands[i].name == tiedResult.name) {
@@ -159,29 +153,7 @@ static ParseResult tieOperand(
       break;
     }
   }
-  if (operandIndex == TiedOpInterface::kUntiedIndex) {
-    return parser.emitError(tiedResult.location,
-                            "tied operand not found for result reference ")
-           << tiedResult.name;
-  }
-
-  auto resultType = operandTypes[operandIndex];
-  resultTypes.push_back(resultType);
-  tiedOperandIndices.push_back(operandIndex);
-
-  auto shapedType = resultType.dyn_cast<ShapedType>();
-  if (shapedType) {
-    unsigned dimsIndex = 0;
-    for (unsigned i = 0; i < operandIndex; ++i) {
-      if (auto shapedType = operandTypes[i].dyn_cast<ShapedType>()) {
-        dimsIndex += shapedType.getNumDynamicDims();
-      }
-    }
-    resultDims.append(llvm::to_vector<4>(
-        operandDims.slice(dimsIndex, shapedType.getNumDynamicDims())));
-  }
-
-  return success();
+  return operandIndex;
 }
 
 static ParseResult parseShapedResultList(
@@ -194,31 +166,40 @@ static ParseResult parseShapedResultList(
   do {
     OpAsmParser::OperandType tiedResult;
     auto res = parser.parseOptionalOperand(tiedResult);
+    Type type;
+    int64_t tiedOperandIndex = TiedOpInterface::kUntiedIndex;
     if (res.hasValue() && succeeded(res.getValue())) {
-      if (failed(tieOperand(tiedResult, parser, operands, operandTypes,
-                            operandDims, resultTypes, resultDims,
-                            tiedOperandIndices))) {
-        return failure();
+      tiedOperandIndex = findTiedOperand(tiedResult, operands);
+      if (tiedOperandIndex == TiedOpInterface::kUntiedIndex) {
+        return parser.emitError(tiedResult.location,
+                                "tied operand not found for result reference ")
+               << tiedResult.name;
       }
-    } else {
-      Type type;
-      if (failed(parser.parseType(type))) return failure();
-      if (auto shapedType = type.dyn_cast<ShapedType>()) {
-        if (!shapedType.hasStaticShape()) {
-          SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
-          if (failed(parser.parseLBrace()) ||
-              failed(parser.parseOperandList(dynamicDims,
-                                             shapedType.getNumDynamicDims(),
-                                             OpAsmParser::Delimiter::None)) ||
-              failed(parser.parseRBrace())) {
-            return failure();
-          }
-          resultDims.append(dynamicDims);
-        }
+      if (succeeded(parser.parseOptionalKeyword("as"))) {
+        // Type _may_ differ from the operand.
+        if (failed(parser.parseType(type))) return failure();
+      } else {
+        // Use the operands type.
+        type = operandTypes[tiedOperandIndex];
       }
-      resultTypes.push_back(type);
-      tiedOperandIndices.push_back(TiedOpInterface::kUntiedIndex);
+    } else if (failed(parser.parseType(type))) {
+      return failure();
     }
+    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+        if (failed(parser.parseLBrace()) ||
+            failed(parser.parseOperandList(dynamicDims,
+                                           shapedType.getNumDynamicDims(),
+                                           OpAsmParser::Delimiter::None)) ||
+            failed(parser.parseRBrace())) {
+          return failure();
+        }
+        resultDims.append(dynamicDims);
+      }
+    }
+    resultTypes.push_back(type);
+    tiedOperandIndices.push_back(tiedOperandIndex);
   } while (succeeded(parser.parseOptionalComma()));
   if (!tiedOperandIndices.empty()) {
     tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
@@ -286,25 +267,34 @@ static void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
   if (resultTypes.size() != 1) p << "(";
   auto tiedOp = cast<TiedOpInterface>(op);
   for (unsigned i = 0; i < resultTypes.size(); ++i) {
-    auto tiedOperand = tiedOp.getTiedResultOperandIndex(i);
-    if (tiedOperand.hasValue()) {
-      p.printOperand(op->getOperand(tiedOperand.getValue()));
-    } else {
-      auto type = resultTypes[i];
-      p.printType(type);
-      if (auto shapedType = type.dyn_cast<ShapedType>()) {
-        if (!shapedType.hasStaticShape()) {
-          if (resultDims.empty()) {
-            p << "{<<INVALID>>}";
-            return;
-          }
-          p << "{";
-          llvm::interleaveComma(
-              resultDims.take_front(shapedType.getNumDynamicDims()), p,
-              [&](Value value) { p.printOperand(value); });
-          p << "}";
-          resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
+    auto resultType = resultTypes[i];
+    auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
+    bool printType = true;
+    if (tiedOperandIndex.hasValue()) {
+      auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
+      p.printOperand(tiedOperand);
+      if (tiedOperand.getType() != resultType) {
+        p << " as ";
+      } else {
+        // Type elided as it matches the operand.
+        printType = false;
+      }
+    }
+    if (printType) {
+      p.printType(resultType);
+    }
+    if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        if (resultDims.empty()) {
+          p << "{<<INVALID>>}";
+          return;
         }
+        p << "{";
+        llvm::interleaveComma(
+            resultDims.take_front(shapedType.getNumDynamicDims()), p,
+            [&](Value value) { p.printOperand(value); });
+        p << "}";
+        resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
       }
     }
     if (i < resultTypes.size() - 1) p << ", ";

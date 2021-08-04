@@ -68,8 +68,8 @@ func @removeUnusedDynamicResult(%arg0: tensor<4x?xf32>, %dim0: index,
                                 %arg1: tensor<8x?xf32>, %dim1: index) -> tensor<8x?xf32> {
   // CHECK: flow.ex.stream.fragment(%[[ARG1]]) :
   %0:2 = flow.ex.stream.fragment(%arg0, %arg1) :
-      // CHECK-SAME: (tensor<8x?xf32>{%[[DIM1]]}) -> %[[ARG1]] =
-      (tensor<4x?xf32>{%dim0}, tensor<8x?xf32>{%dim1}) -> (%arg0, %arg1) =
+      // CHECK-SAME: (tensor<8x?xf32>{%[[DIM1]]}) -> %[[ARG1]]{%[[DIM1]]} =
+      (tensor<4x?xf32>{%dim0}, tensor<8x?xf32>{%dim1}) -> (%arg0{%dim0}, %arg1{%dim1}) =
       // CHECK-NEXT: (%[[INNER_ARG:.+]]: tensor<8x?xf32>) -> tensor<8x?xf32>
       (%unused: tensor<4x?xf32>, %arg1: tensor<8x?xf32>) -> (tensor<4x?xf32>, tensor<8x?xf32>) {
     // CHECK-NEXT: flow.return %[[INNER_ARG]] : tensor<8x?xf32>

@@ -39,7 +39,21 @@ func @inplaceDynamicDispatch(%arg0 : tensor<4x?xf32>, %arg1 : tensor<8x?xf32>) -
   %dim0 = constant 100 : index
   // CHECK-DAG: %[[DIM1:.+]] = constant 200
   %dim1 = constant 200 : index
-  // CHECK: %0:2 = flow.dispatch @ex0::@dispatch_fn[%[[CST]]](%[[CST]], %arg0, %arg1) : (index, tensor<4x?xf32>{%[[DIM0]]}, tensor<8x?xf32>{%[[DIM1]]}) -> (%arg0, %arg1)
-  %0, %1 = flow.dispatch @ex0::@dispatch_fn[%cst](%cst, %arg0, %arg1) : (index, tensor<4x?xf32>{%dim0}, tensor<8x?xf32>{%dim1}) -> (%arg0, %arg1)
+  // CHECK: %0:2 = flow.dispatch @ex0::@dispatch_fn[%[[CST]]](%[[CST]], %arg0, %arg1) : (index, tensor<4x?xf32>{%[[DIM0]]}, tensor<8x?xf32>{%[[DIM1]]}) -> (%arg0{%[[DIM1]]}, %arg1{%[[DIM0]]})
+  %0, %1 = flow.dispatch @ex0::@dispatch_fn[%cst](%cst, %arg0, %arg1) : (index, tensor<4x?xf32>{%dim0}, tensor<8x?xf32>{%dim1}) -> (%arg0{%dim1}, %arg1{%dim0})
   return %0, %1 : tensor<4x?xf32>, tensor<8x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @inplaceTypeChange
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?xf32>)
+func @inplaceTypeChange(%arg0: tensor<4x?xf32>) -> tensor<?x4xf32> {
+  // CHECK-DAG: %[[CST:.+]] = constant 4
+  %cst = constant 4 : index
+  // CHECK-DAG: %[[DIM0:.+]] = constant 100
+  %dim0 = constant 100 : index
+  // CHECK: %0 = flow.dispatch @ex0::@dispatch_fn[%[[CST]]](%[[ARG0]]) : (tensor<4x?xf32>{%[[DIM0]]}) -> %arg0 as tensor<?x4xf32>{%[[DIM0]]}
+  %0 = flow.dispatch @ex0::@dispatch_fn[%cst](%arg0) : (tensor<4x?xf32>{%dim0}) -> %arg0 as tensor<?x4xf32>{%dim0}
+  return %0 : tensor<?x4xf32>
 }
