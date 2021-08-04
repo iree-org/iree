@@ -626,8 +626,8 @@ void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
                                            ArrayRef<Value> operands) {
   auto rank = getOperandRank();
   SmallVector<AffineMap> maps;
-  // The size of coefficent buffer is epxected to match `2^(stage-1)`, where is
-  // exacatlly the last dim of operands.
+  // The size of coefficent buffer is epxected to match `2^(stage-1)`, which
+  // equals to the last dim of operands.
   maps.append(
       2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
   maps.append(operands.size(), b.getMultiDimIdentityMap(rank));
