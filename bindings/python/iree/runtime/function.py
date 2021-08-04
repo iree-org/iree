@@ -5,7 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from typing import Optional
+from typing import Dict, Optional
 
 import json
 import logging
@@ -66,6 +66,9 @@ class FunctionInvoker:
       "_abi_dict",
       "_arg_descs",
       "_ret_descs",
+      "_named_arg_indices",
+      "_max_named_arg_index",
+      "_has_inlined_results",
       "_has_kwargs",
       "_tracer",
   ]
@@ -84,6 +87,9 @@ class FunctionInvoker:
     self._arg_descs = None
     self._ret_descs = None
     self._has_kwargs = False
+    self._has_inlined_results = False
+    self._named_arg_indices: Dict[str, int] = {}
+    self._max_named_arg_index: int = -1
     self._parse_abi_dict(vm_function)
 
   @property
@@ -109,8 +115,24 @@ class FunctionInvoker:
     # So we just append the kwargs dict to the args list and let decoding
     # happen normally.
     if self._has_kwargs:
+      # TODO: Remove all of this kwargs dict support after 9/2021
       args = list(args)
       args.append(kwargs if kwargs else dict())
+    elif kwargs:
+      # Marge keyword args in by name->position mapping.
+      args = list(args)
+      len_delta = self._max_named_arg_index - len(args) + 1
+      if len_delta > 0:
+        args.extend([NotImplemented] * len_delta)
+      for kwarg_key, kwarg_value in kwargs.items():
+        try:
+          kwarg_index = self._named_arg_indices[kwarg_key]
+        except KeyError:
+          raise RuntimeError(f"Specified kwarg '{kwarg_key}' is unknown")
+        len_delta = kwarg_index - len(args) + 1
+        if len_delta <= 0:
+          args.extend([NotImplemented] * len_delta)
+        args[kwarg_index] = kwarg_value
 
     arg_list = VmVariantList(len(args))
     ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
@@ -120,7 +142,14 @@ class FunctionInvoker:
     self._vm_context.invoke(self._vm_function, arg_list, ret_list)
     if call_trace:
       call_trace.add_vm_list(ret_list, "results")
-    returns = _extract_vm_sequence_to_python(inv, ret_list, ret_descs)
+
+    # Un-inline the results to align with reflection, as needed.
+    reflection_aligned_ret_list = ret_list
+    if self._has_inlined_results:
+      reflection_aligned_ret_list = VmVariantList(1)
+      reflection_aligned_ret_list.push_list(ret_list)
+    returns = _extract_vm_sequence_to_python(inv, reflection_aligned_ret_list,
+                                             ret_descs)
     if call_trace:
       call_trace.end_call()
     return_arity = len(returns)
@@ -162,6 +191,24 @@ class FunctionInvoker:
       maybe_kwargs_desc = self._arg_descs[-1]
       if maybe_kwargs_desc and maybe_kwargs_desc[0] == "sdict_kwargs":
         self._has_kwargs = True
+
+    # Post-process the arg descs to transform "named" records to just their
+    # type, stashing the index.
+    for i in range(len(self._arg_descs)):
+      maybe_named_desc = self._arg_descs[i]
+      if maybe_named_desc and maybe_named_desc[0] == "named":
+        arg_name, arg_type_desc = maybe_named_desc[1:]
+        self._arg_descs[i] = arg_type_desc
+        self._named_arg_indices[arg_name] = i
+        if i > self._max_named_arg_index:
+          self._max_named_arg_index = i
+
+    # Detect whether the results are a slist/stuple/sdict, which indicates
+    # that they are inlined with the function's results.
+    if len(self._ret_descs) == 1:
+      maybe_inlined = self._ret_descs[0]
+      if maybe_inlined and maybe_inlined[0] in ["slist", "stuple", "sdict"]:
+        self._has_inlined_results = True
 
   def __repr__(self):
     return repr(self._vm_function)

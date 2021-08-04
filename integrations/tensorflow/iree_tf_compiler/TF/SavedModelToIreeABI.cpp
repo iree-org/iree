@@ -101,6 +101,7 @@ struct StructureLevel {
   // index for arguments, return index for returns).
   int valueIndex = 0;
   Type valueType;
+  StringRef valueName;
 
   // For child levels, the key in the parent container, either a string or int
   // value.
@@ -109,15 +110,7 @@ struct StructureLevel {
 
   // Children (must be heap allocated due to recursion).
   std::vector<StructureLevel> children;
-
-  // The root argument level is still just a list but has a special dict
-  // child in which to shove kwargs. Once everything is constructed, if the
-  // kwargs dict is not empty, it is added as the last child.
   bool isRootArgs = false;
-  std::unique_ptr<StructureLevel> kwargs;
-
-  // If this is the kwargs dict level, it will have this bit set.
-  bool isKwargs = false;
 
   static StructureLevel leafValue(int valueIndex) {
     return StructureLevel{LevelType::Value, valueIndex};
@@ -126,9 +119,6 @@ struct StructureLevel {
   static StructureLevel createRootArgsList() {
     StructureLevel ret = StructureLevel{LevelType::List};
     ret.isRootArgs = true;
-    ret.kwargs =
-        std::unique_ptr<StructureLevel>(new StructureLevel{LevelType::Dict});
-    ret.kwargs->isKwargs = true;
     return ret;
   }
 
@@ -168,7 +158,17 @@ struct StructureLevel {
   json::Value createReflectionType() {
     switch (type) {
       case LevelType::Value:
-        return mapTypeToJsonTypeRecord(valueType);
+        if (valueName.empty()) {
+          // Unnamed.
+          return mapTypeToJsonTypeRecord(valueType);
+        } else {
+          // Named.
+          json::Array namedRecord;
+          namedRecord.push_back(json::Value("named"));
+          namedRecord.push_back(json::Value(valueName));
+          namedRecord.push_back(mapTypeToJsonTypeRecord(valueType));
+          return json::Value(std::move(namedRecord));
+        }
       case LevelType::List:
       case LevelType::Tuple: {
         json::Array typeRecord;
@@ -186,8 +186,7 @@ struct StructureLevel {
       }
       case LevelType::Dict: {
         json::Array typeRecord;
-        typeRecord.push_back(isKwargs ? json::Value("sdict_kwargs")
-                                      : json::Value("sdict"));
+        typeRecord.push_back(json::Value("sdict"));
         for (auto &child : children) {
           json::Array nvRecord;
           nvRecord.push_back(child.skey);
@@ -313,12 +312,6 @@ struct StructureLevel {
   }
 
   void normalize() {
-    // Handle root kwargs.
-    if (isRootArgs && !kwargs->children.empty()) {
-      kwargs->ikey = children.size();
-      children.push_back(std::move(*kwargs));
-    }
-
     // Sort by key.
     if (type == LevelType::List || type == LevelType::Tuple) {
       std::sort(
@@ -369,9 +362,17 @@ struct StructureLevel {
   StructureLevel *allocateChild(Location loc, StringRef childKey) {
     if (type == LevelType::None) type = LevelType::Dict;
     if (type != LevelType::Dict) {
-      // Special case for root-args: shove it into the kwargs.
+      // Special case for root-args: create a named bindings.
       if (isRootArgs) {
-        return kwargs->allocateChild(loc, childKey);
+        int maxIKey = 0;
+        for (auto &child : children) {
+          if (child.ikey > maxIKey) maxIKey = child.ikey;
+        }
+
+        children.push_back({});
+        children.back().ikey = maxIKey + 1;
+        children.back().valueName = childKey;
+        return &children.back();
       } else {
         emitError(loc) << "structure path mismatch: dereference a non-dict "
                        << "with a dict key '" << childKey << "'";
@@ -463,7 +464,11 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // towards multi-return safe by converting to tuple.
   // TODO: Investigate upstream whether there are additional signals to be
   // plumbed.
-  bool isMultiResult = resultsRoot.type == LevelType::Tuple;
+  // Tuples, lists and dicts are just inlined as multi results instead of
+  // introducing a root nesting.
+  bool isMultiResult = resultsRoot.type == LevelType::Tuple ||
+                       resultsRoot.type == LevelType::List ||
+                       resultsRoot.type == LevelType::Dict;
 
   // Build the wrapper function type.
   SmallVector<Type> wrapperArgTypes;
@@ -525,8 +530,9 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
     for (int i = 0, e = resultsRoot.children.size(); i < e; ++i) {
       wrapperReturns[i] = resultsRoot.children[i].emitCreateReturns(
           loc, builder, internalResults);
-      refReturns.push_back(resultsRoot.children[i].createReflectionType());
     }
+    // Multi-result roots are implicitly inlined.
+    refReturns.push_back(resultsRoot.createReflectionType());
   } else {
     // Single return.
     assert(wrapperReturns.size() == 1 &&
