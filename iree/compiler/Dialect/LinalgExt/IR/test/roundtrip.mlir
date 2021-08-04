@@ -371,12 +371,12 @@ func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
     %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = constant 5 : index
   %0:2 = linalg_ext.fft
-    ins(%cst1, %arg2, %arg3: index, tensor<1xf32>, tensor<1xf32>)
+    ins(%cst1, %arg2, %arg3: index, tensor<16xf32>, tensor<16xf32>)
     outs(%arg0, %arg1: tensor<1024xf32>, tensor<1024xf32>)
   : tensor<1024xf32>, tensor<1024xf32>
   return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
 }
-// CHECK-LABEL: func @fft_tensor_coef_stage_two(
+// CHECK-LABEL: func @fft_tensor_coef_stage_5(
 //  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
