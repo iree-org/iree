@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -28,23 +29,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-static SmallVector<linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
-    OpBuilder &builder, Location loc, unsigned numDims,
-    ArrayRef<int64_t> workgroupSize) {
-  assert(numDims <= kNumMaxParallelDims);
-  SmallVector<linalg::ProcInfo, 2> procInfo(numDims);
-  std::array<StringRef, kNumMaxParallelDims> dimAttr{"x", "y", "z"};
-  Type indexType = builder.getIndexType();
-  for (unsigned i = 0; i < numDims; ++i) {
-    StringAttr attr = builder.getStringAttr(dimAttr[i]);
-    procInfo[numDims - 1 - i] = {
-        builder.create<gpu::ThreadIdOp>(loc, indexType, attr),
-        builder.create<ConstantOp>(loc,
-                                   builder.getIndexAttr(workgroupSize[i]))};
-  }
-  return procInfo;
-}
 
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
@@ -139,105 +123,6 @@ static void populateTilingToInvocationPatterns(
           {Identifier::get(getWorkgroupMarker(), context),
            Identifier::get(getWorkgroupKTiledMarker(), context),
            Identifier::get(getWorkgroupMemoryMarker(), context)},
-          Identifier::get(getVectorizeMarker(), context)));
-}
-
-/// Patterns for copy to shared memory mapping. Copy to shared memory are not
-/// part of the launch config but needs to be distributed on the workgroup
-/// picked by the root op.
-static void populateTilingCopyToWorkgroupMemPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns,
-    ArrayRef<int64_t> workgroupSize) {
-  // Tile and distribute copy to workgroup memory.
-  linalg::TileSizeComputationFunction wgCopyTileSizeFn =
-      [](OpBuilder &builder, Operation *operation) {
-        const int64_t copyTileSize = 4;
-        // We tile to 4 as we want each thread to load 4 element in a cyclic
-        // distribution.
-        SmallVector<Value, 4> tileSizesVal;
-        unsigned rank =
-            cast<linalg::CopyOp>(operation).getOutputBufferTypes()[0].getRank();
-        for (unsigned i = 0; i < rank - 1; i++) {
-          int64_t t = (rank - i) <= kNumMaxParallelDims ? 1 : 0;
-          tileSizesVal.push_back(
-              builder.create<ConstantIndexOp>(operation->getLoc(), t));
-        }
-        tileSizesVal.push_back(
-            builder.create<ConstantIndexOp>(operation->getLoc(), copyTileSize));
-        return tileSizesVal;
-      };
-  auto getCopyThreadProcInfoFn = [workgroupSize](
-                                     OpBuilder &builder, Location loc,
-                                     ArrayRef<Range> parallelLoopRanges) {
-    SmallVector<std::array<int64_t, 3>, 2> staticRanges;
-    bool hasDynamicRange = false;
-    // If the ranges are not constant fall back to naive disribution.
-    for (auto range : parallelLoopRanges) {
-      auto cstOffset = range.offset.getDefiningOp<ConstantIndexOp>();
-      auto cstSize = range.size.getDefiningOp<ConstantIndexOp>();
-      auto cstStride = range.stride.getDefiningOp<ConstantIndexOp>();
-      if (!cstOffset || !cstSize || !cstStride) {
-        hasDynamicRange = true;
-        break;
-      }
-      staticRanges.push_back(
-          {cstOffset.getValue(), cstSize.getValue(), cstStride.getValue()});
-    }
-    // Only support static dimension with 1D workgroups for now. Fall back to
-    // the naive distribution for other cases.
-    if (hasDynamicRange || workgroupSize[1] != 1 || workgroupSize[2] != 1)
-      return getGPUThreadIdsAndCounts(builder, loc, parallelLoopRanges.size(),
-                                      workgroupSize);
-    Value serializedId =
-        builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(), "x");
-    int64_t numIds = workgroupSize[0];
-    int numDims = parallelLoopRanges.size();
-    SmallVector<linalg::ProcInfo, 2> procInfo(numDims);
-    assert(numDims <= kNumMaxParallelDims);
-    // Distribute the available Ids on the loop dimensions.
-    for (int i = numDims - 1; i >= 0; i--) {
-      std::array<int64_t, 3> &range = staticRanges[i];
-      Value id = serializedId;
-      int64_t interval = ceilDiv(range[1] - range[0], range[2]);
-      Value intervalValue = builder.create<ConstantIndexOp>(loc, interval);
-      int64_t count = 0;
-      if (numIds <= 1) {
-        count = 1;
-        id = builder.create<ConstantIndexOp>(loc, 0);
-      } else if (numIds > interval) {
-        AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
-        AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
-        if (i > 0)
-          id = makeComposedAffineApply(builder, loc, d0 % s0,
-                                       {id, intervalValue});
-        count = interval;
-      } else {
-        count = numIds;
-      }
-      numIds = numIds / interval;
-      AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
-      AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
-      serializedId = makeComposedAffineApply(builder, loc, d0.floorDiv(s0),
-                                             {serializedId, intervalValue});
-      procInfo[i] = {id, builder.create<ConstantIndexOp>(loc, count)};
-    }
-    return procInfo;
-  };
-  linalg::LinalgLoopDistributionOptions copyInvocationDistributionOptions;
-  copyInvocationDistributionOptions.procInfo = getCopyThreadProcInfoFn;
-  copyInvocationDistributionOptions.distributionMethod = {
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic}};
-
-  auto tilingOptions =
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::Loops)
-          .setTileSizeComputationFunction(wgCopyTileSizeFn)
-          .setDistributionOptions(copyInvocationDistributionOptions);
-  patterns.insert<linalg::LinalgTilingPattern<linalg::CopyOp>>(
-      context, tilingOptions,
-      linalg::LinalgTransformationFilter(
-          {Identifier::get(getCopyToWorkgroupMemoryMarker(), context)},
           Identifier::get(getVectorizeMarker(), context)));
 }
 
@@ -372,8 +257,6 @@ struct LLVMGPUTileAndDistributePass
       OwningRewritePatternList threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(context, threadLevelTilingPatterns,
                                          workgroupSize);
-      populateTilingCopyToWorkgroupMemPatterns(
-          context, threadLevelTilingPatterns, workgroupSize);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(threadLevelTilingPatterns));
     }

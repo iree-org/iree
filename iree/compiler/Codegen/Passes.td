@@ -193,6 +193,12 @@ def LLVMGPUVectorLowering :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
 }
 
+def LLVMGPUDistributeSharedMemoryCopy :
+    Pass<"iree-llvmgpu-distribute-shared-memory-copy", "FuncOp"> {
+  let summary = "Pass to distribute shared memory copies to threads.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUDistributeSharedMemoryCopy()";
+}
+
 //------------------------------------------------------------------------------
 // SPIRV
 //------------------------------------------------------------------------------

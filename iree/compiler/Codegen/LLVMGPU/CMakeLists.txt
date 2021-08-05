@@ -16,11 +16,13 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
+    "LLVMGPUUtils.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "KernelConfig.cpp"
+    "LLVMGPUDistributeSharedMemoryCopy.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPURemoveTrivialLoops.cpp"
     "LLVMGPUTileAndDistribute.cpp"

@@ -103,6 +103,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize:
         addGPUVectorizationPassPipeline(nestedModulePM);
         break;
+      case IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
+        addGPUMatmulSimtPassPipeline(nestedModulePM);
+        break;
       default:
         llvm_unreachable("Unsupported pipeline on GPU target.");
     }

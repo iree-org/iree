@@ -27,13 +27,12 @@ struct TileWorkgroupSizePair {
 /// Return the best combination of tile size and wg size. It will then used to
 /// pick the best size aligned with the shape dimension.
 static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 128, 4}, {32, 1, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{64, 128, 8}, {32, 4, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
 }
 
 static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
-  if (getLoweringConfig(op)) return success();
   TileSizesListType tileSizes;
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape = getUntiledShape(op.getInputOperand(0)->get());
@@ -58,6 +57,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   // Default tile size and workgroup size.
   int64_t tileX = 2;
   int64_t tileY = 256;
+  int64_t tileK = 4;
   SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
   SmallVector<TileWorkgroupSizePair> tileSizeConfig;
   // Query the best configuration.
@@ -68,6 +68,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
     if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
       tileX = config.tileSize[0];
       tileY = config.tileSize[1];
+      tileK = config.tileSize[2];
       workgroupSize.assign(config.workgroupSize.begin(),
                            config.workgroupSize.end());
       break;
@@ -80,8 +81,8 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   // inner dimension with the tileX/tileY size.
   ts.append(op.getNumParallelLoops() - 2, 1);
   ts.append({tileX, tileY});
-  // Tile all the reduction dimension with a size of 4.
-  ts.append(op.getNumReductionLoops(), 4);
+  // Tile all the reduction dimensions.
+  ts.append(op.getNumReductionLoops(), tileK);
   tileSizes.push_back(ts);  // Workgroup level.
   tileSizes.push_back({});  // Subgroup level.
   // At the thread level only tile parallel loops.
@@ -91,7 +92,8 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   tileSizes.push_back(invocationLevelTs);  // Thread level.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
+      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt,
+      workgroupSize);
 }
 
 // Basic default properties for linalg ops that haven't been tuned.
