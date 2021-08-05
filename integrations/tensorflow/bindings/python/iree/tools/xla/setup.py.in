@@ -70,7 +70,10 @@ setup(
         "Development Status :: 3 - Alpha",
     ],
     python_requires=">=3.7",
-    packages=find_namespace_packages(include=["iree.tools.xla"]),
+    packages=find_namespace_packages(include=[
+      "iree.tools.xla",
+      "iree.tools.xla.*",
+    ]),
     package_data={
         "iree.tools.xla": [f"iree-import-xla{exe_suffix}",],
     },
