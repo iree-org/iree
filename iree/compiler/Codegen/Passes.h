@@ -288,9 +288,8 @@ createSPIRVTileAndVectorizePass(const SPIRVCodegenOptions &options);
 std::unique_ptr<OperationPass<FuncOp>>
 createSPIRVVectorToCooperativeMatrixPass();
 
-/// Pass to convert vector operations to GPU level operations. Instructions of
-/// vector size equal to subgroup size are distributed across the subgroup.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToGPUPass();
+/// Pass to lower linalg.copy for copying data to workgroup memory.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVCopyToWorkgroupMemoryPass();
 
 /// Converts memref of scalar to memref of vector of efficent size. This will
 /// allow to convert memory accesses to vector load/store in SPIR-V without
@@ -318,10 +317,6 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm,
 //----------------------------------------------------------------------------//
 // SPIRV Codegen specific patterns.
 //----------------------------------------------------------------------------//
-
-/// Populates patterns to tile and distribute linalg.copy operations.
-void populateTileAndDistributeLinalgCopyPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
 
 /// Populates patterns to fold processor ID uses by using processor counts
 /// information where possible.

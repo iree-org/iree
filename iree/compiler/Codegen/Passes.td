@@ -261,10 +261,10 @@ def SPIRVVectorToCooperativeMatrix :
 }
 
 // TODO: Rename argument to be fully qualified.
-def SPIRVVectorToGPU :
-    Pass<"iree-spirv-vector-to-gpu", "FuncOp"> {
+def SPIRVCopyToWorkgroupMemory :
+    Pass<"iree-spirv-copy-to-workgroup-memory", "FuncOp"> {
   let summary = "Convert vector dialect to gpu subgroup level GPU instructions";
-  let constructor = "mlir::iree_compiler::createSPIRVVectorToGPUPass()";
+  let constructor = "mlir::iree_compiler::createSPIRVCopyToWorkgroupMemoryPass()";
 }
 
 //------------------------------------------------------------------------------
