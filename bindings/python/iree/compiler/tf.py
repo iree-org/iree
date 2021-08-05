@@ -84,6 +84,7 @@ class ImportOptions(CompilerOptions):
                save_temp_tf_input: Optional[str] = None,
                save_temp_mid_level_input: Optional[str] = None,
                save_temp_iree_input: Optional[str] = None,
+               use_tosa: bool = False,
                **kwargs):
     """Initialize options from keywords.
 
@@ -116,6 +117,7 @@ class ImportOptions(CompilerOptions):
     self.save_temp_tf_input = save_temp_tf_input
     self.save_temp_mid_level_input = save_temp_mid_level_input
     self.save_temp_iree_input = save_temp_iree_input
+    self.use_tosa = use_tosa
 
 
 def build_import_command_line(input_path: str, tfs: TempFileSaver,
@@ -163,6 +165,9 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
                                        export_as=options.save_temp_iree_input)
   if save_iree_input:
     cl.append(f"--save-temp-iree-input={save_iree_input}")
+
+  if options.use_tosa:
+    cl.append(f"--use-tosa")
 
   # Crash reproducer (locally qualified).
   requested_crash_reproducer_path = options.crash_reproducer_path

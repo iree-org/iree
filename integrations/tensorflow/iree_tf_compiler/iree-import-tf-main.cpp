@@ -163,6 +163,9 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Prettifies TF debug information to make it easier "
                      "to look at"),
       llvm::cl::init(true));
+  static llvm::cl::opt<bool> useTosa(
+      "use-tosa", llvm::cl::desc("Use tosa as the intermediate IR"),
+      llvm::cl::init(false));
 
   // Register any command line options.
   registerAsmPrinterCLOptions();
@@ -222,7 +225,7 @@ int main(int argc, char **argv) {
       pm.addPass(iree_integrations::TF::createPrettifyDebugInfoPass());
     }
 
-    iree_integrations::TF::buildTFImportPassPipeline(pm);
+    iree_integrations::TF::buildTFImportPassPipeline(pm, useTosa);
     if (failed(pm.run(*module))) {
       llvm::errs() << "Running iree-import-tf TF import pass pipeline failed "
                       "(see diagnostics)\n";
