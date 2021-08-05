@@ -29,7 +29,6 @@ cc_library(
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Dialect/VM/Transforms",
-        "//iree/compiler/InputConversion/Common",
         "//iree/compiler/InputConversion/MHLO",
         "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Utils",

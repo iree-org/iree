@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "dynamic_torch_index_select_vector.mlir"
     "globals.mlir"
     "scalar.mlir"
+    "tensor_cast.mlir"
     "trace_dispatch_tensors.mlir"
     "unused_args.mlir"
   DATA
