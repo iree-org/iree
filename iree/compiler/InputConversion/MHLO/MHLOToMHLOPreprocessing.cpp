@@ -842,6 +842,8 @@ struct MHLOToMHLOPreprocessingPass
     }
 
     OwningRewritePatternList patterns(&getContext());
+    // TODO: Remove once we have a general contraction to matmul pass.
+    mhlo::PopulateEinsumToDotGeneralPatterns(context, &patterns);
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);

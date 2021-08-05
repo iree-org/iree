@@ -88,6 +88,7 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@mlir-hlo//:chlo_legalize_to_hlo",
         "@mlir-hlo//:hlo",
+        "@mlir-hlo//:legalize_einsum_to_dot_general",
         "@mlir-hlo//:legalize_gather_to_torch_index_select",
         "@mlir-hlo//:legalize_to_linalg",
         "@mlir-hlo//:map_lmhlo_to_scalar_op",
