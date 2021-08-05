@@ -216,7 +216,8 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
       return TypeSwitch<Operation *, LogicalResult>(op)
           .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface>(
-              [&](auto op) { return setRootConfig(entryPointFn, op); });
+              [&](auto op) { return setRootConfig(entryPointFn, op); })
+          .Default([&](Operation *op) { return success(); });
     };
 
     if (failed(setRootConfigFn(computeOp))) {
