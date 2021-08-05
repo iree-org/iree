@@ -115,7 +115,7 @@ class FunctionInvoker:
         try:
           kwarg_index = self._named_arg_indices[kwarg_key]
         except KeyError:
-          raise RuntimeError(f"Specified kwarg '{kwarg_key}' is unknown")
+          raise ArgumentError(f"specified kwarg '{kwarg_key}' is unknown")
         len_delta = kwarg_index - len(args) + 1
         if len_delta <= 0:
           args.extend([NotImplemented] * len_delta)
@@ -200,6 +200,10 @@ class FunctionInvoker:
 #   target_list: VmVariantList to append to
 #   python_value: The python value of the given type
 #   desc: The ABI descriptor list (or None if in dynamic mode).
+
+
+def _missing_argument(inv: Invocation, t: VmVariantList, x, desc):
+  _raise_argument_error(inv, f"a required argument was not specified")
 
 
 def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
@@ -304,6 +308,7 @@ def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 
 
 PYTHON_TO_VM_CONVERTERS = {
+    NotImplemented.__class__: _missing_argument,
     bool: _bool_to_vm,
     int: _int_to_vm,
     float: _float_to_vm,
@@ -353,11 +358,33 @@ def _vm_to_stuple(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
   return tuple(_vm_to_slist(inv, vm_list, vm_index, desc))
 
 
+def _vm_to_scalar(type_bound: type):
+
+  def convert(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
+    value = vm_list.get_variant(vm_index)
+    if not isinstance(value, type_bound):
+      raise ReturnError(
+          f"expected an {type_bound} value but got {value.__class__}")
+    return value
+
+  return convert
+
+
 VM_TO_PYTHON_CONVERTERS = {
     "ndarray": _vm_to_ndarray,
     "sdict": _vm_to_sdict,
     "slist": _vm_to_slist,
     "stuple": _vm_to_stuple,
+
+    # Scalars.
+    "i8": _vm_to_scalar(int),
+    "i16": _vm_to_scalar(int),
+    "i32": _vm_to_scalar(int),
+    "i64": _vm_to_scalar(int),
+    "f16": _vm_to_scalar(float),
+    "f32": _vm_to_scalar(float),
+    "f64": _vm_to_scalar(float),
+    "bf16": _vm_to_scalar(float),
 }
 
 ABI_TYPE_TO_DTYPE = {
@@ -409,11 +436,20 @@ def _cast_scalar_to_ndarray(inv: Invocation, x, desc):
   return dtype(x)
 
 
+class ArgumentError(ValueError):
+  pass
+
+
+class ReturnError(ValueError):
+  pass
+
+
 def _raise_argument_error(inv: Invocation,
                           summary: str,
                           e: Optional[Exception] = None):
-  new_e = ValueError(f"Error passing argument: {summary} "
-                     f"(while encoding argument {inv.summarize_arg_error()})")
+  new_e = ArgumentError(
+      f"Error passing argument: {summary} "
+      f"(while encoding argument {inv.summarize_arg_error()})")
   if e:
     raise new_e from e
   else:
@@ -423,8 +459,8 @@ def _raise_argument_error(inv: Invocation,
 def _raise_return_error(inv: Invocation,
                         summary: str,
                         e: Optional[Exception] = None):
-  new_e = ValueError(f"Error processing function return: {summary} "
-                     f"(while decoding return {inv.summarize_return_error()})")
+  new_e = ReturnError(f"Error processing function return: {summary} "
+                      f"(while decoding return {inv.summarize_return_error()})")
   if e:
     raise new_e from e
   else:
@@ -457,6 +493,8 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
             f" (for desc {desc})")
     try:
       converter(inv, vm_list, py_value, desc)
+    except ArgumentError:
+      raise
     except Exception as e:
       _raise_argument_error(inv, f"exception converting from Python type to VM",
                             e)
@@ -479,13 +517,15 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
       converted = vm_list.get_variant(vm_index)
     else:
       # Known type descriptor.
-      vm_type = desc[0]
+      vm_type = desc if isinstance(desc, str) else desc[0]
       try:
         converter = VM_TO_PYTHON_CONVERTERS[vm_type]
       except KeyError:
         _raise_return_error(inv, f"cannot map VM type to Python: {vm_type}")
       try:
         converted = converter(inv, vm_list, vm_index, desc)
+      except ReturnError:
+        raise
       except Exception as e:
         _raise_return_error(inv, f"exception converting from VM type to Python",
                             e)
