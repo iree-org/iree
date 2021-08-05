@@ -44,7 +44,10 @@ class ExportBenchmarkFuncsPass
       }
     }
     for (auto entryFuncOp : entryFuncOps) {
-      createEntryPointBenchmarkFunc(moduleOp, entryFuncOp);
+      if (failed(createEntryPointBenchmarkFunc(moduleOp, entryFuncOp))) {
+        signalPassFailure();
+        return;
+      }
     }
   }
 
@@ -55,7 +58,11 @@ class ExportBenchmarkFuncsPass
     std::string baseName = "_benchmark_input_";
     std::string name = baseName + std::to_string(uniqueId++);
     auto initialValue = moduleBuilder.getZeroAttr(inputType);
-    assert(initialValue && "failed to get zero attr for type");
+    if (!initialValue) {
+      mlir::emitError(loc) << "unsupported function argument type: "
+                           << inputType;
+      return {};
+    }
     auto variableOp = moduleBuilder.create<VariableOp>(loc, name,
                                                        /*isMutable=*/false,
                                                        inputType, initialValue);
@@ -64,7 +71,8 @@ class ExportBenchmarkFuncsPass
     return variableOp;
   }
 
-  void createEntryPointBenchmarkFunc(ModuleOp moduleOp, FuncOp entryFuncOp) {
+  LogicalResult createEntryPointBenchmarkFunc(ModuleOp moduleOp,
+                                              FuncOp entryFuncOp) {
     OpBuilder moduleBuilder(&getContext());
     moduleBuilder.setInsertionPointAfter(entryFuncOp);
 
@@ -72,8 +80,9 @@ class ExportBenchmarkFuncsPass
     Location loc = entryFuncOp.getLoc();
     SmallVector<IREE::Flow::VariableOp, 4> dummyInputVariableOps;
     for (auto inputType : entryFuncOp.getType().getInputs()) {
-      dummyInputVariableOps.push_back(
-          createDummyInputVariableOp(loc, inputType, moduleBuilder));
+      auto dummyVar = createDummyInputVariableOp(loc, inputType, moduleBuilder);
+      if (!dummyVar) return failure();
+      dummyInputVariableOps.push_back(dummyVar);
     }
 
     // Create a `() -> ()` entry point op the benchmark tool can run.
@@ -110,6 +119,8 @@ class ExportBenchmarkFuncsPass
     entryFuncOp->setAttr("noinline", moduleBuilder.getUnitAttr());
     entryFuncOp->removeAttr("iree.reflection");
     entryFuncOp.setPrivate();
+
+    return success();
   }
 
   int uniqueId = 0;
