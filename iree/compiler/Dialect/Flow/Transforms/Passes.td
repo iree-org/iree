@@ -21,10 +21,16 @@ def ConvertConv2DToImg2Col :
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
 }
 
-def ConvertToFlowTensorOps :
-    Pass<"iree-flow-convert-to-flow-tensor-ops-pass", "FuncOp"> {
-  let summary = "Convert operations to equivalent flow.tensor.* operations";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertToFlowTensorOpsPass()";
+def ConvertTensorOps :
+    Pass<"iree-flow-convert-tensor-ops-pass", "FuncOp"> {
+  let summary = "Convert tensor operations to equivalent flow.tensor.* operations";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertTensorOpsPass()";
+}
+
+def ConvertLinalgTensorOps :
+    Pass<"iree-flow-convert-linalg-tensor-ops-pass", "FuncOp"> {
+  let summary = "Convert linalg operations to equivalent flow.tensor.* operations";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgTensorOpsPass()";
   let options = [
     Option<"runBeforeDispatchRegionFormation", "run-before-dispatch-region-formation",
            "bool", /*default=*/"true", "Run the pass before dispatch region formation">

@@ -61,11 +61,17 @@ std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 /// the most inner loops.
 std::unique_ptr<OperationPass<FuncOp>> createInterchangeGenericOpsPass();
 
-// Convert operations to equivalent flow.tensor.* ops.
+// Convert tensor operations to equivalent flow.tensor.* operations
 // `runBeforeDispatchRegionFormation` controls whether to run before dispatch
 // region creation. If run after, it will catch operations that were left
 // outside of dispatch regions and could be represented as flow.tensor.* ops.
-std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass(
+std::unique_ptr<OperationPass<FuncOp>> createConvertTensorOpsPass();
+
+// Convert linalg.tensor operations to equivalent flow.tensor.* ops.
+// `runBeforeDispatchRegionFormation` controls whether to run before dispatch
+// region creation. If run after, it will catch operations that were left
+// outside of dispatch regions and could be represented as flow.tensor.* ops.
+std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgTensorOpsPass(
     bool runBeforeDispatchRegionFormation = true);
 
 // Promote I1 tensor constants to I8 tensors to match later operations.

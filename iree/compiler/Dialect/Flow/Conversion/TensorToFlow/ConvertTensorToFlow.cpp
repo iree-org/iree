@@ -4,27 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
+
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/LLVM.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
-#define DEBUG_TYPE "iree-flow-convert-to-flow-tensor-ops"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+namespace {
 
 /// An operation that uses `offsets`, `sizes` and `strides` (i.e. implements the
 /// `OffsetSizeAndStrideInterface`) can be mapped to flow operations that
@@ -127,39 +119,8 @@ static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
   return dynamicDims;
 }
 
-namespace {
-
-/// Converts linalg.tensor_reshape operations into flow.tensor.reshape
-/// operations.
-template <typename TensorReshapeOp>
-struct LinalgTensorReshapeToFlowTensorReshape
-    : public OpRewritePattern<TensorReshapeOp> {
-  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
-                                PatternRewriter &rewriter) const override {
-    if (reshapeOp->template getParentOfType<Flow::DispatchWorkgroupsOp>()) {
-      return failure();
-    }
-    SmallVector<SmallVector<Value>> outputShape;
-    if (failed(reshapeOp.reifyResultShapes(rewriter, outputShape))) {
-      return failure();
-    }
-    SmallVector<Value> outputDynamicShapes;
-    for (auto shape :
-         llvm::zip(reshapeOp.getResultType().getShape(), outputShape[0])) {
-      if (std::get<0>(shape) != ShapedType::kDynamicSize) continue;
-      outputDynamicShapes.push_back(std::get<1>(shape));
-    }
-    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
-        reshapeOp, reshapeOp.getResultType(), reshapeOp.src(),
-        outputDynamicShapes);
-    return success();
-  }
-};
-
-/// Convert subtensor insert operation flow.tensor.update where possible.
-struct SubTensorInsertToTensorUpdate
+/// Convert tensor.insert_slice ops into flow.tensor.update ops where possible.
+struct ConvertTensorInsertSlicePattern
     : public OpRewritePattern<tensor::InsertSliceOp> {
   using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
 
@@ -168,6 +129,7 @@ struct SubTensorInsertToTensorUpdate
     if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
+
     SmallVector<OpFoldResult, 4> offsets = insertOp.getMixedOffsets();
     SmallVector<OpFoldResult, 4> sizes = insertOp.getMixedSizes();
     SmallVector<OpFoldResult, 4> strides = insertOp.getMixedStrides();
@@ -176,6 +138,7 @@ struct SubTensorInsertToTensorUpdate
                                              dstShape)) {
       return failure();
     }
+
     Location loc = insertOp.getLoc();
     auto sourceDynamicDims = getDynamicValues(sizes);
     Value source = insertOp.source();
@@ -192,7 +155,7 @@ struct SubTensorInsertToTensorUpdate
           loc, sourceType, source, sourceDynamicDims, sourceDynamicDims);
     }
 
-    auto offsetVals = getAsValues(rewriter, loc, offsets);
+    auto offsetVals = getAsValues(rewriter, loc, insertOp.getMixedOffsets());
     Value dest = insertOp.dest();
     auto destDynamicDims = getDynamicDimValues(rewriter, loc, dest);
     rewriter.replaceOpWithNewOp<TensorUpdateOp>(
@@ -202,8 +165,8 @@ struct SubTensorInsertToTensorUpdate
   }
 };
 
-/// Convert subtensor operation to flow.tensor.slice where possible.
-struct SubTensorToTensorSlice
+/// Convert tensor.extract_slice ops into flow.tensor.slice ops where possible.
+struct ConvertTensorExtractSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
 
@@ -212,6 +175,7 @@ struct SubTensorToTensorSlice
     if (sliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
+
     SmallVector<OpFoldResult, 4> offsets = sliceOp.getMixedOffsets();
     SmallVector<OpFoldResult, 4> sizes = sliceOp.getMixedSizes();
     SmallVector<OpFoldResult, 4> strides = sliceOp.getMixedStrides();
@@ -220,6 +184,7 @@ struct SubTensorToTensorSlice
                                              srcShape)) {
       return failure();
     }
+
     Location loc = sliceOp.getLoc();
 
     ShapedType sourceType = sliceOp.getSourceType();
@@ -251,68 +216,103 @@ struct SubTensorToTensorSlice
   }
 };
 
-/// Converts linalg.fill ops into flow.tensor.splat ops.
-///
-/// This is expected to improve performance because we can use DMA
-/// functionalities for the fill, instead of dispatching kernels.
-struct LinalgFillToFlowTensorSplat final
-    : public OpRewritePattern<linalg::FillOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
+  using OpRewritePattern<tensor::CastOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
+  LogicalResult matchAndRewrite(tensor::CastOp op,
                                 PatternRewriter &rewriter) const override {
-    if (fillOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
-      // Don't convert linalg.fill ops that were fused together with other ops.
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
 
-    SmallVector<Value, 4> dynamicDims =
-        getDynamicDimValues(rewriter, fillOp.getLoc(), fillOp.output());
-    rewriter.replaceOpWithNewOp<TensorSplatOp>(
-        fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);
+    auto loc = op.getLoc();
+    Value input = op.getOperand();
+    ShapedType inputType = input.getType().dyn_cast<ShapedType>();
+    ShapedType resultType =
+        op.getResult().getType().dyn_cast_or_null<ShapedType>();
+    if (!inputType || !resultType || !inputType.hasRank() ||
+        !resultType.hasRank()) {
+      return rewriter.notifyMatchFailure(op, "not ranked shaped types");
+    }
+    // This should not happen, except in the context of type conversion.
+    if (inputType.getRank() != resultType.getRank()) {
+      return rewriter.notifyMatchFailure(op, "mismatched rank");
+    }
+
+    // Resolve dims to the most specific value.
+    int rank = inputType.getRank();
+    SmallVector<Value> dimSizes(rank);
+    auto resolveDimSize = [&](int position) -> Value {
+      if (!dimSizes[position]) {
+        // Find the most specific.
+        if (!inputType.isDynamicDim(position) ||
+            !resultType.isDynamicDim(position)) {
+          // Static dim.
+          int64_t dimSize = !inputType.isDynamicDim(position)
+                                ? inputType.getDimSize(position)
+                                : resultType.getDimSize(position);
+          dimSizes[position] = rewriter.create<ConstantIndexOp>(loc, dimSize);
+        } else {
+          // Dynamic dim.
+          dimSizes[position] =
+              rewriter.create<tensor::DimOp>(loc, input, position);
+        }
+      }
+
+      return dimSizes[position];
+    };
+
+    SmallVector<Value> sourceDynamicDims;
+    SmallVector<Value> targetDynamicDims;
+    for (int i = 0; i < rank; i++) {
+      if (inputType.isDynamicDim(i)) {
+        sourceDynamicDims.push_back(resolveDimSize(i));
+      }
+      if (resultType.isDynamicDim(i)) {
+        targetDynamicDims.push_back(resolveDimSize(i));
+      }
+    }
+
+    // TODO: Decide if this needs to be replaced with a flow.tensor.cast
+    // See https://github.com/google/iree/issues/6418
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, resultType, input, sourceDynamicDims, targetDynamicDims);
+
     return success();
   }
 };
 
-/// Converts operations that can map to flow.tensor.* operations.
-struct ConvertToFlowTensorOpsPass
-    : public ConvertToFlowTensorOpsBase<ConvertToFlowTensorOpsPass> {
-  ConvertToFlowTensorOpsPass(bool runBefore) {
-    runBeforeDispatchRegionFormation = runBefore;
-  }
-  ConvertToFlowTensorOpsPass(const ConvertToFlowTensorOpsPass &that) {
-    runBeforeDispatchRegionFormation = that.runBeforeDispatchRegionFormation;
-  }
+struct ConvertTensorFromElementsPattern
+    : public OpRewritePattern<tensor::FromElementsOp> {
+  using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, memref::MemRefDialect,
-                    mlir::StandardOpsDialect>();
-  }
-  void runOnOperation() override {
-    FuncOp funcOp = getOperation();
-    MLIRContext *context = funcOp->getContext();
-    context->allowUnregisteredDialects(true);
-    RewritePatternSet patterns(&getContext());
-    if (runBeforeDispatchRegionFormation) {
-      patterns.insert<
-          LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
-          LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>,
-          SubTensorInsertToTensorUpdate, SubTensorToTensorSlice>(context);
-    } else {
-      patterns.insert<LinalgFillToFlowTensorSplat>(context);
+  LogicalResult matchAndRewrite(tensor::FromElementsOp op,
+                                PatternRewriter &rewriter) const override {
+    // TODO: This pattern was mainly added to iron out some kinks specific to
+    // detensoring (see: https://github.com/google/iree/issues/1159). Do we need
+    // to expand this check for other uses?
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>() ||
+        op.getType().getDimSize(0) != 1) {
+      return failure();
     }
-    IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
+
+    auto loc = op.getLoc();
+    SmallVector<Value> dimSizes(1);
+    dimSizes[0] = rewriter.create<ConstantIndexOp>(loc, 1);
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
+        op, op.getType(), op.getOperand(0), dimSizes);
+    return success();
   }
 };
+
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertToFlowTensorOpsPass(
-    bool runBeforeDispatchRegionFormation) {
-  return std::make_unique<ConvertToFlowTensorOpsPass>(
-      runBeforeDispatchRegionFormation);
+void populateTensorToFlowPatterns(MLIRContext *context,
+                                  OwningRewritePatternList &patterns) {
+  patterns
+      .insert<ConvertTensorInsertSlicePattern, ConvertTensorExtractSlicePattern,
+              ConvertTensorCastPattern, ConvertTensorFromElementsPattern>(
+          context);
 }
 
 }  // namespace Flow

@@ -33,7 +33,8 @@ cc_library(
     srcs = [
         "ConvertConv2D1x1ToMatmulPass.cpp",
         "ConvertConv2DToImg2ColPass.cpp",
-        "ConvertToFlowTensorOps.cpp",
+        "ConvertLinalgTensorOps.cpp",
+        "ConvertTensorOps.cpp",
         "DeduplicateExecutables.cpp",
         "DestructiveUpdateUtils.cpp",
         "DispatchLinalgOnTensors.cpp",
@@ -65,6 +66,7 @@ cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
