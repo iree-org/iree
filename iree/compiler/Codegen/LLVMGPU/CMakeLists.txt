@@ -24,6 +24,7 @@ iree_cc_library(
     "KernelConfig.cpp"
     "LLVMGPUDistributeSharedMemoryCopy.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
+    "LLVMGPUPipelining.cpp"
     "LLVMGPURemoveTrivialLoops.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUVectorLowering.cpp"
@@ -48,6 +49,7 @@ iree_cc_library(
     MLIRNVVMIR
     MLIRPass
     MLIRROCDLIR
+    MLIRSCF
     MLIRSCFToStandard
     MLIRStandard
     MLIRStandardOpsTransforms
