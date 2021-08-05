@@ -3,7 +3,7 @@
 // CHECK-LABEL: module @binary_func
 // Should just be a pass through.
 // CHECK: func @binary_func
-// CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22v\22:1}"
+// CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22stuple\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]],\22v\22:1}"
 // CHECK: %[[ARG0_TENSOR:.*]] = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[ARG1_TENSOR:.*]] = hal.tensor.cast %arg1 : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[R:.*]]:2 = call @__inference_binary_func_70(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
@@ -40,7 +40,7 @@ builtin.module @unary_func attributes {tf.versions = {bad_consumers = [], min_co
 // -----
 // CHECK-LABEL: module @return_list
 // CHECK: func @return_list
-// CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22v\22:1}"
+// CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22stuple\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]],\22v\22:1}"
 // CHECK: %[[ARG0_TENSOR:.*]] = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[ARG1_TENSOR:.*]] = hal.tensor.cast %arg1 : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[R:.+]]:2 = call @__inference_return_list_260(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
