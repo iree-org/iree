@@ -8,8 +8,8 @@ add_mlir_library(IREEDialectsIREEPublicDialect
   DEPENDS
   MLIRIREEPublicOpsIncGen
 
-	LINK_LIBS PUBLIC
-	MLIRIR
+  LINK_LIBS PUBLIC
+  MLIRIR
   MLIRSideEffectInterfaces
 )
 

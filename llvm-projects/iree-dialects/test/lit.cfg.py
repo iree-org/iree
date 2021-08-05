@@ -61,12 +61,14 @@ llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
 tool_dirs = [config.llvm_tools_dir]
 tools = [
-  ToolSubst('%PYTHON', config.python_executable, unresolved='ignore'),
+    ToolSubst('%PYTHON', config.python_executable, unresolved='ignore'),
 ]
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
 
 if config.enable_bindings_python:
-    llvm_config.with_environment('PYTHONPATH', [
-        os.path.join(config.iree_dialects_obj_root, 'python_packages', 'iree_dialects'),
-    ], append_path=True)
+  llvm_config.with_environment('PYTHONPATH', [
+      os.path.join(config.iree_dialects_obj_root, 'python_packages',
+                   'iree_dialects'),
+  ],
+                               append_path=True)
