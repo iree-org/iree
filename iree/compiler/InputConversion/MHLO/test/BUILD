@@ -29,6 +29,7 @@ iree_lit_test_suite(
             "mhlo_to_mhlo_preprocessing_canoncalize_dot_general.mlir",
             "mhlo_to_mhlo_preprocessing_extract_pad_from_conv.mlir",
             "missing_legalizations.mlir",
+            "rng.mlir",
             "verify_compiler_mhlo_input_legality.mlir",
         ],
         include = ["*.mlir"],

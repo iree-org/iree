@@ -268,6 +268,116 @@ struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// mhlo.RngUniformOp conversion patterns.
+//===----------------------------------------------------------------------===//
+
+/// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
+/// are "parallel" except the last `nReduction` elements, where are "reduction"
+/// attributes.
+static SmallVector<StringRef, 3> GetParallelAndReductionIterators(
+    unsigned nLoops, unsigned nReduction) {
+  SmallVector<StringRef, 3> res(nLoops - nReduction,
+                                getParallelIteratorTypeName());
+  res.append(nReduction, getReductionIteratorTypeName());
+  return res;
+}
+
+struct RngUniformConversion : public OpConversionPattern<mhlo::RngUniformOp> {
+  using OpConversionPattern<mhlo::RngUniformOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::RngUniformOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const final {
+    // TODO(raikonenfnu): Handle other element types as well.
+    auto minTy = args[0].getType().dyn_cast<ShapedType>();
+    auto maxTy = args[0].getType().dyn_cast<ShapedType>();
+    if (!minTy.getElementType().dyn_cast<FloatType>() ||
+        !maxTy.getElementType().dyn_cast<FloatType>()) {
+      return rewriter.notifyMatchFailure(
+          op, "expected min/max for rng op to be FloatType");
+    }
+    Type int32Type = IntegerType::get(op.getContext(), /*width=*/32);
+    auto loc = op.getLoc();
+    Value targetShapeValue = args[2];
+    auto targetTy = op->getResult(0).getType().dyn_cast<ShapedType>();
+    if (!targetTy) {
+      return rewriter.notifyMatchFailure(
+          op, "expected target shape of rng op to be ShapedType");
+    }
+    auto targetRank = targetTy.getRank();
+    auto targetShape = targetTy.getShape();
+    SmallVector<Value, 2> dynSize;
+    for (int i = 0; i < targetRank; i++) {
+      if (targetShape[i] != ShapedType::kDynamicSize) continue;
+      Value dynIndex =
+          rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(i));
+      Value dynSizeInt =
+          rewriter.create<tensor::ExtractOp>(loc, targetShapeValue, dynIndex);
+      dynSize.push_back(rewriter.create<IndexCastOp>(
+          loc, rewriter.getIndexType(), dynSizeInt));
+    }
+    Value initTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, dynSize, targetShape, targetTy.getElementType());
+    auto resultTy = this->typeConverter->convertType(op.getResult().getType())
+                        .cast<ShapedType>();
+    // Creates index map using target matrix's rank.
+    SmallVector<AffineMap, 3> indexingMaps(
+        2, AffineMap::get(targetRank, /*symbolCount=*/0,
+                          SmallVector<AffineExpr>({}), rewriter.getContext()));
+    ;
+    SmallVector<AffineExpr> outputExprs;
+    for (int i = 0; i < targetRank; i++) {
+      outputExprs.push_back(rewriter.getAffineDimExpr(i));
+    }
+    indexingMaps.push_back(rewriter.getMultiDimIdentityMap(targetRank));
+    const int kInitialSeed = 0;
+    // Generic region with LCG Algorithm that make use of element index from:
+    // https://reviews.llvm.org/D101364
+    auto linalgOp = rewriter.create<linalg::GenericOp>(
+        op.getLoc(), /*resultTensors=*/resultTy,
+        /*inputs=*/ValueRange{args[0], args[1]},
+        /*outputs=*/initTensor, indexingMaps,
+        GetParallelAndReductionIterators(/*nLoops=*/targetRank,
+                                         /*nReduction=*/0),
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          llvm::SmallVector<Value> updateVec = {
+              b.create<ConstantOp>(loc, b.getI32IntegerAttr(kInitialSeed))};
+          Value multiplier =
+              b.create<ConstantOp>(loc, b.getI32IntegerAttr(1103515245));
+          Value incrementStep =
+              b.create<ConstantOp>(loc, b.getI32IntegerAttr(12345));
+          // For output matrix with rank N:
+          // temp1 = (cast(I32, index(D.0)) + seed) * mult + incr
+          // ...
+          // tempN = (cast(I32, index(D.(N))) + tempN_1) * mult + incr
+          for (int i = 0; i < targetRank; i++) {
+            Value update = updateVec.back();
+            Value ind = b.create<linalg::IndexOp>(loc, i);
+            Value castInd = b.create<IndexCastOp>(loc, int32Type, ind);
+            Value addRes = b.create<AddIOp>(loc, castInd, update);
+            Value multRes = b.create<MulIOp>(loc, addRes, multiplier);
+            Value incRes = b.create<AddIOp>(loc, multRes, incrementStep);
+            updateVec.push_back(incRes);
+          }
+          // Scaling = (max - min) * const(F64, 2.3283064e-10)
+          Value epsilon = b.create<ConstantOp>(
+              loc, b.getFloatAttr(args[0].getType(), 2.3283063999999999E-10));
+          Value range = b.create<SubFOp>(loc, args[1], args[0]);
+          Value scale = b.create<MulFOp>(loc, range, epsilon);
+          // Res = cast(T, cast(F64, tempN) * scaling + min)
+          auto scaleFloatType = scale.getType().dyn_cast<FloatType>();
+          Value updateCast =
+              b.create<UIToFPOp>(loc, scaleFloatType, updateVec.back());
+          Value scaleUpdate = b.create<MulFOp>(loc, updateCast, scale);
+          Value res = b.create<AddFOp>(loc, scaleUpdate, args[0]);
+          b.create<linalg::YieldOp>(loc, res);
+        });
+    rewriter.replaceOp(op, linalgOp.getResults());
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateMHLOToLinalgOnTensorsConversionPatterns(
@@ -276,8 +386,9 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
-  patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion>(
-      typeConverter, context, PatternBenefit(1000));
+  patterns.insert<ConstOpConversion, ConcatenateOpConversion,
+                  RngUniformConversion, FftOpConversion>(typeConverter, context,
+                                                         PatternBenefit(1000));
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass() {
