@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -37,7 +38,8 @@ static void populateTilingReductionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   auto tileSizesFn = [&](OpBuilder &builder,
                          Operation *op) -> SmallVector<Value, 4> {
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    SmallVector<unsigned> partitionedLoops =
+        IREE::Flow::getPartitionedLoops(op);
     SmallVector<int64_t, 4> tileSizes = getTileSizes(op, 0);
     Location loc = op->getLoc();
     auto tileSizesVal =
@@ -75,7 +77,8 @@ static void populateTilingToInvocationPatterns(
         SmallVector<Value, 4> tileSizesVal;
         SmallVector<int64_t, 4> tileSizes = getTileSizes(operation, 2);
         if (tileSizes.empty()) return SmallVector<Value, 4>();
-        SmallVector<unsigned> partitionedLoops = getPartitionedLoops(operation);
+        SmallVector<unsigned> partitionedLoops =
+            IREE::Flow::getPartitionedLoops(operation);
         llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                      partitionedLoops.end());
         tileSizesVal.reserve(tileSizes.size());

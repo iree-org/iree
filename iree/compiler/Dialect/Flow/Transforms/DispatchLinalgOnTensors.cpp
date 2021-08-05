@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/DestructiveUpdateUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
@@ -63,8 +64,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-
-static unsigned kNumMaxParallelDims = 3;
 
 //===----------------------------------------------------------------------===//
 // Root and fusion group attribute handling
@@ -133,19 +132,6 @@ static void removeFusionGroupsAttribute(Operation *op) {
 // Utility methods
 //===----------------------------------------------------------------------===//
 
-/// Returns the number of consecutive outer loops that are "parallel". This is a
-/// copy of the function from
-/// iree/compiler/Codegen/CodegenUtils/FunctionUtils.h that is duplicated
-/// here to avoid adding an build dependency.
-static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
-  return op.iterator_types()
-      .getValue()
-      .take_while([](Attribute attr) -> bool {
-        return linalg::isParallelIteratorType(attr);
-      })
-      .size();
-}
-
 /// Given the `shape` of the computation with the first element being the
 /// slowest varying and last element being the fastest warying returns the
 /// workload value with
@@ -155,11 +141,11 @@ static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
 /// `kNumMaxParallelDims`.
 static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
                                                ArrayRef<Value> shape) {
-  assert(shape.size() <= kNumMaxParallelDims &&
+  assert(shape.size() <= getNumMaxParallelDims() &&
          "workload cannot be more than 3D for now");
   SmallVector<Value, 4> workload = llvm::to_vector<4>(llvm::reverse(shape));
   Value one = b.create<ConstantIndexOp>(loc, 1);
-  workload.resize(kNumMaxParallelDims, one);
+  workload.resize(getNumMaxParallelDims(), one);
   return workload;
 }
 
@@ -653,31 +639,6 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   return success();
 }
 
-/// Returns the loops that are partitioned during dispatch region formations, in
-/// order, i.e. starting from the outer-most to innermost.
-static SmallVector<unsigned> getPartitionedLoops(Operation *op) {
-  SmallVector<unsigned> partitionedLoops;
-  if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
-    return {0, 1};
-  }
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    size_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
-    partitionedLoops =
-        llvm::to_vector<4>(llvm::seq<unsigned>(0, numOuterParallelLoops));
-    if (partitionedLoops.size() > kNumMaxParallelDims) {
-      partitionedLoops.erase(
-          partitionedLoops.begin(),
-          std::next(partitionedLoops.begin(),
-                    numOuterParallelLoops - kNumMaxParallelDims));
-    }
-    return partitionedLoops;
-  }
-  if (auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op)) {
-    return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
-  }
-  return {};
-}
-
 /// Computes the shape of the output. This is used to get the workload of the
 /// dispatch region if a dispatch region contains a single "Dispatchable op"
 static Optional<SmallVector<SmallVector<Value, 4>, 1>> computeOutputShape(
@@ -985,18 +946,18 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
     // kNumMaxParallelDims.
     Location loc = op->getLoc();
     SmallVector<Value, 4> count(resultShapes[0].begin(), resultShapes[0].end());
-    if (count.size() > kNumMaxParallelDims) {
+    if (count.size() > getNumMaxParallelDims()) {
       unsigned numSymbols = 0;
       AffineExpr expr = rewriter.getAffineSymbolExpr(numSymbols++);
-      for (int64_t i = 1; i < count.size() - kNumMaxParallelDims + 1; i++) {
+      for (int64_t i = 1; i < count.size() - getNumMaxParallelDims() + 1; i++) {
         expr = expr * rewriter.getAffineSymbolExpr(numSymbols++);
       }
-      count[count.size() - kNumMaxParallelDims] = linalg::applyMapToValues(
+      count[count.size() - getNumMaxParallelDims()] = linalg::applyMapToValues(
           rewriter, loc, AffineMap::get(0, numSymbols, expr),
-          ArrayRef<Value>(count).take_front(count.size() - kNumMaxParallelDims +
-                                            1))[0];
+          ArrayRef<Value>(count).take_front(count.size() -
+                                            getNumMaxParallelDims() + 1))[0];
       count = llvm::to_vector<4>(
-          ArrayRef<Value>(count).take_back(kNumMaxParallelDims));
+          ArrayRef<Value>(count).take_back(getNumMaxParallelDims()));
     }
     auto workload = convertToWorkload(rewriter, loc, count);
 

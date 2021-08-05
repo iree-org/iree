@@ -35,6 +35,7 @@ cc_library(
         "//iree/compiler/Codegen/Common",
         "//iree/compiler/Codegen/Transforms",
         "//iree/compiler/Codegen/Utils",
+        "//iree/compiler/Dialect/Flow/Utils",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/LinalgExt/IR",

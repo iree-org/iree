@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
@@ -101,7 +102,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   IREE::HAL::DispatchLoweringPassPipeline passPipeline =
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
-  SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+  SmallVector<unsigned> partitionedLoops = IREE::Flow::getPartitionedLoops(op);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(

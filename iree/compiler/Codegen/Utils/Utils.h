@@ -36,12 +36,6 @@ void setTranslationInfo(FuncOp entryPointFn,
                         IREE::HAL::DispatchLoweringPassPipeline passPipeline,
                         ArrayRef<int64_t> workgroupSize = {});
 
-/// Returns the loops that are partitioned during dispatch region formations, in
-/// order, i.e. starting from the outer-most to innermost.
-/// Note that this is the same method that is used at the Flow dispatch region
-/// formation to tile and distribute the ops.
-SmallVector<unsigned> getPartitionedLoops(Operation *op);
-
 // /// Usually the tile sizes for the first level of tiling decides the
 // workgroup
 // /// size for the dispatch on the CPU backend. This is a general helper that

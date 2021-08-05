@@ -1,10 +1,11 @@
-# Copyright 2020 The IREE Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Utilities for working with IREE MLIR types.
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,22 +16,15 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
-        "MarkerUtils.cpp",
-        "Utils.cpp",
+        "DispatchUtils.cpp",
     ],
     hdrs = [
-        "MarkerUtils.h",
-        "Utils.h",
+        "DispatchUtils.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/Flow/Utils",
-        "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/LinalgExt/IR",
-        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
-        "@llvm-project//mlir:Support",
     ],
 )

@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -59,29 +60,6 @@ void setTranslationInfo(FuncOp entryPointFn,
   setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
 }
 
-SmallVector<unsigned> getPartitionedLoops(Operation *op) {
-  SmallVector<unsigned> partitionedLoops;
-  if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
-    return {0, 1};
-  }
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    size_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
-    partitionedLoops =
-        llvm::to_vector<4>(llvm::seq<unsigned>(0, numOuterParallelLoops));
-    if (partitionedLoops.size() > kNumMaxParallelDims) {
-      partitionedLoops.erase(
-          partitionedLoops.begin(),
-          std::next(partitionedLoops.begin(),
-                    numOuterParallelLoops - kNumMaxParallelDims));
-    }
-    return partitionedLoops;
-  }
-  if (auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op)) {
-    return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
-  }
-  return {};
-}
-
 LogicalResult setOpConfigAndEntryPointFnTranslation(
     FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
     ArrayRef<int64_t> nativeVectorSize,
@@ -90,7 +68,7 @@ LogicalResult setOpConfigAndEntryPointFnTranslation(
   IREE::HAL::LoweringConfig config =
       buildConfigAttr(tileSizes, nativeVectorSize, op->getContext());
   setLoweringConfig(op, config);
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto partitionedLoops = IREE::Flow::getPartitionedLoops(op);
   SmallVector<int64_t, 3> workloadPerWorkgroup;
   if (!tileSizes.empty() && !tileSizes[0].empty() &&
       !partitionedLoops.empty()) {

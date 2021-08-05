@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -184,7 +185,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
 /// generic op.
 static LogicalResult setDefaultRootConfig(FuncOp entryPointFn, Operation *op) {
   if (getLoweringConfig(op)) return success();
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto partitionedLoops = IREE::Flow::getPartitionedLoops(op);
   if (partitionedLoops.empty()) {
     // Return success without doing anything. Eventually default will be used.
     return success();
