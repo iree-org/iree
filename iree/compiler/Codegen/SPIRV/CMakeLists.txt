@@ -15,19 +15,18 @@ iree_cc_library(
     SPIRV
   HDRS
     "KernelDispatchUtils.h"
-    "LaunchConfig.h"
     "MemorySpace.h"
     "Utils.h"
   SRCS
-    "CodeGenOptionUtils.cpp"
     "ConvertToSPIRVPass.cpp"
     "KernelDispatchUtils.cpp"
-    "LaunchConfig.cpp"
     "Passes.cpp"
-    "SPIRVConcretizeWorkgroupTiles.cpp"
     "SPIRVConvertToGPU.cpp"
     "SPIRVCopyToWorkgroupMemory.cpp"
     "SPIRVFoldGPUProcessorIDUses.cpp"
+    "SPIRVLowerExecutableTargetPass.cpp"
+    "SPIRVRemoveOneTripTiledLoops.cpp"
+    "SPIRVTileAndDistribute.cpp"
     "SPIRVTileAndVectorize.cpp"
     "SPIRVVectorToCooperativeMatrix.cpp"
     "SPIRVVectorizeLoadStore.cpp"

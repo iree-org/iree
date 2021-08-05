@@ -4,7 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- SPIRVTileAndVectorize.cpp ------------------------------------------===//
+//===- SPIRVTileAndDistribute.cpp
+//------------------------------------------===//
 //
 // This pass tiles and vectorizes Linalg ops on buffers within in a single
 // workgroup.
@@ -76,11 +77,11 @@ static unsigned dimToIndex(StringRef dim) {
 
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
-class SPIRVTileAndVectorizePass
-    : public SPIRVTileAndVectorizeBase<SPIRVTileAndVectorizePass> {
+class SPIRVTileAndDistributePass
+    : public SPIRVTileAndDistributeBase<SPIRVTileAndDistributePass> {
  public:
-  SPIRVTileAndVectorizePass() = default;
-  SPIRVTileAndVectorizePass(const SPIRVTileAndVectorizePass &pass) = default;
+  SPIRVTileAndDistributePass() = default;
+  SPIRVTileAndDistributePass(const SPIRVTileAndDistributePass &pass) = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, IREE::HAL::HALDialect, gpu::GPUDialect,
@@ -91,66 +92,6 @@ class SPIRVTileAndVectorizePass
   void runOnOperation() override;
 };
 }  // namespace
-
-//===----------------------------------------------------------------------===//
-// Patterns to promote subviews to workgroup memory
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Pattern to promote matmul operands to workgroup memory.
-struct PromoteMatmulSubviewsPattern
-    : public linalg::LinalgPromotionPattern<linalg::MatmulOp> {
-  PromoteMatmulSubviewsPattern(MLIRContext *context,
-                               linalg::LinalgPromotionOptions options,
-                               linalg::LinalgTransformationFilter marker,
-                               PatternBenefit benefit = 1)
-      : linalg::LinalgPromotionPattern<linalg::MatmulOp>(
-            context,
-            options.setOperandsToPromote({0, 1}).setUseFullTileBuffers(
-                {false, false}),
-            marker, benefit) {}
-};
-
-/// Patterns to promote convolution operands to workgroup memory.
-// TODO(ravishankarm): This pattern is only promoting the image subview to
-// workgroup memory. In reality we should also be able to promote the filter
-// subview to workgroup memory as well. Since none of the loops used to access
-// the filter are tiled, this would mean the entire filter is moved to workgroup
-// memory. Two reasons this is not done right now:
-// 1) Linalg when tiling doesnt create a subview for the filter (since none of
-//    its dimensions are tiled. This needs to be relaxed (maybe by using an
-//    option).
-// 2) Maybe there are better alternatives for handling filter like using
-//    different storage classes, since for inference workloads these are model
-//    constants. This is TBD.
-template <typename ConvOpTy>
-struct PromoteConvSubviewsPattern
-    : public linalg::LinalgPromotionPattern<ConvOpTy> {
-  PromoteConvSubviewsPattern(MLIRContext *context,
-                             linalg::LinalgPromotionOptions options,
-                             linalg::LinalgTransformationFilter marker,
-                             PatternBenefit benefit = 1)
-      : linalg::LinalgPromotionPattern<ConvOpTy>(
-            context,
-            options.setOperandsToPromote({0}).setUseFullTileBuffers(
-                {false, false}),
-            marker, benefit) {}
-};
-}  // namespace
-
-static void populatePromotionPatterns(MLIRContext *context,
-                                      RewritePatternSet &patterns) {
-  patterns
-      .insert<PromoteMatmulSubviewsPattern,
-              PromoteConvSubviewsPattern<linalg::ConvInputNHWCFilterHWCFOp>>(
-          context,
-          linalg::LinalgPromotionOptions()
-              .setAllocationDeallocationFns(allocateWorkgroupMemory,
-                                            deallocateWorkgroupMemory)
-              .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory),
-          getLinalgMatchAndReplaceMarker(getWorkgroupMarker(),
-                                         getWorkgroupMemoryMarker(), context));
-}
 
 //===----------------------------------------------------------------------===//
 // Patterns to tile computation to map to subgroups
@@ -243,8 +184,8 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
             }));
       };
 
-  auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
-                                ArrayRef<Range> parallelLoopRanges) {
+  auto getThreadProcInfoFn = [&](OpBuilder &builder, Location loc,
+                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
         builder, loc, parallelLoopRanges.size());
   };
@@ -307,147 +248,6 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getThreadRange(
 }
 
 //====---------------------------------------------------------------------===//
-// Patterns for vectorization
-//====---------------------------------------------------------------------===//
-
-static void populateVectorizationPatterns(MLIRContext *context,
-                                          RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::FillOp, linalg::GenericOp,
-                                      linalg::ContractionOpInterface>(
-      patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(
-          Identifier::get(getVectorizeMarker(), context)));
-}
-
-//====---------------------------------------------------------------------===//
-// Patterns for unrolling vectors
-//====---------------------------------------------------------------------===//
-
-static void populateVectorUnrollPatterns(MLIRContext *context,
-                                         RewritePatternSet &patterns) {
-  vector::populateVectorUnrollPatterns(
-      patterns,
-      vector::UnrollVectorOptions().setNativeShapeFn(getSPIRVNativeVectorSize));
-}
-
-namespace {
-
-/// Workaround SPIR-V backend limitations. SPIR-V vetorization pass relies on
-/// unrolling to reduce instructions to a vector size we can convert to SPIR-V.
-/// When vectorization creates transpose those block unrolling and result in
-/// large vector we currently cannot lower. For now we always merge the
-/// transpose into the contract op so that it can be unrolled.
-// TODO(thomasraoux): Make transpose work with the current unrolling mechanism
-// or replace unrolling.
-class CombineContractTranspose final
-    : public OpRewritePattern<vector::ContractionOp> {
- public:
-  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::ContractionOp op,
-                                PatternRewriter &rewriter) const override {
-    // Perform lhs + rhs transpositions to conform to matmul row-major
-    // semantics. Bail out if the contraction cannot be put in this form.
-    MLIRContext *ctx = op.getContext();
-    Location loc = op.getLoc();
-    bool foundTranspose = false;
-    std::array<Value, 3> sources = {op.lhs(), op.rhs(), op.acc()};
-    SmallVector<AffineMap> newMaps;
-    SmallVector<Value> newSources;
-    for (auto source : llvm::enumerate(sources)) {
-      auto map =
-          op.indexing_maps()[source.index()].cast<AffineMapAttr>().getValue();
-      auto tranposeOp = source.value().getDefiningOp<vector::TransposeOp>();
-      if (!tranposeOp) {
-        newSources.push_back(source.value());
-        newMaps.push_back(map);
-        continue;
-      }
-      SmallVector<int64_t, 3> perm;
-      tranposeOp.getTransp(perm);
-      SmallVector<AffineExpr> exprs(perm.size());
-      for (auto remap : llvm::enumerate(perm)) {
-        exprs[remap.value()] = map.getResult(remap.index());
-      }
-      newMaps.push_back(
-          AffineMap::get(map.getNumDims(), map.getNumSymbols(), exprs, ctx));
-      newSources.push_back(tranposeOp.vector());
-      foundTranspose = true;
-    }
-    if (!foundTranspose) return failure();
-
-    Value res = rewriter.create<vector::ContractionOp>(
-        loc, newSources[0], newSources[1], newSources[2],
-        rewriter.getAffineMapArrayAttr(newMaps), op.iterator_types());
-    rewriter.replaceOp(op, res);
-    return success();
-  }
-};
-
-}  // namespace
-
-//====---------------------------------------------------------------------===//
-// Vector patterns
-//====---------------------------------------------------------------------===//
-
-static void applyVectorTransformation(FuncOp funcOp) {
-  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(funcOp));
-  bool useCooperativeMatrix =
-      targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
-      targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix);
-  {
-    {
-      RewritePatternSet vectorUnrollPatterns(funcOp.getContext());
-      populateVectorUnrollPatterns(funcOp.getContext(), vectorUnrollPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
-    }
-    {
-      linalg::hoistRedundantVectorTransfers(funcOp);
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "--- After hoisting vector transfers ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
-    }
-    {
-      RewritePatternSet canonicalizationPatterns2(funcOp.getContext());
-      vector::populateVectorTransferPermutationMapLoweringPatterns(
-          canonicalizationPatterns2);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns2));
-
-      if (useCooperativeMatrix) {
-        // When using cooperative matrix we don't want to lower the contract,
-        // instead we want to merge contract and transpose so that they can be
-        // converted to cooperative matrix matmul op.
-        // TODO(thomasraoux): remove that once we support cooperative matrix
-        // lowering in MLIR core.
-        RewritePatternSet combineTransposePatterns(funcOp.getContext());
-        combineTransposePatterns.add<CombineContractTranspose>(
-            funcOp.getContext());
-        (void)applyPatternsAndFoldGreedily(funcOp,
-                                           std::move(combineTransposePatterns));
-      } else {
-        RewritePatternSet contractLoweringPatterns(funcOp.getContext());
-        vector::populateVectorContractLoweringPatterns(
-            contractLoweringPatterns,
-            vector::VectorTransformsOptions().setVectorTransformsOptions(
-                vector::VectorContractLowering::OuterProduct));
-        (void)applyPatternsAndFoldGreedily(funcOp,
-                                           std::move(contractLoweringPatterns));
-      }
-    }
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After unrolling vector ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-}
-
-//====---------------------------------------------------------------------===//
 // Patterns to tile convolution window dimensions
 //====---------------------------------------------------------------------===//
 
@@ -505,33 +305,11 @@ struct LowerToLoops final : public OpRewritePattern<OpTy> {
 // Main pass implementation
 //====---------------------------------------------------------------------===//
 
-void SPIRVTileAndVectorizePass::runOnOperation() {
+void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
   FuncOp funcOp = getOperation();
   auto entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp) return;
-
-  // TODO(thomasraoux, antiagainst): Tiling to subgroups shouldn't be
-  // controlled by vectorization. This is needed due to historical reasons.
-  // Change the second level tiling to cyclic to loops and remove this.
-  RewritePatternSet secondLevelTilingPatterns(&getContext());
-  populateTilingToSubgroupPatterns(context, secondLevelTilingPatterns);
-  (void)applyPatternsAndFoldGreedily(funcOp,
-                                     std::move(secondLevelTilingPatterns));
-
-  RewritePatternSet secondLevelTilingCanonicalizationPatterns =
-      linalg::getLinalgTilingCanonicalizationPatterns(context);
-  populateAffineMinCanonicalizationPattern(
-      secondLevelTilingCanonicalizationPatterns);
-  (void)applyPatternsAndFoldGreedily(
-      funcOp, std::move(secondLevelTilingCanonicalizationPatterns));
-  promoteSingleIterationLoops(funcOp);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "--- After tiling to subgroups ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
 
   {
     RewritePatternSet thirdLevelTilingPatterns(&getContext());
@@ -543,7 +321,7 @@ void SPIRVTileAndVectorizePass::runOnOperation() {
     // prove the tiling was perfect.
     RewritePatternSet canoncalizationPatterns(context);
     populateAffineMinSCFCanonicalizationPattern(canoncalizationPatterns);
-    SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
+    auto workgroupSize = getWorkgroupSize(entryPointOp);
     auto getThreadRangeFn = [workgroupSize](Value processorValue,
                                             SmallVectorImpl<Value> &dims,
                                             SmallVectorImpl<Value> &symbols) {
@@ -592,29 +370,6 @@ void SPIRVTileAndVectorizePass::runOnOperation() {
     });
   }
 
-  {
-    RewritePatternSet vectorizationPatterns(&getContext());
-    populateVectorizationPatterns(context, vectorizationPatterns);
-    populateLinalgToVectorVectorizeConvPatterns(context, vectorizationPatterns);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(vectorizationPatterns));
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After vectorization ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  // TODO: This should be a folding of Add into Contract in core but while
-  // they live in different dialects, it is not possible without unnatural
-  // dependencies.
-  funcOp.walk([&](Operation *op) {
-    if (auto contract = canonicalizeContractionAdd(op))
-      op->replaceAllUsesWith(contract);
-  });
-
-  applyVectorTransformation(funcOp);
-
   // Lower ops that were tiled to invocations but not vectorized to loops.
   // TODO(antiagainst): This is here now to simplify the interaction with
   // ConvertToGPUPass, where we finally lower away all Linalg ops. Once that
@@ -641,8 +396,8 @@ void SPIRVTileAndVectorizePass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndVectorizePass() {
-  return std::make_unique<SPIRVTileAndVectorizePass>();
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass() {
+  return std::make_unique<SPIRVTileAndDistributePass>();
 }
 
 }  // namespace iree_compiler
