@@ -230,7 +230,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
             "unhandled multiple roots in dispatch region");
       }
       rootOp = computeOp;
-      continue;
     }
   }
 
@@ -251,7 +250,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
               "unhandled multiple roots in dispatch region");
         }
         rootOp = computeOp;
-        continue;
       }
     }
   }

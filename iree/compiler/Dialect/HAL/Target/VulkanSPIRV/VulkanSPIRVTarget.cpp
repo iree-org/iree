@@ -82,7 +82,6 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(""));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.codegenOptions = SPIRVCodegenOptions::getFromCLOptions();
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
 
@@ -152,7 +151,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    buildSPIRVCodegenPassPipeline(passManager, options_.codegenOptions);
+    buildSPIRVCodegenPassPipeline(passManager);
   }
 
   // TODO(antiagainst): Re-enable SPIR-V linking once the tensorflow integration

@@ -59,6 +59,10 @@ IREE::HAL::TranslationInfo buildTranslationInfo(
 IREE::HAL::TranslationInfo getTranslationInfo(
     IREE::HAL::ExecutableEntryPointOp entryPointOp);
 
+/// Returns the workgroup size specified on the `entryPointOp`.
+SmallVector<int64_t> getWorkgroupSize(
+    IREE::HAL::ExecutableEntryPointOp entryPointOp);
+
 /// Set the translate executable info with the entry point op. Overwrites the
 /// existing attributes.
 // TODO(ravishankarm, benvanik): Eventually all the information needed for the
