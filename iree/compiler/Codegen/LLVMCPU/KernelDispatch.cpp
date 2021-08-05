@@ -60,6 +60,21 @@ static llvm::cl::opt<int> batchMatmulL2TileSize(
     "iree-codegen-llvm-batch-matmul-vector-size",
     llvm::cl::desc("linalg.batch_matmul vector tile size"), llvm::cl::init(4));
 
+static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
+    "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
+    llvm::cl::desc("linalg.mmt4d workgroup tile size"), llvm::cl::ZeroOrMore,
+    llvm::cl::MiscFlags::CommaSeparated);
+
+static llvm::cl::list<int> mmt4dL1TileSizes(
+    "iree-codegen-llvm-mmt4d-l1-tile-size",
+    llvm::cl::desc("linalg.mmt4d L1 tile size"), llvm::cl::ZeroOrMore,
+    llvm::cl::MiscFlags::CommaSeparated);
+
+static llvm::cl::list<int> mmt4dVectorSizes(
+    "iree-codegen-llvm-mmt4d-vector-size",
+    llvm::cl::desc("linalg.mmt4d vector tile size"), llvm::cl::ZeroOrMore,
+    llvm::cl::MiscFlags::CommaSeparated);
+
 static llvm::cl::opt<int> defaultWorkgroupTileSize(
     "iree-codegen-llvm-generic-ops-workgroup-size",
     llvm::cl::desc(
@@ -125,6 +140,46 @@ static LogicalResult setRootConfig(
   return success();
 }
 
+/// Sets the lowering configuration for dispatch region for linalg.mmt4d root op
+static LogicalResult setRootConfig(FuncOp entryPointFn,
+                                   linalg::Mmt4DOp mmt4dOp) {
+  // TODO(ataei): These are hand tuned for some performance benchmarks for now,
+  // we want to adapt the same strategy as matmul that dynamically sets tile
+  // size.
+  auto getWorkgroupTileSizes = [&]() -> SmallVector<int64_t> {
+    if (!mmt4dWorkgroupTileSizes.empty()) {
+      return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
+                                  mmt4dWorkgroupTileSizes.end());
+    }
+    return {64, 32};
+  };
+
+  auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
+    if (!mmt4dL1TileSizes.empty()) {
+      return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
+                                  mmt4dL1TileSizes.end());
+    }
+    return {32, 32, 4, 4, 4, 4};
+  };
+
+  auto getVectorSizes = [&]() -> SmallVector<int64_t> {
+    if (!mmt4dVectorSizes.empty()) {
+      return SmallVector<int64_t>(mmt4dVectorSizes.begin(),
+                                  mmt4dVectorSizes.end());
+    }
+    return {1, 1, 4, 4, 1, 4};
+  };
+
+  SmallVector<int64_t, 4> nativeVectorSize = getVectorSizes();
+
+  TileSizesListType tileSizes = {getWorkgroupTileSizes(), getL1TileSizes(),
+                                 nativeVectorSize};
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
+      IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
+}
+
 /// Sets the lowering configuration for dispatch region with root op being a
 /// generic op.
 static LogicalResult setDefaultRootConfig(FuncOp entryPointFn, Operation *op) {
@@ -157,12 +212,18 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
   Operation *rootOp = nullptr;
   for (auto computeOp : computeOps) {
     if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
-    if (auto contractionOp =
-            dyn_cast<linalg::ContractionOpInterface>(computeOp)) {
-      if (failed(setRootConfig(entryPointFn, contractionOp))) {
-        return failure();
-      }
+
+    auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
+      return TypeSwitch<Operation *, LogicalResult>(op)
+          .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface>(
+              [&](auto op) { return setRootConfig(entryPointFn, op); })
+          .Default([&](Operation *op) { return success(); });
+    };
+
+    if (failed(setRootConfigFn(computeOp))) {
+      return failure();
     }
+
     if (getLoweringConfig(computeOp)) {
       if (rootOp) {
         return computeOp->emitError(
