@@ -17,6 +17,7 @@ cc_library(
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
         "KernelConfig.cpp",
+        "LLVMGPUDistributeSharedMemoryCopy.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPURemoveTrivialLoops.cpp",
         "LLVMGPUTileAndDistribute.cpp",
@@ -27,6 +28,7 @@ cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
+        "LLVMGPUUtils.h",
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
