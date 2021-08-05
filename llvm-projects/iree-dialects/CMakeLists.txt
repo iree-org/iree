@@ -1,7 +1,7 @@
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 message(FATAL_ERROR
   "This project is intended to be built as part of LLVM via "
-  "-DLLVM_EXTERNAL_PROJECTS=iree_llvm_sandbox "
+  "-DLLVM_EXTERNAL_PROJECTS=iree-dialects "
   "-DLLVM_EXTERNAL_IREE_LLVM_SANDBOX_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
