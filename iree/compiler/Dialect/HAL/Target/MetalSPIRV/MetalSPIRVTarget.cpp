@@ -61,7 +61,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    buildSPIRVCodegenPassPipeline(passManager, SPIRVCodegenOptions());
+    buildSPIRVCodegenPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,

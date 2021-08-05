@@ -72,6 +72,12 @@ Type getUntiledType(Value tiledView);
 /// `subtensor` op chain (for tensors).
 ArrayRef<int64_t> getUntiledShape(Value tiledView);
 
+/// Returns the shape of the result of the untiled operation for
+/// `LinalgOp`s. First looks at definitions of the corresponding `outs`
+/// operands. If that fails, then looks at uses of the `result`.
+ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
+                                        unsigned resultNum);
+
 /// Assuming that `funcOp` contains a single nested scf.for that represented the
 /// tiled+fused+distributed loops with the distribution being across workgroups,
 /// i.e.

@@ -18,7 +18,6 @@
 #include <array>
 
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/LaunchConfig.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -35,9 +34,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-Optional<LaunchConfig> initGPULaunchConfig(
-    MLIRContext *context, const linalg::LinalgDependenceGraph &dependenceGraph,
-    const SPIRVCodegenOptions &options, ArrayRef<linalg::LinalgOp> linalgOps);
+LogicalResult initSPIRVLaunchConfig(ModuleOp moduleOp);
 
 /// Returns the size of instruction in `vector` dialect that maps directly to
 /// the hardware.

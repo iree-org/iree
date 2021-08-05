@@ -19,8 +19,6 @@ namespace HAL {
 
 // Options controlling the SPIR-V translation.
 struct VulkanSPIRVTargetOptions {
-  // SPIR-V codegeneration options
-  SPIRVCodegenOptions codegenOptions;
   // Vulkan target environment as #vk.target_env attribute assembly.
   std::string vulkanTargetEnv;
   // Vulkan target triple.

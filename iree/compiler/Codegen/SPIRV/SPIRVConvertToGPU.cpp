@@ -115,7 +115,6 @@ static LogicalResult distributeSingleIterationPerProcessor(
                                                generateGuard);
 }
 
-
 //===----------------------------------------------------------------------===//
 // Pass and patterns.
 //===----------------------------------------------------------------------===//
@@ -165,7 +164,6 @@ struct MapLinalgOpToGlobalInvocationId
         linalg::linalgOpToParallelLoops(rewriter, linalgOp);
     if (!loops) return failure();
 
-    SmallVector<int64_t, 3> workgroupSize(3, 1);
     if (!loops.getValue().empty()) {
       scf::ParallelOp pLoopOp = dyn_cast<scf::ParallelOp>(loops.getValue()[0]);
       // If there are parallel loops partition them to threads using global
@@ -179,21 +177,7 @@ struct MapLinalgOpToGlobalInvocationId
           return rewriter.notifyMatchFailure(
               linalgOp, "mapping to GlobalInvocationID failed");
         }
-        workgroupSize = {32, 1, 1};
       }
-    }
-    WorkgroupCountRegionBuilder regionBuilder =
-        [&workgroupSize](OpBuilder &b, Location loc,
-                         std::array<Value, 3> workload) {
-          Value one = b.create<ConstantIndexOp>(loc, 1);
-          return std::array<Value, 3>{
-              getWorkgroupCountX(b, loc, workload, workgroupSize[0]), one, one};
-        };
-    if (failed(defineWorkgroupCountRegion(rewriter, funcOp, regionBuilder))) {
-      return failure();
-    }
-    if (failed(updateWorkGroupSize(funcOp, workgroupSize))) {
-      return failure();
     }
     rewriter.eraseOp(linalgOp);
     return success();
@@ -202,8 +186,9 @@ struct MapLinalgOpToGlobalInvocationId
 
 }  // namespace
 
-
 void SPIRVConvertToGPUPass::runOnOperation() {
+  FuncOp funcOp = getOperation();
+  if (!isEntryPoint(funcOp)) return;
   MLIRContext *context = &getContext();
   ConversionTarget target(*context);
   // After this pass Linalg and scf.parallel ops should be gone.
@@ -223,20 +208,16 @@ void SPIRVConvertToGPUPass::runOnOperation() {
                   MapLinalgOpToGlobalInvocationId<linalg::GenericOp>>(context);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
-  for (FuncOp funcOp : getOperation().getInnerModule().getOps<FuncOp>()) {
-    if (!isEntryPoint(funcOp)) continue;
-    Region &body = funcOp.getBody();
-    if (!llvm::hasSingleElement(body)) {
-      funcOp.emitError("unhandled dispatch function with multiple blocks");
-      return signalPassFailure();
-    }
-    if (failed(applyFullConversion(funcOp, target, frozenPatterns)))
-      return signalPassFailure();
+  Region &body = funcOp.getBody();
+  if (!llvm::hasSingleElement(body)) {
+    funcOp.emitError("unhandled dispatch function with multiple blocks");
+    return signalPassFailure();
   }
+  if (failed(applyFullConversion(funcOp, target, frozenPatterns)))
+    return signalPassFailure();
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVConvertToGPUPass() {
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVConvertToGPUPass() {
   return std::make_unique<SPIRVConvertToGPUPass>();
 }
 
