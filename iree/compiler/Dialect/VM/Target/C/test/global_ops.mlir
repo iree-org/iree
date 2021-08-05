@@ -10,39 +10,39 @@ vm.module @global_ops {
   // CHECK-NEXT: iree_vm_function_t imports[0];
   // CHECK-NEXT: };
 
-  vm.global.i32 @c42 : i32 = 42 : i32
-  vm.global.i32 mutable @c107_mut : i32 = 107 : i32
+  vm.global.i32 mutable @c42 = 42 : i32
+  vm.global.i32 mutable @c107_mut = 107 : i32
 
   // Skip forward declarations
   // CHECK: DEFINE FUNCTIONS
 
   vm.export @test_global_load_i32
-  // CHECK: static iree_status_t global_ops_test_global_load_i32_impl(
+  // CHECK: static iree_status_t global_ops_test_global_load_i32(
   vm.func @test_global_load_i32() -> i32 {
-    // CHECK-NEXT: VARIABLE DECLARATIONS
-    // CHECK-NEXT: RESULTS
-    // CHECK-NEXT: int32_t v1;
-    // CHECK-NEXT: BASIC BLOCK ARGUMENTS
-    // CHECK-NEXT: END VARIABLE DECLARATIONS
-    // CHECK-NEXT: v1 = vm_global_load_i32(state->rwdata, 0);
+    // CHECK-NEXT: uint8_t* v5;
+    // CHECK-NEXT: int32_t v6;
+    // CHECK-NEXT: iree_status_t v7;
+    // CHECK-NEXT: v5 = EMITC_STRUCT_PTR_MEMBER(v3, rwdata);
+    // CHECK-NEXT: v6 = vm_global_load_i32(v5, 0);
     %value = vm.global.load.i32 @c42 : i32
     vm.return %value : i32
   }
 
   vm.export @test_global_store_i32
-  // CHECK: static iree_status_t global_ops_test_global_store_i32_impl(
+  // CHECK: static iree_status_t global_ops_test_global_store_i32(
   vm.func @test_global_store_i32() -> i32 {
-    // CHECK-NEXT: VARIABLE DECLARATIONS
-    // CHECK-NEXT: RESULTS
-    // CHECK-NEXT: int32_t v1;
-    // CHECK-NEXT: int32_t v2;
-    // CHECK-NEXT: BASIC BLOCK ARGUMENTS
-    // CHECK-NEXT: END VARIABLE DECLARATIONS
-    // CHECK-NEXT: v1 = 17;
+    // CHECK-NEXT: int32_t v5;
+// CHECK-NEXT: uint8_t* v6;
+    // CHECK-NEXT: uint8_t* v7;
+    // CHECK-NEXT: int32_t v8;
+    // CHECK-NEXT: iree_status_t v9;
+    // CHECK-NEXT: v5 = 17;
     %c17 = vm.const.i32 17 : i32
-    // CHECK-NEXT: vm_global_store_i32(state->rwdata, 4, v1);
+    // CHECK-NEXT: v6 = EMITC_STRUCT_PTR_MEMBER(v3, rwdata);
+    // CHECK-NEXT: vm_global_store_i32(v6, 4, v5);
     vm.global.store.i32 %c17, @c107_mut : i32
-    // CHECK-NEXT: v2 = vm_global_load_i32(state->rwdata, 4);
+    // CHECK-NEXT: v7 = EMITC_STRUCT_PTR_MEMBER(v3, rwdata);
+    // CHECK-NEXT: v8 = vm_global_load_i32(v7, 4);
     %value = vm.global.load.i32 @c107_mut : i32
     vm.return %value : i32
   }

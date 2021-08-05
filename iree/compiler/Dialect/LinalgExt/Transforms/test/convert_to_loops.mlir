@@ -325,3 +325,159 @@ func @scatter_update_slice_dynamic_2D(
 // CHECK:             %[[INDEXVAL:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]]
 // CHECK:             %[[INDEX:.+]] = index_cast %[[INDEXVAL]] : i32 to index
 // CHECK:             memref.store %[[UPDATEVAL]], %[[ORIGINAL]][%[[INDEX]], %[[J]]]
+
+// -----
+
+func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
+  %stage = constant 1 : index
+  linalg_ext.fft
+    ins(%stage: index)
+    outs(%real, %imag: memref<16xf32>, memref<16xf32>)
+  return
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0) -> (d0)>
+// CHECK:       func @fft_1D
+// CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[C16:.+]] = constant 16 : index
+// CHECK-DAG:     %[[SCALE:.+]] = constant -6.28318548 : f32
+// CHECK-DAG:     %[[NODE_RNG:.+]] = shift_left %[[C1]], %[[C1]] : index
+// CHECK:         scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[NODE_RNG]]
+// CHECK-DAG:       %[[M:.+]] = shift_left %[[C1]], %[[C1]] : index
+// CHECK-DAG:       %[[HM:.+]] = shift_right_signed %[[M]], %[[C1]] : index
+// CHECK:           %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[K]]] [%[[HM]]] [1]
+// CHECK:           %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[K]]] [%[[HM]]] [1]
+// CHECK:           %[[R_OFFSET:.+]] = addi %[[K]], %[[HM]] : index
+// CHECK:           %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[R_OFFSET]]] [%[[HM]]] [1]
+// CHECK:           %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[R_OFFSET]]] [%[[HM]]] [1]
+// CHECK:           %[[M_I32:.+]] = index_cast %[[M]] : index to i32
+// CHECK:           %[[M_F32:.+]] = sitofp %[[M_I32]] : i32 to f32
+// CHECK:           %[[COEFF:.+]] = divf %[[SCALE]], %[[M_F32]]
+// CHECK:           linalg.generic
+// CHECK-SAME:        indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:        iterator_types = ["parallel"]
+// CHECK-SAME:        outs(%[[L_REAL_SLICE]], %[[L_IMAG_SLICE]], %[[R_REAL_SLICE]], %[[R_IMAG_SLICE]]
+// CHECK:           ^bb0(%[[L_REAL:.+]]: f32, %[[L_IMAG:.+]]: f32, %[[R_REAL:.+]]: f32, %[[R_IMAG:.+]]: f32)
+//
+//                    Compute exp coeff.
+// CHECK:             %[[J_IDX:.+]] = linalg.index 0 : index
+// CHECK:             %[[J_I32:.+]] = index_cast %[[J_IDX]] : index to i32
+// CHECK:             %[[J_F32:.+]] = sitofp %[[J_I32]] : i32 to f32
+// CHECK:             %[[EXP_COEF:.+]] = mulf %[[COEFF]], %[[J_F32]] : f32
+// CHECK:             %[[W_REAL:.+]] = math.cos %[[EXP_COEF]]
+// CHECK:             %[[W_IMAG:.+]] = math.sin %[[EXP_COEF]]
+//
+//                    Compute "t = w * a[k + j + mh]" by expanding
+//                      (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
+// CHECK-DAG:         %[[XU:.+]] = mulf %[[W_REAL]], %[[R_REAL]]
+// CHECK-DAG:         %[[YV:.+]] = mulf %[[W_IMAG]], %[[R_IMAG]]
+// CHECK-DAG:         %[[XV:.+]] = mulf %[[W_REAL]], %[[R_IMAG]]
+// CHECK-DAG:         %[[YU:.+]] = mulf %[[W_IMAG]], %[[R_REAL]]
+// CHECK:             %[[T_REAL:.+]] = subf %[[XU]], %[[YV]]
+// CHECK:             %[[T_IMAG:.+]] = addf %[[XV]], %[[YU]]
+//
+//                    Compute the results.
+//                      u = a[k + j];
+//                      a[k + j] = u + t;
+//                      a[k + j + mh] = u - t;
+// CHECK:             %[[RES1:.+]] = addf %[[L_REAL]], %[[T_REAL]]
+// CHECK:             %[[RES2:.+]] = addf %[[L_IMAG]], %[[T_IMAG]]
+// CHECK:             %[[RES3:.+]] = subf %[[L_REAL]], %[[T_REAL]]
+// CHECK:             %[[RES4:.+]] = subf %[[L_IMAG]], %[[T_IMAG]]
+// CHECK:             linalg.yield %[[RES1]], %[[RES2]], %[[RES3]], %[[RES4]]
+
+// -----
+
+func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
+  %stage = constant 2 : index
+  linalg_ext.fft
+    ins(%stage: index)
+    outs(%real, %imag: memref<?x16xf32>, memref<?x16xf32>)
+  return
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:       func @fft_2D
+// CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = constant 2 : index
+// CHECK-DAG:     %[[D0:.+]] = memref.dim %[[REAL]], %[[C0]] : memref<?x16xf32>
+// CHECK-DAG:     %[[NODE_RNG:.+]] = shift_left %[[C1]], %[[C2]] : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
+// CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[NODE_RNG]]
+// CHECK-DAG:         %[[M:.+]] = shift_left %[[C1]], %[[C2]] : index
+// CHECK-DAG:         %[[HM:.+]] = shift_right_signed %[[M]], %[[C1]] : index
+// CHECK:             %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
+// CHECK:             %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
+// CHECK:             %[[R_OFFSET:.+]] = addi %[[K]], %[[HM]] : index
+// CHECK:             %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
+// CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
+// CHECK:             linalg.generic
+// CHECK-SAME:          indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]], #[[MAP1]]]
+// CHECK-SAME:          iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:          outs(%[[L_REAL_SLICE]], %[[L_IMAG_SLICE]], %[[R_REAL_SLICE]], %[[R_IMAG_SLICE]]
+//
+//                    The computation is bascially the same, and they are
+//                    checked above. Here only checks the different part.
+// CHECK:             %{{.+}} = linalg.index 1 : index
+
+// -----
+
+func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
+                      %coef_real: memref<1xf32>, %coef_imag: memref<1xf32>) {
+  %stage = constant 1 : index
+  linalg_ext.fft
+    ins(%stage, %coef_real, %coef_imag: index, memref<1xf32>, memref<1xf32>)
+    outs(%real, %imag: memref<?x16xf32>, memref<?x16xf32>)
+  return
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:       func @fft_2D_coef_buf
+// CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[COEF_REAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[COEF_IMAG:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:     %[[D0:.+]] = memref.dim %[[REAL]], %[[C0]] : memref<?x16xf32>
+// CHECK-DAG:     %[[NODE_RNG:.+]] = shift_left %[[C1]], %[[C1]] : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
+// CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[NODE_RNG]]
+// CHECK-DAG:         %[[M:.+]] = shift_left %[[C1]], %[[C1]] : index
+// CHECK-DAG:         %[[HM:.+]] = shift_right_signed %[[M]], %[[C1]] : index
+// CHECK:             %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
+// CHECK:             %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
+// CHECK:             %[[R_OFFSET:.+]] = addi %[[K]], %[[HM]] : index
+// CHECK:             %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
+// CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
+// CHECK:             linalg.generic
+// CHECK-SAME:          indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP2]], #[[MAP2]], #[[MAP2]], #[[MAP2]]]
+// CHECK-SAME:          iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:          ins(%[[COEF_REAL]], %[[COEF_IMAG]]
+// CHECK-SAME:          outs(%[[L_REAL_SLICE]], %[[L_IMAG_SLICE]], %[[R_REAL_SLICE]], %[[R_IMAG_SLICE]]
+// CHECK:             ^bb0(%[[W_REAL:.+]]: f32, %[[W_IMAG:.+]]: f32, %[[L_REAL:.+]]: f32, %[[L_IMAG:.+]]: f32, %[[R_REAL:.+]]: f32, %[[R_IMAG:.+]]: f32)
+//                      Compute "t = w * a[k + j + mh]" by expanding
+//                        (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
+// CHECK-DAG:           %[[XU:.+]] = mulf %[[W_REAL]], %[[R_REAL]]
+// CHECK-DAG:           %[[YV:.+]] = mulf %[[W_IMAG]], %[[R_IMAG]]
+// CHECK-DAG:           %[[XV:.+]] = mulf %[[W_REAL]], %[[R_IMAG]]
+// CHECK-DAG:           %[[YU:.+]] = mulf %[[W_IMAG]], %[[R_REAL]]
+// CHECK:               %[[T_REAL:.+]] = subf %[[XU]], %[[YV]]
+// CHECK:               %[[T_IMAG:.+]] = addf %[[XV]], %[[YU]]
+//
+//                      Compute the results.
+//                        u = a[k + j];
+//                        a[k + j] = u + t;
+//                        a[k + j + mh] = u - t;
+// CHECK:               %[[RES1:.+]] = addf %[[L_REAL]], %[[T_REAL]]
+// CHECK:               %[[RES2:.+]] = addf %[[L_IMAG]], %[[T_IMAG]]
+// CHECK:               %[[RES3:.+]] = subf %[[L_REAL]], %[[T_REAL]]
+// CHECK:               %[[RES4:.+]] = subf %[[L_IMAG]], %[[T_IMAG]]
+// CHECK:               linalg.yield %[[RES1]], %[[RES2]], %[[RES3]], %[[RES4]]

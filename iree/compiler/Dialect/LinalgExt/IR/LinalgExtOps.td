@@ -179,7 +179,8 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort",
 }
 
 def LinalgExt_FftOp : LinalgExt_Op<"fft",
-    [DeclareOpInterfaceMethods<TiledOpInterface, []>]> {
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+        ["generateScalarImplementation"]>]> {
   let summary = "Fft operator";
   let description = [{
     Apply 1D FFT to innermost dim. This is an iterative FFT, not recurrsive.
@@ -190,6 +191,9 @@ def LinalgExt_FftOp : LinalgExt_Op<"fft",
     https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm
 
     The size of innermost dim is expected to be a power of 2.
+
+    It is optional to carry coefficient tensors/buffers as inputs. In this
+    context, they will be the second and third inputs.
   }];
 
   let arguments = (ins Variadic<AnyType>:$inputs,
@@ -202,11 +206,24 @@ def LinalgExt_FftOp : LinalgExt_Op<"fft",
     (`:` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value operand() {
-      return outputs()[0];
+    Value getStage() { return inputs()[0]; }
+    Value getReal() { return outputs()[0]; }
+    Value getImag() { return outputs()[1]; }
+    bool hasCoeff() { return getNumInputs() > 1; }
+    void generateScalarImplWithoutCoeffBuf(
+        OpBuilder & b, Location loc, ArrayRef<Value> operands, Value wholeSize);
+    void generateScalarImplWithCoeffBuf(OpBuilder & b, Location loc,
+                                        ArrayRef<Value> operands);
+    Value getRealCoeff() {
+      if (!hasCoeff()) return Value();
+      return inputs()[1];
+    }
+    Value getImagCoeff() {
+      if (!hasCoeff()) return Value();
+      return inputs()[2];
     }
     ShapedType getOperandType() {
-      return operand().getType().cast<ShapedType>();
+      return getReal().getType().cast<ShapedType>();
     }
     int64_t getOperandRank() {
       return getOperandType().getRank();
@@ -217,7 +234,6 @@ def LinalgExt_FftOp : LinalgExt_Op<"fft",
     int64_t getFftLength() {
       return getOperandShape().back();
     }
-    Value getStage() { return inputs()[0]; }
   }];
 }
 

@@ -22,6 +22,7 @@ iree_lit_test_suite(
             "convert_to_nvvm.mlir",
             "convert_to_rocdl.mlir",
             "distribute_to_thread.mlir",
+            "gpu_set_num_workgroups.mlir",
             "nvvm_pipeline_test.mlir",
             "remove_loops.mlir",
             "rocdl_pipeline_test.mlir",

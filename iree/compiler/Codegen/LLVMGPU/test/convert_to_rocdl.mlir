@@ -24,6 +24,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 }
 
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%{{.*}}: !llvm.ptr<f32>, %{{.*}}: !llvm.ptr<f32>, %{{.*}}: !llvm.ptr<f32>)
+//  CHECK-SAME: (%{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32}, %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32},
+//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32})
 //      CHECK:    rocdl.workgroup.dim.x
 //      CHECK:    llvm.fadd

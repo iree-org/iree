@@ -44,7 +44,6 @@ cc_library(
 cc_library(
     name = "Common",
     srcs = [
-        "ConvertUpstreamToIREE.cpp",
         "Passes.cpp",
         "TopLevelSCFToCFG.cpp",
     ],
@@ -55,6 +54,7 @@ cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/Flow/Transforms",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

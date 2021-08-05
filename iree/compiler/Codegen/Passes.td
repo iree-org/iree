@@ -176,7 +176,7 @@ def LLVMGPURemoveSingleIterationLoop :
 }
 
 def LLVMGPUTileAndDistribute :
-    Pass<"iree-llvmgpu-tile-and-distribute", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-llvmgpu-tile-and-distribute", "FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistributeToThreads()";
 }
@@ -185,6 +185,12 @@ def LLVMGPUVectorization :
     Pass<"iree-llvmgpu-vectorization", "FuncOp"> {
   let summary = "Pass to convert linalg into Vector.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
+}
+
+def LLVMGPUVectorLowering :
+    Pass<"iree-llvmgpu-vector-lowering", "FuncOp"> {
+  let summary = "Pass to lower Vector ops before conversion to LLVM.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
 }
 
 //------------------------------------------------------------------------------

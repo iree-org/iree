@@ -7,6 +7,7 @@
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+# load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -202,10 +203,10 @@ cc_library(
 )
 
 # TODO(#357): Add a script to update bytecode_op_table.h.
-# gentbl(
+# gentbl_cc_library(
 #     name = "bytecode_op_table_gen",
 #     tbl_outs = [
-#         ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
+#         (["-gen-iree-vm-op-table-defs"], "bytecode_op_table.h"),
 #     ],
 #     tblgen = "//iree/tools:iree-tblgen",
 #     td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
@@ -315,6 +316,13 @@ cc_library(
     ],
     deps = [
         "//iree/base",
+    ],
+)
+
+cc_library(
+    name = "ops_emitc",
+    hdrs = [
+        "ops_emitc.h",
     ],
 )
 

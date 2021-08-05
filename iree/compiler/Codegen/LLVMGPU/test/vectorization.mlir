@@ -50,7 +50,13 @@ func @add_dispatch_0() attributes {cuda_workgroup_size = dense<[32, 1, 1]> : vec
   return
 }
 // CHECK-LABEL: func @add_dispatch_0()
-//       CHECK:   vector.transfer_read {{.*}} : memref<1024x1024x1024xf32>, vector<4xf32>
-//       CHECK:   vector.transfer_read {{.*}} : memref<1024x1024x1024xf32>, vector<4xf32>
-//       CHECK:   addf %{{.*}}, %{{.*}}  : vector<1x1x4xf32>
-//       CHECK:   vector.transfer_write {{.*}} : vector<4xf32>, memref<1024x1024x1024xf32>
+//       CHECK:   scf.for
+//       CHECK:     scf.for
+//       CHECK:       scf.for
+//       CHECK:         scf.for
+//       CHECK:           scf.for
+//       CHECK:             scf.for
+//       CHECK:               vector.transfer_read {{.*}} : memref<1x1x4xf32, {{.*}}>, vector<1x1x4xf32>
+//       CHECK:               vector.transfer_read {{.*}} : memref<1x1x4xf32, {{.*}}>, vector<1x1x4xf32>
+//       CHECK:               addf %{{.*}}, %{{.*}}  : vector<1x1x4xf32>
+//       CHECK:               vector.transfer_write {{.*}} : vector<1x1x4xf32>, memref<1x1x4xf32, {{.*}}>

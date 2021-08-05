@@ -367,42 +367,6 @@ struct InsertSliceTiledOpInterface
 // Patterns for tiling LinalgExtOps.
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-template <typename OpTy>
-struct TiledOpInterfaceTilingPattern
-    : public TiledOpInterfaceBaseTilingPattern {
-  TiledOpInterfaceTilingPattern(MLIRContext *context,
-                                linalg::LinalgTilingOptions options,
-                                linalg::LinalgTransformationFilter filter =
-                                    linalg::LinalgTransformationFilter(),
-                                PatternBenefit benefit = 1)
-      : TiledOpInterfaceBaseTilingPattern(context, options, filter, benefit) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    auto tilableOp = dyn_cast<TiledOpInterface>(op);
-    if (!tilableOp) return failure();
-    TiledOp tiledOp;
-    // Check for failure.
-    if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
-            op, rewriter, tiledOp))) {
-      return failure();
-    }
-    // Check for do-nothing case.
-    if (!tiledOp.op) return failure();
-    if (tiledOp.op != op) {
-      if (tiledOp.results.empty()) {
-        rewriter.eraseOp(op);
-      } else {
-        rewriter.replaceOp(op, tiledOp.results);
-      }
-    }
-    return success();
-  }
-};
-}  // namespace
-
 LogicalResult TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
     TiledOpInterface tilableOp, PatternRewriter &rewriter,
     TiledOp &result) const {

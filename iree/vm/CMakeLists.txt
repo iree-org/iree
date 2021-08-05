@@ -286,6 +286,14 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    ops_emitc
+  HDRS
+    "ops_emitc.h"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     shims_emitc
   HDRS
     "shims_emitc.h"

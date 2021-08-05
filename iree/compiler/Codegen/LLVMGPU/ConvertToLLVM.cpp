@@ -230,20 +230,26 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
     MemRefType memrefType =
         ireeBindingOp.getResult().getType().dyn_cast<MemRefType>();
     IREE::HAL::InterfaceBindingOp binding = ireeBindingOp.queryBindingOp();
-    Value llvmBufferBasePtr = llvmFuncOp.getArgument(argMapping[binding]);
+    mlir::BlockArgument llvmBufferArg =
+        llvmFuncOp.getArgument(argMapping[binding]);
+    // As a convention with HAL all the kernel argument pointers are 16Bytes
+    // aliigned.
+    llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
+                          LLVM::LLVMDialect::getAlignAttrName(),
+                          rewriter.getI32IntegerAttr(16));
     // Add the byte offset.
     Value llvmBufferBasei8Ptr = rewriter.create<LLVM::BitcastOp>(
         loc,
         LLVM::LLVMPointerType::get(rewriter.getIntegerType(8),
-                                   llvmBufferBasePtr.getType()
+                                   llvmBufferArg.getType()
                                        .cast<LLVM::LLVMPointerType>()
                                        .getAddressSpace()),
-        llvmBufferBasePtr);
+        llvmBufferArg);
     llvmBufferBasei8Ptr = rewriter.create<LLVM::GEPOp>(
         loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
         adaptor.byte_offset());
-    llvmBufferBasePtr = rewriter.create<LLVM::BitcastOp>(
-        loc, llvmBufferBasePtr.getType(), llvmBufferBasei8Ptr);
+    Value llvmBufferBasePtr = rewriter.create<LLVM::BitcastOp>(
+        loc, llvmBufferArg.getType(), llvmBufferBasei8Ptr);
     if (memrefType.hasStaticShape()) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);

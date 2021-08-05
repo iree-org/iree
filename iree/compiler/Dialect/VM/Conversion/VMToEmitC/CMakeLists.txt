@@ -21,6 +21,7 @@ if(${IREE_ENABLE_EMITC})
       MLIREmitC
       MLIRIR
       MLIRPass
+      MLIRStandard
       MLIRTransforms
       iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
       iree::compiler::Dialect::IREE::IR

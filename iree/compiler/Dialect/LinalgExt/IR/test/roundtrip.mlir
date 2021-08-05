@@ -285,9 +285,9 @@ func @scatter_update_slice_2D(
 
 func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
     -> (tensor<1024xf32>, tensor<1024xf32>) {
-  %cst0 = constant 0 : index
+  %cst1 = constant 1 : index
   %0:2 = linalg_ext.fft
-    ins(%cst0: index)
+    ins(%cst1: index)
     outs(%arg0, %arg1: tensor<1024xf32>, tensor<1024xf32>)
   : tensor<1024xf32>, tensor<1024xf32>
   return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
@@ -295,7 +295,7 @@ func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
 // CHECK-LABEL: func @fft_tensor(
 //  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
-//       CHECK:   %[[CST:.+]] = constant 0 : index
+//       CHECK:   %[[CST:.+]] = constant 1 : index
 //       CHECK:   %[[RES:.+]]:2 = linalg_ext.fft
 //  CHECK-SAME:     ins(%[[CST]] : index)
 //  CHECK-SAME:    outs(%[[REAL]], %[[IMAG]] : tensor<1024xf32>, tensor<1024xf32>)
@@ -305,17 +305,85 @@ func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
 // -----
 
 func @fft_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>) {
-  %cst0 = constant 0 : index
+  %cst1 = constant 1 : index
   linalg_ext.fft
-    ins(%cst0: index)
+    ins(%cst1: index)
     outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
   return
 }
 // CHECK-LABEL: func @fft_memref(
 //  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
 //  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
-//       CHECK:   %[[CST:.+]] = constant 0 : index
+//       CHECK:   %[[CST:.+]] = constant 1 : index
 //       CHECK:   linalg_ext.fft
 //  CHECK-SAME:     ins(%[[CST]] : index)
 //  CHECK-SAME:    outs(%[[REAL]], %[[IMAG]] : memref<1024xf32>, memref<1024xf32>)
 //       CHECK:   return
+
+// -----
+
+func @fft_tensor_coef(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
+    %arg2: tensor<1xf32>, %arg3: tensor<1xf32>) -> (tensor<1024xf32>, tensor<1024xf32>) {
+  %cst1 = constant 1 : index
+  %0:2 = linalg_ext.fft
+    ins(%cst1, %arg2, %arg3: index, tensor<1xf32>, tensor<1xf32>)
+    outs(%arg0, %arg1: tensor<1024xf32>, tensor<1024xf32>)
+  : tensor<1024xf32>, tensor<1024xf32>
+  return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
+}
+// CHECK-LABEL: func @fft_tensor_coef(
+//  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[CST:.+]] = constant 1 : index
+//       CHECK:   %[[RES:.+]]:2 = linalg_ext.fft
+//  CHECK-SAME:     ins(%[[CST]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, tensor<1xf32>, tensor<1xf32>)
+//  CHECK-SAME:    outs(%[[REAL]], %[[IMAG]] : tensor<1024xf32>, tensor<1024xf32>)
+//  CHECK-SAME:   : tensor<1024xf32>, tensor<1024xf32>
+//       CHECK:   return %[[RES]]#0, %[[RES]]#1
+
+// -----
+
+func @fft_memref_coef(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
+                 %arg2: memref<1xf32>, %arg3: memref<1xf32>) {
+  %cst1 = constant 1 : index
+  linalg_ext.fft
+    ins(%cst1, %arg2, %arg3: index, memref<1xf32>, memref<1xf32>)
+    outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
+  return
+}
+// CHECK-LABEL: func @fft_memref_coef(
+//  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[CST:.+]] = constant 1 : index
+//       CHECK:   linalg_ext.fft
+//  CHECK-SAME:     ins(%[[CST]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, memref<1xf32>, memref<1xf32>)
+//  CHECK-SAME:    outs(%[[REAL]], %[[IMAG]] : memref<1024xf32>, memref<1024xf32>)
+//       CHECK:   return
+
+// -----
+
+// The size of coefficient tensor is 2^(stage-1).
+func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
+    %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<1024xf32>, tensor<1024xf32>) {
+  %cst1 = constant 5 : index
+  %0:2 = linalg_ext.fft
+    ins(%cst1, %arg2, %arg3: index, tensor<16xf32>, tensor<16xf32>)
+    outs(%arg0, %arg1: tensor<1024xf32>, tensor<1024xf32>)
+  : tensor<1024xf32>, tensor<1024xf32>
+  return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
+}
+// CHECK-LABEL: func @fft_tensor_coef_stage_5(
+//  CHECK-SAME:   %[[REAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[IMAG:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[CST:.+]] = constant 5 : index
+//       CHECK:   %[[RES:.+]]:2 = linalg_ext.fft
+//  CHECK-SAME:     ins(%[[CST]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, tensor<16xf32>, tensor<16xf32>)
+//  CHECK-SAME:    outs(%[[REAL]], %[[IMAG]] : tensor<1024xf32>, tensor<1024xf32>)
+//  CHECK-SAME:   : tensor<1024xf32>, tensor<1024xf32>
+//       CHECK:   return %[[RES]]#0, %[[RES]]#1

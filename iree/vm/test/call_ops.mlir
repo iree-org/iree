@@ -38,9 +38,8 @@ vm.module @call_ops {
     vm.return
   }
 
-  // TODO(simon-camp): The EmitC conversion doesn't support multiple return values.
-  vm.export @test_call_v_ii attributes {emitc.exclude}
-  vm.func private @test_call_v_ii() {
+  vm.export @test_call_v_ii
+  vm.func @test_call_v_ii() {
     %c1 = vm.const.i32 1 : i32
     %c2 = vm.const.i32 2 : i32
     %0:2 = vm.call @_v_ii() : () -> (i32, i32)

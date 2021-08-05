@@ -24,9 +24,11 @@ iree_cc_library(
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPURemoveTrivialLoops.cpp"
     "LLVMGPUTileAndDistribute.cpp"
+    "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
   DEPS
+    LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
     MLIRGPUOps
@@ -59,6 +61,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::Transforms
     tensorflow::mlir_hlo
