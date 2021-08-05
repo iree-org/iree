@@ -230,7 +230,8 @@ void ExStreamFragmentOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ClosureOptimizationPattern<ExStreamFragmentOp>>(context);
   results.insert<InsertImmutabilityPreservingStreamClones>(context);
-  results.insert<TieStreamResults>(context);
+  // TODO(#6420): fix HAL lowering of this (or wait until streams are gone).
+  // results.insert<TieStreamResults>(context);
 }
 
 //===----------------------------------------------------------------------===//
