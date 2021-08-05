@@ -175,9 +175,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
   TileSizesListType tileSizes = {getWorkgroupTileSizes(), getL1TileSizes(),
                                  nativeVectorSize};
 
-  IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, nativeVectorSize, mmt4dOp->getContext());
-
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
       IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
