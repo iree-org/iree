@@ -940,10 +940,15 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   return success();
 }
 
-// Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte value.
+// Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte integer value.
 static Value splatFillPattern(Location loc, Value baseValue,
                               OpBuilder &builder) {
-  switch (baseValue.getType().getIntOrFloatBitWidth()) {
+  // Bitcast to an integer, then use integer math for the rest of the pattern.
+  auto baseBitWidth = baseValue.getType().getIntOrFloatBitWidth();
+  baseValue = builder.createOrFold<BitcastOp>(
+      loc, builder.getIntegerType(baseBitWidth), baseValue);
+
+  switch (baseBitWidth) {
     case 8: {
       // (v << 24) | (v << 16) | (v << 8) | v
       auto b0 = builder.createOrFold<ZeroExtendIOp>(loc, baseValue,
