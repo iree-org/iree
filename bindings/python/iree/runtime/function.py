@@ -5,7 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from typing import Optional
+from typing import Dict, Optional
 
 import json
 import logging
@@ -66,7 +66,9 @@ class FunctionInvoker:
       "_abi_dict",
       "_arg_descs",
       "_ret_descs",
-      "_has_kwargs",
+      "_named_arg_indices",
+      "_max_named_arg_index",
+      "_has_inlined_results",
       "_tracer",
   ]
 
@@ -83,7 +85,9 @@ class FunctionInvoker:
     self._abi_dict = None
     self._arg_descs = None
     self._ret_descs = None
-    self._has_kwargs = False
+    self._has_inlined_results = False
+    self._named_arg_indices: Dict[str, int] = {}
+    self._max_named_arg_index: int = -1
     self._parse_abi_dict(vm_function)
 
   @property
@@ -101,16 +105,21 @@ class FunctionInvoker:
     inv = Invocation(self._device)
     ret_descs = self._ret_descs
 
-    # If kwargs are present, we treat those more as kwarg-only parameters (i.e.
-    # you cannot just arbitrarily use them to override positional arguments
-    # by name in the current implementation). If the backing ABI metadata
-    # declares support for kwargs, this will be done by having a final
-    # 'kwargs_sdict' arg descriptor, and we rewrite into this form.
-    # So we just append the kwargs dict to the args list and let decoding
-    # happen normally.
-    if self._has_kwargs:
+    # Merge keyword args in by name->position mapping.
+    if kwargs:
       args = list(args)
-      args.append(kwargs if kwargs else dict())
+      len_delta = self._max_named_arg_index - len(args) + 1
+      if len_delta > 0:
+        args.extend([NotImplemented] * len_delta)
+      for kwarg_key, kwarg_value in kwargs.items():
+        try:
+          kwarg_index = self._named_arg_indices[kwarg_key]
+        except KeyError:
+          raise ArgumentError(f"specified kwarg '{kwarg_key}' is unknown")
+        len_delta = kwarg_index - len(args) + 1
+        if len_delta <= 0:
+          args.extend([NotImplemented] * len_delta)
+        args[kwarg_index] = kwarg_value
 
     arg_list = VmVariantList(len(args))
     ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
@@ -120,7 +129,14 @@ class FunctionInvoker:
     self._vm_context.invoke(self._vm_function, arg_list, ret_list)
     if call_trace:
       call_trace.add_vm_list(ret_list, "results")
-    returns = _extract_vm_sequence_to_python(inv, ret_list, ret_descs)
+
+    # Un-inline the results to align with reflection, as needed.
+    reflection_aligned_ret_list = ret_list
+    if self._has_inlined_results:
+      reflection_aligned_ret_list = VmVariantList(1)
+      reflection_aligned_ret_list.push_list(ret_list)
+    returns = _extract_vm_sequence_to_python(inv, reflection_aligned_ret_list,
+                                             ret_descs)
     if call_trace:
       call_trace.end_call()
     return_arity = len(returns)
@@ -157,11 +173,23 @@ class FunctionInvoker:
       raise RuntimeError(
           f"Malformed function reflection metadata structure: {reflection}")
 
-    # See if kwargs are expected.
-    if self._arg_descs:
-      maybe_kwargs_desc = self._arg_descs[-1]
-      if maybe_kwargs_desc and maybe_kwargs_desc[0] == "sdict_kwargs":
-        self._has_kwargs = True
+    # Post-process the arg descs to transform "named" records to just their
+    # type, stashing the index.
+    for i in range(len(self._arg_descs)):
+      maybe_named_desc = self._arg_descs[i]
+      if maybe_named_desc and maybe_named_desc[0] == "named":
+        arg_name, arg_type_desc = maybe_named_desc[1:]
+        self._arg_descs[i] = arg_type_desc
+        self._named_arg_indices[arg_name] = i
+        if i > self._max_named_arg_index:
+          self._max_named_arg_index = i
+
+    # Detect whether the results are a slist/stuple/sdict, which indicates
+    # that they are inlined with the function's results.
+    if len(self._ret_descs) == 1:
+      maybe_inlined = self._ret_descs[0]
+      if maybe_inlined and maybe_inlined[0] in ["slist", "stuple", "sdict"]:
+        self._has_inlined_results = True
 
   def __repr__(self):
     return repr(self._vm_function)
@@ -172,6 +200,10 @@ class FunctionInvoker:
 #   target_list: VmVariantList to append to
 #   python_value: The python value of the given type
 #   desc: The ABI descriptor list (or None if in dynamic mode).
+
+
+def _missing_argument(inv: Invocation, t: VmVariantList, x, desc):
+  _raise_argument_error(inv, f"a required argument was not specified")
 
 
 def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
@@ -216,7 +248,7 @@ def _list_or_tuple_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 
 def _dict_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   desc_type = desc[0]
-  if desc_type != "sdict" and desc_type != "sdict_kwargs":
+  if desc_type != "sdict":
     _raise_argument_error(inv, f"passed a dict but expected {desc_type}")
   # When decoding a dict, the desc object is like:
   # ['sdict', ['key0', [...value_type_0...]], ['key1', [...value_type_1...]]]]
@@ -276,6 +308,7 @@ def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 
 
 PYTHON_TO_VM_CONVERTERS = {
+    NotImplemented.__class__: _missing_argument,
     bool: _bool_to_vm,
     int: _int_to_vm,
     float: _float_to_vm,
@@ -325,11 +358,33 @@ def _vm_to_stuple(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
   return tuple(_vm_to_slist(inv, vm_list, vm_index, desc))
 
 
+def _vm_to_scalar(type_bound: type):
+
+  def convert(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
+    value = vm_list.get_variant(vm_index)
+    if not isinstance(value, type_bound):
+      raise ReturnError(
+          f"expected an {type_bound} value but got {value.__class__}")
+    return value
+
+  return convert
+
+
 VM_TO_PYTHON_CONVERTERS = {
     "ndarray": _vm_to_ndarray,
     "sdict": _vm_to_sdict,
     "slist": _vm_to_slist,
     "stuple": _vm_to_stuple,
+
+    # Scalars.
+    "i8": _vm_to_scalar(int),
+    "i16": _vm_to_scalar(int),
+    "i32": _vm_to_scalar(int),
+    "i64": _vm_to_scalar(int),
+    "f16": _vm_to_scalar(float),
+    "f32": _vm_to_scalar(float),
+    "f64": _vm_to_scalar(float),
+    "bf16": _vm_to_scalar(float),
 }
 
 ABI_TYPE_TO_DTYPE = {
@@ -381,11 +436,20 @@ def _cast_scalar_to_ndarray(inv: Invocation, x, desc):
   return dtype(x)
 
 
+class ArgumentError(ValueError):
+  pass
+
+
+class ReturnError(ValueError):
+  pass
+
+
 def _raise_argument_error(inv: Invocation,
                           summary: str,
                           e: Optional[Exception] = None):
-  new_e = ValueError(f"Error passing argument: {summary} "
-                     f"(while encoding argument {inv.summarize_arg_error()})")
+  new_e = ArgumentError(
+      f"Error passing argument: {summary} "
+      f"(while encoding argument {inv.summarize_arg_error()})")
   if e:
     raise new_e from e
   else:
@@ -395,8 +459,8 @@ def _raise_argument_error(inv: Invocation,
 def _raise_return_error(inv: Invocation,
                         summary: str,
                         e: Optional[Exception] = None):
-  new_e = ValueError(f"Error processing function return: {summary} "
-                     f"(while decoding return {inv.summarize_return_error()})")
+  new_e = ReturnError(f"Error processing function return: {summary} "
+                      f"(while decoding return {inv.summarize_return_error()})")
   if e:
     raise new_e from e
   else:
@@ -429,6 +493,8 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
             f" (for desc {desc})")
     try:
       converter(inv, vm_list, py_value, desc)
+    except ArgumentError:
+      raise
     except Exception as e:
       _raise_argument_error(inv, f"exception converting from Python type to VM",
                             e)
@@ -451,13 +517,15 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
       converted = vm_list.get_variant(vm_index)
     else:
       # Known type descriptor.
-      vm_type = desc[0]
+      vm_type = desc if isinstance(desc, str) else desc[0]
       try:
         converter = VM_TO_PYTHON_CONVERTERS[vm_type]
       except KeyError:
         _raise_return_error(inv, f"cannot map VM type to Python: {vm_type}")
       try:
         converted = converter(inv, vm_list, vm_index, desc)
+      except ReturnError:
+        raise
       except Exception as e:
         _raise_return_error(inv, f"exception converting from VM type to Python",
                             e)
