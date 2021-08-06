@@ -462,12 +462,10 @@ if(${IREE_BUILD_COMPILER})
   # does not support (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
   add_executable(iree::tools::IreeFileCheck ALIAS iree_tools_IreeFileCheck)
 
-  if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
-    add_custom_target(BundledLLVMFileCheck ALL
-      COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
-      DEPENDS FileCheck
-    )
-  endif()
+  add_custom_target(BundledLLVMFileCheck ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
+    DEPENDS FileCheck
+  )
 
   # lld install - required by the compiler to link codegen executables.
   install(
