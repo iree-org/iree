@@ -96,7 +96,7 @@ def IREE_DynamicShapeConstantOp : IREE_Op<"dynamic_shape_constant"> {
     information should be hidden from the compiler and resolved at runtime.
 
     ```mlir
-    %c = iree.dynamic_shape_constant tensor<2x2xf32> -> tensor<?x?xf32>
+    %c = util.dynamic_shape_constant tensor<2x2xf32> -> tensor<?x?xf32>
     %res = "mhlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
     ```
   }];
@@ -110,7 +110,7 @@ def IREE_UnfoldableConstantOp : IREE_Op<"unfoldable_constant"> {
   let description = [{
     Similar to a std.constant, but is declared as having a side effect and has
     no folder. This is really just syntactic sugar as it is canonicalized to a
-    std.constant wrapped in an iree.do_not_optimize.
+    std.constant wrapped in an util.do_not_optimize.
   }];
 
   let arguments = (ins AnyAttr:$value);
@@ -136,7 +136,7 @@ def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
       cond_br %true, ^bb2, ^bb1
     ^bb1:
       // Indicates that this branch should never be taken.
-      iree.unreachable "shouldn't be here"
+      util.unreachable "shouldn't be here"
     ^bb2:
       ...
 
@@ -152,7 +152,7 @@ def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
 // Lists
 //===----------------------------------------------------------------------===//
 // NOTE: this type is mostly just a placeholder. Ideally we'd make this
-// immutable and have operations like iree.list.append/concat/etc the returned
+// immutable and have operations like util.list.append/concat/etc the returned
 // new SSA values. This would make optimizing the list usage much easier and
 // enable hoisting/CSE of list access/mutation.
 

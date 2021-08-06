@@ -6,7 +6,7 @@
 // CHECK-LABEL: EXEC @many_tensor
 func @many_tensor() -> (tensor<2x2xf32>, tensor<2x2xf32>, tensor<2x2xf32>,
                         tensor<2x2xf32>, tensor<2x2xf32>, tensor<2x2xf32>) {
-  %res = iree.unfoldable_constant
+  %res = util.unfoldable_constant
       dense<[[1.0, 2.0], [3.0, 4.0]]> : tensor<2x2xf32>
   return %res, %res, %res, %res, %res, %res :
         tensor<2x2xf32>, tensor<2x2xf32>, tensor<2x2xf32>, tensor<2x2xf32>,

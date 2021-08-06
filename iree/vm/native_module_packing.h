@@ -428,7 +428,7 @@ struct ParamUnpack<const ref<T>> {
   }
 };
 
-// An `iree.byte_buffer` containing a string.
+// An `util.byte_buffer` containing a string.
 // The string view is aliased directly into the underlying byte buffer.
 template <>
 struct ParamUnpack<iree_string_view_t> {

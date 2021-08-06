@@ -22,7 +22,7 @@ namespace iree_compiler {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// iree.null
+// util.null
 //===----------------------------------------------------------------------===//
 
 class NullOpConversion : public OpConversionPattern<IREE::NullOp> {
@@ -38,7 +38,7 @@ class NullOpConversion : public OpConversionPattern<IREE::NullOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// iree.byte_buffer.*
+// util.byte_buffer.*
 //===----------------------------------------------------------------------===//
 
 class ByteBufferConstantOpConversion

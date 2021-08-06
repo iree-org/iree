@@ -328,7 +328,7 @@ class MaterializeShapeSupportPass
 
   // Creates a function to query the |inputVarOps| at runtime by the bindings.
   //
-  // func @_query_input_shape(%index : index, %shape : !iree.list<index>)
+  // func @_query_input_shape(%index : index, %shape : !util.list<index>)
   void createQueryInputShapeFunc(Location loc, StringRef namePrefix,
                                  ArrayRef<IREE::Flow::VariableOp> inputVarOps,
                                  OpBuilder &moduleBuilder) {
@@ -364,7 +364,7 @@ class MaterializeShapeSupportPass
 
   // Creates a function to resize |inputVarOps| and sets the |dirtyVarOp| flag.
   //
-  // func @_resize_input_shape(%index : index, %shape : !iree.list<index>)
+  // func @_resize_input_shape(%index : index, %shape : !util.list<index>)
   void createResizeInputShapeFunc(Location loc, StringRef namePrefix,
                                   ArrayRef<IREE::Flow::VariableOp> inputVarOps,
                                   IREE::Flow::VariableOp dirtyVarOp,
@@ -404,7 +404,7 @@ class MaterializeShapeSupportPass
 
   // Creates a function to query the |outputVarOps| at runtime by the bindings.
   //
-  // func @_query_output_shape(%index : index, %shape : !iree.list<index>)
+  // func @_query_output_shape(%index : index, %shape : !util.list<index>)
   void createQueryOutputShapeFunc(Location loc, StringRef namePrefix,
                                   ArrayRef<IREE::Flow::VariableOp> outputVarOps,
                                   FuncOp calculateShapeFuncOp,

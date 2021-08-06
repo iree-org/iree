@@ -27,7 +27,7 @@ namespace iree_compiler {
 namespace IREE {
 
 //===----------------------------------------------------------------------===//
-// iree.do_not_optimize
+// util.do_not_optimize
 //===----------------------------------------------------------------------===//
 
 void DoNotOptimizeOp::build(OpBuilder &builder, OperationState &state,
@@ -56,7 +56,7 @@ ParseResult parseDoNotOptimizeOp(OpAsmParser &parser, OperationState &state) {
 }
 
 void printDoNotOptimizeOp(OpAsmPrinter &p, Operation *op) {
-  p << "iree.do_not_optimize";
+  p << "util.do_not_optimize";
   p << "(";
   p.printOperands(op->getOperands());
   p << ")";
@@ -88,7 +88,7 @@ static LogicalResult verifyDoNotOptimizeOp(DoNotOptimizeOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// iree.unfoldable_constant
+// util.unfoldable_constant
 //===----------------------------------------------------------------------===//
 
 // Parsing/printing copied from std.constant
@@ -113,7 +113,7 @@ ParseResult parseUnfoldableConstantOp(OpAsmParser &parser,
 
 void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
   auto constOp = cast<IREE::UnfoldableConstantOp>(op);
-  p << "iree.unfoldable_constant ";
+  p << "util.unfoldable_constant ";
   p.printOptionalAttrDict(constOp->getAttrs(), /*elidedAttrs=*/{"value"});
 
   if (constOp->getAttrs().size() > 1) p << ' ';
@@ -151,7 +151,7 @@ static ParseResult parseListTypeGet(OpAsmParser &parser, Type &listType,
                                     Type &elementType) {
   if (failed(parser.parseType(listType))) {
     return parser.emitError(parser.getCurrentLocation(),
-                            "expected !iree.list<T> type");
+                            "expected !util.list<T> type");
   }
   auto listElementType = listType.cast<ListType>().getElementType();
   if (succeeded(parser.parseOptionalArrow())) {
@@ -188,18 +188,18 @@ static ParseResult parseListTypeSet(OpAsmParser &parser, Type &listType,
   Type leadingType;
   if (failed(parser.parseType(leadingType))) {
     return parser.emitError(parser.getCurrentLocation(),
-                            "expected element type or !iree.list<T> type");
+                            "expected element type or !util.list<T> type");
   }
   if (succeeded(parser.parseOptionalArrow())) {
     elementType = leadingType;
     if (failed(parser.parseType(listType)) || !listType.isa<ListType>()) {
       return parser.emitError(parser.getCurrentLocation(),
-                              "expected an !iree.list<T> type");
+                              "expected an !util.list<T> type");
     }
   } else {
     if (!leadingType.isa<ListType>()) {
       return parser.emitError(parser.getCurrentLocation(),
-                              "expected an !iree.list<T> type");
+                              "expected an !util.list<T> type");
     }
     listType = leadingType;
     elementType = listType.cast<ListType>().getElementType();

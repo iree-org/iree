@@ -16,7 +16,7 @@ namespace iree_compiler {
 class IREEDialect : public Dialect {
  public:
   explicit IREEDialect(MLIRContext* context);
-  static StringRef getDialectNamespace() { return "iree"; }
+  static StringRef getDialectNamespace() { return "util"; }
 
   /// Parses a type registered to this dialect.
   Type parseType(DialectAsmParser& parser) const override;

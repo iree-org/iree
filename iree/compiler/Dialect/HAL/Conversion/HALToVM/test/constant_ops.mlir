@@ -20,10 +20,10 @@ func private @pool_storage0_buffer_initializer() -> !hal.buffer {
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%dev : !hal.device> : !hal.allocator
   // CHECK: [[STORAGE_REF:%.+]] = vm.const.ref.rodata @pool_storage0 : !vm.buffer
-  %storage = hal.constant_storage.lookup @pool::@_storage0 : !iree.byte_buffer
+  %storage = hal.constant_storage.lookup @pool::@_storage0 : !util.byte_buffer
   // CHECK: = vm.call @hal.allocator.wrap.byte_buffer({{.+}}, %c22, %c15, [[STORAGE_REF]], %zero, %c16)
   %mapped = hal.allocator.map<%allocator : !hal.allocator>
-      source(%storage : !iree.byte_buffer)[%c0, %c16]
+      source(%storage : !util.byte_buffer)[%c0, %c16]
       type("HostVisible|HostCoherent|DeviceVisible")
       usage("Constant|Transfer|Mapping|Dispatch") : !hal.buffer
   return %mapped : !hal.buffer
