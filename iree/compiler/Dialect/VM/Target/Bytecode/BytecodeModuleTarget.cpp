@@ -34,6 +34,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Translation.h"
 
@@ -724,6 +725,17 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   if (failed(canonicalizeModule(targetOptions, moduleOp))) {
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";
+  }
+
+  // Dump VM assembly source listing to a file and annotate IR locations.
+  if (!targetOptions.sourceListing.empty()) {
+    OpPrintingFlags printFlags;
+    printFlags.elideLargeElementsAttrs(8192);
+    if (failed(mlir::generateLocationsFromIR(targetOptions.sourceListing, "vm",
+                                             moduleOp, printFlags))) {
+      return moduleOp.emitError() << "failed to write source listing to '"
+                                  << targetOptions.sourceListing << "'";
+    }
   }
 
   if (targetOptions.outputFormat == BytecodeOutputFormat::kAnnotatedMlirText) {

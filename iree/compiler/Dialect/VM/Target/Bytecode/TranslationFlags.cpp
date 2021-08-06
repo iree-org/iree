@@ -40,6 +40,12 @@ static llvm::cl::opt<bool> optimizeFlag{
     llvm::cl::init(true),
 };
 
+static llvm::cl::opt<std::string> sourceListingFlag{
+    "iree-vm-bytecode-source-listing",
+    llvm::cl::desc("Dump a VM MLIR file and annotate source locations with it"),
+    llvm::cl::init(""),
+};
+
 static llvm::cl::opt<bool> stripSymbolsFlag{
     "iree-vm-bytecode-module-strip-symbols",
     llvm::cl::desc("Strips all internal symbol names from the module"),
@@ -69,6 +75,7 @@ BytecodeTargetOptions getBytecodeTargetOptionsFromFlags() {
   BytecodeTargetOptions targetOptions;
   targetOptions.outputFormat = outputFormatFlag;
   targetOptions.optimize = optimizeFlag;
+  targetOptions.sourceListing = sourceListingFlag;
   targetOptions.stripSymbols = stripSymbolsFlag;
   targetOptions.stripSourceMap = stripSourceMapFlag;
   targetOptions.stripDebugOps = stripDebugOpsFlag;
