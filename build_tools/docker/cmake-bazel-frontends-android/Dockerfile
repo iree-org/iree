@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/cmake-bazel-frontends@sha256:4698b2d423171ca85bb42aa8c90ae31fa0f422ee11a197afe5870b9079895166 AS final
+FROM gcr.io/iree-oss/cmake-bazel-frontends@sha256:7633ff2b483a07b6c786ffab40cca7cae64d6a211ad0e95ff55d3f1cd2dd1ea9 AS final
 
 # Note that NDK_VERSION should be kept in sync with the one in cmake-android.
 # That actually means this isn't really an ARG because we cannot build this
