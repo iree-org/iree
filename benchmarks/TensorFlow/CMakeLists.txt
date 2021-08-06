@@ -102,6 +102,7 @@ iree_mlir_benchmark_suite(
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
     #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib-sync"
@@ -126,6 +127,7 @@ iree_mlir_benchmark_suite(
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
     #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
@@ -152,6 +154,7 @@ iree_mlir_benchmark_suite(
     "--iree-flow-inline-constants-max-byte-length=2048"
     # TODO(GH-5857): Enable this after fixing segfault.
     #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
