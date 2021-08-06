@@ -4,23 +4,23 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from iree.compiler_backend import ir
-from iree.compiler_backend.dialects import chlo
-from iree.compiler_backend.dialects import mhlo
-from iree.compiler_backend.dialects import iree_public
-from iree.compiler_backend.dialects import builtin
-from iree.compiler_backend.dialects import std
-from iree.compiler_backend.dialects import linalg
+from iree.compiler import ir
+from iree.compiler.dialects import chlo
+from iree.compiler.dialects import mhlo
+from iree.compiler.dialects import iree_public
+from iree.compiler.dialects import builtin
+from iree.compiler.dialects import std
+from iree.compiler.dialects import linalg
 try:
-  from iree.compiler_backend.dialects import linalg
+  from iree.compiler.dialects import linalg
 except ImportError as e:
   print("KNOWN ISSUE: Linalg has an absolute path dependency issue:", e)
-from iree.compiler_backend.dialects import math
-from iree.compiler_backend.dialects import memref
-from iree.compiler_backend.dialects import shape
-from iree.compiler_backend.dialects import tensor
-from iree.compiler_backend.dialects import tosa
-from iree.compiler_backend.dialects import vector
+from iree.compiler.dialects import math
+from iree.compiler.dialects import memref
+from iree.compiler.dialects import shape
+from iree.compiler.dialects import tensor
+from iree.compiler.dialects import tosa
+from iree.compiler.dialects import vector
 
 with ir.Context() as ctx:
   try:
