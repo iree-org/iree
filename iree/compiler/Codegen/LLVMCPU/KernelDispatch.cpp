@@ -159,7 +159,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
       return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
                                   mmt4dL1TileSizes.end());
     }
-    return {32, 32, 4, 4, 4, 4};
+    return {1, 1, 4, 4, 1, 4};
   };
 
   auto getVectorSizes = [&]() -> SmallVector<int64_t> {

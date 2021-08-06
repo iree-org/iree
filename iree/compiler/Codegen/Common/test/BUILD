@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "remove_dead_allocs.mlir",
             "transpose_canonicalization.mlir",
             "vectorize_linalg_conv.mlir",
+            "vectorize_linalg_mmt4d.mlir",
         ],
         include = ["*.mlir"],
     ),
