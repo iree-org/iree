@@ -28,11 +28,11 @@ func @fn() {
 flow.variable @var_indirect mutable : tensor<i32>
 func @fn() {
   // CHECK: %[[ADDR:.+]] = hal.variable.address @var_indirect
-  %0 = flow.variable.address @var_indirect : !iree.ptr<tensor<i32>>
+  %0 = flow.variable.address @var_indirect : !util.ptr<tensor<i32>>
   // CHECK-NEXT: %[[VALUE:.+]] = hal.variable.load.indirect %[[ADDR]]
-  %1 = flow.variable.load.indirect %0 : !iree.ptr<tensor<i32>> -> tensor<i32>
+  %1 = flow.variable.load.indirect %0 : !util.ptr<tensor<i32>> -> tensor<i32>
   // CHECK-NEXT: hal.variable.store.indirect %[[VALUE]], %[[ADDR]]
-  flow.variable.store.indirect %1, %0 : tensor<i32> -> !iree.ptr<tensor<i32>>
+  flow.variable.store.indirect %1, %0 : tensor<i32> -> !util.ptr<tensor<i32>>
   return
 }
 

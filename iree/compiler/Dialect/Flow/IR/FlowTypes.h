@@ -8,8 +8,8 @@
 #define IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"

@@ -7,7 +7,7 @@ module {
   func @my_fn() {
     // CHECK-NEXT: %[[CODE:.+]] = vm.const.i32 2
     // CHECK-NEXT: vm.fail %[[CODE]], "nope!"
-    iree.unreachable "nope!"
+    util.unreachable "nope!"
   }
 }
 }

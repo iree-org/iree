@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -225,8 +225,10 @@ class VariableStoreIndirectOpConversion
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::VariableStoreIndirectOp::Adaptor operands(newOperands);
 
-    Type variableType =
-        operands.variable().getType().cast<IREE::PtrType>().getTargetType();
+    Type variableType = operands.variable()
+                            .getType()
+                            .cast<IREE::Util::PtrType>()
+                            .getTargetType();
     Value storeValue = implicitCastVariableStore(
         storeOp.getLoc(), operands.value(), variableType, rewriter);
     if (!storeValue) {

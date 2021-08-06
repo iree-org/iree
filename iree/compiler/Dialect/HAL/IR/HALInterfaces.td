@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_HAL_INTERFACES
 #define IREE_DIALECT_HAL_INTERFACES
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE::HAL::SizeAwareOpInterface

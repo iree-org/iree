@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "llvm/ADT/STLExtras.h"

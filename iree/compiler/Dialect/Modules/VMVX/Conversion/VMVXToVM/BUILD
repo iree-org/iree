@@ -19,8 +19,8 @@ cc_library(
         "ConvertVMVXToVM.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Modules/VMVX/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",

@@ -1,5 +1,5 @@
 func @conv() {
-  %input = iree.unfoldable_constant dense<
+  %input = util.unfoldable_constant dense<
      [[[[6.0, 7.5, 0.0, 1.5],
         [1.5, 3.5, 4.5, 2.0],
         [3.0, 6.0, 0.5, 3.0]],
@@ -10,7 +10,7 @@ func @conv() {
         [4.5, 0.0, 5.0, 1.5],
         [5.5, 1.0, 0.0, 0.0]]]]>
     : tensor<1x3x3x4xf32>
-  %filter = iree.unfoldable_constant dense<
+  %filter = util.unfoldable_constant dense<
       [[[[2.0, 2.5, 2.5, 3.0, 4.0, 2.0, 0.5, 2.0, 4.5, 5.0, 5.0, 4.0, 0.5, 0.5, 3.5, 4.5,
           4.5, 1.5, 3.0, 3.5, 1.0, 0.0, 1.5, 2.5, 4.5, 5.0, 2.0, 2.0, 3.0, 2.0, 2.0, 1.5],
          [2.0, 2.0, 4.0, 2.0, 1.5, 5.0, 3.5, 2.5, 2.5, 0.0, 0.5, 2.5, 4.5, 1.5, 0.0, 2.5,
@@ -69,13 +69,13 @@ func @conv() {
 }
 
 func @depthwise_conv() {
-  %input = iree.unfoldable_constant dense<
+  %input = util.unfoldable_constant dense<
     [[[[6.0, 7.5, 0.0, 1.5, 1.5, 3.5, 4.5, 2.0, 3.0, 6.0, 0.5, 3.0, 3.5, 7.0, 2.5, 6.5],
        [4.0, 4.5, 8.0, 2.5, 7.5, 7.5, 0.0, 1.5, 7.0, 3.5, 0.0, 0.5, 4.5, 0.0, 5.0, 1.5],
        [5.5, 1.0, 0.0, 0.0, 2.0, 2.5, 3.0, 4.0, 7.5, 2.0, 4.5, 5.0, 0.5, 0.5, 3.5, 4.5],
        [1.5, 3.0, 5.5, 7.0, 0.0, 7.0, 1.5, 6.0, 5.0, 5.5, 2.0, 3.0, 2.0, 7.5, 1.5, 6.0]]]]>
     : tensor<1x1x4x16xf32>
-  %filter = iree.unfoldable_constant dense<
+  %filter = util.unfoldable_constant dense<
     [[[[2.0, 2.0, 4.0, 2.0, 1.5, 5.0, 3.5, 2.5, 2.5, 0.0, 0.5, 2.5, 4.5, 1.5, 0.0, 2.5]]]]>
     : tensor<1x1x1x16xf32>
 

@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_SHAPE_IR_IREETYPES_H_
 #define IREE_COMPILER_DIALECT_SHAPE_IR_IREETYPES_H_
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"

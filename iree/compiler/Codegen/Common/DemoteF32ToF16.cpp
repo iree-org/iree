@@ -10,7 +10,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,7 +31,7 @@ namespace {
 /// Any fp32 derived type is illegal.
 static bool isIllegalType(Type type) {
   if (type.isF32()) return true;
-  if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
+  if (auto ptrType = type.dyn_cast<IREE::Util::PtrType>()) {
     return isIllegalType(ptrType.getTargetType());
   }
   if (auto shapedType = type.dyn_cast<ShapedType>()) {
@@ -55,10 +55,10 @@ class FloatTypeConverter : public TypeConverter {
       return type;
     });
     addConversion(convertTensor);
-    addConversion([&](IREE::PtrType ptrType) {
+    addConversion([&](IREE::Util::PtrType ptrType) {
       if (auto tensorType =
               ptrType.getTargetType().dyn_cast<RankedTensorType>()) {
-        return IREE::PtrType::get(convertTensor(tensorType));
+        return IREE::Util::PtrType::get(convertTensor(tensorType));
       }
       return ptrType;
     });

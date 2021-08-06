@@ -9,9 +9,9 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"

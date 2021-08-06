@@ -27,7 +27,7 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
@@ -58,7 +58,7 @@ cc_library(
     deps = [
         ":ShapeInterfacesGen",
         ":ShapeOpsGen",
-        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",

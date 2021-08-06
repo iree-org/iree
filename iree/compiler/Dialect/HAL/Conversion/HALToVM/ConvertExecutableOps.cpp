@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/DenseMap.h"

@@ -30,7 +30,7 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -68,7 +68,7 @@ cc_library(
         ":VMOpInterfaceGen",
         ":VMOpsGen",
         ":VMStructsGen",
-        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",

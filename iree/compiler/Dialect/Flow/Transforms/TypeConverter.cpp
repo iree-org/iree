@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/TypeConverter.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir {

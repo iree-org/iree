@@ -211,7 +211,7 @@ cc_library(
 #     tblgen = "//iree/tools:iree-tblgen",
 #     td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
 #     td_srcs = [
-#         "//iree/compiler/Dialect/IREE/IR:td_files",
+#         "//iree/compiler/Dialect/Util/IR:td_files",
 #         "//iree/compiler/Dialect/VM/IR:td_files",
 #         "@llvm-project//mlir:OpBaseTdFiles",
 #         "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",

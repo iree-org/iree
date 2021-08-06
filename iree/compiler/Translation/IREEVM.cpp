@@ -10,7 +10,7 @@
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -182,7 +182,7 @@ static void buildIREEVMTransformPassPipeline(
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
-  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
+  passManager.addPass(IREE::Util::createDropCompilerHintsPass());
 }
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
