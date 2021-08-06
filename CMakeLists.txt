@@ -37,7 +37,6 @@ endif()
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
-option(IREE_ENABLE_MLIR "Enables MLIR/LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
@@ -96,13 +95,9 @@ option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disa
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-if(IREE_BUILD_COMPILER)
-  set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
-endif()
-
 if(IREE_ENABLE_EMITC)
-  if(NOT IREE_ENABLE_MLIR)
-    message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_MLIR to ON.")
+  if(NOT IREE_BUILD_COMPILER)
+    message(FATAL_ERROR "Enabling EmitC requires setting IREE_BUILD_COMPILER to ON.")
   endif()
 endif()
 
@@ -335,7 +330,7 @@ endif()
 # MLIR/LLVM Dependency
 #-------------------------------------------------------------------------------
 
-if(NOT IREE_ENABLE_MLIR)
+if(NOT IREE_BUILD_COMPILER)
   message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
 elseif(TARGET LLVMSupport)
   message(STATUS "Not adding IREE bundled LLVM because it has already been included")
