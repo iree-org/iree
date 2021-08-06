@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_IREE_UTIL_OPS
-#define IREE_DIALECT_IREE_UTIL_OPS
+#ifndef IREE_DIALECT_UTIL_IR_UTIL_OPS
+#define IREE_DIALECT_UTIL_IR_UTIL_OPS
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -242,4 +242,4 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-#endif  // IREE_DIALECT_IREE_UTIL_OPS
+#endif  // IREE_DIALECT_UTIL_IR_UTIL_OPS

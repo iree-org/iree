@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
@@ -51,7 +51,7 @@ UtilDialect::UtilDialect(MLIRContext *context)
   registerTypes();
 #define GET_OP_LIST
   addOperations<
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"
       >();
 }
 

@@ -14,15 +14,15 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["IREEBase.td"])
+exports_files(["UtilBase.td"])
 
 td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
-            "IREEBase.td",
-            "IREEInterfaces.td",
-            "IREEOps.td",
+            "UtilBase.td",
+            "UtilInterfaces.td",
+            "UtilOps.td",
         ],
         include = ["*.td"],
     ),
@@ -35,23 +35,23 @@ td_library(
 cc_library(
     name = "IR",
     srcs = [
-        "IREEOpInterfaces.cpp.inc",
-        "IREEOps.cpp",
-        "IREEOps.cpp.inc",
-        "IREETypes.cpp",
         "UtilDialect.cpp",
+        "UtilOpInterfaces.cpp.inc",
+        "UtilOps.cpp",
+        "UtilOps.cpp.inc",
+        "UtilTypes.cpp",
     ],
     hdrs = [
-        "IREEOpInterfaces.h.inc",
-        "IREEOps.h",
-        "IREEOps.h.inc",
-        "IREETraits.h",
-        "IREETypes.h",
         "UtilDialect.h",
+        "UtilOpInterfaces.h.inc",
+        "UtilOps.h",
+        "UtilOps.h.inc",
+        "UtilTraits.h",
+        "UtilTypes.h",
     ],
     deps = [
-        ":IREEInterfacesGen",
-        ":IREEOpsGen",
+        ":UtilInterfacesGen",
+        ":UtilOpsGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
@@ -62,48 +62,48 @@ cc_library(
 )
 
 gentbl_cc_library(
-    name = "IREEInterfacesGen",
+    name = "UtilInterfacesGen",
     tbl_outs = [
         (
             ["-gen-op-interface-decls"],
-            "IREEOpInterfaces.h.inc",
+            "UtilOpInterfaces.h.inc",
         ),
         (
             ["-gen-op-interface-defs"],
-            "IREEOpInterfaces.cpp.inc",
+            "UtilOpInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEInterfaces.td",
+    td_file = "UtilInterfaces.td",
     deps = [":td_files"],
 )
 
 gentbl_cc_library(
-    name = "IREEOpsGen",
+    name = "UtilOpsGen",
     tbl_outs = [
         (
             ["-gen-op-decls"],
-            "IREEOps.h.inc",
+            "UtilOps.h.inc",
         ),
         (
             ["-gen-op-defs"],
-            "IREEOps.cpp.inc",
+            "UtilOps.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEOps.td",
+    td_file = "UtilOps.td",
     deps = [":td_files"],
 )
 
 iree_tablegen_doc(
-    name = "IREEUtilDialectDocGen",
+    name = "UtilUtilDialectDocGen",
     tbl_outs = [
         (
             ["-gen-dialect-doc"],
-            "IREEUtilDialect.md",
+            "UtilUtilDialect.md",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEOps.td",
+    td_file = "UtilOps.td",
     deps = [":td_files"],
 )

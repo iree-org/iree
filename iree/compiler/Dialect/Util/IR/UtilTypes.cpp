@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 
-#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -243,7 +243,7 @@ void excludeTiedOperandAndResultIndices(
 }
 
 // At the end so it can use functions above:
-#include "iree/compiler/Dialect/IREE/IR/IREEOpInterfaces.cpp.inc"
+#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect

@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"

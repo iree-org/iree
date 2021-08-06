@@ -22,7 +22,7 @@ td_library(
     ),
     deps = [
         "//iree/compiler/Dialect/HAL/IR:td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
@@ -44,7 +44,7 @@ cc_library(
         ":custom_ops_gen",
         "//iree/compiler/Dialect/HAL/Conversion",
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",

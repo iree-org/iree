@@ -27,10 +27,10 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Modules::VMVX::IR
     iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

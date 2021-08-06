@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
@@ -247,4 +247,4 @@ static LogicalResult verifyListSetOp(ListSetOp &op) {
 }  // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"

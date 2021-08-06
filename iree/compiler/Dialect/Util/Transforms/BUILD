@@ -11,16 +11,14 @@ package(
 )
 
 cc_library(
-    name = "PreserveCompilerHints",
-    srcs = [
-        "PreserveCompilerHints.cpp",
-    ],
+    name = "Transforms",
+    srcs = ["DropCompilerHints.cpp"],
     hdrs = [
-        "PreserveCompilerHints.h",
+        "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:Pass",
     ],
 )

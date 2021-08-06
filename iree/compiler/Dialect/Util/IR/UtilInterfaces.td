@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_IREE_UTIL_INTERFACES
-#define IREE_DIALECT_IREE_UTIL_INTERFACES
+#ifndef IREE_DIALECT_UTIL_IR_UTIL_INTERFACES
+#define IREE_DIALECT_UTIL_IR_UTIL_INTERFACES
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
@@ -170,4 +170,4 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   }];
 }
 
-#endif  // IREE_DIALECT_IREE_UTIL_INTERFACES
+#endif  // IREE_DIALECT_UTIL_IR_UTIL_INTERFACES

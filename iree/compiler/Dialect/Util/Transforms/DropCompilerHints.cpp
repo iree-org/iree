@@ -6,8 +6,8 @@
 
 #include <utility>
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -18,7 +18,9 @@ namespace Util {
 class DropCompilerHintsPass
     : public PassWrapper<DropCompilerHintsPass, OperationPass<void>> {
  public:
-  StringRef getArgument() const override { return "iree-drop-compiler-hints"; }
+  StringRef getArgument() const override {
+    return "iree-util-drop-compiler-hints";
+  }
 
   StringRef getDescription() const override {
     return "Deletes operations that have no runtime equivalent and are only "

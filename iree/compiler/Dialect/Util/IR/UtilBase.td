@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_IREE_UTIL_BASE
-#define IREE_DIALECT_IREE_UTIL_BASE
+#ifndef IREE_DIALECT_UTIL_IR_UTIL_BASE
+#define IREE_DIALECT_UTIL_IR_UTIL_BASE
 
 include "mlir/IR/OpBase.td"
 
@@ -237,4 +237,4 @@ def YieldPoint : NativeOpTrait<"IREE::Util::YieldPoint">;
 // runtime if loaded for dynamic execution.
 def Unsafe : NativeOpTrait<"IREE::Util::Unsafe">;
 
-#endif  // IREE_DIALECT_IREE_UTIL_BASE
+#endif  // IREE_DIALECT_UTIL_IR_UTIL_BASE

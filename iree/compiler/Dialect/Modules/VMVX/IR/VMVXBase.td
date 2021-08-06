@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_MODULES_VMVX_BASE
 #define IREE_DIALECT_MODULES_VMVX_BASE
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE VMVX (Virtual Machine-based Linear Algebra) dialect

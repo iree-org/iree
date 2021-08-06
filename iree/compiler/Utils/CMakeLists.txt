@@ -32,7 +32,7 @@ iree_cc_library(
     MLIRTransforms
     iree::base::internal::flatcc
     iree::base::tracing
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 
