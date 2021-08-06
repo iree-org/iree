@@ -7,8 +7,8 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -2223,7 +2223,7 @@ class ConvertVMToEmitCPass
                          OperationPass<IREE::VM::ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::emitc::EmitCDialect, mlir::BuiltinDialect,
-                    mlir::StandardOpsDialect, IREEDialect>();
+                    mlir::StandardOpsDialect, IREE::Util::UtilDialect>();
   }
 
   StringRef getArgument() const override { return "iree-convert-vm-to-emitc"; }
@@ -2264,8 +2264,8 @@ class ConvertVMToEmitCPass
     target.addLegalDialect<mlir::emitc::EmitCDialect, mlir::BuiltinDialect,
                            mlir::StandardOpsDialect>();
 
-    target.addDynamicallyLegalOp<IREE::DoNotOptimizeOp>(
-        [&](IREE::DoNotOptimizeOp op) {
+    target.addDynamicallyLegalOp<IREE::Util::DoNotOptimizeOp>(
+        [&](IREE::Util::DoNotOptimizeOp op) {
           return typeConverter.isLegal(op.getResultTypes());
         });
 

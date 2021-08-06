@@ -13,17 +13,17 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace Util {
 
 namespace {
-class PreserveDoNotOptimize
-    : public OpConversionPattern<IREE::DoNotOptimizeOp> {
+class PreserveDoNotOptimize : public OpConversionPattern<DoNotOptimizeOp> {
  public:
-  using OpConversionPattern<IREE::DoNotOptimizeOp>::OpConversionPattern;
+  using OpConversionPattern<DoNotOptimizeOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::DoNotOptimizeOp op, llvm::ArrayRef<Value> operands,
+      DoNotOptimizeOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::DoNotOptimizeOp>(op, operands,
-                                                       op->getAttrs());
+    rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, operands, op->getAttrs());
     return success();
   }
 };
@@ -31,12 +31,11 @@ class PreserveDoNotOptimize
 
 void setupCompilerHintsLegality(MLIRContext *context, ConversionTarget &target,
                                 TypeConverter &typeConverter) {
-  target.addDynamicallyLegalOp<IREE::DoNotOptimizeOp>(
-      [&](IREE::DoNotOptimizeOp op) {
-        return llvm::all_of(op.getResultTypes(), [&typeConverter](Type t) {
-          return typeConverter.isLegal(t);
-        });
-      });
+  target.addDynamicallyLegalOp<DoNotOptimizeOp>([&](DoNotOptimizeOp op) {
+    return llvm::all_of(op.getResultTypes(), [&typeConverter](Type t) {
+      return typeConverter.isLegal(t);
+    });
+  });
 }
 
 void populatePreserveCompilerHintsPatterns(MLIRContext *context,
@@ -44,5 +43,7 @@ void populatePreserveCompilerHintsPatterns(MLIRContext *context,
   patterns.insert<PreserveDoNotOptimize>(context);
 }
 
+}  // namespace Util
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

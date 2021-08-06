@@ -10,8 +10,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -37,7 +37,7 @@ class InsertConstantClonesPass
     : public InsertConstantClonesBase<InsertConstantClonesPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, IREE::Flow::FlowDialect>();
+    registry.insert<IREE::Util::UtilDialect, IREE::Flow::FlowDialect>();
   }
 
   void runOnOperation() override {
@@ -60,7 +60,7 @@ class InsertConstantClonesPass
     auto op = value.getDefiningOp();
     if (!op) return false;
     if (op->hasTrait<OpTrait::ConstantLike>() ||
-        isa<IREE::UnfoldableConstantOp>(op)) {
+        isa<IREE::Util::UnfoldableConstantOp>(op)) {
       return true;
     } else if (auto loadOp = dyn_cast<IREE::Flow::VariableLoadOp>(op)) {
       return !loadOp.getLoadedVariable().is_mutable();

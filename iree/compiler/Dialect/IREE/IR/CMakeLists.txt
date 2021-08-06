@@ -14,18 +14,18 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    "IREEDialect.h"
     "IREEOpInterfaces.h.inc"
     "IREEOps.h"
     "IREEOps.h.inc"
     "IREETraits.h"
     "IREETypes.h"
+    "UtilDialect.h"
   SRCS
-    "IREEDialect.cpp"
     "IREEOpInterfaces.cpp.inc"
     "IREEOps.cpp"
     "IREEOps.cpp.inc"
     "IREETypes.cpp"
+    "UtilDialect.cpp"
   DEPS
     ::IREEInterfacesGen
     ::IREEOpsGen
@@ -60,11 +60,11 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    IREEDialectDocGen
+    IREEUtilDialectDocGen
   TD_FILE
     "IREEOps.td"
   OUTS
-    -gen-dialect-doc IREEDialect.md
+    -gen-dialect-doc IREEUtilDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

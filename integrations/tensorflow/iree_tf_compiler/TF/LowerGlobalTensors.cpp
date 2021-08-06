@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
@@ -96,7 +96,7 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
       auto variableAddressOp =
           builder.create<iree_compiler::IREE::Flow::VariableAddressOp>(
               globalTensor.getLoc(),
-              iree_compiler::IREE::PtrType::get(globalTensor.type()),
+              iree_compiler::IREE::Util::PtrType::get(globalTensor.type()),
               builder.getSymbolRefAttr(
                   symNameToFlowSymName[globalTensor.sym_name()]));
       typeConversionWorklist.push_back(variableAddressOp.getResult());
@@ -166,7 +166,7 @@ class LowerGlobalTensors
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::tf_saved_model::TensorFlowSavedModelDialect,
                     iree_compiler::IREE::Flow::FlowDialect,
-                    iree_compiler::IREEDialect>();
+                    iree_compiler::IREE::Util::UtilDialect>();
   }
 
   StringRef getArgument() const override {

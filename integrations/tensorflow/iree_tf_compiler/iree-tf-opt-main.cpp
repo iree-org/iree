@@ -12,7 +12,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   mlir::registerXLADialects(registry);
   registry.insert<mlir::iree_compiler::IREE::Flow::FlowDialect,
                   mlir::iree_compiler::IREE::HAL::HALDialect,
-                  mlir::iree_compiler::IREEDialect>();
+                  mlir::iree_compiler::IREE::Util::UtilDialect>();
 
   // Select IREE input passes.
   mlir::iree_compiler::registerCommonInputConversionPasses();

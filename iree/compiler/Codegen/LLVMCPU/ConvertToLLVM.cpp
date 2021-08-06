@@ -9,8 +9,8 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
@@ -654,9 +654,9 @@ void ConvertToLLVMPass::runOnOperation() {
   // rest of the IR.
   target.addLegalOp<ModuleOp, IREE::HAL::InterfaceOp,
                     IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
-  target.addIllegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
-                           IREE::HAL::HALDialect, math::MathDialect,
-                           tosa::TosaDialect>();
+  target.addIllegalDialect<ShapeDialect, StandardOpsDialect,
+                           IREE::Util::UtilDialect, IREE::HAL::HALDialect,
+                           math::MathDialect, tosa::TosaDialect>();
   target.addIllegalOp<UnrealizedConversionCastOp>();
 
   // Don't apply patterns to private function (e.g num_workgroups func).
@@ -664,15 +664,15 @@ void ConvertToLLVMPass::runOnOperation() {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
-  target
-      .addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect, IREEDialect,
-                                  IREE::HAL::HALDialect, math::MathDialect>(
-          [&](Operation *op) {
-            auto funcParent = op->getParentOfType<FuncOp>();
-            if (!funcParent) return false;
-            if (isEntryPoint(funcParent)) return false;
-            return true;
-          });
+  target.addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect,
+                                    IREE::Util::UtilDialect,
+                                    IREE::HAL::HALDialect, math::MathDialect>(
+      [&](Operation *op) {
+        auto funcParent = op->getParentOfType<FuncOp>();
+        if (!funcParent) return false;
+        if (isEntryPoint(funcParent)) return false;
+        return true;
+      });
 
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();

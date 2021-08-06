@@ -10,10 +10,12 @@
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
 //===----------------------------------------------------------------------===//
-// IREE::TiedOpInterface
+// IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
 def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
   let description = [{
     An operation that "ties" one or more results to its operands indicating
     that the result is directly related to the operand in an operation-defined
@@ -82,7 +84,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*args=*/(ins "unsigned":$resultIndex),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        return IREE::TiedOpInterface::findTiedBaseValue($_op.getResult(resultIndex));
+        return IREE::Util::TiedOpInterface::findTiedBaseValue($_op.getResult(resultIndex));
       }]
     >,
     InterfaceMethod<
@@ -114,7 +116,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*args=*/(ins "unsigned":$resultIndex),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        return IREE::detail::getTiedResultOperandIndex($_op, resultIndex);
+        return IREE::Util::detail::getTiedResultOperandIndex($_op, resultIndex);
       }]
     >,
     InterfaceMethod<
@@ -130,7 +132,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
                     "::llvm::Optional<unsigned>":$operandIndex),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        return IREE::detail::setTiedResultOperandIndex($_op, resultIndex, operandIndex);
+        return IREE::Util::detail::setTiedResultOperandIndex($_op, resultIndex, operandIndex);
       }]
     >,
     InterfaceMethod<
@@ -146,7 +148,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        return IREE::detail::getTiedResultOperandIndices($_op);
+        return IREE::Util::detail::getTiedResultOperandIndices($_op);
       }]
     >,
   ];
@@ -164,7 +166,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   }];
 
   let verify = [{
-    return IREE::detail::verifyTiedOp($_op);
+    return IREE::Util::detail::verifyTiedOp($_op);
   }];
 }
 

@@ -15,7 +15,7 @@ include "mlir/IR/OpBase.td"
 
 def Util_Dialect : Dialect {
   let name = "util";
-  let cppNamespace = "::mlir::iree_compiler::IREE";
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let summary = [{
     A dialect used for types common across IREE subdialects.
@@ -141,32 +141,32 @@ class Util_StructAttr<string thisKind, string name, Dialect dialect,
 
 def AnyPtr : DialectType<
     Util_Dialect,
-    CPred<"$_self.isa<IREE::PtrType>()">,
+    CPred<"$_self.isa<IREE::Util::PtrType>()">,
     "ptr"> {
   let description = [{
     Pointer to a typed value.
   }];
-  let builderCall = "$_builder.getType<IREE::PtrType>()";
+  let builderCall = "$_builder.getType<IREE::Util::PtrType>()";
 }
 
 class PtrOf<Type type> :
     Type<And<[
-      CPred<"$_self.isa<IREE::PtrType>()">,
-      SubstLeaves<"$_self", "$_self.cast<IREE::PtrType>().getTargetType()",
+      CPred<"$_self.isa<IREE::Util::PtrType>()">,
+      SubstLeaves<"$_self", "$_self.cast<IREE::Util::PtrType>().getTargetType()",
                   type.predicate>
     ]>, "ptr<" # type.summary # ">"> {
   // Set the builder call if the base type has a builder call.
   string builderCall = !if(!empty(type.builderCall),
-                           "", "PtrType::get(" # type.builderCall # ")");
+                           "", "IREE::Util::PtrType::get(" # type.builderCall # ")");
 }
 
 class AnyPtrOf<list<Type> types> :
     Type<And<[
-      CPred<"$_self.isa<IREE::PtrType>()">,
+      CPred<"$_self.isa<IREE::Util::PtrType>()">,
       Or<!foreach(type, types,
           SubstLeaves<
               "$_self",
-              "$_self.cast<IREE::PtrType>().getTargetType()",
+              "$_self.cast<IREE::Util::PtrType>().getTargetType()",
               type.predicate>)>,
     ]>, !interleave(!foreach(type, types, type.summary), " or ")> {
   string builderCall = "";
@@ -174,7 +174,7 @@ class AnyPtrOf<list<Type> types> :
 
 def ByteBufferType : DialectType<
     Util_Dialect,
-    CPred<"$_self.isa<IREE::ByteBufferType>()">,
+    CPred<"$_self.isa<IREE::Util::ByteBufferType>()">,
     "byte_buffer"> {
   let description = [{
     A constant buffer of mapped host memory.
@@ -184,7 +184,7 @@ def ByteBufferRefAttr : AliasedSymbolRefAttr;
 
 def MutableByteBufferType : DialectType<
     Util_Dialect,
-    CPred<"$_self.isa<IREE::MutableByteBufferType>()">,
+    CPred<"$_self.isa<IREE::Util::MutableByteBufferType>()">,
     "mutable_byte_buffer"> {
   let description = [{
     A buffer of read-write host memory.
@@ -197,7 +197,7 @@ def MutableByteBufferType : DialectType<
 
 def AnyList : DialectType<
     Util_Dialect,
-    CPred<"$_self.isa<IREE::ListType>()">,
+    CPred<"$_self.isa<IREE::Util::ListType>()">,
     "list"> {
   let description = [{
     A resizable list of some type.
@@ -206,14 +206,14 @@ def AnyList : DialectType<
 
 class ListOf<Type type> :
     Type<And<[
-      CPred<"$_self.isa<IREE::ListType>()">,
+      CPred<"$_self.isa<IREE::Util::ListType>()">,
       SubstLeaves<"$_self",
-                  "$_self.cast<IREE::ListType>().getElementType()",
+                  "$_self.cast<IREE::Util::ListType>().getElementType()",
                   type.predicate>
     ]>, "list<" # type.summary # ">"> {
   // Set the builder call if the base type has a builder call.
   string builderCall = !if(!empty(type.builderCall),
-                           "", "IREE::ListType::get(" # type.builderCall # ")");
+                           "", "IREE::Util::ListType::get(" # type.builderCall # ")");
 }
 
 //===----------------------------------------------------------------------===//
@@ -230,11 +230,11 @@ class ListOf<Type type> :
 // Need to add a new call type and function attr for 'async', then can validate
 // entire parts of the call tree are either async-compatible or async-hostile.
 // Only vm.call_async callees may contain an operation with YieldPoint.
-def YieldPoint : NativeOpTrait<"IREE::YieldPoint">;
+def YieldPoint : NativeOpTrait<"IREE::Util::YieldPoint">;
 
 // Denotes that an operation is potentially "unsafe" if used.
 // Untrusted modules containing ops marked as unsafe will fail to verify at
 // runtime if loaded for dynamic execution.
-def Unsafe : NativeOpTrait<"IREE::Unsafe">;
+def Unsafe : NativeOpTrait<"IREE::Util::Unsafe">;
 
 #endif  // IREE_DIALECT_IREE_UTIL_BASE

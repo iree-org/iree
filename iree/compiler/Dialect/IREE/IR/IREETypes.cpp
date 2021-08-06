@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -17,6 +17,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
+namespace Util {
 
 //===----------------------------------------------------------------------===//
 // ListType
@@ -47,8 +48,11 @@ bool ListType::isCompatible(Type type) { return true; }
 
 // static
 bool ListType::canImplicitlyCast(Type from, Type to) {
-  if (from.isa<IREE::VariantType>() || to.isa<IREE::VariantType>()) return true;
-  if (from.isa<TensorType>() && to.isa<TensorType>()) return true;
+  if (from.isa<VariantType>() || to.isa<VariantType>()) {
+    return true;
+  } else if (from.isa<TensorType>() && to.isa<TensorType>()) {
+    return true;
+  }
   return from == to;
 }
 
@@ -107,7 +111,7 @@ PtrType PtrType::getChecked(function_ref<InFlightDiagnostic()> emitError,
 Type PtrType::getTargetType() { return getImpl()->targetType; }
 
 //===----------------------------------------------------------------------===//
-// TiedOpInterface
+// IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
 llvm::Optional<unsigned> detail::getTiedResultOperandIndex(
@@ -241,16 +245,17 @@ void excludeTiedOperandAndResultIndices(
 // At the end so it can use functions above:
 #include "iree/compiler/Dialect/IREE/IR/IREEOpInterfaces.cpp.inc"
 
-}  // namespace IREE
-
 //===----------------------------------------------------------------------===//
-// IREEDialect
+// IREE::Util::UtilDialect
 //===----------------------------------------------------------------------===//
 
-void IREEDialect::registerTypes() {
-  addTypes<IREE::ByteBufferType, IREE::ListType, IREE::MutableByteBufferType,
-           IREE::PtrType, IREE::VariantType>();
+void UtilDialect::registerTypes() {
+  addTypes<IREE::Util::ByteBufferType, IREE::Util::ListType,
+           IREE::Util::MutableByteBufferType, IREE::Util::PtrType,
+           IREE::Util::VariantType>();
 }
 
+}  // namespace Util
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

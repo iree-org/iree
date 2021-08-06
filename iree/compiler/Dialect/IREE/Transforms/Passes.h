@@ -12,12 +12,14 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
+namespace Util {
 
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
 
 // Register all Passes
 inline void registerTransformPasses() { createDropCompilerHintsPass(); }
 
+}  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

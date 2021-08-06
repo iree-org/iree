@@ -74,7 +74,7 @@ LogicalResult updateHALToVMVXEntryFuncOp(FuncOp funcOp,
   auto i32Type = IntegerType::get(funcOp.getContext(), 32);
   auto memRefI8Type = MemRefType::get({-1}, i8Type);
   auto memRefI32Type = MemRefType::get({-1}, i32Type);
-  auto bindingsType = IREE::ListType::get(memRefI8Type);
+  auto bindingsType = IREE::Util::ListType::get(memRefI8Type);
   auto indexType = IndexType::get(funcOp.getContext());
   auto newType = FunctionType::get(funcOp.getContext(),
                                    {
@@ -216,7 +216,7 @@ class ConvertHALInterfaceBindingSubspanOp
     // Find the vmvx.interface argument to the function.
     auto bindingsArg =
         op->getParentOfType<mlir::FuncOp>().getArgument(kEntryArgBindings);
-    assert(bindingsArg && bindingsArg.getType().isa<IREE::ListType>() &&
+    assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
            "entry point not conforming to requirements");
 
     // Lookup the source interface binding.
@@ -229,8 +229,8 @@ class ConvertHALInterfaceBindingSubspanOp
     }
 
     auto bindingType =
-        bindingsArg.getType().cast<IREE::ListType>().getElementType();
-    auto getOp = rewriter.create<IREE::ListGetOp>(
+        bindingsArg.getType().cast<IREE::Util::ListType>().getElementType();
+    auto getOp = rewriter.create<IREE::Util::ListGetOp>(
         op.getLoc(), bindingType, bindingsArg,
         rewriter.createOrFold<ConstantIndexOp>(
             op.getLoc(), interfaceBindingOp.binding().getZExtValue()));

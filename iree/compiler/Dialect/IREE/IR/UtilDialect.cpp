@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
@@ -19,6 +19,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace Util {
 
 // Used to control inlining behavior.
 struct IREEInlinerInterface : public DialectInlinerInterface {
@@ -43,8 +45,8 @@ struct IREEInlinerInterface : public DialectInlinerInterface {
   }
 };
 
-IREEDialect::IREEDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context, TypeID::get<IREEDialect>()) {
+UtilDialect::UtilDialect(MLIRContext *context)
+    : Dialect(getDialectNamespace(), context, TypeID::get<UtilDialect>()) {
   addInterfaces<IREEInlinerInterface>();
   registerTypes();
 #define GET_OP_LIST
@@ -53,11 +55,11 @@ IREEDialect::IREEDialect(MLIRContext *context)
       >();
 }
 
-Type IREEDialect::parseType(DialectAsmParser &parser) const {
+Type UtilDialect::parseType(DialectAsmParser &parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
   if (spec == "variant") {
-    return IREE::VariantType::get(getContext());
+    return IREE::Util::VariantType::get(getContext());
   } else if (spec.consume_front("ptr")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
@@ -71,11 +73,11 @@ Type IREEDialect::parseType(DialectAsmParser &parser) const {
           << parser.getFullSymbolSpec() << "'";
       return Type();
     }
-    return IREE::PtrType::getChecked(variableType, loc);
+    return IREE::Util::PtrType::getChecked(variableType, loc);
   } else if (spec == "byte_buffer") {
-    return IREE::ByteBufferType::get(getContext());
+    return IREE::Util::ByteBufferType::get(getContext());
   } else if (spec == "mutable_byte_buffer") {
-    return IREE::MutableByteBufferType::get(getContext());
+    return IREE::Util::MutableByteBufferType::get(getContext());
   } else if (spec.consume_front("list")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
@@ -84,7 +86,7 @@ Type IREEDialect::parseType(DialectAsmParser &parser) const {
     }
     Type elementType;
     if (spec == "?") {
-      elementType = IREE::VariantType::get(getContext());
+      elementType = IREE::Util::VariantType::get(getContext());
     } else {
       elementType = mlir::parseType(spec, getContext());
     }
@@ -94,24 +96,24 @@ Type IREEDialect::parseType(DialectAsmParser &parser) const {
           << parser.getFullSymbolSpec() << "'";
       return Type();
     }
-    return IREE::ListType::getChecked(elementType, loc);
+    return IREE::Util::ListType::getChecked(elementType, loc);
   }
   emitError(loc, "unknown IREE type: ") << spec;
   return Type();
 }
 
-void IREEDialect::printType(Type type, DialectAsmPrinter &os) const {
-  if (type.isa<IREE::VariantType>()) {
+void UtilDialect::printType(Type type, DialectAsmPrinter &os) const {
+  if (type.isa<IREE::Util::VariantType>()) {
     os << "variant";
-  } else if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
+  } else if (auto ptrType = type.dyn_cast<IREE::Util::PtrType>()) {
     os << "ptr<" << ptrType.getTargetType() << ">";
-  } else if (type.isa<IREE::ByteBufferType>()) {
+  } else if (type.isa<IREE::Util::ByteBufferType>()) {
     os << "byte_buffer";
-  } else if (type.isa<IREE::MutableByteBufferType>()) {
+  } else if (type.isa<IREE::Util::MutableByteBufferType>()) {
     os << "mutable_byte_buffer";
-  } else if (auto listType = type.dyn_cast<IREE::ListType>()) {
+  } else if (auto listType = type.dyn_cast<IREE::Util::ListType>()) {
     os << "list<";
-    if (listType.getElementType().isa<IREE::VariantType>()) {
+    if (listType.getElementType().isa<IREE::Util::VariantType>()) {
       os << "?";
     } else {
       os << listType.getElementType();
@@ -122,5 +124,7 @@ void IREEDialect::printType(Type type, DialectAsmPrinter &os) const {
   }
 }
 
+}  // namespace Util
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

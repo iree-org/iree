@@ -19,12 +19,13 @@ namespace iree_compiler {
 namespace {
 
 class DynamicShapeConstantOpConversion
-    : public OpConversionPattern<IREE::DynamicShapeConstantOp> {
+    : public OpConversionPattern<IREE::Util::DynamicShapeConstantOp> {
  public:
-  using OpConversionPattern<IREE::DynamicShapeConstantOp>::OpConversionPattern;
+  using OpConversionPattern<
+      IREE::Util::DynamicShapeConstantOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::DynamicShapeConstantOp constantOp,
+      IREE::Util::DynamicShapeConstantOp constantOp,
       llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     assert(newOperands.empty() && "dynamic_shape_constant takes no operands");
@@ -63,7 +64,7 @@ class DynamicShapeConstantOpConversion
     auto view = rewriter.createOrFold<IREE::HAL::BufferViewCreateOp>(
         constantOp.getLoc(), buffer, elementType.getValue(), shape);
 
-    rewriter.replaceOpWithNewOp<IREE::DoNotOptimizeOp>(constantOp, view);
+    rewriter.replaceOpWithNewOp<IREE::Util::DoNotOptimizeOp>(constantOp, view);
     return success();
   }
 };
@@ -102,26 +103,30 @@ class GenericConvertTypesConversion : public OpConversionPattern<T> {
 void populateIREEToHALPatterns(MLIRContext *context, ConversionTarget &target,
                                TypeConverter &typeConverter,
                                OwningRewritePatternList &patterns) {
-  target.addIllegalOp<IREE::DynamicShapeConstantOp>();
+  target.addIllegalOp<IREE::Util::DynamicShapeConstantOp>();
   patterns.insert<DynamicShapeConstantOpConversion>(context);
 
-  typeConverter.addConversion([&](IREE::ListType type) {
+  typeConverter.addConversion([&](IREE::Util::ListType type) {
     auto elementType = typeConverter.convertType(type.getElementType());
-    return IREE::ListType::get(elementType);
+    return IREE::Util::ListType::get(elementType);
   });
 
-  target.addDynamicallyLegalOp<IREE::ListCreateOp>([&](IREE::ListCreateOp op) {
-    return typeConverter.isLegal(op.getType());
-  });
-  target.addDynamicallyLegalOp<IREE::ListGetOp>(
-      [&](IREE::ListGetOp op) { return typeConverter.isLegal(op.getType()); });
-  target.addDynamicallyLegalOp<IREE::ListSetOp>([&](IREE::ListSetOp op) {
-    return typeConverter.isLegal(op.value().getType());
-  });
-  patterns.insert<GenericConvertTypesConversion<IREE::ListCreateOp>,
-                  GenericConvertTypesConversion<IREE::ListGetOp>,
-                  GenericConvertTypesConversion<IREE::ListSetOp>>(typeConverter,
-                                                                  context);
+  target.addDynamicallyLegalOp<IREE::Util::ListCreateOp>(
+      [&](IREE::Util::ListCreateOp op) {
+        return typeConverter.isLegal(op.getType());
+      });
+  target.addDynamicallyLegalOp<IREE::Util::ListGetOp>(
+      [&](IREE::Util::ListGetOp op) {
+        return typeConverter.isLegal(op.getType());
+      });
+  target.addDynamicallyLegalOp<IREE::Util::ListSetOp>(
+      [&](IREE::Util::ListSetOp op) {
+        return typeConverter.isLegal(op.value().getType());
+      });
+  patterns.insert<GenericConvertTypesConversion<IREE::Util::ListCreateOp>,
+                  GenericConvertTypesConversion<IREE::Util::ListGetOp>,
+                  GenericConvertTypesConversion<IREE::Util::ListSetOp>>(
+      typeConverter, context);
 }
 
 }  // namespace iree_compiler

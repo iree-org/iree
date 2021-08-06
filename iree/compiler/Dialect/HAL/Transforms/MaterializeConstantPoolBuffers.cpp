@@ -10,7 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -29,7 +29,7 @@ class MaterializeConstantPoolBuffersPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::StandardOpsDialect>();
-    registry.insert<IREEDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
     registry.insert<IREE::HAL::HALDialect>();
   }
 
@@ -138,7 +138,7 @@ class MaterializeConstantPoolBuffersPass
     // TODO(benvanik): allocate based on usage tracking.
     auto sourceValue =
         funcBuilder.createOrFold<IREE::HAL::ConstantStorageLookupOp>(
-            storageOp.getLoc(), IREE::ByteBufferType::get(context),
+            storageOp.getLoc(), IREE::Util::ByteBufferType::get(context),
             funcBuilder.getSymbolRefAttr(
                 storageOp->getParentOfType<ConstantPoolOp>().getName(),
                 {funcBuilder.getSymbolRefAttr(storageOp)}));

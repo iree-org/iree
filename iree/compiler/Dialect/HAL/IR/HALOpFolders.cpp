@@ -320,8 +320,8 @@ struct ExpandAllocatorConstantOp
         IREE::HAL::BufferUsageBitfield::Constant;
     Type bufferType = IREE::HAL::BufferType::get(rewriter.getContext());
 
-    auto hostBuffer = rewriter.createOrFold<IREE::ByteBufferConstantOp>(
-        op.getLoc(), IREE::ByteBufferType::get(rewriter.getContext()),
+    auto hostBuffer = rewriter.createOrFold<IREE::Util::ByteBufferConstantOp>(
+        op.getLoc(), IREE::Util::ByteBufferType::get(rewriter.getContext()),
         op.value());
     auto zero = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 0);
     auto neg1 = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), -1);

@@ -13,6 +13,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace Util {
 
 // Adds op legality rules to |conversionTarget| to preserve compiler hints
 // that satisfy the type constraints of |typeConverter|.
@@ -25,6 +27,8 @@ void setupCompilerHintsLegality(MLIRContext *context,
 void populatePreserveCompilerHintsPatterns(MLIRContext *context,
                                            OwningRewritePatternList &patterns);
 
+}  // namespace Util
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 

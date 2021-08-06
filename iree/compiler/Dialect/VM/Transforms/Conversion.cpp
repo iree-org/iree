@@ -8,7 +8,7 @@
 #include <tuple>
 
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -82,8 +82,9 @@ class ConversionPass
       : targetOptions_(targetOptions) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, IREE::VM::VMDialect, StandardOpsDialect,
-                    math::MathDialect, AffineDialect, memref::MemRefDialect>();
+    registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
+                    StandardOpsDialect, math::MathDialect, AffineDialect,
+                    memref::MemRefDialect>();
   }
 
   StringRef getArgument() const override { return "iree-vm-conversion"; }
@@ -148,8 +149,10 @@ class ConversionPass
           importSymbols, conversionPatterns, typeConverter);
     }
     Shape::populateFoldConversionPatterns(context, conversionPatterns);
-    populatePreserveCompilerHintsPatterns(context, conversionPatterns);
-    setupCompilerHintsLegality(context, conversionTarget, typeConverter);
+    IREE::Util::populatePreserveCompilerHintsPatterns(context,
+                                                      conversionPatterns);
+    IREE::Util::setupCompilerHintsLegality(context, conversionTarget,
+                                           typeConverter);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
                                       std::move(conversionPatterns)))) {

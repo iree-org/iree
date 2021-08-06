@@ -7,8 +7,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -28,7 +28,7 @@ class ExportBenchmarkFuncsPass
     : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
  public:
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<IREEDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
@@ -111,7 +111,7 @@ class ExportBenchmarkFuncsPass
     // Sink all results with do_not_optimize to ensure that DCE does not
     // remove the call.
     for (auto result : callOp.getResults()) {
-      blockBuilder.create<IREE::DoNotOptimizeOp>(loc, result);
+      blockBuilder.create<IREE::Util::DoNotOptimizeOp>(loc, result);
     }
     blockBuilder.create<mlir::ReturnOp>(loc);
 

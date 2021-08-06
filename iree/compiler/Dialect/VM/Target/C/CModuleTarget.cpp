@@ -309,7 +309,7 @@ static LogicalResult canonicalizeModule(
   OwningRewritePatternList patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
-  target.addLegalOp<IREE::DoNotOptimizeOp>();
+  target.addLegalOp<IREE::Util::DoNotOptimizeOp>();
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();

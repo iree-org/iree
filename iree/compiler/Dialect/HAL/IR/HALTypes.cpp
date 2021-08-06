@@ -374,7 +374,7 @@ static Value lookupValueSize(Value value) {
   }
 
   // Skip do-not-optimize ops.
-  if (auto dnoOp = dyn_cast<IREE::DoNotOptimizeOp>(definingOp)) {
+  if (auto dnoOp = dyn_cast<IREE::Util::DoNotOptimizeOp>(definingOp)) {
     return lookupValueSize(dnoOp.getOperand(0));
   }
 

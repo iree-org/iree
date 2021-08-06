@@ -35,19 +35,19 @@ td_library(
 cc_library(
     name = "IR",
     srcs = [
-        "IREEDialect.cpp",
         "IREEOpInterfaces.cpp.inc",
         "IREEOps.cpp",
         "IREEOps.cpp.inc",
         "IREETypes.cpp",
+        "UtilDialect.cpp",
     ],
     hdrs = [
-        "IREEDialect.h",
         "IREEOpInterfaces.h.inc",
         "IREEOps.h",
         "IREEOps.h.inc",
         "IREETraits.h",
         "IREETypes.h",
+        "UtilDialect.h",
     ],
     deps = [
         ":IREEInterfacesGen",
@@ -96,11 +96,11 @@ gentbl_cc_library(
 )
 
 iree_tablegen_doc(
-    name = "IREEDialectDocGen",
+    name = "IREEUtilDialectDocGen",
     tbl_outs = [
         (
             ["-gen-dialect-doc"],
-            "IREEDialect.md",
+            "IREEUtilDialect.md",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",

@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
@@ -31,7 +31,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   registry.insert<IREE::Flow::FlowDialect,
                   IREE::HAL::HALDialect,
                   ShapeDialect,
-                  IREEDialect,
+                  IREE::Util::UtilDialect,
                   linalg_ext::LinalgExtDialect,
                   IREE::VM::VMDialect,
                   IREE::VMVX::VMVXDialect,

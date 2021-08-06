@@ -12,6 +12,7 @@
 namespace mlir {
 namespace OpTrait {
 namespace IREE {
+namespace Util {
 
 template <typename ConcreteType>
 class YieldPoint : public OpTrait::TraitBase<ConcreteType, YieldPoint> {
@@ -31,6 +32,7 @@ class Unsafe : public OpTrait::TraitBase<ConcreteType, Unsafe> {
   }
 };
 
+}  // namespace Util
 }  // namespace IREE
 }  // namespace OpTrait
 }  // namespace mlir

@@ -245,7 +245,7 @@ class MaterializeResourceCachesPass
         IREE::HAL::MatchAlwaysAttr::get(loc.getContext()));
     auto defaultBuilder = OpBuilder::atBlockBegin(&defaultRegion->front());
     auto nullValue =
-        defaultBuilder.createOrFold<IREE::NullOp>(loc, executableType);
+        defaultBuilder.createOrFold<IREE::Util::NullOp>(loc, executableType);
     defaultBuilder.create<IREE::HAL::ReturnOp>(loc, nullValue);
 
     auto switchOp = switchBuilder.build();

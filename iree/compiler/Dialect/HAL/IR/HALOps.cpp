@@ -295,7 +295,7 @@ Value TensorCastOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
 }
 
 Value TensorCastOp::getTiedResult(unsigned resultIndex) {
-  return IREE::TiedOpInterface::findTiedBaseValue(source());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
 }
 
 ::llvm::Optional<unsigned> TensorCastOp::getTiedResultOperandIndex(
@@ -514,7 +514,7 @@ static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
 
 static LogicalResult verifyVariableLoadIndirectOp(VariableLoadIndirectOp &op) {
   auto variableType =
-      op.variable().getType().cast<IREE::PtrType>().getTargetType();
+      op.variable().getType().cast<IREE::Util::PtrType>().getTargetType();
   auto loadType = op.result().getType();
   if (!isVariableTypeCompatible(variableType, loadType)) {
     return op.emitOpError() << "variable type mismatch; variable pointer is "
@@ -553,7 +553,7 @@ static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
 static LogicalResult verifyVariableStoreIndirectOp(
     VariableStoreIndirectOp &op) {
   auto variableType =
-      op.variable().getType().cast<IREE::PtrType>().getTargetType();
+      op.variable().getType().cast<IREE::Util::PtrType>().getTargetType();
   auto storeType = op.value().getType();
   if (!isVariableTypeCompatible(variableType, storeType)) {
     return op.emitOpError() << "variable type mismatch; variable pointer is "

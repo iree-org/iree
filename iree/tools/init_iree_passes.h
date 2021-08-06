@@ -45,10 +45,10 @@ inline void registerAllIreePasses() {
   registerTOSAConversionPasses();
 
   linalg_ext::registerLinalgExtPasses();
+  Shape::registerShapePasses();
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
-  IREE::registerTransformPasses();
-  Shape::registerShapePasses();
+  IREE::Util::registerTransformPasses();
   IREE::VM::registerVMPasses();
   IREE::VM::registerVMAnalysisTestPasses();
   IREE::VM::registerVMTestPasses();

@@ -12,10 +12,12 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace Util {
 
-class IREEDialect : public Dialect {
+class UtilDialect : public Dialect {
  public:
-  explicit IREEDialect(MLIRContext* context);
+  explicit UtilDialect(MLIRContext* context);
   static StringRef getDialectNamespace() { return "util"; }
 
   /// Parses a type registered to this dialect.
@@ -29,6 +31,8 @@ class IREEDialect : public Dialect {
   void registerTypes();
 };
 
+}  // namespace Util
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -77,12 +77,12 @@ HALTypeConverter::HALTypeConverter(
 
   // Recursively handle pointer target types (we want to convert
   // ptr<tensor<...>> to ptr<!hal.buffer<...>>, for example).
-  addConversion([this](IREE::PtrType type) -> Type {
+  addConversion([this](IREE::Util::PtrType type) -> Type {
     auto targetType = convertType(type.getTargetType());
     if (!targetType) {
       return Type();
     }
-    return IREE::PtrType::get(targetType);
+    return IREE::Util::PtrType::get(targetType);
   });
 }
 

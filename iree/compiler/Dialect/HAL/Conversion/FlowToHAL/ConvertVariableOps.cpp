@@ -225,8 +225,10 @@ class VariableStoreIndirectOpConversion
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::VariableStoreIndirectOp::Adaptor operands(newOperands);
 
-    Type variableType =
-        operands.variable().getType().cast<IREE::PtrType>().getTargetType();
+    Type variableType = operands.variable()
+                            .getType()
+                            .cast<IREE::Util::PtrType>()
+                            .getTargetType();
     Value storeValue = implicitCastVariableStore(
         storeOp.getLoc(), operands.value(), variableType, rewriter);
     if (!storeValue) {

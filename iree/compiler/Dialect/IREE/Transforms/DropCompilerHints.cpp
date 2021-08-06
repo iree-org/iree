@@ -13,6 +13,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
+namespace Util {
 
 class DropCompilerHintsPass
     : public PassWrapper<DropCompilerHintsPass, OperationPass<void>> {
@@ -41,6 +42,7 @@ std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass() {
 
 static PassRegistration<DropCompilerHintsPass> pass;
 
+}  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

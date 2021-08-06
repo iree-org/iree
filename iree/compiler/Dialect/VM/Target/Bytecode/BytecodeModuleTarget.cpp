@@ -318,7 +318,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   OwningRewritePatternList patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
-  target.addLegalOp<IREE::DoNotOptimizeOp>();
+  target.addLegalOp<IREE::Util::DoNotOptimizeOp>();
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
@@ -356,7 +356,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
     modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
-  modulePasses.addPass(createDropCompilerHintsPass());
+  modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the

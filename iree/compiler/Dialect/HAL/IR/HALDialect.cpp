@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
@@ -107,7 +107,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<HALDialect>()) {
-  context->loadDialect<IREEDialect>();
+  context->loadDialect<IREE::Util::UtilDialect>();
 
   registerAttributes();
   registerTypes();

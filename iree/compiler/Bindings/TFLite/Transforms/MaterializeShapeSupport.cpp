@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -40,7 +40,7 @@ class MaterializeShapeSupportPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<iree_compiler::IREE::Flow::FlowDialect>();
-    registry.insert<iree_compiler::IREEDialect>();
+    registry.insert<iree_compiler::IREE::Util::UtilDialect>();
     registry.insert<iree_compiler::ShapeDialect>();
     registry.insert<StandardOpsDialect>();
   }
@@ -210,8 +210,9 @@ class MaterializeShapeSupportPass
          llvm::zip(entryBlock.getArguments(), inputVarOps)) {
       auto inputValue = std::get<0>(inputValueVar);
       auto inputVarOp = std::get<1>(inputValueVar);
-      auto inputPlaceholder = recalculateBuilder.createOrFold<IREE::NullOp>(
-          loc, inputValue.getType());
+      auto inputPlaceholder =
+          recalculateBuilder.createOrFold<IREE::Util::NullOp>(
+              loc, inputValue.getType());
       auto inputShapeValue =
           recalculateBuilder.createOrFold<IREE::Flow::VariableLoadOp>(
               loc, inputVarOp.type(), inputVarOp.getName());
@@ -300,13 +301,13 @@ class MaterializeShapeSupportPass
   // Packs a shape into a list.
   void packShape(Location loc, Shape::RankedShapeType shapeType,
                  Value shapeValue, Value listValue, OpBuilder &builder) {
-    builder.create<IREE::ListResizeOp>(
+    builder.create<IREE::Util::ListResizeOp>(
         loc, listValue,
         builder.createOrFold<ConstantIndexOp>(loc, shapeType.getRank()));
     for (int i = 0; i < shapeType.getRank(); ++i) {
       auto dimValue =
           builder.createOrFold<Shape::RankedDimOp>(loc, shapeValue, i);
-      builder.create<IREE::ListSetOp>(
+      builder.create<IREE::Util::ListSetOp>(
           loc, listValue, builder.createOrFold<ConstantIndexOp>(loc, i),
           dimValue);
     }
@@ -318,7 +319,7 @@ class MaterializeShapeSupportPass
     SmallVector<Value, 4> dynamicDims;
     for (int i = 0; i < shapeType.getRank(); ++i) {
       if (!shapeType.isDimDynamic(i)) continue;
-      dynamicDims.push_back(builder.createOrFold<IREE::ListGetOp>(
+      dynamicDims.push_back(builder.createOrFold<IREE::Util::ListGetOp>(
           loc, builder.getIndexType(), listValue,
           builder.createOrFold<ConstantIndexOp>(loc, i)));
     }
@@ -337,7 +338,7 @@ class MaterializeShapeSupportPass
         moduleBuilder.getFunctionType(/*inputs=*/
                                       TypeRange{
                                           moduleBuilder.getIndexType(),
-                                          IREE::ListType::get(
+                                          IREE::Util::ListType::get(
                                               moduleBuilder.getIndexType()),
                                       },
                                       /*outputs=*/TypeRange{}));
@@ -374,7 +375,7 @@ class MaterializeShapeSupportPass
         moduleBuilder.getFunctionType(/*inputs=*/
                                       TypeRange{
                                           moduleBuilder.getIndexType(),
-                                          IREE::ListType::get(
+                                          IREE::Util::ListType::get(
                                               moduleBuilder.getIndexType()),
                                       },
                                       /*outputs=*/TypeRange{}));
@@ -414,7 +415,7 @@ class MaterializeShapeSupportPass
         moduleBuilder.getFunctionType(/*inputs=*/
                                       TypeRange{
                                           moduleBuilder.getIndexType(),
-                                          IREE::ListType::get(
+                                          IREE::Util::ListType::get(
                                               moduleBuilder.getIndexType()),
                                       },
                                       /*outputs=*/TypeRange{}));

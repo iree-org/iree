@@ -17,6 +17,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
+namespace Util {
 
 class TiedOpInterface;
 
@@ -134,11 +135,11 @@ void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedResultIndices,
     SmallVector<int64_t, 4> &tiedOperandIndices);
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOpInterfaces.h.inc"  // IWYU pragma: export
-
+}  // namespace Util
 }  // namespace IREE
-
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#include "iree/compiler/Dialect/IREE/IR/IREEOpInterfaces.h.inc"  // IWYU pragma: export
 
 #endif  // IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_

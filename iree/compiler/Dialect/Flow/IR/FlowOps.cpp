@@ -146,7 +146,7 @@ static ParseResult parseShapedOperandList(
 // Returns TiedOpInterface::kUntiedIndex if no operand is found.
 static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
                                ArrayRef<OpAsmParser::OperandType> operands) {
-  int64_t operandIndex = TiedOpInterface::kUntiedIndex;
+  int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
     if (operands[i].name == tiedResult.name) {
       operandIndex = i;
@@ -167,10 +167,10 @@ static ParseResult parseShapedResultList(
     OpAsmParser::OperandType tiedResult;
     auto res = parser.parseOptionalOperand(tiedResult);
     Type type;
-    int64_t tiedOperandIndex = TiedOpInterface::kUntiedIndex;
+    int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
     if (res.hasValue() && succeeded(res.getValue())) {
       tiedOperandIndex = findTiedOperand(tiedResult, operands);
-      if (tiedOperandIndex == TiedOpInterface::kUntiedIndex) {
+      if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
         return parser.emitError(tiedResult.location,
                                 "tied operand not found for result reference ")
                << tiedResult.name;
@@ -265,7 +265,7 @@ static void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
   });
   p << ") -> ";
   if (resultTypes.size() != 1) p << "(";
-  auto tiedOp = cast<TiedOpInterface>(op);
+  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
   for (unsigned i = 0; i < resultTypes.size(); ++i) {
     auto resultType = resultTypes[i];
     auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
@@ -499,7 +499,7 @@ VariableOp VariableLoadOp::getLoadedVariable() {
 
 static LogicalResult verifyVariableLoadIndirectOp(VariableLoadIndirectOp &op) {
   auto variableType =
-      op.variable().getType().cast<IREE::PtrType>().getTargetType();
+      op.variable().getType().cast<IREE::Util::PtrType>().getTargetType();
   auto loadType = op.result().getType();
   if (!isVariableTypeCompatible(variableType, loadType)) {
     return op.emitOpError() << "variable type mismatch; variable pointer is "
@@ -538,7 +538,7 @@ static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
 static LogicalResult verifyVariableStoreIndirectOp(
     VariableStoreIndirectOp &op) {
   auto variableType =
-      op.variable().getType().cast<IREE::PtrType>().getTargetType();
+      op.variable().getType().cast<IREE::Util::PtrType>().getTargetType();
   auto storeType = op.value().getType();
   if (!isVariableTypeCompatible(variableType, storeType)) {
     return op.emitOpError() << "variable type mismatch; variable pointer is "
@@ -655,8 +655,8 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operandDims);
   state.addOperands(resultDims);
   state.addAttributes(attributes);
-  state.attributes.erase(TiedOpInterface::getStorageAttrName());
-  state.addAttribute(TiedOpInterface::getStorageAttrName(),
+  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
                      builder.getIndexArrayAttr(tiedOperands));
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
@@ -679,7 +679,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   for (unsigned resultIndex = 0; resultIndex < tiedOperands.size();
        ++resultIndex) {
     int64_t tiedOperandIndex = tiedOperands[resultIndex];
-    if (tiedOperandIndex != TiedOpInterface::kUntiedIndex) {
+    if (tiedOperandIndex != IREE::Util::TiedOpInterface::kUntiedIndex) {
       operandAliases[tiedOperandIndex] = true;
       resultAliases[resultIndex] = true;
     }
@@ -854,14 +854,14 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   // operands.
   unsigned tiedOperandOffset = getTiedOperandsIndexAndLength().first;
   for (unsigned i = 0; i < newTiedOperandIndices.size(); ++i) {
-    if (newTiedOperandIndices[i] != TiedOpInterface::kUntiedIndex) {
+    if (newTiedOperandIndices[i] != IREE::Util::TiedOpInterface::kUntiedIndex) {
       newTiedOperandIndices[i] -= tiedOperandOffset;
     }
   }
 
   // This need to happen *after* accounting for tied operand offset, given that
   // all excluded operand/result indices are relative ranges.
-  excludeTiedOperandAndResultIndices(
+  IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
   auto newOp = rewriter.create<DispatchWorkgroupsOp>(
@@ -1082,8 +1082,9 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operandDims);
   state.addOperands(resultDims);
   state.addAttributes(attributes);
-  state.attributes.erase(TiedOpInterface::getStorageAttrName());
-  state.addAttribute(TiedOpInterface::getStorageAttrName(), tiedOperands);
+  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                     tiedOperands);
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
                      builder.getI32VectorAttr({
@@ -1143,7 +1144,7 @@ Value TensorReshapeOp::buildResultRankedShape(unsigned idx,
 }
 
 Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
-  return IREE::TiedOpInterface::findTiedBaseValue(source());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
 }
 
 ::llvm::Optional<unsigned> TensorReshapeOp::getTiedResultOperandIndex(
@@ -1247,7 +1248,7 @@ Value TensorUpdateOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
 }
 
 Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
-  return IREE::TiedOpInterface::findTiedBaseValue(target());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
 }
 
 ::llvm::Optional<unsigned> TensorUpdateOp::getTiedResultOperandIndex(
@@ -1273,8 +1274,8 @@ void ExStreamFragmentOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operandDims);
   state.addOperands(resultDims);
   state.addAttributes(attributes);
-  state.attributes.erase(TiedOpInterface::getStorageAttrName());
-  state.addAttribute(TiedOpInterface::getStorageAttrName(),
+  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
                      builder.getIndexArrayAttr(tiedOperands));
   state.attributes.erase("operand_segment_sizes");
   state.addAttribute("operand_segment_sizes",
@@ -1415,7 +1416,7 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
 
   auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
-  excludeTiedOperandAndResultIndices(
+  IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
   assert(getTiedOperandsIndexAndLength().first == 0 &&
          "operands must be the first ODS group");

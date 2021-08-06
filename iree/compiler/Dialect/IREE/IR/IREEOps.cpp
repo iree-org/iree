@@ -25,6 +25,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
+namespace Util {
 
 //===----------------------------------------------------------------------===//
 // util.do_not_optimize
@@ -112,7 +113,7 @@ ParseResult parseUnfoldableConstantOp(OpAsmParser &parser,
 }
 
 void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
-  auto constOp = cast<IREE::UnfoldableConstantOp>(op);
+  auto constOp = cast<IREE::Util::UnfoldableConstantOp>(op);
   p << "util.unfoldable_constant ";
   p.printOptionalAttrDict(constOp->getAttrs(), /*elidedAttrs=*/{"value"});
 
@@ -127,7 +128,7 @@ namespace {
 
 struct ExpandUnfoldableConstantOp
     : public OpRewritePattern<UnfoldableConstantOp> {
-  using OpRewritePattern<IREE::UnfoldableConstantOp>::OpRewritePattern;
+  using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
     auto stdConst = rewriter.create<ConstantOp>(op.getLoc(), op.value());
@@ -219,7 +220,7 @@ static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
 }
 
 static LogicalResult verifyListGetOp(ListGetOp &op) {
-  auto listType = op.list().getType().cast<IREE::ListType>();
+  auto listType = op.list().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
   auto resultType = op.result().getType();
   if (!ListType::canImplicitlyCast(elementType, resultType)) {
@@ -230,7 +231,7 @@ static LogicalResult verifyListGetOp(ListGetOp &op) {
 }
 
 static LogicalResult verifyListSetOp(ListSetOp &op) {
-  auto listType = op.list().getType().cast<IREE::ListType>();
+  auto listType = op.list().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
   auto valueType = op.value().getType();
   if (!ListType::canImplicitlyCast(valueType, elementType)) {
@@ -240,6 +241,7 @@ static LogicalResult verifyListSetOp(ListSetOp &op) {
   return success();
 }
 
+}  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

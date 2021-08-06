@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Modules/VMVX/Conversion/HALToVMVX/ConvertHALToVMVX.h"
 #include "iree/compiler/Dialect/Modules/VMVX/Conversion/StandardToVMVX/ConvertStandardToVMVX.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
@@ -34,8 +34,9 @@ class ConversionPass
     : public PassWrapper<ConversionPass, OperationPass<mlir::ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, IREE::HAL::HALDialect, IREE::VM::VMDialect,
-                    IREE::VMVX::VMVXDialect, memref::MemRefDialect>();
+    registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
+                    IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
+                    memref::MemRefDialect>();
   }
 
   StringRef getArgument() const override { return "iree-vmvx-conversion"; }
@@ -64,7 +65,7 @@ class ConversionPass
     ConversionTarget conversionTarget(*context);
     conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
     conversionTarget.addIllegalDialect<tensor::TensorDialect>();
-    conversionTarget.addLegalDialect<IREEDialect>();
+    conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
     conversionTarget.addLegalDialect<IREE::VMVX::VMVXDialect>();
     conversionTarget.addLegalDialect<mlir::StandardOpsDialect>();
     conversionTarget.addLegalDialect<mlir::AffineDialect>();

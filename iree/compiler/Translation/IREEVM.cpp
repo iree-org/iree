@@ -182,7 +182,7 @@ static void buildIREEVMTransformPassPipeline(
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
-  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
+  passManager.addPass(IREE::Util::createDropCompilerHintsPass());
 }
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
