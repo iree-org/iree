@@ -5,7 +5,7 @@
 module @t001_cmp_eq_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -22,7 +22,7 @@ module {
 module @t002_cmp_ne_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -39,7 +39,7 @@ module {
 module @t003_cmp_slt_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -56,7 +56,7 @@ module {
 module @t004_cmp_sle_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -73,7 +73,7 @@ module {
 module @t005_cmp_sgt_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -90,7 +90,7 @@ module {
 module @t006_cmp_sge_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -107,7 +107,7 @@ module {
 module @t007_cmp_ult_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -124,7 +124,7 @@ module {
 module @t008_cmp_ule_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -141,7 +141,7 @@ module {
 module @t009_cmp_ugt_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
@@ -158,7 +158,7 @@ module {
 module @t010_cmp_uge_i32 {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {

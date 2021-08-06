@@ -17,7 +17,7 @@ vm.module @module_attributed attributes {a} {
 
 // CHECK-LABEL: @module_structure
 vm.module @module_structure {
-  // CHECK-NEXT: vm.global.i32 @g0 : i32
+  // CHECK-NEXT: vm.global.i32 public @g0 : i32
   vm.global.i32 @g0 : i32
   // CHECK-NEXT: vm.export @fn
   vm.export @fn

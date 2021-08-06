@@ -1,19 +1,22 @@
 // RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
-// CHECK: vm.global.i32 @v_initialized_const = 4 : i32
+// CHECK: vm.global.i32 public @v_initialized_const = 4 : i32
 hal.variable @v_initialized_const = 4 : i32
+
+// CHECK: vm.global.i32 private @v_private_const = 5 : i32
+hal.variable @v_private_const attributes {sym_visibility = "private"} = 5 : i32
 
 // -----
 
-// CHECK: vm.global.ref @v_initialized initializer(@initializer) : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref public @v_initialized initializer(@initializer) : !vm.ref<!hal.buffer>
 hal.variable @v_initialized init(@initializer) : !hal.buffer
 func private @initializer() -> !hal.buffer
 
 // -----
 
-// CHECK: vm.global.ref @v_loaded : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref public @v_loaded : !vm.ref<!hal.buffer>
 hal.variable @v_loaded : !hal.buffer
-// CHECK-LABEL: func @loaded
+// CHECK-LABEL: vm.func private @loaded
 func @loaded() {
   // CHECK: %v_loaded = vm.global.load.ref @v_loaded : !vm.ref<!hal.buffer>
   %0 = hal.variable.load @v_loaded : !hal.buffer
@@ -22,9 +25,9 @@ func @loaded() {
 
 // -----
 
-// CHECK: vm.global.ref mutable @v_stored : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref public mutable @v_stored : !vm.ref<!hal.buffer>
 hal.variable @v_stored mutable : !hal.buffer
-// CHECK-LABEL: func @stored
+// CHECK-LABEL: vm.func private @stored
 func @stored(%arg0 : !hal.buffer) {
   // CHECK: vm.global.store.ref %arg0, @v_stored : !vm.ref<!hal.buffer>
   hal.variable.store %arg0, @v_stored : !hal.buffer

@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
-// CHECK-LABEL: func @check_success
+// CHECK-LABEL: vm.func private @check_success
 func @check_success() {
     // CHECK: %[[CODE:.+]] =
     %statusCode = constant 1 : i32
@@ -11,7 +11,7 @@ func @check_success() {
 
 // -----
 
-// CHECK-LABEL: func @check_success_with_message
+// CHECK-LABEL: vm.func private @check_success_with_message
 func @check_success_with_message() {
     // CHECK: %[[CODE:.+]] =
     %statusCode = constant 1 : i32

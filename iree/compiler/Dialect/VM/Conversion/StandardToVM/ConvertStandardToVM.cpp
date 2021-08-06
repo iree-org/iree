@@ -124,6 +124,9 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
       rewriter.create<IREE::VM::ExportOp>(srcOp.getLoc(), newFuncOp,
                                           exportName);
     }
+    // VM functions are private by default and exported via the dedicated
+    // vm.export ops.
+    newFuncOp.setPrivate();
 
     rewriter.replaceOp(srcOp, llvm::None);
     return success();
