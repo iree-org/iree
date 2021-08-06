@@ -68,7 +68,7 @@ class CMakeBuildPy(_build_py):
       shutil.rmtree(cmake_install_dir)
     cmake_cache_file = os.path.join(cmake_build_dir, "CMakeCache.txt")
     if os.path.exists(cmake_cache_file):
-     os.remove(cmake_cache_file)
+      os.remove(cmake_cache_file)
     subprocess.check_call(["cmake", src_dir] + cmake_args, cwd=cmake_build_dir)
     subprocess.check_call(["cmake", "--build", ".", "--target", "install"] +
                           build_args,
