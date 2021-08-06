@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_IREE_OPS
-#define IREE_DIALECT_IREE_OPS
+#ifndef IREE_DIALECT_IREE_UTIL_OPS
+#define IREE_DIALECT_IREE_UTIL_OPS
 
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -14,20 +14,20 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 // Op types
 //===----------------------------------------------------------------------===//
 
-class IREE_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<IREE_Dialect, mnemonic, traits> {
+class Util_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<Util_Dialect, mnemonic, traits> {
   let parser = [{ return parse$cppClass(parser, result); }];
   let printer = [{ print$cppClass(p, *this); }];
 }
 
-class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
-    IREE_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+class Util_PureOp<string mnemonic, list<OpTrait> traits = []> :
+    Util_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
 // Byte buffers and host data
 //===----------------------------------------------------------------------===//
 
-def IREE_NullOp : IREE_PureOp<"null"> {
+def Util_NullOp : Util_PureOp<"null"> {
   let summary = "a null type value";
   let description = [{
     Defines an SSA value that is lowered into dialects supporting
@@ -43,7 +43,7 @@ def IREE_NullOp : IREE_PureOp<"null"> {
   }];
 }
 
-def IREE_ByteBufferConstantOp : IREE_PureOp<"byte_buffer.constant"> {
+def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
   let summary = "constant host-side byte buffer";
   let description = [{
     Defines a compile-time byte buffer based on the given attribute value.
@@ -67,7 +67,7 @@ def IREE_ByteBufferConstantOp : IREE_PureOp<"byte_buffer.constant"> {
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
-def IREE_DoNotOptimizeOp : IREE_Op<"do_not_optimize"> {
+def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize"> {
   let summary = "Prevents compiler optimizations of a value.";
   let description = [{
     Wraps any operands in an unoptimizable identity. This operation is declared
@@ -87,7 +87,7 @@ def IREE_DoNotOptimizeOp : IREE_Op<"do_not_optimize"> {
 // TODO(gcmn): It shouldn't be necessary to have both of these ops. Unify the
 // approach here.
 
-def IREE_DynamicShapeConstantOp : IREE_Op<"dynamic_shape_constant"> {
+def Util_DynamicShapeConstantOp : Util_Op<"dynamic_shape_constant"> {
   let summary = "A tensor constant that can have dynamic dimensions";
   let description = [{
     Allows specifying a constant where the return value can erase shape
@@ -105,7 +105,7 @@ def IREE_DynamicShapeConstantOp : IREE_Op<"dynamic_shape_constant"> {
   let assemblyFormat = "$value attr-dict `->` type($result)";
 }
 
-def IREE_UnfoldableConstantOp : IREE_Op<"unfoldable_constant"> {
+def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
   let summary = "A constant that cannot be folded by the compiler.";
   let description = [{
     Similar to a std.constant, but is declared as having a side effect and has
@@ -123,7 +123,7 @@ def IREE_UnfoldableConstantOp : IREE_Op<"unfoldable_constant"> {
   let hasCanonicalizer = 1;
 }
 
-def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
+def Util_UnreachableOp : Util_Op<"unreachable", [NoSideEffect, Terminator]> {
   let summary = [{unreachable assertion op}];
   let description = [{
     Signals to the compiler that the parent block should not be reachable.
@@ -156,7 +156,7 @@ def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
 // new SSA values. This would make optimizing the list usage much easier and
 // enable hoisting/CSE of list access/mutation.
 
-def IREE_ListCreateOp : IREE_PureOp<
+def Util_ListCreateOp : Util_PureOp<
     "list.create", [MemoryEffects<[MemAlloc]>]> {
   let summary = [{creates a new empty list}];
   let description = [{
@@ -173,7 +173,7 @@ def IREE_ListCreateOp : IREE_PureOp<
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` type($result)";
 }
 
-def IREE_ListSizeOp : IREE_Op<"list.size", [MemoryEffects<[MemRead]>]> {
+def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   let summary = [{the size of the list in elements}];
   let description = [{
     Returns the current size of the list in elements.
@@ -189,7 +189,7 @@ def IREE_ListSizeOp : IREE_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   let assemblyFormat = "operands attr-dict `:` type($list)";
 }
 
-def IREE_ListResizeOp : IREE_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
+def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   let summary = [{resizes the list to a new count in elements}];
   let description = [{
     Resizes the list to contain `new_size` elements. This will either truncate
@@ -205,7 +205,7 @@ def IREE_ListResizeOp : IREE_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   let assemblyFormat = "operands attr-dict `:` type($list)";
 }
 
-def IREE_ListGetOp : IREE_Op<"list.get", [MemoryEffects<[MemRead]>]> {
+def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   let summary = [{element accessor}];
   let description = [{
     Returns the value of the element at the given index. Note that the value
@@ -225,7 +225,7 @@ def IREE_ListGetOp : IREE_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-def IREE_ListSetOp : IREE_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
+def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let summary = [{element mutator}];
   let description = [{
     Sets the element at the given index to the new value.
@@ -242,4 +242,4 @@ def IREE_ListSetOp : IREE_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-#endif  // IREE_DIALECT_IREE_OPS
+#endif  // IREE_DIALECT_IREE_UTIL_OPS

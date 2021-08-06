@@ -174,7 +174,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     AttrSizedOperandSegments,
     SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
     DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
-    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
       "getTiedOperandsIndexAndLength",
     ]>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
@@ -220,7 +220,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     Variadic<AnyType>:$operands,
     FLOW_ShapeDynamicDims:$operand_dims,
     FLOW_ShapeDynamicDims:$result_dims,
-    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -658,7 +658,7 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
 def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     AttrSizedOperandSegments,
     FLOW_StreamableOp,
-    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
       "getTiedOperandsIndexAndLength",
     ]>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
@@ -676,7 +676,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     Variadic<AnyType>:$operands,
     FLOW_ShapeDynamicDims:$operand_dims,
     FLOW_ShapeDynamicDims:$result_dims,
-    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results
@@ -732,7 +732,7 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     FLOW_StreamableOp,
     AllElementTypesMatch<["source", "result"]>,
     AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
         "getTiedResult",
         "getTiedResultOperandIndex",
         "getTiedResultOperandIndices",
@@ -991,7 +991,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     AllTypesMatch<["target", "result"]>,
     AllElementTypesMatch<["update", "target", "result"]>,
     AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
         "getTiedResult",
         "getTiedResultOperandIndex",
         "getTiedResultOperandIndices",
@@ -1010,7 +1010,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     Variadic<FLOW_Dim>:$start_indices,
     FLOW_Tensor:$update,
     FLOW_ShapeDynamicDims:$update_dims,
-    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     FLOW_Tensor:$result
@@ -1067,7 +1067,7 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
     IsolatedFromAbove,
     AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
-    DeclareOpInterfaceMethods<IREE_TiedOpInterface>,
+    DeclareOpInterfaceMethods<Util_TiedOpInterface>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   ]> {
   let summary = [{experimental op for defining formed stream regions}];
@@ -1081,7 +1081,7 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
     Variadic<AnyType>:$operands,
     FLOW_ShapeDynamicDims:$operand_dims,
     FLOW_ShapeDynamicDims:$result_dims,
-    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
   );
   let results = (outs
     Variadic<AnyType>:$results

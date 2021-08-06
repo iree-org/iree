@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_IREE_BASE
-#define IREE_DIALECT_IREE_BASE
+#ifndef IREE_DIALECT_IREE_UTIL_BASE
+#define IREE_DIALECT_IREE_UTIL_BASE
 
 include "mlir/IR/OpBase.td"
 
@@ -13,8 +13,7 @@ include "mlir/IR/OpBase.td"
 // IREE base dialect used for types common across IREE subdialects.
 //===----------------------------------------------------------------------===//
 
-// TODO(b/143787186): rename when old dialects are removed.
-def IREE_Dialect : Dialect {
+def Util_Dialect : Dialect {
   let name = "util";
   let cppNamespace = "::mlir::iree_compiler::IREE";
 
@@ -27,13 +26,13 @@ def IREE_Dialect : Dialect {
 // General types and helpers
 //===----------------------------------------------------------------------===//
 
-def IREE_Bool :
+def Util_Bool :
     AnyTypeOf<[I1, I8], "boolean-storing type (1 or 8 -bit integer)">;
-def IREE_Element : AnyTypeOf<[AnySignlessInteger, AnyFloat]>;
-def IREE_MemRef : MemRefOf<[IREE_Element]>;
-def IREE_Tensor : TensorOf<[IREE_Element]>;
+def Util_Element : AnyTypeOf<[AnySignlessInteger, AnyFloat]>;
+def Util_MemRef : MemRefOf<[Util_Element]>;
+def Util_Tensor : TensorOf<[Util_Element]>;
 
-class IREE_IndexAttrBase<string descr> :
+class Util_IndexAttrBase<string descr> :
     TypedAttrBase<
       Index, "IntegerAttr",
       And<[
@@ -43,10 +42,10 @@ class IREE_IndexAttrBase<string descr> :
       descr> {
   let returnType = [{ APInt }];
 }
-def IREE_IndexAttr : IREE_IndexAttrBase<"size_t">;
+def Util_IndexAttr : Util_IndexAttrBase<"size_t">;
 
-def IREE_TiedOpStorageAttr :
-    TypedArrayAttrBase<IREE_IndexAttr, "64-bit integer array attribute"> {
+def Util_TiedOpStorageAttr :
+    TypedArrayAttrBase<Util_IndexAttr, "64-bit integer array attribute"> {
   let constBuilderCall = "$_builder.getI64ArrayAttr($0)";
 }
 
@@ -54,7 +53,7 @@ def IREE_TiedOpStorageAttr :
 // Status codes
 //===----------------------------------------------------------------------===//
 
-def IREE_Status : I<32>;
+def Util_Status : I<32>;
 
 //===----------------------------------------------------------------------===//
 // Attribute constraints
@@ -110,20 +109,20 @@ class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
 }
 
 //===----------------------------------------------------------------------===//
-// IREE_StructAttr
+// Util_StructAttr
 //===----------------------------------------------------------------------===//
 // This has a custom tablegen generator in StructAttrGen.cpp to create the
 // attribute and storage types. It differs from the core MLIR StructAttr
 // by more closely matching what handwritten C++ would have (better typing
 // and ergonomics and custom parser/printer).
 
-class IREE_StructFieldAttr<string thisName, Attr thisType> {
+class Util_StructFieldAttr<string thisName, Attr thisType> {
   string name = thisName;
   Attr type = thisType;
 }
 
-class IREE_StructAttr<string thisKind, string name, Dialect dialect,
-                      list<IREE_StructFieldAttr> attributes>
+class Util_StructAttr<string thisKind, string name, Dialect dialect,
+                      list<Util_StructFieldAttr> attributes>
     : Attr<CPred<"$_self.isa<" # name # ">()">,
                  "structured attribute of " # name> {
   string kind = thisKind;
@@ -133,7 +132,7 @@ class IREE_StructAttr<string thisKind, string name, Dialect dialect,
   let returnType = name;
   let convertFromStorage = "$_self";
   Dialect structDialect = dialect;
-  list<IREE_StructFieldAttr> fields = attributes;
+  list<Util_StructFieldAttr> fields = attributes;
 }
 
 //===----------------------------------------------------------------------===//
@@ -141,7 +140,7 @@ class IREE_StructAttr<string thisKind, string name, Dialect dialect,
 //===----------------------------------------------------------------------===//
 
 def AnyPtr : DialectType<
-    IREE_Dialect,
+    Util_Dialect,
     CPred<"$_self.isa<IREE::PtrType>()">,
     "ptr"> {
   let description = [{
@@ -174,7 +173,7 @@ class AnyPtrOf<list<Type> types> :
 }
 
 def ByteBufferType : DialectType<
-    IREE_Dialect,
+    Util_Dialect,
     CPred<"$_self.isa<IREE::ByteBufferType>()">,
     "byte_buffer"> {
   let description = [{
@@ -184,7 +183,7 @@ def ByteBufferType : DialectType<
 def ByteBufferRefAttr : AliasedSymbolRefAttr;
 
 def MutableByteBufferType : DialectType<
-    IREE_Dialect,
+    Util_Dialect,
     CPred<"$_self.isa<IREE::MutableByteBufferType>()">,
     "mutable_byte_buffer"> {
   let description = [{
@@ -197,7 +196,7 @@ def MutableByteBufferType : DialectType<
 //===----------------------------------------------------------------------===//
 
 def AnyList : DialectType<
-    IREE_Dialect,
+    Util_Dialect,
     CPred<"$_self.isa<IREE::ListType>()">,
     "list"> {
   let description = [{
@@ -238,4 +237,4 @@ def YieldPoint : NativeOpTrait<"IREE::YieldPoint">;
 // runtime if loaded for dynamic execution.
 def Unsafe : NativeOpTrait<"IREE::Unsafe">;
 
-#endif  // IREE_DIALECT_IREE_BASE
+#endif  // IREE_DIALECT_IREE_UTIL_BASE

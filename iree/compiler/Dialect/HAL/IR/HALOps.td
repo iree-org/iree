@@ -60,7 +60,7 @@ def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
 
 def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
     AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
         "getTiedResult",
         "getTiedResultOperandIndex",
         "getTiedResultOperandIndices",
@@ -291,7 +291,7 @@ def HAL_CheckSuccessOp : HAL_Op<"check_success"> {
   }];
 
   let arguments = (ins
-    IREE_Status:$status,
+    Util_Status:$status,
     OptionalAttr<StrAttr>:$message
   );
 
@@ -2559,7 +2559,7 @@ def HAL_SemaphoreQueryOp : HAL_Op<"semaphore.query"> {
     HAL_Semaphore:$semaphore
   );
   let results = (outs
-    IREE_Status:$status,
+    Util_Status:$status,
     HAL_TimelineValue:$value
   );
 
@@ -2599,7 +2599,7 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
 
   let arguments = (ins
     HAL_Semaphore:$semaphore,
-    IREE_Status:$status
+    Util_Status:$status
   );
 
   let assemblyFormat = [{
@@ -2624,7 +2624,7 @@ def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [YieldPoint]> {
     HAL_TimelineValue:$min_value
   );
   let results = (outs
-    IREE_Status:$status
+    Util_Status:$status
   );
 
   let assemblyFormat = [{

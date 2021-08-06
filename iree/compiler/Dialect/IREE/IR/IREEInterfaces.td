@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_IREE_INTERFACES
-#define IREE_DIALECT_IREE_INTERFACES
+#ifndef IREE_DIALECT_IREE_UTIL_INTERFACES
+#define IREE_DIALECT_IREE_UTIL_INTERFACES
 
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
@@ -13,7 +13,7 @@ include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 // IREE::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
-def IREE_TiedOpInterface : OpInterface<"TiedOpInterface"> {
+def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   let description = [{
     An operation that "ties" one or more results to its operands indicating
     that the result is directly related to the operand in an operation-defined
@@ -40,7 +40,7 @@ def IREE_TiedOpInterface : OpInterface<"TiedOpInterface"> {
 
     The default implementations use an attribute on the op to store the
     relationship:
-      `OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands`
+      `OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands`
 
     Note that `$tied_operands` are indices inside the operand range returned
     by `getTiedOperandsIndexAndLength`, which may *not* be the full operand
@@ -168,4 +168,4 @@ def IREE_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   }];
 }
 
-#endif  // IREE_DIALECT_IREE_INTERFACES
+#endif  // IREE_DIALECT_IREE_UTIL_INTERFACES

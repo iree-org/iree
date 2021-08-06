@@ -31,8 +31,8 @@ using llvm::StringRef;
 class StructFieldAttr {
  public:
   explicit StructFieldAttr(const llvm::Record *record) : def(record) {
-    assert(def->isSubClassOf("IREE_StructFieldAttr") &&
-           "must be subclass of TableGen 'IREE_StructFieldAttr' class");
+    assert(def->isSubClassOf("Util_StructFieldAttr") &&
+           "must be subclass of TableGen 'Util_StructFieldAttr' class");
   }
   explicit StructFieldAttr(const llvm::Record &record)
       : StructFieldAttr(&record) {}
@@ -52,8 +52,8 @@ class StructFieldAttr {
 class StructAttr : public Attribute {
  public:
   explicit StructAttr(const llvm::Record *record) : Attribute(record) {
-    assert(isSubClassOf("IREE_StructAttr") &&
-           "must be subclass of TableGen 'IREE_StructAttr' class");
+    assert(isSubClassOf("Util_StructAttr") &&
+           "must be subclass of TableGen 'Util_StructAttr' class");
   }
   explicit StructAttr(const llvm::Record &record) : StructAttr(&record) {}
   explicit StructAttr(const llvm::DefInit *init) : StructAttr(init->getDef()) {}
@@ -194,7 +194,7 @@ class DialectAsmPrinter;
 
 static bool emitStructDecls(const RecordKeeper &recordKeeper, raw_ostream &os) {
   llvm::emitSourceFileHeader("Struct Attr Declarations", os);
-  auto defs = recordKeeper.getAllDerivedDefinitions("IREE_StructAttr");
+  auto defs = recordKeeper.getAllDerivedDefinitions("Util_StructAttr");
   for (const auto *def : defs) {
     emitStructDecl(*def, os);
   }
@@ -456,7 +456,7 @@ static void emitStructDef(const Record &structDef, raw_ostream &os) {
 
 static bool emitStructDefs(const RecordKeeper &recordKeeper, raw_ostream &os) {
   llvm::emitSourceFileHeader("Struct Attr Definitions", os);
-  auto defs = recordKeeper.getAllDerivedDefinitions("IREE_StructAttr");
+  auto defs = recordKeeper.getAllDerivedDefinitions("Util_StructAttr");
   for (const auto *def : defs) {
     emitStructDef(*def, os);
   }
