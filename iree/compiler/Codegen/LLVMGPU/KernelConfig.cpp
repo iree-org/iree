@@ -137,8 +137,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-      workgroupSize);
+      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
 }
 
 static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
