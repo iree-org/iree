@@ -127,11 +127,8 @@ static void populateTilingToInvocationPatterns(
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
-  // TODO(thomasraoux): Improve barrier placement.
-  b.create<gpu::BarrierOp>(src.getLoc());
   auto copyOp = b.create<linalg::CopyOp>(src.getLoc(), src, dst);
   setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
-  b.create<gpu::BarrierOp>(src.getLoc());
   return success();
 }
 
@@ -235,6 +232,23 @@ struct LLVMGPUTileAndDistributePass
       OwningRewritePatternList promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
+      // Insert barriers before and after copies to workgroup memory and skip
+      // insert barriers between back to back copy to workgroup memory.
+      OpBuilder builder(&getContext());
+      funcOp.walk([&builder](linalg::CopyOp copyOp) {
+        if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
+          Operation *prevOp = copyOp->getPrevNode();
+          if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
+            builder.setInsertionPoint(copyOp);
+            builder.create<gpu::BarrierOp>(copyOp.getLoc());
+          }
+          Operation *nextOp = copyOp->getNextNode();
+          if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
+            builder.setInsertionPointAfter(copyOp);
+            builder.create<gpu::BarrierOp>(copyOp.getLoc());
+          }
+        }
+      });
     }
 
     {
