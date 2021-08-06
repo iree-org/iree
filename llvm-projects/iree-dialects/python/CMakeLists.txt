@@ -1,5 +1,4 @@
 include(AddMLIRPython)
-include(MLIRDetectPythonEnv)
 
 ################################################################################
 # Sources
@@ -31,6 +30,8 @@ declare_mlir_python_extension(IREEDialectsPythonExtensions.Main
     ${CMAKE_CURRENT_SOURCE_DIR}/IREEDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS
     IREEDialectsCAPI
+  PRIVATE_LINK_LIBS
+    LLVMSupport
 )
 
 ################################################################################

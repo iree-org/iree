@@ -7,7 +7,10 @@
 #ifndef IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_PUBLIC_IREE_PUBLIC_DIALECT_H
 #define IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_PUBLIC_IREE_PUBLIC_DIALECT_H
 
-#include "iree-dialects/Dialects/iree_public/IREEPublicOpsDialect.h.inc"
 #include "mlir/IR/Dialect.h"
+
+// Include generated dialect code (this comment blocks clang-format from
+// clobbering order).
+#include "iree-dialects/Dialects/iree_public/IREEPublicOpsDialect.h.inc"
 
 #endif  // IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_PUBLIC_IREE_PUBLIC_DIALECT_H
