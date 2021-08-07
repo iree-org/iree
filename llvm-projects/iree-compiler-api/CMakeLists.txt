@@ -100,10 +100,18 @@ add_system_include_hack(${LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR}/include)
 add_system_include_hack(${LLVM_MAIN_BINARY_DIR}/tools/iree-dialects/include)
 add_system_include_hack(${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR}/include)
 add_system_include_hack(${LLVM_MAIN_BINARY_DIR}/tools/mlir-hlo/include)
+add_system_include_hack(${IREE_COMPILER_API_SOURCE_DIR}/include)
+
+function(iree_compiler_target_includes target)
+  target_include_directories(${target} PUBLIC
+    $<BUILD_INTERFACE:${IREE_COMPILER_API_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${IREE_COMPILER_API_BINARY_DIR}/include>
+  )
+endfunction()
 
 # Common CMake module paths.
 list(APPEND CMAKE_MODULE_PATH ${MLIR_MAIN_SRC_DIR}/cmake/modules)
-list(APPEND CMAKE_MODULE_PATH ${LLVM_MAIN_SRC_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${LLVM_MAIN_SRC_DIR}/cmake/modules)
 
 # Configure Python3 deps so that everyone downstream of here latches to the same
 # thing.
@@ -122,4 +130,8 @@ message(STATUS "Configuring IREE from (${IREE_MAIN_SOURCE_DIR} into ${IREE_MAIN_
 add_subdirectory("${IREE_MAIN_SOURCE_DIR}" "${IREE_MAIN_BINARY_DIR}" EXCLUDE_FROM_ALL)
 
 # Sub-directories.
+# Since building outside of the LLVM build system, setup options for local
+# sources.
+include(HandleLLVMOptions)
+add_subdirectory(lib)
 add_subdirectory(python)
