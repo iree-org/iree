@@ -132,6 +132,12 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
       break;
     }
   }
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    // Tile reduction dimension to 1. Using a large tile size may allow better
+    // scheduling and could help in case one of the input has transpose.
+    // TODO(thomasraoux): improve the heuristic.
+    workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 1);
+  }
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   tileSizes.push_back({});                                // Subgroup level.
   tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level

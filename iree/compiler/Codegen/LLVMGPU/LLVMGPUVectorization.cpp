@@ -25,30 +25,11 @@ namespace iree_compiler {
 //====---------------------------------------------------------------------===//
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  // We currently don't support vectorization of generic ops with reduction.
-  // TODO(thomasraoux): Add lowering for vector.multireduce ops.
-  auto filterReduction = [](Operation *op) {
-    if (auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op)) {
-      auto linalgOp = cast<linalg::LinalgOp>(op);
-      // TODO(thomasraoux): Disable vectorization if the output indexing map has
-      // permutation to workaround a bug in MLIR core. This will be removed once
-      // the fix is integrated.
-      bool vectorizeContract =
-          linalg::isaContractionOpInterface(linalgOp) &&
-          compressUnusedDims(
-              linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0)))
-              .isIdentity();
-      if (!vectorizeContract && genericOp.getNumReductionLoops() > 0)
-        return failure();
-    }
-    return success();
-  };
   linalg::insertVectorizationPatterns<linalg::FillOp, linalg::CopyOp,
                                       linalg::GenericOp,
                                       linalg::ContractionOpInterface>(
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
-          filterReduction,
           Identifier::get(getVectorizeMarker(), patterns.getContext())));
 }
 
@@ -111,7 +92,6 @@ struct LLVMGPUVectorizationPass
       populateVectorUnrollPatterns(vectorUnrollPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(vectorUnrollPatterns));
-      linalg::hoistRedundantVectorTransfers(funcOp);
     }
     {
       // Step 2. Lower transfer op to canonical form.
@@ -144,6 +124,8 @@ struct LLVMGPUVectorizationPass
           contractLoweringPatterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
+      vector::populateVectorMultiReductionLoweringPatterns(
+          contractLoweringPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(contractLoweringPatterns));
     }
