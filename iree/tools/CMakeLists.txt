@@ -178,7 +178,7 @@ if(${IREE_BUILD_COMPILER})
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/IREE/Tools/StructAttrGen.cpp"
+      "${IREE_SOURCE_DIR}/iree/compiler/Dialect/Util/Tools/StructAttrGen.cpp"
       "${IREE_SOURCE_DIR}/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
       "${IREE_SOURCE_DIR}/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
@@ -203,14 +203,14 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect
       iree::compiler::Dialect::HAL::Transforms
-      iree::compiler::Dialect::IREE::IR
-      iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::LinalgExt::IR
       iree::compiler::Dialect::LinalgExt::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms
       iree::compiler::Dialect::Shape::IR
       iree::compiler::Dialect::Shape::Transforms
+      iree::compiler::Dialect::Util::IR
+      iree::compiler::Dialect::Util::Transforms
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Transforms
@@ -462,12 +462,10 @@ if(${IREE_BUILD_COMPILER})
   # does not support (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
   add_executable(iree::tools::IreeFileCheck ALIAS iree_tools_IreeFileCheck)
 
-  if(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
-    add_custom_target(BundledLLVMFileCheck ALL
-      COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
-      DEPENDS FileCheck
-    )
-  endif()
+  add_custom_target(BundledLLVMFileCheck ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
+    DEPENDS FileCheck
+  )
 
   # lld install - required by the compiler to link codegen executables.
   install(

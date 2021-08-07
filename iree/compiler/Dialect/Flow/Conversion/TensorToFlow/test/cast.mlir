@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow-tensor-ops-pass %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-tensor-ops-pass %s | IreeFileCheck %s
 
 func @static_tensor_cast_to_dynamic(%arg0: tensor<4x4xf32>) -> tensor<?x?xf32> {
   // CHECK-DAG: %[[C4:.*]] = constant 4 : index

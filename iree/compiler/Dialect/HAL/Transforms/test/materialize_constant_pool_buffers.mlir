@@ -11,9 +11,9 @@ hal.constant_pool @dense_variable_init attributes {buffer_constraints = #hal.buf
 
 //      CHECK: hal.variable @dense_variable_init_storage_buffer init(@dense_variable_init_storage_buffer_initializer) : !hal.buffer
 // CHECK-NEXT: func private @dense_variable_init_storage_buffer_initializer() -> !hal.buffer
-//      CHECK: %[[STORAGE:.+]] = hal.constant_storage.lookup @dense_variable_init::@_storage : !iree.byte_buffer
+//      CHECK: %[[STORAGE:.+]] = hal.constant_storage.lookup @dense_variable_init::@_storage : !util.byte_buffer
 //      CHECK: = hal.allocator.map<%allocator : !hal.allocator>
-// CHECK-SAME:   source(%[[STORAGE]] : !iree.byte_buffer)[%c0, %c768]
+// CHECK-SAME:   source(%[[STORAGE]] : !util.byte_buffer)[%c0, %c768]
 // CHECK-SAME:   : !hal.buffer
 
 // -----
@@ -56,9 +56,9 @@ hal.constant_pool @pool attributes {buffer_constraints = #hal.buffer_constraints
 
 //      CHECK: hal.variable @pool_storage0_buffer init(@pool_storage0_buffer_initializer) : !hal.buffer
 // CHECK-NEXT: func private @pool_storage0_buffer_initializer() -> !hal.buffer
-//      CHECK: %[[STORAGE:.+]] = hal.constant_storage.lookup @pool::@_storage0 : !iree.byte_buffer
+//      CHECK: %[[STORAGE:.+]] = hal.constant_storage.lookup @pool::@_storage0 : !util.byte_buffer
 //      CHECK: = hal.allocator.map<%allocator : !hal.allocator>
-// CHECK-SAME:   source(%[[STORAGE]] : !iree.byte_buffer)[%c0, %c16]
+// CHECK-SAME:   source(%[[STORAGE]] : !util.byte_buffer)[%c0, %c16]
 // CHECK-SAME:   : !hal.buffer
 
 //      CHECK: hal.variable @pool_storage1_buffer init(@pool_storage1_buffer_initializer) : !hal.buffer

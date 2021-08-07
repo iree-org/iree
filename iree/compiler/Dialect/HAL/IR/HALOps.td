@@ -9,7 +9,7 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
-include "iree/compiler/Dialect/IREE/IR/IREEInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
@@ -60,7 +60,7 @@ def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
 
 def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
     AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<IREE_TiedOpInterface, [
+    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
         "getTiedResult",
         "getTiedResultOperandIndex",
         "getTiedResultOperandIndices",
@@ -291,7 +291,7 @@ def HAL_CheckSuccessOp : HAL_Op<"check_success"> {
   }];
 
   let arguments = (ins
-    IREE_Status:$status,
+    Util_Status:$status,
     OptionalAttr<StrAttr>:$message
   );
 
@@ -2272,6 +2272,10 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
     // Returns true if the all bindings in the interface match exactly those
     // in |other| (including order).
     bool isEquivalentTo(IREE::HAL::InterfaceOp other);
+
+    // Returns a hash for the interface, considering the push constant and
+    // all bindings.
+    llvm::hash_code getInterfaceHash();
   }];
 }
 
@@ -2311,6 +2315,12 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
     HAL_DescriptorTypeAttr:$type,
     HAL_MemoryAccessBitfieldAttr:$access
   );
+
+  let extraClassDeclaration = [{
+    /// Returns a hash for the descriptor, considering the set, binding,
+    /// type, and access.
+    llvm::hash_code getDescriptorHash();
+  }];
 }
 
 def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
@@ -2549,7 +2559,7 @@ def HAL_SemaphoreQueryOp : HAL_Op<"semaphore.query"> {
     HAL_Semaphore:$semaphore
   );
   let results = (outs
-    IREE_Status:$status,
+    Util_Status:$status,
     HAL_TimelineValue:$value
   );
 
@@ -2589,7 +2599,7 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
 
   let arguments = (ins
     HAL_Semaphore:$semaphore,
-    IREE_Status:$status
+    Util_Status:$status
   );
 
   let assemblyFormat = [{
@@ -2614,7 +2624,7 @@ def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [YieldPoint]> {
     HAL_TimelineValue:$min_value
   );
   let results = (outs
-    IREE_Status:$status
+    Util_Status:$status
   );
 
   let assemblyFormat = [{

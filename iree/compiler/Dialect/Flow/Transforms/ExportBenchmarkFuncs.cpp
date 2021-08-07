@@ -7,8 +7,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -28,7 +28,7 @@ class ExportBenchmarkFuncsPass
     : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
  public:
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<IREEDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
@@ -44,7 +44,10 @@ class ExportBenchmarkFuncsPass
       }
     }
     for (auto entryFuncOp : entryFuncOps) {
-      createEntryPointBenchmarkFunc(moduleOp, entryFuncOp);
+      if (failed(createEntryPointBenchmarkFunc(moduleOp, entryFuncOp))) {
+        signalPassFailure();
+        return;
+      }
     }
   }
 
@@ -55,7 +58,11 @@ class ExportBenchmarkFuncsPass
     std::string baseName = "_benchmark_input_";
     std::string name = baseName + std::to_string(uniqueId++);
     auto initialValue = moduleBuilder.getZeroAttr(inputType);
-    assert(initialValue && "failed to get zero attr for type");
+    if (!initialValue) {
+      mlir::emitError(loc) << "unsupported function argument type: "
+                           << inputType;
+      return {};
+    }
     auto variableOp = moduleBuilder.create<VariableOp>(loc, name,
                                                        /*isMutable=*/false,
                                                        inputType, initialValue);
@@ -64,7 +71,8 @@ class ExportBenchmarkFuncsPass
     return variableOp;
   }
 
-  void createEntryPointBenchmarkFunc(ModuleOp moduleOp, FuncOp entryFuncOp) {
+  LogicalResult createEntryPointBenchmarkFunc(ModuleOp moduleOp,
+                                              FuncOp entryFuncOp) {
     OpBuilder moduleBuilder(&getContext());
     moduleBuilder.setInsertionPointAfter(entryFuncOp);
 
@@ -72,8 +80,9 @@ class ExportBenchmarkFuncsPass
     Location loc = entryFuncOp.getLoc();
     SmallVector<IREE::Flow::VariableOp, 4> dummyInputVariableOps;
     for (auto inputType : entryFuncOp.getType().getInputs()) {
-      dummyInputVariableOps.push_back(
-          createDummyInputVariableOp(loc, inputType, moduleBuilder));
+      auto dummyVar = createDummyInputVariableOp(loc, inputType, moduleBuilder);
+      if (!dummyVar) return failure();
+      dummyInputVariableOps.push_back(dummyVar);
     }
 
     // Create a `() -> ()` entry point op the benchmark tool can run.
@@ -102,7 +111,7 @@ class ExportBenchmarkFuncsPass
     // Sink all results with do_not_optimize to ensure that DCE does not
     // remove the call.
     for (auto result : callOp.getResults()) {
-      blockBuilder.create<IREE::DoNotOptimizeOp>(loc, result);
+      blockBuilder.create<IREE::Util::DoNotOptimizeOp>(loc, result);
     }
     blockBuilder.create<mlir::ReturnOp>(loc);
 
@@ -110,6 +119,8 @@ class ExportBenchmarkFuncsPass
     entryFuncOp->setAttr("noinline", moduleBuilder.getUnitAttr());
     entryFuncOp->removeAttr("iree.reflection");
     entryFuncOp.setPrivate();
+
+    return success();
   }
 
   int uniqueId = 0;

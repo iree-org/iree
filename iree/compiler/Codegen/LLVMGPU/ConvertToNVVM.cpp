@@ -8,7 +8,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
@@ -76,6 +76,8 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateStdToLLVMConversionPatterns(converter, llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
+      populateShapeToLLVMConversionPatterns(&getContext(), &converter,
+                                            llvmPatterns);
       LLVMConversionTarget target(getContext());
       populateStdToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToNVVMConversionLegality(target);

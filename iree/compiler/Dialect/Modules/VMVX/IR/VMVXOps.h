@@ -9,8 +9,8 @@
 
 #include <cstdint>
 
-#include "iree/compiler/Dialect/IREE/IR/IREETraits.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"

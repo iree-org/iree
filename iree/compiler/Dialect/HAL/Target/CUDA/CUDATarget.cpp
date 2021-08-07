@@ -188,6 +188,12 @@ class CUDATargetBackend final : public TargetBackend {
       return variantOp.emitError() << "failed to translate the MLIR LLVM "
                                       "dialect to the native llvm::Module";
     }
+
+    // Collect all the entry point names.
+    llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
+    for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+      entryPointOps[op.sym_name()] = op;
+    }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     std::vector<std::string> entryPointNames;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
@@ -197,10 +203,14 @@ class CUDATargetBackend final : public TargetBackend {
       llvmFunc->setName(sanitizeNameForCuda(func.getName()));
       entryPointNames.emplace_back(llvmFunc->getName());
       std::array<int32_t, 3> workgroup_size;
-      for (auto it : llvm::enumerate(func->getAttr("llvmgpu_workgroup_size")
-                                         .cast<DenseIntElementsAttr>()
-                                         .getIntValues())) {
-        workgroup_size[it.index()] = it.value().getZExtValue();
+      auto entryPointOp = entryPointOps[func.getName()];
+      if (Optional<ArrayAttr> workgroupSizeAttr =
+              entryPointOp.workgroup_size()) {
+        for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
+          workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
+        }
+      } else {
+        workgroup_size = {1, 1, 1};
       }
       workgroupSizes.push_back(workgroup_size);
       llvm::Metadata *llvmMetadata[] = {

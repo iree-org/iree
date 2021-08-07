@@ -14,15 +14,6 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Pipelines
-//===----------------------------------------------------------------------===//
-
-// Performs input legalization for specific combination of input dialects.
-void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
-
-void registerCommonConversionPassPipelines();
-
-//===----------------------------------------------------------------------===//
 // Passes
 //===----------------------------------------------------------------------===//
 

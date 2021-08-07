@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_HAL_DIALECT
 #define IREE_DIALECT_HAL_DIALECT
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE HAL (Hardware Abstraction Layer) dialect

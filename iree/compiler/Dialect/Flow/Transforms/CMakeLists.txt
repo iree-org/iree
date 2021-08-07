@@ -30,7 +30,8 @@ iree_cc_library(
   SRCS
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
-    "ConvertToFlowTensorOps.cpp"
+    "ConvertLinalgTensorOps.cpp"
+    "ConvertTensorOps.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchLinalgOnTensors.cpp"
@@ -72,12 +73,12 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
 )

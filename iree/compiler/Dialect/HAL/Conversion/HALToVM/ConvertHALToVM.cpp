@@ -9,8 +9,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -103,7 +103,7 @@ class ConvertHALToVMPass
       : targetOptions_(targetOptions) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, IREE::VM::VMDialect>();
+    registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect>();
   }
 
   StringRef getArgument() const override { return "iree-convert-hal-to-vm"; }

@@ -44,10 +44,10 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -1469,8 +1469,9 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
  public:
   LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect, linalg::LinalgDialect, memref::MemRefDialect,
-                    scf::SCFDialect, StandardOpsDialect>();
+    registry
+        .insert<IREE::Util::UtilDialect, linalg::LinalgDialect,
+                memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect>();
   }
   void runOnOperation() override;
 

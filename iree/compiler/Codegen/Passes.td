@@ -176,7 +176,7 @@ def LLVMGPURemoveSingleIterationLoop :
 }
 
 def LLVMGPUTileAndDistribute :
-    Pass<"iree-llvmgpu-tile-and-distribute", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-llvmgpu-tile-and-distribute", "FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistributeToThreads()";
 }
@@ -185,6 +185,18 @@ def LLVMGPUVectorization :
     Pass<"iree-llvmgpu-vectorization", "FuncOp"> {
   let summary = "Pass to convert linalg into Vector.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
+}
+
+def LLVMGPUVectorLowering :
+    Pass<"iree-llvmgpu-vector-lowering", "FuncOp"> {
+  let summary = "Pass to lower Vector ops before conversion to LLVM.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
+}
+
+def LLVMGPUDistributeSharedMemoryCopy :
+    Pass<"iree-llvmgpu-distribute-shared-memory-copy", "FuncOp"> {
+  let summary = "Pass to distribute shared memory copies to threads.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUDistributeSharedMemoryCopy()";
 }
 
 //------------------------------------------------------------------------------
@@ -249,10 +261,10 @@ def SPIRVVectorToCooperativeMatrix :
 }
 
 // TODO: Rename argument to be fully qualified.
-def SPIRVVectorToGPU :
-    Pass<"iree-spirv-vector-to-gpu", "FuncOp"> {
+def SPIRVCopyToWorkgroupMemory :
+    Pass<"iree-spirv-copy-to-workgroup-memory", "FuncOp"> {
   let summary = "Convert vector dialect to gpu subgroup level GPU instructions";
-  let constructor = "mlir::iree_compiler::createSPIRVVectorToGPUPass()";
+  let constructor = "mlir::iree_compiler::createSPIRVCopyToWorkgroupMemoryPass()";
 }
 
 //------------------------------------------------------------------------------

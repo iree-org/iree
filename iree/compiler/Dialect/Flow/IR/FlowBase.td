@@ -7,7 +7,8 @@
 #ifndef IREE_DIALECT_FLOW_BASE
 #define IREE_DIALECT_FLOW_BASE
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 
 //===----------------------------------------------------------------------===//
@@ -137,6 +138,14 @@ def FLOW_WritableDispatchTensor : DialectType<
     to query the metadata about the tensor (such as its shape) as well as store
     to the backing tensor representation.
   }];
+}
+
+// TODO(benvanik): remove when we have real types using this.
+def FLOW_Dummy0 : TypeDef<FLOW_Dialect, "Dummy", []> {
+  let mnemonic = "dummy";
+}
+def FLOW_Dummy1 : AttrDef<FLOW_Dialect, "Dummy", []> {
+  let mnemonic = "dummy";
 }
 
 #endif  // IREE_DIALECT_FLOW_BASE

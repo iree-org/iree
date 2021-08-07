@@ -99,17 +99,22 @@ struct LLVMGPUVectorizationPass
       populateVectorizationPatterns(vectorizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(vectorizationPatterns));
-    }
-    // TODO: This should be a folding of Add into Contract in core but while
-    // they live in different dialects, it is not possible without unnatural
-    // dependencies.
-    funcOp.walk([&](Operation *op) {
-      if (auto contract = canonicalizeContractionAdd(op))
-        op->replaceAllUsesWith(contract);
-    });
+      // TODO: This should be a folding of Add into Contract in core but while
+      // they live in different dialects, it is not possible without unnatural
+      // dependencies.
+      funcOp.walk([&](Operation *op) {
+        if (auto contract = canonicalizeContractionAdd(op))
+          op->replaceAllUsesWith(contract);
+      });
 
+      RewritePatternSet vectorUnrollPatterns(context);
+      populateVectorUnrollPatterns(vectorUnrollPatterns);
+      (void)applyPatternsAndFoldGreedily(funcOp,
+                                         std::move(vectorUnrollPatterns));
+      linalg::hoistRedundantVectorTransfers(funcOp);
+    }
     {
-      // Lower transfer op to canonical form.
+      // Step 2. Lower transfer op to canonical form.
       RewritePatternSet lowerTransferOpPatterns(funcOp.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
           lowerTransferOpPatterns);
@@ -126,24 +131,21 @@ struct LLVMGPUVectorizationPass
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(vectorUnrollPatterns));
 
-      RewritePatternSet canonicalizationPatterns1(funcOp.getContext());
+      RewritePatternSet canonicalizationPatterns(funcOp.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
-          canonicalizationPatterns1);
+          canonicalizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns1));
-
-      linalg::hoistRedundantVectorTransfers(funcOp);
+                                         std::move(canonicalizationPatterns));
     }
     {
-      // Step 3. Canonicalize the transfer ops generated.
-      RewritePatternSet vectorToLoopsPatterns(context);
-      VectorTransferToSCFOptions vectorToSCFOptions;
-      vectorToSCFOptions.setUnroll(true);
-      populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
-                                            vectorToSCFOptions);
-      memref::populateFoldSubViewOpPatterns(vectorToLoopsPatterns);
+      // Step 3. Lower contract op to outer product.
+      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      vector::populateVectorContractLoweringPatterns(
+          contractLoweringPatterns,
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct));
       (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorToLoopsPatterns));
+                                         std::move(contractLoweringPatterns));
     }
   }
 };

@@ -43,6 +43,13 @@ iree_py_library(
 
 iree_py_test(
   NAME
+    function_test
+  SRCS
+    "function_test.py"
+)
+
+iree_py_test(
+  NAME
     hal_test
   SRCS
     "hal_test.py"

@@ -29,7 +29,7 @@ iree_lit_test_suite(
     "tile_and_vectorize_conv.mlir"
     "tile_and_vectorize_matmul.mlir"
     "vector_to_cooperative_matrix.mlir"
-    "vector_to_gpu.mlir"
+    "vectorize_copy_to_workgroup_memory.mlir"
     "vectorize_elementwise_ops.mlir"
     "vectorize_load_store.mlir"
     "vectorize_matmul.mlir"

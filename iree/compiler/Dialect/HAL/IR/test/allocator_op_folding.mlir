@@ -3,9 +3,9 @@
 // CHECK-LABEL: @allocator_constant_buffer
 // CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
 func @allocator_constant_buffer(%allocator: !hal.allocator) -> !hal.buffer {
-  //      CHECK: %[[RODATA:.+]] = iree.byte_buffer.constant : !iree.byte_buffer = dense<123> : tensor<4x4xi32>
+  //      CHECK: %[[RODATA:.+]] = util.byte_buffer.constant : !util.byte_buffer = dense<123> : tensor<4x4xi32>
   // CHECK-NEXT: %[[BUFFER:.+]] = hal.allocator.map<%[[ALLOCATOR]] : !hal.allocator>
-  // CHECK-SAME:   source(%[[RODATA]] : !iree.byte_buffer)[%c0, %c-1]
+  // CHECK-SAME:   source(%[[RODATA]] : !util.byte_buffer)[%c0, %c-1]
   // CHECK-SAME:   type("HostVisible|DeviceVisible|DeviceLocal")
   // CHECK-SAME:   usage("Constant|Transfer|Mapping|Dispatch")
   // CHECK-SAME:   : !hal.buffer
@@ -21,9 +21,9 @@ func @allocator_constant_buffer(%allocator: !hal.allocator) -> !hal.buffer {
 // CHECK-LABEL: @allocator_constant_buffer_view
 // CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
 func @allocator_constant_buffer_view(%allocator: !hal.allocator) -> !hal.buffer_view {
-  //      CHECK: %[[RODATA:.+]] = iree.byte_buffer.constant : !iree.byte_buffer = dense<123> : tensor<4x4xi32>
+  //      CHECK: %[[RODATA:.+]] = util.byte_buffer.constant : !util.byte_buffer = dense<123> : tensor<4x4xi32>
   // CHECK-NEXT: %[[BUFFER:.+]] = hal.allocator.map<%[[ALLOCATOR]] : !hal.allocator>
-  // CHECK-SAME:   source(%[[RODATA]] : !iree.byte_buffer)[%c0, %c-1]
+  // CHECK-SAME:   source(%[[RODATA]] : !util.byte_buffer)[%c0, %c-1]
   // CHECK-SAME:   type("HostVisible|DeviceVisible|DeviceLocal")
   // CHECK-SAME:   usage("Constant|Transfer|Mapping|Dispatch")
   // CHECK-SAME:   : !hal.buffer

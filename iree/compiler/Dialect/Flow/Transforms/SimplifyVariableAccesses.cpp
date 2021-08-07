@@ -79,7 +79,7 @@ static void hoistImmutableLoads(FuncOp funcOp,
 
 static bool doesOpBlockMotion(Operation *op) {
   return isa<mlir::CallOpInterface>(op) ||
-         op->hasTrait<OpTrait::IREE::YieldPoint>();
+         op->hasTrait<OpTrait::IREE::Util::YieldPoint>();
 }
 
 static void moveOpUpInBlock(Block &block, Operation *op) {

@@ -19,7 +19,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
 
 **Pre-requisites:**
 
-* A relatively recent Python3 installation (we aim to support
+* A relatively recent Python3 installation >=3.7 (we aim to support
   [non-eol Python versions](https://endoflife.date/python)).
 * Installation of python dependencies as specified in
   [`bindings/python/build_requirements.txt`](https://github.com/google/iree/blob/main/bindings/python/build_requirements.txt).

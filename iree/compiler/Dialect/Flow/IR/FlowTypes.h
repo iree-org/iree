@@ -7,14 +7,16 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
 #define IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
@@ -27,6 +29,9 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+#include "iree/compiler/Dialect/Flow/IR/FlowOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/Flow/IR/FlowTypeInterfaces.h.inc"  // IWYU pragma: export
 
 //===----------------------------------------------------------------------===//
 // Object types
@@ -182,5 +187,12 @@ struct DispatchTensorTypeStorage : public TypeStorage {
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+// clang-format off: must be included after all LLVM/MLIR headers.
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/Flow/IR/FlowAttrs.h.inc"  // IWYU pragma: keep
+#define GET_TYPEDEF_CLASSES
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h.inc"  // IWYU pragma: keep
+// clang-format on
 
 #endif  // IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_

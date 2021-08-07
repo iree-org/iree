@@ -6,7 +6,7 @@
 // CHECK: Test failed as expected
 module @expect_failure {
 func @expect_true_of_false() {
-  %false = iree.unfoldable_constant 0 : i32
+  %false = util.unfoldable_constant 0 : i32
   check.expect_true(%false) : i32
   return
 }

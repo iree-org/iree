@@ -1,5 +1,5 @@
 
-// RUN: iree-opt -split-input-file -pass-pipeline='func(iree-flow-promote-i1-to-i8)' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-flow-promote-i1-to-i8)' %s | IreeFileCheck %s
 
 // CHECK: #[[$MAP:.+]] = affine_map<(d0) -> (d0)>
 

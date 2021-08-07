@@ -69,8 +69,11 @@ setup(
         "Operating System :: OS Independent",
         "Development Status :: 3 - Alpha",
     ],
-    python_requires=">=3.6",
-    packages=find_namespace_packages(include=["iree.tools.tflite"]),
+    python_requires=">=3.7",
+    packages=find_namespace_packages(include=[
+      "iree.tools.tflite",
+      "iree.tools.tflite.*",
+    ]),
     package_data={
         "iree.tools.tflite": [f"iree-import-tflite{exe_suffix}",],
     },

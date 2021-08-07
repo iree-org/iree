@@ -223,28 +223,28 @@ As an example, here are some tests for the XLA HLO floor operation:
 
 ```mlir
 func @tensor() {
-  %input = iree.unfoldable_constant dense<[0.0, 1.1, 2.5, 4.9]> : tensor<4xf32>
+  %input = util.unfoldable_constant dense<[0.0, 1.1, 2.5, 4.9]> : tensor<4xf32>
   %result = "mhlo.floor"(%input) : (tensor<4xf32>) -> tensor<4xf32>
   check.expect_almost_eq_const(%result, dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf32>): tensor<4xf32>
   return
 }
 
 func @scalar() {
-  %input = iree.unfoldable_constant dense<101.3> : tensor<f32>
+  %input = util.unfoldable_constant dense<101.3> : tensor<f32>
   %result = "mhlo.floor"(%input) : (tensor<f32>) -> tensor<f32>
   check.expect_almost_eq_const(%result, dense<101.0> : tensor<f32>): tensor<f32>
   return
 }
 
 func @double() {
-  %input = iree.unfoldable_constant dense<11.2> : tensor<f64>
+  %input = util.unfoldable_constant dense<11.2> : tensor<f64>
   %result = "mhlo.floor"(%input) : (tensor<f64>) -> tensor<f64>
   check.expect_almost_eq_const(%result, dense<11.0> : tensor<f64>): tensor<f64>
   return
 }
 
 func @negative() {
-  %input = iree.unfoldable_constant dense<-1.1> : tensor<f32>
+  %input = util.unfoldable_constant dense<-1.1> : tensor<f32>
   %result = "mhlo.floor"(%input) : (tensor<f32>) -> tensor<f32>
   check.expect_almost_eq_const(%result, dense<-2.0> : tensor<f32>): tensor<f32>
   return
@@ -253,12 +253,12 @@ func @negative() {
 
 Test cases are created in gtest for each public function exported by the module.
 
-Note the use of `iree.unfoldable_constant` to specify test constants. If we were
+Note the use of `util.unfoldable_constant` to specify test constants. If we were
 to use a regular constant, the compiler would "helpfully" fold away everything
 at compile time and our test would not actually test the runtime.
 `unfoldable_constant` hides the value of the constant from the compiler so it
 cannot use it at compile time. To hide an arbitrary SSA-value, you can use
-`iree.do_not_optimize`. This wraps any value in an unoptimizable identity
+`util.do_not_optimize`. This wraps any value in an unoptimizable identity
 function.
 
 Next we use this input constant to exercise the runtime feature under test (in

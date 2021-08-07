@@ -286,7 +286,7 @@ static iree_status_t iree_trace_replay_parse_scalar(
 static iree_status_t iree_trace_replay_parse_vm_list(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* value_node, iree_vm_list_t* target_list) {
-  if (value_node->type != YAML_SEQUENCE_NODE) {
+  if (value_node->type != YAML_MAPPING_NODE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "(%zu): expected sequence node for type",
                             value_node->start_mark.line);

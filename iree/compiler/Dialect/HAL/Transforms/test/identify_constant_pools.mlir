@@ -58,8 +58,8 @@ func @mutable_variables() -> tensor<128xf32> {
 flow.variable @_large_const_0 dense<3.0> : tensor<128xf32>
 func @skip_indirect_variables() -> (tensor<128xf32>) {
   // CHECK: flow.variable.address
-  %0 = flow.variable.address @_large_const_0 : !iree.ptr<tensor<128xf32>>
+  %0 = flow.variable.address @_large_const_0 : !util.ptr<tensor<128xf32>>
   // CHECK: flow.variable.load.indirect
-  %1 = flow.variable.load.indirect %0 : !iree.ptr<tensor<128xf32>> -> tensor<128xf32>
+  %1 = flow.variable.load.indirect %0 : !util.ptr<tensor<128xf32>> -> tensor<128xf32>
   return %1 : tensor<128xf32>
 }

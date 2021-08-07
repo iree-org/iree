@@ -6,7 +6,7 @@ module {
   // CHECK: vm.func @my_fn
   func @my_fn() {
     // CHECK-NEXT: = vm.rodata.inline : !vm.buffer = dense<[1, 2, 3]> : tensor<3xi32>
-    %0 = iree.byte_buffer.constant : !iree.byte_buffer = dense<[1, 2, 3]> : tensor<3xi32>
+    %0 = util.byte_buffer.constant : !util.byte_buffer = dense<[1, 2, 3]> : tensor<3xi32>
     return
   }
 }
