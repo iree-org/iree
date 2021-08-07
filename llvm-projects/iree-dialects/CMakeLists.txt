@@ -14,7 +14,7 @@ message(STATUS "Building iree-dialects project at ${IREE_DIALECTS_SOURCE_DIR} (i
 # TODO: Fix this upstream so that global include directories are not needed.
 set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir)
 set(MLIR_INCLUDE_DIR ${LLVM_MAIN_SRC_DIR}/../mlir/include)
-set(MLIR_GENERATED_INCLUDE_DIR ${CMAKE_BINARY_DIR}/tools/mlir/include)
+set(MLIR_GENERATED_INCLUDE_DIR ${LLVM_BINARY_DIR}/tools/mlir/include)
 
 # TODO: Needed for tablegen. Remove.
 include_directories(SYSTEM ${MLIR_INCLUDE_DIR})

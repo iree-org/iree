@@ -50,6 +50,17 @@ macro(iree_set_llvm_cmake_options)
   set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 endmacro()
 
+macro(iree_add_llvm_external_project name identifier location)
+  message(STATUS "Adding LLVM external project ${name} (${identifier}) -> ${location}")
+  if(NOT EXISTS "${location}/CMakeLists.txt")
+    message(FATAL_ERROR "External project location ${location} is not valid")
+  endif()
+  list(APPEND LLVM_EXTERNAL_PROJECTS ${name})
+  list(REMOVE_DUPLICATES LLVM_EXTERNAL_PROJECTS)
+  set(LLVM_EXTERNAL_${identifier}_SOURCE_DIR ${location} CACHE STRING "" FORCE)
+  set(LLVM_EXTERNAL_PROJECTS ${LLVM_EXTERNAL_PROJECTS} CACHE STRING "" FORCE)
+endmacro()
+
 macro(iree_set_spirv_cross_cmake_options)
   set(SPIRV_CROSS_ENABLE_MSL ON CACHE BOOL "" FORCE)
   set(SPIRV_CROSS_ENABLE_GLSL ON CACHE BOOL "" FORCE) # Required to enable MSL
