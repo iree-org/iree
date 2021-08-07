@@ -14,9 +14,9 @@ declare_mlir_python_sources(IREEDialectsPythonSources.Dialects
 declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEDialectsPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mlir"
-  TD_FILE dialects/IreePublicBinding.td
-  SOURCES dialects/iree_public.py
-  DIALECT_NAME iree_public
+  TD_FILE dialects/IreeBinding.td
+  SOURCES dialects/iree.py
+  DIALECT_NAME iree
 )
 
 ################################################################################

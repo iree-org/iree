@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_PUBLIC_IREE_PUBLIC_DIALECT_TD
-#define IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_PUBLIC_IREE_PUBLIC_DIALECT_TD
+#ifndef IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_IREE_DIALECT_TD
+#define IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_IREE_DIALECT_TD
 
 include "mlir/IR/OpBase.td"
 
-def IREEPublic_Dialect : Dialect {
-  let name = "iree_public";
+def IREE_Dialect : Dialect {
+  let name = "iree";
   let summary = "Public ops/type/attributes legal for input to IREE's compiler";
   let description = [{
     IREE's compiler allows as input a number of common dialects. This dialect
@@ -24,10 +24,10 @@ def IREEPublic_Dialect : Dialect {
     are of course, limits, and source-compatibility is not guaranteed, since
     LLVM/MLIR's API surface is itself unstable.
   }];
-  let cppNamespace = "::mlir::iree_public";
+  let cppNamespace = "::mlir::iree";
 }
 
-class IREEPublic_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<IREEPublic_Dialect, mnemonic, traits>;
+class IREE_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<IREE_Dialect, mnemonic, traits>;
 
-#endif // IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_PUBLIC_IREE_PUBLIC_DIALECT_TD
+#endif // IREE_LLVM_PROJECTS_IREE_DIALECTS_DIALECTS_IREE_IREE_DIALECT_TD

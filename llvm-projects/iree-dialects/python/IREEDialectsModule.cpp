@@ -15,9 +15,9 @@ PYBIND11_MODULE(_ireeDialects, m) {
   m.doc() = "iree-dialects main python extension";
 
   m.def(
-      "register_iree_public_dialect",
+      "register_iree_dialect",
       [](MlirContext context, bool load) {
-        MlirDialectHandle handle = mlirGetDialectHandle__iree_public__();
+        MlirDialectHandle handle = mlirGetDialectHandle__iree__();
         mlirDialectHandleRegisterDialect(handle, context);
         if (load) {
           mlirDialectHandleLoadDialect(handle, context);
