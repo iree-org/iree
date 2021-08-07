@@ -70,6 +70,11 @@ struct LLVMGPUPipeliningPass
         if (op.getNumRegions() > 0) return;
         if (isa<gpu::BarrierOp>(op)) hasBarrier = true;
       }
+      // Check that the loop has a barrier to know that it is doing copy to
+      // workgroup memory.
+      // TODO(thomasraoux): Ideally we should have markers propagated on the
+      // transfer ops coming fomr workgroup memory but there is no such
+      // mechanism in core.
       if (hasBarrier) {
         OpBuilder builder(forOp.getContext());
         forOp->setAttr(kPipeliningLoopMarker, builder.getUnitAttr());
