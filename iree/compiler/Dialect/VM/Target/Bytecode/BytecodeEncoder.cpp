@@ -249,6 +249,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return std::move(bytecode_);
   }
 
+  size_t getOffset() const { return bytecode_.size(); }
+
   LogicalResult ensureAlignment(size_t alignment) {
     size_t paddedSize = (bytecode_.size() + (alignment - 1)) & ~(alignment - 1);
     size_t padding = paddedSize - bytecode_.size();
@@ -327,7 +329,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 // static
 Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-    SymbolTable &symbolTable) {
+    SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase) {
   EncodedBytecodeFunction result;
 
   // Perform register allocation first so that we can quickly lookup values as
@@ -337,6 +339,8 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     funcOp.emitError() << "register allocation failed";
     return llvm::None;
   }
+
+  FunctionSourceMap sourceMap;
 
   V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
   for (auto &block : funcOp.getBlocks()) {
@@ -351,6 +355,8 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
         op.emitOpError() << "is not serializable";
         return llvm::None;
       }
+      sourceMap.locations.push_back(
+          {static_cast<int32_t>(encoder.getOffset()), op.getLoc()});
       if (failed(encoder.beginOp(&op)) ||
           failed(serializableOp.encode(symbolTable, encoder)) ||
           failed(encoder.endOp(&op))) {
@@ -364,6 +370,8 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
       return llvm::None;
     }
   }
+
+  debugDatabase.addFunctionSourceMap(funcOp, sourceMap);
 
   if (failed(encoder.ensureAlignment(8))) {
     funcOp.emitError() << "failed to pad function";
