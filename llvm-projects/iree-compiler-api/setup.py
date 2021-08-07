@@ -70,9 +70,9 @@ class CMakeBuildPy(_build_py):
     if os.path.exists(cmake_cache_file):
       os.remove(cmake_cache_file)
     subprocess.check_call(["cmake", src_dir] + cmake_args, cwd=cmake_build_dir)
-    subprocess.check_call(["cmake", "--build", ".", "--target", "install"] +
-                          build_args,
-                          cwd=cmake_build_dir)
+    subprocess.check_call(
+        ["cmake", "--build", ".", "--target", "install/strip"] + build_args,
+        cwd=cmake_build_dir)
     shutil.copytree(os.path.join(cmake_install_dir, "python_package"),
                     target_dir,
                     symlinks=False,

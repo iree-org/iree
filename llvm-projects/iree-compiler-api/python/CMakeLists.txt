@@ -1,10 +1,41 @@
 include(AddMLIRPython)
 
 ################################################################################
+# Sources
+################################################################################
+
+declare_mlir_python_sources(IREECompilerAPIPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  SOURCES
+    api/driver.py
+    version.py
+)
+declare_mlir_python_sources(IREECompilerAPIPythonExtensions)
+
+################################################################################
+# Extensions
+################################################################################
+
+declare_mlir_python_extension(IREECompilerAPIPythonExtensions.CompilerDriver
+  MODULE_NAME _ireeCompilerDriver
+  ADD_TO_PARENT IREECompilerAPIPythonExtensions
+  SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/CompilerModule.cpp
+  EMBED_CAPI_LINK_LIBS
+    IREECompilerAPICompilerCAPI
+  PRIVATE_LINK_LIBS
+    LLVMSupport
+)
+
+################################################################################
 # Generate packages and shared library
 ################################################################################
 
 set(_source_components
+  # Local sources.
+  IREECompilerAPIPythonSources
+  IREECompilerAPIPythonExtensions
+
   # TODO: Core is now implicitly building/registering all dialects, increasing
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
