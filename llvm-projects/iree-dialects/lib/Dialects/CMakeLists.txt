@@ -1,1 +1,1 @@
-add_subdirectory(iree_public)
+add_subdirectory(iree)

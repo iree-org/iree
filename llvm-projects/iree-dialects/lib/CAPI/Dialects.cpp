@@ -6,8 +6,7 @@
 
 #include "iree-dialects-c/Dialects.h"
 
-#include "iree-dialects/Dialects/iree_public/IREEPublicDialect.h"
+#include "iree-dialects/Dialects/iree/IREEDialect.h"
 #include "mlir/CAPI/Registration.h"
 
-MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREEPublic, iree_public,
-                                      mlir::iree_public::IREEPublicDialect)
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREE, iree, mlir::iree::IREEDialect)

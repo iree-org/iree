@@ -1,12 +1,12 @@
-add_mlir_library(IREEDialectsIREEPublicDialect
-  IREEPublicDialect.cpp
-  IREEPublicOps.cpp
+add_mlir_library(IREEDialectsIREEDialect
+  IREEDialect.cpp
+  IREEOps.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${IREE_DIALECTS_SOURCE_DIR}/include
 
   DEPENDS
-  MLIRIREEPublicOpsIncGen
+  MLIRIREEOpsIncGen
 
   LINK_LIBS PUBLIC
   MLIRIR
@@ -15,4 +15,4 @@ add_mlir_library(IREEDialectsIREEPublicDialect
 
 # TODO: Fix upstream so there is a way to know what the actual compile target
 # is (versus prefixing with "obj." which is conditional).
-iree_dialects_target_includes(obj.IREEDialectsIREEPublicDialect)
+iree_dialects_target_includes(obj.IREEDialectsIREEDialect)

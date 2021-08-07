@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef PYTHON_BINDINGS_IREE_PUBLIC_OPS
-#define PYTHON_BINDINGS_IREE_PUBLIC_OPS
+#ifndef PYTHON_BINDINGS_IREE_OPS
+#define PYTHON_BINDINGS_IREE_OPS
 
 include "mlir/Bindings/Python/Attributes.td"
-include "iree-dialects/Dialects/iree_public/IREEPublicOps.td"
+include "iree-dialects/Dialects/iree/IREEOps.td"
 
-#endif // PYTHON_BINDINGS_IREE_PUBLIC_OPS
+#endif // PYTHON_BINDINGS_IREE_OPS

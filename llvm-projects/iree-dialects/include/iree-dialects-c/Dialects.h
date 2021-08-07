@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREEPublic, iree_public);
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREE, iree);
 
 #ifdef __cplusplus
 }
