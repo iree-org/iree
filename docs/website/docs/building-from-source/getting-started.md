@@ -19,6 +19,11 @@ compiler:
     3. Install [Ninja](https://ninja-build.org/) 
        (typically "ninja-build" package).
 
+On a relatively recent Debian/Ubuntu:
+
+``` shell
+sudo apt install cmake ninja-build clang lld
+```
 
 === "Windows"
 
@@ -61,8 +66,8 @@ cmake -GNinja -B ../iree-build/ -S . \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DIREE_ENABLE_LLD=ON
 
-# Minimal/release with system compiler:
-cmake -GNinja -B ../iree-build/ -S . -DCMAKE_BUILD_TYPE=Release
+# Alternately, with system compiler and your choice of CMake generator:
+# cmake -B ../iree-build/ -S .
 
 # Additional quality of life CMake flags:
 # Enable ccache:
