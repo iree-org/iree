@@ -1,5 +1,5 @@
-// RUN: (iree-translate --iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-run-module --entry_function=many_tensor) | IreeFileCheck %s
-// RUN: iree-translate --iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-benchmark-module --driver=vmvx --entry_function=many_tensor | IreeFileCheck --check-prefix=BENCHMARK %s
+// RUN: (iree-translate -iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-run-module --entry_function=many_tensor) | IreeFileCheck %s
+// RUN: iree-translate -iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-benchmark-module --driver=vmvx --entry_function=many_tensor | IreeFileCheck --check-prefix=BENCHMARK %s
 // RUN: iree-run-mlir -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
 
 // BENCHMARK-LABEL: BM_many_tensor
