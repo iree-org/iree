@@ -71,7 +71,7 @@ function(iree_lit_test)
       ${_TEST_FILE_PATH}
       ${_DATA_DEP_PATHS}
     WORKING_DIRECTORY
-      "${CMAKE_BINARY_DIR}"
+      "${CMAKE_CURRENT_BINARY_DIR}"
   )
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
