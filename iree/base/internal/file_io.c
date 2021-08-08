@@ -16,7 +16,16 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
+
+#if defined(IREE_PLATFORM_WINDOWS)
+#include <fcntl.h>
+#include <io.h>
+#define IREE_SET_BINARY_MODE(handle) _setmode(_fileno(handle), O_BINARY)
+#else
+#define IREE_SET_BINARY_MODE(handle) ((void)0)
+#endif  // IREE_PLATFORM_WINDOWS
 
 iree_status_t iree_file_exists(const char* path) {
   IREE_ASSERT_ARGUMENT(path);
@@ -123,21 +132,65 @@ iree_status_t iree_file_write_contents(const char* path,
   return status;
 }
 
+static iree_status_t iree_stdin_read_contents_impl(
+    iree_allocator_t allocator, iree_byte_span_t* out_contents) {
+  // HACK: fix stdin mode to binary on Windows to match Unix behavior.
+  // Ideally we'd do this in one place for all our tools.
+  IREE_SET_BINARY_MODE(stdin);
+
+  iree_host_size_t capacity = 4096;
+  iree_host_size_t size = 0;
+  char* buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, capacity, (void**)&buffer));
+  for (int c = getchar(); c != EOF; c = getchar()) {
+    if (size >= capacity - 1) {
+      iree_host_size_t new_capacity = capacity * 2;
+      iree_status_t status =
+          iree_allocator_realloc(allocator, new_capacity, (void**)&buffer);
+      if (!iree_status_is_ok(status)) {
+        iree_allocator_free(allocator, buffer);
+        return status;
+      }
+      capacity = new_capacity;
+    }
+    buffer[size++] = c;
+  }
+  buffer[size] = 0;  // NUL
+  *out_contents = iree_make_byte_span(buffer, size);
+  return iree_ok_status();
+}
+
+iree_status_t iree_stdin_read_contents(iree_allocator_t allocator,
+                                       iree_byte_span_t* out_contents) {
+  IREE_ASSERT_ARGUMENT(out_contents);
+  memset(out_contents, 0, sizeof(*out_contents));
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_stdin_read_contents_impl(allocator, out_contents);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 #else
 
 iree_status_t iree_file_exists(const char* path) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "File I/O is disabled");
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "File I/O is disabled");
 }
 
 iree_status_t iree_file_read_contents(const char* path,
                                       iree_allocator_t allocator,
                                       iree_byte_span_t* out_contents) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "File I/O is disabled");
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "File I/O is disabled");
 }
 
 iree_status_t iree_file_write_contents(const char* path,
                                        iree_const_byte_span_t content) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "File I/O is disabled");
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "File I/O is disabled");
+}
+
+iree_status_t iree_stdin_read_contents(iree_allocator_t allocator,
+                                       iree_byte_span_t* out_contents) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "File I/O is disabled");
 }
 
 #endif  // IREE_FILE_IO_ENABLE
