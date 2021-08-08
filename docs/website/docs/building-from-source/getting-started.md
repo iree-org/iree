@@ -54,7 +54,7 @@ Configure CMake:
 
 ``` shell
 # Recommended for simple development using clang and lld:
-cmake -GNinja -B ../iree-build/ -H . \
+cmake -GNinja -B ../iree-build/ -S . \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DIREE_ENABLE_ASSERTIONS=ON \
     -DCMAKE_C_COMPILER=clang \
@@ -62,7 +62,7 @@ cmake -GNinja -B ../iree-build/ -H . \
     -DCMAKE_LINKER=lld
 
 # Minimal/release with system compiler:
-cmake -GNinja -B ../iree-build/ -H . -DCMAKE_BUILD_TYPE=Release
+cmake -GNinja -B ../iree-build/ -S . -DCMAKE_BUILD_TYPE=Release
 
 # Additional quality of life CMake flags:
 # Enable ccache:
