@@ -15,6 +15,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Value.h"
@@ -49,6 +50,11 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
     blockOrdinals[&block] = blockOrdinals.size();
   }
 
+  // Keep asm state to make getting the SSA value names fast.
+  OpPrintingFlags printingFlags;
+  printingFlags.elideLargeElementsAttrs(1);
+  AsmState asmState(funcOp, printingFlags);
+
   // Gather attributes for each op before we actually add them. We do this so
   // that it's easier to slice out the results for printing without also
   // including the attributes we ourselves are trying to add.
@@ -69,7 +75,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
         }
       } else {
         llvm::raw_string_ostream os(str);
-        value.print(os);
+        value.print(os, asmState);
         str = os.str();
       }
 
