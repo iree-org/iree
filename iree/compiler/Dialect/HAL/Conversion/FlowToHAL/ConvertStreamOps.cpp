@@ -941,6 +941,10 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
 }
 
 // Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte integer value.
+// The bit representation of |baseValue| will be repeated as many times as
+// needed in the returned value to use 4 bytes of storage. For example,
+// a 16-bit value (int or float) will have its native bit representation
+// repeated twice.
 static Value splatFillPattern(Location loc, Value baseValue,
                               OpBuilder &builder) {
   // Bitcast to an integer, then use integer math for the rest of the pattern.
