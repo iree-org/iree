@@ -14,7 +14,11 @@ from absl.testing import absltest
 
 NOTEBOOKS_TO_SKIP = []
 
-NOTEBOOKS_EXPECTED_TO_FAIL = []
+NOTEBOOKS_EXPECTED_TO_FAIL = [
+    # Text classification notebook fails to extract the vocab file on Docker
+    # (needs visibility into the tempdir?)
+    "tflite_text_classification.ipynb",
+]
 
 
 class ColabNotebookTests(absltest.TestCase):
