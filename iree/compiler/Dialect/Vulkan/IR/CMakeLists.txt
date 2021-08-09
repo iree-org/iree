@@ -32,7 +32,7 @@ iree_cc_library(
     MLIRIR
     MLIRSPIRV
     MLIRSupport
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

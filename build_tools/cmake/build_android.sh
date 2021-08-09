@@ -75,7 +75,6 @@ cd build-android
   -DANDROID_PLATFORM=android-29 \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_ENABLE_MLIR=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF
 "${CMAKE_BIN?}" --build .

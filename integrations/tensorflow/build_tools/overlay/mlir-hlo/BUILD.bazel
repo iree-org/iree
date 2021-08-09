@@ -24,6 +24,7 @@ alias(
     for name in [
         "chlo_legalize_to_hlo",
         "legalize_control_flow",
+        "legalize_einsum_to_dot_general",
         "legalize_gather_to_torch_index_select",
         "legalize_to_linalg",
         "lhlo",

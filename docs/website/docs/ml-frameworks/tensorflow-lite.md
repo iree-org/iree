@@ -47,6 +47,7 @@ tools or the [Python API](https://google.github.io/iree/bindings/python/):
 ``` shell
 iree-translate \
   --iree-mlir-to-vm-bytecode-module \
+  --iree-input-type=tosa \
   --iree-hal-target-backends=vmvx \
   sample.mlir \
   -o sample.vmfb

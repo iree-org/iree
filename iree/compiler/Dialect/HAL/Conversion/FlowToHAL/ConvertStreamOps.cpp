@@ -12,9 +12,9 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
@@ -57,7 +57,8 @@ static ValueAliasingMap computeValueAliases(
 
   // Start with outputs so that we handle tied values that may lead all the way
   // back up the chain to the stream inputs.
-  auto tiedStreamOp = cast<IREE::TiedOpInterface>(streamOp.getOperation());
+  auto tiedStreamOp =
+      cast<IREE::Util::TiedOpInterface>(streamOp.getOperation());
   auto returnOp = cast<IREE::Flow::ReturnOp>(streamBlock->back());
   for (auto result : llvm::enumerate(streamOp.getResults())) {
     auto streamValue = returnOp.getOperand(result.index());
@@ -72,7 +73,7 @@ static ValueAliasingMap computeValueAliases(
   }
 
   for (auto &op : *streamBlock) {
-    auto tiedOp = dyn_cast<IREE::TiedOpInterface>(op);
+    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
     for (auto it : llvm::enumerate(op.getResults())) {
       auto result = it.value();
       if (!result.getType().isa<ShapedType>()) continue;
@@ -490,7 +491,8 @@ static LogicalResult allocateOutputBuffers(
     IREE::Flow::ExStreamFragmentOp streamOp,
     StreamSchedulingState &schedulingState, ConversionPatternRewriter &rewriter,
     SmallVectorImpl<Value> &output) {
-  auto tiedStreamOp = cast<IREE::TiedOpInterface>(streamOp.getOperation());
+  auto tiedStreamOp =
+      cast<IREE::Util::TiedOpInterface>(streamOp.getOperation());
   auto &entryBlock = streamOp.body().front();
 
   SmallVector<Value> outputBuffers;

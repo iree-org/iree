@@ -110,18 +110,18 @@ func @allocator_constant_buffer(%allocator: !hal.allocator) {
 
 // CHECK-LABEL: @allocator_map_byte_buffer
 //  CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
-func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !iree.byte_buffer) {
+func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !util.byte_buffer) {
   // CHECK-DAG: %[[OFFSET:.+]] = constant 100
   %offset = constant 100 : index
   // CHECK-DAG: %[[LENGTH:.+]] = constant 200
   %length = constant 200 : index
   //      CHECK: = hal.allocator.map<%[[ALLOCATOR]] : !hal.allocator>
-  // CHECK-SAME:   source(%arg1 : !iree.byte_buffer)[%[[OFFSET]], %[[LENGTH]]]
+  // CHECK-SAME:   source(%arg1 : !util.byte_buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-SAME:   type("DeviceVisible|DeviceLocal")
   // CHECK-SAME:   usage(Transfer)
   // CHECK-SAME:   : !hal.buffer
   %ref = hal.allocator.map<%allocator : !hal.allocator>
-                    source(%arg1 : !iree.byte_buffer)[%offset, %length]
+                    source(%arg1 : !util.byte_buffer)[%offset, %length]
                     type(DeviceLocal) usage(Transfer) : !hal.buffer
   return
 }

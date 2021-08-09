@@ -8,7 +8,7 @@
 #define IREE_DIALECT_FLOW_BASE
 
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 
 //===----------------------------------------------------------------------===//

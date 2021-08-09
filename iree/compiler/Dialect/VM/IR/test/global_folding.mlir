@@ -4,19 +4,19 @@
 
 // CHECK-LABEL: @global_i32_folds
 vm.module @global_i32_folds {
-  // CHECK: vm.global.i32 mutable @g0 = 123 : i32
+  // CHECK: vm.global.i32 public mutable @g0 = 123 : i32
   vm.global.i32 mutable @g0 initializer(@g0init) : i32
   vm.func @g0init() -> i32 {
     %c123 = vm.const.i32 123 : i32
     vm.return %c123 : i32
   }
 
-  // CHECK: vm.global.i32 mutable @g1 : i32
+  // CHECK: vm.global.i32 public mutable @g1 : i32
   vm.global.i32 mutable @g1 = 0 : i32
-  // CHECK: vm.global.i32 @g2 : i32
+  // CHECK: vm.global.i32 public @g2 : i32
   vm.global.i32 @g2 = 0 : i32
 
-  // CHECK: vm.global.i32 mutable @g3 : i32
+  // CHECK: vm.global.i32 public mutable @g3 : i32
   vm.global.i32 mutable @g3 initializer(@g3init) : i32
   vm.func @g3init() -> i32 {
     %c0 = vm.const.i32 0 : i32
@@ -28,7 +28,7 @@ vm.module @global_i32_folds {
 
 // CHECK-LABEL: @global_ref_folds_null
 vm.module @global_ref_folds_null {
-  // CHECK: vm.global.ref mutable @g0 : !vm.ref<?>
+  // CHECK: vm.global.ref public mutable @g0 : !vm.ref<?>
   vm.global.ref mutable @g0 initializer(@g0init) : !vm.ref<?>
   vm.func @g0init() -> !vm.ref<?> {
     %null = vm.const.ref.zero : !vm.ref<?>
@@ -92,18 +92,18 @@ vm.module @global_indirect_folds {
 
   // CHECK-LABEL: @fold_load_i32
   vm.func @fold_load_i32() -> i32 {
-    %0 = vm.global.address @g0 : !iree.ptr<i32>
+    %0 = vm.global.address @g0 : !util.ptr<i32>
     // CHECK-NEXT: %[[VALUE:.+]] = vm.global.load.i32 @g0 : i32
-    %1 = vm.global.load.indirect.i32 %0 : !iree.ptr<i32> -> i32
+    %1 = vm.global.load.indirect.i32 %0 : !util.ptr<i32> -> i32
     // CHECK-NEXT: vm.return %[[VALUE]]
     vm.return %1 : i32
   }
 
   // CHECK-LABEL: @fold_store_i32
   vm.func @fold_store_i32(%arg0 : i32) {
-    %0 = vm.global.address @g0 : !iree.ptr<i32>
+    %0 = vm.global.address @g0 : !util.ptr<i32>
     // CHECK-NEXT: vm.global.store.i32 %arg0, @g0 : i32
-    vm.global.store.indirect.i32 %arg0, %0 : i32 -> !iree.ptr<i32>
+    vm.global.store.indirect.i32 %arg0, %0 : i32 -> !util.ptr<i32>
     vm.return
   }
 }

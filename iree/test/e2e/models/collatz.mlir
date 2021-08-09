@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: EXEC @collatz
 func @collatz() -> tensor<f32> {
-  %arg0 = iree.unfoldable_constant dense<178.0> : tensor<f32>
+  %arg0 = util.unfoldable_constant dense<178.0> : tensor<f32>
   %0 = mhlo.constant dense<1.0> : tensor<f32>
   %1 = mhlo.constant dense<3.0> : tensor<f32>
   %2 = mhlo.constant dense<2.0> : tensor<f32>

@@ -27,7 +27,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

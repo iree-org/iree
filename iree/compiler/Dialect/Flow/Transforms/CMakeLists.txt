@@ -54,6 +54,7 @@ iree_cc_library(
     "SimplifyVariableAccesses.cpp"
     "StripAndSplatConstantVariables.cpp"
     "TypeConverter.cpp"
+    "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
@@ -73,12 +74,12 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
 )

@@ -11,7 +11,7 @@ hal.constant_pool @pool attributes {buffer_constraints = #hal.buffer_constraints
   hal.constant_storage @_storage1 = dense<[6, 7, 8, 0]> : vector<4xi8>
 }
 
-// CHECK: vm.global.ref @pool_storage0_buffer initializer(@pool_storage0_buffer_initializer) : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref private @pool_storage0_buffer initializer(@pool_storage0_buffer_initializer) : !vm.ref<!hal.buffer>
 hal.variable @pool_storage0_buffer init(@pool_storage0_buffer_initializer) : !hal.buffer attributes {sym_visibility = "private"}
 // CHECK: vm.func private @pool_storage0_buffer_initializer() -> !vm.ref<!hal.buffer>
 func private @pool_storage0_buffer_initializer() -> !hal.buffer {
@@ -20,20 +20,20 @@ func private @pool_storage0_buffer_initializer() -> !hal.buffer {
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%dev : !hal.device> : !hal.allocator
   // CHECK: [[STORAGE_REF:%.+]] = vm.const.ref.rodata @pool_storage0 : !vm.buffer
-  %storage = hal.constant_storage.lookup @pool::@_storage0 : !iree.byte_buffer
+  %storage = hal.constant_storage.lookup @pool::@_storage0 : !util.byte_buffer
   // CHECK: = vm.call @hal.allocator.wrap.byte_buffer({{.+}}, %c22, %c15, [[STORAGE_REF]], %zero, %c16)
   %mapped = hal.allocator.map<%allocator : !hal.allocator>
-      source(%storage : !iree.byte_buffer)[%c0, %c16]
+      source(%storage : !util.byte_buffer)[%c0, %c16]
       type("HostVisible|HostCoherent|DeviceVisible")
       usage("Constant|Transfer|Mapping|Dispatch") : !hal.buffer
   return %mapped : !hal.buffer
 }
 
-// CHECK: vm.global.ref @pool_storage1_buffer initializer(@pool_storage1_buffer_initializer) : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref private @pool_storage1_buffer initializer(@pool_storage1_buffer_initializer) : !vm.ref<!hal.buffer>
 hal.variable @pool_storage1_buffer init(@pool_storage1_buffer_initializer) : !hal.buffer attributes {sym_visibility = "private"}
 func private @pool_storage1_buffer_initializer() -> !hal.buffer
 
-// CHECK: vm.global.ref @pool_splats initializer(@pool_splats_initializer) : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref private @pool_splats initializer(@pool_splats_initializer) : !vm.ref<!hal.buffer>
 hal.variable @pool_splats init(@pool_splats_initializer) : !hal.buffer attributes {sym_visibility = "private"}
 // CHECK: vm.func private @pool_splats_initializer() -> !vm.ref<!hal.buffer>
 func private @pool_splats_initializer() -> !hal.buffer {

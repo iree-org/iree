@@ -35,7 +35,7 @@ cc_binary(
         "//iree_tf_compiler/TF",
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/HAL/IR",
-        "@iree//iree/compiler/Dialect/IREE/IR",
+        "@iree//iree/compiler/Dialect/Util/IR",
         "@iree//iree/compiler/InputConversion/Common",
         "@iree//iree/compiler/InputConversion/MHLO",
         "@iree//iree/compiler/InputConversion/TOSA",

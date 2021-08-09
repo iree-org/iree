@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
@@ -46,8 +46,11 @@ static ParseResult parseSymbolVisibility(OpAsmParser &parser,
 
 static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
                                   StringAttr symVisibilityAttr) {
-  if (!symVisibilityAttr) return;
-  p << symVisibilityAttr.getValue();
+  if (!symVisibilityAttr) {
+    p << "public";
+  } else {
+    p << symVisibilityAttr.getValue();
+  }
 }
 
 //===----------------------------------------------------------------------===//

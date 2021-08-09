@@ -81,3 +81,7 @@ RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
 COPY --from=install-swiftshader /swiftshader /swiftshader
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
+
+
+######################## LibXML2 for LLD #######################################
+RUN apt-get update && apt-get install -y libxml2-dev

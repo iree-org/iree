@@ -175,7 +175,8 @@ iree_status_t Run() {
   }
 
   // Read back the results and ensure we got the right values.
-  iree_hal_buffer_mapping_t mapped_memory = {0};
+  iree_hal_buffer_mapping_t mapped_memory;
+  memset(&mapped_memory, 0, sizeof(mapped_memory));
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_map_range(
         iree_hal_buffer_view_buffer(ret_buffer_view),

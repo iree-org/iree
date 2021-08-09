@@ -8,7 +8,7 @@
 #define IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_OPS
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def CUSTOM_Dialect : Dialect {

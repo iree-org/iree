@@ -10,7 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -245,7 +245,7 @@ class MaterializeResourceCachesPass
         IREE::HAL::MatchAlwaysAttr::get(loc.getContext()));
     auto defaultBuilder = OpBuilder::atBlockBegin(&defaultRegion->front());
     auto nullValue =
-        defaultBuilder.createOrFold<IREE::NullOp>(loc, executableType);
+        defaultBuilder.createOrFold<IREE::Util::NullOp>(loc, executableType);
     defaultBuilder.create<IREE::HAL::ReturnOp>(loc, nullValue);
 
     auto switchOp = switchBuilder.build();

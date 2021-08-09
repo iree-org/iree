@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Dialect/Modules/VMVX/Conversion/VMVXToVM/ConvertVMVXToVM.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOps.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"

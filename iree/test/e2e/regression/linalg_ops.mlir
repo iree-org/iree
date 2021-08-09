@@ -1,9 +1,9 @@
 func @multi_result() {
-  %input1 = iree.unfoldable_constant dense<[
+  %input1 = util.unfoldable_constant dense<[
       [1, 2, 3, 4],
       [5, 6, 7, 8],
       [9, 10, 11, 12]]> : tensor<3x4xi32>
-  %input2 = iree.unfoldable_constant dense<[
+  %input2 = util.unfoldable_constant dense<[
       [13, 14, 15, 16],
       [17, 18, 19, 20],
       [21, 22, 23, 24]]> : tensor<3x4xi32>

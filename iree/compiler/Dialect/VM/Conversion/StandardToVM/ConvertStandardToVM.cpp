@@ -7,7 +7,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
 #include "iree/base/api.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -124,6 +124,9 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
       rewriter.create<IREE::VM::ExportOp>(srcOp.getLoc(), newFuncOp,
                                           exportName);
     }
+    // VM functions are private by default and exported via the dedicated
+    // vm.export ops.
+    newFuncOp.setPrivate();
 
     rewriter.replaceOp(srcOp, llvm::None);
     return success();

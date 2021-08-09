@@ -11,6 +11,7 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/ref.h"
+#include "iree/vm/stack.h"
 
 IREE_API_EXPORT iree_status_t iree_vm_function_call_get_cconv_fragments(
     const iree_vm_function_signature_t* signature,
@@ -259,6 +260,31 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
                               /*out_signature=*/NULL);
 }
 
+IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
+    const iree_vm_module_t* module, iree_vm_stack_frame_t* frame,
+    iree_vm_source_location_t* out_source_location) {
+  IREE_ASSERT_ARGUMENT(module);
+  IREE_ASSERT_ARGUMENT(frame);
+  IREE_ASSERT_ARGUMENT(out_source_location);
+  memset(out_source_location, 0, sizeof(*out_source_location));
+  if (module->resolve_source_location) {
+    return module->resolve_source_location(module->self, frame,
+                                           out_source_location);
+  }
+  return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+}
+
+IREE_API_EXPORT iree_status_t
+iree_vm_source_location_format(iree_vm_source_location_t* source_location,
+                               iree_string_builder_t* builder) {
+  IREE_ASSERT_ARGUMENT(builder);
+  if (!source_location || !source_location->format) {
+    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+  }
+  return source_location->format(source_location->self, source_location->data,
+                                 builder);
+}
+
 IREE_API_EXPORT iree_string_view_t
 iree_vm_function_name(const iree_vm_function_t* function) {
   iree_string_view_t name;
@@ -288,10 +314,8 @@ iree_vm_function_signature(const iree_vm_function_t* function) {
 
 IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
     const iree_vm_function_t* function, iree_string_view_t key) {
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_vm_module_t* module = function->module;
   if (!module->get_function_reflection_attr) {
-    IREE_TRACE_ZONE_END(z0);
     return iree_string_view_empty();
   }
   for (int index = 0;; ++index) {
@@ -303,12 +327,10 @@ IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
       iree_status_ignore(status);
       break;
     }
-    if (iree_string_view_compare(key, index_key) == 0) {
-      IREE_TRACE_ZONE_END(z0);
+    if (iree_string_view_equal(key, index_key)) {
       return index_value;
     }
   }
-  IREE_TRACE_ZONE_END(z0);
   return iree_string_view_empty();
 }
 

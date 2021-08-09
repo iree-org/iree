@@ -10,8 +10,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
@@ -142,11 +142,11 @@ struct InsertImmutabilityPreservingStreamClones
 
   LogicalResult matchAndRewrite(ExStreamFragmentOp op,
                                 PatternRewriter &rewriter) const override {
-    bool didClone =
-        insertTiedClones(cast<TiedOpInterface>(op.getOperation()), rewriter);
+    bool didClone = insertTiedClones(
+        cast<IREE::Util::TiedOpInterface>(op.getOperation()), rewriter);
     for (auto &block : op.getClosureBodyRegion()) {
       for (auto &innerOp : block) {
-        if (auto tiedOp = dyn_cast<TiedOpInterface>(innerOp)) {
+        if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(innerOp)) {
           didClone |= insertTiedClones(tiedOp, rewriter);
         }
       }
@@ -154,7 +154,7 @@ struct InsertImmutabilityPreservingStreamClones
     return success(didClone);
   }
 
-  bool insertTiedClones(TiedOpInterface tiedOp,
+  bool insertTiedClones(IREE::Util::TiedOpInterface tiedOp,
                         PatternRewriter &rewriter) const {
     bool didClone = false;
     for (unsigned resultIndex = 0; resultIndex < tiedOp->getNumResults();
@@ -212,7 +212,7 @@ struct TieStreamResults : public OpRewritePattern<ExStreamFragmentOp> {
           continue;  // Already tied.
         }
         auto baseValue =
-            IREE::TiedOpInterface::findTiedBaseValue(result.value());
+            IREE::Util::TiedOpInterface::findTiedBaseValue(result.value());
         if (auto blockArg = baseValue.dyn_cast<BlockArgument>()) {
           unsigned operandIndex = blockArg.getArgNumber();
           op.setTiedResultOperandIndex(result.index(), operandIndex);

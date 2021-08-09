@@ -20,9 +20,9 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/JSON.h"
@@ -123,16 +123,16 @@ struct StructureLevel {
   }
 
   Type getIrType(Builder builder) {
-    auto variantType = IREE::VariantType::get(builder.getContext());
+    auto variantType = IREE::Util::VariantType::get(builder.getContext());
     if (type == LevelType::Value) {
       if (valueType.isa<TensorType>()) {
         return IREE::HAL::BufferViewType::get(builder.getContext());
       }
       return valueType;
     } else if (type == LevelType::List || type == LevelType::Tuple) {
-      return IREE::ListType::get(variantType);
+      return IREE::Util::ListType::get(variantType);
     } else if (type == LevelType::Dict) {
-      return IREE::ListType::get(variantType);
+      return IREE::Util::ListType::get(variantType);
     }
 
     llvm_unreachable("Unknown LevelType");
@@ -262,14 +262,15 @@ struct StructureLevel {
       Value listSizeValue =
           builder.create<ConstantOp>(loc, builder.getIndexType(),
                                      builder.getIndexAttr(getNeededListSize()));
-      Value listValue = builder.create<IREE::ListCreateOp>(
+      Value listValue = builder.create<IREE::Util::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
-      builder.create<IREE::ListResizeOp>(loc, listValue, listSizeValue);
+      builder.create<IREE::Util::ListResizeOp>(loc, listValue, listSizeValue);
       for (StructureLevel &child : children) {
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(child.ikey));
-        builder.create<IREE::ListSetOp>(loc, listValue, indexValue, childValue);
+        builder.create<IREE::Util::ListSetOp>(loc, listValue, indexValue,
+                                              childValue);
       }
       return listValue;
     }
@@ -279,15 +280,16 @@ struct StructureLevel {
       Value listSizeValue =
           builder.create<ConstantOp>(loc, builder.getIndexType(),
                                      builder.getIndexAttr(getNeededListSize()));
-      Value listValue = builder.create<IREE::ListCreateOp>(
+      Value listValue = builder.create<IREE::Util::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
-      builder.create<IREE::ListResizeOp>(loc, listValue, listSizeValue);
+      builder.create<IREE::Util::ListResizeOp>(loc, listValue, listSizeValue);
       for (auto it : llvm::enumerate(children)) {
         StructureLevel &child = it.value();
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(it.index()));
-        builder.create<IREE::ListSetOp>(loc, listValue, indexValue, childValue);
+        builder.create<IREE::Util::ListSetOp>(loc, listValue, indexValue,
+                                              childValue);
       }
       return listValue;
     }
@@ -300,8 +302,8 @@ struct StructureLevel {
                         int index) {
     Value indexValue = builder.create<ConstantOp>(loc, builder.getIndexType(),
                                                   builder.getIndexAttr(index));
-    Value itemValue = builder.create<IREE::ListGetOp>(loc, getIrType(builder),
-                                                      parentList, indexValue);
+    Value itemValue = builder.create<IREE::Util::ListGetOp>(
+        loc, getIrType(builder), parentList, indexValue);
     // TODO: Null check, etc. How does that work if returning a tensor? Need
     // to box somehow?
     if (itemValue.getType().isa<IREE::HAL::BufferViewType>()) {
@@ -569,9 +571,10 @@ class SavedModelToIREEABIPass
     : public PassWrapper<SavedModelToIREEABIPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, iree_compiler::IREEDialect,
-                    IREE::HAL::HALDialect,
-                    mlir::tf_saved_model::TensorFlowSavedModelDialect>();
+    registry
+        .insert<IREE::Flow::FlowDialect, iree_compiler::IREE::Util::UtilDialect,
+                IREE::HAL::HALDialect,
+                mlir::tf_saved_model::TensorFlowSavedModelDialect>();
   }
 
   StringRef getArgument() const override {

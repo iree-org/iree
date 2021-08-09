@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -374,7 +374,7 @@ static Value lookupValueSize(Value value) {
   }
 
   // Skip do-not-optimize ops.
-  if (auto dnoOp = dyn_cast<IREE::DoNotOptimizeOp>(definingOp)) {
+  if (auto dnoOp = dyn_cast<IREE::Util::DoNotOptimizeOp>(definingOp)) {
     return lookupValueSize(dnoOp.getOperand(0));
   }
 
