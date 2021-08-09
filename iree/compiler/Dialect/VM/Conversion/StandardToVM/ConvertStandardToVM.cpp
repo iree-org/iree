@@ -656,6 +656,33 @@ class FPToUIOpConversion : public OpConversionPattern<FPToUIOp> {
   }
 };
 
+class BitcastOpConversion : public OpConversionPattern<BitcastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      BitcastOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto srcType = operands[0].getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType.isF32() && dstType.isInteger(32)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BitcastF32I32Op>(srcOp, dstType,
+                                                             operands[0]);
+    } else if (srcType.isInteger(32) && dstType.isF32()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BitcastI32F32Op>(srcOp, dstType,
+                                                             operands[0]);
+    } else if (srcType.isF64() && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BitcastF64I64Op>(srcOp, dstType,
+                                                             operands[0]);
+    } else if (srcType.isInteger(64) && dstType.isF64()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BitcastI64F64Op>(srcOp, dstType,
+                                                             operands[0]);
+    } else {
+      return rewriter.notifyMatchFailure(srcOp, "unsupported bitcast");
+    }
+    return success();
+  }
+};
+
 class SelectOpConversion : public OpConversionPattern<SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -846,7 +873,8 @@ void populateStandardToVMPatterns(MLIRContext *context,
 
   // Floating-point conversion ops.
   patterns.insert<SIToFPOpConversion, UIToFPOpConversion, FPToSIOpConversion,
-                  FPToUIOpConversion>(typeConverter, context);
+                  FPToUIOpConversion, BitcastOpConversion>(typeConverter,
+                                                           context);
 
   // Shift ops.
   patterns.insert<
