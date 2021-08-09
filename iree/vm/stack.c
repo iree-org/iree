@@ -7,6 +7,7 @@
 #include "iree/vm/stack.h"
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -453,4 +454,76 @@ iree_vm_stack_function_leave(iree_vm_stack_t* stack) {
   stack->top = stack->top->parent;
 
   return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
+    iree_vm_stack_t* stack, iree_string_builder_t* builder) {
+  for (iree_vm_stack_frame_header_t* frame = stack->top; frame != NULL;
+       frame = frame->parent) {
+    // Stack frame prefix.
+    const char* type_str;
+    switch (frame->type) {
+      default:
+        type_str = "??";
+        break;
+      case IREE_VM_STACK_FRAME_EXTERNAL:
+        type_str = "external";
+        break;
+      case IREE_VM_STACK_FRAME_NATIVE:
+        type_str = "native";
+        break;
+      case IREE_VM_STACK_FRAME_BYTECODE:
+        type_str = "bytecode";
+        break;
+    }
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder, "\n[%*" PRId32 "] %*s ", 2, frame->frame.depth, 8, type_str));
+
+    // Common module/function name and PC.
+    iree_string_view_t module_name =
+        iree_vm_module_name(frame->frame.function.module);
+    iree_string_view_t function_name =
+        iree_vm_function_name(&frame->frame.function);
+    if (iree_string_view_is_empty(function_name)) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          builder, "%.*s@%d", (int)module_name.size, module_name.data,
+          (int)frame->frame.function.ordinal));
+    } else {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          builder, "%.*s.%.*s", (int)module_name.size, module_name.data,
+          (int)function_name.size, function_name.data));
+    }
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder, ":%" PRIu64 " ", (uint64_t)frame->frame.pc));
+
+    iree_vm_module_t* module = frame->frame.function.module;
+    iree_vm_source_location_t source_location;
+    iree_status_t status = iree_vm_module_resolve_source_location(
+        module, &frame->frame, &source_location);
+    if (iree_status_is_ok(status)) {
+      status = iree_vm_source_location_format(&source_location, builder);
+    }
+    if (iree_status_is_unavailable(status)) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "-"));
+    } else if (!iree_status_is_ok(status)) {
+      return status;
+    }
+  }
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_stack_annotate_backtrace(
+    iree_vm_stack_t* stack, iree_status_t base_status) {
+  iree_string_builder_t builder;
+  iree_string_builder_initialize(stack->allocator, &builder);
+  iree_status_t status = iree_vm_stack_format_backtrace(stack, &builder);
+  if (iree_status_is_ok(status)) {
+    // TODO(benvanik): don't duplicate the buffer here - we should be attaching
+    // a payload but that requires additional plumbing.
+    status = iree_status_annotate_f(base_status, "%.*s",
+                                    (int)iree_string_builder_size(&builder),
+                                    iree_string_builder_buffer(&builder));
+  }
+  iree_string_builder_deinitialize(&builder);
+  return status;
 }

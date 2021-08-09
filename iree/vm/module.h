@@ -14,6 +14,7 @@
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/base/string_builder.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -260,6 +261,22 @@ typedef struct iree_vm_execution_result_t {
   int reserved;
 } iree_vm_execution_result_t;
 
+// Source location interface.
+typedef struct iree_vm_source_location_t {
+  IREE_API_UNSTABLE
+
+  // Implementation-specified fields. Do not use directly.
+  void* self;
+  uint64_t data[2];
+
+  iree_status_t(IREE_API_PTR* format)(void* self, uint64_t data[2],
+                                      iree_string_builder_t* builder);
+} iree_vm_source_location_t;
+
+// Formats the |source_location| to its canonical string form.
+IREE_API_EXPORT iree_status_t iree_vm_source_location_format(
+    iree_vm_source_location_t* source_location, iree_string_builder_t* builder);
+
 // Defines an interface that can be used to reflect and execute functions on a
 // module.
 //
@@ -295,6 +312,12 @@ typedef struct iree_vm_module_t {
   iree_status_t(IREE_API_PTR* lookup_function)(
       void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
       iree_vm_function_t* out_function);
+
+  // Resolves a stack |frame| from the module to a |out_source_location|, if
+  // debug information is available.
+  iree_status_t(IREE_API_PTR* resolve_source_location)(
+      void* self, iree_vm_stack_frame_t* frame,
+      iree_vm_source_location_t* out_source_location);
 
   // Allocates module state data.
   iree_status_t(IREE_API_PTR* alloc_state)(
@@ -379,6 +402,12 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
     const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
     iree_host_size_t ordinal, iree_vm_function_t* out_function,
     iree_string_view_t* out_linkage_name);
+
+// Resolves a stack |frame| from the module to a |out_source_location|, if
+// debug information is available.
+IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
+    const iree_vm_module_t* module, iree_vm_stack_frame_t* frame,
+    iree_vm_source_location_t* out_source_location);
 
 // Returns the name of the given function or empty string if not available.
 IREE_API_EXPORT iree_string_view_t

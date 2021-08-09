@@ -159,6 +159,11 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 //
 // See the `-iree-vm-target-extension=` compiler option for more information.
 
+#if !defined(IREE_VM_BACKTRACE_ENABLE)
+// Enables backtraces in VM failures when debugging information is available.
+#define IREE_VM_BACKTRACE_ENABLE 1
+#endif  // !IREE_VM_BACKTRACE_ENABLE
+
 #if !defined(IREE_VM_EXT_I64_ENABLE)
 // Enables the 64-bit integer instruction extension.
 // Targeted from the compiler with `-iree-vm-target-extension=i64`.
