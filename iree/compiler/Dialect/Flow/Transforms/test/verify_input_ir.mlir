@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-check-input-ir -verify-diagnostics %s -split-input-file
+// RUN: iree-opt -iree-verify-input-legality -verify-diagnostics %s -split-input-file
 
 func @check_no_mlir(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @+1 {{illegal operation in input to iree core compiler. Use -iree-input-type=mhlo to legalize this operation}}

@@ -42,10 +42,6 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
-/// Checks if the input to the Flow transformation passes has operations from
-/// dialects that are expected to be legalized before this pass.
-std::unique_ptr<OperationPass<FuncOp>> createCheckInputIRPass();
-
 /// Creates a pass to convert linalg convolution ops with 1x1 kernels into
 /// linalg.matmul
 std::unique_ptr<OperationPass<FuncOp>> createConvertConv2D1x1ToMatmulPass();
@@ -90,6 +86,10 @@ std::unique_ptr<OperationPass<FuncOp>> createPromoteTensorLoadsPass();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
+
+/// Verified if the input to the Flow transformation passes has operations from
+/// dialects that are expected to be legalized before this pass.
+std::unique_ptr<OperationPass<FuncOp>> createVerifyInputLegalityPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)

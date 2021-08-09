@@ -15,7 +15,8 @@ namespace IREE {
 namespace Flow {
 
 namespace {
-class CheckInputIRPass : public CheckInputIRBase<CheckInputIRPass> {
+class VerifyInputLegalityPass
+    : public VerifyInputLegalityBase<VerifyInputLegalityPass> {
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
     auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
@@ -35,8 +36,8 @@ class CheckInputIRPass : public CheckInputIRBase<CheckInputIRPass> {
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createCheckInputIRPass() {
-  return std::make_unique<CheckInputIRPass>();
+std::unique_ptr<OperationPass<FuncOp>> createVerifyInputLegalityPass() {
+  return std::make_unique<VerifyInputLegalityPass>();
 }
 
 }  // namespace Flow

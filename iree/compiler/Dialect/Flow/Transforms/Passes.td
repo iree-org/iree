@@ -9,11 +9,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def CheckInputIR: Pass<"iree-check-input-ir", "FuncOp"> {
-  let summary = "Checks the legality of the IR at the start of IREE compilation flow.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createCheckInputIRPass()";
-}
-
 def ConvertConv2D1x1ConvToMatmul :
     Pass<"iree-flow-convert-conv2d-1x1-to-matmul", "FuncOp"> {
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
@@ -149,6 +144,11 @@ def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "ModuleOp"> {
   let summary = "Strips constant flow.variables and replaces them with splats.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
+}
+
+def VerifyInputLegality: Pass<"iree-verify-input-legality", "FuncOp"> {
+  let summary = "Checks the legality of the IR at the start of IREE compilation flow.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
 }
 
 #endif  // IREE_DIALECT_FLOW_PASSES
