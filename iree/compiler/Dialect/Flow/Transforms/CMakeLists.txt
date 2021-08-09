@@ -28,6 +28,7 @@ iree_cc_library(
     "Passes.h.inc"
     "TypeConverter.h"
   SRCS
+    "CheckInputIR.cpp"
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
     "ConvertLinalgTensorOps.cpp"

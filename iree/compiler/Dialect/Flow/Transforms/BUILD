@@ -31,6 +31,7 @@ gentbl_cc_library(
 cc_library(
     name = "Transforms",
     srcs = [
+        "CheckInputIR.cpp",
         "ConvertConv2D1x1ToMatmulPass.cpp",
         "ConvertConv2DToImg2ColPass.cpp",
         "ConvertLinalgTensorOps.cpp",
