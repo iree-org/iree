@@ -146,4 +146,9 @@ def StripAndSplatConstantVariables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
 }
 
+def VerifyInputLegality: Pass<"iree-verify-input-legality", "FuncOp"> {
+  let summary = "Checks the legality of the IR at the start of IREE compilation flow.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
+}
+
 #endif  // IREE_DIALECT_FLOW_PASSES
