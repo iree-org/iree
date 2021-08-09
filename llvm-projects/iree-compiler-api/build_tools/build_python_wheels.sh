@@ -14,12 +14,19 @@ version="$("$PYTHON" --version)"
 echo "Using python: $PYTHON (version $version)"
 
 repo_root="$(cd $(dirname $0)/.. && pwd)"
-wheelhouse="$repo_root/wheelhouse"
-mkdir -p $wheelhouse
-cd $wheelhouse
+wheelhouse="$repo_root/wheels"
+mkdir -p "$wheelhouse"
 
 echo "---- BUILDING iree-compiler-api ----"
-CMAKE_GENERATOR=Ninja CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+if [ -x "$(command -v ccache)" ]; then
+  echo "Using ccache"
+  export CMAKE_C_COMPILER_LAUNCHER=ccache
+  export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+fi
+if [ -x "$(command -v ninja)" ]; then
+  echo "Using ninja"
+  export CMAKE_GENERATOR=Ninja
+fi
 $PYTHON -m pip wheel "${repo_root}" \
   --use-feature=in-tree-build \
   -w "$wheelhouse" -v
