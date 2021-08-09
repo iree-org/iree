@@ -1935,7 +1935,7 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                IREE::VM::EmitCTypeConverter &typeConverter,
                                OwningRewritePatternList &patterns,
                                VMAnalysisCache &vmAnalysisCache) {
-  populatePreserveCompilerHintsPatterns(context, patterns);
+  IREE::Util::populatePreserveCompilerHintsPatterns(context, patterns);
 
   // CFG
   patterns.insert<BranchOpConversion>(context);
