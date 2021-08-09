@@ -13,8 +13,7 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: Name of target (see Note).
 # SRC: Source file to compile into a bytecode module.
-# FLAGS: Flags to pass to the translation tool (list of strings). The
-#     default flag set is "-iree-mlir-to-vm-bytecode-module".
+# FLAGS: Flags to pass to the translation tool (list of strings).
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
 #     tool is "iree-translate".
 # C_IDENTIFIER: Identifier to use for generate c embed code.
@@ -42,12 +41,7 @@ function(iree_bytecode_module)
     return()
   endif()
 
-  # Set defaults for FLAGS and TRANSLATE_TOOL
-  if(DEFINED _RULE_FLAGS)
-    set(_FLAGS ${_RULE_FLAGS})
-  else()
-    set(_FLAGS "-iree-mlir-to-vm-bytecode-module")
-  endif()
+  # Set default for TRANSLATE_TOOL.
   if(DEFINED _RULE_TRANSLATE_TOOL)
     set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
   else()
@@ -57,7 +51,7 @@ function(iree_bytecode_module)
   iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
   iree_get_executable_path(_EMBEDDED_LINKER_TOOL_EXECUTABLE "lld")
 
-  set(_ARGS "${_FLAGS}")
+  set(_ARGS "${_RULE_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_NAME}.vmfb")
