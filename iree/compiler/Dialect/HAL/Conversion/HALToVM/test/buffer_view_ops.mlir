@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
-// CHECK-LABEL: func @buffer_view_dims
+// CHECK-LABEL: vm.func private @buffer_view_dims
 // CHECK-SAME: %[[VIEW:.+]]: !vm.ref<!hal.buffer_view>
 func @buffer_view_dims(%arg0 : !hal.buffer_view) -> (index, index, index) {
   // CHECK-DAG: %[[D0:.+]] = vm.call @hal.buffer_view.dim(%[[VIEW]], %zero)

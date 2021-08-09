@@ -1,6 +1,6 @@
 func @dot_general_lower() {
-  %lhs = iree.unfoldable_constant dense<[[[0.3, 0.5]]]> : tensor<1x1x2xf32>
-  %rhs = iree.unfoldable_constant  dense<[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]> : tensor<2x3xf32>
+  %lhs = util.unfoldable_constant dense<[[[0.3, 0.5]]]> : tensor<1x1x2xf32>
+  %rhs = util.unfoldable_constant  dense<[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]> : tensor<2x3xf32>
   %res = "mhlo.dot_general"(%lhs, %rhs) {
       dot_dimension_numbers = {
           lhs_batching_dimensions = dense<[]> : tensor<0xi64>,
@@ -15,8 +15,8 @@ func @dot_general_lower() {
 }
 
 func @dot_general_lower_swapped() {
-  %lhs = iree.unfoldable_constant  dense<[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]> : tensor<2x3xf32>
-  %rhs = iree.unfoldable_constant dense<[[[0.3, 0.5]]]> : tensor<1x1x2xf32>
+  %lhs = util.unfoldable_constant  dense<[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]> : tensor<2x3xf32>
+  %rhs = util.unfoldable_constant dense<[[[0.3, 0.5]]]> : tensor<1x1x2xf32>
   %res = "mhlo.dot_general"(%lhs, %rhs) {
         dot_dimension_numbers = {
             lhs_batching_dimensions = dense<[]> : tensor<0xi64>,
@@ -31,8 +31,8 @@ func @dot_general_lower_swapped() {
 }
 
 func @dot_general_trivial_batching_dimension() {
-  %lhs = iree.unfoldable_constant  dense<[[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]]> : tensor<1x2x3xf32>
-  %rhs = iree.unfoldable_constant dense<[[
+  %lhs = util.unfoldable_constant  dense<[[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]]> : tensor<1x2x3xf32>
+  %rhs = util.unfoldable_constant dense<[[
     [1.0, 2.0, 3.0, 4.0],
     [1.0, 2.0, 3.0, 4.0],
     [1.0, 2.0, 3.0, 4.0]]]> : tensor<1x3x4xf32>
@@ -50,8 +50,8 @@ func @dot_general_trivial_batching_dimension() {
 }
 
 func @dot_general_matmul() {
-  %lhs = iree.unfoldable_constant dense<3.0> : tensor<2x4xf32>
-  %rhs = iree.unfoldable_constant dense<2.0> : tensor<4x2xf32>
+  %lhs = util.unfoldable_constant dense<3.0> : tensor<2x4xf32>
+  %rhs = util.unfoldable_constant dense<2.0> : tensor<4x2xf32>
   %res = "mhlo.dot_general"(%lhs, %rhs) {
     dot_dimension_numbers = {
       lhs_batching_dimensions = dense<> : tensor<0xi64>,
@@ -64,8 +64,8 @@ func @dot_general_matmul() {
 }
 
 func @dot_general_matmul_i32.i32.i32() {
-  %lhs = iree.unfoldable_constant dense<3> : tensor<2x4xi32>
-  %rhs = iree.unfoldable_constant dense<2> : tensor<4x2xi32>
+  %lhs = util.unfoldable_constant dense<3> : tensor<2x4xi32>
+  %rhs = util.unfoldable_constant dense<2> : tensor<4x2xi32>
   %res = "mhlo.dot_general"(%lhs, %rhs) {
     dot_dimension_numbers = {
       lhs_batching_dimensions = dense<> : tensor<0xi64>,
@@ -78,10 +78,10 @@ func @dot_general_matmul_i32.i32.i32() {
 }
 
 func @dot_general_nontrivial_batching_dimension() {
-  %lhs = iree.unfoldable_constant dense<[
+  %lhs = util.unfoldable_constant dense<[
     [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
     [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]]> : tensor<2x2x3xf32>
-  %rhs = iree.unfoldable_constant dense<[[
+  %rhs = util.unfoldable_constant dense<[[
     [1.0, 2.0, 3.0, 4.0],
     [1.0, 2.0, 3.0, 4.0],
     [1.0, 2.0, 3.0, 4.0]
@@ -109,8 +109,8 @@ func @dot_general_nontrivial_batching_dimension() {
 }
 
 func @large_dot_general() {
-  %lhs = iree.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
-  %rhs = iree.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
+  %lhs = util.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
+  %rhs = util.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
   %res = "mhlo.dot_general"(%lhs, %rhs) {
            dot_dimension_numbers = {
              lhs_batching_dimensions = dense<0> : tensor<1xi64>,
@@ -125,8 +125,8 @@ func @large_dot_general() {
 }
 
 func @large_dot_general2() {
-  %lhs = iree.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
-  %rhs = iree.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
+  %lhs = util.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
+  %rhs = util.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
   %res = "mhlo.dot_general"(%lhs, %rhs) {
            dot_dimension_numbers = {
              lhs_batching_dimensions = dense<0> : tensor<1xi64>,

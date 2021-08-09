@@ -18,6 +18,8 @@ iree_cc_library(
     "assert.h"
     "status.c"
     "status.h"
+    "string_builder.c"
+    "string_builder.h"
     "string_view.c"
     "string_view.h"
     "time.c"
@@ -50,6 +52,17 @@ iree_cc_test(
   DEPS
     ::base
     ::cc
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    string_builder_test
+  SRCS
+    "string_builder_test.cc"
+  DEPS
+    ::base
     iree::testing::gtest
     iree::testing::gtest_main
 )

@@ -20,9 +20,9 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Modules/VMVX/IR",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
+        "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",

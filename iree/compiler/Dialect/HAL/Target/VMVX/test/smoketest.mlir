@@ -46,8 +46,8 @@ flow.executable @add_dispatch_0 {
 //  CHECK-SAME:       ordinal = 0 : index
 //  CHECK-SAME:     }
 //       CHECK:     module {
-//  CHECK-NEXT:       vm.module @module {
-//  CHECK-NEXT:         vm.func @entry(
+//  CHECK-NEXT:       vm.module public @module {
+//  CHECK-NEXT:         vm.func private @entry(
 //  CHECK-SAME:             %[[SCRATCHPAD:.+]]: !vm.buffer, %[[CONSTANTS:.+]]: !vm.buffer,
 //  CHECK-SAME:             %[[BINDINGS:.+]]: !vm.list<!vm.buffer>
 //   CHECK-DAG:           %c16 = vm.const.i32 16 : i32

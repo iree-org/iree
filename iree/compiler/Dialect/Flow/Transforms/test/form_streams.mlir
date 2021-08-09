@@ -329,8 +329,8 @@ func @ordering(%w : index) -> (tensor<i32>, tensor<f32>, tensor<i32>) {
   //  CHECK-DAG:   %[[D1:.+]] = flow.dispatch @dispatch_1::@dispatch_1
   // CHECK-NEXT:   flow.return %[[D1]]
   %d1 = flow.dispatch @dispatch_1::@dispatch_1[%w](%c1) : (i32) -> tensor<i32>
-  // CHECK: %[[SE_USER:.+]] = iree.do_not_optimize(%[[S1]])
-  %side_effecting_user = iree.do_not_optimize(%d1) : tensor<i32>
+  // CHECK: %[[SE_USER:.+]] = util.do_not_optimize(%[[S1]])
+  %side_effecting_user = util.do_not_optimize(%d1) : tensor<i32>
   %c2 = constant 2 : i32
   //      CHECK: %[[S2:.+]] = flow.ex.stream.fragment
   //      CHECK:   %[[C2:.+]] = constant 2

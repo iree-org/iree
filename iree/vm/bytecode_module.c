@@ -495,6 +495,150 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
   }
 }
 
+static iree_status_t iree_vm_bytecode_location_format(
+    int32_t location_ordinal,
+    iree_vm_LocationTypeDef_union_vec_t location_table,
+    iree_string_builder_t* builder) {
+  iree_vm_LocationTypeDef_union_t location =
+      iree_vm_LocationTypeDef_union_vec_at(location_table, location_ordinal);
+  switch (location.type) {
+    default:
+    case iree_vm_LocationTypeDef_NONE: {
+      return iree_string_builder_append_cstring(builder, "[unknown]");
+    }
+    case iree_vm_LocationTypeDef_CallSiteLocDef: {
+      // NOTE: MLIR prints caller->callee, but in a stack trace we want the
+      // upside-down callee->caller.
+      iree_vm_CallSiteLocDef_table_t loc =
+          (iree_vm_CallSiteLocDef_table_t)location.value;
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_location_format(
+          iree_vm_CallSiteLocDef_callee(loc), location_table, builder));
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(builder, "\n      at "));
+      return iree_vm_bytecode_location_format(
+          iree_vm_CallSiteLocDef_caller(loc), location_table, builder);
+    }
+    case iree_vm_LocationTypeDef_FileLineColLocDef: {
+      iree_vm_FileLineColLocDef_table_t loc =
+          (iree_vm_FileLineColLocDef_table_t)location.value;
+      flatbuffers_string_t filename = iree_vm_FileLineColLocDef_filename(loc);
+      return iree_string_builder_append_format(
+          builder, "%.*s:%d:%d", (int)flatbuffers_string_len(filename),
+          filename, iree_vm_FileLineColLocDef_line(loc),
+          iree_vm_FileLineColLocDef_column(loc));
+    }
+    case iree_vm_LocationTypeDef_FusedLocDef: {
+      iree_vm_FusedLocDef_table_t loc =
+          (iree_vm_FusedLocDef_table_t)location.value;
+      if (iree_vm_FusedLocDef_metadata_is_present(loc)) {
+        flatbuffers_string_t metadata = iree_vm_FusedLocDef_metadata(loc);
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            builder, "<%.*s>", (int)flatbuffers_string_len(metadata),
+            metadata));
+      }
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "[\n"));
+      flatbuffers_int32_vec_t child_locs = iree_vm_FusedLocDef_locations(loc);
+      for (size_t i = 0; i < flatbuffers_int32_vec_len(child_locs); ++i) {
+        if (i == 0) {
+          IREE_RETURN_IF_ERROR(
+              iree_string_builder_append_cstring(builder, "    "));
+        } else {
+          IREE_RETURN_IF_ERROR(
+              iree_string_builder_append_cstring(builder, ",\n    "));
+        }
+        IREE_RETURN_IF_ERROR(iree_vm_bytecode_location_format(
+            flatbuffers_int32_vec_at(child_locs, i), location_table, builder));
+      }
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(builder, "\n  ]"));
+      return iree_ok_status();
+    }
+    case iree_vm_LocationTypeDef_NameLocDef: {
+      iree_vm_NameLocDef_table_t loc =
+          (iree_vm_NameLocDef_table_t)location.value;
+      flatbuffers_string_t name = iree_vm_NameLocDef_name(loc);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          builder, "\"%.*s\"", (int)flatbuffers_string_len(name), name));
+      if (iree_vm_NameLocDef_child_location_is_present(loc)) {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "("));
+        IREE_RETURN_IF_ERROR(iree_vm_bytecode_location_format(
+            iree_vm_NameLocDef_child_location(loc), location_table, builder));
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ")"));
+      }
+      return iree_ok_status();
+    }
+  }
+}
+
+static iree_status_t iree_vm_bytecode_module_source_location_format(
+    void* self, uint64_t data[2], iree_string_builder_t* builder) {
+  iree_vm_DebugDatabaseDef_table_t debug_database_def =
+      (iree_vm_DebugDatabaseDef_table_t)self;
+  iree_vm_FunctionSourceMapDef_table_t source_map_def =
+      (iree_vm_FunctionSourceMapDef_table_t)data[0];
+  iree_vm_BytecodeLocationDef_vec_t locations =
+      iree_vm_FunctionSourceMapDef_locations(source_map_def);
+  iree_vm_source_offset_t source_offset = (iree_vm_source_offset_t)data[1];
+
+  size_t location_def_ordinal =
+      iree_vm_BytecodeLocationDef_vec_scan_by_bytecode_offset(
+          locations, (int32_t)source_offset);
+  if (location_def_ordinal == -1) {
+    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+  }
+  iree_vm_BytecodeLocationDef_struct_t location_def =
+      iree_vm_BytecodeLocationDef_vec_at(locations, location_def_ordinal);
+  if (!location_def) {
+    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+  }
+
+  // Print source location stack trace.
+  iree_vm_LocationTypeDef_union_vec_t location_table =
+      iree_vm_DebugDatabaseDef_location_table_union(debug_database_def);
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_location_format(
+      location_def->location, location_table, builder));
+
+  return iree_ok_status();
+}
+
+static iree_status_t iree_vm_bytecode_module_resolve_source_location(
+    void* self, iree_vm_stack_frame_t* frame,
+    iree_vm_source_location_t* out_source_location) {
+  // Get module debug database, if available.
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  iree_vm_BytecodeModuleDef_table_t module_def = module->def;
+  iree_vm_DebugDatabaseDef_table_t debug_database_def =
+      iree_vm_BytecodeModuleDef_debug_database(module_def);
+  if (!debug_database_def) {
+    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+  }
+
+  // Remap the function to its internal ordinal used in the debug database.
+  iree_vm_function_t function = frame->function;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
+      self, function.linkage, function.ordinal, &function, NULL, NULL));
+
+  // Lookup the source map for the function, if available.
+  iree_vm_FunctionSourceMapDef_vec_t source_maps_vec =
+      iree_vm_DebugDatabaseDef_functions(debug_database_def);
+  iree_vm_FunctionSourceMapDef_table_t source_map_def =
+      function.ordinal < iree_vm_FunctionSourceMapDef_vec_len(source_maps_vec)
+          ? iree_vm_FunctionSourceMapDef_vec_at(source_maps_vec,
+                                                function.ordinal)
+          : NULL;
+  if (!source_map_def) {
+    return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+  }
+
+  // The source location stores the source map and PC and will perform the
+  // actual lookup within the source map on demand.
+  out_source_location->self = (void*)debug_database_def;
+  out_source_location->data[0] = (uint64_t)source_map_def;
+  out_source_location->data[1] = (uint64_t)frame->pc;
+  out_source_location->format = iree_vm_bytecode_module_source_location_format;
+  return iree_ok_status();
+}
+
 // Lays out the nested tables within a |state| structure.
 // Returns the total size of the structure and all tables with padding applied.
 // |state| may be null if only the structure size is required for allocation.
@@ -795,6 +939,10 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->interface.signature = iree_vm_bytecode_module_signature;
   module->interface.get_function = iree_vm_bytecode_module_get_function;
   module->interface.lookup_function = iree_vm_bytecode_module_lookup_function;
+#if IREE_VM_BACKTRACE_ENABLE
+  module->interface.resolve_source_location =
+      iree_vm_bytecode_module_resolve_source_location;
+#endif  // IREE_VM_BACKTRACE_ENABLE
   module->interface.alloc_state = iree_vm_bytecode_module_alloc_state;
   module->interface.free_state = iree_vm_bytecode_module_free_state;
   module->interface.resolve_import = iree_vm_bytecode_module_resolve_import;

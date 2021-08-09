@@ -22,7 +22,7 @@ td_library(
     ),
     deps = [
         "//iree/compiler/Dialect/HAL/IR:td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )

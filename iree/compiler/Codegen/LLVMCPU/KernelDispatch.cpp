@@ -201,7 +201,7 @@ static LogicalResult setDefaultRootConfig(FuncOp entryPointFn, Operation *op) {
   }
   TileSizesListType tileSizes = {workgroupTileSizes};
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      entryPointFn, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
 }
 

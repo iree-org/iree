@@ -18,10 +18,10 @@
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Modules/VMVX/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
@@ -45,10 +45,10 @@ inline void registerAllIreePasses() {
   registerTOSAConversionPasses();
 
   linalg_ext::registerLinalgExtPasses();
+  Shape::registerShapePasses();
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
-  IREE::registerTransformPasses();
-  Shape::registerShapePasses();
+  IREE::Util::registerTransformPasses();
   IREE::VM::registerVMPasses();
   IREE::VM::registerVMAnalysisTestPasses();
   IREE::VM::registerVMTestPasses();

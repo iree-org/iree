@@ -7,7 +7,7 @@
 #ifndef IREE_MODULES_CHECK_DIALECT_CHECK_OPS
 #define IREE_MODULES_CHECK_DIALECT_CHECK_OPS
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 
 def CHECK_Dialect : Dialect {

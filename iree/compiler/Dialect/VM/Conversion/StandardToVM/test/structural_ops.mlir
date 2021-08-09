@@ -6,9 +6,9 @@
 // CHECK-LABEL: @t001_module_all_options
 module @t001_module_all_options {
 
-// CHECK: module @my_module {
+// CHECK: vm.module public @my_module {
 module @my_module {
-  // CHECK: vm.func @my_fn(%[[ARG0:[a-zA-Z0-9$._-]+]]: i32) -> i32
+  // CHECK: vm.func private @my_fn(%[[ARG0:[a-zA-Z0-9$._-]+]]: i32) -> i32
   func @my_fn(%arg0: i32) -> (i32) {
     // CHECK: vm.return %[[ARG0]] : i32
     return %arg0 : i32
@@ -22,7 +22,7 @@ module @my_module {
 module @t002_no_args_results {
 
 module @my_module {
-  // CHECK: vm.func @my_fn() {
+  // CHECK: vm.func private @my_fn() {
   func @my_fn() -> () {
     // CHECK: vm.return
     return
@@ -35,7 +35,7 @@ module @my_module {
 // CHECK-LABEL: @t003_unnamed_module
 module @t003_unnamed_module {
 
-// CHECK: module @module {
+// CHECK: vm.module public @module {
 module {
 }
 
@@ -49,9 +49,9 @@ module {
   module {
     // CHECK: module
     module {
-      // CHECK-LABEL: vm.module @deeplyNested
+      // CHECK-LABEL: vm.module public @deeplyNested
       module @deeplyNested {
-        // CHECK: vm.func @foo
+        // CHECK: vm.func private @foo
         func @foo() {
           return
         }

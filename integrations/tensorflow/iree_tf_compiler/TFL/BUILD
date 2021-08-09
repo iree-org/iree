@@ -26,9 +26,9 @@ cc_library(
     ],
     deps = [
         "@iree//iree/compiler/Dialect/Flow/IR",
-        "@iree//iree/compiler/Dialect/IREE/IR",
         "@iree//iree/compiler/Dialect/Shape/IR",
         "@iree//iree/compiler/Dialect/Shape/Transforms",
+        "@iree//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

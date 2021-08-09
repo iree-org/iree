@@ -1,7 +1,7 @@
 // TODO(hanchung): Add other types of fft tests, e.g. fft, ifft, irfft.
 
 func @rfft_1d() {
-  %input = iree.unfoldable_constant dense<[
+  %input = util.unfoldable_constant dense<[
     9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5, -0.777, 2.0, 1.7,
     3.5, -4.5, 0.0, 9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5,
     -0.777, 2.0, 1.7, 3.5, -4.5, 0.0]> : tensor<32xf32>
@@ -16,7 +16,7 @@ func @rfft_1d() {
 }
 
 func @rfft_2d() {
-  %input = iree.unfoldable_constant dense<[[
+  %input = util.unfoldable_constant dense<[[
     9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5, -0.777, 2.0, 1.7,
     3.5, -4.5, 0.0, 9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5,
     -0.777, 2.0, 1.7, 3.5, -4.5, 0.0]]> : tensor<1x32xf32>

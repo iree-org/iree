@@ -83,11 +83,13 @@ class GlobalInitializationPass
 
     // If we didn't need to initialize anything then we can elide the functions.
     if (initFuncOp.getBlocks().front().getOperations().size() > 1) {
+      initFuncOp.setPrivate();
       moduleBuilder.create<ExportOp>(moduleBuilder.getUnknownLoc(), initFuncOp);
     } else {
       initFuncOp.erase();
     }
     if (deinitFuncOp.getBlocks().front().getOperations().size() > 1) {
+      deinitFuncOp.setPrivate();
       moduleBuilder.create<ExportOp>(moduleBuilder.getUnknownLoc(),
                                      deinitFuncOp);
     } else {

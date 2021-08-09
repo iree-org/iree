@@ -1,10 +1,10 @@
 func @conv2d_nopadding() {
-  %inputs = iree.unfoldable_constant dense<[[
+  %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
       [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0]],
       [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0]]]]> : tensor<1x4x4x2xf32>
-  %weights = iree.unfoldable_constant dense<[
+  %weights = util.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
@@ -31,7 +31,7 @@ func @conv2d_nopadding() {
 }
 
 func @conv2d_nopadding_batch_feature() {
-  %inputs = iree.unfoldable_constant dense<[
+  %inputs = util.unfoldable_constant dense<[
     [[[ 1.0], [ 3.0], [ 5.0], [ 7.0]],
      [[11.0], [13.0], [15.0], [17.0]],
      [[21.0], [23.0], [25.0], [27.0]],
@@ -41,7 +41,7 @@ func @conv2d_nopadding_batch_feature() {
      [[22.0], [24.0], [26.0], [28.0]],
      [[32.0], [34.0], [36.0], [38.0]]]
       ]> : tensor<2x4x4x1xf32>
-  %weights = iree.unfoldable_constant dense<[
+  %weights = util.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
@@ -68,12 +68,12 @@ func @conv2d_nopadding_batch_feature() {
 }
 
 func @conv2d_reorder_input_spatial() {
-  %inputs = iree.unfoldable_constant dense<[[
+  %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [11.0, 12.0], [21.0, 22.0], [31.0, 32.0]],
       [[ 3.0,  4.0], [13.0, 14.0], [23.0, 24.0], [33.0, 34.0]],
       [[ 5.0,  6.0], [15.0, 16.0], [25.0, 26.0], [35.0, 36.0]],
       [[ 7.0,  8.0], [17.0, 18.0], [27.0, 28.0], [37.0, 38.0]]]]> : tensor<1x4x4x2xf32>
-  %weights = iree.unfoldable_constant dense<[
+  %weights = util.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
@@ -100,12 +100,12 @@ func @conv2d_reorder_input_spatial() {
 }
 
 func @conv2d_reorder_kernel() {
-  %inputs = iree.unfoldable_constant dense<[[
+  %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
       [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0]],
       [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0]]]]> : tensor<1x4x4x2xf32>
-  %weights = iree.unfoldable_constant dense<
+  %weights = util.unfoldable_constant dense<
       [[[[ 1.0,  3.0], [ 2.0,  4.0]],
         [[ 5.0,  7.0], [ 6.0,  8.0]],
         [[ 9.0, 11.0], [10.0, 12.0]]]]> : tensor<1x3x2x2xf32>
@@ -132,12 +132,12 @@ func @conv2d_reorder_kernel() {
 }
 
 func @conv2d_reorder_output() {
-  %inputs = iree.unfoldable_constant dense<[[
+  %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
       [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0]],
       [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0]]]]> : tensor<1x4x4x2xf32>
-  %weights = iree.unfoldable_constant dense<[
+  %weights = util.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
@@ -165,12 +165,12 @@ func @conv2d_reorder_output() {
 }
 
 func @conv2d_1452x3221_same() {
-  %inputs = iree.unfoldable_constant dense<[[
+  %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0], [ 9.0, 10.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0], [19.0, 20.0]],
       [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0], [27.0, 28.0], [29.0, 30.0]],
       [[31.0, 32.0], [33.0, 34.0], [35.0, 36.0], [37.0, 38.0], [39.0, 40.0]]]]> : tensor<1x4x5x2xf32>
-  %weights = iree.unfoldable_constant dense<[
+  %weights = util.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0]], [[ 3.0], [ 4.0]]],
       [[[ 5.0], [ 6.0]], [[ 7.0], [ 8.0]]],
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
@@ -200,7 +200,7 @@ func @conv2d_1452x3221_same() {
 }
 
 func @conv2d_2451x2311_same() {
-  %inputs = iree.unfoldable_constant dense<[
+  %inputs = util.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0]],
        [[ 6.0], [ 7.0], [ 8.0], [ 9.0], [10.0]],
        [[11.0], [12.0], [13.0], [14.0], [15.0]],
@@ -209,7 +209,7 @@ func @conv2d_2451x2311_same() {
        [[26.0], [27.0], [28.0], [29.0], [30.0]],
        [[31.0], [32.0], [33.0], [34.0], [35.0]],
        [[36.0], [37.0], [38.0], [39.0], [40.0]]]]> : tensor <2x4x5x1xf32>
-  %weights = iree.unfoldable_constant dense<[
+  %weights = util.unfoldable_constant dense<[
       [[[1.0]], [[2.0]], [[3.0]]],
       [[[4.0]], [[5.0]], [[6.0]]]]> : tensor <2x3x1x1xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
@@ -242,7 +242,7 @@ func @conv2d_2451x2311_same() {
 }
 
 func @conv2d_no_padding2() {
-  %inputs = iree.unfoldable_constant dense<[
+  %inputs = util.unfoldable_constant dense<[
        [[[  1.0,   2.0,   3.0],
          [  4.0,   5.0,   6.0],
          [  7.0,   8.0,   9.0],
@@ -283,7 +283,7 @@ func @conv2d_no_padding2() {
          [112.0, 113.0, 114.0],
          [115.0, 116.0, 117.0],
          [118.0, 119.0, 120.0]]]]> : tensor<2x4x5x3xf32>
-  %weights = iree.unfoldable_constant dense<[
+  %weights = util.unfoldable_constant dense<[
       [[[  1.0,   2.0,   3.0,   4.0,   5.0,   6.0],
         [  7.0,   8.0,   9.0,  10.0,  11.0,  12.0],
         [ 13.0,  14.0,  15.0,  16.0,  17.0,  18.0]],
@@ -341,7 +341,7 @@ func @conv2d_no_padding2() {
 }
 
 func @conv2d_1452x2223_dilated_valid() {
-  %inputs = iree.unfoldable_constant dense<
+  %inputs = util.unfoldable_constant dense<
      [[[[0.09762701,  0.43037874],
        [ 0.20552675,  0.08976637],
        [-0.1526904,   0.29178822],
@@ -362,7 +362,7 @@ func @conv2d_1452x2223_dilated_valid() {
        [-0.9624204,   0.23527099],
        [ 0.22419144,  0.23386799],
        [ 0.8874962,   0.3636406 ]]]]> : tensor<1x4x5x2xf32>
-  %weights = iree.unfoldable_constant dense<
+  %weights = util.unfoldable_constant dense<
     [[[[-0.2809842,  -0.12593609,  0.3952624 ],
        [-0.8795491,   0.33353344,  0.34127575]],
       [[-0.5792349,  -0.7421474,  -0.3691433 ],
@@ -402,8 +402,8 @@ func @conv2d_1452x2223_dilated_valid() {
 }
 
 func @depthwise_conv_non_1_channel_multiplier() {
-  %arg0 = iree.unfoldable_constant dense<1.0> : tensor<2x4x5x2xf32>
-  %arg1 = iree.unfoldable_constant dense<1.0> : tensor<2x2x2x3xf32>
+  %arg0 = util.unfoldable_constant dense<1.0> : tensor<2x4x5x2xf32>
+  %arg1 = util.unfoldable_constant dense<1.0> : tensor<2x2x2x3xf32>
   %res = "mhlo.convolution"(%arg0, %arg1) {
     batch_group_count = 1 : i64,
     dimension_numbers = {

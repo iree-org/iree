@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
@@ -37,18 +37,18 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
   /// the symbol when printing textual IR. These aliases must not contain `.` or
   /// end with a numeric digit([0-9]+). Returns success if an alias was
   /// provided, failure otherwise.
-  LogicalResult getAlias(Attribute attr, raw_ostream &os) const override {
+  AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     if (auto targetAttr = attr.dyn_cast<DeviceTargetAttr>()) {
       os << "device_target_" << targetAttr.getSymbolNameFragment();
-      return success();
+      return AliasResult::OverridableAlias;
     } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
       os << "executable_target_" << targetAttr.getSymbolNameFragment();
-      return success();
+      return AliasResult::OverridableAlias;
     } else if (attr.isa<LoweringConfig>()) {
       os << "config";
-      return success();
+      return AliasResult::OverridableAlias;
     }
-    return failure();
+    return AliasResult::NoAlias;
   }
 };
 
@@ -107,7 +107,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<HALDialect>()) {
-  context->loadDialect<IREEDialect>();
+  context->loadDialect<IREE::Util::UtilDialect>();
 
   registerAttributes();
   registerTypes();

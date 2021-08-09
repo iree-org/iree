@@ -105,7 +105,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+        entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
         passPipeline, {1, 1, 1});
   }
 
@@ -132,13 +132,18 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
       break;
     }
   }
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    // Tile reduction dimension to 1. Using a large tile size may allow better
+    // scheduling and could help in case one of the input has transpose.
+    // TODO(thomasraoux): improve the heuristic.
+    workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 1);
+  }
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   tileSizes.push_back({});                                // Subgroup level.
   tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-      workgroupSize);
+      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
 }
 
 static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {

@@ -64,14 +64,14 @@ The above are all representable with native constructs in the VM:
     -   Runtime:
         [`iree_vm_list`](https://github.com/google/iree/blob/main/iree/vm/list.h)
         containing `i8`
-    -   Compile Time: `!iree.list<i8>`
+    -   Compile Time: `!util.list<i8>`
 
 -   Tuple:
 
     -   Runtime:
         [`iree_vm_list`](https://github.com/google/iree/blob/main/iree/vm/list.h)
         of variant
-    -   Compile Time: `!iree.list<?>`
+    -   Compile Time: `!util.list<?>`
     -   Note that these are statically type erased at the boundary.
 
 -   TypedList (homogenous):
@@ -79,7 +79,7 @@ The above are all representable with native constructs in the VM:
     -   Runtime:
         [`iree_vm_list`](https://github.com/google/iree/blob/main/iree/vm/list.h)
         of `T`
-    -   Compile Time: `!iree.list<T>`
+    -   Compile Time: `!util.list<T>`
 
 ### Extended Type Calling Conventions
 
@@ -105,7 +105,7 @@ In C-like languages, this may just be a `struct`. In Python, it is typically a
 slots. In both, its slots are of fixed arity.
 
 In this convention, such a structure is represented as a `Tuple` in the native
-calling convention (i.e. `!iree.list` of variant type). The order of the
+calling convention (i.e. `!util.list` of variant type). The order of the
 elements of the tuple are the natural order of the structure, where that is
 either:
 
@@ -118,7 +118,7 @@ either:
 
 Most languages interop between byte arrays (i.e. the native ABI `String` type)
 by way of applying an encoding. Such strings are just a sequence of bytes (i.e.
-`!iree.list<i8>`).
+`!util.list<i8>`).
 
 #### Typed List
 
@@ -134,8 +134,8 @@ non-POD, etc). These types are permitted for completeness, not necessarily
 performance: by nature they are already indirected and have overheads.
 
 In the native ABI, these are represented as a composite tuple type (i.e. today a
-list since sugar for tuple is not yet defined): `!iree.tuple<!iree.list<T>,
-!iree.list<index>>`. The first element of the tuple is the list of values,
+list since sugar for tuple is not yet defined): `!iree.tuple<!util.list<T>,
+!util.list<index>>`. The first element of the tuple is the list of values,
 packed with a C-Layout and the second element is the list of dimension sizes.
 
 #### Reflection

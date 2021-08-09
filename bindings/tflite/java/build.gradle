@@ -36,7 +36,6 @@ android {
                         // Disable all but the runtime components needed for the
                         // java bindings.
                         "-DIREE_BUILD_COMPILER=OFF",
-                        "-DIREE_ENABLE_MLIR=OFF",
                         "-DIREE_BUILD_TESTS=OFF",
                         "-DIREE_BUILD_SAMPLES=OFF",
                         "-DIREE_BUILD_PYTHON_BINDINGS=OFF",

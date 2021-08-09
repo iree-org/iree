@@ -59,45 +59,45 @@ builtin.module @return_list attributes {tf.versions = {bad_consumers = [], min_c
 
 // -----
 // CHECK-LABEL: module @dict_nest
-// CHECK: func @dict_nest(%arg0: !iree.list<?>, %arg1: !hal.buffer_view) -> (!iree.list<?>, !iree.list<?>)
+// CHECK: func @dict_nest(%arg0: !util.list<?>, %arg1: !hal.buffer_view) -> (!util.list<?>, !util.list<?>)
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22sdict\22,[\22dict\22,[\22sdict\22,[\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22b\22,[\22ndarray\22,\22f32\22,1,16]]]],[\22list\22,[\22slist\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]]],[\22ndarray\22,\22f32\22,0]],\22r\22:[[\22sdict\22,[\22dict\22,[\22sdict\22,[\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22b\22,[\22ndarray\22,\22f32\22,1,16]]]],[\22list\22,[\22stuple\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]]]],\22v\22:1}"
 // CHECK: %[[c0:.+]] = constant 0 : index
-// CHECK: %[[L0:.+]] = iree.list.get %arg0[%[[c0]]] : !iree.list<?> -> !iree.list<?>
+// CHECK: %[[L0:.+]] = util.list.get %arg0[%[[c0]]] : !util.list<?> -> !util.list<?>
 // CHECK: %[[c0_0:.+]] = constant 0 : index
-// CHECK: %[[L1:.+]] = iree.list.get %[[L0]][%[[c0_0]]] : !iree.list<?> -> !hal.buffer_view
+// CHECK: %[[L1:.+]] = util.list.get %[[L0]][%[[c0_0]]] : !util.list<?> -> !hal.buffer_view
 // CHECK: %[[L1_TENSOR:.+]] = hal.tensor.cast %[[L1]] : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[c1:.+]] = constant 1 : index
-// CHECK: %[[L2:.+]] = iree.list.get %[[L0]][%[[c1]]] : !iree.list<?> -> !hal.buffer_view
+// CHECK: %[[L2:.+]] = util.list.get %[[L0]][%[[c1]]] : !util.list<?> -> !hal.buffer_view
 // CHECK: %[[L2_TENSOR:.+]] = hal.tensor.cast %[[L2]] : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[c1_1:.+]] = constant 1 : index
-// CHECK: %[[L3:.+]] = iree.list.get %arg0[%[[c1_1]]] : !iree.list<?> -> !iree.list<?>
+// CHECK: %[[L3:.+]] = util.list.get %arg0[%[[c1_1]]] : !util.list<?> -> !util.list<?>
 // CHECK: %[[c0_2:.+]] = constant 0 : index
-// CHECK: %[[L4:.+]] = iree.list.get %[[L3]][%[[c0_2]]] : !iree.list<?> -> !hal.buffer_view
+// CHECK: %[[L4:.+]] = util.list.get %[[L3]][%[[c0_2]]] : !util.list<?> -> !hal.buffer_view
 // CHECK: %[[L4_TENSOR:.+]] = hal.tensor.cast %[[L4]] : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[c1_3:.+]] = constant 1 : index
-// CHECK: %[[L5:.+]] = iree.list.get %[[L3]][%[[c1_3]]] : !iree.list<?> -> !hal.buffer_view
+// CHECK: %[[L5:.+]] = util.list.get %[[L3]][%[[c1_3]]] : !util.list<?> -> !hal.buffer_view
 // CHECK: %[[L5_TENSOR:.+]] = hal.tensor.cast %[[L5]] : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[ARG1_TENSOR:.+]] = hal.tensor.cast %arg1 : !hal.buffer_view -> tensor<f32>
 // CHECK: %[[RESULT:.+]]:4 = call @__inference_dict_nest_190(%[[L1_TENSOR]], %[[L2_TENSOR]], %[[L4_TENSOR]], %[[L5_TENSOR]], %[[ARG1_TENSOR]]) : (tensor<16xf32>, tensor<16xf32>, tensor<16xf32>, tensor<16xf32>, tensor<f32>) -> (tensor<16xf32>, tensor<16xf32>, tensor<16xf32>, tensor<16xf32>)
 // CHECK: %[[c2:.+]] = constant 2 : index
-// CHECK: %[[R7:.+]] = iree.list.create %[[c2]] : !iree.list<?>
-// CHECK: iree.list.resize %[[R7]], %[[c2]]
+// CHECK: %[[R7:.+]] = util.list.create %[[c2]] : !util.list<?>
+// CHECK: util.list.resize %[[R7]], %[[c2]]
 // CHECK: %[[R0_BV:.+]] = hal.tensor.cast %[[RESULT]]#0 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: %[[c0_4:.+]] = constant 0 : index
-// CHECK: iree.list.set %[[R7]][%[[c0_4]]], %[[R0_BV]] : !hal.buffer_view -> !iree.list<?>
+// CHECK: util.list.set %[[R7]][%[[c0_4]]], %[[R0_BV]] : !hal.buffer_view -> !util.list<?>
 // CHECK: %[[R1_BV:.+]] = hal.tensor.cast %[[RESULT]]#1 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: %[[c1_5:.+]] = constant 1 : index
-// CHECK: iree.list.set %[[R7]][%[[c1_5]]], %[[R1_BV]] : !hal.buffer_view -> !iree.list<?>
+// CHECK: util.list.set %[[R7]][%[[c1_5]]], %[[R1_BV]] : !hal.buffer_view -> !util.list<?>
 // CHECK: %[[c2_8:.+]] = constant 2 : index
-// CHECK: %[[R9:.+]] = iree.list.create %[[c2_8]] : !iree.list<?>
-// CHECK: iree.list.resize %[[R9]], %[[c2_8]]
+// CHECK: %[[R9:.+]] = util.list.create %[[c2_8]] : !util.list<?>
+// CHECK: util.list.resize %[[R9]], %[[c2_8]]
 // CHECK: %[[R2_BV:.+]] = hal.tensor.cast %[[RESULT]]#2 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: %[[c0_9:.+]] = constant 0 : index
-// CHECK: iree.list.set %[[R9]][%[[c0_9]]], %[[R2_BV]] : !hal.buffer_view -> !iree.list<?>
+// CHECK: util.list.set %[[R9]][%[[c0_9]]], %[[R2_BV]] : !hal.buffer_view -> !util.list<?>
 // CHECK: %[[R3_BV:.+]] = hal.tensor.cast %[[RESULT]]#3 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: %[[c1_10:.+]] = constant 1 : index
-// CHECK: iree.list.set %[[R9]][%[[c1_10]]], %[[R3_BV]] : !hal.buffer_view -> !iree.list<?>
-// return %[[R7]], %[[R8]] : !iree.list<?>, !iree.list<?>
+// CHECK: util.list.set %[[R9]][%[[c1_10]]], %[[R3_BV]] : !hal.buffer_view -> !util.list<?>
+// return %[[R7]], %[[R8]] : !util.list<?>, !util.list<?>
 // CHECK: func private @__inference_dict_nest_190
 // CHECK-NOT: tf_saved_model
 builtin.module @dict_nest attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 729 : i32}, tf_saved_model.semantics}  {
@@ -117,7 +117,7 @@ builtin.module @dict_nest attributes {tf.versions = {bad_consumers = [], min_con
 
 // -----
 // CHECK-LABEL: module @kwargs
-// CHECK: func @dict_nest(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !iree.list<?>
+// CHECK: func @dict_nest(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !util.list<?>
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22named\22,\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22named\22,\22b\22,[\22ndarray\22,\22f32\22,1,16]],[\22named\22,\22scalar\22,[\22ndarray\22,\22f32\22,0]]],\22r\22:[[\22sdict\22,[\22dict\22,[\22sdict\22,[\22a\22,[\22ndarray\22,\22f32\22,1,16]],[\22b\22,[\22ndarray\22,\22f32\22,1,16]],[\22scalar\22,[\22ndarray\22,\22f32\22,0]]]]]],\22v\22:1}"
 builtin.module @kwargs attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 729 : i32}, tf_saved_model.semantics}  {
   builtin.func @__inference_dict_nest_190(

@@ -67,8 +67,8 @@ hal.constant_pool @pool attributes {
 
 // CHECK: func @storage_lookup
 func @storage_lookup() {
-  // CHECK-NEXT: = hal.constant_storage.lookup @pool::@_storage1 : !iree.byte_buffer
-  %storage = hal.constant_storage.lookup @pool::@_storage1 : !iree.byte_buffer
+  // CHECK-NEXT: = hal.constant_storage.lookup @pool::@_storage1 : !util.byte_buffer
+  %storage = hal.constant_storage.lookup @pool::@_storage1 : !util.byte_buffer
   return
 }
 

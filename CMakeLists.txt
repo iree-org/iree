@@ -37,7 +37,6 @@ endif()
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
-option(IREE_ENABLE_MLIR "Enables MLIR/LLVM dependencies." ON)
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
@@ -96,22 +95,9 @@ option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disa
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_COMPILER})
-  set(IREE_ENABLE_MLIR ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
-endif()
-
-if(${IREE_ENABLE_MLIR})
-  set(IREE_MLIR_DEP_MODE "BUNDLED" CACHE STRING "One of BUNDLED (default), DISABLED, INSTALLED")
-endif()
-
-if(${IREE_ENABLE_EMITC})
-  if(NOT ${IREE_ENABLE_MLIR})
-    message(FATAL_ERROR "Enabling EmitC requires setting IREE_ENABLE_MLIR to ON.")
-  endif()
-
-  string(TOUPPER "${IREE_MLIR_DEP_MODE}" uppercase_IREE_MLIR_DEP_MODE)
-  if(NOT uppercase_IREE_MLIR_DEP_MODE MATCHES "^(BUNDLED|INSTALLED)$")
-    message(FATAL_ERROR "Enabling EmitC requires IREE_MLIR_DEP_MODE set to BUNDELED or INSTALLED.")
+if(IREE_ENABLE_EMITC)
+  if(NOT IREE_BUILD_COMPILER)
+    message(FATAL_ERROR "Enabling EmitC requires setting IREE_BUILD_COMPILER to ON.")
   endif()
 endif()
 
@@ -273,6 +259,7 @@ include(iree_cc_library)
 include(iree_cc_test)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
+include(iree_third_party_cmake_options)
 include(iree_c_embed_data)
 include(iree_bytecode_module)
 include(iree_c_module)
@@ -341,102 +328,73 @@ endif()
 
 #-------------------------------------------------------------------------------
 # MLIR/LLVM Dependency
-# We treat the LLVM dependency specially because we support several different
-# ways to use it:
-#   - Bundled (default): a source dependency directly on the
-#     third_party/llvm-project submodule.
-#   - External: An external (source or installed) dependency on LLVM.
-#   - Provided: When IREE is used as a sub-project, it is assumed that the LLVM
-#     dependency is added prior to including this configuration.
 #-------------------------------------------------------------------------------
 
-# Disable LLVM's warnings.
-set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
-
-# Adds bundled projects that must be included after the LLVM directory has
-# been added and within the scope of its settings (i.e. build type override,
-# etc).
-function(add_bundled_mlir_dependent_projects)
-  if(${IREE_BUILD_COMPILER})
-    add_subdirectory(third_party/mlir-hlo EXCLUDE_FROM_ALL)
+if(NOT IREE_BUILD_COMPILER)
+  message(STATUS "Not adding LLVM/MLIR because the configuration does not require it")
+elseif(TARGET LLVMSupport)
+  message(STATUS "Not adding IREE bundled LLVM because it has already been included")
+  if(NOT TARGET MLIRIR)
+    message(FATAL_ERROR "Detected externally provided LLVM project but could not find MLIR projects (is it enabled/installed?)")
   endif()
-endfunction()
+else()
+  message(STATUS "Adding bundled LLVM source dependency")
+  iree_set_llvm_cmake_options()
 
-function(add_iree_mlir_src_dep llvm_monorepo_path)
+  # Disable LLVM's warnings.
+  set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
+
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
-  add_subdirectory("${llvm_monorepo_path}/llvm" "third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
+  add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
-endfunction()
 
-if(${IREE_ENABLE_MLIR})
-  if(${IREE_MLIR_DEP_MODE} STREQUAL "DISABLED")
-    message(STATUS "Not adding MLIR/LLVM dep due to IREE_MLIR_DEP_MODE=DISABLED")
-  elseif(${IREE_MLIR_DEP_MODE} STREQUAL "BUNDLED")
-    message(STATUS "Adding bundled LLVM source dependency")
-    add_iree_mlir_src_dep("third_party/llvm-project")
+  # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
 
-    # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
-    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/lib/cmake/llvm/")
+  # Add the bundled include directories for cmake files looking for them.
+  list(APPEND LLVM_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
+  )
+  list(APPEND MLIR_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
+    ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+  )
 
-    # Add the bundled include directories for cmake files looking for them.
-    list(APPEND LLVM_INCLUDE_DIRS
-      ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-      ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-    )
-    list(APPEND MLIR_INCLUDE_DIRS
-      ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-      ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
-    )
+  # Avoid globally modifying paths by instead adding the include paths to the
+  # rules that really should have them in the first place.
+  target_include_directories(LLVMSupport PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
+  )
+  target_include_directories(MLIRSupport PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
+  )
+endif()
 
-    # Avoid globally modifying paths by instead adding the include paths to the
-    # rules that really should have them in the first place.
-    target_include_directories(LLVMSupport PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
-    )
-    target_include_directories(MLIRSupport PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
-    )
-
-    # Set build option to use MHLO alongside with bundled MLIR
-    set(MHLO_BUILD_EMBEDDED ON)
-  elseif(${IREE_MLIR_DEP_MODE} STREQUAL "INSTALLED")
-    # Deps of installed MLIR/LLVM packages.
-    find_package(ZLIB)  # See: https://reviews.llvm.org/D79219
-    message(STATUS "Looking for installed MLIR/LLVM packages (configure with MLIR_DIR variable)")
-    find_package(MLIR REQUIRED CONFIG)
-    message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-    message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-    list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
-    list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-    include(TableGen)
-    include(AddLLVM)
-    include(AddMLIR)
-    include(HandleLLVMOptions)
-
-    # Add include/link directories
-    include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
-    include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
-    link_directories(${LLVM_BUILD_LIBRARY_DIR})
-    add_definitions(${LLVM_DEFINITIONS})
+# Add bundled mlir-hlo project unless if already provided.
+if(IREE_BUILD_COMPILER)
+  if(TARGET MLIRMhloUtils)
+    message(STATUS "Not adding IREE bundled mlir-hlo project because it is already present")
   else()
-    message(FATAL "Unsupported IREE_MLIR_DEP_MODE=${IREE_MLIR_DEP_MODE}")
+    message(STATUS "Adding IREE bundled mlir-hlo project")
+    # TODO: Have better sub project detection upstream.
+    set(MHLO_BUILD_EMBEDDED ON)
+    add_subdirectory(third_party/mlir-hlo EXCLUDE_FROM_ALL)
   endif()
-
-  add_bundled_mlir_dependent_projects()
 endif()
 
 #-------------------------------------------------------------------------------
 # Python bindings.
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_PYTHON_BINDINGS})
+if(IREE_BUILD_PYTHON_BINDINGS)
   # Note: Optional because python libs can be manually specified.
   find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 endif()
@@ -449,17 +407,24 @@ include(external_cc_library)
 include(flatbuffer_c_library)
 
 add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
+iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
-if(${IREE_ENABLE_THREADING})
+
+if(IREE_ENABLE_THREADING)
+  iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+  iree_set_cpuinfo_cmake_options()
   add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 endif()
+
+iree_set_flatcc_cmake_options()
+add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
+
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
@@ -469,23 +434,24 @@ if (NOT CMAKE_CROSSCOMPILING)
           RUNTIME DESTINATION bin)
 endif()
 
-if(${IREE_BUILD_COMPILER})
+if(IREE_BUILD_COMPILER)
   add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
 endif()
 
-if(${IREE_ENABLE_EMITC})
+if(IREE_ENABLE_EMITC)
   add_subdirectory(build_tools/third_party/mlir-emitc EXCLUDE_FROM_ALL)
 endif()
 
-if(${IREE_BUILD_TESTS})
+if(IREE_BUILD_TESTS)
   enable_testing(iree)
 endif()
 
-if(${IREE_BUILD_PYTHON_BINDINGS})
+if(IREE_BUILD_PYTHON_BINDINGS)
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
 endif()
 
-if(${IREE_TARGET_BACKEND_METAL-SPIRV})
+if(IREE_TARGET_BACKEND_METAL-SPIRV)
+  iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
 endif()

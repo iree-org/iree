@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -320,8 +320,8 @@ struct ExpandAllocatorConstantOp
         IREE::HAL::BufferUsageBitfield::Constant;
     Type bufferType = IREE::HAL::BufferType::get(rewriter.getContext());
 
-    auto hostBuffer = rewriter.createOrFold<IREE::ByteBufferConstantOp>(
-        op.getLoc(), IREE::ByteBufferType::get(rewriter.getContext()),
+    auto hostBuffer = rewriter.createOrFold<IREE::Util::ByteBufferConstantOp>(
+        op.getLoc(), IREE::Util::ByteBufferType::get(rewriter.getContext()),
         op.value());
     auto zero = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 0);
     auto neg1 = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), -1);

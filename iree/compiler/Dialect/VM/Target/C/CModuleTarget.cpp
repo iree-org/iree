@@ -7,8 +7,8 @@
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
 #include "emitc/Target/Cpp/CppEmitter.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
@@ -309,7 +309,7 @@ static LogicalResult canonicalizeModule(
   OwningRewritePatternList patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
-  target.addLegalOp<IREE::DoNotOptimizeOp>();
+  target.addLegalOp<IREE::Util::DoNotOptimizeOp>();
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
@@ -371,7 +371,7 @@ static LogicalResult canonicalizeModule(
   // C target specific pass
   modulePasses.addPass(createConvertVMToEmitCPass());
 
-  modulePasses.addPass(createDropCompilerHintsPass());
+  modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
 
   if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";

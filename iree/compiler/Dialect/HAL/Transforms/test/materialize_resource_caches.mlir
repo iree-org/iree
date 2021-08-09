@@ -159,7 +159,7 @@ hal.executable @exe {
 // CHECK:     hal.return %[[EXE]] : !hal.executable
 // CHECK:   },
 // CHECK:   #hal.match.always {
-// CHECK:     %[[NULL:.+]] = iree.null : !hal.executable
+// CHECK:     %[[NULL:.+]] = util.null : !hal.executable
 // CHECK:     hal.return %[[NULL]] : !hal.executable
 // CHECK:   }
 // CHECK:   return %[[RET]] : !hal.executable

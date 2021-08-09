@@ -3542,7 +3542,7 @@ def VM_FailOp : VM_Op<"fail", [
   }];
 
   let arguments = (ins
-    IREE_Status:$status,
+    Util_Status:$status,
     OptionalAttr<StrAttr>:$message
   );
 
@@ -3597,7 +3597,7 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
 
   let arguments = (ins
     VM_CondValue:$condition,
-    IREE_Status:$status,
+    Util_Status:$status,
     OptionalAttr<StrAttr>:$message
   );
 

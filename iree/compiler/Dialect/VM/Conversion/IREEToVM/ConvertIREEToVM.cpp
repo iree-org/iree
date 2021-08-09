@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -22,14 +22,14 @@ namespace iree_compiler {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// iree.null
+// util.null
 //===----------------------------------------------------------------------===//
 
-class NullOpConversion : public OpConversionPattern<IREE::NullOp> {
+class NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::NullOp op, ArrayRef<Value> operands,
+      IREE::Util::NullOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ConstRefZeroOp>(
         op, IREE::VM::RefType::get(op.getType()));
@@ -38,15 +38,15 @@ class NullOpConversion : public OpConversionPattern<IREE::NullOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// iree.byte_buffer.*
+// util.byte_buffer.*
 //===----------------------------------------------------------------------===//
 
 class ByteBufferConstantOpConversion
-    : public OpConversionPattern<IREE::ByteBufferConstantOp> {
+    : public OpConversionPattern<IREE::Util::ByteBufferConstantOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::ByteBufferConstantOp op, ArrayRef<Value> operands,
+      IREE::Util::ByteBufferConstantOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::RodataInlineOp>(
         op,
@@ -62,16 +62,17 @@ class ByteBufferConstantOpConversion
 //===----------------------------------------------------------------------===//
 
 class UnreachableOpConversion
-    : public OpConversionPattern<IREE::UnreachableOp> {
+    : public OpConversionPattern<IREE::Util::UnreachableOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::UnreachableOp srcOp, ArrayRef<Value> operands,
+      IREE::Util::UnreachableOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(
         srcOp,
         rewriter.createOrFold<IREE::VM::ConstI32Op>(
-            srcOp.getLoc(), static_cast<int32_t>(IREE::StatusCode::Unknown)),
+            srcOp.getLoc(),
+            static_cast<int32_t>(IREE::Util::StatusCode::Unknown)),
         srcOp.message());
     return success();
   }
@@ -81,12 +82,13 @@ class UnreachableOpConversion
 // Lists
 //===----------------------------------------------------------------------===//
 
-class ListCreateOpConversion : public OpConversionPattern<IREE::ListCreateOp> {
+class ListCreateOpConversion
+    : public OpConversionPattern<IREE::Util::ListCreateOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::ListCreateOp srcOp, ArrayRef<Value> operands,
+      IREE::Util::ListCreateOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::ListCreateOpAdaptor srcOperands(operands);
+    IREE::Util::ListCreateOpAdaptor srcOperands(operands);
     rewriter.replaceOpWithNewOp<IREE::VM::ListAllocOp>(
         srcOp, typeConverter->convertType(srcOp.result().getType()),
         srcOperands.initial_capacity());
@@ -94,12 +96,13 @@ class ListCreateOpConversion : public OpConversionPattern<IREE::ListCreateOp> {
   }
 };
 
-class ListSizeOpConversion : public OpConversionPattern<IREE::ListSizeOp> {
+class ListSizeOpConversion
+    : public OpConversionPattern<IREE::Util::ListSizeOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::ListSizeOp srcOp, ArrayRef<Value> operands,
+      IREE::Util::ListSizeOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::ListSizeOpAdaptor srcOperands(operands);
+    IREE::Util::ListSizeOpAdaptor srcOperands(operands);
     rewriter.replaceOpWithNewOp<IREE::VM::ListSizeOp>(
         srcOp, typeConverter->convertType(srcOp.result().getType()),
         srcOperands.list());
@@ -107,24 +110,25 @@ class ListSizeOpConversion : public OpConversionPattern<IREE::ListSizeOp> {
   }
 };
 
-class ListResizeOpConversion : public OpConversionPattern<IREE::ListResizeOp> {
+class ListResizeOpConversion
+    : public OpConversionPattern<IREE::Util::ListResizeOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::ListResizeOp srcOp, ArrayRef<Value> operands,
+      IREE::Util::ListResizeOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::ListResizeOpAdaptor srcOperands(operands);
+    IREE::Util::ListResizeOpAdaptor srcOperands(operands);
     rewriter.replaceOpWithNewOp<IREE::VM::ListResizeOp>(
         srcOp, srcOperands.list(), srcOperands.new_size());
     return success();
   }
 };
 
-class ListGetOpConversion : public OpConversionPattern<IREE::ListGetOp> {
+class ListGetOpConversion : public OpConversionPattern<IREE::Util::ListGetOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::ListGetOp srcOp, ArrayRef<Value> operands,
+      IREE::Util::ListGetOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::ListGetOpAdaptor srcOperands(operands);
+    IREE::Util::ListGetOpAdaptor srcOperands(operands);
     auto resultType = typeConverter->convertType(srcOp.result().getType());
     if (resultType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListGetI32Op>(
@@ -148,12 +152,12 @@ class ListGetOpConversion : public OpConversionPattern<IREE::ListGetOp> {
   }
 };
 
-class ListSetOpConversion : public OpConversionPattern<IREE::ListSetOp> {
+class ListSetOpConversion : public OpConversionPattern<IREE::Util::ListSetOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::ListSetOp srcOp, ArrayRef<Value> operands,
+      IREE::Util::ListSetOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::ListSetOpAdaptor srcOperands(operands);
+    IREE::Util::ListSetOpAdaptor srcOperands(operands);
     auto valueType = srcOperands.value().getType();
     if (valueType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ListSetI32Op>(
@@ -186,19 +190,21 @@ void populateIREEToVMPatterns(MLIRContext *context,
   patterns.insert<ByteBufferConstantOpConversion>(typeConverter, context);
   patterns.insert<UnreachableOpConversion>(typeConverter, context);
 
-  typeConverter.addConversion([](IREE::ByteBufferType type) -> Optional<Type> {
-    return IREE::VM::RefType::get(IREE::VM::BufferType::get(type.getContext()));
-  });
   typeConverter.addConversion(
-      [](IREE::MutableByteBufferType type) -> Optional<Type> {
+      [](IREE::Util::ByteBufferType type) -> Optional<Type> {
+        return IREE::VM::RefType::get(
+            IREE::VM::BufferType::get(type.getContext()));
+      });
+  typeConverter.addConversion(
+      [](IREE::Util::MutableByteBufferType type) -> Optional<Type> {
         return IREE::VM::RefType::get(
             IREE::VM::BufferType::get(type.getContext()));
       });
 
   typeConverter.addConversion(
-      [&typeConverter](IREE::ListType type) -> Optional<Type> {
+      [&typeConverter](IREE::Util::ListType type) -> Optional<Type> {
         Type elementType;
-        if (type.getElementType().isa<IREE::VariantType>()) {
+        if (type.getElementType().isa<IREE::Util::VariantType>()) {
           elementType = IREE::VM::OpaqueType::get(type.getContext());
         } else {
           elementType = typeConverter.convertType(type.getElementType());

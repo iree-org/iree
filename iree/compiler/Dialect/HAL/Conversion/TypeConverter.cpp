@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -77,12 +77,12 @@ HALTypeConverter::HALTypeConverter(
 
   // Recursively handle pointer target types (we want to convert
   // ptr<tensor<...>> to ptr<!hal.buffer<...>>, for example).
-  addConversion([this](IREE::PtrType type) -> Type {
+  addConversion([this](IREE::Util::PtrType type) -> Type {
     auto targetType = convertType(type.getTargetType());
     if (!targetType) {
       return Type();
     }
-    return IREE::PtrType::get(targetType);
+    return IREE::Util::PtrType::get(targetType);
   });
 }
 

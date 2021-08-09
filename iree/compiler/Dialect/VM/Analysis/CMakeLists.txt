@@ -28,7 +28,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::IR
   PUBLIC
 )
