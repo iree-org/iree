@@ -128,7 +128,7 @@ func @reverseOp(%arg0 : !custom.message) -> !custom.message {
 // -----
 
 // CHECK: vm.import @custom.get_unique_message
-// CHECK-LABEL: func @getUniqueMessageOp
+// CHECK-LABEL: @getUniqueMessageOp
 func @getUniqueMessageOp() -> !custom.message {
   // CHECK: %ref = vm.call @custom.get_unique_message() : () -> !vm.ref<!custom.message>
   %0 = "custom.get_unique_message"() : () -> !custom.message

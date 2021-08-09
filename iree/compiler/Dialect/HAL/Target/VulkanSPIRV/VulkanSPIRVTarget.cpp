@@ -14,17 +14,23 @@
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvironment.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/spirv_executable_def_builder.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Path.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/Linking/ModuleCombiner.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
@@ -32,6 +38,32 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+namespace {
+llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
+  if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
+    for (auto &childLoc : loc.getLocations()) {
+      auto childResult = findFirstFileLoc(childLoc);
+      if (childResult) return childResult;
+    }
+  } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
+    return loc;
+  }
+  return llvm::None;
+}
+
+std::string guessModuleName(mlir::ModuleOp moduleOp) {
+  std::string moduleName =
+      moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
+  if (!moduleName.empty()) return moduleName;
+  auto loc = findFirstFileLoc(moduleOp.getLoc());
+  if (loc.hasValue()) {
+    return llvm::sys::path::stem(loc.getValue().getFilename()).str();
+  } else {
+    return "spirv_module";
+  }
+}
+}  // namespace
 
 VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // TODO(antiagainst): Enable option categories once the following bug is
@@ -123,10 +155,131 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     buildSPIRVCodegenPassPipeline(passManager, options_.codegenOptions);
   }
 
+  // TODO(antiagainst): Re-enable SPIR-V linking once the tensorflow integration
+  // crash is fixed.
+/*
+  LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
+    // Note: Vulkan flavored SPIR-V does not have linking in the conventional
+    // sense. For example, there is no cross-module symbol reference and symbol
+    // resolution and such. It's more just combining all SPIR-V modules into the
+    // one, with multiple entry points.
+
+    // 1. Create source executable groups according to their executable
+    // interface. We only combine executables in the same group.
+
+    // Map from an executable interface's hash to all source executables having
+    // that interface.
+    llvm::DenseMap<llvm::hash_code, SmallVector<IREE::HAL::ExecutableOp, 4>>
+        sourceExecutableOpGroups;
+
+    int numExecutables = 0;
+    for (auto op : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+      auto interfaceOps =
+          llvm::to_vector<1>(op.getBlock().getOps<IREE::HAL::InterfaceOp>());
+      if (!llvm::hasSingleElement(interfaceOps)) {
+        return op->emitError("only one hal.interface is supported now");
+      }
+
+      llvm::hash_code hash = interfaceOps.front().getInterfaceHash();
+      sourceExecutableOpGroups[hash].push_back(op);
+
+      ++numExecutables;
+    }
+    if (numExecutables <= 1) return success();
+
+    SymbolTable symbolTable(moduleOp);
+
+    auto sharedTargetsAttr = getExecutableTargets(moduleOp.getContext());
+    if (llvm::size(sharedTargetsAttr) != 1) {
+      return moduleOp.emitError("only one executable target is supported now");
+    }
+
+    auto sharedTargetAttr = sharedTargetsAttr.getValue()
+                                .front()
+                                .cast<IREE::HAL::ExecutableTargetAttr>();
+
+    // Guess a module name, if needed, to make the output files readable.
+    auto moduleName = guessModuleName(moduleOp);
+
+    // 2. Create "linked" executables for each source executable group.
+    // This just pulls in spv.module ops that should be combined into the same
+    // hal.executable.variant inner module.
+
+    SmallVector<mlir::ModuleOp, 8> innerModuleOps;
+    innerModuleOps.reserve(sourceExecutableOpGroups.size());
+    for (auto hashExecutablePair : sourceExecutableOpGroups) {
+      llvm::hash_code hash = hashExecutablePair.first;
+      const auto &sourceExecutableOps = hashExecutablePair.second;
+
+      // Just one executable for this group. No need to link.
+      if (sourceExecutableOps.size() == 1) continue;
+
+      OpBuilder builder(moduleOp.getContext());
+
+      // Create a new "linked" hal.executable for collecting all source
+      // executables in this group.
+      std::string linkedExecutableName =
+          llvm::formatv("{0}_linked_{1}", moduleName, name());
+      auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
+          moduleOp.getLoc(), linkedExecutableName);
+      symbolTable.insert(linkedExecutableOp, moduleOp.getBody()->begin());
+
+      // Add our hal.executable.variant with an empty module.
+      builder.setInsertionPointToStart(linkedExecutableOp.getBody());
+      auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
+          moduleOp.getLoc(), sharedTargetAttr.getSymbolNameFragment(),
+          sharedTargetAttr);
+      builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
+      innerModuleOps.push_back(
+          builder.create<mlir::ModuleOp>(moduleOp.getLoc()));
+
+      // Try linking together all executables in moduleOp.
+      if (failed(linkExecutablesInto(
+              moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
+              [](mlir::ModuleOp moduleOp) { return moduleOp; }, builder)))
+        return failure();
+    }
+
+    // 3. Now we can have multiple spv.module ops in the same
+    // hal.executable.variant inner module. Combining them into one.
+
+    auto symbolRenameListener = [](spirv::ModuleOp symbolTable,
+                                   StringRef oldSymbol, StringRef newSymbol) {
+      // We don't care about global variable renaming. There should not exist
+      // duplicated functions. But double check that.
+      if (Operation *op = SymbolTable::lookupSymbolIn(symbolTable, oldSymbol)) {
+        assert(!isa<spirv::FuncOp>(op) &&
+               "found duplicated spv.func names when linking!");
+      }
+    };
+
+    for (mlir::ModuleOp innerModule : innerModuleOps) {
+      auto spvModules =
+          llvm::to_vector<4>(innerModule.getBody()->getOps<spirv::ModuleOp>());
+      if (spvModules.size() <= 1) continue;
+
+      OpBuilder builder(innerModule);
+      auto newModule = builder.create<mlir::ModuleOp>(innerModule.getLoc());
+
+      // Create the combined spv.module op and erase the old inner module.
+      builder.setInsertionPointToStart(newModule.getBody());
+      spirv::combine(spvModules, builder, symbolRenameListener).release();
+      innerModule.erase();
+    }
+
+    return success();
+  }
+*/
+
   LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
-    auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
+    auto spirvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
+    if (!llvm::hasSingleElement(spirvModuleOps)) {
+      return variantOp.emitError()
+             << "should only contain exactly one spv.module op";
+    }
+    auto spvModuleOp = *spirvModuleOps.begin();
 
     FlatbufferBuilder builder;
     iree_SpirVExecutableDef_start_as_root(builder);

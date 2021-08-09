@@ -28,11 +28,11 @@ func @fn() {
 flow.variable @var_indirect mutable : tensor<i32>
 func @fn() {
   // CHECK: %[[ADDR:.+]] = hal.variable.address @var_indirect
-  %0 = flow.variable.address @var_indirect : !iree.ptr<tensor<i32>>
+  %0 = flow.variable.address @var_indirect : !util.ptr<tensor<i32>>
   // CHECK-NEXT: %[[VALUE:.+]] = hal.variable.load.indirect %[[ADDR]]
-  %1 = flow.variable.load.indirect %0 : !iree.ptr<tensor<i32>> -> tensor<i32>
+  %1 = flow.variable.load.indirect %0 : !util.ptr<tensor<i32>> -> tensor<i32>
   // CHECK-NEXT: hal.variable.store.indirect %[[VALUE]], %[[ADDR]]
-  flow.variable.store.indirect %1, %0 : tensor<i32> -> !iree.ptr<tensor<i32>>
+  flow.variable.store.indirect %1, %0 : tensor<i32> -> !util.ptr<tensor<i32>>
   return
 }
 
@@ -92,13 +92,13 @@ flow.variable @var_out_of_order mutable dense<0.000000e+00> : tensor<f32>
 // Checks that the implicit cast allowing a buffer_view to indirect store into
 // a variable that maps to a buffer is permitted.
 // CHECK-LABEL: hal.variable @var_indirect_with_buffer_view_store
-// CHECK: %[[ptr:.*]] = hal.variable.address @var_indirect_with_buffer_view_store : !iree.ptr<!hal.buffer>
+// CHECK: %[[ptr:.*]] = hal.variable.address @var_indirect_with_buffer_view_store : !util.ptr<!hal.buffer>
 // CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
-// CHECK: hal.variable.store.indirect %[[buffer]], %[[ptr]] : !hal.buffer -> !iree.ptr<!hal.buffer>
+// CHECK: hal.variable.store.indirect %[[buffer]], %[[ptr]] : !hal.buffer -> !util.ptr<!hal.buffer>
 flow.variable @var_indirect_with_buffer_view_store mutable : tensor<i32>
 func @fn(%arg0: !hal.buffer_view) {
-  %0 = flow.variable.address @var_indirect_with_buffer_view_store : !iree.ptr<tensor<i32>>
+  %0 = flow.variable.address @var_indirect_with_buffer_view_store : !util.ptr<tensor<i32>>
   %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<i32>
-  flow.variable.store.indirect %1, %0 : tensor<i32> -> !iree.ptr<tensor<i32>>
+  flow.variable.store.indirect %1, %0 : tensor<i32> -> !util.ptr<tensor<i32>>
   return
 }

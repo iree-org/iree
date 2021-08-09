@@ -65,8 +65,9 @@ void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
   // vectorization flow. Only perform one level of distribution to map them to
   // GPU global invocation IDs for distribution.
   // TODO(antiagainst): Handle all the cases uniformly and remove this pass.
+  pm.nest<ModuleOp>().addNestedPass<FuncOp>(
+      createSPIRVCopyToWorkgroupMemoryPass());
   pm.addPass(createSPIRVConvertToGPUPass());
-  pm.nest<ModuleOp>().addNestedPass<FuncOp>(createSPIRVVectorToGPUPass());
   pm.nest<ModuleOp>().addPass(createLowerAffinePass());
   pm.nest<ModuleOp>().addPass(createCanonicalizerPass());
   pm.nest<ModuleOp>().addPass(createCSEPass());

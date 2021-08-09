@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_VM_OPCODES_CORE
 #define IREE_DIALECT_VM_OPCODES_CORE
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
 // VM opcodes

@@ -347,7 +347,7 @@ def HAL_BufferType : AnyTypeOf<[
   HAL_Buffer,
 ]>;
 
-def HAL_OrdinalAttr : IREE_IndexAttrBase<"size_t">;
+def HAL_OrdinalAttr : Util_IndexAttrBase<"size_t">;
 
 def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 
@@ -356,11 +356,11 @@ def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
 
 def HAL_DeviceSize : TypeAlias<Index>;
-def HAL_DeviceSizeAttr : IREE_IndexAttrBase<"iree_device_size_t">;
+def HAL_DeviceSizeAttr : Util_IndexAttrBase<"iree_device_size_t">;
 def HAL_DeviceSizes : Variadic<HAL_DeviceSize>;
 
 def HAL_HostSize : TypeAlias<Index>;
-def HAL_HostSizeAttr : IREE_IndexAttrBase<"size_t">;
+def HAL_HostSizeAttr : Util_IndexAttrBase<"size_t">;
 
 def HAL_TimelineValue : TypeAlias<Index>;
 
@@ -370,7 +370,7 @@ def HAL_VariableRefAttr : AliasedSymbolRefAttr;
 def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
 def HAL_VariablePtr : PtrOf<HAL_VariableType>;
 
-def HAL_IndexAttr : IREE_IndexAttrBase<"index">;
+def HAL_IndexAttr : Util_IndexAttrBase<"index">;
 def HAL_IndexArrayAttr : TypedArrayAttrBase<HAL_IndexAttr,
                                       "index array attribute"> {
   let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
@@ -383,7 +383,7 @@ def HAL_ShapeDynamicDims : Variadic<HAL_Dim>;
 
 // TODO(benvanik): assert rank 3
 def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<
-    IREE_IndexAttrBase<"size_t">,
+    Util_IndexAttrBase<"size_t">,
     "index array attribute"> {
   let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
 }
@@ -412,40 +412,40 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
 //===----------------------------------------------------------------------===//
 
 def HAL_BufferConstraintsAttr :
-  IREE_StructAttr<"buffer_constraints", "BufferConstraintsAttr", HAL_Dialect, [
+  Util_StructAttr<"buffer_constraints", "BufferConstraintsAttr", HAL_Dialect, [
     // The maximum size of a memory allocation that can be created, even if
     // there is more space available in the heap.
-    IREE_StructFieldAttr<"max_allocation_size", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"max_allocation_size", HAL_DeviceSizeAttr>,
     // The minimum required alignment, in bytes, for offsets used in runtime
     // buffer bindings for target backends. Offset values (both dynamic and
     // static) must be an integer multiple of this limit.
-    IREE_StructFieldAttr<"min_buffer_offset_alignment", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"min_buffer_offset_alignment", HAL_DeviceSizeAttr>,
     // The maximum value that can be specified for size ranges of buffer
     // bindings. The underlying allocation may be larger than this but only
     // up to this amount will be visible to kernels.
-    IREE_StructFieldAttr<"max_buffer_range", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"max_buffer_range", HAL_DeviceSizeAttr>,
     // The minimum required alignment, in bytes, for size ranges of buffer
     // bindings.
-    IREE_StructFieldAttr<"min_buffer_range_alignment", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"min_buffer_range_alignment", HAL_DeviceSizeAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
 def HAL_ByteRangeAttr :
-  IREE_StructAttr<"byte_range", "ByteRangeAttr", HAL_Dialect, [
-    IREE_StructFieldAttr<"offset", HAL_DeviceSizeAttr>,
-    IREE_StructFieldAttr<"length", HAL_DeviceSizeAttr>,
+  Util_StructAttr<"byte_range", "ByteRangeAttr", HAL_Dialect, [
+    Util_StructFieldAttr<"offset", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"length", HAL_DeviceSizeAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
 def HAL_DescriptorSetLayoutBindingAttr :
-  IREE_StructAttr<"descriptor_set_layout_binding",
+  Util_StructAttr<"descriptor_set_layout_binding",
                   "DescriptorSetLayoutBindingAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"binding", I32Attr>,
-    IREE_StructFieldAttr<"type", HAL_DescriptorTypeAttr>,
-    IREE_StructFieldAttr<"access", HAL_MemoryAccessBitfieldAttr>,
+    Util_StructFieldAttr<"binding", I32Attr>,
+    Util_StructFieldAttr<"type", HAL_DescriptorTypeAttr>,
+    Util_StructFieldAttr<"access", HAL_MemoryAccessBitfieldAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
@@ -586,40 +586,40 @@ def HAL_ExecutableTargetAttr :
 // TODO(benvanik): drop this when we have a HAL dispatch abstraction.
 
 def HAL_ExConstantStorageAttr :
-  IREE_StructAttr<"ex.constant_storage",
+  Util_StructAttr<"ex.constant_storage",
                   "ExConstantStorageAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"binding", StrAttr>,
-    IREE_StructFieldAttr<"storage", StrAttr>,
-    IREE_StructFieldAttr<"offset", IndexAttr>,
-    IREE_StructFieldAttr<"length", IndexAttr>,
+    Util_StructFieldAttr<"binding", StrAttr>,
+    Util_StructFieldAttr<"storage", StrAttr>,
+    Util_StructFieldAttr<"offset", IndexAttr>,
+    Util_StructFieldAttr<"length", IndexAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 def HAL_ExPushConstantAttr :
-  IREE_StructAttr<"ex.push_constant",
+  Util_StructAttr<"ex.push_constant",
                   "ExPushConstantAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"ordinal", IndexAttr>,
-    IREE_StructFieldAttr<"operand", IndexAttr>,
+    Util_StructFieldAttr<"ordinal", IndexAttr>,
+    Util_StructFieldAttr<"operand", IndexAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 def HAL_ExOperandBufferAttr :
-  IREE_StructAttr<"ex.operand_buffer",
+  Util_StructAttr<"ex.operand_buffer",
                   "ExOperandBufferAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"binding", StrAttr>,
-    IREE_StructFieldAttr<"operand", IndexAttr>,
+    Util_StructFieldAttr<"binding", StrAttr>,
+    Util_StructFieldAttr<"operand", IndexAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 def HAL_ExResultBufferAttr :
-  IREE_StructAttr<"ex.result_buffer",
+  Util_StructAttr<"ex.result_buffer",
                   "ExResultBufferAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"binding", StrAttr>,
-    IREE_StructFieldAttr<"result", IndexAttr>,
+    Util_StructFieldAttr<"binding", StrAttr>,
+    Util_StructFieldAttr<"result", IndexAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }

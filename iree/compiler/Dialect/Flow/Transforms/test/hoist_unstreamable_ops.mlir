@@ -53,8 +53,8 @@ func @side_effects() {
   // CHECK-DAG: constant 1
   // CHECK-DAG: constant 2
   %c1 = constant 1 : index
-  // CHECK: iree.do_not_optimize()
-  iree.do_not_optimize()
+  // CHECK: util.do_not_optimize()
+  util.do_not_optimize()
   %c2 = constant 2 : index
   return
 }

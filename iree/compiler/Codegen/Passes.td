@@ -193,6 +193,12 @@ def LLVMGPUVectorLowering :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
 }
 
+def LLVMGPUDistributeSharedMemoryCopy :
+    Pass<"iree-llvmgpu-distribute-shared-memory-copy", "FuncOp"> {
+  let summary = "Pass to distribute shared memory copies to threads.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUDistributeSharedMemoryCopy()";
+}
+
 //------------------------------------------------------------------------------
 // SPIRV
 //------------------------------------------------------------------------------
@@ -255,10 +261,10 @@ def SPIRVVectorToCooperativeMatrix :
 }
 
 // TODO: Rename argument to be fully qualified.
-def SPIRVVectorToGPU :
-    Pass<"iree-spirv-vector-to-gpu", "FuncOp"> {
+def SPIRVCopyToWorkgroupMemory :
+    Pass<"iree-spirv-copy-to-workgroup-memory", "FuncOp"> {
   let summary = "Convert vector dialect to gpu subgroup level GPU instructions";
-  let constructor = "mlir::iree_compiler::createSPIRVVectorToGPUPass()";
+  let constructor = "mlir::iree_compiler::createSPIRVCopyToWorkgroupMemoryPass()";
 }
 
 //------------------------------------------------------------------------------

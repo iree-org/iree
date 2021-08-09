@@ -64,6 +64,6 @@ ninja
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 echo "Testing with CTest"
-ctest --output-on-failure \
+ctest --timeout 900 --output-on-failure \
    --tests-regex "^integrations/tensorflow/|^bindings/python/" \
    --label-exclude "^nokokoro$|^vulkan_uses_vk_khr_shader_float16_int8$"

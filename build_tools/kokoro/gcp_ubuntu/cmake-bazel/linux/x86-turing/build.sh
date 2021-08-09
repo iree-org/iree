@@ -68,7 +68,7 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
 # Only test drivers that use the GPU, since we run all tests on non-GPU machines
 # as well.
 echo "Testing with CTest"
-ctest --output-on-failure \
+ctest --timeout 900 --output-on-failure \
    --tests-regex "^integrations/tensorflow/|^bindings/python/" \
    --label-regex "^driver=vulkan$|^driver=cuda$" \
    --label-exclude "^nokokoro$"

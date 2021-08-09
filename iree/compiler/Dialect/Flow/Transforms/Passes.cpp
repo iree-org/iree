@@ -125,15 +125,16 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(mlir::createLinalgDetensorizePass());
   }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
+  passManager.addNestedPass<FuncOp>(IREE::Flow::createConvertTensorOpsPass());
   passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createConvertToFlowTensorOpsPass(
+      IREE::Flow::createConvertLinalgTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/true));
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createConvertToFlowTensorOpsPass(
+      IREE::Flow::createConvertLinalgTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/false));
   // NOTE: required because the current dispatch-linalg-on-tensors pass
   // creates a lot of dead IR that needs to be cleaned up.

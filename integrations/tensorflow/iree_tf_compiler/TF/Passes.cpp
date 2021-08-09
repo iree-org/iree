@@ -16,6 +16,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/transforms/tf_saved_model_passes.h"
+#include "tensorflow/compiler/mlir/tosa/tf_passes.h"
 
 namespace mlir {
 namespace iree_integrations {
@@ -23,7 +24,7 @@ namespace TF {
 
 // All IREE-specific passes that lower TF representations before reaching the
 // IREE core should go here.
-void buildTFImportPassPipeline(OpPassManager &pm) {
+void buildTFImportPassPipeline(OpPassManager &pm, bool useTosa) {
   //----------------------------------------------------------------------------
   // Clean up tf_executor and extraneous unused functions.
   //----------------------------------------------------------------------------
@@ -60,10 +61,15 @@ void buildTFImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
-  // Legalize to XLA
+  // Legalize to TOSA/XLA
   //----------------------------------------------------------------------------
-  pm.addPass(createConvertToMHLOPass());
-  pm.addPass(createCanonicalizerPass());
+  if (useTosa) {
+    tosa::TOSATFLegalizationPipelineOptions tosaOptions;
+    tosa::createTFtoTOSALegalizationPipeline(pm, tosaOptions);
+  } else {
+    pm.addPass(createConvertToMHLOPass());
+    pm.addPass(createCanonicalizerPass());
+  }
 
   //----------------------------------------------------------------------------
   // Now that the IR is starting to look nice, optimize global tensors.
@@ -110,7 +116,16 @@ void registerTFImportPassPipeline() {
       "iree-import-tf-pipeline",
       "Run IREE-specific passes for importing TF code into IREE",
       [](OpPassManager &passManager) {
-        buildTFImportPassPipeline(passManager);
+        buildTFImportPassPipeline(passManager, false);
+      });
+}
+
+void registerTFTosaImportPassPipeline() {
+  mlir::PassPipelineRegistration<> pipeline(
+      "iree-import-tf-tosa-pipeline",
+      "Run IREE-specific passes for importing TF code into IREE",
+      [](OpPassManager &passManager) {
+        buildTFImportPassPipeline(passManager, true);
       });
 }
 

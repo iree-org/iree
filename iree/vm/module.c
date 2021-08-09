@@ -288,10 +288,8 @@ iree_vm_function_signature(const iree_vm_function_t* function) {
 
 IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
     const iree_vm_function_t* function, iree_string_view_t key) {
-  IREE_TRACE_ZONE_BEGIN(z0);
   iree_vm_module_t* module = function->module;
   if (!module->get_function_reflection_attr) {
-    IREE_TRACE_ZONE_END(z0);
     return iree_string_view_empty();
   }
   for (int index = 0;; ++index) {
@@ -303,12 +301,10 @@ IREE_API_EXPORT iree_string_view_t iree_vm_function_reflection_attr(
       iree_status_ignore(status);
       break;
     }
-    if (iree_string_view_compare(key, index_key) == 0) {
-      IREE_TRACE_ZONE_END(z0);
+    if (iree_string_view_equal(key, index_key)) {
       return index_value;
     }
   }
-  IREE_TRACE_ZONE_END(z0);
   return iree_string_view_empty();
 }
 

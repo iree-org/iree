@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
-include(iree_installed_test)
 
 # iree_cc_test()
 #
@@ -126,8 +125,6 @@ function(iree_cc_test)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
 
-  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-
   # Case for cross-compiling towards Android.
   if(ANDROID)
     set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
@@ -152,24 +149,22 @@ function(iree_cc_test)
         TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
-    set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
   else(ANDROID)
-    iree_add_installed_test(
-      TEST_NAME "${_TEST_NAME}"
-      LABELS "${_RULE_LABELS}"
+    add_test(
+      NAME
+        ${_TEST_NAME}
       COMMAND
         # We run all our tests through a custom test runner to allow temp
         # directory cleanup upon test completion.
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
         "$<TARGET_FILE:${_NAME}>"
-      INSTALLED_COMMAND
-        # Must match install destination below.
-        "${_PACKAGE_PATH}/$<TARGET_FILE_NAME:${_NAME}>"
-    )
+      WORKING_DIRECTORY
+        "${CMAKE_BINARY_DIR}"
+      )
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
+    iree_add_test_environment_properties(${_TEST_NAME})
   endif(ANDROID)
 
-  install(TARGETS ${_NAME}
-    DESTINATION "tests/${_PACKAGE_PATH}"
-    COMPONENT Tests
-  )
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()

@@ -19,7 +19,7 @@ namespace TF {
 
 // Create a single pipeline that will run all the needed IREE-specific TF import
 // passes in the right order.
-void buildTFImportPassPipeline(OpPassManager &pm);
+void buildTFImportPassPipeline(OpPassManager &pm, bool useTosa);
 void registerTFImportPassPipeline();
 
 //===----------------------------------------------------------------------===//

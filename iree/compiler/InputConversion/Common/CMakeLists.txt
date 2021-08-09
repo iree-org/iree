@@ -49,10 +49,7 @@ iree_cc_library(
     MLIRSCF
     MLIRSCFToStandard
     MLIRStandard
-    MLIRTensor
     MLIRTransforms
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
   PUBLIC
 )
 

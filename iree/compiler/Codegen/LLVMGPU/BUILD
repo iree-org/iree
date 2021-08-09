@@ -17,6 +17,7 @@ cc_library(
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
         "KernelConfig.cpp",
+        "LLVMGPUDistributeSharedMemoryCopy.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPURemoveTrivialLoops.cpp",
         "LLVMGPUTileAndDistribute.cpp",
@@ -27,6 +28,7 @@ cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
+        "LLVMGPUUtils.h",
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
@@ -34,10 +36,10 @@ cc_library(
         "//iree/compiler/Codegen/Transforms",
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/LinalgExt/IR",
         "//iree/compiler/Dialect/LinalgExt/Transforms",
         "//iree/compiler/Dialect/Shape/Transforms",
+        "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandard",

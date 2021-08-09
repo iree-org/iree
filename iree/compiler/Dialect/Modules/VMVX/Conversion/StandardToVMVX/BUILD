@@ -19,10 +19,10 @@ cc_library(
         "ConvertStandardToVMVX.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Modules/VMVX/IR",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",

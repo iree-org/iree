@@ -52,6 +52,30 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
 
+void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
+  // Convert tensor to buffers.
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
+  //===--------------------------------------------------------------------===//
+  // Initial clean up.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Distribute linalg onto threads within the workgroup.
+  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistributeToThreads());
+  pm.addNestedPass<FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addNestedPass<FuncOp>(createLLVMGPURemoveSingleIterationLoopPass());
+
+  // Linalg -> vector
+  pm.addNestedPass<FuncOp>(createLLVMGPUVectorizationPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+}
+
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   // Convert tensor to buffers.
   addLinalgBufferizePasses(pm, gpuAllocationFunction);

@@ -269,18 +269,18 @@ MODEL_BENCHMARKS = [
                         ]
                     })),
         ]),
-    ModelBenchmarkInfo(
-        name="mobilebert-f16",
-        model_artifacts_name="mobilebert-f16.tar.gz",
-        model_path="mobilebert-f16/mobilebert-f16.mlir",
-        flagfile_path="mobilebert-f16/flagfile",
-        phones=[
-            PhoneBenchmarkInfo(
-                name="S20",
-                benchmark_key="4636549841944576",
-                targets=get_s20_default_target_list(
-                    skipped_target=['cpu', 'vmvx3t', 'cpu2', 'vlk2'])),
-        ])
+    #ModelBenchmarkInfo(
+    #    name="mobilebert-f16",
+    #    model_artifacts_name="mobilebert-f16.tar.gz",
+    #    model_path="mobilebert-f16/mobilebert-f16.mlir",
+    #    flagfile_path="mobilebert-f16/flagfile",
+    #    phones=[
+    #        PhoneBenchmarkInfo(
+    #            name="S20",
+    #            benchmark_key="4636549841944576",
+    #            targets=get_s20_default_target_list(
+    #                skipped_target=['cpu', 'vmvx3t', 'cpu2', 'vlk2'])),
+    #    ])
 ]
 
 

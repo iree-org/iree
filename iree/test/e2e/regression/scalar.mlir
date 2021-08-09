@@ -4,7 +4,7 @@
 
 // CHECK-LABEL: EXEC @scalar
 func @scalar() -> i32 {
-  %result = iree.unfoldable_constant 42 : i32
+  %result = util.unfoldable_constant 42 : i32
   return %result : i32
 }
 // CHECK: i32=42

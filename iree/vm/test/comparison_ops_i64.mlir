@@ -7,9 +7,9 @@ vm.module @comparison_ops_i64 {
   vm.export @test_cmp_lt_s_0_i64
   vm.func @test_cmp_lt_s_0_i64() {
     %lhs = vm.const.i64 4294967295 : i64
-    %lhs_dno = iree.do_not_optimize(%lhs) : i64
+    %lhs_dno = util.do_not_optimize(%lhs) : i64
     %rhs = vm.const.i64 -4294967295 : i64
-    %rhs_dno = iree.do_not_optimize(%rhs) : i64
+    %rhs_dno = util.do_not_optimize(%rhs) : i64
     %actual = vm.cmp.lt.i64.s %lhs_dno, %rhs_dno : i64
     %expected = vm.const.i32 0 : i32
     vm.check.eq %actual, %expected, "4294967295 (UINT_MAX) < -4294967295 (UINT_MAX)" : i32
@@ -19,9 +19,9 @@ vm.module @comparison_ops_i64 {
   vm.export @test_cmp_lt_s_1_i64
   vm.func @test_cmp_lt_s_1_i64() {
     %lhs = vm.const.i64 -4294967295 : i64
-    %lhs_dno = iree.do_not_optimize(%lhs) : i64
+    %lhs_dno = util.do_not_optimize(%lhs) : i64
     %rhs = vm.const.i64 4294967295 : i64
-    %rhs_dno = iree.do_not_optimize(%rhs) : i64
+    %rhs_dno = util.do_not_optimize(%rhs) : i64
     %actual = vm.cmp.lt.i64.s %lhs_dno, %rhs_dno : i64
     %expected = vm.const.i32 1 : i32
     vm.check.eq %actual, %expected, "-4294967295 (UINT_MAX) < 4294967295 (UINT_MAX)" : i32
@@ -32,9 +32,9 @@ vm.module @comparison_ops_i64 {
   vm.export @test_cmp_lt_s_2_i64
   vm.func @test_cmp_lt_s_2_i64() {
     %lhs = vm.const.i64 18446744073709551615 : i64
-    %lhs_dno = iree.do_not_optimize(%lhs) : i64
+    %lhs_dno = util.do_not_optimize(%lhs) : i64
     %rhs = vm.const.i64 2 : i64
-    %rhs_dno = iree.do_not_optimize(%rhs) : i64
+    %rhs_dno = util.do_not_optimize(%rhs) : i64
     %actual = vm.cmp.lt.i64.s %lhs_dno, %rhs_dno : i64
     %expected = vm.const.i32 1 : i32
     vm.check.eq %actual, %expected, "18446744073709551615 (ULONG_MAX) < 2" : i32
@@ -48,9 +48,9 @@ vm.module @comparison_ops_i64 {
   vm.export @test_cmp_lt_u_0_i64
   vm.func @test_cmp_lt_u_0_i64() {
     %lhs = vm.const.i64 2 : i64
-    %lhs_dno = iree.do_not_optimize(%lhs) : i64
+    %lhs_dno = util.do_not_optimize(%lhs) : i64
     %rhs = vm.const.i64 -2 : i64
-    %rhs_dno = iree.do_not_optimize(%rhs) : i64
+    %rhs_dno = util.do_not_optimize(%rhs) : i64
     %actual = vm.cmp.lt.i64.u %lhs_dno, %rhs_dno : i64
     %expected = vm.const.i32 1 : i32
     vm.check.eq %actual, %expected, "2 < -2 (as unsigned)" : i32
@@ -60,9 +60,9 @@ vm.module @comparison_ops_i64 {
   vm.export @test_cmp_lt_u_1_i64
   vm.func @test_cmp_lt_u_1_i64() {
     %lhs = vm.const.i64 -2 : i64
-    %lhs_dno = iree.do_not_optimize(%lhs) : i64
+    %lhs_dno = util.do_not_optimize(%lhs) : i64
     %rhs = vm.const.i64 2 : i64
-    %rhs_dno = iree.do_not_optimize(%rhs) : i64
+    %rhs_dno = util.do_not_optimize(%rhs) : i64
     %actual = vm.cmp.lt.i64.u %lhs_dno, %rhs_dno : i64
     %expected = vm.const.i32 0 : i32
     vm.check.eq %actual, %expected, "-2 < 2 (as unsigned)" : i32
@@ -72,9 +72,9 @@ vm.module @comparison_ops_i64 {
   vm.export @test_cmp_lt_u_2_i64
   vm.func @test_cmp_lt_u_2_i64() {
     %lhs = vm.const.i64 18446744073709551615 : i64
-    %lhs_dno = iree.do_not_optimize(%lhs) : i64
+    %lhs_dno = util.do_not_optimize(%lhs) : i64
     %rhs = vm.const.i64 2 : i64
-    %rhs_dno = iree.do_not_optimize(%rhs) : i64
+    %rhs_dno = util.do_not_optimize(%rhs) : i64
     %actual = vm.cmp.lt.i64.u %lhs_dno, %rhs_dno : i64
     %expected = vm.const.i32 0 : i32
     vm.check.eq %actual, %expected, "18446744073709551615 (ULONG_MAX) < 2 (as unsigned)" : i32
@@ -94,9 +94,9 @@ vm.module @comparison_ops_i64 {
     %false = vm.const.i32 0 : i32
 
     %cn2 = vm.const.i64 -2 : i64
-    %cn2_dno = iree.do_not_optimize(%cn2) : i64
+    %cn2_dno = util.do_not_optimize(%cn2) : i64
     %c2 = vm.const.i64 2 : i64
-    %c2_dno = iree.do_not_optimize(%c2) : i64
+    %c2_dno = util.do_not_optimize(%c2) : i64
 
     %cmp_0 = vm.cmp.lte.i64.s %cn2_dno, %c2_dno : i64
     vm.check.eq %cmp_0, %true, "-2 <= 2" : i32
@@ -121,9 +121,9 @@ vm.module @comparison_ops_i64 {
     %false = vm.const.i32 0 : i32
 
     %cn2 = vm.const.i64 -2 : i64
-    %cn2_dno = iree.do_not_optimize(%cn2) : i64
+    %cn2_dno = util.do_not_optimize(%cn2) : i64
     %c2 = vm.const.i64 2 : i64
-    %c2_dno = iree.do_not_optimize(%c2) : i64
+    %c2_dno = util.do_not_optimize(%c2) : i64
 
     %cmp_0 = vm.cmp.gt.i64.s %cn2_dno, %c2_dno : i64
     vm.check.eq %cmp_0, %false, "-2 > 2" : i32
@@ -148,9 +148,9 @@ vm.module @comparison_ops_i64 {
     %false = vm.const.i32 0 : i32
 
     %cn2 = vm.const.i64 -2 : i64
-    %cn2_dno = iree.do_not_optimize(%cn2) : i64
+    %cn2_dno = util.do_not_optimize(%cn2) : i64
     %c2 = vm.const.i64 2 : i64
-    %c2_dno = iree.do_not_optimize(%c2) : i64
+    %c2_dno = util.do_not_optimize(%c2) : i64
 
     %cmp_0 = vm.cmp.gte.i64.s %cn2_dno, %c2_dno : i64
     vm.check.eq %cmp_0, %false, "-2 >= 2" : i32

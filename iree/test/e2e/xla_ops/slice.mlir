@@ -1,5 +1,5 @@
 func @slice_whole_buffer() {
-  %input = iree.unfoldable_constant dense<[
+  %input = util.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
@@ -16,7 +16,7 @@ func @slice_whole_buffer() {
 }
 
 func @slice_whole_stride() {
-  %input = iree.unfoldable_constant dense<[
+  %input = util.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
@@ -30,7 +30,7 @@ func @slice_whole_stride() {
 }
 
 func @slice_stride_part() {
-  %input = iree.unfoldable_constant dense<[
+  %input = util.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
@@ -44,7 +44,7 @@ func @slice_stride_part() {
 }
 
 func @slice_multi_stride() {
-  %input = iree.unfoldable_constant dense<[
+  %input = util.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>

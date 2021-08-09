@@ -7,7 +7,7 @@
 steps:
   - label: "build"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:a152f0d006e237105f8ed9a7e041a6a235c1a69dc1e209383c81087c574b39bf build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:7d780787608474301e74e1b5cc2a1bfd1304a79ed9e0774c7ed422c0e4a38625 build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a"
       - "tar --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build-android"
     agents:
       - "queue=build"
@@ -23,7 +23,7 @@ steps:
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
       - "cd build-android/"
-      - "ctest --output-on-failure"
+      - "ctest --timeout 900 --output-on-failure"
     agents:
       - "android-soc=exynos-990"
       - "queue=test-android"
@@ -37,7 +37,7 @@ steps:
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
       - "cd build-android/"
-      - "ctest --output-on-failure"
+      - "ctest --timeout 900 --output-on-failure"
     agents:
       - "android-soc=exynos-9820"
       - "queue=test-android"
@@ -53,7 +53,7 @@ steps:
       - "cd build-android/"
       # vulkan tests using khr_shader_float16_int8 are failing on pixel4.
       # Disabling it until we identify the root cause.
-      - "ctest --output-on-failure --label-exclude \"^vulkan_uses_vk_khr_shader_float16_int8\\$\""
+      - "ctest --timeout 900 --output-on-failure --label-exclude \"^vulkan_uses_vk_khr_shader_float16_int8\\$\""
     agents:
       - "android-soc=snapdragon-855"
       - "queue=test-android"

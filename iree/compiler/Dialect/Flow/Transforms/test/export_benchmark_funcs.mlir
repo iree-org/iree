@@ -14,8 +14,8 @@ module {
 // CHECK-DAG: %[[ARG0:.+]] = flow.variable.load @[[MAIN_IN_0]] : tensor<5x3xf32>
 // CHECK-DAG: %[[ARG1:.+]] = flow.variable.load @[[MAIN_IN_1]] : tensor<3x5xf32>
 //     CHECK: %[[RET:.+]]:2 = call @two_dispatch(%[[ARG0]], %[[ARG1]])
-// CHECK-DAG: iree.do_not_optimize(%[[RET]]#0) : tensor<5x5xf32>
-// CHECK-DAG: iree.do_not_optimize(%[[RET]]#1) : tensor<3x5xf32>
+// CHECK-DAG: util.do_not_optimize(%[[RET]]#0) : tensor<5x5xf32>
+// CHECK-DAG: util.do_not_optimize(%[[RET]]#1) : tensor<3x5xf32>
 
 // -----
 
@@ -38,6 +38,6 @@ func @while(%start: tensor<i32>, %bound: tensor<i32>) -> tensor<i32> {
 // CHECK-DAG:   %[[ARG0:.+]] = flow.variable.load @_benchmark_input_0 : tensor<i32>
 // CHECK-DAG:   %[[ARG1:.+]] = flow.variable.load @_benchmark_input_1 : tensor<i32>
 //     CHECK:   %[[RET0:.+]] = call @while(%[[ARG0]], %[[ARG1]])
-//     CHECK:   iree.do_not_optimize(%[[RET0]]) : tensor<i32>
+//     CHECK:   util.do_not_optimize(%[[RET0]]) : tensor<i32>
 //     CHECK:   return
 //     CHECK: }

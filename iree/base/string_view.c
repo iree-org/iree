@@ -79,7 +79,7 @@ IREE_API_EXPORT iree_host_size_t iree_string_view_find_last_of(
   for (iree_host_size_t i = 0; i < s.size; ++i) {
     lookup_table[(uint8_t)s.data[i]] = true;
   }
-  pos = iree_min(pos, value.size);
+  pos = iree_min(pos, value.size) + 1;
   iree_host_size_t i = pos;
   while (i != 0) {
     --i;

@@ -10,10 +10,9 @@
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
-#include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Utils/TracingUtils.h"
@@ -28,19 +27,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-// TODO(#3817): move all of this code to the iree-compile driver/API.
-// Breaking this up such that for development iree-opt runs all passes/pipelines
-// and iree-translate strictly does the VM dialect to bytecode/emitc files will
-// match upstream better, and then our own iree-compile C API/binary will do the
-// whole end-to-end with options for bindings/targets/etc.
-struct BindingOptions {
-  // Whether to include runtime support functions for the IREE native ABI.
-  bool native = true;
-  // Whether to include runtime support functions required for the IREE TFLite
-  // API compatibility bindings.
-  bool tflite = false;
-};
 
 static BindingOptions getBindingOptionsFromFlags() {
   static llvm::cl::OptionCategory bindingOptionsCategory(
@@ -63,27 +49,6 @@ static BindingOptions getBindingOptionsFromFlags() {
   bindingOptions.tflite = *bindingsTFLiteFlag;
   return bindingOptions;
 }
-
-// The transformation to apply to the input prior to main compiler execution.
-// These input pipelines are purposefully primitive and mainly focused on
-// test case/reproducers as opposed to anything that should be coming from
-// a user. For user/framework level interfacing, a dedicated importer likely
-// needs to be created in order to represent whole-module level framework
-// quirks. These are just about the ops in the functions.
-struct InputDialectOptions {
-  enum class Type {
-    // Applies no input transformation. Only supported core and extension ops
-    // are supported.
-    none,
-
-    // Legalizes input defined over TOSA ops.
-    tosa,
-
-    // Legalizes input defined over MHLO ops.
-    mhlo,
-  };
-  Type type;
-};
 
 static InputDialectOptions getInputDialectOptionsFromFlags() {
   static llvm::cl::OptionCategory inputDialectOptions(
@@ -158,7 +123,7 @@ static LogicalResult convertToVMModule(ModuleOp moduleOp,
   return success();
 }
 
-static void buildIREEVMTransformPassPipeline(
+void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, OpPassManager &passManager) {
@@ -180,11 +145,10 @@ static void buildIREEVMTransformPassPipeline(
       break;
   }
 
-  buildCommonInputConversionPassPipeline(passManager);
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
-  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
+  passManager.addPass(IREE::Util::createDropCompilerHintsPass());
 }
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {

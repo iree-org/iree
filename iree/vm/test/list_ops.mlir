@@ -12,7 +12,7 @@ vm.module @list_ops {
     %list = vm.list.alloc %c42 : (i32) -> !vm.list<i8>
     vm.list.reserve %list, %c100 : (!vm.list<i8>, i32)
     %sz = vm.list.size %list : (!vm.list<i8>) -> i32
-    %sz_dno = iree.do_not_optimize(%sz) : i32
+    %sz_dno = util.do_not_optimize(%sz) : i32
     vm.check.eq %sz_dno, %c0, "list<i8>.empty.size()=0" : i32
     vm.return
   }
@@ -125,7 +125,7 @@ vm.module @list_ops {
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<i32>
     vm.list.resize %list, %c1 : (!vm.list<i32>, i32)
     %v = vm.list.get.i32 %list, %c1 : (!vm.list<i32>, i32) -> i32
-    %v_dno = iree.do_not_optimize(%v) : i32
+    %v_dno = util.do_not_optimize(%v) : i32
     vm.return
   }
 

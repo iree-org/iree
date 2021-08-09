@@ -201,12 +201,15 @@ void buildLLVMCPUCodegenPassPipeline(
 
 /// Lowering calling vectorization patterns. Expects pass manager to be a
 /// module-level pass manager.
-void addGPUVectorizationPassPipeline(OpPassManager &passManager);
+void addGPUVectorizationPassPipeline(OpPassManager &pm);
+
+/// Lowering calling vectorization patterns.
+void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level
 /// pass manager.
-void addGPUSimpleDistributePassPipeline(OpPassManager &passManager);
+void addGPUSimpleDistributePassPipeline(OpPassManager &pm);
 
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
@@ -235,6 +238,10 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass();
 
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();
+
+/// Convert shared memory copies to distributed transfer_read/transfer_write.
+std::unique_ptr<OperationPass<FuncOp>>
+createLLVMGPUDistributeSharedMemoryCopy();
 
 //------------------------------------------------------------------------------
 // SPIRV Passes
@@ -281,9 +288,8 @@ createSPIRVTileAndVectorizePass(const SPIRVCodegenOptions &options);
 std::unique_ptr<OperationPass<FuncOp>>
 createSPIRVVectorToCooperativeMatrixPass();
 
-/// Pass to convert vector operations to GPU level operations. Instructions of
-/// vector size equal to subgroup size are distributed across the subgroup.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToGPUPass();
+/// Pass to lower linalg.copy for copying data to workgroup memory.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVCopyToWorkgroupMemoryPass();
 
 /// Converts memref of scalar to memref of vector of efficent size. This will
 /// allow to convert memory accesses to vector load/store in SPIR-V without
@@ -311,10 +317,6 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm,
 //----------------------------------------------------------------------------//
 // SPIRV Codegen specific patterns.
 //----------------------------------------------------------------------------//
-
-/// Populates patterns to tile and distribute linalg.copy operations.
-void populateTileAndDistributeLinalgCopyPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
 
 /// Populates patterns to fold processor ID uses by using processor counts
 /// information where possible.

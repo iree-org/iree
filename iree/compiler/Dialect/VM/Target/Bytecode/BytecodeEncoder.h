@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Dialect/VM/Target/Bytecode/DebugDatabaseBuilder.h"
 #include "mlir/IR/SymbolTable.h"
 
 namespace mlir {
@@ -17,8 +18,13 @@ namespace IREE {
 namespace VM {
 
 struct EncodedBytecodeFunction {
+  // Encoded bytecode data for the function body.
   std::vector<uint8_t> bytecodeData;
+
+  // Total i32 register slots required for execution.
+  // Note that larger types also use these slots (i64=2xi32).
   uint16_t i32RegisterCount = 0;
+  // Total vm.ref register slots required for execution.
   uint16_t refRegisterCount = 0;
 };
 
@@ -29,7 +35,7 @@ class BytecodeEncoder : public VMFuncEncoder {
   // Returns None on failure.
   static Optional<EncodedBytecodeFunction> encodeFunction(
       IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-      SymbolTable &symbolTable);
+      SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase);
 
   BytecodeEncoder() = default;
   ~BytecodeEncoder() = default;

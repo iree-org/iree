@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -24,7 +24,7 @@ namespace VM {
 TypeConverter::TypeConverter(TargetOptions targetOptions)
     : targetOptions_(targetOptions) {
   // Variant means opaque in VM.
-  addConversion([](IREE::VariantType type) {
+  addConversion([](IREE::Util::VariantType type) {
     return IREE::VM::OpaqueType::get(type.getContext());
   });
 
@@ -40,14 +40,14 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   });
 
   // Pointer types remain as pointer types types are passed through unmodified.
-  addConversion([this](IREE::PtrType type) -> Optional<Type> {
+  addConversion([this](IREE::Util::PtrType type) -> Optional<Type> {
     // Recursively handle pointer target types (we want to convert ptr<index> to
     // ptr<i32>, for example).
     auto targetType = convertType(type.getTargetType());
     if (!targetType) {
       return llvm::None;
     }
-    return IREE::PtrType::get(targetType);
+    return IREE::Util::PtrType::get(targetType);
   });
 
   // Convert integer types.

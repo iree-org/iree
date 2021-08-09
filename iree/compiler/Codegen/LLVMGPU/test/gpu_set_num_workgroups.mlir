@@ -46,7 +46,7 @@ hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
 //  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0) -> (d0)>
 //      CHECK: hal.executable.entry_point @add_dispatch_0
-// CHECK-SAME:     passPipeline = 2 : i32
+// CHECK-SAME:     passPipeline = 3 : i32
 // CHECK-SAME:     workloadPerWorkgroup = [128]
 // CHECK-SAME:     workgroup_size = [32 : index, 1 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index,
@@ -106,7 +106,7 @@ hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 256)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //      CHECK: hal.executable.entry_point @dot_dispatch_1
-// CHECK-SAME:     passPipeline = 3 : i32
+// CHECK-SAME:     passPipeline = 4 : i32
 // CHECK-SAME:     workloadPerWorkgroup = [256, 2]
 // CHECK-SAME:     workgroup_size = [64 : index, 1 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index,

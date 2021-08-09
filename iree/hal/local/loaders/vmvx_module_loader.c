@@ -240,7 +240,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   //   func @entry(
   //       %local_memory: !vmvx.buffer,
   //       %constants: !vmvx.buffer,
-  //       %bindings: !iree.list<!vmvx.buffer>,
+  //       %bindings: !util.list<!vmvx.buffer>,
   //       %workgroup_x: index,
   //       %workgroup_y: index,
   //       %workgroup_z: index,

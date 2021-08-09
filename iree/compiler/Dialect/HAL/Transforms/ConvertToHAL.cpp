@@ -15,12 +15,12 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Util/Conversion/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -41,7 +41,7 @@ class ConvertToHALPass
     : public PassWrapper<ConvertToHALPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
     registry.insert<HALDialect>();
     registry.insert<StandardOpsDialect>();
   }
@@ -74,8 +74,9 @@ class ConvertToHALPass
     populateIREEToHALPatterns(context, conversionTarget, typeConverter,
                               patterns);
 
-    setupCompilerHintsLegality(context, conversionTarget, typeConverter);
-    populatePreserveCompilerHintsPatterns(context, patterns);
+    IREE::Util::setupCompilerHintsLegality(context, conversionTarget,
+                                           typeConverter);
+    IREE::Util::populatePreserveCompilerHintsPatterns(context, patterns);
 
     setupStandardToHALLegality(context, conversionTarget, typeConverter);
     populateStandardToHALPatterns(context, patterns, typeConverter);

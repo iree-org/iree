@@ -19,7 +19,7 @@ cc_library(
         "ConvertMemRefToVM.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//mlir:Affine",

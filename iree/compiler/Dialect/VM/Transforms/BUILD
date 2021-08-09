@@ -25,9 +25,9 @@ cc_library(
         "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/Conversion:PreserveCompilerHints",
-        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Util/Conversion:PreserveCompilerHints",
+        "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/Conversion/IREEToVM",
         "//iree/compiler/Dialect/VM/Conversion/MathToVM",

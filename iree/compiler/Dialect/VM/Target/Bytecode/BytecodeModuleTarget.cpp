@@ -8,9 +8,9 @@
 
 #include <algorithm>
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -34,6 +34,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Translation.h"
 
@@ -318,7 +319,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   OwningRewritePatternList patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
-  target.addLegalOp<IREE::DoNotOptimizeOp>();
+  target.addLegalOp<IREE::Util::DoNotOptimizeOp>();
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
@@ -356,7 +357,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
     modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
-  modulePasses.addPass(createDropCompilerHintsPass());
+  modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
@@ -490,6 +491,11 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   // file and is only used to prime the flatcc builder.
   iree_vm_BytecodeModuleDef_start_as_root(fbb);
 
+  // Debug database is always populated but conditionally written.
+  // This allows us to emit the database to a separate file if we want to strip
+  // the module but still allow debugging later.
+  DebugDatabaseBuilder debugDatabase;
+
   SymbolTable symbolTable(moduleOp);
   if (!moduleOp.ordinal_counts().hasValue()) {
     return moduleOp.emitError() << "ordinal_counts attribute not found. The "
@@ -582,7 +588,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   size_t totalBytecodeLength = 0;
   for (auto funcOp : llvm::enumerate(internalFuncOps)) {
     auto encodedFunction = BytecodeEncoder::encodeFunction(
-        funcOp.value(), typeOrdinalMap, symbolTable);
+        funcOp.value(), typeOrdinalMap, symbolTable, debugDatabase);
     if (!encodedFunction) {
       return funcOp.value().emitError() << "failed to encode function bytecode";
     }
@@ -697,6 +703,11 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
     moduleStateDef = iree_vm_ModuleStateDef_end(fbb);
   }
 
+  iree_vm_DebugDatabaseDef_ref_t debugDatabaseRef = 0;
+  if (!targetOptions.stripSourceMap) {
+    debugDatabaseRef = debugDatabase.build(fbb);
+  }
+
   auto moduleNameRef = fbb.createString(
       moduleOp.sym_name().empty() ? "module" : moduleOp.sym_name());
 
@@ -711,6 +722,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   iree_vm_BytecodeModuleDef_function_descriptors_add(fbb,
                                                      functionDescriptorsRef);
   iree_vm_BytecodeModuleDef_bytecode_data_add(fbb, bytecodeDataRef);
+  iree_vm_BytecodeModuleDef_debug_database_add(fbb, debugDatabaseRef);
   iree_vm_BytecodeModuleDef_end_as_root(fbb);
 
   return success();
@@ -724,6 +736,17 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   if (failed(canonicalizeModule(targetOptions, moduleOp))) {
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";
+  }
+
+  // Dump VM assembly source listing to a file and annotate IR locations.
+  if (!targetOptions.sourceListing.empty()) {
+    OpPrintingFlags printFlags;
+    printFlags.elideLargeElementsAttrs(8192);
+    if (failed(mlir::generateLocationsFromIR(targetOptions.sourceListing, "vm",
+                                             moduleOp, printFlags))) {
+      return moduleOp.emitError() << "failed to write source listing to '"
+                                  << targetOptions.sourceListing << "'";
+    }
   }
 
   if (targetOptions.outputFormat == BytecodeOutputFormat::kAnnotatedMlirText) {
