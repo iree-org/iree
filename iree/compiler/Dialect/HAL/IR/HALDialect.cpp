@@ -37,18 +37,18 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
   /// the symbol when printing textual IR. These aliases must not contain `.` or
   /// end with a numeric digit([0-9]+). Returns success if an alias was
   /// provided, failure otherwise.
-  LogicalResult getAlias(Attribute attr, raw_ostream &os) const override {
+  AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     if (auto targetAttr = attr.dyn_cast<DeviceTargetAttr>()) {
       os << "device_target_" << targetAttr.getSymbolNameFragment();
-      return success();
+      return AliasResult::OverridableAlias;
     } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
       os << "executable_target_" << targetAttr.getSymbolNameFragment();
-      return success();
+      return AliasResult::OverridableAlias;
     } else if (attr.isa<LoweringConfig>()) {
       os << "config";
-      return success();
+      return AliasResult::OverridableAlias;
     }
-    return failure();
+    return AliasResult::NoAlias;
   }
 };
 

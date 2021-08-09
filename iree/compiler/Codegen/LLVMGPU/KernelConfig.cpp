@@ -105,7 +105,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+        entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
         passPipeline, {1, 1, 1});
   }
 
