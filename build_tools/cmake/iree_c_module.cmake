@@ -14,8 +14,7 @@ include(CMakeParseArguments)
 # H_FILE_OUTPUT: The H header file to output.
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
 #     tool is "iree-translate".
-# FLAGS: Flags to pass to the translation tool (list of strings). The
-#     default flag set is "-iree-vm-ir-to-c-module".
+# FLAGS: Flags to pass to the translation tool (list of strings).
 # TESTONLY: When added, this target will only be built if user passes
 #    -DIREE_BUILD_TESTS=ON to CMake.
 #
@@ -44,12 +43,7 @@ function(iree_c_module)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  # Set defaults for FLAGS and TRANSLATE_TOOL
-  if(DEFINED _RULE_FLAGS)
-    set(_FLAGS ${_RULE_FLAGS})
-  else()
-    set(_FLAGS "-iree-vm-ir-to-c-module")
-  endif()
+  # Set defaults for TRANSLATE_TOOL.
   if(DEFINED _RULE_TRANSLATE_TOOL)
     set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
   else()
@@ -58,7 +52,7 @@ function(iree_c_module)
 
   iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
 
-  set(_ARGS "${_FLAGS}")
+  set(_ARGS "${_RULE_FLAGS}")
   list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_H_FILE_OUTPUT}")
