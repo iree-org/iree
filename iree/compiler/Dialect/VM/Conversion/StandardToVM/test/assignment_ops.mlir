@@ -5,7 +5,7 @@
 module @t001_cmp_select {
 
 module @my_module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]
@@ -28,7 +28,7 @@ module @my_module {
 module @t002_cmp_select_index {
 
 module @my_module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]

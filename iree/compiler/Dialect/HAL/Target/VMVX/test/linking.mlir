@@ -89,7 +89,7 @@ func @basic_linking() -> () {
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @io_0, ordinal = 1 : index}
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_2 attributes {interface = @io_1, ordinal = 2 : index}
 // CHECK-NEXT:      module {
-// CHECK-NEXT:        vm.module @linked_module {
+// CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
 // CHECK-NEXT:            vm.return
 // CHECK-NEXT:          }
@@ -197,7 +197,7 @@ func @other_targets() -> () {
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
 // CHECK-NEXT:      hal.executable.entry_point @dispatch_1 attributes {interface = @io_1, ordinal = 1 : index}
 // CHECK-NEXT:      module {
-// CHECK-NEXT:        vm.module @linked_module {
+// CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
 // CHECK-NEXT:            vm.return
 // CHECK-NEXT:          }
@@ -361,7 +361,7 @@ hal.executable @dispatch_1 attributes {sym_visibility = "private"} {
 // CHECK:       hal.executable @vmvx_linked attributes {sym_visibility = "private"} {
 // CHECK:       hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 // CHECK:           module {
-// CHECK-NEXT:        vm.module @linked_module {
+// CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.rodata public @rodata_a dense<0> : tensor<1xi32>
 // CHECK-NEXT:          vm.rodata public @rodata_b dense<0> : tensor<1xi32>
 // CHECK-NEXT:          vm.rodata public @rodata_b_0 dense<0> : tensor<1xi32>

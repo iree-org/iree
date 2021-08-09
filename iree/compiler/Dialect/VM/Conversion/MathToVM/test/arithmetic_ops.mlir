@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vm-conversion -iree-vm-target-extension=f32 %s | IreeFileCheck %s
 
 module {
-  // CHECK-LABEL: func @arithmetic
+  // CHECK-LABEL: vm.func private @arithmetic
   func @arithmetic(%arg0: f32) -> f32 {
 
     // CHECK: vm.atan.f32

@@ -25,9 +25,10 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
     auto convertedType = typeConverter.convertType(op.type());
     if (convertedType.isa<IREE::VM::RefType>() ||
         IREE::VM::RefType::isCompatible(convertedType)) {
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
+      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op->getDialectAttrs()));
+      newOp.setVisibility(op.getVisibility());
       return success();
     } else if (convertedType.isInteger(32)) {
       auto convertedValue =
@@ -35,9 +36,10 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
               ? rewriter.getI32IntegerAttr(static_cast<int32_t>(
                     op.initial_value().getValue().cast<IntegerAttr>().getInt()))
               : Attribute{};
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
+      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
+      newOp.setVisibility(op.getVisibility());
       return success();
     } else if (convertedType.isInteger(64)) {
       auto convertedValue =
@@ -45,9 +47,10 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
               ? rewriter.getI64IntegerAttr(
                     op.initial_value().getValue().cast<IntegerAttr>().getInt())
               : Attribute{};
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
+      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
+      newOp.setVisibility(op.getVisibility());
       return success();
     } else if (convertedType.isF32()) {
       auto convertedValue = op.initial_value().hasValue()
@@ -57,9 +60,10 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
                                           .cast<FloatAttr>()
                                           .getValueAsDouble()))
                                 : Attribute{};
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalF32Op>(
+      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF32Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
+      newOp.setVisibility(op.getVisibility());
       return success();
     } else if (convertedType.isF64()) {
       auto convertedValue =
@@ -69,9 +73,10 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
                                              .cast<FloatAttr>()
                                              .getValueAsDouble())
               : Attribute{};
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalF64Op>(
+      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF64Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
+      newOp.setVisibility(op.getVisibility());
       return success();
     }
     return op.emitOpError("unsupported variable type");
