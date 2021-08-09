@@ -93,7 +93,6 @@ $ cmake -G Ninja -B ../iree-build-android/ \
   -DANDROID_ABI="arm64-v8a" \
   -DANDROID_PLATFORM=android-29 \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_ENABLE_MLIR=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
   .
 $ cmake --build ../iree-build-android/

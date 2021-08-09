@@ -77,7 +77,6 @@ cmake -B ../iree-build-riscv/ \
   -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build-host/install) \
   -DRISCV_CPU=rv64 \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_ENABLE_MLIR=OFF \
   -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
   .
 ```
