@@ -491,6 +491,11 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   // file and is only used to prime the flatcc builder.
   iree_vm_BytecodeModuleDef_start_as_root(fbb);
 
+  // Debug database is always populated but conditionally written.
+  // This allows us to emit the database to a separate file if we want to strip
+  // the module but still allow debugging later.
+  DebugDatabaseBuilder debugDatabase;
+
   SymbolTable symbolTable(moduleOp);
   if (!moduleOp.ordinal_counts().hasValue()) {
     return moduleOp.emitError() << "ordinal_counts attribute not found. The "
@@ -583,7 +588,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   size_t totalBytecodeLength = 0;
   for (auto funcOp : llvm::enumerate(internalFuncOps)) {
     auto encodedFunction = BytecodeEncoder::encodeFunction(
-        funcOp.value(), typeOrdinalMap, symbolTable);
+        funcOp.value(), typeOrdinalMap, symbolTable, debugDatabase);
     if (!encodedFunction) {
       return funcOp.value().emitError() << "failed to encode function bytecode";
     }
@@ -698,6 +703,11 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
     moduleStateDef = iree_vm_ModuleStateDef_end(fbb);
   }
 
+  iree_vm_DebugDatabaseDef_ref_t debugDatabaseRef = 0;
+  if (!targetOptions.stripSourceMap) {
+    debugDatabaseRef = debugDatabase.build(fbb);
+  }
+
   auto moduleNameRef = fbb.createString(
       moduleOp.sym_name().empty() ? "module" : moduleOp.sym_name());
 
@@ -712,6 +722,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   iree_vm_BytecodeModuleDef_function_descriptors_add(fbb,
                                                      functionDescriptorsRef);
   iree_vm_BytecodeModuleDef_bytecode_data_add(fbb, bytecodeDataRef);
+  iree_vm_BytecodeModuleDef_debug_database_add(fbb, debugDatabaseRef);
   iree_vm_BytecodeModuleDef_end_as_root(fbb);
 
   return success();

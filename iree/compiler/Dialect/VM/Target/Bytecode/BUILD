@@ -12,6 +12,8 @@ cc_library(
         "BytecodeModuleTarget.cpp",
         "ConstantEncoder.cpp",
         "ConstantEncoder.h",
+        "DebugDatabaseBuilder.cpp",
+        "DebugDatabaseBuilder.h",
         "TranslationFlags.cpp",
         "TranslationRegistration.cpp",
     ],
