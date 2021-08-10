@@ -320,12 +320,12 @@ static inline int32_t vm_cast_f32ui32(float operand) {
 }
 static inline float vm_bitcast_i32f32(int32_t operand) {
   float result;
-  memcpy(&result, &operand, 4);
+  memcpy(&result, &operand, sizeof(result));
   return result;
 }
 static inline int32_t vm_bitcast_f32i32(float operand) {
   int32_t result;
-  memcpy(&result, &operand, 4);
+  memcpy(&result, &operand, sizeof(result));
   return result;
 }
 
