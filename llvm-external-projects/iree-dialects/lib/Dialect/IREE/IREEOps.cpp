@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef PYTHON_BINDINGS_IREE_OPS
-#define PYTHON_BINDINGS_IREE_OPS
+#include "iree-dialects/Dialect/IREE/IREEOps.h"
 
-include "mlir/Bindings/Python/Attributes.td"
-include "iree-dialects/Dialects/iree/IREEOps.td"
+#include "iree-dialects/Dialect/IREE/IREEDialect.h"
+#include "mlir/IR/OpImplementation.h"
 
-#endif // PYTHON_BINDINGS_IREE_OPS
+#define GET_OP_CLASSES
+#include "iree-dialects/Dialect/IREE/IREEOps.cpp.inc"

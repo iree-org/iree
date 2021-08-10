@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_PROJECTS_IREE_COMPILER_API_COMPILER_H
-#define IREE_LLVM_PROJECTS_IREE_COMPILER_API_COMPILER_H
+#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_COMPILER_API_COMPILER_H
+#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_COMPILER_API_COMPILER_H
 
 #include "mlir-c/Pass.h"
 #include "mlir-c/Support.h"
@@ -64,4 +64,4 @@ MLIR_CAPI_EXPORTED MlirLogicalResult ireeCompilerTranslateModuletoVMBytecode(
 }
 #endif
 
-#endif  // IREE_LLVM_PROJECTS_IREE_COMPILER_API_COMPILER_H
+#endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_COMPILER_API_COMPILER_H
