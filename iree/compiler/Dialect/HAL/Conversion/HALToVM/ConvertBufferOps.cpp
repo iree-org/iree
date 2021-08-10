@@ -17,7 +17,7 @@ class BufferLoadOpConversion
  public:
   BufferLoadOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                          TypeConverter &typeConverter, StringRef importName)
-      : OpConversionPattern(context) {
+      : OpConversionPattern(typeConverter, context) {
     importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
     assert(importOp);
   }
@@ -27,14 +27,20 @@ class BufferLoadOpConversion
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::BufferLoadOp::Adaptor adaptor(operands);
     auto importType = importOp.getType();
+    auto resultType = op.getResult().getType();
     auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
             IREE::HAL::getRoundedElementByteWidth(op.getResult().getType())));
-    rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
-        op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
+    auto callOp = rewriter.create<IREE::VM::CallOp>(
+        op.getLoc(), rewriter.getSymbolRefAttr(importOp),
+        importType.getResults(),
         ArrayRef<Value>{adaptor.source_buffer(), adaptor.source_offset(),
                         sizeConst});
+    // If the original result was a floating point type, we want to bitcast
+    // from importType (i32) to a matching bit depth floating point type (f32).
+    rewriter.replaceOpWithNewOp<BitcastOp>(
+        op, typeConverter->convertType(resultType), callOp.getResult(0));
     return success();
   }
 
