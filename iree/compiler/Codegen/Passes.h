@@ -243,6 +243,9 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();
 std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUDistributeSharedMemoryCopy();
 
+/// Apply software pipelining.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
+
 //------------------------------------------------------------------------------
 // SPIRV Passes
 //------------------------------------------------------------------------------

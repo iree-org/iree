@@ -199,6 +199,11 @@ def LLVMGPUDistributeSharedMemoryCopy :
   let constructor = "mlir::iree_compiler::createLLVMGPUDistributeSharedMemoryCopy()";
 }
 
+def LLVMGPUPipelining :
+    Pass<"iree-llvmgpu-pipelining", "FuncOp"> {
+  let summary = "Pass to do software pipelining.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPipeliningPass()";
+}
 //------------------------------------------------------------------------------
 // SPIRV
 //------------------------------------------------------------------------------
