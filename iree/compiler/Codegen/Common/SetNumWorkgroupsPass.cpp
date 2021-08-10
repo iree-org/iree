@@ -49,7 +49,8 @@ void SetNumWorkgroupsPass::runOnOperation() {
       getAllEntryPoints(module);
   for (auto funcOp : module.getOps<FuncOp>()) {
     auto entryPointOp = entryPoints.lookup(funcOp.getName());
-    if (!entryPointOp) continue;
+    if (!entryPointOp || !entryPointOp.workgroup_count_region().empty())
+      continue;
     SmallVector<int64_t, 4> currWorkloadPerWorkgroup;
 
     // First check if there is a workload provided.

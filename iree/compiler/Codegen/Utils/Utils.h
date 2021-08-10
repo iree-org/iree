@@ -34,7 +34,8 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 /// set.
 void setTranslationInfo(FuncOp entryPointFn,
                         IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-                        ArrayRef<int64_t> workgroupSize = {});
+                        ArrayRef<int64_t> workgroupSize,
+                        ArrayRef<int64_t> workloadPerWorkgroup);
 
 /// Returns the loops that are partitioned during dispatch region formations, in
 /// order, i.e. starting from the outer-most to innermost.
