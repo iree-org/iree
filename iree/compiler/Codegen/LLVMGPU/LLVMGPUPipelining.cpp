@@ -45,7 +45,10 @@ static void getPipelineStages(
     if (op.hasAttr(kPipeliningGlobalLoad))
       addDepOps(loadDep, &op, forOp.getBody());
   }
-  // Create a schedule with stage 1 ops first followed by stage 0 ops.
+  // Create a modulo schedule with loads from global memory and the operations
+  // it depends on in stage 0. Store to shared memory and computation are in
+  // stage 1. In order to have a correct scheduling even with back edges we
+  // order stages in decreasing order.
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (!loadDep.count(&op) && !isa<scf::YieldOp>(op))
       ops.push_back(std::make_pair(&op, 1));
