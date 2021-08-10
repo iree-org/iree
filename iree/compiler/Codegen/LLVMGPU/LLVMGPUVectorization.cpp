@@ -44,7 +44,13 @@ static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
   } else if (auto vt = dyn_cast<VectorTransferOpInterface>(op)) {
     auto rank = vt.getVectorType().getRank();
     SmallVector<int64_t, 4> nativeSize(rank, 1);
-    nativeSize.back() = 4;
+    // Load 4 elements on the most inner dimension.
+    for (auto dim : llvm::enumerate(vt.permutation_map().getResults())) {
+      if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
+        if (dimExpr.getPosition() == vt.permutation_map().getNumDims() - 1)
+          nativeSize[dim.index()] = 4;
+      }
+    }
     return nativeSize;
   } else if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
     unsigned lastParalleldim = 0;
