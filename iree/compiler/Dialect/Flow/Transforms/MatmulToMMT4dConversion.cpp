@@ -18,6 +18,67 @@ namespace Flow {
 
 namespace {
 
+// Expands a 2d tensor operand to 4d given its target shape.
+static Value expandTo4D(mlir::Location loc, PatternRewriter &rewriter,
+                        Value operand, ArrayRef<int64_t> targetShape) {
+  auto operandType = operand.getType().cast<RankedTensorType>();
+  auto targetType =
+      RankedTensorType::get(targetShape, operandType.getElementType());
+  SmallVector<ReassociationIndices> expandIndices = {{0, 1}, {2, 3}};
+  Value reshapedOperand = rewriter.create<linalg::TensorExpandShapeOp>(
+      loc, targetType, operand, expandIndices);
+  return reshapedOperand;
+}
+
+// Creates a linalg.generic that transposes operand using permutation indices.
+static Value transposeOperand(mlir::Location loc, PatternRewriter &rewriter,
+                              Value operand, ArrayRef<int64_t> indices) {
+  RankedTensorType operandTensorType =
+      operand.getType().cast<RankedTensorType>();
+  auto nloops = indices.size();
+  auto inputShape = operandTensorType.getShape();
+
+  SmallVector<AffineExpr, 4> exprs = llvm::to_vector<4>(
+      llvm::map_range(indices, [&](int64_t index) -> AffineExpr {
+        return rewriter.getAffineDimExpr(index);
+      }));
+
+  SmallVector<int64_t> targetShape = llvm::to_vector<4>(llvm::map_range(
+      indices, [&](int64_t index) -> int64_t { return inputShape[index]; }));
+
+  Value outputTensor = rewriter.create<linalg::InitTensorOp>(
+      loc, targetShape, operandTensorType.getElementType());
+
+  SmallVector<StringRef> loopAttributeTypes(nloops, "parallel");
+
+  SmallVector<AffineMap> indexingMaps = {
+      inversePermutation(
+          AffineMap::get(nloops, 0, exprs, rewriter.getContext())),
+      AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
+
+  auto transposedOp = rewriter.create<linalg::GenericOp>(
+      loc, outputTensor.getType(),
+      /*inputs=*/operand, /*outputs=*/outputTensor, indexingMaps,
+      loopAttributeTypes,
+      [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+        nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
+      });
+
+  return transposedOp.getResult(0);
+};
+
+// Collapses a 4d tensor operand to 2d given its target shape.
+static Value collapseTo2D(mlir::Location loc, PatternRewriter &rewriter,
+                          Value operand, ArrayRef<int64_t> targetShape) {
+  auto operandType = operand.getType().cast<RankedTensorType>();
+  auto targetType =
+      RankedTensorType::get(targetShape, operandType.getElementType());
+  SmallVector<ReassociationIndices> collapseIndices = {{0, 1}, {2, 3}};
+  Value reshapedOperand = rewriter.create<linalg::TensorCollapseShapeOp>(
+      loc, targetType, operand, collapseIndices);
+  return reshapedOperand;
+}
+
 // Converts linalg.matmul -> linalg.mmt4d where M0, N0, K0 are compile time
 // constants.
 class LinalgMatmulOpToLinalgMMT4dOpPattern
@@ -62,18 +123,6 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
     int n1 = n / N0Size;
     int k1 = k / K0Size;
 
-    // Expands a 2d tensor operand to 4d given its target shape.
-    auto expandTo4D = [&](Value operand,
-                          ArrayRef<int64_t> targetShape) -> Value {
-      auto operandType = operand.getType().cast<RankedTensorType>();
-      auto targetType =
-          RankedTensorType::get(targetShape, operandType.getElementType());
-      SmallVector<ReassociationIndices> expandIndices = {{0, 1}, {2, 3}};
-      Value reshapedOperand = rewriter.create<linalg::TensorExpandShapeOp>(
-          loc, targetType, operand, expandIndices);
-      return reshapedOperand;
-    };
-
     bool isInitTensorDst = false;
     if (dst.getDefiningOp() && isa<linalg::FillOp>(dst.getDefiningOp())) {
       auto fillOpValue = cast<linalg::FillOp>(dst.getDefiningOp());
@@ -88,71 +137,25 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
                                                    dstType.getElementType());
     };
 
-    auto lhs4D = expandTo4D(lhs, {m1, M0Size, k1, K0Size});
-    auto rhs4D = expandTo4D(rhs, {k1, K0Size, n1, N0Size});
+    auto lhs4D = expandTo4D(loc, rewriter, lhs, {m1, M0Size, k1, K0Size});
+    auto rhs4D = expandTo4D(loc, rewriter, rhs, {k1, K0Size, n1, N0Size});
     auto dst4D = isInitTensorDst
                      ? createTransposedInitTensor({m1, n1, M0Size, N0Size})
-                     : expandTo4D(dst, {m1, M0Size, n1, N0Size});
-    auto transposeOperand = [&](Value operand,
-                                ArrayRef<int64_t> indices) -> Value {
-      RankedTensorType operandTensorType =
-          operand.getType().cast<RankedTensorType>();
-      auto nloops = indices.size();
-      auto inputShape = operandTensorType.getShape();
+                     : expandTo4D(loc, rewriter, dst, {m1, M0Size, n1, N0Size});
 
-      SmallVector<AffineExpr, 4> exprs = llvm::to_vector<4>(
-          llvm::map_range(indices, [&](int64_t index) -> AffineExpr {
-            return rewriter.getAffineDimExpr(index);
-          }));
-
-      SmallVector<int64_t> targetShape = llvm::to_vector<4>(llvm::map_range(
-          indices,
-          [&](int64_t index) -> int64_t { return inputShape[index]; }));
-
-      Value outputTensor = rewriter.create<linalg::InitTensorOp>(
-          loc, targetShape, operandTensorType.getElementType());
-
-      SmallVector<StringRef> loopAttributeTypes(nloops, "parallel");
-
-      SmallVector<AffineMap> indexingMaps = {
-          inversePermutation(
-              AffineMap::get(nloops, 0, exprs, rewriter.getContext())),
-          AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
-
-      auto transposedOp = rewriter.create<linalg::GenericOp>(
-          loc, outputTensor.getType(),
-          /*inputs=*/operand, /*outputs=*/outputTensor, indexingMaps,
-          loopAttributeTypes,
-          [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
-            nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
-          });
-
-      return transposedOp.getResult(0);
-    };
-
-    auto lhs4DT = transposeOperand(lhs4D, {0, 2, 1, 3});
-    auto rhs4DT = transposeOperand(rhs4D, {2, 0, 1, 3});
-    auto dst4DT =
-        isInitTensorDst ? dst4D : transposeOperand(dst4D, {0, 2, 1, 3});
+    auto lhs4DT = transposeOperand(loc, rewriter, lhs4D, {0, 2, 1, 3});
+    auto rhs4DT = transposeOperand(loc, rewriter, rhs4D, {2, 0, 1, 3});
+    auto dst4DT = isInitTensorDst
+                      ? dst4D
+                      : transposeOperand(loc, rewriter, dst4D, {0, 2, 1, 3});
 
     auto mmt4DResult = rewriter.create<linalg::Mmt4DOp>(
         loc, dst4DT.getType(), ValueRange{lhs4DT, rhs4DT}, ValueRange{dst4DT});
 
     auto mmt4dResultTransposed =
-        transposeOperand(mmt4DResult.getResult(0), {0, 2, 1, 3});
+        transposeOperand(loc, rewriter, mmt4DResult.getResult(0), {0, 2, 1, 3});
 
-    auto collapseTo2D = [&](Value operand,
-                            ArrayRef<int64_t> targetShape) -> Value {
-      auto operandType = operand.getType().cast<RankedTensorType>();
-      auto targetType =
-          RankedTensorType::get(targetShape, operandType.getElementType());
-      SmallVector<ReassociationIndices> collapseIndices = {{0, 1}, {2, 3}};
-      Value reshapedOperand = rewriter.create<linalg::TensorCollapseShapeOp>(
-          loc, targetType, operand, collapseIndices);
-      return reshapedOperand;
-    };
-
-    Value result = collapseTo2D(mmt4dResultTransposed, {m, n});
+    Value result = collapseTo2D(loc, rewriter, mmt4dResultTransposed, {m, n});
 
     rewriter.replaceOp(matmulOp, ArrayRef<Value>{result});
 
