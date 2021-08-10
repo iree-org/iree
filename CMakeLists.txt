@@ -37,7 +37,6 @@ endif()
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
-option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
@@ -95,11 +94,7 @@ option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disa
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-if(IREE_ENABLE_EMITC)
-  if(NOT IREE_BUILD_COMPILER)
-    message(FATAL_ERROR "Enabling EmitC requires setting IREE_BUILD_COMPILER to ON.")
-  endif()
-endif()
+option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILER})
 
 #-------------------------------------------------------------------------------
 # Target and backend configuration
