@@ -181,7 +181,8 @@ static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 
 static void populatePromotionPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
-  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>>(
+  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
+                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
       context,
       linalg::LinalgPromotionOptions()
           .setAllocationDeallocationFns(allocateWorkgroupMemory,

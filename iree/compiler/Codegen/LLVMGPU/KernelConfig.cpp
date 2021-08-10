@@ -28,6 +28,8 @@ struct TileWorkgroupSizePair {
 /// pick the best size aligned with the shape dimension.
 static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{64, 128, 8}, {32, 4, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 16}, {64, 2, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
 }
