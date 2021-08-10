@@ -80,8 +80,6 @@ model execution is in a single-thread synchronous fashion.
 ### Set CMake options
 
 * `set(IREE_BUILD_COMPILER OFF)`: Build IREE runtime only
-* `set(IREE_ENABLE_MLIR OFF)`: Disable LLVM/MLIR dependencies for the runtime
-library
 * `set(CMAKE_SYSTEM_NAME Generic)`: Tell CMake to skip targeting a specific
 operating system
 * `set(IREE_BINDINGS_TFLITE OFF)`: Disable the TFLite binding support

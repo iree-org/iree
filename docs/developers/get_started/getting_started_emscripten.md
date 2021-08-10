@@ -48,7 +48,6 @@ $ emcmake cmake -G Ninja -B ../iree-build-emscripten/ \
   -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build-host/install) \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_ENABLE_MLIR=OFF \
   .
 ```
 
