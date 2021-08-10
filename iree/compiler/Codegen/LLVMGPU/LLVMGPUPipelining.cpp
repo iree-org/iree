@@ -45,6 +45,7 @@ static void getPipelineStages(
     if (op.hasAttr(kPipeliningGlobalLoad))
       addDepOps(loadDep, &op, forOp.getBody());
   }
+  // Create a schedule with stage 1 ops first followed by stage 0 ops.
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (!loadDep.count(&op) && !isa<scf::YieldOp>(op))
       ops.push_back(std::make_pair(&op, 1));
