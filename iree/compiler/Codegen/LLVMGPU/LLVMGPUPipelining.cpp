@@ -20,6 +20,7 @@ namespace mlir {
 namespace iree_compiler {
 
 static const StringLiteral kPipeliningLoopMarker = "__pipelining_K_loop__";
+static const StringLiteral kPipeliningGlobalLoad = "__pipelining_global_load__";
 
 /// Helper to recursively add operation dependencies within `block` to `dep`
 /// set.
@@ -38,14 +39,11 @@ static void getPipelineStages(
     scf::ForOp forOp, std::vector<std::pair<Operation*, unsigned>>& ops) {
   if (!forOp->hasAttr(kPipeliningLoopMarker)) return;
 
-  // Track dependencies of transfer_read op from global memory.
+  // Track dependencies of the global memory load.
   llvm::SmallDenseSet<Operation*> loadDep;
   for (Operation& op : forOp.getBody()->getOperations()) {
-    auto ld = dyn_cast<vector::TransferReadOp>(op);
-    if (ld &&
-        ld.source().getType().cast<MemRefType>().getMemorySpaceAsInt() == 0) {
-      addDepOps(loadDep, ld, forOp.getBody());
-    }
+    if (op.hasAttr(kPipeliningGlobalLoad))
+      addDepOps(loadDep, &op, forOp.getBody());
   }
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (!loadDep.count(&op) && !isa<scf::YieldOp>(op))
@@ -62,23 +60,29 @@ struct LLVMGPUPipeliningPass
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext* context = &getContext();
-    // Mark the loop we want to pipeline.
+    // Mark the loop with shared memory copy for pipelining.
     funcOp.walk([](scf::ForOp forOp) {
-      bool hasBarrier = false;
+      bool copyToWorkgroupMemory = false;
+      OpBuilder builder(forOp.getContext());
       for (Operation& op : forOp.getBody()->getOperations()) {
         // Pipeline the most inner for op that should be a flat region.
         if (op.getNumRegions() > 0) return;
-        if (isa<gpu::BarrierOp>(op)) hasBarrier = true;
+        auto ld = dyn_cast<vector::TransferReadOp>(op);
+        if (!ld) continue;
+        unsigned ldAddSpace =
+            ld.source().getType().cast<MemRefType>().getMemorySpaceAsInt();
+        if (ldAddSpace != 0 || !ld->hasOneUse()) continue;
+        auto st =
+            dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
+        if (!st) continue;
+        unsigned stAddSpace =
+            st.source().getType().cast<MemRefType>().getMemorySpaceAsInt();
+        if (stAddSpace != 3) continue;
+        copyToWorkgroupMemory = true;
+        ld->setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
       }
-      // Check that the loop has a barrier to know that it is doing copy to
-      // workgroup memory.
-      // TODO(thomasraoux): Ideally we should have markers propagated on the
-      // transfer ops coming fomr workgroup memory but there is no such
-      // mechanism in core.
-      if (hasBarrier) {
-        OpBuilder builder(forOp.getContext());
+      if (copyToWorkgroupMemory)
         forOp->setAttr(kPipeliningLoopMarker, builder.getUnitAttr());
-      }
     });
     scf::PipeliningOption options;
     options.getScheduleFn = getPipelineStages;
