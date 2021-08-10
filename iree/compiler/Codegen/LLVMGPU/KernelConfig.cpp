@@ -179,7 +179,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // distribute.
       setTranslationInfo(
           funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          {1, 1, 1});
+          {1, 1, 1}, /*workloadPerWorkgroup=*/{});
       continue;
     }
 
@@ -208,7 +208,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // distribute.
       setTranslationInfo(
           funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          {1, 1, 1});
+          {1, 1, 1}, /*workloadPerWorkgroup=*/{});
       continue;
     }
     if (failed(setRootConfig(funcOp, rootOperation))) continue;

@@ -52,11 +52,11 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 
 void setTranslationInfo(FuncOp entryPointFn,
                         IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-                        ArrayRef<int64_t> workgroupSize) {
+                        ArrayRef<int64_t> workgroupSize,
+                        ArrayRef<int64_t> workloadPerWorkgroup) {
   auto entryPointOp = getEntryPoint(entryPointFn);
   auto translationInfo = buildTranslationInfo(
-      passPipeline, /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
-      entryPointFn.getContext());
+      passPipeline, workloadPerWorkgroup, entryPointFn.getContext());
   setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
 }
 

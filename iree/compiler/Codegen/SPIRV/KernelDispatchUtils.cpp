@@ -17,9 +17,11 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
@@ -571,14 +573,42 @@ static LogicalResult setMaliSpecificConfig(
   return failure();
 }
 
-LogicalResult setRootConfig(FuncOp entryPoint,
-                            const spirv::TargetEnv &targetEnv,
-                            linalg::DepthwiseConvInputNHWCFilterHWCOp op) {
+static LogicalResult setRootConfig(
+    FuncOp entryPoint, const spirv::TargetEnv &targetEnv,
+    linalg::DepthwiseConvInputNHWCFilterHWCOp op) {
   if (targetEnv.getVendorID() == spirv::Vendor::ARM &&
       succeeded(setMaliSpecificConfig(entryPoint, op))) {
     return success();
   }
   return success();
+}
+
+/// Helper function to generate the number of workgroups when the
+/// `SPIRVDistributeToGlobalID` is used.
+// TODO(ravishankarm): Remove this when that pipeline is deprecated.
+static LogicalResult setTranslationUsingDistributeToGlobalId(
+    FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
+  auto entryPointOp = getEntryPoint(funcOp);
+  MLIRContext *context = entryPointOp.getContext();
+  auto translationInfo = buildTranslationInfo(
+      IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistributeToGlobalID,
+      /*workloadPerWorkgroup =*/{}, context);
+  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
+  OpBuilder builder(context);
+  int64_t workgroupSizeX = workgroupSize[0];
+  auto numWorkgroupsFn =
+      [workgroupSizeX](OpBuilder &b, Location loc,
+                       std::array<Value, 3> workload) -> std::array<Value, 3> {
+    AffineExpr e1, e2, e3;
+    bindSymbols(b.getContext(), e1, e2, e3);
+    AffineExpr expr = e1 * e2 * e3;
+    expr = expr.ceilDiv(workgroupSizeX);
+    Value numWorkgroupsX = linalg::applyMapToValues(
+        b, loc, AffineMap::get(0, 3, expr), workload)[0];
+    Value one = b.create<ConstantIndexOp>(loc, 1);
+    return {numWorkgroupsX, one, one};
+  };
+  return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
 }
 
 LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
@@ -614,10 +644,11 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
         continue;
       }
       std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
-      setTranslationInfo(
-          funcOp,
-          IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistributeToGlobalID,
-          workgroupSize);
+      if (failed(
+              setTranslationUsingDistributeToGlobalId(funcOp, workgroupSize))) {
+        return computeOps[0]->emitOpError(
+            "failed to set translation info for distributing to global IDs");
+      }
       continue;
     }
 
@@ -675,10 +706,12 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
           if (getNumOuterParallelLoops(linalgOp)) {
             workgroupSize = {subgroupSize, 1, 1};
           }
-          setTranslationInfo(funcOp,
-                             IREE::HAL::DispatchLoweringPassPipeline::
-                                 SPIRVDistributeToGlobalID,
-                             workgroupSize);
+          if (failed(setTranslationUsingDistributeToGlobalId(funcOp,
+                                                             workgroupSize))) {
+            return computeOp->emitOpError(
+                "failed to set translation info for distributing to global "
+                "IDs");
+          }
           rootOperation = computeOp;
           break;
         }
