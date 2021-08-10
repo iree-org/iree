@@ -2000,6 +2000,16 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t* result = VM_DecResultRegI32("result");
         *result = vm_cast_f32ui32(operand);
       });
+      DISPATCH_OP(EXT_F32, BitcastI32F32, {
+        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
+        float* result = VM_DecResultRegF32("result");
+        *result = vm_bitcast_i32f32(operand);
+      });
+      DISPATCH_OP(EXT_F32, BitcastF32I32, {
+        float operand = VM_DecOperandRegF32("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = vm_bitcast_f32i32(operand);
+      });
 
       //===----------------------------------------------------------------===//
       // ExtF32: Comparison ops
