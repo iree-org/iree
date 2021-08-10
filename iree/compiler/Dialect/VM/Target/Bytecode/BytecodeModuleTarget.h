@@ -39,6 +39,11 @@ struct BytecodeTargetOptions {
   // Run basic CSE/inlining/etc passes prior to serialization.
   bool optimize = true;
 
+  // Dump a VM MLIR file and annotate source locations with it.
+  // This allows for the runtime to serve stack traces referencing both the
+  // original source locations and the VM IR.
+  std::string sourceListing;
+
   // Strips all internal symbol names. Import and export names will remain.
   bool stripSymbols = false;
   // Strips source map information.

@@ -46,8 +46,11 @@ static ParseResult parseSymbolVisibility(OpAsmParser &parser,
 
 static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
                                   StringAttr symVisibilityAttr) {
-  if (!symVisibilityAttr) return;
-  p << symVisibilityAttr.getValue();
+  if (!symVisibilityAttr) {
+    p << "public";
+  } else {
+    p << symVisibilityAttr.getValue();
+  }
 }
 
 //===----------------------------------------------------------------------===//

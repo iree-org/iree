@@ -81,7 +81,7 @@ iree_hal_format_shape(const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     int n = snprintf(buffer ? buffer + buffer_length : NULL,
                      buffer ? buffer_capacity - buffer_length : 0,
                      (i < shape_rank - 1) ? "%dx" : "%d", shape[i]);
-    if (n < 0) {
+    if (IREE_UNLIKELY(n < 0)) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "snprintf failed to write dimension %zu", i);
     } else if (buffer && n >= buffer_capacity - buffer_length) {

@@ -624,3 +624,46 @@ func @tensorSplatDynamic(%value: i8, %dim: index) -> tensor<?x128xi8> {
 }
 
 }
+
+// -----
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
+
+// CHECK-LABEL: func @tensorSplatF32
+// CHECK-SAME: (%[[VALUE:.+]]: f32)
+func @tensorSplatF32(%value: f32) -> tensor<2x128xf32> {
+  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c1024}
+  %0 = flow.ex.stream.fragment(%value) : (f32) -> tensor<2x128xf32> =
+      (%arg0: f32) -> tensor<2x128xf32> {
+    //  CHECK-DAG: %[[PATTERN:.+]] = bitcast %[[VALUE]] : f32 to i32
+    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c1024] pattern(%[[PATTERN]] : i32)
+    %1 = flow.tensor.splat %arg0 : tensor<2x128xf32>
+    flow.return %1 : tensor<2x128xf32>
+  }
+  return %0 : tensor<2x128xf32>
+}
+
+}
+
+// -----
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
+
+// CHECK-LABEL: func @tensorSplatF16
+// CHECK-SAME: (%[[VALUE:.+]]: f16)
+func @tensorSplatF16(%value: f16) -> tensor<2x128xf16> {
+  // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c512}
+  %0 = flow.ex.stream.fragment(%value) : (f16) -> tensor<2x128xf16> =
+      (%arg0: f16) -> tensor<2x128xf16> {
+    //  CHECK-DAG: %[[BITCAST:.+]] = bitcast %[[VALUE]] : f16 to i16
+    //  CHECK-DAG: %[[B0:.+]] = zexti %[[BITCAST]] : i16 to i32
+    //  CHECK-DAG: %[[B1:.+]] = shift_left %[[B0]], %c16
+    //  CHECK-DAG: %[[PATTERN:.+]] = or %[[B0]], %[[B1]]
+    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c512] pattern(%[[PATTERN]] : i32)
+    %1 = flow.tensor.splat %arg0 : tensor<2x128xf16>
+    flow.return %1 : tensor<2x128xf16>
+  }
+  return %0 : tensor<2x128xf16>
+}
+
+}

@@ -6,6 +6,7 @@
 
 #include "iree/tools/utils/trace_replay.h"
 
+#include <ctype.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -324,18 +325,29 @@ static iree_status_t iree_trace_replay_parse_vm_list(
 // - 2
 // - 3
 // ```
+// or
+// ```yaml
+// shape: 1x2x3
+// ```
 static iree_status_t iree_trace_replay_parse_hal_shape(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* shape_node, size_t shape_capacity, iree_hal_dim_t* shape,
-    size_t* out_shape_rank) {
-  size_t shape_rank = 0;
+    yaml_node_t* shape_node, iree_host_size_t shape_capacity,
+    iree_hal_dim_t* shape, iree_host_size_t* out_shape_rank) {
+  iree_host_size_t shape_rank = 0;
   *out_shape_rank = shape_rank;
   if (!shape_node) return iree_ok_status();
-  if (shape_node->type != YAML_SEQUENCE_NODE) {
+
+  if (shape_node->type == YAML_SCALAR_NODE) {
+    // Short-hand using the canonical shape parser (4x8).
+    return iree_hal_parse_shape(iree_yaml_node_as_string(shape_node),
+                                shape_capacity, shape, out_shape_rank);
+  } else if (shape_node->type != YAML_SEQUENCE_NODE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "(%zu): expected sequence node for shape",
+                            "(%zu): expected scalar or sequence node for shape",
                             shape_node->start_mark.line);
   }
+
+  // Shape dimension list:
   for (yaml_node_item_t* item = shape_node->data.sequence.items.start;
        item != shape_node->data.sequence.items.top; ++item) {
     yaml_node_t* dim_node = yaml_document_get_node(document, *item);
@@ -363,6 +375,43 @@ static iree_status_t iree_trace_replay_parse_hal_shape(
   return iree_ok_status();
 }
 
+// Parses an element type.
+//
+// ```yaml
+// element_type: 50331680
+// ```
+// or
+// ```yaml
+// element_type: f32
+// ```
+static iree_status_t iree_trace_replay_parse_hal_element_type(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* element_type_node, iree_hal_element_type_t* out_element_type) {
+  *out_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+
+  iree_string_view_t element_type_str =
+      iree_yaml_node_as_string(element_type_node);
+  if (iree_string_view_is_empty(element_type_str)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "(%zu): element type missing",
+                            element_type_node->start_mark.line);
+  }
+
+  // If the first character is a digit then interpret as a %d type.
+  if (isdigit(element_type_str.data[0])) {
+    static_assert(sizeof(*out_element_type) == sizeof(uint32_t), "4 bytes");
+    if (!iree_string_view_atoi_uint32(element_type_str, out_element_type)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "(%zu): invalid element type",
+                              element_type_node->start_mark.line);
+    }
+    return iree_ok_status();
+  }
+
+  // Parse as a canonical element type.
+  return iree_hal_parse_element_type(element_type_str, out_element_type);
+}
+
 // Parses a serialized !hal.buffer into |buffer|.
 //
 // ```yaml
@@ -371,7 +420,8 @@ static iree_status_t iree_trace_replay_parse_hal_shape(
 // ```
 static iree_status_t iree_trace_replay_parse_hal_buffer(
     iree_trace_replay_t* replay, yaml_document_t* document,
-    yaml_node_t* contents_node, iree_hal_buffer_t* buffer) {
+    yaml_node_t* contents_node, iree_hal_element_type_t element_type,
+    iree_hal_buffer_t* buffer) {
   if (!contents_node) {
     // Empty contents = zero fill.
     return iree_ok_status();
@@ -380,23 +430,26 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
                             "(%zu): expected scalar node for buffer contents",
                             contents_node->start_mark.line);
   }
-  iree_string_view_t value = iree_make_string_view(
-      contents_node->data.scalar.value, contents_node->data.scalar.length);
-  value = iree_string_view_trim(value);
+  iree_string_view_t value =
+      iree_string_view_trim(iree_yaml_node_as_string(contents_node));
 
+  iree_hal_buffer_mapping_t mapping;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_map_range(buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0,
+                                IREE_WHOLE_BUFFER, &mapping));
+  iree_status_t status = iree_ok_status();
   if (strcmp(contents_node->tag, "tag:yaml.org,2002:binary") == 0) {
-    iree_hal_buffer_mapping_t mapping;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_map_range(buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
-                                  0, IREE_WHOLE_BUFFER, &mapping));
-    iree_status_t status = iree_yaml_base64_decode(value, mapping.contents);
-    iree_hal_buffer_unmap_range(&mapping);
-    return status;
+    status = iree_yaml_base64_decode(value, mapping.contents);
+  } else if (strcmp(contents_node->tag, "tag:yaml.org,2002:str") == 0) {
+    status =
+        iree_hal_parse_buffer_elements(value, element_type, mapping.contents);
+  } else {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED, "(%zu): unimplemented buffer encoding '%s'",
+        contents_node->start_mark.line, contents_node->tag);
   }
-
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "(%zu): unimplemented buffer encoding '%s'",
-                          contents_node->start_mark.line, contents_node->tag);
+  iree_hal_buffer_unmap_range(&mapping);
+  return status;
 }
 
 // Parses a !hal.buffer_view and appends it to |target_list|.
@@ -416,19 +469,14 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
       document, value_node, iree_make_cstring_view("element_type"),
       &element_type_node));
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
-  static_assert(sizeof(element_type) == sizeof(uint32_t), "4 bytes");
-  if (!iree_string_view_atoi_uint32(iree_yaml_node_as_string(element_type_node),
-                                    &element_type)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "(%zu): invalid element type",
-                            element_type_node->start_mark.line);
-  }
+  IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_element_type(
+      replay, document, element_type_node, &element_type));
 
   yaml_node_t* shape_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
       document, value_node, iree_make_cstring_view("shape"), &shape_node));
   iree_hal_dim_t shape[16];
-  size_t shape_rank = 0;
+  iree_host_size_t shape_rank = 0;
   IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_shape(
       replay, document, shape_node, IREE_ARRAYSIZE(shape), shape, &shape_rank));
 
@@ -447,7 +495,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
       IREE_HAL_BUFFER_USAGE_ALL, allocation_size, &buffer));
   iree_status_t status = iree_trace_replay_parse_hal_buffer(
-      replay, document, contents_node, buffer);
+      replay, document, contents_node, element_type, buffer);
   if (!iree_status_is_ok(status)) {
     iree_hal_buffer_release(buffer);
     return status;
@@ -465,6 +513,25 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
   return status;
 }
 
+// Parses a !hal.buffer_view in tensor form and appends it to |target_list|.
+//
+// ```yaml
+// !tensor 4xf32=[0 1 2 3]
+// ```
+static iree_status_t iree_trace_replay_parse_inline_hal_buffer_view(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
+      iree_yaml_node_as_string(value_node),
+      iree_hal_device_allocator(replay->device), &buffer_view));
+  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+  iree_status_t status =
+      iree_vm_list_push_ref_move(target_list, &buffer_view_ref);
+  iree_vm_ref_release(&buffer_view_ref);
+  return status;
+}
+
 // Parses a typed item from |value_node| and appends it to |target_list|.
 //
 // ```yaml
@@ -473,10 +540,19 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
 // - type: value
 //   i8: 7
 // ```
+// or
+// ```yaml
+// !hal.buffer_view 4xf32=[0 1 2 3]
+// ```
 static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
                                                   yaml_document_t* document,
                                                   yaml_node_t* value_node,
                                                   iree_vm_list_t* target_list) {
+  if (strcmp(value_node->tag, "!hal.buffer_view") == 0) {
+    return iree_trace_replay_parse_inline_hal_buffer_view(
+        replay, document, value_node, target_list);
+  }
+
   yaml_node_t* type_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
       document, value_node, iree_make_cstring_view("type"), &type_node));

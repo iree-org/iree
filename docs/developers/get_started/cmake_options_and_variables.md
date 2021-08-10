@@ -26,16 +26,9 @@ Enables instrumented runtime tracing. Defaults to `OFF`.
 Enables instrumented compiler tracing. This requires that
 `IREE_ENABLE_RUNTIME_TRACING` also be set. Defaults to `OFF`.
 
-#### `IREE_ENABLE_MLIR`:BOOL
-
-Enables MLIR/LLVM dependencies. Defaults to `ON`. MLIR/LLVM dependencies are
-required when building the IREE compiler components. Therefore, the option is
-automatically set to `ON` if `IREE_BUILD_COMPILER` is set to `ON`.
-
 #### `IREE_ENABLE_EMITC`:BOOL
 
-Enables the build of the out-of-tree MLIR dialect EmitC. Defaults to `OFF`. To
-build the EmitC dialect, `IREE_ENABLE_MLIR` must be set to `ON`.
+Enables the build of the out-of-tree MLIR dialect EmitC. Defaults to `OFF`.
 
 #### `IREE_BUILD_COMPILER`:BOOL
 

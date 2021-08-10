@@ -5,7 +5,7 @@
 module @t001_addi {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -22,7 +22,7 @@ module {
 module @t002_divis {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -39,7 +39,7 @@ module {
 module @t002_diviu {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -56,7 +56,7 @@ module {
 module @t003_muli {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -73,7 +73,7 @@ module {
 module @t004_remis {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -90,7 +90,7 @@ module {
 module @t005_remiu {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -107,7 +107,7 @@ module {
 module @t006_subi {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -124,7 +124,7 @@ module {
 module @t007_and {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -141,7 +141,7 @@ module {
 module @t008_or {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -158,7 +158,7 @@ module {
 module @t009_xor {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
@@ -175,7 +175,7 @@ module {
 module @t010_shift_left {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32) -> (i32) {
     %c3 = constant 3 : i32
@@ -192,7 +192,7 @@ module {
 module @t011_shift_right {
 
 module {
-  // CHECK: func @my_fn
+  // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   func @my_fn(%arg0: i32) -> (i32) {
     %c3 = constant 3 : i32

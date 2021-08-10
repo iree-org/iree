@@ -57,6 +57,7 @@ cc_library(
         "SimplifyVariableAccesses.cpp",
         "StripAndSplatConstantVariables.cpp",
         "TypeConverter.cpp",
+        "VerifyInputLegality.cpp",
     ],
     hdrs = [
         "DestructiveUpdateUtils.h",

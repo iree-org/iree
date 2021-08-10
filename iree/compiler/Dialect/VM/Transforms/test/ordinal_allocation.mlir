@@ -13,9 +13,9 @@
   // CHECK-SAME: rwdatas = 0
   // CHECK-SAME: >}
 vm.module @global_address_propagation {
-  // CHECK-DAG: vm.global.i32 mutable @g0 {ordinal = 0 : i32} : i32
+  // CHECK-DAG: vm.global.i32 public mutable @g0 {ordinal = 0 : i32} : i32
   vm.global.i32 mutable @g0 : i32
-  // CHECK-DAG: vm.global.i32 mutable @g1 {ordinal = 4 : i32} : i32
+  // CHECK-DAG: vm.global.i32 public mutable @g1 {ordinal = 4 : i32} : i32
   vm.global.i32 mutable @g1 : i32
 
   // CHECK-NEXT: @main
