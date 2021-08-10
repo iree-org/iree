@@ -12,6 +12,7 @@
 #ifndef IREE_TOOLS_INIT_IREE_DIALECTS_H_
 #define IREE_TOOLS_INIT_IREE_DIALECTS_H_
 
+#include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -35,7 +36,8 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   linalg_ext::LinalgExtDialect,
                   IREE::VM::VMDialect,
                   IREE::VMVX::VMVXDialect,
-                  IREE::Vulkan::VulkanDialect>();
+                  IREE::Vulkan::VulkanDialect,
+                  mlir::iree::IREEDialect>();
   // clang-format on
 }
 

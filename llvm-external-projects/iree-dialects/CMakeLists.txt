@@ -22,12 +22,21 @@ include_directories(SYSTEM ${MLIR_GENERATED_INCLUDE_DIR})
 include_directories(SYSTEM ${IREE_DIALECTS_SOURCE_DIR}/include)
 
 function(iree_dialects_target_includes target)
-  target_include_directories(${target} PUBLIC
+  set(_dirs
     $<BUILD_INTERFACE:${MLIR_INCLUDE_DIR}>
     $<BUILD_INTERFACE:${MLIR_GENERATED_INCLUDE_DIR}>
     $<BUILD_INTERFACE:${IREE_DIALECTS_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${IREE_DIALECTS_BINARY_DIR}/include>
   )
+  # In LLVM parlance, the actual target may just be an interface and may not
+  # be responsible for actually compiling anything. The corresponding obj.
+  # target, when present, is just used for compilation and does not
+  # contribute to the interface properties.
+  # TODO: Normalize this upstream.
+  target_include_directories(${target} PUBLIC ${_dirs})
+  if(TARGET obj.${target})
+    target_include_directories(obj.${target} PRIVATE ${_dirs})
+  endif()
 endfunction()
 
 # Configure CMake and tablegen.

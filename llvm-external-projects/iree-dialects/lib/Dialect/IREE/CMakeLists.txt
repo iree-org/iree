@@ -13,6 +13,4 @@ add_mlir_library(IREEDialectsIREEDialect
   MLIRSideEffectInterfaces
 )
 
-# TODO: Fix upstream so there is a way to know what the actual compile target
-# is (versus prefixing with "obj." which is conditional).
-iree_dialects_target_includes(obj.IREEDialectsIREEDialect)
+iree_dialects_target_includes(IREEDialectsIREEDialect)
