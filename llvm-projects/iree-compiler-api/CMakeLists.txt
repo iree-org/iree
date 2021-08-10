@@ -66,7 +66,8 @@ set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 # prefixing, which feels gross but is stable. Investigate a better mechanism
 # upstream.
 iree_set_llvm_cmake_options()
-set(LLVM_EXTERNAL_PROJECTS "mlir-iree-dialects;mlir-hlo" CACHE STRING "" FORCE)
+iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR})
+iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR})
 set(MLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
 set(MLIR_BINDINGS_PYTHON_LOCK_VERSION OFF CACHE BOOL "" FORCE)
 # TODO: Conflicting gtest.
