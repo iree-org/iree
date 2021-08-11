@@ -44,7 +44,7 @@ static bool isConstantLarge(ConstantOp constantOp,
 static std::vector<ConstantOp> findLargeConstantsInModule(
     ModuleOp moduleOp, size_t minLargeConstantSize) {
   std::vector<ConstantOp> largeConstantOps;
-  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
     for (auto &block : funcOp.getBlocks()) {
       for (auto constantOp : block.getOps<ConstantOp>()) {
         if (isConstantLarge(constantOp, minLargeConstantSize)) {
@@ -115,7 +115,7 @@ class OutlineLargeConstantsPass
   size_t minLargeConstantSize;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineLargeConstantsPass(
     size_t minLargeConstantSize) {
   return std::make_unique<OutlineLargeConstantsPass>(minLargeConstantSize);
 }

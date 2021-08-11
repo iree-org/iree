@@ -33,7 +33,7 @@ struct ConvertTensorOpsPass
                     tensor::TensorDialect>();
   }
   void runOnOperation() override {
-    FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
@@ -45,7 +45,7 @@ struct ConvertTensorOpsPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertTensorOpsPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertTensorOpsPass() {
   return std::make_unique<ConvertTensorOpsPass>();
 }
 

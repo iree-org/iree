@@ -18,7 +18,7 @@ namespace {
 class VerifyInputLegalityPass
     : public VerifyInputLegalityBase<VerifyInputLegalityPass> {
   void runOnOperation() override {
-    FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
       StringRef opDialectName = op->getDialect()->getNamespace();
       if (opDialectName == "mhlo" || opDialectName == "tosa") {
@@ -36,7 +36,7 @@ class VerifyInputLegalityPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createVerifyInputLegalityPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createVerifyInputLegalityPass() {
   return std::make_unique<VerifyInputLegalityPass>();
 }
 

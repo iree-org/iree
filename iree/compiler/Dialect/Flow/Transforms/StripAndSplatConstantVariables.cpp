@@ -74,7 +74,7 @@ class StripAndSplatConstantVariablesPass
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantVariablesPass() {
   return std::make_unique<StripAndSplatConstantVariablesPass>();
 }

@@ -107,7 +107,8 @@ struct ConvertConv2D1x1ConvToMatmulPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertConv2D1x1ToMatmulPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createConvertConv2D1x1ToMatmulPass() {
   return std::make_unique<ConvertConv2D1x1ConvToMatmulPass>();
 }
 

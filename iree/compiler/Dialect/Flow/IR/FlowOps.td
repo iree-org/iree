@@ -25,8 +25,8 @@ class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def FLOW_VariableOp : FLOW_Op<"variable", [
-    Symbol,
-  ]> {
+  Symbol,
+]> {
   let summary = [{stateful variable declaration}];
   let description = [{
     Declares a persistent variable that maintains its value.
@@ -46,9 +46,11 @@ def FLOW_VariableOp : FLOW_Op<"variable", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins "StringRef":$name, "bool":$isMutable,
-      "FuncOp":$initializer, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+      "mlir::FuncOp":$initializer,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
     OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
-      "Attribute":$initialValue, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
+      "Attribute":$initialValue,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
     OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
@@ -76,9 +78,9 @@ def FLOW_VariableAddressOp : FLOW_PureOp<"variable.address"> {
 }
 
 def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [
-    // HACK: works around the lack of symbol side effects in C++.
-    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-  ]> {
+  // HACK: works around the lack of symbol side effects in C++.
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the variable value.
@@ -170,15 +172,15 @@ def FLOW_VariableStoreIndirectOp : FLOW_Op<"variable.store.indirect"> {
 //===----------------------------------------------------------------------===//
 
 def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
-    IsolatedFromAbove,
-    AttrSizedOperandSegments,
-    SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
-    DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
-    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-      "getTiedOperandsIndexAndLength",
-    ]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  IsolatedFromAbove,
+  AttrSizedOperandSegments,
+  SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
+  DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
   let description = [{
     Dispatches some number of workgroups across an n-dimensional grid. The
@@ -273,8 +275,8 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 }
 
 def FLOW_DispatchWorkgroupRankOp : FLOW_PureOp<"dispatch.workgroup.rank", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+]> {
   let summary = [{returns the rank of the workgroup dimensions}];
   let description = [{
     The number of workgroup dimensions used during dispatch, bounding the
@@ -294,8 +296,8 @@ def FLOW_DispatchWorkgroupRankOp : FLOW_PureOp<"dispatch.workgroup.rank", [
 }
 
 def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+]> {
   let summary = [{returns the index of the current workgroup in the grid}];
   let description = [{
     The global workgroup ID of the current workgroup in the range of
@@ -326,8 +328,8 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
 }
 
 def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+]> {
   let summary = [{returns the total workgroup count of the grid}];
   let description = [{
     The total number of workgroups along each dimension in the dispatch grid.
@@ -357,8 +359,8 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
 }
 
 def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+]> {
   let summary = [{returns the size of each workgroup in invocations}];
   let description = [{
     The number of local invocations within the current workgroup along each
@@ -396,9 +398,9 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
 }
 
 def FLOW_DispatchShapeOp : FLOW_PureOp<"dispatch.shape", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    DeclareOpInterfaceMethods<InferTypeOpInterface>
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<InferTypeOpInterface>
+]> {
   let summary = [{returns the shape of a dispatch region input/output tensor}];
   let description = [{
     Queries the shape of an input or output tensor of a
@@ -446,7 +448,7 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape"> {
 def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     AttrSizedOperandSegments,
     OffsetSizeAndStrideOpInterface,
-  ]> {
+]> {
   let summary = [{loads a tensor from a dispatch input placeholder}];
   let description = [{
     Loads an input tensor or subtensor from an input placeholder. As each
@@ -515,7 +517,7 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
 def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     AttrSizedOperandSegments,
     OffsetSizeAndStrideOpInterface,
-  ]> {
+]> {
   let summary = [{stores a tensor into a dispatch output placeholder}];
   let description = [{
     Stores a tensor or subtensor into an output tensor placeholder. As each
@@ -591,11 +593,11 @@ def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
 //===----------------------------------------------------------------------===//
 
 def FLOW_ExecutableOp : FLOW_Op<"executable", [
-    IsolatedFromAbove,
-    SingleBlockImplicitTerminator<"IREE::Flow::ExecutableEndOp">,
-    NativeOpTrait<"SymbolTable">,
-    Symbol,
-  ]> {
+  IsolatedFromAbove,
+  SingleBlockImplicitTerminator<"IREE::Flow::ExecutableEndOp">,
+  NativeOpTrait<"SymbolTable">,
+  Symbol,
+]> {
   let summary = [{generic executable module}];
   let description = [{
     An executable module containing one or more public functions. The contents
@@ -627,17 +629,17 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
 }
 
 def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
-    HasParent<"IREE::Flow::ExecutableOp">,
-    Terminator,
-  ]> {
+  HasParent<"IREE::Flow::ExecutableOp">,
+  Terminator,
+]> {
   let summary = [{terminator pseudo-op for the executable op}];
   let assemblyFormat = "attr-dict";
 }
 
 def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
-    HasParent<"IREE::Flow::ExecutableOp">,
-    Symbol,
-  ]> {
+  HasParent<"IREE::Flow::ExecutableOp">,
+  Symbol,
+]> {
   let summary = [{defines an executable entry point for dispatch operations}];
   let description = [{
     Specifies an exported function with an externally-visible alias. Multiple
@@ -656,13 +658,13 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
 //===----------------------------------------------------------------------===//
 
 def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
-    AttrSizedOperandSegments,
-    FLOW_StreamableOp,
-    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-      "getTiedOperandsIndexAndLength",
-    ]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  AttrSizedOperandSegments,
+  FLOW_StreamableOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
   let description = [{
     Dispatches workgroups across an n-dimensional grid defined by the specified
@@ -729,16 +731,16 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 //===----------------------------------------------------------------------===//
 
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
-    FLOW_StreamableOp,
-    AllElementTypesMatch<["source", "result"]>,
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-        "getTiedResult",
-        "getTiedResultOperandIndex",
-        "getTiedResultOperandIndices",
-    ]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  FLOW_StreamableOp,
+  AllElementTypesMatch<["source", "result"]>,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{reshapes a tensor}];
   let description = [{
     Reshapes a tensor to a new shape without modifying the contents.
@@ -782,12 +784,12 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
 }
 
 def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
-    TypesMatchWith<"value type matches element type of target operand",
-                   "source", "result",
-                   "$_self.cast<ShapedType>().getElementType()">,
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  TypesMatchWith<"value type matches element type of target operand",
+                  "source", "result",
+                  "$_self.cast<ShapedType>().getElementType()">,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{loads a value from a tensor element}];
   let description = [{
     Returns the element at the given location from within the tensor.
@@ -826,13 +828,13 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
 }
 
 def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
-    AllTypesMatch<["target", "result"]>,
-    TypesMatchWith<"value type matches element type of target operand",
-                   "target", "value",
-                   "$_self.cast<ShapedType>().getElementType()">,
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  AllTypesMatch<["target", "result"]>,
+  TypesMatchWith<"value type matches element type of target operand",
+                  "target", "value",
+                  "$_self.cast<ShapedType>().getElementType()">,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{stores a value into a tensor element}];
   let description = [{
     Returns a tensor with the element at the given index set to the given value.
@@ -871,12 +873,12 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
 }
 
 def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
-    FLOW_StreamableOp,
-    TypesMatchWith<"value type matches element type of result",
-                   "result", "value",
-                   "$_self.cast<ShapedType>().getElementType()">,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  FLOW_StreamableOp,
+  TypesMatchWith<"value type matches element type of result",
+                  "result", "value",
+                  "$_self.cast<ShapedType>().getElementType()">,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{splats a value into a shaped tensor}];
   let description = [{
     Returns a tensor initialized to the given primitive value.
@@ -905,10 +907,10 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
 }
 
 def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
-    FLOW_StreamableOp,
-    AllTypesMatch<["operand", "result"]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  FLOW_StreamableOp,
+  AllTypesMatch<["operand", "result"]>,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{performs a full tensor clone operation}];
   let description = [{
     Clones the input tensor into an identical output tensor.
@@ -947,12 +949,12 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
 }
 
 def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
-    FLOW_StreamableOp,
-    AllRanksMatch<["source", "result"]>,
-    AllElementTypesMatch<["source", "result"]>,
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  FLOW_StreamableOp,
+  AllRanksMatch<["source", "result"]>,
+  AllElementTypesMatch<["source", "result"]>,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{slices out a subregion of a tensor}];
   let description = [{
     Clones a subregion of a tensor.
@@ -986,18 +988,18 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
 }
 
 def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
-    FLOW_StreamableOp,
-    AllRanksMatch<["update", "target", "result"]>,
-    AllTypesMatch<["target", "result"]>,
-    AllElementTypesMatch<["update", "target", "result"]>,
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-        "getTiedResult",
-        "getTiedResultOperandIndex",
-        "getTiedResultOperandIndices",
-    ]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  FLOW_StreamableOp,
+  AllRanksMatch<["update", "target", "result"]>,
+  AllTypesMatch<["target", "result"]>,
+  AllElementTypesMatch<["update", "target", "result"]>,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{updates a tensor with the contents of another tensor}];
   let description = [{
     Updates the target tensor with the contents of the update tensor at the
@@ -1064,12 +1066,12 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 
 // TODO(benvanik): replace with real segmented stream ops.
 def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
-    IsolatedFromAbove,
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
-    DeclareOpInterfaceMethods<Util_TiedOpInterface>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-  ]> {
+  IsolatedFromAbove,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface>,
+  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+]> {
   let summary = [{experimental op for defining formed stream regions}];
   let description = [{
     Represents a region where all of the dispatches are meant to target the

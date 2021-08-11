@@ -24,7 +24,7 @@ namespace IREE {
 namespace Flow {
 
 // Builds symbol ref set for all immutable variables in |moduleOp|.
-static DenseSet<StringRef> gatherImmutableVariables(ModuleOp moduleOp) {
+static DenseSet<StringRef> gatherImmutableVariables(mlir::ModuleOp moduleOp) {
   DenseSet<StringRef> set;
   for (auto variableOp : moduleOp.getOps<IREE::Flow::VariableOp>()) {
     if (!variableOp.is_mutable()) {
@@ -36,7 +36,7 @@ static DenseSet<StringRef> gatherImmutableVariables(ModuleOp moduleOp) {
 
 // Hoists all loads of immutable variables in |funcOp| to the entry block.
 // |immutableVariables| is used for lookups of which variables are immutable.
-static void hoistImmutableLoads(FuncOp funcOp,
+static void hoistImmutableLoads(mlir::FuncOp funcOp,
                                 DenseSet<StringRef> &immutableVariables) {
   // Since CSE of loads isn't a thing yet we perform a basic deduping here by
   // folding all subsequent loads into the first one found. This works only for
@@ -269,7 +269,8 @@ class SimplifyVariableAccessesPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createSimplifyVariableAccessesPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createSimplifyVariableAccessesPass() {
   return std::make_unique<SimplifyVariableAccessesPass>();
 }
 

@@ -88,7 +88,7 @@ class HoistUnstreamableOpsPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createHoistUnstreamableOpsPass() {
   return std::make_unique<HoistUnstreamableOpsPass>();
 }
 

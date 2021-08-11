@@ -390,7 +390,7 @@ static LogicalResult verifyVariableOp(VariableOp op) {
       return op.emitOpError() << "initializer function "
                               << op.initializer().getValue() << " not found";
     }
-    auto initializerOp = dyn_cast<FuncOp>(symbolOp);
+    auto initializerOp = dyn_cast<mlir::FuncOp>(symbolOp);
     if (initializerOp.getNumArguments() != 0 ||
         initializerOp.getNumResults() != 1 ||
         initializerOp.getType().getResult(0) != op.type()) {

@@ -68,7 +68,7 @@ struct InterchangeGenericOpsPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createInterchangeGenericOpsPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createInterchangeGenericOpsPass() {
   return std::make_unique<InterchangeGenericOpsPass>();
 }
 
