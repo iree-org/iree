@@ -32,13 +32,13 @@ class ExportBenchmarkFuncsPass
   }
 
   void runOnOperation() override {
-    ModuleOp moduleOp = getOperation();
+    auto moduleOp = getOperation();
 
     // Gather the functions we want to wrap for benchmarking and wrap them.
     // Since we are inserting new functions as part of this pass we must perform
     // the wrapping for only the inputs.
-    SmallVector<FuncOp, 4> entryFuncOps;
-    for (auto entryFuncOp : moduleOp.getOps<FuncOp>()) {
+    SmallVector<mlir::FuncOp, 4> entryFuncOps;
+    for (auto entryFuncOp : moduleOp.getOps<mlir::FuncOp>()) {
       if (entryFuncOp.isPublic()) {
         entryFuncOps.push_back(entryFuncOp);
       }
@@ -63,16 +63,16 @@ class ExportBenchmarkFuncsPass
                            << inputType;
       return {};
     }
-    auto variableOp = moduleBuilder.create<VariableOp>(loc, name,
-                                                       /*isMutable=*/false,
-                                                       inputType, initialValue);
+    auto variableOp = moduleBuilder.create<IREE::Flow::VariableOp>(
+        loc, name,
+        /*isMutable=*/false, inputType, initialValue);
     variableOp.setPrivate();
     variableOp->setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
     return variableOp;
   }
 
-  LogicalResult createEntryPointBenchmarkFunc(ModuleOp moduleOp,
-                                              FuncOp entryFuncOp) {
+  LogicalResult createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
+                                              mlir::FuncOp entryFuncOp) {
     OpBuilder moduleBuilder(&getContext());
     moduleBuilder.setInsertionPointAfter(entryFuncOp);
 
@@ -87,7 +87,7 @@ class ExportBenchmarkFuncsPass
 
     // Create a `() -> ()` entry point op the benchmark tool can run.
     std::string funcName = std::string(entryFuncOp.getName()) + "_benchmark";
-    auto funcOp = moduleBuilder.create<FuncOp>(
+    auto funcOp = moduleBuilder.create<mlir::FuncOp>(
         loc, funcName, moduleBuilder.getFunctionType({}, {}));
     funcOp.setPublic();
     funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
@@ -126,7 +126,8 @@ class ExportBenchmarkFuncsPass
   int uniqueId = 0;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createExportBenchmarkFuncsPass() {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createExportBenchmarkFuncsPass() {
   return std::make_unique<ExportBenchmarkFuncsPass>();
 }
 

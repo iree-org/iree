@@ -207,13 +207,13 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
   }
 
   // Walk all functions and ensure equivalent.
-  if (!compare_ranges(lhsModule.getOps<FuncOp>(), rhsModule.getOps<FuncOp>(),
-                      [](FuncOp lhs, FuncOp rhs) {
-                        if (lhs.getType() != rhs.getType()) return false;
-                        if (lhs->getAttrs() != rhs->getAttrs()) return false;
-                        return isStructurallyEquivalentTo(lhs.getRegion(),
-                                                          rhs.getRegion());
-                      })) {
+  if (!compare_ranges(
+          lhsModule.getOps<mlir::FuncOp>(), rhsModule.getOps<mlir::FuncOp>(),
+          [](mlir::FuncOp lhs, mlir::FuncOp rhs) {
+            if (lhs.getType() != rhs.getType()) return false;
+            if (lhs->getAttrs() != rhs->getAttrs()) return false;
+            return isStructurallyEquivalentTo(lhs.getRegion(), rhs.getRegion());
+          })) {
     return false;  // dispatch entry mismatch
   }
 
@@ -312,7 +312,8 @@ class DeduplicateExecutablesPass
       "Number of flow.executable ops remaining after deduplication"};
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createDeduplicateExecutablesPass() {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createDeduplicateExecutablesPass() {
   return std::make_unique<DeduplicateExecutablesPass>();
 }
 

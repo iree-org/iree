@@ -77,6 +77,9 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
 
+/// Creates a pass to vectorize a very specific form of linalg.conv ops.
+std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeMMT4dPass();
+
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
 
@@ -94,6 +97,10 @@ createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 /// static-sized subviews. To match, output shape must be 1x1xWoxCo, where Co
 /// Co is a multiple of 4, and filter shape must be 1x1x4xCo.
 void populateLinalgToVectorVectorizeConvPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns);
+
+/// Populates `patterns` to convert linalg.mmt4d to vector.contract.
+void populateLinalgToVectorVectorizeMMT4dPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
 /// Populates `patterns` with conversions of Shape dialect to LLVM Dialect.
@@ -242,6 +249,9 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();
 /// Convert shared memory copies to distributed transfer_read/transfer_write.
 std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUDistributeSharedMemoryCopy();
+
+/// Apply software pipelining.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
 
 //------------------------------------------------------------------------------
 // SPIRV Passes

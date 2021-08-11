@@ -87,7 +87,7 @@ class PromoteTensorLoadsPass
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createPromoteTensorLoadsPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteTensorLoadsPass() {
   return std::make_unique<PromoteTensorLoadsPass>();
 }
 

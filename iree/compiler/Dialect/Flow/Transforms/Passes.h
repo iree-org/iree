@@ -44,11 +44,12 @@ void registerFlowTransformPassPipeline();
 
 /// Creates a pass to convert linalg convolution ops with 1x1 kernels into
 /// linalg.matmul
-std::unique_ptr<OperationPass<FuncOp>> createConvertConv2D1x1ToMatmulPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createConvertConv2D1x1ToMatmulPass();
 
 /// Creates a pass to convert linalg convolution ops into linalg.matmul ops
 /// using im2col tranformation.
-std::unique_ptr<OperationPass<FuncOp>> createConvertConv2DToImg2ColPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertConv2DToImg2ColPass();
 
 /// Pass to convert a linalg.pad_tensor operation into a linalg.fill +
 /// subtensor_insert. This allows lowering the operation into a single kernel.
@@ -59,37 +60,38 @@ std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
 /// Create a pass to interchange generic ops to force the reduction loop to be
 /// the most inner loops.
-std::unique_ptr<OperationPass<FuncOp>> createInterchangeGenericOpsPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createInterchangeGenericOpsPass();
 
 // Convert tensor operations to equivalent flow.tensor.* operations
 // `runBeforeDispatchRegionFormation` controls whether to run before dispatch
 // region creation. If run after, it will catch operations that were left
 // outside of dispatch regions and could be represented as flow.tensor.* ops.
-std::unique_ptr<OperationPass<FuncOp>> createConvertTensorOpsPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertTensorOpsPass();
 
 // Convert linalg.tensor operations to equivalent flow.tensor.* ops.
 // `runBeforeDispatchRegionFormation` controls whether to run before dispatch
 // region creation. If run after, it will catch operations that were left
 // outside of dispatch regions and could be represented as flow.tensor.* ops.
-std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgTensorOpsPass(
+std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertLinalgTensorOpsPass(
     bool runBeforeDispatchRegionFormation = true);
 
 // Promote I1 tensor constants to I8 tensors to match later operations.
-std::unique_ptr<OperationPass<FuncOp>> createPromoteI1ToI8Pass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
 
 // Converts standard ops which match to flow.tensor.load (typically causing a
 // read-back).
 // Note that there are typically very specific phase ordering issues with
 // performing such a conversion, so even though it is of fine granularity,
 // this is maintained separately.
-std::unique_ptr<OperationPass<FuncOp>> createPromoteTensorLoadsPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteTensorLoadsPass();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
-std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createExpandVariableDynamicDimsPass();
 
 /// Verified if the input to the Flow transformation passes has operations from
 /// dialects that are expected to be legalized before this pass.
-std::unique_ptr<OperationPass<FuncOp>> createVerifyInputLegalityPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createVerifyInputLegalityPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
@@ -97,24 +99,26 @@ std::unique_ptr<OperationPass<FuncOp>> createVerifyInputLegalityPass();
 
 /// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
 /// A dispatch region is created for each tiled loop nest.
-std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createDispatchLinalgOnTensorsPass();
 
 // Outlines dispatch regions into executables.
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOutlineDispatchRegionsPass();
 
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
-std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createInjectDispatchTracingPass();
 
 // Exports all functions and dispatch executables as `() -> ()` benchmark funcs.
-std::unique_ptr<OperationPass<ModuleOp>> createExportBenchmarkFuncsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
 
 //===----------------------------------------------------------------------===//
 // Linalg transforms
 //===----------------------------------------------------------------------===//
 
 /// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
-std::unique_ptr<OperationPass<FuncOp>> createPadLinalgOpsToIntegerMultiplePass(
-    int paddingSize = 4);
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createPadLinalgOpsToIntegerMultiplePass(int paddingSize = 4);
 
 //===----------------------------------------------------------------------===//
 // Optimizations
@@ -125,30 +129,32 @@ std::unique_ptr<OperationPass<FuncOp>> createPadLinalgOpsToIntegerMultiplePass(
 // TODO(#5493): implement the support for inlining constants into the command
 // buffer and raise this value to one that is measured to be good.
 static constexpr size_t kMinLargeConstantSize = 1;
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineLargeConstantsPass(
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineLargeConstantsPass(
     size_t minLargeConstantSize = kMinLargeConstantSize);
 
 // Deduplicates equivalent executables.
-std::unique_ptr<OperationPass<ModuleOp>> createDeduplicateExecutablesPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createDeduplicateExecutablesPass();
 
 //===----------------------------------------------------------------------===//
 // Stream Formation and Folding
 //===----------------------------------------------------------------------===//
 
 // Identifies dispatches that can be grouped into streams within functions.
-std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createFormStreamsPass();
 
 // Reorders blocks to hoist ops that cannot be put into streams.
-std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createHoistUnstreamableOpsPass();
 
 // Hoists loads and sinks stores to variables to decrease data dependency
 // regions.
-std::unique_ptr<OperationPass<FuncOp>> createSimplifyVariableAccessesPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createSimplifyVariableAccessesPass();
 
 // TODO(benvanik): cross-function stream flows.
 
 // Inserts clones of constant values where they may be required.
-std::unique_ptr<OperationPass<FuncOp>> createInsertConstantClonesPass();
+std::unique_ptr<OperationPass<mlir::FuncOp>> createInsertConstantClonesPass();
 
 //===----------------------------------------------------------------------===//
 // Module Analysis and Finalization
@@ -163,7 +169,7 @@ std::unique_ptr<OperationPass<FuncOp>> createInsertConstantClonesPass();
 // and is intended for use as a development tool.
 // TODO(scotttodd): pass pipeline with this and other development passes to
 //                  generate test cases / models suitable for check-in
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantVariablesPass();
 
 //===----------------------------------------------------------------------===//

@@ -547,7 +547,8 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
     feedbackArcSet.acyclicEdges.push_back({scratchReg, feedbackEdge.second});
   }
   if (scratchI32Reg != maxI32RegisterOrdinal_) {
-    scratchI32RegisterCount_ = scratchI32Reg - maxI32RegisterOrdinal_;
+    scratchI32RegisterCount_ = std::max(scratchI32RegisterCount_,
+                                        scratchI32Reg - maxI32RegisterOrdinal_);
     assert(getMaxI32RegisterOrdinal() <= Register::kInt32RegisterCount &&
            "spilling i32 regs");
     if (getMaxI32RegisterOrdinal() > Register::kInt32RegisterCount) {
@@ -555,7 +556,8 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
     }
   }
   if (scratchRefReg != maxRefRegisterOrdinal_) {
-    scratchRefRegisterCount_ = scratchRefReg - maxRefRegisterOrdinal_;
+    scratchRefRegisterCount_ = std::max(scratchRefRegisterCount_,
+                                        scratchRefReg - maxRefRegisterOrdinal_);
     assert(getMaxRefRegisterOrdinal() <= Register::kRefRegisterCount &&
            "spilling ref regs");
     if (getMaxRefRegisterOrdinal() > Register::kRefRegisterCount) {

@@ -74,9 +74,15 @@ def LinalgToVectorVectorizeConv :
     Pass<"iree-codegen-vectorize-linalg-conv", "FuncOp"> {
   let summary = "Vectorize a very specific form of linalg.conv";
   let constructor =
-      "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass();";
+      "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass()";
 }
 
+def LinalgToVectorVectorizeMMT4d :
+    Pass<"iree-codegen-vectorize-linalg-mmt4d", "FuncOp"> {
+  let summary = "Vectorize a very specific form of linalg.mmt4d";
+  let constructor =
+      "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
+}
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -199,6 +205,11 @@ def LLVMGPUDistributeSharedMemoryCopy :
   let constructor = "mlir::iree_compiler::createLLVMGPUDistributeSharedMemoryCopy()";
 }
 
+def LLVMGPUPipelining :
+    Pass<"iree-llvmgpu-pipelining", "FuncOp"> {
+  let summary = "Pass to do software pipelining.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPipeliningPass()";
+}
 //------------------------------------------------------------------------------
 // SPIRV
 //------------------------------------------------------------------------------
