@@ -26,16 +26,21 @@ namespace iree_compiler {
 
 IREE::HAL::TranslationInfo buildTranslationInfo(
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workloadPerWorkgroup, MLIRContext *context) {
+    ArrayRef<int64_t> fullWorkload, ArrayRef<int64_t> workloadPerWorkgroup,
+    MLIRContext *context) {
   OpBuilder builder(context);
   auto pipelineAttr =
       IREE::HAL::DispatchLoweringPassPipelineAttr::get(context, passPipeline);
+  ArrayAttr fullWorkloadAttr = nullptr;
+  if (!fullWorkload.empty()) {
+    fullWorkloadAttr = builder.getI64ArrayAttr(fullWorkload);
+  }
   ArrayAttr workloadPerWorkgroupAttr = nullptr;
   if (!workloadPerWorkgroup.empty()) {
     workloadPerWorkgroupAttr = builder.getI64ArrayAttr(workloadPerWorkgroup);
   }
-  return IREE::HAL::TranslationInfo::get(pipelineAttr, workloadPerWorkgroupAttr,
-                                         context);
+  return IREE::HAL::TranslationInfo::get(pipelineAttr, fullWorkloadAttr,
+                                         workloadPerWorkgroupAttr, context);
 }
 
 IREE::HAL::TranslationInfo getTranslationInfo(

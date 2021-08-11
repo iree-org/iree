@@ -278,7 +278,8 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (!getTranslationInfo(entryPointOp)) {
       setTranslationInfo(funcOp,
                          IREE::HAL::DispatchLoweringPassPipeline::CPUDefault,
-                         /*workgroupSize =*/{}, /*workloadPerWorkgroup =*/{});
+                         /*workgroupSize =*/{}, /*fullWorkload=*/{},
+                         /*workloadPerWorkgroup =*/{});
     }
   }
   return success();

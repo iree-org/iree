@@ -52,7 +52,8 @@ inline bool operator!=(const TranslationInfo &lhs, const TranslationInfo &rhs) {
 /// Builder method for IREE::HAL::TranslationInfoAttr.
 IREE::HAL::TranslationInfo buildTranslationInfo(
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workloadPerWorkgroup, MLIRContext *context);
+    ArrayRef<int64_t> fullWorkload, ArrayRef<int64_t> workloadPerWorkgroup,
+    MLIRContext *context);
 
 /// Gets the translate executable info attribute value associated with
 /// `entryPointOp`.

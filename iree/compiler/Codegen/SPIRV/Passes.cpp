@@ -65,7 +65,7 @@ void addSPIRVVectorizationPassPipeline(OpPassManager &pm) {
   //===--------------------------------------------------------------------===//
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  // pm.addNestedPass<FuncOp>(createSPIRVRemoveOneTripTiledLoopPass());
+  pm.addNestedPass<FuncOp>(createSPIRVRemoveOneTripTiledLoopPass());
   //  Tile and distribute to GPU subgroups/invocations and vectorize.
   pm.addNestedPass<FuncOp>(createSPIRVTileAndVectorizePass());
   pm.addPass(createCanonicalizerPass());

@@ -37,6 +37,8 @@ namespace iree_compiler {
 
 namespace {
 
+int64_t ceilDiv(int64_t a, int64_t b) { return (a + b - 1) / b; }
+
 /// Returns true if the given `expr` is a linear expression over one
 /// symbol/dimension.
 ///
@@ -83,58 +85,70 @@ int dimensionToIndex(StringRef dimension) {
   return StringSwitch<int>(dimension).Case("x", 0).Case("y", 1).Case("z", 2);
 }
 
-IREE::HAL::ReturnOp getEntryPointReturnOp(Operation *op) {
-  auto funcOp = op->getParentOfType<FuncOp>();
+SmallVector<int64_t> getNumWorkgroups(FuncOp funcOp) {
   IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
-  if (!entryPointOp || !entryPointOp.getBody()) return {};
+  if (!entryPointOp) return {};
 
-  Operation *terminator = entryPointOp.getBlock()->getTerminator();
-  auto retOp = dyn_cast<IREE::HAL::ReturnOp>(terminator);
-  if (!retOp || retOp.getNumOperands() != 3) return {};
+  auto info = getTranslationInfo(entryPointOp);
+  if (!info) return {};
 
-  LLVM_DEBUG(llvm::dbgs() << "workgroup count function return op: " << retOp
-                          << "\n");
-  return retOp;
+  ArrayAttr fullWorkload = info.fullWorkload();
+  ArrayAttr wgWorkload = info.workloadPerWorkgroup();
+  if (fullWorkload.empty() || wgWorkload.empty()) return {};
+
+  assert(fullWorkload.size() == wgWorkload.size());
+
+  SmallVector<int64_t> numWorkgroups;
+  for (auto pair : llvm::zip(fullWorkload.getValue(), wgWorkload.getValue())) {
+    auto total = std::get<0>(pair).cast<IntegerAttr>().getInt();
+    auto part = std::get<1>(pair).cast<IntegerAttr>().getInt();
+    if (ShapedType::isDynamic(total) || ShapedType::isDynamic(part)) {
+      numWorkgroups.push_back(ShapedType::kDynamicSize);
+    } else {
+      numWorkgroups.push_back(ceilDiv(total, part));
+    }
+  }
+  return numWorkgroups;
 }
 
 /// Gets the block processor ID's upper bound. This queries the workgroup count
 /// function.
 Optional<int64_t> getProcessorIDUpperBound(gpu::BlockIdOp blockIDOp) {
-  auto retOp = getEntryPointReturnOp(blockIDOp);
-  if (!retOp) return llvm::None;
-
+  auto numWorkgroups = getNumWorkgroups(blockIDOp->getParentOfType<FuncOp>());
   int index = dimensionToIndex(blockIDOp.dimension());
-  IntegerAttr attr;
-  if (!matchPattern(retOp.getOperand(index), m_Constant(&attr)))
+  if (index >= numWorkgroups.size() ||
+      ShapedType::isDynamic(numWorkgroups[index])) {
     return llvm::None;
-
-  return attr.getInt();
+  }
+  return numWorkgroups[index];
 }
 
 Optional<int64_t> getProcessorIDUpperBound(
     IREE::HAL::InterfaceWorkgroupIDOp blockIDOp) {
-  auto retOp = getEntryPointReturnOp(blockIDOp);
-  if (!retOp) return llvm::None;
-
+  auto numWorkgroups = getNumWorkgroups(blockIDOp->getParentOfType<FuncOp>());
   int index = blockIDOp.dimensionAttr().getInt();
-  IntegerAttr attr;
-  if (!matchPattern(retOp.getOperand(index), m_Constant(&attr)))
+  if (index >= numWorkgroups.size() ||
+      ShapedType::isDynamic(numWorkgroups[index])) {
     return llvm::None;
-
-  return attr.getInt();
+  }
+  return numWorkgroups[index];
 }
 
 /// Gets the thread processor ID's upper bound. This queries the SPIR-V entry
 /// point ABI.
 Optional<int64_t> getProcessorIDUpperBound(gpu::ThreadIdOp threadIDOp) {
   FuncOp funcOp = threadIDOp->getParentOfType<FuncOp>();
-  auto abiAttr = funcOp->getAttrOfType<spirv::EntryPointABIAttr>(
-      spirv::getEntryPointABIAttrName());
-  if (!abiAttr) return llvm::None;
+  IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
+  if (!entryPointOp) return {};
+
+  Optional<ArrayAttr> sizes = entryPointOp.workgroup_size();
+  if (!sizes) return {};
 
   int index = dimensionToIndex(threadIDOp.dimension());
-  auto valueIt = abiAttr.local_size().getIntValues().begin() + index;
-  return (*valueIt).getZExtValue();
+  if (index < sizes->size()) {
+    return sizes->getValue()[index].cast<IntegerAttr>().getInt();
+  }
+  return llvm::None;
 }
 
 /// Folds `affine.min` ops which has only one symbol operand, which is a

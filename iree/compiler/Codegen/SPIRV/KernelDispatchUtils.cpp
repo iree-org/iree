@@ -498,9 +498,13 @@ static LogicalResult setMaliSpecificConfig(
     SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 1, 1, 4};
     tileSizes.emplace_back(fourthLevel);
 
+    SmallVector<int64_t, 3> fullWorkload = {outputShape[3], outputShape[2],
+                                            outputShape[1]};
+
     return setOpConfigAndEntryPointFnTranslation(
         entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
-        IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize, workgroupSize);
+        IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize, workgroupSize,
+        fullWorkload);
   }
   return failure();
 }
@@ -566,9 +570,12 @@ static LogicalResult setMaliSpecificConfig(
     SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 1, 1};
     tileSizes.emplace_back(fourthLevel);
 
+    SmallVector<int64_t, 3> fullWorkload = {outputShape[3], outputShape[2],
+                                            outputShape[1]};
     return setOpConfigAndEntryPointFnTranslation(
         entryPoint, op, tileSizes, /*nativeVectorSize =*/ArrayRef<int64_t>{},
-        IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize, workgroupSize);
+        IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize, workgroupSize,
+        fullWorkload);
   }
   return failure();
 }
@@ -592,7 +599,7 @@ static LogicalResult setTranslationUsingDistributeToGlobalId(
   MLIRContext *context = entryPointOp.getContext();
   auto translationInfo = buildTranslationInfo(
       IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistributeToGlobalID,
-      /*workloadPerWorkgroup =*/{}, context);
+      /*fullWorkload=*/{}, /*workloadPerWorkgroup =*/{}, context);
   setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
   OpBuilder builder(context);
   int64_t workgroupSizeX = workgroupSize[0];

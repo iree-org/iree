@@ -35,6 +35,7 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 void setTranslationInfo(FuncOp entryPointFn,
                         IREE::HAL::DispatchLoweringPassPipeline passPipeline,
                         ArrayRef<int64_t> workgroupSize,
+                        ArrayRef<int64_t> fullWorkload,
                         ArrayRef<int64_t> workloadPerWorkgroup);
 
 /// Returns the loops that are partitioned during dispatch region formations, in
@@ -56,7 +57,7 @@ LogicalResult setOpConfigAndEntryPointFnTranslation(
     FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
     ArrayRef<int64_t> nativeVectorSizes,
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {});
+    ArrayRef<int64_t> workgroupSize = {}, ArrayRef<int64_t> fullWorkload = {});
 
 /// Returns the number of outer parallel loops of a linalgOp.
 /// Note: To be used only if needed. Use the `getPartitionedLoops` method if
