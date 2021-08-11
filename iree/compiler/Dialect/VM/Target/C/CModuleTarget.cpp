@@ -23,6 +23,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
+static void printCompilerConfigurationBlock(llvm::raw_ostream &output) {
+  output << "//" << std::string(77, '=') << "\n"
+         << "// compiler configuration\n"
+         << "//" << std::string(77, '=') << "\n\n";
+
+  output << "#if defined(IREE_COMPILER_MSVC)\n";
+  output << "#pragma warning(disable:4102)\n";
+  output << "#endif  // IREE_COMPILER_MSVC\n";
+}
+
 static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
                                llvm::raw_ostream &output) {
   output << "//" << std::string(77, '=') << "\n"
@@ -41,6 +51,7 @@ static void printSeparatingComment(llvm::raw_ostream &output) {
             "//"
          << std::string(77, '=') << "\n";
 }
+
 static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
                                         mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
@@ -81,6 +92,7 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
 
   return success();
 }
+
 static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
                                             mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
@@ -89,15 +101,21 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   output << "struct " << moduleName << "_t {};\n";
   output << "struct " << moduleName << "_state_t {\n";
 
+  // Returns |count| or 1 if |count| == 0.
+  // Some compilers (MSVC) don't support zero-length struct fields on the
+  // interior of structs (just VLA at the tail).
+  auto countOrEmpty = [](uint32_t count) { return count ? count : 1; };
+
+  auto ordinalCounts = moduleOp.ordinal_counts().getValue();
   output << "iree_allocator_t allocator;\n";
-  output << "uint8_t rwdata["
-         << moduleOp.ordinal_counts().getValue().global_bytes() << "];\n";
-  output << "iree_vm_ref_t refs["
-         << moduleOp.ordinal_counts().getValue().global_refs() << "];\n";
+  output << "uint8_t rwdata[" << countOrEmpty(ordinalCounts.global_bytes())
+         << "];\n";
+  output << "iree_vm_ref_t refs[" << countOrEmpty(ordinalCounts.global_refs())
+         << "];\n";
   output << "iree_vm_buffer_t rodata_buffers["
-         << moduleOp.ordinal_counts().getValue().rodatas() << "];\n";
+         << countOrEmpty(ordinalCounts.rodatas()) << "];\n";
   output << "iree_vm_function_t imports["
-         << moduleOp.ordinal_counts().getValue().import_funcs() << "];\n";
+         << countOrEmpty(ordinalCounts.import_funcs()) << "];\n";
   output << "};\n";
 
   output << "typedef struct " << moduleName << "_t " << moduleName << "_t;\n";
@@ -150,76 +168,95 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   };
 
   // exports
-  std::string exportName = moduleName + "_exports_";
-  output << "static const iree_vm_native_export_descriptor_t " << exportName
-         << "[] = {\n";
-
-  // sort export ops
   SmallVector<IREE::VM::ExportOp, 4> exportOps(
       moduleOp.getOps<IREE::VM::ExportOp>());
-  llvm::sort(exportOps, [](auto &lhs, auto &rhs) {
-    return lhs.export_name().compare(rhs.export_name()) < 0;
-  });
+  std::string exportName = moduleName + "_exports_";
+  output << "static const size_t " << exportName
+         << "count_ = " << exportOps.size() << ";\n";
+  output << "static const iree_vm_native_export_descriptor_t " << exportName
+         << "[] = {\n";
+  if (exportOps.empty()) {
+    // Empty list placeholder.
+    output << "    {0},\n";
+  } else {
+    // sort export ops
+    llvm::sort(exportOps, [](auto &lhs, auto &rhs) {
+      return lhs.export_name().compare(rhs.export_name()) < 0;
+    });
+    for (auto exportOp : exportOps) {
+      StringRef funcName = exportOp.function_ref();
+      auto funcOp = symbolTable.lookup<mlir::FuncOp>(funcName);
+      if (!funcOp) {
+        return exportOp.emitError("Couldn't find referenced FuncOp");
+      }
+      StringAttr callingConvention = funcOp.getOperation()
+                                         ->getAttr("calling_convention")
+                                         .cast<StringAttr>();
+      if (!callingConvention) {
+        return exportOp.emitError(
+            "Couldn't create calling convention string for referenced FuncOp");
+      }
 
-  for (auto exportOp : exportOps) {
-    StringRef funcName = exportOp.function_ref();
-    auto funcOp = symbolTable.lookup<mlir::FuncOp>(funcName);
-    if (!funcOp) {
-      return exportOp.emitError("Couldn't find referenced FuncOp");
+      // TODO(simon-camp): support function-level reflection attributes
+      output << "{" << printCStringView(exportOp.export_name()) << ", "
+             << printCStringView(callingConvention.getValue())
+             << ", 0, NULL},\n";
     }
-    StringAttr callingConvention =
-        funcOp.getOperation()->getAttr("calling_convention").cast<StringAttr>();
-    if (!callingConvention) {
-      return exportOp.emitError(
-          "Couldn't create calling convention string for referenced FuncOp");
-    }
-
-    // TODO(simon-camp): support function-level reflection attributes
-    output << "{" << printCStringView(exportOp.export_name()) << ", "
-           << printCStringView(callingConvention.getValue()) << ", 0, NULL},\n";
   }
   output << "};\n";
   output << "\n";
 
   // imports
-  std::string importName = moduleName + "_imports_";
-  output << "static const iree_vm_native_import_descriptor_t " << importName
-         << "[] = {\n";
-
-  // sort import ops
   SmallVector<IREE::VM::ImportOp, 4> importOps(
       moduleOp.getOps<IREE::VM::ImportOp>());
-  llvm::sort(importOps, [](auto &lhs, auto &rhs) {
-    return lhs.getName().compare(rhs.getName()) < 0;
-  });
-
-  for (auto importOp : importOps) {
-    output << "{" << printCStringView(importOp.getName()) << "},\n";
+  std::string importName = moduleName + "_imports_";
+  output << "static const size_t " << importName
+         << "count_ = " << importOps.size() << ";\n";
+  output << "static const iree_vm_native_import_descriptor_t " << importName
+         << "[] = {\n";
+  if (importOps.empty()) {
+    // Empty list placeholder.
+    output << "    {0},\n";
+  } else {
+    // sort import ops
+    llvm::sort(importOps, [](auto &lhs, auto &rhs) {
+      return lhs.getName().compare(rhs.getName()) < 0;
+    });
+    for (auto importOp : importOps) {
+      output << "{" << printCStringView(importOp.getName()) << "},\n";
+    }
   }
   output << "};\n";
   output << "\n";
 
   // functions
   std::string functionName = moduleName + "_funcs_";
+  output << "static const size_t " << functionName
+         << "count_ = " << exportOps.size() << ";\n";
   output << "static const iree_vm_native_function_ptr_t " << functionName
          << "[] = {\n";
+  if (exportOps.empty()) {
+    // Empty list placeholder.
+    output << "    {0},\n";
+  } else {
+    // We only add exported functions to the table, as calls to internal
+    // functions are directly mapped to C function calls of the generated
+    // implementation.
+    for (auto exportOp : exportOps) {
+      StringRef funcName = exportOp.function_ref();
+      auto funcOp = symbolTable.lookup<mlir::FuncOp>(funcName);
+      if (!funcOp) {
+        return exportOp.emitError("Couldn't find referenced FuncOp");
+      }
+      output << "{"
+             << "(iree_vm_native_function_shim_t)";
 
-  // We only add exported functions to the table, as calls to internal functions
-  // are directly mapped to C function calls of the generated implementation.
-  for (auto exportOp : exportOps) {
-    StringRef funcName = exportOp.function_ref();
-    auto funcOp = symbolTable.lookup<mlir::FuncOp>(funcName);
-    if (!funcOp) {
-      return exportOp.emitError("Couldn't find referenced FuncOp");
+      if (failed(printShim(funcOp, output))) {
+        return funcOp.emitError("Couldn't create calling convention string");
+      }
+      output << ", "
+             << "(iree_vm_native_function_target_t)" << funcName << "},\n";
     }
-    output << "{"
-           << "(iree_vm_native_function_shim_t)";
-
-    if (failed(printShim(funcOp, output))) {
-      return funcOp.emitError("Couldn't create calling convention string");
-    }
-    output << ", "
-           << "(iree_vm_native_function_target_t)" << funcName << "},\n";
   }
   output << "};\n";
   output << "\n";
@@ -230,11 +267,11 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "static const iree_vm_native_module_descriptor_t " << descriptorName
          << " = {\n"
          << printCStringView(moduleName) << ",\n"
-         << "IREE_ARRAYSIZE(" << importName << "),\n"
+         << importName << "count_,\n"
          << importName << ",\n"
-         << "IREE_ARRAYSIZE(" << exportName << "),\n"
+         << exportName << "count_,\n"
          << exportName << ",\n"
-         << "IREE_ARRAYSIZE(" << functionName << "),\n"
+         << functionName << "count_,\n"
          << functionName << ",\n"
          << "0,\n"
          << "NULL,\n"
@@ -404,6 +441,9 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printInclude("iree/vm/ops_emitc.h");
   printInclude("iree/vm/shims_emitc.h");
   printInclude("iree/vm/value.h");
+  output << "\n";
+
+  printCompilerConfigurationBlock(output);
   output << "\n";
 
   printModuleComment(moduleOp, output);
