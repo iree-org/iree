@@ -65,7 +65,9 @@ cc_library(
     includes = ["include"],
     deps = [
         ":IREEOpsIncGen",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
     ],
 )
 
