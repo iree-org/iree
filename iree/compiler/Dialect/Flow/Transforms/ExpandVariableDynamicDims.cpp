@@ -51,7 +51,7 @@ class ExpandVariableDynamicDimsPass
  private:
   // Expands a flow.variable representing a shape with one variable per dim.
   // Uses of the variable will be replaced with the per-dim ones.
-  void expandShapeVariable(ModuleOp moduleOp, VariableOp shapeVarOp) {
+  void expandShapeVariable(mlir::ModuleOp moduleOp, VariableOp shapeVarOp) {
     // Create one flow.variable per dimension (static or dynamic).
     OpBuilder moduleBuilder(shapeVarOp);
     auto shapeType = shapeVarOp.type().cast<Shape::RankedShapeType>();
@@ -84,7 +84,7 @@ class ExpandVariableDynamicDimsPass
   }
 
   // Replaces uses of |shapeVarOp| in |moduleOp| with the expanded |dimVarOps|.
-  void replaceShapeVariableUses(ModuleOp moduleOp,
+  void replaceShapeVariableUses(mlir::ModuleOp moduleOp,
                                 Shape::RankedShapeType shapeType,
                                 VariableOp shapeVarOp,
                                 ArrayRef<VariableOp> dimVarOps) {
@@ -128,7 +128,8 @@ class ExpandVariableDynamicDimsPass
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createExpandVariableDynamicDimsPass() {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createExpandVariableDynamicDimsPass() {
   return std::make_unique<ExpandVariableDynamicDimsPass>();
 }
 

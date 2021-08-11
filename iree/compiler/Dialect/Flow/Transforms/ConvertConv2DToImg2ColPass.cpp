@@ -358,7 +358,8 @@ struct ConvertConv2DToImg2ColPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertConv2DToImg2ColPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createConvertConv2DToImg2ColPass() {
   return std::make_unique<ConvertConv2DToImg2ColPass>();
 }
 

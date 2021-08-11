@@ -114,7 +114,7 @@ class InsertConstantClonesPass
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createInsertConstantClonesPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createInsertConstantClonesPass() {
   return std::make_unique<InsertConstantClonesPass>();
 }
 

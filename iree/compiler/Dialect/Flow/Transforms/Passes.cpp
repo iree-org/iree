@@ -74,13 +74,13 @@ namespace Flow {
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Simplify flow.variable accesses early on; this can help with dispatch
   // region formation as redundant store-loads are removed.
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createSimplifyVariableAccessesPass());
 
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Replaces variables with !shapex.ranked_shape types with individual
   // variables for each dimension. This allows for constant dimensions to be
@@ -96,56 +96,60 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // The generated ABI wrappers assume such an expansion and will generate code
   // to produce it from the original reflection metadata captured in the
   // previous pass.
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
       Shape::createExpandFunctionDynamicDimsPass());
 
   // Special case peephole optimizations.
   if (clEnable1x1ConvToMatmul) {
-    passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
+    passManager.addNestedPass<mlir::FuncOp>(
+        createConvertConv2D1x1ToMatmulPass());
   }
   if (clEnableConvToImg2Col) {
-    passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
+    passManager.addNestedPass<mlir::FuncOp>(createConvertConv2DToImg2ColPass());
   }
   // Pad linalg op
   if (clEnablePaddingLinalgOps) {
-    passManager.addNestedPass<FuncOp>(
+    passManager.addNestedPass<mlir::FuncOp>(
         createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
   }
   passManager.addPass(createPadTensorToSubTensorInsertPass());
 
   // Elementwise, fusion, tiling and distribution.
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
       mlir::createConvertElementwiseToLinalgPass());
-  passManager.addNestedPass<FuncOp>(mlir::createLinalgFoldUnitExtentDimsPass());
-  passManager.addNestedPass<FuncOp>(createInterchangeGenericOpsPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      mlir::createLinalgFoldUnitExtentDimsPass());
+  passManager.addNestedPass<mlir::FuncOp>(createInterchangeGenericOpsPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(createFusionOfTensorOpsPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
   if (clEnableLinalgDetensorize) {
-    passManager.addNestedPass<FuncOp>(mlir::createLinalgDetensorizePass());
+    passManager.addNestedPass<mlir::FuncOp>(
+        mlir::createLinalgDetensorizePass());
   }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createConvertTensorOpsPass());
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Flow::createConvertTensorOpsPass());
+  passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createConvertLinalgTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/true));
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createConvertLinalgTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/false));
   // NOTE: required because the current dispatch-linalg-on-tensors pass
   // creates a lot of dead IR that needs to be cleaned up.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
 
   // Outline the dispatch regions into their own functions wrapped in
   // executables.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
 
   // Deduplicate executables created from dispatch regions.
   // Note: this only deduplicates equivalent executables. We could in addition
@@ -156,7 +160,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // TODO: Prune and rename this pass. This runs after sending everything
   // possible to the device and then legalizes any remaining h<->d loads,
   // typically coming from top level flow control.
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createPromoteTensorLoadsPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Flow::createPromoteTensorLoadsPass());
 
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as
@@ -168,7 +173,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Inject tracing that logs both input and output tensors from all dispatches.
   // We do this after deduping so that the executable names match later stages.
   if (clTraceDispatchTensors) {
-    passManager.addNestedPass<FuncOp>(
+    passManager.addNestedPass<mlir::FuncOp>(
         IREE::Flow::createInjectDispatchTracingPass());
   }
 
@@ -180,24 +185,24 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Form streams.
   // Cleanup the IR before we try to form streams.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Reorder blocks to increase the grouping of streamable ops.
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createHoistUnstreamableOpsPass());
 
   // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
   // arbitrary ordering.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Clone constants that escape basic blocks until we have better analysis.
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createInsertConstantClonesPass());
 
   // Group streamable ops into streams.
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
+  passManager.addNestedPass<mlir::FuncOp>(IREE::Flow::createFormStreamsPass());
 
   // Prior to leaving the pipeline we need to clean things up for following
   // layers. These transforms may be undone by subsequent CSE/folding passes.
@@ -205,8 +210,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.

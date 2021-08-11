@@ -59,7 +59,7 @@ class InjectDispatchTracingPass
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createInjectDispatchTracingPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createInjectDispatchTracingPass() {
   return std::make_unique<InjectDispatchTracingPass>();
 }
 

@@ -250,7 +250,7 @@ struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
     if (!op.initializer()) return failure();
     auto *symbolOp =
         SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
-    auto initializer = cast<FuncOp>(symbolOp);
+    auto initializer = cast<mlir::FuncOp>(symbolOp);
     if (initializer.getBlocks().size() == 1 &&
         initializer.getBlocks().front().getOperations().size() == 2 &&
         isa<mlir::ReturnOp>(
