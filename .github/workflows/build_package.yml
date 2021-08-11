@@ -252,6 +252,11 @@ jobs:
           release_id: ${{ github.event.inputs.release_id }}
           assets_path: ./bindist/*
 
+  validate_and_publish:
+    name: "Invoke workflow to validate and publish release"
+    needs: build_core
+    runs-on: ubuntu-18.04
+    steps:
       - name: "Invoke workflow :: Validate and Publish Release"
         uses: benc-uk/workflow-dispatch@v1
         with:
