@@ -39,5 +39,5 @@ Type IREEDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void IREEDialect::printType(Type type, DialectAsmPrinter &printer) const {
-  generatedTypePrinter(type, printer);
+  (void)generatedTypePrinter(type, printer);
 }
