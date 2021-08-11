@@ -42,6 +42,7 @@ cc_library(
         "SetNumWorkgroupsPass.cpp",
         "ShapeToLLVMConversion.cpp",
         "VectorizeConv.cpp",
+        "VectorizeMMT4d.cpp",
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
