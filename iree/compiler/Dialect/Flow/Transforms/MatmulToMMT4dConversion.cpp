@@ -81,6 +81,7 @@ static Value collapseTo2D(mlir::Location loc, PatternRewriter &rewriter,
 
 // Converts linalg.matmul -> linalg.mmt4d where M0, N0, K0 are compile time
 // constants.
+// TODO(ataei): Move this pattern to linalg transforms upstream.
 class LinalgMatmulOpToLinalgMMT4dOpPattern
     : public OpRewritePattern<linalg::MatmulOp> {
  public:
@@ -180,11 +181,6 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
 
     auto fillOp = dyn_cast<linalg::FillOp>(input.getDefiningOp());
     if (!fillOp) return failure();
-
-    auto initTensorOp =
-        dyn_cast<linalg::InitTensorOp>(fillOp.output().getDefiningOp());
-
-    if (!initTensorOp) return failure();
 
     auto loc = genericOp.getLoc();
     Value newInitTensor = rewriter.create<linalg::InitTensorOp>(
