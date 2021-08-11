@@ -55,11 +55,3 @@ jobs:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
           inputs: '{"package_suffix": "-snapshot", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'
-
-      - name: Publish Release
-        id: publish_release
-        uses: eregon/publish-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
-        with:
-          release_id: ${{ steps.create_release.outputs.id }}

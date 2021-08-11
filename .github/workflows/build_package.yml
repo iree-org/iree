@@ -251,3 +251,11 @@ jobs:
         with:
           release_id: ${{ github.event.inputs.release_id }}
           assets_path: ./bindist/*
+
+      - name: "Invoke workflow :: Validate and Publish Release"
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: Validate and Publish Release
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          ref: "${{ env.tag_name }}"
+          inputs: '{"release_id": "${{ steps.create_release.outputs.id }}"}'
