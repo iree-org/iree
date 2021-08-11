@@ -5,14 +5,18 @@ name: Validate and Publish Release
 on:
   workflow_dispatch:
     inputs:
-      package_version:
       release_id:
         description: 'Release id to publish'
+        required: true
         default: ''
 
-# TODO(jennik): Add more validation. https://github.com/google/iree/issues/6316
-
 jobs:
+  validate_release:
+    name: "Validate release"
+    runs-on: ubuntu-18.04
+    # TODO(jennik): Add more validation.
+    # https://github.com/google/iree/issues/6316
+
   publish_release:
     name: "Publish release"
     runs-on: ubuntu-18.04
