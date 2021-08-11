@@ -6,10 +6,10 @@
 
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
 
+#include "iree-dialects/Dialect/IREE/IREEOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/Support/LLVM.h"
-#include "iree-dialects/Dialect/IREE/IREEOps.h"
 
 using namespace mlir;
 using namespace mlir::iree;
