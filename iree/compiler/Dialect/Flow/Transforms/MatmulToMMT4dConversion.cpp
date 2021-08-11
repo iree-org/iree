@@ -101,7 +101,6 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
 
     RankedTensorType lhsType = lhs.getType().dyn_cast<RankedTensorType>();
     RankedTensorType rhsType = rhs.getType().dyn_cast<RankedTensorType>();
-    RankedTensorType dstType = dst.getType().dyn_cast<RankedTensorType>();
 
     if (!lhsType || !rhsType || !lhsType.hasStaticShape() ||
         !rhsType.hasStaticShape()) {
@@ -123,31 +122,13 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
     int n1 = n / N0Size;
     int k1 = k / K0Size;
 
-    bool isInitTensorDst = false;
-    if (dst.getDefiningOp() && isa<linalg::FillOp>(dst.getDefiningOp())) {
-      auto fillOpValue = cast<linalg::FillOp>(dst.getDefiningOp());
-      if (fillOpValue.output().getDefiningOp() &&
-          isa<linalg::InitTensorOp>(fillOpValue.output().getDefiningOp())) {
-        isInitTensorDst = true;
-      }
-    }
-    auto createTransposedInitTensor =
-        [&](ArrayRef<int64_t> targetShape) -> Value {
-      return rewriter.create<linalg::InitTensorOp>(loc, targetShape,
-                                                   dstType.getElementType());
-    };
-
     auto lhs4D = expandTo4D(loc, rewriter, lhs, {m1, M0Size, k1, K0Size});
     auto rhs4D = expandTo4D(loc, rewriter, rhs, {k1, K0Size, n1, N0Size});
-    auto dst4D = isInitTensorDst
-                     ? createTransposedInitTensor({m1, n1, M0Size, N0Size})
-                     : expandTo4D(loc, rewriter, dst, {m1, M0Size, n1, N0Size});
+    auto dst4D = expandTo4D(loc, rewriter, dst, {m1, M0Size, n1, N0Size});
 
     auto lhs4DT = transposeOperand(loc, rewriter, lhs4D, {0, 2, 1, 3});
     auto rhs4DT = transposeOperand(loc, rewriter, rhs4D, {2, 0, 1, 3});
-    auto dst4DT = isInitTensorDst
-                      ? dst4D
-                      : transposeOperand(loc, rewriter, dst4D, {0, 2, 1, 3});
+    auto dst4DT = transposeOperand(loc, rewriter, dst4D, {0, 2, 1, 3});
 
     auto mmt4DResult = rewriter.create<linalg::Mmt4DOp>(
         loc, dst4DT.getType(), ValueRange{lhs4DT, rhs4DT}, ValueRange{dst4DT});
@@ -168,6 +149,53 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
   int K0Size;
 };
 
+/// Canonicalizes [linalg.init_tensor -> linalg.fill -> linalg.generic] ->
+/// [linalg.init_tensor -> linalg.fill] where linalg.generic does only copy e.g
+/// a transpose.
+struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (genericOp.getNumInputs() != 1) return failure();
+    if (genericOp.getNumOutputs() != 1) return failure();
+
+    // Check linalg.generic does have copy only semantics.
+    if (genericOp.getNumParallelLoops() != genericOp.getNumLoops())
+      return failure();
+    auto results =
+        llvm::to_vector<4>(genericOp.getBody()->getOps<linalg::YieldOp>());
+    if (results.size() != 1) return failure();
+    if (results[0].values().size() != 1) return failure();
+    auto blockArgument = results[0].values()[0].dyn_cast<BlockArgument>();
+    if (!blockArgument || blockArgument.getArgNumber() != 0) return failure();
+
+    auto input = genericOp.inputs()[0];
+
+    auto outputType =
+        genericOp.outputs()[0].getType().dyn_cast<RankedTensorType>();
+
+    // TODO: To enable dynamic shapes we need to apply the same permutation on
+    // init tensor sizes.
+    if (!outputType || !outputType.hasStaticShape()) return failure();
+
+    auto fillOp = dyn_cast<linalg::FillOp>(input.getDefiningOp());
+    if (!fillOp) return failure();
+
+    auto initTensorOp =
+        dyn_cast<linalg::InitTensorOp>(fillOp.output().getDefiningOp());
+
+    if (!initTensorOp) return failure();
+
+    auto loc = genericOp.getLoc();
+    Value newInitTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, outputType.getShape(), outputType.getElementType());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(genericOp, fillOp.value(),
+                                                newInitTensor);
+
+    return success();
+  }
+};
+
 class ConvertLinalgMatmulOpToLinalgMMT4dPass
     : public ConvertMatmulToMMT4dBase<ConvertLinalgMatmulOpToLinalgMMT4dPass> {
  public:
@@ -179,10 +207,21 @@ class ConvertLinalgMatmulOpToLinalgMMT4dPass
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns(&getContext());
-    patterns.insert<LinalgMatmulOpToLinalgMMT4dOpPattern>(context, M0Size,
-                                                          N0Size, K0Size);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    // Main pattern.
+    {
+      OwningRewritePatternList patterns(&getContext());
+      patterns.insert<LinalgMatmulOpToLinalgMMT4dOpPattern>(context, M0Size,
+                                                            N0Size, K0Size);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
+    // Canonicalization.
+    {
+      OwningRewritePatternList patterns(&getContext());
+      linalg::TensorExpandShapeOp::getCanonicalizationPatterns(patterns,
+                                                               context);
+      patterns.insert<FoldFillGenericOpPattern>(context);
+      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    }
   }
 
  private:
