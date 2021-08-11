@@ -13,4 +13,7 @@
 // clobbering order).
 #include "iree-dialects/Dialect/IREE/IREEOpsDialect.h.inc"
 
+#define GET_TYPEDEF_CLASSES
+#include "iree-dialects/Dialect/IREE/IREEOpsTypes.h.inc"
+
 #endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_DIALECT_H
