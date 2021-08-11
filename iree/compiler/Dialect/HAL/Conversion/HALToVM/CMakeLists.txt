@@ -39,8 +39,8 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::IREEToVM
     iree::compiler::Dialect::VM::Conversion::StandardToVM
+    iree::compiler::Dialect::VM::Conversion::UtilToVM
     iree::compiler::Dialect::VM::IR
   PUBLIC
 )

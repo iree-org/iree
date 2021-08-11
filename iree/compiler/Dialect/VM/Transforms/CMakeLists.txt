@@ -40,10 +40,10 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Conversion::PreserveCompilerHints
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::IREEToVM
     iree::compiler::Dialect::VM::Conversion::MathToVM
     iree::compiler::Dialect::VM::Conversion::MemRefToVM
     iree::compiler::Dialect::VM::Conversion::StandardToVM
+    iree::compiler::Dialect::VM::Conversion::UtilToVM
     iree::compiler::Dialect::VM::IR
   PUBLIC
 )

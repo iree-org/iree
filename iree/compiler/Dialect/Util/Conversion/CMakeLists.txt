@@ -18,7 +18,10 @@ iree_cc_library(
   SRCS
     "PreserveCompilerHints.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
+    MLIRStandard
+    MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Util::IR
   PUBLIC
