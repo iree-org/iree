@@ -9,9 +9,6 @@ on:
         description: 'Release id to publish'
         required: true
         default: ''
-  push:
-    branches:
-      - publish-release
 
 # TODO(jennik): Add more validation. https://github.com/google/iree/issues/6316
 
