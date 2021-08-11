@@ -9,14 +9,13 @@ on:
         description: 'Release id to publish'
         required: true
         default: ''
+  push:
+    branches:
+      - publish-release
+
+# TODO(jennik): Add more validation. https://github.com/google/iree/issues/6316
 
 jobs:
-  validate_release:
-    name: "Validate release"
-    runs-on: ubuntu-18.04
-    # TODO(jennik): Add more validation.
-    # https://github.com/google/iree/issues/6316
-
   publish_release:
     name: "Publish release"
     runs-on: ubuntu-18.04
