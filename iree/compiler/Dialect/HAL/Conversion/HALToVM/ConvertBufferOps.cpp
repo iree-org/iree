@@ -27,7 +27,6 @@ class BufferLoadOpConversion
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::BufferLoadOp::Adaptor adaptor(operands);
     auto importType = importOp.getType();
-    auto resultType = op.getResult().getType();
     auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
@@ -39,8 +38,15 @@ class BufferLoadOpConversion
                         sizeConst});
     // If the original result was a floating point type, we want to bitcast
     // from importType (i32) to a matching bit depth floating point type (f32).
-    rewriter.replaceOpWithNewOp<BitcastOp>(
-        op, typeConverter->convertType(resultType), callOp.getResult(0));
+    auto originalResultType = op.getResult().getType();
+    auto newResultType = typeConverter->convertType(originalResultType);
+    auto callResult = callOp.getResult(0);
+    if (newResultType == callResult.getType()) {
+      rewriter.replaceOp(op, {callResult});
+    } else {
+      rewriter.replaceOpWithNewOp<BitcastOp>(op, newResultType, callResult);
+    }
+
     return success();
   }
 
