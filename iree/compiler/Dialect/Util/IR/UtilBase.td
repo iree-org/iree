@@ -79,19 +79,18 @@ class AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
 // NamedTuple type constraint
 //===----------------------------------------------------------------------===//
 
-class NamedTupleElement<int thisOrdinal, string thisName, Type thisType> {
+class Util_NamedTupleElement<int thisOrdinal, string thisName, Type thisType> {
   int ordinal = thisOrdinal;
   string name = thisName;
   Type type = thisType;
 }
 
 // Check if all of the tuple elements are buildable.
-class AreTupleElementsBuildable<list<NamedTupleElement> lst> {
+class Util_AreTupleElementsBuildable<list<Util_NamedTupleElement> lst> {
   bit ret = !foldl(1, lst, lhs, y, !and(lhs, !ne(y.type.builderCall, "")));
 }
 
-// TODO(b/143188410): support ordered tuples in OpBase.td.
-class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
+class Util_NamedTupleOf<list<Util_NamedTupleElement> elements, string descr> :
     Type<And<[
       IsTupleTypePred,
       CPred<"$_self.cast<TupleType>().size() == " # !size(elements)>,
@@ -102,7 +101,7 @@ class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
               element.type.predicate>)>
     ]>, descr> {
   // Generate a builder call if all of the elements are buildable.
-  let builderCall = !if(!eq(AreTupleElementsBuildable<elements>.ret, 0),
+  let builderCall = !if(!eq(Util_AreTupleElementsBuildable<elements>.ret, 0),
     "", "$_builder.getTupleType({" #
         !interleave(!foreach(t, elements, t.type.builderCall), ", ") # "})"
   );
@@ -139,7 +138,7 @@ class Util_StructAttr<string thisKind, string name, Dialect dialect,
 // ptr types
 //===----------------------------------------------------------------------===//
 
-def AnyPtr : DialectType<
+def Util_AnyPtr : DialectType<
     Util_Dialect,
     CPred<"$_self.isa<IREE::Util::PtrType>()">,
     "ptr"> {
@@ -149,7 +148,7 @@ def AnyPtr : DialectType<
   let builderCall = "$_builder.getType<IREE::Util::PtrType>()";
 }
 
-class PtrOf<Type type> :
+class Util_PtrOf<Type type> :
     Type<And<[
       CPred<"$_self.isa<IREE::Util::PtrType>()">,
       SubstLeaves<"$_self", "$_self.cast<IREE::Util::PtrType>().getTargetType()",
@@ -160,7 +159,7 @@ class PtrOf<Type type> :
                            "", "IREE::Util::PtrType::get(" # type.builderCall # ")");
 }
 
-class AnyPtrOf<list<Type> types> :
+class Util_AnyPtrOf<list<Type> types> :
     Type<And<[
       CPred<"$_self.isa<IREE::Util::PtrType>()">,
       Or<!foreach(type, types,
@@ -171,6 +170,24 @@ class AnyPtrOf<list<Type> types> :
     ]>, !interleave(!foreach(type, types, type.summary), " or ")> {
   string builderCall = "";
 }
+
+//===----------------------------------------------------------------------===//
+// Variable types
+//===----------------------------------------------------------------------===//
+
+def Util_GlobalRefAttr : Confined<FlatSymbolRefAttr, [
+  ReferToOp<"IREE::Util::GlobalOp">,
+]>;
+
+def Util_AnyGlobalPtr : TypeAlias<Util_AnyPtr>;
+// TODO(benvanik): actually implement Util_GlobalPtrOf.
+class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtr>;
+
+//===----------------------------------------------------------------------===//
+// Buffer types
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): rework these as a single type with an access mode attr.
 
 def ByteBufferType : DialectType<
     Util_Dialect,
@@ -195,7 +212,7 @@ def MutableByteBufferType : DialectType<
 // List types
 //===----------------------------------------------------------------------===//
 
-def AnyList : DialectType<
+def Util_AnyList : DialectType<
     Util_Dialect,
     CPred<"$_self.isa<IREE::Util::ListType>()">,
     "list"> {
@@ -204,7 +221,7 @@ def AnyList : DialectType<
   }];
 }
 
-class ListOf<Type type> :
+class Util_ListOf<Type type> :
     Type<And<[
       CPred<"$_self.isa<IREE::Util::ListType>()">,
       SubstLeaves<"$_self",

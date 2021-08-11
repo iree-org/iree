@@ -18,9 +18,11 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "byte_buffer_ops.mlir",
-            "do_not_optimize.mlir",
+            "global_folding.mlir",
+            "global_ops.mlir",
+            "hint_folding.mlir",
+            "hint_ops.mlir",
             "list_ops.mlir",
-            "parse_print.mlir",
         ],
         include = ["*.mlir"],
     ),

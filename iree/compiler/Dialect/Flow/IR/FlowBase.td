@@ -85,7 +85,7 @@ def FLOW_Tensor : TypeAlias<AnyRankedTensor>;
 
 def FLOW_ExecutableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariableRefAttr : AliasedSymbolRefAttr;
-def FLOW_VariablePtr : AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
+def FLOW_VariablePtr : Util_AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 
 def FLOW_TensorAccessCanReadPred : CPred<[{
   $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==

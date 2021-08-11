@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "drop_compiler_hints.mlir"
+    "simplify_global_accesses.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

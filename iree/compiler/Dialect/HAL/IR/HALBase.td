@@ -368,7 +368,7 @@ def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
 def HAL_VariableRefAttr : AliasedSymbolRefAttr;
 def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
-def HAL_VariablePtr : PtrOf<HAL_VariableType>;
+def HAL_VariablePtr : Util_PtrOf<HAL_VariableType>;
 
 def HAL_IndexAttr : Util_IndexAttrBase<"index">;
 def HAL_IndexArrayAttr : TypedArrayAttrBase<HAL_IndexAttr,
