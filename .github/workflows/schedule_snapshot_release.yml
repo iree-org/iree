@@ -32,7 +32,7 @@ jobs:
         uses: ad-m/github-push-action@v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          branch: publish-release
+          branch: main
           tags: true
 
       - name: Create Release
