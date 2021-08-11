@@ -14,7 +14,7 @@ on:
 
 jobs:
   publish_release:
-  name: "Publish release"
+    name: "Publish release"
     runs-on: ubuntu-18.04
     steps:
       - name: Publish Release
