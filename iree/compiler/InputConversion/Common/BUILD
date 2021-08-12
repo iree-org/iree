@@ -44,6 +44,7 @@ cc_library(
 cc_library(
     name = "Common",
     srcs = [
+        "IREEImportPublic.cpp",
         "Passes.cpp",
         "TopLevelSCFToCFG.cpp",
     ],

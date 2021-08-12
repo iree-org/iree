@@ -18,6 +18,7 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<FuncOp>> createTopLevelSCFToCFGPass();
+std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
