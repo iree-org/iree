@@ -23,7 +23,7 @@ namespace Flow {
 // Clones each exported functions (including those just created) with
 // placeholder constant inputs instead of arguments and removes the exported
 // attribute from the old functions.
-// The input are provided using flow.variables.
+// The input are provided using util.globals.
 class ExportBenchmarkFuncsPass
     : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
  public:
@@ -52,9 +52,8 @@ class ExportBenchmarkFuncsPass
   }
 
  private:
-  IREE::Flow::VariableOp createDummyInputVariableOp(Location loc,
-                                                    Type inputType,
-                                                    OpBuilder& moduleBuilder) {
+  IREE::Util::GlobalOp createDummyInputVariableOp(Location loc, Type inputType,
+                                                  OpBuilder& moduleBuilder) {
     std::string baseName = "_benchmark_input_";
     std::string name = baseName + std::to_string(uniqueId++);
     auto initialValue = moduleBuilder.getZeroAttr(inputType);
@@ -63,12 +62,12 @@ class ExportBenchmarkFuncsPass
                            << inputType;
       return {};
     }
-    auto variableOp = moduleBuilder.create<IREE::Flow::VariableOp>(
+    auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
         loc, name,
         /*isMutable=*/false, inputType, initialValue);
-    variableOp.setPrivate();
-    variableOp->setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
-    return variableOp;
+    globalOp.setPrivate();
+    globalOp->setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
+    return globalOp;
   }
 
   LogicalResult createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
@@ -78,7 +77,7 @@ class ExportBenchmarkFuncsPass
 
     // Create one dummy input variable per input.
     Location loc = entryFuncOp.getLoc();
-    SmallVector<IREE::Flow::VariableOp, 4> dummyInputVariableOps;
+    SmallVector<IREE::Util::GlobalOp, 4> dummyInputVariableOps;
     for (auto inputType : entryFuncOp.getType().getInputs()) {
       auto dummyVar = createDummyInputVariableOp(loc, inputType, moduleBuilder);
       if (!dummyVar) return failure();
@@ -103,7 +102,7 @@ class ExportBenchmarkFuncsPass
     auto blockBuilder = OpBuilder::atBlockBegin(block);
     SmallVector<Value, 4> args;
     for (int i = 0, e = entryFuncOp.getNumArguments(); i < e; ++i) {
-      args.push_back(blockBuilder.createOrFold<IREE::Flow::VariableLoadOp>(
+      args.push_back(blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
           loc, dummyInputVariableOps[i]));
     }
     auto callOp = blockBuilder.create<mlir::CallOp>(loc, entryFuncOp, args);

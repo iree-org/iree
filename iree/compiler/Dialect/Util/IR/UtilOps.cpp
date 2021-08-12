@@ -319,10 +319,19 @@ static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
   return success();
 }
 
+void GlobalLoadOp::build(OpBuilder &builder, OperationState &state,
+                         GlobalOp globalOp, ArrayRef<NamedAttribute> attrs) {
+  state.addTypes({globalOp.type()});
+  state.addAttribute("global", builder.getSymbolRefAttr(globalOp));
+  state.attributes.append(attrs.begin(), attrs.end());
+}
+
 IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp() {
   return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
       getOperation()->getParentOp(), global());
 }
+
+bool GlobalLoadOp::isGlobalImmutable() { return !getGlobalOp().is_mutable(); }
 
 void GlobalLoadOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -395,7 +404,7 @@ static LogicalResult verifyGlobalStoreIndirectOp(GlobalStoreIndirectOp &op) {
   auto storeType = op.value().getType();
   if (!isGlobalTypeCompatible(globalType, storeType)) {
     return op.emitOpError() << "global type mismatch; global pointer is "
-                            << globalType << " but store is " << globalType;
+                            << globalType << " but store is " << storeType;
   }
   return success();
 }

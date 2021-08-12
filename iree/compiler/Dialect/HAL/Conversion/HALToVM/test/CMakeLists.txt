@@ -22,7 +22,6 @@ iree_lit_test_suite(
     "control_flow_ops.mlir"
     "device_ops.mlir"
     "executable_ops.mlir"
-    "variable_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

@@ -13,6 +13,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Populates only the util.global.* conversion patterns.
+void populateFlowGlobalToHALPatterns(MLIRContext *context,
+                                     OwningRewritePatternList &patterns,
+                                     TypeConverter &converter);
+
 // Populates only the flow.stream.* conversion patterns.
 void populateFlowStreamToHALPatterns(MLIRContext *context,
                                      OwningRewritePatternList &patterns,
@@ -22,11 +27,6 @@ void populateFlowStreamToHALPatterns(MLIRContext *context,
 void populateFlowTensorToHALPatterns(MLIRContext *context,
                                      OwningRewritePatternList &patterns,
                                      TypeConverter &converter);
-
-// Populates only the flow.variable.* conversion patterns.
-void populateFlowVariableToHALPatterns(MLIRContext *context,
-                                       OwningRewritePatternList &patterns,
-                                       TypeConverter &converter);
 
 void setupFlowToHALLegality(MLIRContext *context,
                             ConversionTarget &conversionTarget,
@@ -38,9 +38,9 @@ void setupFlowToHALLegality(MLIRContext *context,
 void populateFlowToHALPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns,
                                TypeConverter &typeConverter) {
+  populateFlowGlobalToHALPatterns(context, patterns, typeConverter);
   populateFlowStreamToHALPatterns(context, patterns, typeConverter);
   populateFlowTensorToHALPatterns(context, patterns, typeConverter);
-  populateFlowVariableToHALPatterns(context, patterns, typeConverter);
 }
 
 }  // namespace iree_compiler

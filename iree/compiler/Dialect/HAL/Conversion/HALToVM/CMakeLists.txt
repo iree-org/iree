@@ -27,7 +27,6 @@ iree_cc_library(
     "ConvertExperimentalOps.cpp"
     "ConvertHALToVM.cpp"
     "ConvertSemaphoreOps.cpp"
-    "ConvertVariableOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR

@@ -74,8 +74,8 @@ func @storage_lookup() {
 
 // -----
 
-// CHECK: hal.variable @storage0_buffer0 : !hal.buffer
-hal.variable @storage0_buffer0 : !hal.buffer
+// CHECK: util.global private @storage0_buffer0 : !hal.buffer
+util.global private @storage0_buffer0 : !hal.buffer
 // CHECK-LABEL: func @runtime_buffer_subspan()
 func @runtime_buffer_subspan() {
   // CHECK-NEXT: = hal.constant.subspan @storage0_buffer0[#hal.byte_range<0, 1024>] : tensor<4xf32>

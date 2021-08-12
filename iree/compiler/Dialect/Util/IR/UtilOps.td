@@ -178,7 +178,7 @@ def Util_GlobalOp : Util_Op<"global", [
     (`mutable` $is_mutable^)?
     $sym_name
     attr-dict
-    (`initializer` `(` $initializer^ `)`)?
+    (`initializer` `(` $initializer^ `)`):(``)?
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
@@ -287,6 +287,7 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
 
   let extraClassDeclaration = [{
     IREE::Util::GlobalOp getGlobalOp();
+    bool isGlobalImmutable();
   }];
 
   let verifier = [{ return verifyGlobalLoadOp(*this); }];

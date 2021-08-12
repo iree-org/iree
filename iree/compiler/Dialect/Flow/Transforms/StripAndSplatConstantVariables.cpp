@@ -10,6 +10,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
@@ -26,7 +28,7 @@ class StripAndSplatConstantVariablesPass
   StripAndSplatConstantVariablesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
@@ -40,7 +42,7 @@ class StripAndSplatConstantVariablesPass
     // TODO(scotttodd): flags to control numbers used (all 0, all 1, increasing)
     int replaceIndex = 1;
 
-    moduleOp.walk([&](VariableOp op) {
+    moduleOp.walk([&](IREE::Util::GlobalOp op) {
       // Only strip constant variables.
       if (op.is_mutable()) {
         return;
@@ -63,7 +65,7 @@ class StripAndSplatConstantVariablesPass
       }
 
       builder.setInsertionPointAfter(op);
-      auto newOp = builder.create<VariableOp>(
+      auto newOp = builder.create<IREE::Util::GlobalOp>(
           op.getLoc(), op.sym_name(), op.is_mutable(), op.type(), newValue);
       newOp.setVisibility(op.getVisibility());
       newOp->setAttr("noinline", UnitAttr::get(builder.getContext()));

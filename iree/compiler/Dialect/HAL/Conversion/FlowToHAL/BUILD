@@ -14,9 +14,9 @@ cc_library(
     name = "FlowToHAL",
     srcs = [
         "ConvertFlowToHAL.cpp",
+        "ConvertGlobalOps.cpp",
         "ConvertStreamOps.cpp",
         "ConvertTensorOps.cpp",
-        "ConvertVariableOps.cpp",
     ],
     hdrs = [
         "ConvertFlowToHAL.h",

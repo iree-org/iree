@@ -17,9 +17,9 @@ iree_cc_library(
     "ConvertFlowToHAL.h"
   SRCS
     "ConvertFlowToHAL.cpp"
+    "ConvertGlobalOps.cpp"
     "ConvertStreamOps.cpp"
     "ConvertTensorOps.cpp"
-    "ConvertVariableOps.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis

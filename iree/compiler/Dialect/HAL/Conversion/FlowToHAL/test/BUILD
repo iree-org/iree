@@ -18,9 +18,9 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "constant_ops.mlir",
+            "global_ops.mlir",
             "stream_ops.mlir",
             "tensor_ops.mlir",
-            "variable_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

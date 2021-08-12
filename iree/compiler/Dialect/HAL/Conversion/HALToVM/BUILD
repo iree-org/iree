@@ -24,7 +24,6 @@ cc_library(
         "ConvertExperimentalOps.cpp",
         "ConvertHALToVM.cpp",
         "ConvertSemaphoreOps.cpp",
-        "ConvertVariableOps.cpp",
     ],
     hdrs = [
         "ConvertHALToVM.h",

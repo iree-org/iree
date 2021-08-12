@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
-#include "iree/compiler/Dialect/Util/Conversion/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -1935,7 +1935,7 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                IREE::VM::EmitCTypeConverter &typeConverter,
                                OwningRewritePatternList &patterns,
                                VMAnalysisCache &vmAnalysisCache) {
-  IREE::Util::populatePreserveCompilerHintsPatterns(context, patterns);
+  populateUtilConversionPatterns(context, typeConverter, patterns);
 
   // CFG
   patterns.insert<BranchOpConversion>(context);

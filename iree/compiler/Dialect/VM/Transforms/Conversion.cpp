@@ -8,7 +8,7 @@
 #include <tuple>
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
-#include "iree/compiler/Dialect/Util/Conversion/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -150,10 +150,8 @@ class ConversionPass
           importSymbols, conversionPatterns, typeConverter);
     }
     Shape::populateFoldConversionPatterns(context, conversionPatterns);
-    IREE::Util::populatePreserveCompilerHintsPatterns(context,
-                                                      conversionPatterns);
-    IREE::Util::setupCompilerHintsLegality(context, conversionTarget,
-                                           typeConverter);
+    populateUtilConversionPatterns(context, conversionTarget, typeConverter,
+                                   conversionPatterns);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
                                       std::move(conversionPatterns)))) {

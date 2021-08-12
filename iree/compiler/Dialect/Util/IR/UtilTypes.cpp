@@ -108,7 +108,7 @@ PtrType PtrType::getChecked(function_ref<InFlightDiagnostic()> emitError,
   return Base::getChecked(emitError, targetType.getContext(), targetType);
 }
 
-Type PtrType::getTargetType() { return getImpl()->targetType; }
+Type PtrType::getTargetType() const { return getImpl()->targetType; }
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface

@@ -16,7 +16,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
-#include "iree/compiler/Dialect/Util/Conversion/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -74,9 +74,12 @@ class ConvertToHALPass
     populateIREEToHALPatterns(context, conversionTarget, typeConverter,
                               patterns);
 
-    IREE::Util::setupCompilerHintsLegality(context, conversionTarget,
-                                           typeConverter);
-    IREE::Util::populatePreserveCompilerHintsPatterns(context, patterns);
+    populateUtilConversionPatterns(context, conversionTarget, typeConverter,
+                                   patterns);
+    conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
+        [&](IREE::Util::GlobalOp op) {
+          return typeConverter.isLegal(op.type());
+        });
 
     setupStandardToHALLegality(context, conversionTarget, typeConverter);
     populateStandardToHALPatterns(context, patterns, typeConverter);

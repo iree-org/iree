@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -77,10 +78,10 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
-  // Simplify flow.variable accesses early on; this can help with dispatch
+  // Simplify util.global accesses early on; this can help with dispatch
   // region formation as redundant store-loads are removed.
   passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createSimplifyVariableAccessesPass());
+      IREE::Util::createSimplifyGlobalAccessesPass());
 
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
@@ -90,7 +91,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Replaces variables with !shapex.ranked_shape types with individual
   // variables for each dimension. This allows for constant dimensions to be
   // DCE'd in following passes.
-  passManager.addPass(IREE::Flow::createExpandVariableDynamicDimsPass());
+  passManager.addPass(IREE::Flow::createExpandGlobalDynamicDimsPass());
 
   // Materialize dynamic shapes in the IR, also expanding function signatures
   // such that:

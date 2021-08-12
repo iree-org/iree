@@ -111,8 +111,8 @@ static bool updatesConstantInStream(Value operand, Operation *updateOp) {
 
   // For loaded variables, check whether it's mutable. Immutable variables will
   // be aggregated into one read-only buffer.
-  if (auto varLoadOp = operand.getDefiningOp<VariableLoadOp>()) {
-    return !varLoadOp.getLoadedVariable().is_mutable();
+  if (auto loadOp = operand.getDefiningOp<IREE::Util::GlobalLoadOp>()) {
+    return loadOp.isGlobalImmutable();
   }
 
   return false;
@@ -232,147 +232,6 @@ void ExStreamFragmentOp::getCanonicalizationPatterns(
   results.insert<InsertImmutabilityPreservingStreamClones>(context);
   // TODO(#6420): fix HAL lowering of this (or wait until streams are gone).
   // results.insert<TieStreamResults>(context);
-}
-
-//===----------------------------------------------------------------------===//
-// Variables
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Converts variable initializer functions that evaluate to a constant to a
-/// specified initial value.
-struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
-  using OpRewritePattern<VariableOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VariableOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return failure();
-    auto *symbolOp =
-        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
-    auto initializer = cast<mlir::FuncOp>(symbolOp);
-    if (initializer.getBlocks().size() == 1 &&
-        initializer.getBlocks().front().getOperations().size() == 2 &&
-        isa<mlir::ReturnOp>(
-            initializer.getBlocks().front().getOperations().back())) {
-      auto &primaryOp = initializer.getBlocks().front().getOperations().front();
-      Attribute constResult;
-      if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
-        rewriter.replaceOpWithNewOp<VariableOp>(
-            op, op.sym_name(), op.is_mutable(), op.type(), constResult);
-        return success();
-      }
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {
-  results.insert<InlineConstVariableOpInitializer>(context);
-}
-
-OpFoldResult VariableLoadOp::fold(ArrayRef<Attribute> operands) {
-  auto variableOp = dyn_cast_or_null<VariableOp>(
-      SymbolTable::lookupNearestSymbolFrom(*this, variable()));
-  if (!variableOp) return {};
-  if (variableOp->getAttr("noinline")) {
-    // Inlining of the constant has been disabled.
-    return {};
-  } else if (variableOp.is_mutable()) {
-    // We can't inline mutable variables as they may be changed at any time.
-    // There may still be other folders/canonicalizers that can help (such as
-    // store-forwarding).
-    return {};
-  } else if (!variableOp.initial_value()) {
-    // Uninitialized variables (or those with initializers) can't be folded as
-    // we don't yet know the value. InlineConstVariableOpInitializer may help.
-    return {};
-  }
-  return variableOp.initial_value().getValue();
-}
-
-namespace {
-
-class PropagateVariableLoadAddress
-    : public OpRewritePattern<VariableLoadIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
- public:
-  LogicalResult matchAndRewrite(VariableLoadIndirectOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
-            op.variable().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<VariableLoadOp>(op, op.result().getType(),
-                                                  addressOp.variable());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableLoadIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<PropagateVariableLoadAddress>(context);
-}
-
-namespace {
-
-/// Erases flow.variable.store ops that are no-ops.
-/// This can happen if there was a variable load, some DCE'd usage, and a
-/// store back to the same variable: we want to be able to elide the entire load
-/// and store.
-struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
-  using OpRewritePattern<VariableStoreOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VariableStoreOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto loadOp =
-            dyn_cast_or_null<VariableLoadOp>(op.value().getDefiningOp())) {
-      if (loadOp.variable() == op.variable()) {
-        rewriter.eraseOp(op);
-        return success();
-      }
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<EraseUnusedVariableStoreOp>(context);
-}
-
-namespace {
-
-class PropagateVariableStoreAddress
-    : public OpRewritePattern<VariableStoreIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
- public:
-  LogicalResult matchAndRewrite(VariableStoreIndirectOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
-            op.variable().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<VariableStoreOp>(op, op.value(),
-                                                   addressOp.variable());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableStoreIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<PropagateVariableStoreAddress>(context);
 }
 
 //===----------------------------------------------------------------------===//

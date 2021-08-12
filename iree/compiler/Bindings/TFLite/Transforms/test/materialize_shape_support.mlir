@@ -2,29 +2,29 @@
 
 // NOTE: canonicalization is run because otherwise there's just way too much IR.
 
-// CHECK-DAG: flow.variable @_tflite_dynamicEntry_input0_shape mutable : !shapex.ranked_shape<[?,8,8,3]>
-// CHECK-DAG: flow.variable @_tflite_dynamicEntry_input1_shape mutable : !shapex.ranked_shape<[?,8,8,3]>
-// CHECK-DAG: flow.variable @_tflite_dynamicEntry_output0_shape mutable : !shapex.ranked_shape<[?,8,8,3]>
-// CHECK-DAG: flow.variable @_tflite_dynamicEntry_output1_shape mutable : !shapex.ranked_shape<[?,8,8,3]>
-// CHECK-DAG: flow.variable @_tflite_dynamicEntry_shapes_dirty mutable true
+// CHECK-DAG: util.global private mutable @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
+// CHECK-DAG: util.global private mutable @_tflite_dynamicEntry_input1_shape : !shapex.ranked_shape<[?,8,8,3]>
+// CHECK-DAG: util.global private mutable @_tflite_dynamicEntry_output0_shape : !shapex.ranked_shape<[?,8,8,3]>
+// CHECK-DAG: util.global private mutable @_tflite_dynamicEntry_output1_shape : !shapex.ranked_shape<[?,8,8,3]>
+// CHECK-DAG: util.global private mutable @_tflite_dynamicEntry_shapes_dirty = true
 
 // CHECK-LABEL: func private @_tflite_dynamicEntry_calculate_shapes() {
 //  CHECK-NEXT:   %false = constant false
-//  CHECK-NEXT:   %[[IS_DIRTY:.+]] = flow.variable.load @_tflite_dynamicEntry_shapes_dirty : i1
+//  CHECK-NEXT:   %[[IS_DIRTY:.+]] = util.global.load @_tflite_dynamicEntry_shapes_dirty : i1
 //  CHECK-NEXT:   cond_br %[[IS_DIRTY]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
 //  CHECK-NEXT:   %[[IN0_NULL:.+]] = util.null : tensor<?x8x8x3xf32>
-//  CHECK-NEXT:   %[[IN0_SHAPE:.+]] = flow.variable.load @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   %[[IN0_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   %[[IN0:.+]] = shapex.tie_shape %[[IN0_NULL]], %[[IN0_SHAPE]] : tensor<?x8x8x3xf32>, !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   %[[IN1_NULL:.+]] = util.null : tensor<?x8x8x3xf32>
-//  CHECK-NEXT:   %[[IN1_SHAPE:.+]] = flow.variable.load @_tflite_dynamicEntry_input1_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   %[[IN1_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_input1_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   %[[IN1:.+]] = shapex.tie_shape %[[IN1_NULL]], %[[IN1_SHAPE]] : tensor<?x8x8x3xf32>, !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   %[[TMP:.+]]:2 = call @dynamicEntry(%[[IN0]], %[[IN1]])
 //  CHECK-NEXT:   %[[OUT0_SHAPE:.+]] = shapex.get_ranked_shape %[[TMP]]#0 : tensor<?x8x8x3xf32> -> !shapex.ranked_shape<[?,8,8,3]>
-//  CHECK-NEXT:   flow.variable.store %[[OUT0_SHAPE]], @_tflite_dynamicEntry_output0_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   util.global.store %[[OUT0_SHAPE]], @_tflite_dynamicEntry_output0_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   %[[OUT1_SHAPE:.+]] = shapex.get_ranked_shape %[[TMP]]#1 : tensor<?x8x8x3xf32> -> !shapex.ranked_shape<[?,8,8,3]>
-//  CHECK-NEXT:   flow.variable.store %[[OUT1_SHAPE]], @_tflite_dynamicEntry_output1_shape : !shapex.ranked_shape<[?,8,8,3]>
-//  CHECK-NEXT:   flow.variable.store %false, @_tflite_dynamicEntry_shapes_dirty : i1
+//  CHECK-NEXT:   util.global.store %[[OUT1_SHAPE]], @_tflite_dynamicEntry_output1_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   util.global.store %false, @_tflite_dynamicEntry_shapes_dirty : i1
 //  CHECK-NEXT:   return
 //  CHECK-NEXT: ^bb2:
 //  CHECK-NEXT:   return
@@ -35,7 +35,7 @@
 //       CHECK:   %[[IS_0:.+]] = cmpi eq, %[[INDEX]], %c0 : index
 //  CHECK-NEXT:   cond_br %[[IS_0]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
-//  CHECK-NEXT:   %[[IN0_SHAPE:.+]] = flow.variable.load @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   %[[IN0_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   util.list.resize %[[LIST]], %c4 : !util.list<index>
 //  CHECK-NEXT:   %[[IN0_D0:.+]] = shapex.ranked_dim %[[IN0_SHAPE]][0] : !shapex.ranked_shape<[?,8,8,3]> -> index
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c0], %[[IN0_D0]] : !util.list<index>
@@ -47,7 +47,7 @@
 //  CHECK-NEXT:   %[[IS_1:.+]] = cmpi eq, %[[INDEX]], %c1 : index
 //  CHECK-NEXT:   cond_br %[[IS_1]], ^bb3, ^bb4
 //  CHECK-NEXT: ^bb3:
-//  CHECK-NEXT:   %[[IN1_SHAPE:.+]] = flow.variable.load @_tflite_dynamicEntry_input1_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   %[[IN1_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_input1_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   util.list.resize %[[LIST]], %c4 : !util.list<index>
 //  CHECK-NEXT:   %[[IN1_D0:.+]] = shapex.ranked_dim %[[IN1_SHAPE]][0] : !shapex.ranked_shape<[?,8,8,3]> -> index
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c0], %[[IN1_D0]] : !util.list<index>
@@ -66,7 +66,7 @@
 //  CHECK-NEXT: ^bb1:
 //  CHECK-NEXT:   %[[IN0_D0:.+]] = util.list.get %[[LIST]][%c0] : !util.list<index>
 //  CHECK-NEXT:   %[[IN0_SHAPE:.+]] = shapex.make_ranked_shape %[[IN0_D0]] : (index) -> !shapex.ranked_shape<[?,8,8,3]>
-//  CHECK-NEXT:   flow.variable.store %[[IN0_SHAPE]], @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   util.global.store %[[IN0_SHAPE]], @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   br ^bb4
 //  CHECK-NEXT: ^bb2:
 //  CHECK-NEXT:   %[[IS_1:.+]] = cmpi eq, %[[INDEX]], %c1 : index
@@ -74,10 +74,10 @@
 //  CHECK-NEXT: ^bb3:
 //  CHECK-NEXT:   %[[IN1_D0:.+]] = util.list.get %[[LIST]][%c0] : !util.list<index>
 //  CHECK-NEXT:   %[[IN1_SHAPE:.+]] = shapex.make_ranked_shape %[[IN1_D0]] : (index) -> !shapex.ranked_shape<[?,8,8,3]>
-//  CHECK-NEXT:   flow.variable.store %[[IN1_SHAPE]], @_tflite_dynamicEntry_input1_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   util.global.store %[[IN1_SHAPE]], @_tflite_dynamicEntry_input1_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   br ^bb4
 //  CHECK-NEXT: ^bb4:
-//  CHECK-NEXT:   flow.variable.store %true, @_tflite_dynamicEntry_shapes_dirty : i1
+//  CHECK-NEXT:   util.global.store %true, @_tflite_dynamicEntry_shapes_dirty : i1
 //  CHECK-NEXT:   return
 //  CHECK-NEXT: }
 
@@ -87,7 +87,7 @@
 //  CHECK-NEXT:   %[[IS_0:.+]] = cmpi eq, %[[INDEX]], %c0 : index
 //  CHECK-NEXT:   cond_br %[[IS_0]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
-//  CHECK-NEXT:   %[[OUT0_SHAPE:.+]] = flow.variable.load @_tflite_dynamicEntry_output0_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   %[[OUT0_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_output0_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   util.list.resize %[[LIST]], %c4 : !util.list<index>
 //  CHECK-NEXT:   %[[OUT0_D0:.+]] = shapex.ranked_dim %[[OUT0_SHAPE]][0] : !shapex.ranked_shape<[?,8,8,3]> -> index
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c0], %[[OUT0_D0]] : !util.list<index>
@@ -99,7 +99,7 @@
 //  CHECK-NEXT:   %[[IS_1:.+]] = cmpi eq, %[[INDEX]], %c1 : index
 //  CHECK-NEXT:   cond_br %[[IS_1]], ^bb3, ^bb4
 //  CHECK-NEXT: ^bb3:
-//  CHECK-NEXT:   %[[OUT1_SHAPE:.+]] = flow.variable.load @_tflite_dynamicEntry_output1_shape : !shapex.ranked_shape<[?,8,8,3]>
+//  CHECK-NEXT:   %[[OUT1_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_output1_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   util.list.resize %[[LIST]], %c4 : !util.list<index>
 //  CHECK-NEXT:   %[[OUT1_D0:.+]] = shapex.ranked_dim %[[OUT1_SHAPE]][0] : !shapex.ranked_shape<[?,8,8,3]> -> index
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c0], %[[OUT1_D0]] : !util.list<index>

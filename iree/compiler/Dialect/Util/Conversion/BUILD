@@ -11,12 +11,12 @@ package(
 )
 
 cc_library(
-    name = "PreserveCompilerHints",
+    name = "Conversion",
     srcs = [
-        "PreserveCompilerHints.cpp",
+        "ConversionPatterns.cpp",
     ],
     hdrs = [
-        "PreserveCompilerHints.h",
+        "ConversionPatterns.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Util/IR",

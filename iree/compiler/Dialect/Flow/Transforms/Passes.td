@@ -49,10 +49,10 @@ def DispatchLinalgOnTensors :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
 }
 
-def ExpandVariableDynamicDims :
-    Pass<"iree-flow-expand-variable-dynamic-dims", "mlir::ModuleOp"> {
+def ExpandGlobalDynamicDims :
+    Pass<"iree-flow-expand-global-dynamic-dims", "mlir::ModuleOp"> {
   let summary = "Expands !shapex.ranked_shape dynamic dimensions stored in variables.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createExpandVariableDynamicDimsPass()";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createExpandGlobalDynamicDimsPass()";
 }
 
 def ExportBenchmarkFuncs :
@@ -105,7 +105,7 @@ def OutlineDispatchRegions :
 
 def OutlineLargeConstants :
     Pass<"iree-flow-outline-large-constants", "mlir::ModuleOp"> {
-  let summary = "Outlines large tensor constants into flow.variables at the module level.";
+  let summary = "Outlines large tensor constants into util.globals at the module level.";
   // TODO(#5493): add a flag for this.
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass(25)";
 }
@@ -141,15 +141,9 @@ def PromoteTensorLoads :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteTensorLoadsPass()";
 }
 
-def SimplifyVariableAccesses :
-    Pass<"iree-flow-simplify-variable-accesses", "mlir::FuncOp"> {
-  let summary = "Hoist loads and sinks stores to variables to decrease data dependency regions.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createSimplifyVariableAccessesPass()";
-}
-
 def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
-  let summary = "Strips constant flow.variables and replaces them with splats.";
+  let summary = "Strips constant util.globals and replaces them with splats.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
 }
 
