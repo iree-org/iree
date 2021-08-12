@@ -544,6 +544,10 @@ void SPIRVTileAndVectorizePass::runOnOperation() {
     RewritePatternSet canoncalizationPatterns(context);
     populateAffineMinSCFCanonicalizationPattern(canoncalizationPatterns);
     SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
+    if (workgroupSize.empty()) {
+      entryPointOp.emitError("expected to have workgroup_size attribute");
+      return signalPassFailure();
+    }
     auto getThreadRangeFn = [workgroupSize](Value processorValue,
                                             SmallVectorImpl<Value> &dims,
                                             SmallVectorImpl<Value> &symbols) {
