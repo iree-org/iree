@@ -50,3 +50,6 @@
 [submodule "third_party/webgpu-headers"]
 	path = third_party/webgpu-headers
 	url = https://github.com/webgpu-native/webgpu-headers.git
+[submodule "third_party/musl"]
+	path = third_party/musl
+	url = git://git.musl-libc.org/musl
