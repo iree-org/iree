@@ -154,7 +154,10 @@ iree_check_single_backend_test_suite(
             "round.mlir",
         ],
     ),
-    compiler_flags = ["-iree-input-type=mhlo"],
+    compiler_flags = [
+        "-iree-input-type=mhlo",
+        "-iree-llvm-link-embedded=true",
+    ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
