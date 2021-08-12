@@ -17,6 +17,7 @@ declare -a excluded_files_patterns=(
   "^\.gitmodules$"
   "/third_party/"
   "^third_party/"
+  "*Makefile*"
 )
 
 # Join on |
