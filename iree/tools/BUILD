@@ -245,7 +245,6 @@ cc_library(
 
 cc_binary(
     name = "iree-opt",
-    data = ["@llvm-project//lld:gen_lld"],
     tags = ["hostonly"],
     deps = [
         ":iree_opt_main",
@@ -266,7 +265,6 @@ cc_library(
 cc_binary(
     name = "iree-run-mlir",
     srcs = ["iree-run-mlir-main.cc"],
-    data = ["@llvm-project//lld:gen_lld"],
     tags = ["hostonly"],
     deps = [
         ":init_passes_and_dialects",
@@ -377,7 +375,6 @@ cc_library(
 
 cc_binary(
     name = "iree-translate",
-    data = ["@llvm-project//lld:gen_lld"],
     tags = ["hostonly"],
     deps = [
         ":iree_translate_main",
