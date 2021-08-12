@@ -13,7 +13,13 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [4: index, 4: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, fullWorkload = [32, 112, 112], workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]}
+    } {
+    ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
+      %x = constant 2: index
+      %y = constant 28: index
+      %z = constant 28: index
+      hal.return %x, %y, %z: index, index, index
     }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @conv_static_shape_f32() {
@@ -106,7 +112,13 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [8: index, 2: index, 2: index],
-      translation.info = {passPipeline = 6 : i32, fullWorkload = [96, 56, 56], workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]}
+    } {
+    ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
+      %x = constant 6: index
+      %y = constant 14: index
+      %z = constant 14: index
+      hal.return %x, %y, %z: index, index, index
     }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @depthwise_conv_static_shape_f32() {

@@ -46,8 +46,6 @@ def TileSizesListAttr :
 def TranslationInfoAttr :
   StructAttr<"TranslationInfo", HAL_Dialect, [
     StructFieldAttr<"passPipeline", DispatchLoweringPassPipelineEnum>,
-    StructFieldAttr<"fullWorkload",
-        DefaultValuedAttr<I64ArrayAttr, "{}">>,
     StructFieldAttr<"workloadPerWorkgroup",
         DefaultValuedAttr<I64ArrayAttr, "{}">>,
   ]>;

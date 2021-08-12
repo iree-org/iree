@@ -53,12 +53,10 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 void setTranslationInfo(FuncOp entryPointFn,
                         IREE::HAL::DispatchLoweringPassPipeline passPipeline,
                         ArrayRef<int64_t> workgroupSize,
-                        ArrayRef<int64_t> fullWorkload,
                         ArrayRef<int64_t> workloadPerWorkgroup) {
   auto entryPointOp = getEntryPoint(entryPointFn);
-  auto translationInfo =
-      buildTranslationInfo(passPipeline, fullWorkload, workloadPerWorkgroup,
-                           entryPointFn.getContext());
+  auto translationInfo = buildTranslationInfo(
+      passPipeline, workloadPerWorkgroup, entryPointFn.getContext());
   setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
 }
 
@@ -89,7 +87,7 @@ LogicalResult setOpConfigAndEntryPointFnTranslation(
     FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
     ArrayRef<int64_t> nativeVectorSize,
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize, ArrayRef<int64_t> fullWorkload) {
+    ArrayRef<int64_t> workgroupSize) {
   IREE::HAL::LoweringConfig config =
       buildConfigAttr(tileSizes, nativeVectorSize, op->getContext());
   setLoweringConfig(op, config);
@@ -122,9 +120,8 @@ LogicalResult setOpConfigAndEntryPointFnTranslation(
     return entryPointFn.emitOpError(
         "unable to find entry point op for entry point function");
   }
-  IREE::HAL::TranslationInfo translationInfo =
-      buildTranslationInfo(passPipeline, fullWorkload, workloadPerWorkgroup,
-                           entryPointOp->getContext());
+  IREE::HAL::TranslationInfo translationInfo = buildTranslationInfo(
+      passPipeline, workloadPerWorkgroup, entryPointOp->getContext());
   setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
   return success();
 }

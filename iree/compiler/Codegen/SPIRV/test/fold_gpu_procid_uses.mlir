@@ -6,8 +6,13 @@ hal.executable @fold_block_id attributes {sym_visibility = "private"} {
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @fold_block_id attributes {
       interface = @io,
-      ordinal = 0 : index,
-      translation.info = {passPipeline = 6: i32, fullWorkload = [224, 336, 16], workloadPerWorkgroup = [2, 8, 16]}
+      ordinal = 0 : index
+    } {
+    ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
+      %x = constant 112: index
+      %y = constant 42: index
+      %z = constant 1: index
+      hal.return %x, %y, %z: index, index, index
     }
     module {
       func @fold_block_id() -> (index, index, index) {
@@ -36,8 +41,13 @@ hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "privat
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @fold_interface_workgroup_id attributes {
       interface = @io,
-      ordinal = 0 : index,
-      translation.info = {passPipeline = 6: i32, fullWorkload = [224, 336, 16], workloadPerWorkgroup = [2, 8, 16]}
+      ordinal = 0 : index
+    } {
+    ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
+      %x = constant 112: index
+      %y = constant 42: index
+      %z = constant 1: index
+      hal.return %x, %y, %z: index, index, index
     }
     module {
       func @fold_interface_workgroup_id() -> (index, index, index) {

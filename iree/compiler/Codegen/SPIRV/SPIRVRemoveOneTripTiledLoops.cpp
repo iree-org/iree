@@ -85,7 +85,6 @@ class RemoveTripOneLoop final : public OpRewritePattern<scf::ForOp> {
 
     // Now make sure the lower bound is smaller than upper bound. The lower
     // bound should be multiplying the workgroup ID with some constant.
-
     auto mulOp = op.lowerBound().getDefiningOp<AffineApplyOp>();
     if (!mulOp || mulOp.mapOperands().size() != 1) return failure();
 
@@ -95,7 +94,6 @@ class RemoveTripOneLoop final : public OpRewritePattern<scf::ForOp> {
 
     // We just need to make sure the max value of the workgroup ID multipled by
     // the multipler is smaller than the upper bound to guarantee one trip.
-
     unsigned dimIndex = idOp.dimension().getZExtValue();
     int64_t dimSize = workloadSize[dimIndex];
     if (dimSize == ShapedType::kDynamicSize) return failure();
