@@ -107,7 +107,7 @@ iree_check_single_backend_test_suite(
     "vmvx"
   COMPILER_FLAGS
     "-iree-input-type=tosa"
-    "-iree-vm-target-extension=i64"
+    "-iree-vm-target-extension-i64"
 )
 
 iree_check_single_backend_test_suite(

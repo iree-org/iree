@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='test-iree-convert-std-to-vm' -iree-vm-target-extension=f32 %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='test-iree-convert-std-to-vm' %s | IreeFileCheck %s
 
 // CHECK-LABEL: @t001_bitcast_i32_f32
 module @t001_bitcast_i32_f32 {
