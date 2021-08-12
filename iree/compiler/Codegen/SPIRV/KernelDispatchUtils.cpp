@@ -507,6 +507,7 @@ static LogicalResult setMaliSpecificConfig(
     // Let the entry point region to return fully static number of workgroups.
     // This is needed for folding `affine.min` ops to expose static-shaped tiled
     // convolution for vectorization.
+    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
     auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
                                std::array<Value, 3>) {
       std::array<Value, 3> xyz;
@@ -593,6 +594,7 @@ static LogicalResult setMaliSpecificConfig(
     // Let the entry point region to return fully static number of workgroups.
     // This is needed for folding `affine.min` ops to expose static-shaped tiled
     // convolution for vectorization.
+    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
     auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
                                std::array<Value, 3>) {
       std::array<Value, 3> xyz;
