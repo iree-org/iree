@@ -444,7 +444,7 @@ LogicalResult setRootConfig(FuncOp entryPoint,
 }
 
 static LogicalResult setMaliSpecificConfig(
-    FuncOp entryPoint, linalg::ConvInputNHWCFilterHWCFOp op) {
+    FuncOp entryFn, linalg::ConvInputNHWCFilterHWCFOp op) {
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape =
       getUntiledResultShape(cast<linalg::LinalgOp>(op.getOperation()), 0);
@@ -498,9 +498,28 @@ static LogicalResult setMaliSpecificConfig(
     SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 1, 1, 4};
     tileSizes.emplace_back(fourthLevel);
 
-    return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
-        IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize, workgroupSize);
+    if (failed(setOpConfigAndEntryPointFnTranslation(
+            entryFn, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+            IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize,
+            workgroupSize)))
+      return failure();
+
+    // Let the entry point region to return fully static number of workgroups.
+    // This is needed for folding `affine.min` ops to expose static-shaped tiled
+    // convolution for vectorization.
+    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
+    auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
+                               std::array<Value, 3>) {
+      std::array<Value, 3> xyz;
+      for (unsigned i = 0; i < 3; ++i) {
+        int64_t count = outputShape[i + 1] / tileSize[i];
+        xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
+      }
+      return xyz;
+    };
+
+    OpBuilder builder(op.getContext());
+    return defineWorkgroupCountRegion(builder, entryFn, numWorkgroupsFn);
   }
   return failure();
 }
@@ -516,7 +535,7 @@ LogicalResult setRootConfig(FuncOp entryPoint,
 }
 
 static LogicalResult setMaliSpecificConfig(
-    FuncOp entryPoint, linalg::DepthwiseConvInputNHWCFilterHWCOp op) {
+    FuncOp entryFn, linalg::DepthwiseConvInputNHWCFilterHWCOp op) {
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape =
       getUntiledResultShape(cast<linalg::LinalgOp>(op.getOperation()), 0);
@@ -566,9 +585,28 @@ static LogicalResult setMaliSpecificConfig(
     SmallVector<int64_t, 4> fourthLevel = {0, 0, 0, 0, 1, 1};
     tileSizes.emplace_back(fourthLevel);
 
-    return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, /*nativeVectorSize =*/ArrayRef<int64_t>{},
-        IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize, workgroupSize);
+    if (failed(setOpConfigAndEntryPointFnTranslation(
+            entryFn, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+            IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize,
+            workgroupSize)))
+      return failure();
+
+    // Let the entry point region to return fully static number of workgroups.
+    // This is needed for folding `affine.min` ops to expose static-shaped tiled
+    // convolution for vectorization.
+    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
+    auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
+                               std::array<Value, 3>) {
+      std::array<Value, 3> xyz;
+      for (unsigned i = 0; i < 3; ++i) {
+        int64_t count = outputShape[i + 1] / tileSize[i];
+        xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
+      }
+      return xyz;
+    };
+
+    OpBuilder builder(op.getContext());
+    return defineWorkgroupCountRegion(builder, entryFn, numWorkgroupsFn);
   }
   return failure();
 }

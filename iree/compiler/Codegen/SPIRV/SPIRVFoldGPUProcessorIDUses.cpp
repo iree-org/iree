@@ -128,13 +128,17 @@ Optional<int64_t> getProcessorIDUpperBound(
 /// point ABI.
 Optional<int64_t> getProcessorIDUpperBound(gpu::ThreadIdOp threadIDOp) {
   FuncOp funcOp = threadIDOp->getParentOfType<FuncOp>();
-  auto abiAttr = funcOp->getAttrOfType<spirv::EntryPointABIAttr>(
-      spirv::getEntryPointABIAttrName());
-  if (!abiAttr) return llvm::None;
+  IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
+  if (!entryPointOp) return {};
+
+  Optional<ArrayAttr> sizes = entryPointOp.workgroup_size();
+  if (!sizes) return {};
 
   int index = dimensionToIndex(threadIDOp.dimension());
-  auto valueIt = abiAttr.local_size().getIntValues().begin() + index;
-  return (*valueIt).getZExtValue();
+  if (index < sizes->size()) {
+    return sizes->getValue()[index].cast<IntegerAttr>().getInt();
+  }
+  return llvm::None;
 }
 
 /// Folds `affine.min` ops which has only one symbol operand, which is a
