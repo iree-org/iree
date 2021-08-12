@@ -94,6 +94,75 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
+    name = "check_dylib_embedded-llvm-aot_dylib",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "abs.mlir",
+            "add.mlir",
+            "batch_norm_inference.mlir",
+            "broadcast.mlir",
+            "broadcast_add.mlir",
+            "compare.mlir",
+            "concatenate.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_general.mlir",
+            "dynamic_slice.mlir",
+            "dynamic_update_slice.mlir",
+            "exponential.mlir",
+            "exponential_minus_one.mlir",
+            "finite.mlir",
+            "floor.mlir",
+            "gather.mlir",
+            "iota.mlir",
+            "maximum.mlir",
+            "minimum.mlir",
+            "multiply.mlir",
+            "negate.mlir",
+            "pad.mlir",
+            "reduce_window.mlir",
+            "reshape.mlir",
+            "reverse.mlir",
+            "rsqrt.mlir",
+            "scatter_dynamic.mlir",
+            "select.mlir",
+            "sine.mlir",
+            "slice.mlir",
+            "sort.mlir",
+            "sqrt.mlir",
+            "subtract.mlir",
+            "torch_index_select.mlir",
+            "transpose.mlir",
+            "while.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "convolution.mlir",
+            "fft.mlir",
+            "log.mlir",
+            "log_plus_one.mlir",
+            "reduce.mlir",
+            "remainder.mlir",
+            "round.mlir",
+            "scatter.mlir",
+            "tanh.mlir",
+        ],
+    ),
+    compiler_flags = [
+        "-iree-input-type=mhlo",
+        "-iree-llvm-link-embedded=true",
+    ],
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
+)
+
+iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = enforce_glob(
         # keep sorted
@@ -156,7 +225,6 @@ iree_check_single_backend_test_suite(
     ),
     compiler_flags = [
         "-iree-input-type=mhlo",
-        "-iree-llvm-link-embedded=true",
     ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
