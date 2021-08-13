@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-convert-to-gpu))' -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-convert-to-gpu))))' -canonicalize -cse %s | IreeFileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 hal.executable @parallel_4D attributes {sym_visibility = "private"} {
@@ -46,7 +46,6 @@ hal.executable @parallel_4D attributes {sym_visibility = "private"} {
   }
 }
 // CHECK-LABEL: func @parallel_4D
-//  CHECK-SAME:   local_size = dense<[32, 1, 1]>
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:     %[[C2:.+]] = constant 2 : index
@@ -119,14 +118,7 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
     }
   }
 }
-//       CHECK: #[[COUNT_MAP:.+]] = affine_map<()[s0, s1, s2] -> (((s0 * s1) * s2) ceildiv 32)>
-//       CHECK: hal.executable.entry_point @parallel_4D_static
-//       CHECK: ^{{.*}}(%[[WORKLOAD_X:.+]]: index, %[[WORKLOAD_Y:.+]]: index, %[[WORKLOAD_Z:.+]]: index):
-//   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[COUNT:.+]] = affine.apply #[[COUNT_MAP]]()[%[[WORKLOAD_X]], %[[WORKLOAD_Y]], %[[WORKLOAD_Z]]]
-//       CHECK:   hal.return %[[COUNT]], %[[C1]], %[[C1]]
-//  CHECK-LABEL: func @parallel_4D_static()
-//  CHECK-SAME:   local_size = dense<[32, 1, 1]>
+// CHECK-LABEL: func @parallel_4D_static()
 //   CHECK-DAG:     %[[C360:.+]] = constant 360 : index
 //   CHECK-DAG:     %[[C120:.+]] = constant 120 : index
 //   CHECK-DAG:     %[[C30:.+]] = constant 30 : index
@@ -196,12 +188,6 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
     }
   }
 }
-//       CHECK: #[[COUNT_MAP:.+]] = affine_map<()[s0, s1, s2] -> ((s0 * s1) * s2)>
-//       CHECK: hal.executable.entry_point @scalar_add
-//       CHECK: ^{{.*}}(%[[WORKLOAD_X:.+]]: index, %[[WORKLOAD_Y:.+]]: index, %[[WORKLOAD_Z:.+]]: index):
-//   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[COUNT:.+]] = affine.apply #[[COUNT_MAP]]()[%[[WORKLOAD_X]], %[[WORKLOAD_Y]], %[[WORKLOAD_Z]]]
-//       CHECK:   hal.return %[[COUNT]], %[[C1]], %[[C1]]
 // CHECK-LABEL: func @scalar_add()
 //       CHECK:     load
 //  CHECK-NEXT:     load
@@ -257,14 +243,7 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
     }
   }
 }
-//       CHECK: #[[COUNT_MAP:.+]] = affine_map<()[s0, s1, s2] -> (((s0 * s1) * s2) ceildiv 32)>
-//       CHECK: hal.executable.entry_point @reduce_sum
-//       CHECK: ^{{.*}}(%[[WORKLOAD_X:.+]]: index, %[[WORKLOAD_Y:.+]]: index, %[[WORKLOAD_Z:.+]]: index):
-//   CHECK-DAG:   %[[C1:.+]] = constant 1
-//   CHECK-DAG:   %[[COUNT:.+]] = affine.apply #[[COUNT_MAP]]()[%[[WORKLOAD_X]], %[[WORKLOAD_Y]], %[[WORKLOAD_Z]]]
-//       CHECK:   hal.return %[[COUNT]], %[[C1]], %[[C1]]
 //CHECK-LABEL: func @reduce_sum
-//  CHECK-SAME:   local_size = dense<[32, 1, 1]> : vector<3xi32>
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:     %[[C40:.+]] = constant 40 : index
 //   CHECK-DAG:     %[[C50:.+]] = constant 50 : index

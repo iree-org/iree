@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-vectorize))))' %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @elementwise_static_shape
 //       CHECK:   vector.transfer_read %{{.+}}[%c0], {{.+}} memref<4xf32, #{{.+}}>, vector<4xf32>
@@ -13,15 +13,13 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @elementwise_static_shape attributes {
-      interface = @io,
-      ordinal = 0 : index
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 1: index, 1: index]
     }
     module attributes {
       spv.target_env =
-        #spv.target_env<#spv.vce<v1.5,
-          [Shader],
-          []>, NVIDIA:DiscreteGPU,
-          {subgroup_size = 32 : i32}>} {
+        #spv.target_env<#spv.vce<v1.5, [Shader], []>,
+        NVIDIA:DiscreteGPU, {subgroup_size = 32 : i32}>} {
       func @elementwise_static_shape() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128xf32>
@@ -29,6 +27,7 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
         %ret0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128xf32>
         linalg.generic {
           __internal_linalg_transform__ = "workgroup",
+          lowering.config = {tileSizes = [[128], [], [4]]},
           indexing_maps = [affine_map<(i) -> (i)>,
                            affine_map<(i) -> (i)>,
                            affine_map<(i) -> (i)>],
@@ -66,15 +65,13 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
     hal.executable.entry_point @elementwise_transpose attributes {
-      interface = @io,
-      ordinal = 0 : index
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 1: index, 1: index]
     }
     module attributes {
       spv.target_env =
-        #spv.target_env<#spv.vce<v1.5,
-          [Shader],
-          []>, NVIDIA:DiscreteGPU,
-          {subgroup_size = 32 : i32}>} {
+        #spv.target_env<#spv.vce<v1.5, [Shader], []>,
+        NVIDIA:DiscreteGPU, {subgroup_size = 32 : i32}>} {
       func @elementwise_transpose() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128x8xf32>
@@ -82,6 +79,7 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
         %ret0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128x8xf32>
         linalg.generic {
           __internal_linalg_transform__ = "workgroup",
+          lowering.config = {tileSizes = [[1, 32], [], [1, 1]]},
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                            affine_map<(d0, d1) -> (d0)>,
                            affine_map<(d0, d1) -> (d0, d1)>],
