@@ -82,8 +82,8 @@ def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
 
 
 def get_origin_tree_commit(distance: int, verbose: bool = False) -> str:
-  """Returns the hash for the commit with the given hash from top of the tree
-  for the origin base branch."""
+  """Returns the hash for the commit with the given distance from top of the
+  tree for the origin base branch."""
   base_branch = get_required_env_var("BUILDKITE_PULL_REQUEST_BASE_BRANCH")
   get_output(['git', 'fetch', '--prune', '--', 'origin', base_branch],
              cwd=THIS_DIRECTORY,
