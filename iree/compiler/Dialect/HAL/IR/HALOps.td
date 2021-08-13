@@ -108,44 +108,6 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
 }
 
 //===----------------------------------------------------------------------===//
-// Control flow
-//===----------------------------------------------------------------------===//
-
-def HAL_CheckSuccessOp : HAL_Op<"check_success"> {
-  let summary = [{raises a global failure if a status is not 'ok'}];
-  let description = [{
-    When the status is not 'ok' this signals a runtime failure that causes the
-    entire active invocation - and possibly *all* in-flight and pending
-    invocations - to fail with the given status. The status will be propagated
-    back via the available runtime error handling mechanisms such as semaphores
-    or synchronous invocation results.
-
-    As the IREE execution model is deeply pipelined it's possible that failures
-    have a latency between when they are emitted and when the application can
-    observe the failure. It's also possible that other work that is in-flight
-    or pending when the failure occurs will complete.
-  }];
-
-  let arguments = (ins
-    Util_Status:$status,
-    OptionalAttr<StrAttr>:$message
-  );
-
-  let assemblyFormat = [{
-    $status (`,` $message^)? attr-dict
-  }];
-
-  let builders = [
-    OpBuilder<(ins "Value":$status, CArg<"StringRef", [{""}]>:$message),
-    [{
-      build(
-        $_builder, $_state, status,
-        message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
-    }]>,
-  ];
-}
-
-//===----------------------------------------------------------------------===//
 // !hal.allocator / iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 

@@ -15,6 +15,7 @@ cc_library(
     srcs = [
         "ConvertGlobalOps.cpp",
         "ConvertListOps.cpp",
+        "ConvertStatusOps.cpp",
         "ConvertUtilToVM.cpp",
     ],
     hdrs = [
