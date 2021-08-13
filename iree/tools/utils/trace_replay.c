@@ -116,15 +116,20 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
       document, module_node, iree_make_cstring_view("path"), &path_node));
 
-  // Load bytecode file contents into memory.
-  char* full_path = NULL;
-  IREE_RETURN_IF_ERROR(iree_file_path_join(replay->root_path,
-                                           iree_yaml_node_as_string(path_node),
-                                           replay->host_allocator, &full_path));
+  // Load bytecode file (or stdin) contents into memory.
   iree_byte_span_t flatbuffer_data;
-  iree_status_t status = iree_file_read_contents(
-      full_path, replay->host_allocator, &flatbuffer_data);
-  iree_allocator_free(replay->host_allocator, full_path);
+  iree_status_t status = iree_ok_status();
+  if (iree_yaml_string_equal(path_node, iree_make_cstring_view("<stdin>"))) {
+    status = iree_stdin_read_contents(replay->host_allocator, &flatbuffer_data);
+  } else {
+    char* full_path = NULL;
+    IREE_RETURN_IF_ERROR(iree_file_path_join(
+        replay->root_path, iree_yaml_node_as_string(path_node),
+        replay->host_allocator, &full_path));
+    status = iree_file_read_contents(full_path, replay->host_allocator,
+                                     &flatbuffer_data);
+    iree_allocator_free(replay->host_allocator, full_path);
+  }
 
   // Load and verify the bytecode module.
   iree_vm_module_t* module = NULL;

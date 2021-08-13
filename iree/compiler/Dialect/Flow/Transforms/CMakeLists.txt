@@ -43,6 +43,7 @@ iree_cc_library(
     "InjectDispatchTracing.cpp"
     "InsertConstantClones.cpp"
     "InterchangeGenericOps.cpp"
+    "MatmulToMMT4dConversion.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineLargeConstants.cpp"
     "PadLinalgOps.cpp"

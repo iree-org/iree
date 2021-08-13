@@ -116,6 +116,13 @@ def PadLinalgOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
 }
 
+def ConvertMatmulToMMT4d :
+    Pass<"iree-flow-convert-matmul-to-mmt4d", "FuncOp"> {
+  let summary = "Convert linalg.matmul to linalg.mmt4d";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulOpToLinalgMMT4dPass()";
+}
+
+
 def PadTensorToSubTensorInsert :
     Pass<"iree-flow-pad-tensor-to-subtensor-insert", ""> {
   let summary = "Convert linalg.pad_tensor into linalg.fill + subtensor_insert";

@@ -9,10 +9,10 @@ vm.module @constant_ops {
   // Check the generated state struct
   // CHECK-LABEL: struct constant_ops_state_t {
   // CHECK-NEXT: iree_allocator_t allocator;
-  // CHECK-NEXT: uint8_t rwdata[0];
-  // CHECK-NEXT: iree_vm_ref_t refs[0];
+  // CHECK-NEXT: uint8_t rwdata[1];
+  // CHECK-NEXT: iree_vm_ref_t refs[1];
   // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[2];
-  // CHECK-NEXT: iree_vm_function_t imports[0];
+  // CHECK-NEXT: iree_vm_function_t imports[1];
   // CHECK-NEXT: };
 
   // We mark the rodata ops public in this test to explicitly prevent DCE from

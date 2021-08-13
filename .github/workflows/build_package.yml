@@ -55,10 +55,10 @@ jobs:
           # Windows packages.
           - os: windows-2019
             build_package: main-dist
-            experimental: true
+            experimental: false
           - os: windows-2019
             build_package: py-runtime-pkg
-            experimental: true
+            experimental: false
           - os: windows-2019
             build_package: py-xla-compiler-tools-pkg
             experimental: true
@@ -72,19 +72,19 @@ jobs:
           # Macos packages.
           - os: macos-latest
             build_package: main-dist
-            experimental: true
+            experimental: false
           - os: macos-latest
             build_package: py-runtime-pkg
-            experimental: true
+            experimental: false
           - os: macos-latest
             build_package: py-xla-compiler-tools-pkg
-            experimental: true
+            experimental: false
           - os: macos-latest
             build_package: py-tflite-compiler-tools-pkg
-            experimental: true
+            experimental: false
           - os: macos-latest
             build_package: py-tf-compiler-tools-pkg
-            experimental: true
+            experimental: false
     env:
       CIBW_BUILD_VERBOSITY: 1
       # Note that on Linux, we run under docker with an altered path.
@@ -251,3 +251,16 @@ jobs:
         with:
           release_id: ${{ github.event.inputs.release_id }}
           assets_path: ./bindist/*
+
+  validate_and_publish:
+    name: "Invoke workflow to validate and publish release"
+    needs: build_core
+    runs-on: ubuntu-18.04
+    steps:
+      - name: "Invoke workflow :: Validate and Publish Release"
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: Validate and Publish Release
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          ref: "${{ env.tag_name }}"
+          inputs: '{"release_id": "${{ github.event.inputs.release_id }}"}'
