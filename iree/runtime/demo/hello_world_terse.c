@@ -82,6 +82,7 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
   IREE_CHECK_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
       iree_runtime_session_device_allocator(session), arg0_shape,
       IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
       iree_make_byte_span((void*)arg0_data, sizeof(arg0_data)),
@@ -100,6 +101,7 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
   IREE_CHECK_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
       iree_runtime_session_device_allocator(session), arg1_shape,
       IREE_ARRAYSIZE(arg1_shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
       iree_make_byte_span((void*)arg1_data, sizeof(arg1_data)),

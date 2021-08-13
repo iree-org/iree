@@ -404,14 +404,18 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
   iree_hal_buffer_t* source_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &source_buffer));
   iree_hal_element_type_t element_type = (iree_hal_element_type_t)args->i1;
+  // TODO(#6762): add encoding type to vm.import.
+  iree_hal_encoding_type_t encoding_type =
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
   iree_host_size_t shape_rank = 0;
   iree_hal_dim_t* shape_dims = NULL;
   IREE_VM_ABI_VLA_STACK_CAST(args, a2_count, a2, iree_hal_dim_t, 128,
                              &shape_rank, &shape_dims);
 
   iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      source_buffer, shape_dims, shape_rank, element_type, &buffer_view));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_view_create(source_buffer, shape_dims, shape_rank,
+                                  element_type, encoding_type, &buffer_view));
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
 }
