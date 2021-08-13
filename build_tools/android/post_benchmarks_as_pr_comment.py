@@ -310,15 +310,18 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
     for i in range(MAX_BASE_COMMIT_QUERY_COUNT):
       base_commit = get_origin_tree_commit(i, verbose)
       base_benchmarks = query_base_benchmark_results(base_commit, verbose)
+      base_commit = md.link(base_commit,
+                            f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
+
       if len(base_benchmarks) == 0:
+        commit_info = (f"@ commit {pr_commit} (no previous benchmark results to"
+                       f" compare against since {base_commit})")
         continue
 
       # Update the aggregate benchmarks with base numbers.
       for bench in base_benchmarks:
         if bench in all_benchmarks:
           all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
-      base_commit = md.link(base_commit,
-                            f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
       commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"
       break
 
