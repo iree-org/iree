@@ -59,6 +59,11 @@ static llvm::cl::opt<int> clLinalgOpsPaddingSize(
                    "flow-padding-size"),
     llvm::cl::init(4));
 
+static llvm::cl::opt<bool> clEnableMatmulToMMT4d(
+    "iree-flow-enable-matmul-to-mmt4d",
+    llvm::cl::desc("Enable converting linalg.matmul into linalg.mmt4d"),
+    llvm::cl::init(false));
+
 // TODO(#1159): enable by default or remove this option once it works on
 //              a broader set of programs
 static llvm::cl::opt<bool> clEnableLinalgDetensorize(
@@ -100,17 +105,25 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       Shape::createExpandFunctionDynamicDimsPass());
 
   // Special case peephole optimizations.
-  if (clEnable1x1ConvToMatmul) {
-    passManager.addNestedPass<mlir::FuncOp>(
-        createConvertConv2D1x1ToMatmulPass());
-  }
-  if (clEnableConvToImg2Col) {
-    passManager.addNestedPass<mlir::FuncOp>(createConvertConv2DToImg2ColPass());
-  }
-  // Pad linalg op
-  if (clEnablePaddingLinalgOps) {
-    passManager.addNestedPass<mlir::FuncOp>(
-        createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
+  {
+    if (clEnable1x1ConvToMatmul) {
+      passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
+    }
+    if (clEnableConvToImg2Col) {
+      passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
+    }
+    // Pad linalg op
+    if (clEnablePaddingLinalgOps) {
+      passManager.addNestedPass<FuncOp>(
+          createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
+    }
+    // Convert linalg.matmul -> linalg.mmt4d
+    if (clEnableMatmulToMMT4d) {
+      passManager.addNestedPass<FuncOp>(
+          createConvertLinalgMatmulOpToLinalgMMT4dPass(clLinalgOpsPaddingSize,
+                                                       clLinalgOpsPaddingSize,
+                                                       clLinalgOpsPaddingSize));
+    }
   }
   passManager.addPass(createPadTensorToSubTensorInsertPass());
 

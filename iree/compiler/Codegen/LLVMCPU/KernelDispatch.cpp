@@ -79,7 +79,7 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
     "iree-codegen-llvm-generic-ops-workgroup-size",
     llvm::cl::desc(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
-    llvm::cl::init(128));
+    llvm::cl::init(64));
 
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.

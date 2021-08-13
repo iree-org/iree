@@ -13,7 +13,7 @@ iree_bytecode_module(
   NAME
     mnist_bytecode_module
   SRC
-    "mnist.mlir"
+    "../models/mnist.mlir"
   C_IDENTIFIER
     "mnist_bytecode_module_c"
   FLAGS

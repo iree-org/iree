@@ -55,6 +55,12 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertConv2DToImg2ColPass();
 /// subtensor_insert. This allows lowering the operation into a single kernel.
 std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass();
 
+/// Pass to convert a linalg.matmul into linalg.mmt4d given M0, N0 and K0 are
+/// compile time constants.
+std::unique_ptr<OperationPass<FuncOp>>
+createConvertLinalgMatmulOpToLinalgMMT4dPass(int M0 = 4, int N0 = 4,
+                                             int K0 = 4);
+
 /// Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
