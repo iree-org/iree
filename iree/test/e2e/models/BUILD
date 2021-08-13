@@ -72,20 +72,3 @@ iree_check_single_backend_test_suite(
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
-
-iree_check_single_backend_test_suite(
-    name = "check_linalg_on_tensors_cuda_cuda",
-    timeout = "long",
-    srcs = CHECK_FRAMEWORK_TESTS,
-    compiler_flags = ["-iree-input-type=mhlo"],
-    driver = "cuda",
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-    ],
-    target_backend = "cuda",
-)
