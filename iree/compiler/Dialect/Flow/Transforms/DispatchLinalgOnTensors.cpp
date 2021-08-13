@@ -1150,6 +1150,11 @@ static unsigned decideFusableLinalgOps(mlir::FuncOp funcOp) {
                 consumerIndexingMap.getResults()) {
           continue;
         }
+        if (llvm::any_of(
+                consumer.getOutputOperands(), [&consumer](OpOperand *operand) {
+                  return !consumer.getTiedIndexingMap(operand).isIdentity();
+                }))
+          continue;
         int64_t rootNumber = getRootNumber(op);
         setRootAttribute(context, user, rootNumber);
         removeRootOpAttribute(op);
