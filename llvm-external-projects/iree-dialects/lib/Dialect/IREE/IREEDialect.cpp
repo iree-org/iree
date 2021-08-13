@@ -22,7 +22,7 @@ using namespace mlir::iree;
 void IREEDialect::initialize() {
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "iree-dialects/Dialect/IREE/IREEOps.cpp.inc"
+#include "iree-dialects/Dialect/IREE/IREEOpsTypes.cpp.inc"
       >();
   addOperations<
 #define GET_OP_LIST
