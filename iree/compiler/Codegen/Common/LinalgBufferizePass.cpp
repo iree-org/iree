@@ -1631,9 +1631,11 @@ void LinalgBufferizePass::runOnOperation() {
         .Case<tensor::DimOp>([&](tensor::DimOp dimOp) {
           Value operand = dimOp.source();
           Value remappedVal = bvm.lookupOrNull(operand);
-          Value newDimOp = b.create<memref::DimOp>(dimOp.getLoc(), remappedVal,
-                                                   dimOp.index());
-          dimOp.replaceAllUsesWith(newDimOp);
+          if (remappedVal) {
+            Value newDimOp = b.create<memref::DimOp>(
+                dimOp.getLoc(), remappedVal, dimOp.index());
+            dimOp.replaceAllUsesWith(newDimOp);
+          }
           return success();
         })
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
