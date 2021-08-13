@@ -8,12 +8,16 @@ func @allocator_compute_size(%arg0: !hal.allocator) -> index {
   %dim1 = constant 200 : index
   // CHECK-DAG: %[[TYPE:.+]] = constant 32
   %type = constant 32 : i32
+  // CHECK-DAG: %[[ENCODING:.+]] = constant 1
+  %encoding = constant 1 : i32
   // CHECK: %[[SIZE:.+]] = hal.allocator.compute_size<%arg0 : !hal.allocator>
   // CHECK-SAME:                                shape([%[[DIM0]], %[[DIM1]]])
-  // CHECK-SAME:                                 type(%[[TYPE]]) : index
+  // CHECK-SAME:                                 type(%[[TYPE]])
+  // CHECK-SAME:                             encoding(%[[ENCODING]]) : index
   %sz = hal.allocator.compute_size<%arg0 : !hal.allocator>
                              shape([%dim0, %dim1])
-                              type(%type) : index
+                              type(%type)
+                          encoding(%encoding) : index
   // CHECK-NEXT: return %[[SIZE]]
   return %sz : index
 }
@@ -32,14 +36,18 @@ func @allocator_compute_offset(%arg0: !hal.allocator) -> index {
   %dim1 = constant 200 : index
   // CHECK-DAG: %[[TYPE:.+]] = constant 32
   %type = constant 32 : i32
+  // CHECK-DAG: %[[ENCODING:.+]] = constant 1
+  %encoding = constant 1 : i32
   // CHECK: %[[OFFSET:.+]] = hal.allocator.compute_offset<%arg0 : !hal.allocator>
   // CHECK-SAME:                                  indices([%[[IDX0]], %[[IDX1]]])
   // CHECK-SAME:                                    shape([%[[DIM0]], %[[DIM1]]])
-  // CHECK-SAME:                                     type(%[[TYPE]]) : index
+  // CHECK-SAME:                                     type(%[[TYPE]])
+  // CHECK-SAME:                                 encoding(%[[ENCODING]]) : index
   %off = hal.allocator.compute_offset<%arg0 : !hal.allocator>
                               indices([%idx0, %idx1])
                                 shape([%dim0, %dim1])
-                                 type(%type) : index
+                                 type(%type)
+                             encoding(%encoding) : index
   // CHECK-NEXT: return %[[OFFSET]]
   return %off : index
 }
@@ -62,16 +70,20 @@ func @allocator_compute_range(%arg0: !hal.allocator) -> (index, index) {
   %dim1 = constant 200 : index
   // CHECK-DAG: %[[TYPE:.+]] = constant 32
   %type = constant 32 : i32
+  // CHECK-DAG: %[[ENCODING:.+]] = constant 1
+  %encoding = constant 1 : i32
   // CHECK: = hal.allocator.compute_range<%arg0 : !hal.allocator>
   // CHECK-SAME:                  indices([%[[IDX0]], %[[IDX1]]])
   // CHECK-SAME:                  lengths([%[[LEN0]], %[[LEN1]]])
   // CHECK-SAME:                    shape([%[[DIM0]], %[[DIM1]]])
-  // CHECK-SAME:                     type(%[[TYPE]]) : index, index
+  // CHECK-SAME:                     type(%[[TYPE]])
+  // CHECK-SAME:                 encoding(%[[ENCODING]]) : index, index
   %off, %len = hal.allocator.compute_range<%arg0 : !hal.allocator>
                                    indices([%idx0, %idx1])
                                    lengths([%len0, %len1])
                                      shape([%dim0, %dim1])
-                                      type(%type) : index, index
+                                      type(%type)
+                                  encoding(%encoding) : index, index
   return %off, %len : index, index
 }
 

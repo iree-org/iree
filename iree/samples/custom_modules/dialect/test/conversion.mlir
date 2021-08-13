@@ -13,10 +13,11 @@
 // CHECK-LABEL: @tensorToMessage
 func @tensorToMessage(%tensor : tensor<2x4xf32>) {
   //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
+  //  CHECK-DAG: [[ENCODING:%.+]] = vm.const.i32 1 : i32
   //  CHECK-DAG: [[DIM0:%.+]] = vm.const.i32 2 : i32
   //  CHECK-DAG: [[DIM1:%.+]] = vm.const.i32 4 : i32
   // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(
-  // CHECK-SAME:     %arg0, [[TYPE]], [
+  // CHECK-SAME:     %arg0, [[TYPE]], [[ENCODING]], [
   // CHECK-SAME:       [[DIM0]], [[DIM1]]
   // CHECK-SAME:     ])
   // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
@@ -32,10 +33,9 @@ func @tensorToMessage(%tensor : tensor<2x4xf32>) {
 // CHECK-LABEL: @dynamicTensorToMessage
 func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index) {
   //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
+  //  CHECK-DAG: [[ENCODING:%.+]] = vm.const.i32 1 : i32
   // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(
-  // CHECK-SAME:     %arg0, [[TYPE]], [
-  // CHECK-SAME:       %arg1, %arg2
-  // CHECK-SAME:     ])
+  // CHECK-SAME:     %arg0, [[TYPE]], [[ENCODING]], [%arg1, %arg2])
   // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %shape = shapex.make_ranked_shape %arg1, %arg2 : (index, index) -> !shapex.ranked_shape<[?, ?]>
   %shaped_tensor = shapex.tie_shape %arg0, %shape : tensor<?x?xf32>, !shapex.ranked_shape<[?, ?]>
@@ -50,9 +50,10 @@ func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : ind
 
 // CHECK-LABEL: @dynamicTensorToMessage2
 func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?, ?]> {iree.reflection = {}}) {
-  // CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
-  // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(%arg0, [[TYPE]],
-  // CHECK-SAME: [%arg1, %arg2])
+  //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
+  //  CHECK-DAG: [[ENCODING:%.+]] = vm.const.i32 1 : i32
+  // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(
+  // CHECK-SAME:     %arg0, [[TYPE]], [[ENCODING]], [%arg1, %arg2])
   // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %shaped_tensor = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?, ?]>
   %0 = "custom.tensor_to_message"(%shaped_tensor) : (tensor<?x?xf32>) -> !custom.message

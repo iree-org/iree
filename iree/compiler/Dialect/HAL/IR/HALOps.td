@@ -614,11 +614,12 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   );
 
   let assemblyFormat = [{
-    $buffer `,`
-    `shape` `=` `[` $shape `]` `,`
-    `element_type` `=` $element_type `,`
-    `encoding_type` `=` $encoding_type
-    attr-dict `:` type($buffer) `->` type($result)
+    `buffer` `(` $buffer `:` type($buffer) `)`
+    `shape` `(` `[` $shape `]` `)`
+    `type` `(` $element_type `)`
+    `encoding` `(` $encoding_type `)`
+    `:` type($result)
+    attr-dict-with-keyword
   }];
 
   let skipDefaultBuilders = 1;
@@ -654,7 +655,9 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
   );
 
   let assemblyFormat = [{
-    $buffer_view attr-dict `:` type($result)
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `:` type($result)
+    attr-dict-with-keyword
   }];
 
   let hasCanonicalizer = 1;
@@ -679,7 +682,9 @@ def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
   );
 
   let assemblyFormat = [{
-    $buffer_view attr-dict `:` type($result)
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `:` type($result)
+    attr-dict-with-keyword
   }];
 
   let skipDefaultBuilders = 1;
@@ -702,7 +707,9 @@ def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {
   );
 
   let assemblyFormat = [{
-    $buffer_view attr-dict `:` type($result)
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `:` type($result)
+    attr-dict-with-keyword
   }];
 }
 
@@ -720,7 +727,9 @@ def HAL_BufferViewEncodingTypeOp : HAL_PureOp<"buffer_view.encoding_type"> {
   );
 
   let assemblyFormat = [{
-    $buffer_view attr-dict `:` type($result)
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `:` type($result)
+    attr-dict-with-keyword
   }];
 }
 
@@ -738,7 +747,9 @@ def HAL_BufferViewRankOp : HAL_PureOp<"buffer_view.rank"> {
   );
 
   let assemblyFormat = [{
-    $buffer_view attr-dict `:` type($result)
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `:` type($result)
+    attr-dict-with-keyword
   }];
 }
 
@@ -757,7 +768,10 @@ def HAL_BufferViewDimOp : HAL_PureOp<"buffer_view.dim"> {
   );
 
   let assemblyFormat = [{
-    $buffer_view `,` $index attr-dict `:` type($result)
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `` `[` $index `]`
+    `:` type($result)
+    attr-dict-with-keyword
   }];
 }
 
@@ -775,7 +789,9 @@ def HAL_BufferViewDimsOp : HAL_PureOp<"buffer_view.dims"> {
   );
 
   let assemblyFormat = [{
-    $buffer_view attr-dict `:` type($result)
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `:` type($result)
+    attr-dict-with-keyword
   }];
 
   let hasCanonicalizer = 1;
@@ -795,7 +811,8 @@ def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
   );
 
   let assemblyFormat = [{
-    attr-dict ($operands^ `:` type($operands))?
+    $operands `:` type($operands)
+    attr-dict-with-keyword
   }];
 }
 

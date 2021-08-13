@@ -66,8 +66,8 @@ func @fn() {
 // Checks that the implicit cast allowing a buffer_view to store into a variable
 // that maps to a buffer is permitted.
 // CHECK-LABEL: util.global public mutable @var_with_buffer_view_store
-// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
-// CHECK: util.global.store %[[buffer]], @var_with_buffer_view_store : !hal.buffer
+// CHECK: %[[BUFFER:.*]] = hal.buffer_view.buffer<%arg0 : !hal.buffer_view> : !hal.buffer
+// CHECK: util.global.store %[[BUFFER]], @var_with_buffer_view_store : !hal.buffer
 util.global public mutable @var_with_buffer_view_store = dense<0.000000e+00> : tensor<f32>
 func @fn(%arg0: !hal.buffer_view) {
   %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<f32>
@@ -79,8 +79,8 @@ func @fn(%arg0: !hal.buffer_view) {
 // Checks that stores are permitted for variables that do not dominate the
 // function containing a store.
 // CHECK-LABEL: func @store_var_out_of_order
-// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
-// CHECK: util.global.store %[[buffer]], @var_out_of_order : !hal.buffer
+// CHECK: %[[BUFFER:.*]] = hal.buffer_view.buffer<%arg0 : !hal.buffer_view> : !hal.buffer
+// CHECK: util.global.store %[[BUFFER]], @var_out_of_order : !hal.buffer
 func @store_var_out_of_order(%arg0: !hal.buffer_view) {
   %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<f32>
   util.global.store %0, @var_out_of_order : tensor<f32>
@@ -92,9 +92,9 @@ util.global public mutable @var_out_of_order = dense<0.000000e+00> : tensor<f32>
 // Checks that the implicit cast allowing a buffer_view to indirect store into
 // a variable that maps to a buffer is permitted.
 // CHECK-LABEL: util.global public mutable @var_indirect_with_buffer_view_store
-// CHECK: %[[ptr:.*]] = util.global.address @var_indirect_with_buffer_view_store : !util.ptr<!hal.buffer>
-// CHECK: %[[buffer:.*]] = hal.buffer_view.buffer %arg0 : !hal.buffer
-// CHECK: util.global.store.indirect %[[buffer]], %[[ptr]] : !hal.buffer -> !util.ptr<!hal.buffer>
+// CHECK: %[[PTR:.*]] = util.global.address @var_indirect_with_buffer_view_store : !util.ptr<!hal.buffer>
+// CHECK: %[[BUFFER:.*]] = hal.buffer_view.buffer<%arg0 : !hal.buffer_view> : !hal.buffer
+// CHECK: util.global.store.indirect %[[BUFFER]], %[[PTR]] : !hal.buffer -> !util.ptr<!hal.buffer>
 util.global public mutable @var_indirect_with_buffer_view_store : tensor<i32>
 func @fn(%arg0: !hal.buffer_view) {
   %0 = util.global.address @var_indirect_with_buffer_view_store : !util.ptr<tensor<i32>>
