@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertGlobalOps.cpp"
     "ConvertListOps.cpp"
+    "ConvertStatusOps.cpp"
     "ConvertUtilToVM.cpp"
   DEPS
     MLIRIR

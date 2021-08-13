@@ -18,7 +18,6 @@ cc_library(
         "ConvertBufferViewOps.cpp",
         "ConvertCommandBufferOps.cpp",
         "ConvertConstantOps.cpp",
-        "ConvertControlFlowOps.cpp",
         "ConvertDeviceOps.cpp",
         "ConvertExecutableOps.cpp",
         "ConvertExperimentalOps.cpp",

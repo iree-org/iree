@@ -455,4 +455,42 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
+//===----------------------------------------------------------------------===//
+// Status
+//===----------------------------------------------------------------------===//
+
+def Util_StatusCheckOkOp : Util_Op<"status.check_ok"> {
+  let summary = [{raises a global failure if a status is not 'ok'}];
+  let description = [{
+    When the status is not 'ok' this signals a runtime failure that causes the
+    entire active invocation - and possibly *all* in-flight and pending
+    invocations - to fail with the given status. The status will be propagated
+    back via the available runtime error handling mechanisms such as semaphores
+    or synchronous invocation results.
+
+    As the IREE execution model is deeply pipelined it's possible that failures
+    have a latency between when they are emitted and when the application can
+    observe the failure. It's also possible that other work that is in-flight
+    or pending when the failure occurs will complete.
+  }];
+
+  let arguments = (ins
+    Util_Status:$status,
+    OptionalAttr<StrAttr>:$message
+  );
+
+  let assemblyFormat = [{
+    $status (`,` $message^)? attr-dict
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$status, CArg<"StringRef", [{""}]>:$message),
+    [{
+      build(
+        $_builder, $_state, status,
+        message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
+    }]>,
+  ];
+}
+
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_OPS
