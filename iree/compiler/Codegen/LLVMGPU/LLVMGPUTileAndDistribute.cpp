@@ -181,7 +181,8 @@ static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 
 static void populatePromotionPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
-  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>>(
+  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
+                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
       context,
       linalg::LinalgPromotionOptions()
           .setAllocationDeallocationFns(allocateWorkgroupMemory,
@@ -228,7 +229,13 @@ struct LLVMGPUTileAndDistributePass
       funcOp.dump();
     });
 
-    {
+    auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
+        getEntryPoint(funcOp).workgroup_size().getValue(),
+        [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+    int64_t flatWorkgroupSize =
+        workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+    // Only promote to workgroup size if there are multiple warps.
+    if (flatWorkgroupSize > 32) {
       OwningRewritePatternList promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
@@ -264,9 +271,6 @@ struct LLVMGPUTileAndDistributePass
     });
 
     {
-      auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-          getEntryPoint(funcOp).workgroup_size().getValue(),
-          [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
       // Apply last level of tiling and distribute to threads.
       OwningRewritePatternList threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(context, threadLevelTilingPatterns,
