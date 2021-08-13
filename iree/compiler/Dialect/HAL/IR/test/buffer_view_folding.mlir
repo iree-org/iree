@@ -14,46 +14,6 @@ func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
 
 // -----
 
-// CHECK-LABEL: func @buffer_view_compute_offset
-// CHECK-SAME: %[[VIEW:.+]]: !hal.buffer_view
-func @buffer_view_compute_offset(%arg0 : !hal.buffer_view) -> index {
-  // CHECK: %[[INDICES:.+]]:2 = "test_hal.indices"() : () -> (index, index)
-  %0:2 = "test_hal.indices"() : () -> (index, index)
-  // CHECK: %[[D0:.+]] = hal.buffer_view.dim %[[VIEW]], 1 : index
-  // CHECK: %[[TYPE:.+]] = hal.buffer_view.element_type %[[VIEW]] : i32
-  // CHECK: %[[T0:.+]] = muli %[[INDICES]]#0, %[[D0]] : index
-  // CHECK: %[[T1:.+]] = addi %[[T0]], %[[INDICES]]#1 : index
-  // CHECK: %[[T2:.+]] = index_cast %[[TYPE]] : i32 to index
-  // CHECK: %[[T3:.+]] = and %[[T2]], %c255 : index
-  // CHECK: %[[T4:.+]] = addi %[[T3]], %c7 : index
-  // CHECK: %[[T6:.+]] = divi_unsigned %[[T4]], %c8 : index
-  // CHECK: %[[T7:.+]] = muli %[[T1]], %[[T6]] : index
-  %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1] : index
-  // CHECK: return %[[T7]]
-  return %off : index
-}
-
-// -----
-
-// CHECK-LABEL: func @buffer_view_compute_range
-// CHECK-SAME: %[[VIEW:.+]]: !hal.buffer_view
-func @buffer_view_compute_range(%arg0 : !hal.buffer_view) -> (index, index) {
-  %0:2 = "test_hal.indices"() : () -> (index, index)
-  %1:2 = "test_hal.lengths"() : () -> (index, index)
-  // Testing things like this is brittle :/
-  // Since the canonicalizers are taking these buffer view ops to allocator ops
-  // the testing there should cover with the checks here just to make sure the
-  // right values from the buffer view are passed in.
-  //      CHECK: = hal.buffer_view.dim %[[VIEW]], 1 : index
-  //      CHECK: = hal.buffer_view.element_type %[[VIEW]] : i32
-  // << A BUNCH OF MATH >>
-  %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : index, index
-  // CHECK: return
-  return %off, %len : index, index
-}
-
-// -----
-
 // CHECK-LABEL: func @expand_buffer_view_dims
 // CHECK-SAME: %[[VIEW:.+]]: !hal.buffer_view
 func @expand_buffer_view_dims(%arg0 : !hal.buffer_view) -> (index, index, index) {

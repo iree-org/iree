@@ -29,27 +29,6 @@ func @buffer_view_byte_length(%arg0: !hal.buffer_view) -> index {
 
 // -----
 
-// CHECK-LABEL: @buffer_view_compute_offset
-func @buffer_view_compute_offset(%arg0: !hal.buffer_view) -> index {
-  %0:2 = "test_hal.indices"() : () -> (index, index)
-  // CHECK: %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1]
-  %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1] : index
-  return %off : index
-}
-
-// -----
-
-// CHECK-LABEL: @buffer_view_compute_range
-func @buffer_view_compute_range(%arg0: !hal.buffer_view) -> (index, index) {
-  %0:2 = "test_hal.indices"() : () -> (index, index)
-  %1:2 = "test_hal.lengths"() : () -> (index, index)
-  // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1]
-  %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : index, index
-  return %off, %len : index, index
-}
-
-// -----
-
 // CHECK-LABEL: @buffer_view_shape_queries
 func @buffer_view_shape_queries(%arg0: !hal.buffer_view) -> (index, index, index, index) {
   // CHECK: %{{.+}} = hal.buffer_view.rank %arg0 : index

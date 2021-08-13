@@ -547,41 +547,6 @@ void BufferViewByteLengthOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.buffer_view.compute_offset
-//===----------------------------------------------------------------------===//
-
-void BufferViewComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
-                                      Value bufferView, ValueRange indices) {
-  state.addOperands({bufferView});
-  state.addOperands(indices);
-  state.addTypes({builder.getIndexType()});
-}
-
-void BufferViewComputeOffsetOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(offset(), "off");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer_view.compute_range
-//===----------------------------------------------------------------------===//
-
-void BufferViewComputeRangeOp::build(OpBuilder &builder, OperationState &state,
-                                     Value bufferView, ValueRange indices,
-                                     ValueRange lengths) {
-  state.addOperands({bufferView});
-  state.addOperands(indices);
-  state.addOperands(lengths);
-  state.addTypes({builder.getIndexType(), builder.getIndexType()});
-}
-
-void BufferViewComputeRangeOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(offset(), "off");
-  setNameFn(length(), "len");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.command_buffer.create
 //===----------------------------------------------------------------------===//
 
