@@ -210,31 +210,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
   }
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_subview(
-    const iree_hal_buffer_view_t* buffer_view,
-    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
-    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
-    iree_hal_buffer_view_t** out_buffer_view) {
-  IREE_ASSERT_ARGUMENT(out_buffer_view);
-
-  // NOTE: we rely on the compute range call to do parameter validation.
-  iree_device_size_t start_offset = 0;
-  iree_device_size_t subview_length = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_range(
-      buffer_view, start_indices, indices_count, lengths, lengths_count,
-      &start_offset, &subview_length));
-
-  iree_hal_buffer_t* subview_buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
-      buffer_view->buffer, start_offset, subview_length, &subview_buffer));
-
-  iree_status_t status =
-      iree_hal_buffer_view_create(subview_buffer, lengths, lengths_count,
-                                  buffer_view->element_type, out_buffer_view);
-  iree_hal_buffer_release(subview_buffer);
-  return status;
-}
-
 IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_view_buffer(
     const iree_hal_buffer_view_t* buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer_view);

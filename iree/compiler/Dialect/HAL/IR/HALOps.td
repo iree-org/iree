@@ -154,7 +154,6 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
   let summary = [{buffer view indices to byte offset computation operation}];
   let description = [{
     Computes an element byte offset within a buffer produced by the allocator.
-    This returns the same value as `hal.buffer_view.compute_offset`.
   }];
 
   let arguments = (ins
@@ -194,7 +193,6 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
   let summary = [{buffer view byte range computation operation}];
   let description = [{
     Computes a byte range within a buffer for one or more elements.
-    This returns the same value as `hal.buffer_view.compute_range`.
   }];
 
   let arguments = (ins
@@ -599,35 +597,6 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   ];
 }
 
-def HAL_BufferViewSubviewOp : HAL_PureOp<"buffer_view.subview", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    SameVariadicOperandSize,
-  ]> {
-  let summary = [{buffer view subview initializer}];
-  let description = [{
-    Returns a view into a another buffer view. The buffer is not copied and both
-    the original and sliced references must be synchronized.
-  }];
-
-  let arguments = (ins
-    HAL_BufferView:$buffer_view,
-    HAL_Dims:$indices,
-    HAL_Dims:$lengths
-  );
-  let results = (outs
-    HAL_BufferView:$result
-  );
-
-  let assemblyFormat = [{
-    $buffer_view `,`
-    `indices` `=` `[` $indices `]` `,`
-    `lengths` `=` `[` $lengths `]`
-    attr-dict `:` type($result)
-  }];
-
-  let hasCanonicalizer = 1;
-}
-
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
@@ -656,6 +625,9 @@ def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
   let summary = [{buffer view buffer byte length accessor}];
   let description = [{
     Returns the allocated size of a shaped buffer view in bytes.
+    This may exceed the logical size of the buffer view; for example sparse
+    tensors will have an allocation size that may be for the maximum possible
+    size of the tensor when fully dense.
   }];
 
   let arguments = (ins
@@ -673,76 +645,6 @@ def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
   let builders = [
     OpBuilder<(ins "Value":$bufferView)>,
   ];
-}
-
-def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let summary = [{buffer view indices to byte offset computation operation}];
-  let description = [{
-    Computes an element byte offset within a buffer view.
-  }];
-
-  let arguments = (ins
-    HAL_BufferView:$buffer_view,
-    HAL_Dims:$indices
-  );
-
-  let results = (outs
-    HAL_DeviceSize:$offset
-  );
-
-  let assemblyFormat = [{
-    $buffer_view `,`
-    `indices` `=` `[` $indices `]`
-    attr-dict `:` type($offset)
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$bufferView, "ValueRange":$indices)>,
-  ];
-
-  let hasCanonicalizer = 1;
-}
-
-def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    SameVariadicOperandSize,
-  ]> {
-  let summary = [{buffer view byte range computation operation}];
-  let description = [{
-    Computes a byte range within a buffer for one or more elements.
-  }];
-
-  let arguments = (ins
-    HAL_BufferView:$buffer_view,
-    HAL_Dims:$indices,
-    HAL_Dims:$lengths
-  );
-  let results = (outs
-    // TODO(benvanik): return a strides tuple instead, or one per dim.
-    HAL_DeviceSize:$offset,
-    HAL_DeviceSize:$length
-  );
-
-  let assemblyFormat = [{
-    $buffer_view `,`
-    `indices` `=` `[` $indices `]` `,`
-    `lengths` `=` `[` $lengths `]`
-    attr-dict `:` type($offset) `,` type($length)
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins
-      "Value":$bufferView,
-      "ValueRange":$indices,
-      "ValueRange":$lengths
-    )>,
-  ];
-
-  let hasCanonicalizer = 1;
 }
 
 def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {

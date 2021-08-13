@@ -91,7 +91,7 @@ class TensorRewriteAdaptor {
   // Performs the equivalent of a hal.buffer_view.byte_length.
   Value getByteLength();
 
-  // Performs the equivalent of a hal.buffer_view.compute_offset.
+  // Performs the equivalent of a hal.allocator.compute_offset.
   Value computeOffset(ValueRange indices);
 
   struct Range {
@@ -99,7 +99,7 @@ class TensorRewriteAdaptor {
     Value length;
   };
 
-  // Performs the equivalent of a hal.buffer_view.compute_range.
+  // Performs the equivalent of a hal.allocator.compute_range.
   llvm::Optional<Range> computeRange(ValueRange indices, ValueRange lengths);
 
  private:

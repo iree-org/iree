@@ -201,30 +201,19 @@ Value TensorRewriteAdaptor::getByteLength() {
 }
 
 Value TensorRewriteAdaptor::computeOffset(ValueRange indices) {
-  if (isBufferView()) {
-    return rewriter_.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
-        loc_, getBufferView(), indices);
-  } else {
-    auto shapeDims = getShapeDims();
-    if (!shapeDims) return {};
-    return rewriter_.createOrFold<IREE::HAL::AllocatorComputeOffsetOp>(
-        loc_, getAllocator(), *shapeDims, getElementType(), indices);
-  }
+  auto shapeDims = getShapeDims();
+  if (!shapeDims) return {};
+  return rewriter_.createOrFold<IREE::HAL::AllocatorComputeOffsetOp>(
+      loc_, getAllocator(), *shapeDims, getElementType(), indices);
 }
 
 llvm::Optional<TensorRewriteAdaptor::Range> TensorRewriteAdaptor::computeRange(
     ValueRange indices, ValueRange lengths) {
-  if (isBufferView()) {
-    auto range = rewriter_.create<IREE::HAL::BufferViewComputeRangeOp>(
-        loc_, getBufferView(), indices, lengths);
-    return Range{range.offset(), range.length()};
-  } else {
-    auto shapeDims = getShapeDims();
-    if (!shapeDims) return llvm::None;
-    auto range = rewriter_.create<IREE::HAL::AllocatorComputeRangeOp>(
-        loc_, getAllocator(), *shapeDims, getElementType(), indices, lengths);
-    return Range{range.offset(), range.length()};
-  }
+  auto shapeDims = getShapeDims();
+  if (!shapeDims) return llvm::None;
+  auto range = rewriter_.create<IREE::HAL::AllocatorComputeRangeOp>(
+      loc_, getAllocator(), *shapeDims, getElementType(), indices, lengths);
+  return Range{range.offset(), range.length()};
 }
 
 }  // namespace HAL

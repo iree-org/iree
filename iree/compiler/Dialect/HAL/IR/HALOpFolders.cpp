@@ -402,42 +402,6 @@ void BufferAllocatorOp::getCanonicalizationPatterns(
 
 namespace {
 
-/// Expands a hal.buffer_view.subview op into range computation and creation
-/// ops. This allows for greater opportunity to CSE/bypass/etc the buffer view
-/// operations.
-struct ExpandBufferViewSubviewOp
-    : public OpRewritePattern<BufferViewSubviewOp> {
-  using OpRewritePattern<BufferViewSubviewOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewSubviewOp op,
-                                PatternRewriter &rewriter) const override {
-    auto computeRangeOp = rewriter.create<BufferViewComputeRangeOp>(
-        op.getLoc(), op.buffer_view(), op.indices(), op.lengths());
-
-    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
-        op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
-        op.buffer_view());
-    auto subspanValue = rewriter.createOrFold<BufferSubspanOp>(
-        op.getLoc(), bufferValue.getType(), bufferValue,
-        computeRangeOp.offset(), computeRangeOp.length());
-
-    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
-        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
-    rewriter.replaceOpWithNewOp<BufferViewCreateOp>(
-        op, subspanValue, elementTypeValue, op.lengths());
-    return success();
-  }
-};
-
-}  // namespace
-
-void BufferViewSubviewOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandBufferViewSubviewOp>(context);
-}
-
-namespace {
-
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
@@ -459,77 +423,6 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
 void BufferViewBufferOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SkipBufferViewBufferOp>(context);
-}
-
-namespace {
-
-/// Expands a hal.buffer_view.compute_offset op to use
-/// hal.allocator.compute_offset. This allows for all of the shape math to
-/// happen in the VM where we can better optimize it.
-struct ExpandBufferViewComputeOffsetOp
-    : public OpRewritePattern<BufferViewComputeOffsetOp> {
-  using OpRewritePattern<BufferViewComputeOffsetOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewComputeOffsetOp op,
-                                PatternRewriter &rewriter) const override {
-    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
-        op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
-        op.buffer_view());
-    auto allocatorValue = rewriter.createOrFold<BufferAllocatorOp>(
-        op.getLoc(), AllocatorType::get(rewriter.getContext()), bufferValue);
-    int rank = op.indices().size();
-    SmallVector<Type, 4> dimTypes(rank, rewriter.getIndexType());
-    auto dimsOp = rewriter.create<BufferViewDimsOp>(op.getLoc(), dimTypes,
-                                                    op.buffer_view());
-    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
-        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
-    rewriter.replaceOpWithNewOp<AllocatorComputeOffsetOp>(
-        op, allocatorValue, dimsOp.result(), elementTypeValue, op.indices());
-    return success();
-  }
-};
-
-}  // namespace
-
-void BufferViewComputeOffsetOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandBufferViewComputeOffsetOp>(context);
-}
-
-namespace {
-
-/// Expands a hal.buffer_view.compute_range op to use
-/// hal.allocator.compute_range. This allows for all of the shape math to
-/// happen in the VM where we can better optimize it.
-struct ExpandBufferViewComputeRangeOp
-    : public OpRewritePattern<BufferViewComputeRangeOp> {
-  using OpRewritePattern<BufferViewComputeRangeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewComputeRangeOp op,
-                                PatternRewriter &rewriter) const override {
-    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
-        op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
-        op.buffer_view());
-    auto allocatorValue = rewriter.createOrFold<BufferAllocatorOp>(
-        op.getLoc(), AllocatorType::get(rewriter.getContext()), bufferValue);
-    int rank = op.indices().size();
-    SmallVector<Type, 4> dimTypes(rank, rewriter.getIndexType());
-    auto dimsOp = rewriter.create<BufferViewDimsOp>(op.getLoc(), dimTypes,
-                                                    op.buffer_view());
-    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
-        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
-    rewriter.replaceOpWithNewOp<AllocatorComputeRangeOp>(
-        op, allocatorValue, dimsOp.result(), elementTypeValue, op.indices(),
-        op.lengths());
-    return success();
-  }
-};
-
-}  // namespace
-
-void BufferViewComputeRangeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandBufferViewComputeRangeOp>(context);
 }
 
 namespace {
