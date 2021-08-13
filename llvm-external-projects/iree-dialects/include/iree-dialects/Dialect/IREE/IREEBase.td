@@ -92,8 +92,8 @@ def IREE_Dims : Variadic<IREE_Dim>;
 def IREE_Shape : Variadic<IREE_Dim>;
 def IREE_ShapeDynamicDims : Variadic<IREE_Dim>;
 
-def IREE_VariableRefAttr : IREE_AliasedSymbolRefAttr;
-def IREE_VariablePtr : IREE_AnyPtrOf<[IREE_Tensor, IREE_PrimitiveType]>;
+def IREE_GlobalRefAttr : IREE_AliasedSymbolRefAttr;
+def IREE_AnyGlobalPtr : IREE_AnyPtrOf<[IREE_Tensor, IREE_PrimitiveType]>;
 
 class IREE_IndexAttrBase<string descr> :
     TypedAttrBase<

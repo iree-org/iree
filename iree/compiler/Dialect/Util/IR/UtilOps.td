@@ -308,7 +308,9 @@ def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
     AnyType:$result
   );
 
-  let assemblyFormat = "$global attr-dict `:` type($global) `->` type($result)";
+  let assemblyFormat = [{
+    $global attr-dict `:` type($global) `->` type($result)
+  }];
 
   let verifier = [{ return verifyGlobalLoadIndirectOp(*this); }];
 
