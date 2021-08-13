@@ -402,42 +402,6 @@ void BufferAllocatorOp::getCanonicalizationPatterns(
 
 namespace {
 
-/// Expands a hal.buffer_view.subview op into range computation and creation
-/// ops. This allows for greater opportunity to CSE/bypass/etc the buffer view
-/// operations.
-struct ExpandBufferViewSubviewOp
-    : public OpRewritePattern<BufferViewSubviewOp> {
-  using OpRewritePattern<BufferViewSubviewOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewSubviewOp op,
-                                PatternRewriter &rewriter) const override {
-    auto computeRangeOp = rewriter.create<BufferViewComputeRangeOp>(
-        op.getLoc(), op.buffer_view(), op.indices(), op.lengths());
-
-    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
-        op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
-        op.buffer_view());
-    auto subspanValue = rewriter.createOrFold<BufferSubspanOp>(
-        op.getLoc(), bufferValue.getType(), bufferValue,
-        computeRangeOp.offset(), computeRangeOp.length());
-
-    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
-        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
-    rewriter.replaceOpWithNewOp<BufferViewCreateOp>(
-        op, subspanValue, elementTypeValue, op.lengths());
-    return success();
-  }
-};
-
-}  // namespace
-
-void BufferViewSubviewOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandBufferViewSubviewOp>(context);
-}
-
-namespace {
-
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {

@@ -523,15 +523,6 @@ void BufferViewCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.buffer_view.subview
-//===----------------------------------------------------------------------===//
-
-void BufferViewSubviewOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "view");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.buffer_view.buffer
 //===----------------------------------------------------------------------===//
 

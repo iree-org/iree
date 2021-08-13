@@ -11,17 +11,6 @@ func @buffer_view_create(%arg0: !hal.buffer) -> !hal.buffer_view {
 
 // -----
 
-// CHECK-LABEL: @buffer_view_subview
-func @buffer_view_subview(%arg0: !hal.buffer_view) -> !hal.buffer_view {
-  %0:2 = "test_hal.indices"() : () -> (index, index)
-  %1:2 = "test_hal.lengths"() : () -> (index, index)
-  // CHECK: %view = hal.buffer_view.subview %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : !hal.buffer_view
-  %view = hal.buffer_view.subview %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : !hal.buffer_view
-  return %view : !hal.buffer_view
-}
-
-// -----
-
 // CHECK-LABEL: @buffer_view_buffer
 func @buffer_view_buffer(%arg0: !hal.buffer_view) -> !hal.buffer {
   // CHECK: %buffer = hal.buffer_view.buffer %arg0 : !hal.buffer

@@ -599,35 +599,6 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   ];
 }
 
-def HAL_BufferViewSubviewOp : HAL_PureOp<"buffer_view.subview", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    SameVariadicOperandSize,
-  ]> {
-  let summary = [{buffer view subview initializer}];
-  let description = [{
-    Returns a view into a another buffer view. The buffer is not copied and both
-    the original and sliced references must be synchronized.
-  }];
-
-  let arguments = (ins
-    HAL_BufferView:$buffer_view,
-    HAL_Dims:$indices,
-    HAL_Dims:$lengths
-  );
-  let results = (outs
-    HAL_BufferView:$result
-  );
-
-  let assemblyFormat = [{
-    $buffer_view `,`
-    `indices` `=` `[` $indices `]` `,`
-    `lengths` `=` `[` $lengths `]`
-    attr-dict `:` type($result)
-  }];
-
-  let hasCanonicalizer = 1;
-}
-
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
@@ -656,6 +627,9 @@ def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
   let summary = [{buffer view buffer byte length accessor}];
   let description = [{
     Returns the allocated size of a shaped buffer view in bytes.
+    This may exceed the logical size of the buffer view; for example sparse
+    tensors will have an allocation size that may be for the maximum possible
+    size of the tensor when fully dense.
   }];
 
   let arguments = (ins

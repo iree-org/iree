@@ -1,30 +1,5 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize -cse %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
-// CHECK-LABEL: func @expand_buffer_view_subview
-func @expand_buffer_view_subview(
-  // CHECK-SAME: %[[VIEW:.+]]: !hal.buffer_view,
-  %view : !hal.buffer_view,
-  // CHECK-SAME: %[[INDEX0:.+]]: index, %[[INDEX1:.+]]: index, %[[LENGTH0:.+]]: index, %[[LENGTH1:.+]]: index
-  %index0 : index, %index1 : index, %length0 : index, %length1 : index
-) -> !hal.buffer_view {
-  //      CHECK: = hal.buffer_view.dim %[[VIEW]], 1 : index
-  //      CHECK: %[[ELEMENT_TYPE:.+]] = hal.buffer_view.element_type %[[VIEW]] : i32
-  // << A BUNCH OF MATH >>
-  //      CHECK: %[[BUFFER:.+]] = hal.buffer_view.buffer %[[VIEW]] : !hal.buffer
-  // CHECK-NEXT: %[[SUBSPAN:.+]] = hal.buffer.subspan<%[[BUFFER]] : !hal.buffer>[%{{.+}}, %{{.+}}] : !hal.buffer
-  //      CHECK: %[[SUBVIEW:.+]] = hal.buffer_view.create
-  // CHECK-SAME:     %[[SUBSPAN]],
-  // CHECK-SAME:     element_type = %[[ELEMENT_TYPE]],
-  // CHECK-SAME:     shape = [%[[LENGTH0]], %[[LENGTH1]]] : !hal.buffer -> !hal.buffer_view
-  %subview = hal.buffer_view.subview %view,
-                                     indices = [%index0, %index1],
-                                     lengths = [%length0, %length1] : !hal.buffer_view
-  // CHECK-NEXT: return %[[SUBVIEW]]
-  return %subview : !hal.buffer_view
-}
-
-// -----
-
 // CHECK-LABEL: func @skip_buffer_view_buffer
 // CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer
 func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {

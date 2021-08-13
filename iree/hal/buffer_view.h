@@ -182,13 +182,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view);
 
-// Creates a buffer view referencing a subview of the given |buffer_view|.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_subview(
-    const iree_hal_buffer_view_t* buffer_view,
-    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
-    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
-    iree_hal_buffer_view_t** out_buffer_view);
-
 // Retains the given |buffer_view| for the caller.
 IREE_API_EXPORT void iree_hal_buffer_view_retain(
     iree_hal_buffer_view_t* buffer_view);
