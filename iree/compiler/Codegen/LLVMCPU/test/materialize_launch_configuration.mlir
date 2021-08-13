@@ -169,8 +169,8 @@ hal.executable @add attributes {sym_visibility = "private"} {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[128, 128]{{\]}}}
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
+//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[64, 64]{{\]}}}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point @add
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
@@ -265,8 +265,8 @@ hal.executable @add4D attributes {sym_visibility = "private"} {
       }
     }
   }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[0, 128, 128, 128]{{\]}}}
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
+//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[0, 64, 64, 64]{{\]}}}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point @add4D
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
