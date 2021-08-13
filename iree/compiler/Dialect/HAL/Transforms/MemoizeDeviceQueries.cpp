@@ -83,10 +83,10 @@ class MemoizeDeviceQueriesPass
           moduleBuilder.getFunctionType({}, {queryType}));
       initializerOp.setPrivate();
       moduleBuilder.setInsertionPoint(initializerOp);
-      auto variableOp = moduleBuilder.create<IREE::HAL::VariableOp>(
+      auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           fusedLoc, variableName,
           /*isMutable=*/false, initializerOp);
-      variableOp.setPrivate();
+      globalOp.setPrivate();
       moduleBuilder.setInsertionPointAfter(initializerOp);
 
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
@@ -100,8 +100,8 @@ class MemoizeDeviceQueriesPass
 
       for (auto queryOp : queryOps) {
         OpBuilder replaceBuilder(queryOp);
-        auto loadOp = replaceBuilder.create<IREE::HAL::VariableLoadOp>(
-            fusedLoc, queryType, variableOp.getName());
+        auto loadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
+            fusedLoc, queryType, globalOp.getName());
         queryOp.replaceAllUsesWith(ValueRange{
             replaceBuilder.createOrFold<ConstantIntOp>(
                 loadOp.getLoc(), /*value=*/1, /*width=*/1),

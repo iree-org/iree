@@ -12,10 +12,10 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
-#include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
+#include "iree/compiler/Dialect/VM/Conversion/UtilToVM/ConvertUtilToVM.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -61,10 +61,6 @@ extern void populateHALExperimentalToVMPatterns(
 extern void populateHALSemaphoreToVMPatterns(
     MLIRContext *context, SymbolTable &importSymbols,
     TypeConverter &typeConverter, OwningRewritePatternList &patterns);
-extern void populateHALVariableToVMPatterns(MLIRContext *context,
-                                            SymbolTable &importSymbols,
-                                            TypeConverter &typeConverter,
-                                            OwningRewritePatternList &patterns);
 
 void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                              OwningRewritePatternList &patterns,
@@ -89,8 +85,6 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                                       patterns);
   populateHALSemaphoreToVMPatterns(context, importSymbols, typeConverter,
                                    patterns);
-  populateHALVariableToVMPatterns(context, importSymbols, typeConverter,
-                                  patterns);
 }
 
 namespace {
@@ -129,7 +123,8 @@ class ConvertHALToVMPass
 
     OwningRewritePatternList conversionPatterns(&getContext());
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
-    populateIREEToVMPatterns(context, typeConverter, conversionPatterns);
+    populateUtilToVMPatterns(context, conversionTarget, typeConverter,
+                             conversionPatterns);
 
     SymbolTable importSymbols(innerModuleOp);
     populateHALToVMPatterns(context, importSymbols, conversionPatterns,

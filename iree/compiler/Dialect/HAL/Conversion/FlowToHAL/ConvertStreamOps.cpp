@@ -274,15 +274,15 @@ class StreamSchedulingState {
   }
 
   // Loads a variable with the given |symName|.
-  Value loadVariable(Type resultType, StringRef symName, OpBuilder &builder) {
-    auto it = loadedVariableMap.find(symName);
-    if (it != loadedVariableMap.end()) {
+  Value loadGlobal(Type resultType, StringRef symName, OpBuilder &builder) {
+    auto it = loadedGlobalMap.find(symName);
+    if (it != loadedGlobalMap.end()) {
       assert(it->second.getType() == resultType && "variable type mismatch");
       return it->second;
     }
-    auto value = builder.createOrFold<IREE::HAL::VariableLoadOp>(
-        loc, resultType, symName);
-    loadedVariableMap.insert(std::make_pair(symName, value));
+    auto value = builder.createOrFold<IREE::Util::GlobalLoadOp>(loc, resultType,
+                                                                symName);
+    loadedGlobalMap.insert(std::make_pair(symName, value));
     return value;
   }
 
@@ -420,8 +420,8 @@ class StreamSchedulingState {
   // Index value -> std.constant index value.
   DenseMap<int64_t, Value> indexConstantMap;
 
-  // Variable sym name -> loaded value.
-  DenseMap<StringRef, Value> loadedVariableMap;
+  // Global sym name -> loaded value.
+  DenseMap<StringRef, Value> loadedGlobalMap;
 
   // Key of [push constants, set layouts] -> loaded value.
   DenseMap<Attribute, Value> executableLayoutMap;
@@ -556,7 +556,7 @@ static LogicalResult allocateTransientBuffers(
   SmallPtrSet<Value, 16> coveredValues;
   auto walkResult = streamOp.walk([&](IREE::HAL::ConstantSubspanOp subspanOp) {
     auto tensorValue = subspanOp.result();
-    auto bufferValue = schedulingState.loadVariable(
+    auto bufferValue = schedulingState.loadGlobal(
         IREE::HAL::BufferType::get(rewriter.getContext()),
         subspanOp.runtime_buffer().getLeafReference(), rewriter);
     auto offsetValue = schedulingState.lookupOrCreateIndex(
@@ -722,7 +722,7 @@ static void recordInterfaceBindings(
           constantStorageAttr.binding());
       assert(bindingOp);
       assert(bindingOp.set().getSExtValue() == setOrdinal);
-      auto storageBuffer = schedulingState.loadVariable(
+      auto storageBuffer = schedulingState.loadGlobal(
           IREE::HAL::BufferType::get(builder.getContext()),
           constantStorageAttr.storage(), rewriter);
       bindings.push_back(std::make_tuple(

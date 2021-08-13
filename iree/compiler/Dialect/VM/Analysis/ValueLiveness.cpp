@@ -264,6 +264,7 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
       Operation *lastUse = &block.front();
       for (auto &use : value.getUses()) {
         if (use.getOwner()->getBlock() != &block) continue;
+        if (lastUse == use.getOwner()) continue;
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }

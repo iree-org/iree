@@ -33,8 +33,6 @@ iree_lit_test_suite(
     "interface_ops.mlir"
     "invalid.mlir"
     "semaphore_ops.mlir"
-    "variable_folding.mlir"
-    "variable_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

@@ -16,7 +16,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
-        ["convert_flow_to_hal.mlir"],
+        ["hint_ops.mlir"],
         include = ["*.mlir"],
     ),
     data = [

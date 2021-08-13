@@ -16,7 +16,10 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
-        ["drop_compiler_hints.mlir"],
+        [
+            "drop_compiler_hints.mlir",
+            "simplify_global_accesses.mlir",
+        ],
         include = ["*.mlir"],
     ),
     data = [

@@ -79,43 +79,43 @@ class MaterializeShapeSupportPass
     // These variables may represent fully static shapes - in which case they'll
     // get constant propagated - or dynamic shapes that will eventually get
     // turned into dynamic runtime values.
-    SmallVector<IREE::Flow::VariableOp, 4> inputVarOps;
-    SmallVector<IREE::Flow::VariableOp, 4> outputVarOps;
-    createShapeVariables(loc, namePrefix, funcOp, inputVarOps, outputVarOps,
-                         moduleBuilder);
+    SmallVector<IREE::Util::GlobalOp, 4> inputGlobalOps;
+    SmallVector<IREE::Util::GlobalOp, 4> outputGlobalOps;
+    createShapeVariables(loc, namePrefix, funcOp, inputGlobalOps,
+                         outputGlobalOps, moduleBuilder);
 
     // Create internal shape calculation function that updates output shapes if
     // needed. This is only required if there are dynamic shapes.
-    auto dirtyVarOp = moduleBuilder.create<IREE::Flow::VariableOp>(
+    auto dirtyGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
         loc, funcOp.getName().str() + "_shapes_dirty",
         /*isMutable=*/true, moduleBuilder.getI1Type(),
         moduleBuilder.getIntegerAttr(moduleBuilder.getI1Type(), 1));
-    dirtyVarOp.setPrivate();
-    auto calculateShapeFuncOp =
-        createShapeCalculationFunc(loc, namePrefix, funcOp, inputVarOps,
-                                   outputVarOps, dirtyVarOp, moduleBuilder);
+    dirtyGlobalOp.setPrivate();
+    auto calculateShapeFuncOp = createShapeCalculationFunc(
+        loc, namePrefix, funcOp, inputGlobalOps, outputGlobalOps, dirtyGlobalOp,
+        moduleBuilder);
 
     // Create input query function (just reads variables).
-    createQueryInputShapeFunc(loc, namePrefix, inputVarOps, moduleBuilder);
+    createQueryInputShapeFunc(loc, namePrefix, inputGlobalOps, moduleBuilder);
 
     // Create input resize function (updates variables, set dirty flag).
-    createResizeInputShapeFunc(loc, namePrefix, inputVarOps, dirtyVarOp,
+    createResizeInputShapeFunc(loc, namePrefix, inputGlobalOps, dirtyGlobalOp,
                                moduleBuilder);
 
     // Create output query function (if dirty recalculates shapes).
-    createQueryOutputShapeFunc(loc, namePrefix, outputVarOps,
+    createQueryOutputShapeFunc(loc, namePrefix, outputGlobalOps,
                                calculateShapeFuncOp, moduleBuilder);
 
     return success();
   }
 
-  // Creates and initializes to default values one flow.variable for each I/O
-  // shape of the given |funcOp|. |inputVarOps| and |outputVarOps| will be
+  // Creates and initializes to default values one util.global for each I/O
+  // shape of the given |funcOp|. |inputGlobalOps| and |outputGlobalOps| will be
   // populated with the created variables.
   void createShapeVariables(
       Location loc, StringRef namePrefix, FuncOp funcOp,
-      SmallVectorImpl<IREE::Flow::VariableOp> &inputVarOps,
-      SmallVectorImpl<IREE::Flow::VariableOp> &outputVarOps,
+      SmallVectorImpl<IREE::Util::GlobalOp> &inputGlobalOps,
+      SmallVectorImpl<IREE::Util::GlobalOp> &outputGlobalOps,
       OpBuilder &moduleBuilder) {
     auto funcType = funcOp.getType();
 
@@ -148,7 +148,7 @@ class MaterializeShapeSupportPass
       auto type = std::get<1>(input);
       auto tensorType = type.dyn_cast<TensorType>();
       assert(tensorType && "expecting only tensors in tflite function I/O");
-      inputVarOps.push_back(
+      inputGlobalOps.push_back(
           createShapeVariable(loc, name, tensorType, moduleBuilder));
     }
     for (auto output : llvm::zip(outputNames, funcType.getResults())) {
@@ -156,29 +156,29 @@ class MaterializeShapeSupportPass
       auto type = std::get<1>(output);
       auto tensorType = type.dyn_cast<TensorType>();
       assert(tensorType && "expecting only tensors in tflite function I/O");
-      outputVarOps.push_back(
+      outputGlobalOps.push_back(
           createShapeVariable(loc, name, tensorType, moduleBuilder));
     }
   }
 
   // Declares a global variable that holds a shape for the given |tensorType|.
-  IREE::Flow::VariableOp createShapeVariable(Location loc, StringRef name,
-                                             TensorType tensorType,
-                                             OpBuilder &moduleBuilder) {
+  IREE::Util::GlobalOp createShapeVariable(Location loc, StringRef name,
+                                           TensorType tensorType,
+                                           OpBuilder &moduleBuilder) {
     auto shapeType = Shape::RankedShapeType::get(tensorType.getShape(),
                                                  moduleBuilder.getContext());
-    auto varOp = moduleBuilder.create<IREE::Flow::VariableOp>(
+    auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
         loc, name, /*isMutable=*/true, shapeType);
-    varOp.setPrivate();
-    return varOp;
+    globalOp.setPrivate();
+    return globalOp;
   }
 
   // Derives a shape calculation function from the given entry point |funcOp|.
   FuncOp createShapeCalculationFunc(
       Location loc, StringRef namePrefix, FuncOp funcOp,
-      ArrayRef<IREE::Flow::VariableOp> inputVarOps,
-      ArrayRef<IREE::Flow::VariableOp> outputVarOps,
-      IREE::Flow::VariableOp dirtyVarOp, OpBuilder &moduleBuilder) {
+      ArrayRef<IREE::Util::GlobalOp> inputGlobalOps,
+      ArrayRef<IREE::Util::GlobalOp> outputGlobalOps,
+      IREE::Util::GlobalOp dirtyGlobalOp, OpBuilder &moduleBuilder) {
     // Clone the entire entry function with all its IR.
     auto calcFuncOp = cast<FuncOp>(moduleBuilder.clone(*funcOp.getOperation()));
     calcFuncOp.setName(namePrefix.str() + "_calculate_shapes");
@@ -190,8 +190,8 @@ class MaterializeShapeSupportPass
     auto entryBuilder = OpBuilder::atBlockBegin(&entryBlock);
 
     // Go back and insert a check for the dirty flag.
-    auto dirtyValue = entryBuilder.createOrFold<IREE::Flow::VariableLoadOp>(
-        loc, dirtyVarOp.type(), dirtyVarOp.getName());
+    auto dirtyValue = entryBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
+        loc, dirtyGlobalOp.type(), dirtyGlobalOp.getName());
     auto *recalculateBlock = calcFuncOp.addBlock();
     auto *returnBlock = calcFuncOp.addBlock();
     entryBuilder.create<CondBranchOp>(loc, dirtyValue, recalculateBlock,
@@ -207,15 +207,15 @@ class MaterializeShapeSupportPass
         recalculateBuilder.getFunctionType(/*inputs=*/TypeRange{},
                                            /*outputs=*/TypeRange{}));
     for (auto inputValueVar :
-         llvm::zip(entryBlock.getArguments(), inputVarOps)) {
+         llvm::zip(entryBlock.getArguments(), inputGlobalOps)) {
       auto inputValue = std::get<0>(inputValueVar);
-      auto inputVarOp = std::get<1>(inputValueVar);
+      auto inputGlobalOp = std::get<1>(inputValueVar);
       auto inputPlaceholder =
           recalculateBuilder.createOrFold<IREE::Util::NullOp>(
               loc, inputValue.getType());
       auto inputShapeValue =
-          recalculateBuilder.createOrFold<IREE::Flow::VariableLoadOp>(
-              loc, inputVarOp.type(), inputVarOp.getName());
+          recalculateBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
+              loc, inputGlobalOp.type(), inputGlobalOp.getName());
       auto tiedValue = recalculateBuilder.create<Shape::TieShapeOp>(
           loc, inputPlaceholder, inputShapeValue);
       inputValue.replaceAllUsesWith(tiedValue);
@@ -236,20 +236,20 @@ class MaterializeShapeSupportPass
       // We do this per exit-site so that if the function has multiple code
       // paths that may return different shape sizes we capture them all.
       for (auto outputValueVar :
-           llvm::zip(returnOp.getOperands(), outputVarOps)) {
+           llvm::zip(returnOp.getOperands(), outputGlobalOps)) {
         auto outputValue = std::get<0>(outputValueVar);
-        auto outputVarOp = std::get<1>(outputValueVar);
+        auto outputGlobalOp = std::get<1>(outputValueVar);
         auto outputShapeValue =
             exitBuilder.createOrFold<Shape::GetRankedShapeOp>(exitLoc,
                                                               outputValue);
-        exitBuilder.create<IREE::Flow::VariableStoreOp>(
-            exitLoc, outputShapeValue, outputVarOp.getName());
+        exitBuilder.create<IREE::Util::GlobalStoreOp>(exitLoc, outputShapeValue,
+                                                      outputGlobalOp.getName());
       }
 
       // Clear the dirty flag now that the shapes have been updated.
       auto falseValue = exitBuilder.createOrFold<ConstantIntOp>(exitLoc, 0, 1);
-      exitBuilder.create<IREE::Flow::VariableStoreOp>(exitLoc, falseValue,
-                                                      dirtyVarOp.getName());
+      exitBuilder.create<IREE::Util::GlobalStoreOp>(exitLoc, falseValue,
+                                                    dirtyGlobalOp.getName());
       exitBuilder.create<ReturnOp>(exitLoc);
       returnOp.erase();
     }
@@ -327,11 +327,12 @@ class MaterializeShapeSupportPass
                                                           dynamicDims);
   }
 
-  // Creates a function to query the |inputVarOps| at runtime by the bindings.
+  // Creates a function to query the |inputGlobalOps| at runtime by the
+  // bindings.
   //
   // func @_query_input_shape(%index : index, %shape : !util.list<index>)
   void createQueryInputShapeFunc(Location loc, StringRef namePrefix,
-                                 ArrayRef<IREE::Flow::VariableOp> inputVarOps,
+                                 ArrayRef<IREE::Util::GlobalOp> inputGlobalOps,
                                  OpBuilder &moduleBuilder) {
     auto queryFuncOp = moduleBuilder.create<FuncOp>(
         loc, namePrefix.str() + "_query_input_shape",
@@ -348,13 +349,12 @@ class MaterializeShapeSupportPass
     auto listValue = entryBlock->getArgument(1);
 
     auto *exitBlock = buildSwitch(
-        loc, entryBlock->getArgument(0), inputVarOps.size(),
+        loc, entryBlock->getArgument(0), inputGlobalOps.size(),
         [&](size_t i, OpBuilder &caseBuilder) {
-          auto inputVarOp = inputVarOps[i];
-          auto shapeType = inputVarOp.type().cast<Shape::RankedShapeType>();
-          auto shapeValue =
-              caseBuilder.createOrFold<IREE::Flow::VariableLoadOp>(
-                  loc, inputVarOp.type(), inputVarOp.getName());
+          auto inputGlobalOp = inputGlobalOps[i];
+          auto shapeType = inputGlobalOp.type().cast<Shape::RankedShapeType>();
+          auto shapeValue = caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
+              loc, inputGlobalOp.type(), inputGlobalOp.getName());
           packShape(loc, shapeType, shapeValue, listValue, caseBuilder);
         },
         entryBuilder);
@@ -363,12 +363,13 @@ class MaterializeShapeSupportPass
     exitBuilder.create<ReturnOp>(loc);
   }
 
-  // Creates a function to resize |inputVarOps| and sets the |dirtyVarOp| flag.
+  // Creates a function to resize |inputGlobalOps| and sets the |dirtyGlobalOp|
+  // flag.
   //
   // func @_resize_input_shape(%index : index, %shape : !util.list<index>)
   void createResizeInputShapeFunc(Location loc, StringRef namePrefix,
-                                  ArrayRef<IREE::Flow::VariableOp> inputVarOps,
-                                  IREE::Flow::VariableOp dirtyVarOp,
+                                  ArrayRef<IREE::Util::GlobalOp> inputGlobalOps,
+                                  IREE::Util::GlobalOp dirtyGlobalOp,
                                   OpBuilder &moduleBuilder) {
     auto resizeFuncOp = moduleBuilder.create<FuncOp>(
         loc, namePrefix.str() + "_resize_input_shape",
@@ -385,31 +386,32 @@ class MaterializeShapeSupportPass
     auto listValue = entryBlock->getArgument(1);
 
     auto *exitBlock = buildSwitch(
-        loc, entryBlock->getArgument(0), inputVarOps.size(),
+        loc, entryBlock->getArgument(0), inputGlobalOps.size(),
         [&](size_t i, OpBuilder &caseBuilder) {
-          auto inputVarOp = inputVarOps[i];
-          auto shapeType = inputVarOp.type().cast<Shape::RankedShapeType>();
+          auto inputGlobalOp = inputGlobalOps[i];
+          auto shapeType = inputGlobalOp.type().cast<Shape::RankedShapeType>();
           auto shapeValue = unpackShape(loc, shapeType, listValue, caseBuilder);
-          caseBuilder.create<IREE::Flow::VariableStoreOp>(loc, shapeValue,
-                                                          inputVarOp.getName());
+          caseBuilder.create<IREE::Util::GlobalStoreOp>(
+              loc, shapeValue, inputGlobalOp.getName());
         },
         entryBuilder);
 
     // Set the dirty flag so that shapes get recalculated as needed.
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
     auto trueValue = exitBuilder.createOrFold<ConstantIntOp>(loc, 1, 1);
-    exitBuilder.create<IREE::Flow::VariableStoreOp>(loc, trueValue,
-                                                    dirtyVarOp.getName());
+    exitBuilder.create<IREE::Util::GlobalStoreOp>(loc, trueValue,
+                                                  dirtyGlobalOp.getName());
     exitBuilder.create<ReturnOp>(loc);
   }
 
-  // Creates a function to query the |outputVarOps| at runtime by the bindings.
+  // Creates a function to query the |outputGlobalOps| at runtime by the
+  // bindings.
   //
   // func @_query_output_shape(%index : index, %shape : !util.list<index>)
-  void createQueryOutputShapeFunc(Location loc, StringRef namePrefix,
-                                  ArrayRef<IREE::Flow::VariableOp> outputVarOps,
-                                  FuncOp calculateShapeFuncOp,
-                                  OpBuilder &moduleBuilder) {
+  void createQueryOutputShapeFunc(
+      Location loc, StringRef namePrefix,
+      ArrayRef<IREE::Util::GlobalOp> outputGlobalOps,
+      FuncOp calculateShapeFuncOp, OpBuilder &moduleBuilder) {
     auto queryFuncOp = moduleBuilder.create<FuncOp>(
         loc, namePrefix.str() + "_query_output_shape",
         moduleBuilder.getFunctionType(/*inputs=*/
@@ -429,13 +431,12 @@ class MaterializeShapeSupportPass
     entryBuilder.create<CallOp>(loc, calculateShapeFuncOp);
 
     auto *exitBlock = buildSwitch(
-        loc, entryBlock->getArgument(0), outputVarOps.size(),
+        loc, entryBlock->getArgument(0), outputGlobalOps.size(),
         [&](size_t i, OpBuilder &caseBuilder) {
-          auto outputVarOp = outputVarOps[i];
-          auto shapeType = outputVarOp.type().cast<Shape::RankedShapeType>();
-          auto shapeValue =
-              caseBuilder.createOrFold<IREE::Flow::VariableLoadOp>(
-                  loc, outputVarOp.type(), outputVarOp.getName());
+          auto outputGlobalOp = outputGlobalOps[i];
+          auto shapeType = outputGlobalOp.type().cast<Shape::RankedShapeType>();
+          auto shapeValue = caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
+              loc, outputGlobalOp.type(), outputGlobalOp.getName());
           packShape(loc, shapeType, shapeValue, listValue, caseBuilder);
         },
         entryBuilder);

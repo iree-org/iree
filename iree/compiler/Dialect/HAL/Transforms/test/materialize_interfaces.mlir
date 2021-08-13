@@ -349,8 +349,8 @@ flow.executable @constant_dispatch {
     }
   }
 }
-hal.variable @storage0 : !hal.buffer
-hal.variable @storage1 : !hal.buffer
+util.global @storage0 : !hal.buffer
+util.global @storage1 : !hal.buffer
 func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
   %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
       (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {

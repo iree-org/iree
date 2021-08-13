@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -145,7 +146,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Run our own CSE on variable loads before moving on.
   // When specifying side effects can help MLIR's core CSE pass eliminate
   // redundant loads we can remove this.
-  passManager.addNestedPass<FuncOp>(createCSEVariableLoadsPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Util::createSimplifyGlobalAccessesPass());
 
   if (transformOptions.serializeExecutables) {
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(

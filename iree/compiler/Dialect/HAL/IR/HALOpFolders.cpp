@@ -35,130 +35,6 @@ OpFoldResult TensorCastOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.variable.*
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Converts variable initializer functions that evaluate to a constant to a
-/// specified initial value.
-struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
-  using OpRewritePattern<VariableOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VariableOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return failure();
-    auto *symbolOp =
-        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
-    auto initializer = cast<FuncOp>(symbolOp);
-    if (initializer.getBlocks().size() == 1 &&
-        initializer.getBlocks().front().getOperations().size() == 2 &&
-        isa<mlir::ReturnOp>(
-            initializer.getBlocks().front().getOperations().back())) {
-      auto &primaryOp = initializer.getBlocks().front().getOperations().front();
-      Attribute constResult;
-      if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
-        auto newOp = rewriter.create<VariableOp>(op.getLoc(), op.sym_name(),
-                                                 op.is_mutable(), op.type(),
-                                                 constResult);
-        newOp.setVisibility(op.getVisibility());
-        rewriter.replaceOp(op, {});
-        return success();
-      }
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {
-  results.insert<InlineConstVariableOpInitializer>(context);
-}
-
-namespace {
-
-class PropagateVariableLoadAddress
-    : public OpRewritePattern<VariableLoadIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
- public:
-  LogicalResult matchAndRewrite(VariableLoadIndirectOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
-            op.variable().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<VariableLoadOp>(op, op.result().getType(),
-                                                  addressOp.variable());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableLoadIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<PropagateVariableLoadAddress>(context);
-}
-
-namespace {
-
-/// Erases hal.variable.store ops that are no-ops.
-/// This can happen if there was a variable load, some DCE'd usage, and a
-/// store back to the same variable: we want to be able to elide the entire load
-/// and store.
-struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
-  using OpRewritePattern<VariableStoreOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VariableStoreOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto loadOp =
-            dyn_cast_or_null<VariableLoadOp>(op.value().getDefiningOp())) {
-      if (loadOp.variable() == op.variable()) {
-        rewriter.eraseOp(op);
-        return success();
-      }
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<EraseUnusedVariableStoreOp>(context);
-}
-
-namespace {
-
-class PropagateVariableStoreAddress
-    : public OpRewritePattern<VariableStoreIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
- public:
-  LogicalResult matchAndRewrite(VariableStoreIndirectOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
-            op.variable().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<VariableStoreOp>(op, op.value(),
-                                                   addressOp.variable());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableStoreIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<PropagateVariableStoreAddress>(context);
-}
-
-//===----------------------------------------------------------------------===//
 // hal.allocator.*
 //===----------------------------------------------------------------------===//
 
@@ -851,7 +727,7 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
 
 namespace {
 
-// Resolves hal.constant.buffer ops to their runtime hal.variable buffer.
+// Resolves hal.constant.buffer ops to their runtime util.global buffer.
 struct ResolveConstantPoolLoadToRuntimeBuffer
     : public OpRewritePattern<ConstantPoolLoadOp> {
   using OpRewritePattern<ConstantPoolLoadOp>::OpRewritePattern;

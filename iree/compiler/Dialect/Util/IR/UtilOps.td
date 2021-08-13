@@ -8,6 +8,8 @@
 #define IREE_DIALECT_UTIL_IR_UTIL_OPS
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "mlir/IR/OpAsmInterface.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -149,6 +151,217 @@ def Util_UnreachableOp : Util_Op<"unreachable", [NoSideEffect, Terminator]> {
 }
 
 //===----------------------------------------------------------------------===//
+// Globals
+//===----------------------------------------------------------------------===//
+
+def Util_GlobalOp : Util_Op<"global", [
+  Symbol,
+]> {
+  let summary = [{stateful global variable declaration}];
+  let description = [{
+    Declares a global variable that maintains its value across invocations.
+    The value is tied to the execution context of the module and different
+    contexts will have different variable storage.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
+    TypeAttr:$type,
+    UnitAttr:$is_mutable,
+    OptionalAttr<FlatSymbolRefAttr>:$initializer,
+    OptionalAttr<AnyAttr>:$initial_value
+  );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    (`mutable` $is_mutable^)?
+    $sym_name
+    attr-dict
+    (`initializer` `(` $initializer^ `)`):(``)?
+    custom<TypeOrAttr>($type, $initial_value)
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "Type":$type,
+      "Optional<StringRef>":$initializer,
+      "Optional<Attribute>":$initialValue,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "mlir::FuncOp":$initializer,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "Type":$type,
+      "Attribute":$initialValue,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "Type":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    StringRef getSymbolName() { return sym_name(); }
+
+    bool isMutable() { return is_mutable(); }
+    void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
+
+    Optional<StringRef> getInitializerAttr() { return initializer(); }
+    void clearInitializer() { (*this)->removeAttr("initializer"); }
+
+    Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
+    void clearInitialValue() { (*this)->removeAttr("initial_value"); }
+  }];
+
+    // TODO(benvanik): verify matches $type.
+  let verifier = [{ return verifyGlobalOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_GlobalAddressOp : Util_PureOp<"global.address", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+]> {
+  let summary = [{returns an address reference to a global}];
+  let description = [{
+    Returns the address of a global as a typed reference. Can be used with the
+    global load and store indirect ops.
+  }];
+
+  let arguments = (ins
+    Util_GlobalRefAttr:$global
+  );
+  let results = (outs
+    Util_AnyGlobalPtr:$result
+  );
+
+  let assemblyFormat = [{
+    $global attr-dict `:` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    IREE::Util::GlobalOp getGlobalOp();
+  }];
+}
+
+def Util_GlobalLoadOp : Util_Op<"global.load", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  // HACK: works around the lack of symbol side effects in C++.
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+]> {
+  let summary = [{loads a value from a global variable}];
+  let description = [{
+    Returns a global variable value.
+  }];
+
+  let arguments = (ins
+    Arg<Util_GlobalRefAttr, "", []>:$global
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $global attr-dict `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "IREE::Util::GlobalOp":$globalOp,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    IREE::Util::GlobalOp getGlobalOp();
+    bool isGlobalImmutable();
+  }];
+
+  let verifier = [{ return verifyGlobalLoadOp(*this); }];
+
+  let hasFolder = 1;
+}
+
+def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
+  let summary = [{loads a value from a global variable}];
+  let description = [{
+    Returns a copy of the global variable value.
+  }];
+
+  let arguments = (ins
+    Arg<Util_AnyGlobalPtr, "", []>:$global
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $global attr-dict `:` type($global) `->` type($result)
+  }];
+
+  let verifier = [{ return verifyGlobalLoadIndirectOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_GlobalStoreOp : Util_Op<"global.store"> {
+  let summary = [{stores a value into a global variable}];
+  let description = [{
+    Stores a copy of the value into a global variable.
+  }];
+
+  let arguments = (ins
+    AnyType:$value,
+    Arg<Util_GlobalRefAttr, "", []>:$global
+  );
+
+  let assemblyFormat = [{
+    $value `,` $global attr-dict `:` type($value)
+  }];
+
+  let extraClassDeclaration = [{
+    IREE::Util::GlobalOp getGlobalOp();
+  }];
+
+  let verifier = [{ return verifyGlobalStoreOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect"> {
+  let summary = [{stores a value into a global variable}];
+  let description = [{
+    Stores a copy of the value into a global variable.
+  }];
+
+  let arguments = (ins
+    AnyType:$value,
+    Arg<Util_AnyGlobalPtr, "", []>:$global
+  );
+
+  let assemblyFormat = [{
+    $value `,` $global attr-dict `:` type($value) `->` type($global)
+  }];
+
+  let verifier = [{ return verifyGlobalStoreIndirectOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Lists
 //===----------------------------------------------------------------------===//
 // NOTE: this type is mostly just a placeholder. Ideally we'd make this
@@ -167,7 +380,7 @@ def Util_ListCreateOp : Util_PureOp<
     Optional<Index>:$initial_capacity
   );
   let results = (outs
-    AnyList:$result
+    Util_AnyList:$result
   );
 
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` type($result)";
@@ -180,7 +393,7 @@ def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   }];
 
   let arguments = (ins
-    AnyList:$list
+    Util_AnyList:$list
   );
   let results = (outs
     Index:$result
@@ -198,7 +411,7 @@ def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   }];
 
   let arguments = (ins
-    AnyList:$list,
+    Util_AnyList:$list,
     Index:$new_size
   );
 
@@ -213,7 +426,7 @@ def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   }];
 
   let arguments = (ins
-    AnyList:$list,
+    Util_AnyList:$list,
     Index:$index
   );
   let results = (outs
@@ -232,7 +445,7 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   }];
 
   let arguments = (ins
-    AnyList:$list,
+    Util_AnyList:$list,
     Index:$index,
     AnyType:$value
   );

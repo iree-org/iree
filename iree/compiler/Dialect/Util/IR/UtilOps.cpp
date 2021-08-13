@@ -28,6 +28,70 @@ namespace IREE {
 namespace Util {
 
 //===----------------------------------------------------------------------===//
+// custom<SymbolVisibility>($sym_visibility)
+//===----------------------------------------------------------------------===//
+// some.op custom<SymbolVisibility>($sym_visibility) $sym_name
+// ->
+// some.op @foo
+// some.op private @foo
+
+static ParseResult parseSymbolVisibility(OpAsmParser &parser,
+                                         StringAttr &symVisibilityAttr) {
+  StringRef symVisibility;
+  parser.parseOptionalKeyword(&symVisibility, {"public", "private", "nested"});
+  if (!symVisibility.empty()) {
+    symVisibilityAttr = parser.getBuilder().getStringAttr(symVisibility);
+  }
+  return success();
+}
+
+static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
+                                  StringAttr symVisibilityAttr) {
+  if (!symVisibilityAttr) {
+    p << "public";
+  } else {
+    p << symVisibilityAttr.getValue();
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// custom<TypeOrAttr>($type, $attr)
+//===----------------------------------------------------------------------===//
+// some.op custom<TypeOrAttr>($type, $attr)
+// ->
+// some.op : i32
+// some.op = 42 : i32
+
+static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
+                                   Attribute &attr) {
+  if (succeeded(parser.parseOptionalEqual())) {
+    if (failed(parser.parseAttribute(attr))) {
+      return parser.emitError(parser.getCurrentLocation())
+             << "expected attribute";
+    }
+    typeAttr = TypeAttr::get(attr.getType());
+  } else {
+    Type type;
+    if (failed(parser.parseColonType(type))) {
+      return parser.emitError(parser.getCurrentLocation()) << "expected type";
+    }
+    typeAttr = TypeAttr::get(type);
+  }
+  return success();
+}
+
+static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
+                            Attribute attr) {
+  if (attr) {
+    p << " = ";
+    p.printAttribute(attr);
+  } else {
+    p << " : ";
+    p.printAttribute(type);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // util.do_not_optimize
 //===----------------------------------------------------------------------===//
 
@@ -142,6 +206,207 @@ struct ExpandUnfoldableConstantOp
 void UnfoldableConstantOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ExpandUnfoldableConstantOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// Globals
+//===----------------------------------------------------------------------===//
+
+// Returns true if the given |accessType| is compatible with the |globalType|.
+// For example, this will return true if the global type is a tensor<?xf32>
+// and the access is tensor<4xf32>.
+static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
+  // If one is a shaped type, then they both must be and have compatible
+  // shapes.
+  if (globalType.isa<ShapedType>() || accessType.isa<ShapedType>()) {
+    return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
+  }
+
+  // TODO(benvanik): use GlobalOpInterface.
+
+  // Otherwise, the types must be the same.
+  return globalType == accessType;
+}
+
+void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
+                     bool isMutable, Type type, Optional<StringRef> initializer,
+                     Optional<Attribute> initialValue,
+                     ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute(SymbolTable::getSymbolAttrName(),
+                      builder.getStringAttr(name));
+  if (isMutable) {
+    result.addAttribute("is_mutable", builder.getUnitAttr());
+  }
+  if (initializer.hasValue()) {
+    result.addAttribute("initializer",
+                        builder.getSymbolRefAttr(initializer.getValue()));
+  } else if (initialValue.hasValue()) {
+    result.addAttribute("initial_value", initialValue.getValue());
+  }
+  result.addAttribute("type", TypeAttr::get(type));
+  result.attributes.append(attrs.begin(), attrs.end());
+}
+
+void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
+                     bool isMutable, mlir::FuncOp initializer,
+                     ArrayRef<NamedAttribute> attrs) {
+  build(builder, result, name, isMutable, initializer.getType().getResult(0),
+        initializer.getName(), llvm::None, attrs);
+}
+
+void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
+                     bool isMutable, Type type, Attribute initialValue,
+                     ArrayRef<NamedAttribute> attrs) {
+  build(builder, result, name, isMutable, type, llvm::None, initialValue,
+        attrs);
+}
+
+void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
+                     bool isMutable, Type type,
+                     ArrayRef<NamedAttribute> attrs) {
+  build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
+}
+
+static LogicalResult verifyGlobalOp(GlobalOp op) {
+  if (op.initializer().hasValue() && op.initial_value().hasValue()) {
+    return op->emitOpError()
+           << "globals can have either an initializer or an initial value";
+  } else if (op.initializer().hasValue()) {
+    // Ensure initializer returns the same value as the global.
+    auto initializerFunc = SymbolTable::lookupNearestSymbolFrom<mlir::FuncOp>(
+        op, op.initializerAttr());
+    if (!initializerFunc) {
+      return op.emitOpError() << "initializer function " << op.initializerAttr()
+                              << " not found or wrong type";
+    }
+    if (initializerFunc.getType().getNumInputs() != 0 ||
+        initializerFunc.getType().getNumResults() != 1 ||
+        !isGlobalTypeCompatible(op.type(),
+                                initializerFunc.getType().getResult(0))) {
+      return op->emitOpError()
+             << "initializer type mismatch; global " << op.getSymbolName()
+             << " is " << op.type() << " but initializer function "
+             << initializerFunc.getName() << " is "
+             << initializerFunc.getType();
+    }
+  } else if (op.initial_value().hasValue()) {
+    // Ensure the value is something we can convert to a const.
+    if (!isGlobalTypeCompatible(op.type(), op.initial_valueAttr().getType())) {
+      return op->emitOpError()
+             << "initial value type mismatch; global " << op.getSymbolName()
+             << " is " << op.type() << " but initial value provided is "
+             << op.initial_valueAttr().getType();
+    }
+  }
+  return success();
+}
+
+IREE::Util::GlobalOp GlobalAddressOp::getGlobalOp() {
+  return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
+      getOperation()->getParentOp(), global());
+}
+
+void GlobalAddressOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), Twine("ptr_" + global()).str());
+}
+
+static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
+  auto globalOp = op.getGlobalOp();
+  if (!globalOp) {
+    return op.emitOpError() << "undefined global: " << op.global();
+  }
+  return success();
+}
+
+void GlobalLoadOp::build(OpBuilder &builder, OperationState &state,
+                         GlobalOp globalOp, ArrayRef<NamedAttribute> attrs) {
+  state.addTypes({globalOp.type()});
+  state.addAttribute("global", builder.getSymbolRefAttr(globalOp));
+  state.attributes.append(attrs.begin(), attrs.end());
+}
+
+IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp() {
+  return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
+      getOperation()->getParentOp(), global());
+}
+
+bool GlobalLoadOp::isGlobalImmutable() { return !getGlobalOp().is_mutable(); }
+
+void GlobalLoadOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), global());
+}
+
+void GlobalLoadOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // HACK: works around the lack of symbol side effects in mlir by only saying
+  // we have a side-effect if the variable we are loading is mutable.
+  auto globalOp =
+      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, global());
+  assert(globalOp);
+  if (globalOp.is_mutable()) {
+    effects.emplace_back(MemoryEffects::Read::get());
+  }
+}
+
+static LogicalResult verifyGlobalLoadOp(GlobalLoadOp op) {
+  auto globalOp = op.getGlobalOp();
+  if (!globalOp) {
+    return op->emitOpError() << "undefined global: " << op.global();
+  }
+  auto loadType = op->getResult(0).getType();
+  if (!isGlobalTypeCompatible(globalOp.type(), loadType)) {
+    return op->emitOpError()
+           << "global type mismatch; global " << op.global() << " is "
+           << globalOp.type() << " but load is " << loadType;
+  }
+  return success();
+}
+
+static LogicalResult verifyGlobalLoadIndirectOp(GlobalLoadIndirectOp &op) {
+  auto globalType =
+      op.global().getType().cast<IREE::Util::PtrType>().getTargetType();
+  auto loadType = op.result().getType();
+  if (!isGlobalTypeCompatible(globalType, loadType)) {
+    return op.emitOpError() << "global type mismatch; global pointer is "
+                            << globalType << " but load is " << loadType;
+  }
+  return success();
+}
+
+IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp() {
+  return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
+      getOperation()->getParentOp(), global());
+}
+
+static LogicalResult verifyGlobalStoreOp(GlobalStoreOp op) {
+  auto globalOp = op.getGlobalOp();
+  if (!globalOp) {
+    return op->emitOpError() << "undefined global: " << op.global();
+  }
+  auto storeType = op->getOperand(0).getType();
+  if (globalOp.type() != storeType) {
+    return op->emitOpError()
+           << "global type mismatch; global " << op.global() << " is "
+           << globalOp.type() << " but store is " << storeType;
+  }
+  if (!globalOp.isMutable()) {
+    return op->emitOpError() << "global " << op.global()
+                             << " is not mutable and cannot be stored to";
+  }
+  return success();
+}
+
+static LogicalResult verifyGlobalStoreIndirectOp(GlobalStoreIndirectOp &op) {
+  auto globalType =
+      op.global().getType().cast<IREE::Util::PtrType>().getTargetType();
+  auto storeType = op.value().getType();
+  if (!isGlobalTypeCompatible(globalType, storeType)) {
+    return op.emitOpError() << "global type mismatch; global pointer is "
+                            << globalType << " but store is " << storeType;
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
