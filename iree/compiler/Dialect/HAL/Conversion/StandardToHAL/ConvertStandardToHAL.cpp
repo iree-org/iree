@@ -57,7 +57,7 @@ class TensorCastPattern : public OpConversionPattern<IREE::HAL::TensorCastOp> {
                                       newOperands.source_dims());
         newValue = rewriter.create<IREE::HAL::BufferViewCreateOp>(
             op.getLoc(), adaptor.getBuffer(), adaptor.getElementType(),
-            shapeDims);
+            adaptor.getEncodingType(), shapeDims);
       } else {
         newValue = adaptor.getBufferView();
       }

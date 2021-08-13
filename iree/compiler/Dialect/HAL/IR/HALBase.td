@@ -355,6 +355,10 @@ def HAL_ElementType : TypeAlias<I32>;
 def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
 
+def HAL_EncodingType : TypeAlias<I32>;
+def HAL_EncodingTypeAttr : SignlessIntegerAttrBase<
+  I32, "encoding type attribute">;
+
 def HAL_DeviceSize : TypeAlias<Index>;
 def HAL_DeviceSizeAttr : Util_IndexAttrBase<"iree_device_size_t">;
 def HAL_DeviceSizes : Variadic<HAL_DeviceSize>;

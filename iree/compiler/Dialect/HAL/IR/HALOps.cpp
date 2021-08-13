@@ -313,17 +313,19 @@ SmallVector<int64_t, 4> TensorCastOp::getTiedResultOperandIndices() {
 
 void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
                                    Value allocator, ValueRange shape,
-                                   int32_t elementType) {
+                                   int32_t elementType, int32_t encodingType) {
   build(builder, state, allocator, shape,
-        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32));
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32));
 }
 
 void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
                                    Value allocator, ValueRange shape,
-                                   Value elementType) {
+                                   Value elementType, Value encodingType) {
   state.addOperands({allocator});
   state.addOperands(shape);
   state.addOperands(elementType);
+  state.addOperands(encodingType);
   state.addTypes({builder.getIndexType()});
 }
 
@@ -338,18 +340,22 @@ void AllocatorComputeSizeOp::getAsmResultNames(
 
 void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
                                      Value allocator, ValueRange shape,
-                                     int32_t elementType, ValueRange indices) {
+                                     int32_t elementType, int32_t encodingType,
+                                     ValueRange indices) {
   build(builder, state, allocator, shape,
         builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
         indices);
 }
 
 void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
                                      Value allocator, ValueRange shape,
-                                     Value elementType, ValueRange indices) {
+                                     Value elementType, Value encodingType,
+                                     ValueRange indices) {
   state.addOperands({allocator});
   state.addOperands(shape);
   state.addOperands(elementType);
+  state.addOperands(encodingType);
   state.addOperands(indices);
   state.addTypes({builder.getIndexType()});
 }
@@ -365,20 +371,22 @@ void AllocatorComputeOffsetOp::getAsmResultNames(
 
 void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
                                     Value allocator, ValueRange shape,
-                                    int32_t elementType, ValueRange indices,
-                                    ValueRange lengths) {
+                                    int32_t elementType, int32_t encodingType,
+                                    ValueRange indices, ValueRange lengths) {
   build(builder, state, allocator, shape,
         builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
         indices, lengths);
 }
 
 void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
                                     Value allocator, ValueRange shape,
-                                    Value elementType, ValueRange indices,
-                                    ValueRange lengths) {
+                                    Value elementType, Value encodingType,
+                                    ValueRange indices, ValueRange lengths) {
   state.addOperands({allocator});
   state.addOperands(shape);
   state.addOperands(elementType);
+  state.addOperands(encodingType);
   state.addOperands(indices);
   state.addOperands(lengths);
   state.addTypes({builder.getIndexType(), builder.getIndexType()});
@@ -503,16 +511,17 @@ void BufferLengthOp::getAsmResultNames(
 
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
                                Value buffer, int32_t elementType,
-                               ValueRange shape) {
+                               int32_t encodingType, ValueRange shape) {
   build(builder, state, buffer,
         builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
         shape);
 }
 
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
                                Value buffer, Value elementType,
-                               ValueRange shape) {
-  state.addOperands({buffer, elementType});
+                               Value encodingType, ValueRange shape) {
+  state.addOperands({buffer, elementType, encodingType});
   state.addOperands(shape);
   state.addTypes({BufferViewType::get(builder.getContext())});
 }

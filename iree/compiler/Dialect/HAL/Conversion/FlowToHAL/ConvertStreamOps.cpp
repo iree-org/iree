@@ -334,6 +334,8 @@ class StreamSchedulingState {
 
     auto elementType = getElementType(shapedType.getElementType(), builder);
     assert(elementType && "unhandled element type for allocation");
+    auto encodingType = getEncodingType({}, builder);
+    assert(encodingType && "unhandled encoding type for allocation");
 
     SmallVector<Value> shapeDims(shapedType.getRank());
     int64_t dynamicDimIndex = 0;
@@ -346,7 +348,7 @@ class StreamSchedulingState {
     }
 
     auto size = builder.createOrFold<IREE::HAL::AllocatorComputeSizeOp>(
-        loc, allocator(), shapeDims, elementType);
+        loc, allocator(), shapeDims, elementType, encodingType);
     if (shapedType.hasStaticShape()) {
       staticShapeToSizeMap[shapedType] = size;
     } else {
@@ -405,6 +407,17 @@ class StreamSchedulingState {
     return constantValue;
   }
 
+  Value getEncodingType(Attribute encodingType, OpBuilder &builder) {
+    auto it = memoizedEncodingTypesConstants.find(encodingType);
+    if (it != memoizedEncodingTypesConstants.end()) return it->second;
+    auto i32Value = IREE::HAL::getEncodingTypeValue(encodingType);
+    assert(i32Value.hasValue() && "unhandled encoding type for allocation");
+    auto constantValue =
+        builder.createOrFold<ConstantIntOp>(loc, i32Value.getValue(), 32);
+    memoizedEncodingTypesConstants[encodingType] = constantValue;
+    return constantValue;
+  }
+
   Location loc;
 
   // !hal.device used throughout the stream.
@@ -428,6 +441,9 @@ class StreamSchedulingState {
 
   // Small cache of constants used for element types.
   DenseMap<Type, Value> memoizedElementTypesConstants;
+
+  // Small cache of constants used for encoding types.
+  DenseMap<Attribute, Value> memoizedEncodingTypesConstants;
 
   // Map of static shaped types to computed size values.
   DenseMap<Type, Value> staticShapeToSizeMap;

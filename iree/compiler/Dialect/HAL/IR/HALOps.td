@@ -117,13 +117,15 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
   let summary = [{buffer allocation size computation operation}];
   let description = [{
     Computes the byte size required for a buffer of the given shape and type.
-    This returns the same value as `hal.buffer_view.byte_length`.
+    The returned size may be larger than the logical size of the tensor type
+    stored within the buffer based on alignment requirements of the allocator.
   }];
 
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_Shape:$shape,
-    HAL_ElementType:$element_type
+    HAL_ElementType:$element_type,
+    HAL_EncodingType:$encoding_type
   );
   let results = (outs
     HAL_DeviceSize:$result
@@ -133,15 +135,24 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
     `<` $allocator `:` type($allocator) `>`
     `shape` `(` `[` $shape `]` `)`
     `type` `(` $element_type `)`
+    `encoding` `(` $encoding_type `)`
     `:` type($result)
     attr-dict-with-keyword
   }];
 
   let builders = [
-    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
-      "int32_t":$elementType)>,
-    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
-      "Value":$elementType)>,
+    OpBuilder<(ins
+      "Value":$allocator,
+      "ValueRange":$shape,
+      "int32_t":$elementType,
+      "int32_t":$encodingType
+    )>,
+    OpBuilder<(ins
+      "Value":$allocator,
+      "ValueRange":$shape,
+      "Value":$elementType,
+      "Value":$encodingType
+    )>,
   ];
 
   let hasCanonicalizer = 1;
@@ -160,6 +171,7 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
     HAL_Allocator:$allocator,
     HAL_Shape:$shape,
     HAL_ElementType:$element_type,
+    HAL_EncodingType:$encoding_type,
     HAL_Dims:$indices
   );
 
@@ -172,15 +184,26 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
     `indices` `(` `[` $indices `]` `)`
     `shape` `(` `[` $shape `]` `)`
     `type` `(` $element_type `)`
+    `encoding` `(` $encoding_type `)`
     `:` type($offset)
     attr-dict-with-keyword
   }];
 
   let builders = [
-    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
-      "int32_t":$elementType, "ValueRange":$indices)>,
-    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
-      "Value":$elementType, "ValueRange":$indices)>,
+    OpBuilder<(ins
+      "Value":$allocator,
+      "ValueRange":$shape,
+      "int32_t":$elementType,
+      "int32_t":$encodingType,
+      "ValueRange":$indices
+    )>,
+    OpBuilder<(ins
+      "Value":$allocator,
+      "ValueRange":$shape,
+      "Value":$elementType,
+      "Value":$encodingType,
+      "ValueRange":$indices
+    )>,
   ];
 
   let hasCanonicalizer = 1;
@@ -199,6 +222,7 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
     HAL_Allocator:$allocator,
     HAL_Shape:$shape,
     HAL_ElementType:$element_type,
+    HAL_EncodingType:$encoding_type,
     HAL_Dims:$indices,
     HAL_Dims:$lengths
   );
@@ -214,15 +238,28 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
     `lengths` `(` `[` $lengths `]` `)`
     `shape` `(` `[` $shape `]` `)`
     `type` `(` $element_type `)`
+    `encoding` `(` $encoding_type `)`
     `:` type($offset) `,` type($length)
     attr-dict-with-keyword
   }];
 
   let builders = [
-    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
-      "int32_t":$elementType, "ValueRange":$indices, "ValueRange":$lengths)>,
-    OpBuilder<(ins "Value":$allocator, "ValueRange":$shape,
-      "Value":$elementType, "ValueRange":$indices, "ValueRange":$lengths)>,
+    OpBuilder<(ins
+      "Value":$allocator,
+      "ValueRange":$shape,
+      "int32_t":$elementType,
+      "int32_t":$encodingType,
+      "ValueRange":$indices,
+      "ValueRange":$lengths
+    )>,
+    OpBuilder<(ins
+      "Value":$allocator,
+      "ValueRange":$shape,
+      "Value":$elementType,
+      "Value":$encodingType,
+      "ValueRange":$indices,
+      "ValueRange":$lengths
+    )>,
   ];
 
   let hasCanonicalizer = 1;
@@ -569,6 +606,7 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   let arguments = (ins
     HAL_BufferType:$buffer,
     HAL_ElementType:$element_type,
+    HAL_EncodingType:$encoding_type,
     HAL_Shape:$shape
   );
   let results = (outs
@@ -577,8 +615,9 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
 
   let assemblyFormat = [{
     $buffer `,`
+    `shape` `=` `[` $shape `]` `,`
     `element_type` `=` $element_type `,`
-    `shape` `=` `[` $shape `]`
+    `encoding_type` `=` $encoding_type
     attr-dict `:` type($buffer) `->` type($result)
   }];
 
@@ -587,11 +626,13 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
     OpBuilder<(ins
       "Value":$buffer,
       "int32_t":$elementType,
+      "int32_t":$encodingType,
       "ValueRange":$shape
     )>,
     OpBuilder<(ins
       "Value":$buffer,
       "Value":$elementType,
+      "Value":$encodingType,
       "ValueRange":$shape
     )>,
   ];
@@ -658,6 +699,24 @@ def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {
   );
   let results = (outs
     HAL_ElementType:$result
+  );
+
+  let assemblyFormat = [{
+    $buffer_view attr-dict `:` type($result)
+  }];
+}
+
+def HAL_BufferViewEncodingTypeOp : HAL_PureOp<"buffer_view.encoding_type"> {
+  let summary = [{buffer view encoding type query}];
+  let description = [{
+    Returns the encoding type of the buffer view.
+  }];
+
+  let arguments = (ins
+    HAL_BufferView:$buffer_view
+  );
+  let results = (outs
+    HAL_EncodingType:$result
   );
 
   let assemblyFormat = [{

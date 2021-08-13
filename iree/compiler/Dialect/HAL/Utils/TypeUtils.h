@@ -83,6 +83,10 @@ class TensorRewriteAdaptor {
   int32_t getElementType();
   IntegerAttr getElementTypeAttr();
 
+  // Returns the encoding type of the tensor as an int32 enum value.
+  int32_t getEncodingType();
+  IntegerAttr getEncodingTypeAttr();
+
   // Returns the I32 shape dimensions of the tensor.
   llvm::Optional<SmallVector<Value, 4>> getShapeDims();
   llvm::Optional<SmallVector<Value, 4>> getShapeDims(
