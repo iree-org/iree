@@ -11,12 +11,12 @@ package(
 )
 
 cc_library(
-    name = "IREEToHAL",
+    name = "UtilToHAL",
     srcs = [
-        "ConvertIREEToHAL.cpp",
+        "ConvertUtilToHAL.cpp",
     ],
     hdrs = [
-        "ConvertIREEToHAL.h",
+        "ConvertUtilToHAL.h",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/IR",

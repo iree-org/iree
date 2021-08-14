@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTIREETOHAL_H_
-#define IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTIREETOHAL_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTUTILTOHAL_H_
+#define IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTUTILTOHAL_H_
 
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
@@ -19,11 +19,11 @@ namespace iree_compiler {
 
 // Appends all patterns for lowering IREE ops to HAL buffer ops and sets their
 // legality.
-void populateIREEToHALPatterns(MLIRContext *context, ConversionTarget &target,
+void populateUtilToHALPatterns(MLIRContext *context, ConversionTarget &target,
                                TypeConverter &typeConverter,
                                OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTIREETOHAL_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERTUTILTOHAL_H_
