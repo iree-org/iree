@@ -214,7 +214,7 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 // There is nothing to verify here except that correct IR is generated (if
 // constants are not handled properly, it will produce illegally ordered IR).
 func @tensorReshapeWithTiedConstant(%arg0: !hal.buffer_view) -> !hal.buffer_view {
-  %0 = hal.buffer_view.dim %arg0, 0 : index
+  %0 = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
   %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?xf32>{%0}
   %2 = flow.ex.stream.fragment(%1) : (tensor<?xf32>{%0}) -> tensor<4xf32> =
       (%arg1: tensor<?xf32>) -> tensor<4xf32> {

@@ -60,6 +60,8 @@ struct ExpandAllocatorComputeSizeOp
     // TODO(benvanik): use buffer constraints for alignment.
     BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
 
+    // TODO(#6762): switch based on op.encoding().
+
     auto elementSize =
         getElementByteCount(op.getLoc(), op.element_type(), rewriter);
     auto byteSize =
@@ -88,6 +90,8 @@ struct ExpandAllocatorComputeOffsetOp
                                 PatternRewriter &rewriter) const override {
     // TODO(benvanik): use buffer constraints.
     BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
+
+    // TODO(#6762): switch based on op.encoding().
 
     auto offset = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 0);
     for (size_t i = 0; i < op.indices().size(); ++i) {
@@ -146,10 +150,10 @@ struct ExpandAllocatorComputeRangeOp
 
     auto startByteOffset = rewriter.createOrFold<AllocatorComputeOffsetOp>(
         op.getLoc(), rewriter.getIndexType(), op.allocator(), op.shape(),
-        op.element_type(), op.indices());
+        op.element_type(), op.encoding_type(), op.indices());
     auto endByteOffset = rewriter.createOrFold<AllocatorComputeOffsetOp>(
         op.getLoc(), rewriter.getIndexType(), op.allocator(), op.shape(),
-        op.element_type(), endIndices);
+        op.element_type(), op.encoding_type(), endIndices);
 
     auto elementSize =
         getElementByteCount(op.getLoc(), op.element_type(), rewriter);
@@ -186,6 +190,11 @@ struct ExpandAllocatorConstantOp
     if (!elementType.hasValue()) {
       return rewriter.notifyMatchFailure(op, "unhandled element type");
     }
+    // TODO(#6762): get encoding type.
+    auto encodingType = IREE::HAL::getEncodingTypeValue({});
+    if (!encodingType.hasValue()) {
+      return rewriter.notifyMatchFailure(op, "unhandled encoding type");
+    }
 
     // TODO(benvanik): compute from SSA use-def chain uses.
     IREE::HAL::MemoryTypeBitfield memoryTypes =
@@ -215,7 +224,8 @@ struct ExpandAllocatorConstantOp
         }
       }
       auto bufferView = rewriter.createOrFold<BufferViewCreateOp>(
-          op.getLoc(), deviceBuffer, elementType.getValue(), shape);
+          op.getLoc(), deviceBuffer, elementType.getValue(),
+          encodingType.getValue(), shape);
       rewriter.replaceOp(op, {bufferView});
     } else {
       rewriter.replaceOp(op, {deviceBuffer});

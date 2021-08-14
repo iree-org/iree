@@ -48,6 +48,11 @@ class DynamicShapeConstantOpConversion
     if (!elementType.hasValue()) {
       return rewriter.notifyMatchFailure(constantOp, "unhandled element type");
     }
+    // TODO(#6762): get encoding type.
+    auto encodingType = IREE::HAL::getEncodingTypeValue({});
+    if (!encodingType.hasValue()) {
+      return rewriter.notifyMatchFailure(constantOp, "unhandled encoding type");
+    }
 
     auto buffer = rewriter.createOrFold<IREE::HAL::AllocatorConstantOp>(
         constantOp.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
@@ -62,7 +67,8 @@ class DynamicShapeConstantOpConversion
     }
 
     auto view = rewriter.createOrFold<IREE::HAL::BufferViewCreateOp>(
-        constantOp.getLoc(), buffer, elementType.getValue(), shape);
+        constantOp.getLoc(), buffer, elementType.getValue(),
+        encodingType.getValue(), shape);
 
     rewriter.replaceOpWithNewOp<IREE::Util::DoNotOptimizeOp>(constantOp, view);
     return success();

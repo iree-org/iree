@@ -135,7 +135,7 @@ TEST_F(CustomModulesTest, PrintTensor) {
   iree_hal_buffer_view_t* buffer_view = nullptr;
   IREE_ASSERT_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
       hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
-      IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       IREE_HAL_MEMORY_ACCESS_ALL, IREE_HAL_BUFFER_USAGE_ALL,
       iree_make_byte_span((void*)kBufferContents, sizeof(kBufferContents)),
@@ -179,7 +179,7 @@ TEST_F(CustomModulesTest, RoundTripTensor) {
   iree_hal_buffer_view_t* buffer_view = nullptr;
   IREE_ASSERT_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
       hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
-      IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       IREE_HAL_MEMORY_ACCESS_ALL, IREE_HAL_BUFFER_USAGE_ALL,
       iree_make_byte_span((void*)kBufferContents, sizeof(kBufferContents)),

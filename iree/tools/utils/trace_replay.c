@@ -417,6 +417,42 @@ static iree_status_t iree_trace_replay_parse_hal_element_type(
   return iree_hal_parse_element_type(element_type_str, out_element_type);
 }
 
+// Parses an encoding type.
+//
+// ```yaml
+// encoding_type: 50331680
+// ```
+static iree_status_t iree_trace_replay_parse_hal_encoding_type(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* encoding_type_node,
+    iree_hal_encoding_type_t* out_encoding_type) {
+  *out_encoding_type = IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
+
+  iree_string_view_t encoding_type_str =
+      iree_yaml_node_as_string(encoding_type_node);
+  if (iree_string_view_is_empty(encoding_type_str)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "(%zu): encoding type missing",
+                            encoding_type_node->start_mark.line);
+  }
+
+  // If the first character is a digit then interpret as a %d type.
+  if (isdigit(encoding_type_str.data[0])) {
+    static_assert(sizeof(*out_encoding_type) == sizeof(uint32_t), "4 bytes");
+    if (!iree_string_view_atoi_uint32(encoding_type_str, out_encoding_type)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "(%zu): invalid encoding type",
+                              encoding_type_node->start_mark.line);
+    }
+    return iree_ok_status();
+  }
+
+  // Parse as a canonical encoding type.
+  // TODO(#6762): implement iree_hal_parse_element_type.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "iree_hal_parse_encoding_type not implemented");
+}
+
 // Parses a serialized !hal.buffer into |buffer|.
 //
 // ```yaml
@@ -469,14 +505,6 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
 static iree_status_t iree_trace_replay_parse_hal_buffer_view(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* value_node, iree_vm_list_t* target_list) {
-  yaml_node_t* element_type_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, value_node, iree_make_cstring_view("element_type"),
-      &element_type_node));
-  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
-  IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_element_type(
-      replay, document, element_type_node, &element_type));
-
   yaml_node_t* shape_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
       document, value_node, iree_make_cstring_view("shape"), &shape_node));
@@ -485,6 +513,23 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
   IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_shape(
       replay, document, shape_node, IREE_ARRAYSIZE(shape), shape, &shape_rank));
 
+  yaml_node_t* element_type_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
+      document, value_node, iree_make_cstring_view("element_type"),
+      &element_type_node));
+  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+  IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_element_type(
+      replay, document, element_type_node, &element_type));
+
+  yaml_node_t* encoding_type_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
+      document, value_node, iree_make_cstring_view("encoding_type"),
+      &encoding_type_node));
+  iree_hal_encoding_type_t encoding_type =
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
+  IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_encoding_type(
+      replay, document, encoding_type_node, &encoding_type));
+
   yaml_node_t* contents_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
       document, value_node, iree_make_cstring_view("contents"),
@@ -492,7 +537,8 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
 
   iree_device_size_t allocation_size = 0;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_compute_view_size(
-      shape, shape_rank, element_type, &allocation_size));
+      shape, shape_rank, element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      &allocation_size));
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
@@ -508,7 +554,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
 
   iree_hal_buffer_view_t* buffer_view = NULL;
   status = iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
-                                       &buffer_view);
+                                       encoding_type, &buffer_view);
   iree_hal_buffer_release(buffer);
   IREE_RETURN_IF_ERROR(status);
 
