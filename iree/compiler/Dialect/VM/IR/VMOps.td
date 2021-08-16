@@ -269,7 +269,7 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     (`mutable` $is_mutable^)?
     $sym_name
     attr-dict
-    (`initializer` `(` $initializer^ `)`)?
+    (`initializer` `(` $initializer^ `)`):(``)?
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
@@ -404,7 +404,7 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
     VM_GlobalRefAttr:$global
   );
   let results = (outs
-    AnyPtr:$result
+    Util_AnyPtr:$result
   );
 
   let assemblyFormat = "$global attr-dict `:` type($result)";
@@ -478,7 +478,7 @@ class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
   let arguments = (ins
-    AnyTypeOf<[VM_Ptr, PtrOf<type>]>:$global
+    AnyTypeOf<[VM_Ptr, Util_PtrOf<type>]>:$global
   );
   let results = (outs
     type:$value
@@ -509,7 +509,7 @@ class VM_GlobalStoreIndirectOp<Type type, string mnemonic,
     ])> {
   let arguments = (ins
     type:$value,
-    AnyTypeOf<[VM_Ptr, PtrOf<type>]>:$global
+    AnyTypeOf<[VM_Ptr, Util_PtrOf<type>]>:$global
   );
 
   let assemblyFormat = "$value `,` $global attr-dict `:` type($value) `->` type($global)";

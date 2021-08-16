@@ -36,6 +36,7 @@ cc_library(
     name = "IR",
     srcs = [
         "UtilDialect.cpp",
+        "UtilOpFolders.cpp",
         "UtilOpInterfaces.cpp.inc",
         "UtilOps.cpp",
         "UtilOps.cpp.inc",
@@ -53,11 +54,14 @@ cc_library(
         ":UtilInterfacesGen",
         ":UtilOpsGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
     ],
 )
 

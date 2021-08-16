@@ -35,7 +35,7 @@ iree_cc_library(
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchLinalgOnTensors.cpp"
-    "ExpandVariableDynamicDims.cpp"
+    "ExpandGlobalDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FormStreams.cpp"
     "FusionOfTensorOps.cpp"
@@ -52,7 +52,6 @@ iree_cc_library(
     "Passes.cpp"
     "PromoteI1ToI8Pass.cpp"
     "PromoteTensorLoads.cpp"
-    "SimplifyVariableAccesses.cpp"
     "StripAndSplatConstantVariables.cpp"
     "TypeConverter.cpp"
     "VerifyInputLegality.cpp"
@@ -81,6 +80,7 @@ iree_cc_library(
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
   PUBLIC
 )

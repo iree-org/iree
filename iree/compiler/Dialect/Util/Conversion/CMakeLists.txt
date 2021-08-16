@@ -12,13 +12,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    PreserveCompilerHints
+    Conversion
   HDRS
-    "PreserveCompilerHints.h"
+    "ConversionPatterns.h"
   SRCS
-    "PreserveCompilerHints.cpp"
+    "ConversionPatterns.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
+    MLIRStandard
+    MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Util::IR
   PUBLIC

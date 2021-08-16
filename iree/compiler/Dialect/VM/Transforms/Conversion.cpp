@@ -8,16 +8,16 @@
 #include <tuple>
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
-#include "iree/compiler/Dialect/Util/Conversion/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
-#include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/MathToVM/ConvertMathToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/MemRefToVM/ConvertMemRefToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
+#include "iree/compiler/Dialect/VM/Conversion/UtilToVM/ConvertUtilToVM.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -129,7 +129,8 @@ class ConversionPass
     }
 
     OwningRewritePatternList conversionPatterns(&getContext());
-    populateIREEToVMPatterns(context, typeConverter, conversionPatterns);
+    populateUtilToVMPatterns(context, conversionTarget, typeConverter,
+                             conversionPatterns);
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
     populateMathToVMPatterns(context, typeConverter, conversionPatterns);
     populateMemRefToVMPatterns(context, conversionTarget, typeConverter,
@@ -149,10 +150,8 @@ class ConversionPass
           importSymbols, conversionPatterns, typeConverter);
     }
     Shape::populateFoldConversionPatterns(context, conversionPatterns);
-    IREE::Util::populatePreserveCompilerHintsPatterns(context,
-                                                      conversionPatterns);
-    IREE::Util::setupCompilerHintsLegality(context, conversionTarget,
-                                           typeConverter);
+    populateUtilConversionPatterns(context, conversionTarget, typeConverter,
+                                   conversionPatterns);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
                                       std::move(conversionPatterns)))) {

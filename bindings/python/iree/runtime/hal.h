@@ -100,9 +100,11 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
     iree_hal_buffer_view_t* bv;
     iree_hal_element_type_t element_type = iree_hal_make_element_type(
         IREE_HAL_ELEMENT_TYPE_NONE, element_size * 8);
+    iree_hal_encoding_type_t encoding_type =
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
     CheckApiStatus(
         iree_hal_buffer_view_create(raw_ptr(), shape.s.data(), shape.s.size(),
-                                    element_type, &bv),
+                                    element_type, encoding_type, &bv),
         "Error creating buffer view");
     return HalBufferView::CreateRetained(bv);
   }

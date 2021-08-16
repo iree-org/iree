@@ -78,6 +78,7 @@ vm.import @buffer.store(
 vm.import @buffer_view.create(
   %buffer : !vm.ref<!hal.buffer>,
   %element_type : i32,
+  %encoding_type : i32,
   %shape : i32 ...
 ) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
@@ -96,6 +97,12 @@ attributes {nosideeffects}
 
 // Returns the element type of the buffer view.
 vm.import @buffer_view.element_type(
+  %buffer_view : !vm.ref<!hal.buffer_view>,
+) -> i32
+attributes {nosideeffects}
+
+// Returns the encoding type of the buffer view.
+vm.import @buffer_view.encoding_type(
   %buffer_view : !vm.ref<!hal.buffer_view>,
 ) -> i32
 attributes {nosideeffects}

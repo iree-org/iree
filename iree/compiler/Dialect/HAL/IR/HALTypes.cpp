@@ -360,6 +360,20 @@ Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
       c8);
 }
 
+llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
+  // TODO(#6762): encoding attribute handling/mapping to enums.
+  assert(!attr && "encoding types other than default not yet supported");
+  // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
+  return 1;
+}
+
+IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context) {
+  auto encodingType = getEncodingTypeValue(attr);
+  if (!encodingType) return {};
+  return IntegerAttr::get(IntegerType::get(context, 32),
+                          encodingType.getValue());
+}
+
 //===----------------------------------------------------------------------===//
 // Size-aware type utils
 //===----------------------------------------------------------------------===//

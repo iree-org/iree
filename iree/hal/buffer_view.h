@@ -77,6 +77,23 @@ enum iree_hal_element_types_t {
 typedef uint32_t iree_hal_element_type_t;
 // clang-format on
 
+// Defines the encoding type of a buffer when known.
+enum iree_hal_encoding_types_t {
+  // Encoding is unknown or unspecified. Generic interpretation of the buffer
+  // contents is not possible.
+  IREE_HAL_ENCODING_TYPE_OPAQUE = 0,
+  // Encoding is a densely-packed numpy/C-style row-major format.
+  // All elements are contiguous in memory.
+  IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR = 1,
+  // TODO(#6762): sparse encodings we care about (_SPARSE_CSR)
+  // We will likely want to make this a bitfield like the element type is that
+  // we can more easily distinguish between encoding types that we can use for
+  // certain operations; for example, size calculations on a DENSE_ROW_MAJOR
+  // and DENSE_COLUMN_MAJOR would be easier to perform if we had a bit to test
+  // for whether it's dense.
+};
+typedef uint32_t iree_hal_encoding_type_t;
+
 // A dimension within a shape.
 typedef int32_t iree_hal_dim_t;
 
@@ -88,18 +105,23 @@ typedef int32_t iree_hal_dim_t;
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type,
     iree_device_size_t* out_allocation_size);
 
 // Calculates a byte offset into a buffer at the given indices.
+// Only works with densely-packed representations.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
-    iree_hal_element_type_t element_type, const iree_hal_dim_t* indices,
+    iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type, const iree_hal_dim_t* indices,
     size_t indices_count, iree_device_size_t* out_offset);
 
 // Calculates a byte range into a buffer of the given contiguous range.
+// Only works with densely-packed representations.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
-    iree_hal_element_type_t element_type, const iree_hal_dim_t* start_indices,
+    iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type, const iree_hal_dim_t* start_indices,
     iree_host_size_t indices_count, const iree_hal_dim_t* lengths,
     iree_host_size_t lengths_count, iree_device_size_t* out_start_offset,
     iree_device_size_t* out_length);
@@ -121,6 +143,7 @@ typedef struct iree_hal_buffer_view_t iree_hal_buffer_view_t;
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Allocates a buffer from |allocator| and wraps it in a buffer view.
@@ -131,7 +154,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage,
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Clones a host buffer using |allocator| and wraps it in a buffer view.
@@ -146,8 +170,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_clone_heap_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
-    iree_const_byte_span_t data, iree_hal_buffer_view_t** out_buffer_view);
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage, iree_const_byte_span_t data,
+    iree_hal_buffer_view_t** out_buffer_view);
 
 // Imports a host buffer using |allocator| and wraps it in a buffer view.
 // This is equivalent to:
@@ -160,7 +185,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_clone_heap_buffer(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view);
 
@@ -178,16 +204,10 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view);
-
-// Creates a buffer view referencing a subview of the given |buffer_view|.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_subview(
-    const iree_hal_buffer_view_t* buffer_view,
-    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
-    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
-    iree_hal_buffer_view_t** out_buffer_view);
 
 // Retains the given |buffer_view| for the caller.
 IREE_API_EXPORT void iree_hal_buffer_view_retain(
@@ -249,6 +269,10 @@ iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view);
 // Note that not all buffers are contiguous or densely packed.
 IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view);
+
+// Returns the encoding type of the buffer.
+IREE_API_EXPORT iree_hal_encoding_type_t
+iree_hal_buffer_view_encoding_type(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the total size of the specified view in bytes.
 // Note that not all buffers are contiguous or densely packed.

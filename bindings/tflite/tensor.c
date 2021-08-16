@@ -122,8 +122,9 @@ iree_status_t _TfLiteTensorReallocateIfNeeded(
   }
   iree_device_size_t allocation_size = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_buffer_compute_view_size(shape_dims, tensor->shape_rank,
-                                            element_type, &allocation_size));
+      z0, iree_hal_buffer_compute_view_size(
+              shape_dims, tensor->shape_rank, element_type,
+              IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, &allocation_size));
   allocation_size *= storage_scalar;
 
   // If the old buffer is the same size then no need to realloc.

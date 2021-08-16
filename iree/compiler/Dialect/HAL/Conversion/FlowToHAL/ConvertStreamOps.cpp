@@ -274,15 +274,15 @@ class StreamSchedulingState {
   }
 
   // Loads a variable with the given |symName|.
-  Value loadVariable(Type resultType, StringRef symName, OpBuilder &builder) {
-    auto it = loadedVariableMap.find(symName);
-    if (it != loadedVariableMap.end()) {
+  Value loadGlobal(Type resultType, StringRef symName, OpBuilder &builder) {
+    auto it = loadedGlobalMap.find(symName);
+    if (it != loadedGlobalMap.end()) {
       assert(it->second.getType() == resultType && "variable type mismatch");
       return it->second;
     }
-    auto value = builder.createOrFold<IREE::HAL::VariableLoadOp>(
-        loc, resultType, symName);
-    loadedVariableMap.insert(std::make_pair(symName, value));
+    auto value = builder.createOrFold<IREE::Util::GlobalLoadOp>(loc, resultType,
+                                                                symName);
+    loadedGlobalMap.insert(std::make_pair(symName, value));
     return value;
   }
 
@@ -334,6 +334,8 @@ class StreamSchedulingState {
 
     auto elementType = getElementType(shapedType.getElementType(), builder);
     assert(elementType && "unhandled element type for allocation");
+    auto encodingType = getEncodingType({}, builder);
+    assert(encodingType && "unhandled encoding type for allocation");
 
     SmallVector<Value> shapeDims(shapedType.getRank());
     int64_t dynamicDimIndex = 0;
@@ -346,7 +348,7 @@ class StreamSchedulingState {
     }
 
     auto size = builder.createOrFold<IREE::HAL::AllocatorComputeSizeOp>(
-        loc, allocator(), shapeDims, elementType);
+        loc, allocator(), shapeDims, elementType, encodingType);
     if (shapedType.hasStaticShape()) {
       staticShapeToSizeMap[shapedType] = size;
     } else {
@@ -405,6 +407,17 @@ class StreamSchedulingState {
     return constantValue;
   }
 
+  Value getEncodingType(Attribute encodingType, OpBuilder &builder) {
+    auto it = memoizedEncodingTypesConstants.find(encodingType);
+    if (it != memoizedEncodingTypesConstants.end()) return it->second;
+    auto i32Value = IREE::HAL::getEncodingTypeValue(encodingType);
+    assert(i32Value.hasValue() && "unhandled encoding type for allocation");
+    auto constantValue =
+        builder.createOrFold<ConstantIntOp>(loc, i32Value.getValue(), 32);
+    memoizedEncodingTypesConstants[encodingType] = constantValue;
+    return constantValue;
+  }
+
   Location loc;
 
   // !hal.device used throughout the stream.
@@ -420,14 +433,17 @@ class StreamSchedulingState {
   // Index value -> std.constant index value.
   DenseMap<int64_t, Value> indexConstantMap;
 
-  // Variable sym name -> loaded value.
-  DenseMap<StringRef, Value> loadedVariableMap;
+  // Global sym name -> loaded value.
+  DenseMap<StringRef, Value> loadedGlobalMap;
 
   // Key of [push constants, set layouts] -> loaded value.
   DenseMap<Attribute, Value> executableLayoutMap;
 
   // Small cache of constants used for element types.
   DenseMap<Type, Value> memoizedElementTypesConstants;
+
+  // Small cache of constants used for encoding types.
+  DenseMap<Attribute, Value> memoizedEncodingTypesConstants;
 
   // Map of static shaped types to computed size values.
   DenseMap<Type, Value> staticShapeToSizeMap;
@@ -556,7 +572,7 @@ static LogicalResult allocateTransientBuffers(
   SmallPtrSet<Value, 16> coveredValues;
   auto walkResult = streamOp.walk([&](IREE::HAL::ConstantSubspanOp subspanOp) {
     auto tensorValue = subspanOp.result();
-    auto bufferValue = schedulingState.loadVariable(
+    auto bufferValue = schedulingState.loadGlobal(
         IREE::HAL::BufferType::get(rewriter.getContext()),
         subspanOp.runtime_buffer().getLeafReference(), rewriter);
     auto offsetValue = schedulingState.lookupOrCreateIndex(
@@ -722,7 +738,7 @@ static void recordInterfaceBindings(
           constantStorageAttr.binding());
       assert(bindingOp);
       assert(bindingOp.set().getSExtValue() == setOrdinal);
-      auto storageBuffer = schedulingState.loadVariable(
+      auto storageBuffer = schedulingState.loadGlobal(
           IREE::HAL::BufferType::get(builder.getContext()),
           constantStorageAttr.storage(), rewriter);
       bindings.push_back(std::make_tuple(

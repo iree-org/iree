@@ -7,9 +7,9 @@
 //  CHECK-SAME: ) attributes {
 //  CHECK-SAME:   iree.abi.stub
 //  CHECK-SAME: } {
-//  CHECK-NEXT:   %[[ARG0_DIM0:.+]] = hal.buffer_view.dim %[[ARG0]], 0 : index
+//  CHECK-NEXT:   %[[ARG0_DIM0:.+]] = hal.buffer_view.dim<%[[ARG0]] : !hal.buffer_view>[0] : index
 //  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.cast %[[ARG0]] : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG0_DIM0]]}
-//  CHECK-NEXT:   %[[ARG1_DIM0:.+]] = hal.buffer_view.dim %[[ARG1]], 0 : index
+//  CHECK-NEXT:   %[[ARG1_DIM0:.+]] = hal.buffer_view.dim<%[[ARG1]] : !hal.buffer_view>[0] : index
 //  CHECK-NEXT:   %[[ARG1_TENSOR:.+]] = hal.tensor.cast %[[ARG1]] : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG1_DIM0]]}
 //  CHECK-NEXT:   %[[RET_TENSOR:.+]]:2 = call @_dynamicEntry(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
 //       CHECK:   %[[RET0_DIM0:.+]] = tensor.dim %[[RET_TENSOR]]#0, %c0{{.*}} : tensor<?x8x8x3xf32>

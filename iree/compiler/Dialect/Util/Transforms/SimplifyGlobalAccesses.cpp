@@ -7,66 +7,66 @@
 #include <algorithm>
 #include <iterator>
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
-#define DEBUG_TYPE "iree-flow-simplify-variable-accesses"
+#define DEBUG_TYPE "iree-util-simplify-global-accesses"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Flow {
+namespace Util {
 
-// Builds symbol ref set for all immutable variables in |moduleOp|.
-static DenseSet<StringRef> gatherImmutableVariables(mlir::ModuleOp moduleOp) {
+// Builds symbol ref set for all immutable globals in |moduleOp|.
+static DenseSet<StringRef> gatherImmutableGlobals(mlir::ModuleOp moduleOp) {
   DenseSet<StringRef> set;
-  for (auto variableOp : moduleOp.getOps<IREE::Flow::VariableOp>()) {
-    if (!variableOp.is_mutable()) {
-      set.insert(variableOp.sym_name());
+  for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOp>()) {
+    if (!globalOp.is_mutable()) {
+      set.insert(globalOp.sym_name());
     }
   }
   return set;
 }
 
-// Hoists all loads of immutable variables in |funcOp| to the entry block.
-// |immutableVariables| is used for lookups of which variables are immutable.
+// Hoists all loads of immutable globals in |funcOp| to the entry block.
+// |immutableGlobals| is used for lookups of which globals are immutable.
 static void hoistImmutableLoads(mlir::FuncOp funcOp,
-                                DenseSet<StringRef> &immutableVariables) {
+                                DenseSet<StringRef> &immutableGlobals) {
   // Since CSE of loads isn't a thing yet we perform a basic deduping here by
   // folding all subsequent loads into the first one found. This works only for
-  // immutable variables as otherwise we'd have to ensure stores and
+  // immutable globals as otherwise we'd have to ensure stores and
   // side-effects were properly observed.
   DenseMap<Attribute, Operation *> loadOps;
   auto *entryBlock = &funcOp.getBlocks().front();
   Operation *lastEntryOp = nullptr;
   SmallVector<std::pair<Operation *, Operation *>> opReplacements;
   for (auto &block : funcOp) {
-    auto ops = llvm::to_vector<8>(block.getOps<IREE::Flow::VariableLoadOp>());
+    auto ops = llvm::to_vector<8>(block.getOps<IREE::Util::GlobalLoadOp>());
     for (auto &op : ops) {
-      if (!immutableVariables.contains(op.variable())) continue;
-      auto variableRef = op.variableAttr().cast<Attribute>();
-      auto it = loadOps.find(variableRef);
+      if (!immutableGlobals.contains(op.global())) continue;
+      auto globalRef = op.globalAttr().cast<Attribute>();
+      auto it = loadOps.find(globalRef);
       if (it == loadOps.end()) {
         // Move to entry block; even if it's already there (so loads are
         // hoisted at the same time).
-        LLVM_DEBUG(llvm::dbgs() << "moving immutable variable " << op.variable()
+        LLVM_DEBUG(llvm::dbgs() << "moving immutable global " << op.global()
                                 << " load to the entry block\n");
         if (lastEntryOp) {
           op->moveAfter(lastEntryOp);
         } else {
           op->moveBefore(entryBlock, entryBlock->begin());
         }
-        loadOps[variableRef] = op;
+        loadOps[globalRef] = op;
         lastEntryOp = op;
       } else {
         LLVM_DEBUG(llvm::dbgs()
-                   << "CSE'ing immutable variable " << op.variable() << "\n");
+                   << "CSE'ing immutable global " << op.global() << "\n");
         opReplacements.push_back({op, it->getSecond()});
       }
     }
@@ -107,9 +107,9 @@ static bool optimizeBuckets(
     for (int i = ops.size() - 1; i >= 1; --i) {
       auto previous = ops[i - 1];
       auto current = ops[i];
-      if (isa<IREE::Flow::VariableStoreOp>(previous) &&
-          isa<IREE::Flow::VariableLoadOp>(current)) {
-        // RAW - forward the stored variable to the following use.
+      if (isa<IREE::Util::GlobalStoreOp>(previous) &&
+          isa<IREE::Util::GlobalLoadOp>(current)) {
+        // RAW - forward the stored global to the following use.
         auto storedValue = previous->getOperand(0);
         LLVM_DEBUG({
           llvm::dbgs() << "RAW: replacing load with previous store value:\n";
@@ -121,9 +121,9 @@ static bool optimizeBuckets(
         ops.erase(ops.begin() + i);
         current->erase();
         didRemoveAny = true;
-      } else if (isa<IREE::Flow::VariableLoadOp>(previous) &&
-                 isa<IREE::Flow::VariableLoadOp>(current)) {
-        // RAR - forward the loaded variable to the following use.
+      } else if (isa<IREE::Util::GlobalLoadOp>(previous) &&
+                 isa<IREE::Util::GlobalLoadOp>(current)) {
+        // RAR - forward the loaded global to the following use.
         LLVM_DEBUG({
           llvm::dbgs() << "RAR: replacing subsequent load with op:\n";
           current->dump();
@@ -134,8 +134,8 @@ static bool optimizeBuckets(
         ops.erase(ops.begin() + i);
         current->erase();
         didRemoveAny = true;
-      } else if (isa<IREE::Flow::VariableStoreOp>(previous) &&
-                 isa<IREE::Flow::VariableStoreOp>(current)) {
+      } else if (isa<IREE::Util::GlobalStoreOp>(previous) &&
+                 isa<IREE::Util::GlobalStoreOp>(current)) {
         // WAW - remove the first store.
         LLVM_DEBUG({
           llvm::dbgs() << "WAW: erasing source op:\n";
@@ -150,16 +150,16 @@ static bool optimizeBuckets(
     }
     if (ops.empty()) continue;
 
-    if (auto loadOp = dyn_cast<IREE::Flow::VariableLoadOp>(ops.front())) {
+    if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(ops.front())) {
       // If the head op is a load we can move that to the top of the block.
-      LLVM_DEBUG(llvm::dbgs() << "moving mutable variable " << loadOp.variable()
+      LLVM_DEBUG(llvm::dbgs() << "moving mutable global " << loadOp.global()
                               << " load upward\n");
       moveOpUpInBlock(block, ops.front());
     }
-    if (auto storeOp = dyn_cast<IREE::Flow::VariableStoreOp>(ops.back())) {
+    if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(ops.back())) {
       // If the tail op is a store we can move that to the bottom of the block.
-      LLVM_DEBUG(llvm::dbgs() << "moving mutable variable "
-                              << storeOp.variable() << " store downward\n");
+      LLVM_DEBUG(llvm::dbgs() << "moving mutable global " << storeOp.global()
+                              << " store downward\n");
       moveOpDownInBlock(block, ops.back());
     }
   }
@@ -167,7 +167,7 @@ static bool optimizeBuckets(
 }
 
 // Hoists loads and sinks stores to the boundary of |block| when safe.
-// |immutableVariables| is used for lookups of which variables are immutable.
+// |immutableGlobals| is used for lookups of which globals are immutable.
 //
 // Basic algorithm (repeat until no op removals):
 //   for each op:
@@ -185,26 +185,26 @@ static bool optimizeBuckets(
 //     if (tail == store) move store to back
 //
 // Returns true if there were any removals and the block should be reprocessed.
-static bool rearrangeBlockVariableAccesses(
-    Block &block, DenseSet<StringRef> &immutableVariables) {
+static bool rearrangeBlockGlobalAccesses(
+    Block &block, DenseSet<StringRef> &immutableGlobals) {
   // Gather sequences of operations that are safe to reorder.
   // Certain ops - like calls/do_not_optimize/etc - prevent us from moving any
-  // variable operations across them.
+  // global operations across them.
   //
   // From each sequence we produce [symbol_name, [op, op, op, ...]] buckets.
   // NOTE: we use a map here so that we are deterministically ordered. This may
-  // not be needed but the variable count is low and it's nice to not care about
+  // not be needed but the global count is low and it's nice to not care about
   // op order issues.
   SmallVector<std::map<StringRef, SmallVector<Operation *>>> sequencedBuckets;
   sequencedBuckets.push_back({});  // Start in a sequence.
   block.walk([&](Operation *op) {
     auto &buckets = sequencedBuckets.back();
-    if (auto loadOp = dyn_cast<IREE::Flow::VariableLoadOp>(op)) {
-      if (!immutableVariables.contains(loadOp.variable())) {
-        buckets[loadOp.variable()].push_back(op);
+    if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
+      if (!immutableGlobals.contains(loadOp.global())) {
+        buckets[loadOp.global()].push_back(op);
       }
-    } else if (auto storeOp = dyn_cast<IREE::Flow::VariableStoreOp>(op)) {
-      buckets[storeOp.variable()].push_back(op);
+    } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
+      buckets[storeOp.global()].push_back(op);
     } else if (doesOpBlockMotion(op)) {
       // Split point - all accesses after this point must not assume anything
       // about accesses before it.
@@ -222,9 +222,19 @@ static bool rearrangeBlockVariableAccesses(
 
 namespace {
 
-class SimplifyVariableAccessesPass
-    : public SimplifyVariableAccessesBase<SimplifyVariableAccessesPass> {
+class SimplifyGlobalAccessesPass
+    : public PassWrapper<SimplifyGlobalAccessesPass,
+                         OperationPass<mlir::FuncOp>> {
  public:
+  StringRef getArgument() const override {
+    return "iree-util-simplify-global-accesses";
+  }
+
+  StringRef getDescription() const override {
+    return "Hoists loads and sinks stores to variables to decrease data "
+           "dependency regions.";
+  }
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     if (funcOp.empty()) return;
@@ -232,22 +242,22 @@ class SimplifyVariableAccessesPass
     auto moduleOp = funcOp->getParentOfType<mlir::ModuleOp>();
     assert(moduleOp && "func not in a module");
 
-    // Build a set of all immutable variables for fast lookup.
-    auto immutableVariables = gatherImmutableVariables(moduleOp);
+    // Build a set of all immutable globals for fast lookup.
+    auto immutableGlobals = gatherImmutableGlobals(moduleOp);
 
-    // Hoist immutable variables first. These have no hazards and don't care
+    // Hoist immutable globals first. These have no hazards and don't care
     // about control flow - like `constant` - so getting them handled first
     // avoids the need for us to do the full analysis.
-    hoistImmutableLoads(funcOp, immutableVariables);
+    hoistImmutableLoads(funcOp, immutableGlobals);
 
     // We can't optimize the function if there are indirect loads/stores.
     // Note that constant loads are still ok above.
     for (auto &block : funcOp) {
       for (auto &op : block) {
-        if (isa<IREE::Flow::VariableLoadIndirectOp>(op) ||
-            isa<IREE::Flow::VariableStoreIndirectOp>(op)) {
+        if (isa<IREE::Util::GlobalLoadIndirectOp>(op) ||
+            isa<IREE::Util::GlobalStoreIndirectOp>(op)) {
           LLVM_DEBUG(llvm::dbgs()
-                     << "bailing on variable access simplification: indirect "
+                     << "bailing on global access simplification: indirect "
                         "accesses present in function\n");
           return;
         }
@@ -259,7 +269,7 @@ class SimplifyVariableAccessesPass
     // real compiler engineer sees this they'll be inspired to do this properly.
     for (auto &block : funcOp) {
       LLVM_DEBUG(llvm::dbgs() << "==== REARRANGING BLOCK ACCESSES ====\n");
-      while (rearrangeBlockVariableAccesses(block, immutableVariables)) {
+      while (rearrangeBlockGlobalAccesses(block, immutableGlobals)) {
         // NOTE: block is processed until no more ops are removed. Will always
         // end in a fixed amount of time as ops are only removed from the block.
       }
@@ -270,11 +280,13 @@ class SimplifyVariableAccessesPass
 }  // namespace
 
 std::unique_ptr<OperationPass<mlir::FuncOp>>
-createSimplifyVariableAccessesPass() {
-  return std::make_unique<SimplifyVariableAccessesPass>();
+createSimplifyGlobalAccessesPass() {
+  return std::make_unique<SimplifyGlobalAccessesPass>();
 }
 
-}  // namespace Flow
+static PassRegistration<SimplifyGlobalAccessesPass> pass;
+
+}  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_IREETOVM_CONVERTIREETOVM_H_
-#define IREE_COMPILER_DIALECT_VM_CONVERSION_IREETOVM_CONVERTIREETOVM_H_
+#ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_UTILTOVM_CONVERTUTILTOVM_H_
+#define IREE_COMPILER_DIALECT_VM_CONVERSION_UTILTOVM_CONVERTUTILTOVM_H_
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -14,11 +14,12 @@ namespace mlir {
 namespace iree_compiler {
 
 // Appends IREE special hint ops to VM dialect patterns.
-void populateIREEToVMPatterns(MLIRContext *context,
+void populateUtilToVMPatterns(MLIRContext *context,
+                              ConversionTarget &conversionTarget,
                               TypeConverter &typeConverter,
                               OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_IREETOVM_CONVERTIREETOVM_H_
+#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_UTILTOVM_CONVERTUTILTOVM_H_

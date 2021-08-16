@@ -18,7 +18,6 @@ iree_cc_library(
   SRCS
     "AssignTargetDevices.cpp"
     "BenchmarkBatchDispatches.cpp"
-    "CSEVariableLoads.cpp"
     "ConvertToHAL.cpp"
     "IdentifyConstantPools.cpp"
     "InlineDeviceSwitches.cpp"
@@ -55,7 +54,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::Util::Conversion::PreserveCompilerHints
+    iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
   PUBLIC

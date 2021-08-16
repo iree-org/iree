@@ -11,12 +11,15 @@ package(
 )
 
 cc_library(
-    name = "IREEToVM",
+    name = "UtilToVM",
     srcs = [
-        "ConvertIREEToVM.cpp",
+        "ConvertGlobalOps.cpp",
+        "ConvertListOps.cpp",
+        "ConvertStatusOps.cpp",
+        "ConvertUtilToVM.cpp",
     ],
     hdrs = [
-        "ConvertIREEToVM.h",
+        "ConvertUtilToVM.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Util/IR",

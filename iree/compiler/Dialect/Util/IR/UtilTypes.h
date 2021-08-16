@@ -11,6 +11,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/SubElementInterfaces.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 
@@ -93,7 +94,8 @@ class ListType
 };
 
 /// Base for typed pointer-like references.
-class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
+class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage,
+                                      mlir::SubElementTypeInterface::Trait> {
  public:
   static PtrType get(Type targetType);
   static PtrType getChecked(Type targetType, Location location);
@@ -102,7 +104,13 @@ class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
 
   using Base::Base;
 
-  Type getTargetType();
+  Type getTargetType() const;
+
+  void walkImmediateSubElements(
+      llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+      llvm::function_ref<void(mlir::Type)> walkTypesFn) const {
+    walkTypesFn(getTargetType());
+  }
 };
 
 /// A buffer of constant mapped memory.

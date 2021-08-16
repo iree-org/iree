@@ -12,6 +12,8 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
@@ -21,41 +23,42 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-class ExpandVariableDynamicDimsPass
-    : public ExpandVariableDynamicDimsBase<ExpandVariableDynamicDimsPass> {
+class ExpandGlobalDynamicDimsPass
+    : public ExpandGlobalDynamicDimsBase<ExpandGlobalDynamicDimsPass> {
  public:
-  ExpandVariableDynamicDimsPass() = default;
+  ExpandGlobalDynamicDimsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect>();
     registry.insert<ShapeDialect>();
   }
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    // Gathers all of the flow.variables containing shapes.
-    SmallVector<VariableOp, 4> shapeVarOps;
-    moduleOp.walk([&](VariableOp op) {
+    // Gathers all of the util.globals containing shapes.
+    SmallVector<IREE::Util::GlobalOp, 4> shapeGlobalOps;
+    moduleOp.walk([&](IREE::Util::GlobalOp op) {
       if (op.type().isa<Shape::RankedShapeType>()) {
-        shapeVarOps.push_back(op);
+        shapeGlobalOps.push_back(op);
       }
     });
 
-    // Split each variable into one variable per dimension.
-    for (auto shapeVarOp : shapeVarOps) {
-      expandShapeVariable(moduleOp, shapeVarOp);
+    // Split each global into one global per dimension.
+    for (auto shapeGlobalOp : shapeGlobalOps) {
+      expandShapeGlobal(moduleOp, shapeGlobalOp);
     }
   }
 
  private:
-  // Expands a flow.variable representing a shape with one variable per dim.
-  // Uses of the variable will be replaced with the per-dim ones.
-  void expandShapeVariable(mlir::ModuleOp moduleOp, VariableOp shapeVarOp) {
-    // Create one flow.variable per dimension (static or dynamic).
-    OpBuilder moduleBuilder(shapeVarOp);
-    auto shapeType = shapeVarOp.type().cast<Shape::RankedShapeType>();
-    SmallVector<VariableOp, 4> dimVarOps;
+  // Expands a util.global representing a shape with one global per dim.
+  // Uses of the global will be replaced with the per-dim ones.
+  void expandShapeGlobal(mlir::ModuleOp moduleOp,
+                         IREE::Util::GlobalOp shapeGlobalOp) {
+    // Create one util.global per dimension (static or dynamic).
+    OpBuilder moduleBuilder(shapeGlobalOp);
+    auto shapeType = shapeGlobalOp.type().cast<Shape::RankedShapeType>();
+    SmallVector<IREE::Util::GlobalOp, 4> dimGlobalOps;
     for (int i = 0; i < shapeType.getRank(); ++i) {
       Attribute initialDimValue;
       if (shapeType.isDimDynamic(i)) {
@@ -67,60 +70,62 @@ class ExpandVariableDynamicDimsPass
       } else {
         initialDimValue = moduleBuilder.getIndexAttr(shapeType.getStaticDim(i));
       }
-      auto dimVarOp = moduleBuilder.create<VariableOp>(
-          shapeVarOp.getLoc(),
-          (shapeVarOp.getName() + "_d" + std::to_string(i)).str(),
+      auto dimGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
+          shapeGlobalOp.getLoc(),
+          (shapeGlobalOp.getName() + "_d" + std::to_string(i)).str(),
           /*isMutable=*/shapeType.isDimDynamic(i), moduleBuilder.getIndexType(),
           initialDimValue);
-      dimVarOp.setPrivate();
-      dimVarOps.push_back(dimVarOp);
+      dimGlobalOp.setPrivate();
+      dimGlobalOps.push_back(dimGlobalOp);
     }
 
-    // Replace all uses of the single variable with the split ones.
-    replaceShapeVariableUses(moduleOp, shapeType, shapeVarOp, dimVarOps);
+    // Replace all uses of the single global with the split ones.
+    replaceShapeGlobalUses(moduleOp, shapeType, shapeGlobalOp, dimGlobalOps);
 
-    // Erase the original variable.
-    shapeVarOp.erase();
+    // Erase the original global.
+    shapeGlobalOp.erase();
   }
 
-  // Replaces uses of |shapeVarOp| in |moduleOp| with the expanded |dimVarOps|.
-  void replaceShapeVariableUses(mlir::ModuleOp moduleOp,
-                                Shape::RankedShapeType shapeType,
-                                VariableOp shapeVarOp,
-                                ArrayRef<VariableOp> dimVarOps) {
-    auto allUses = SymbolTable::getSymbolUses(shapeVarOp, moduleOp)
+  // Replaces uses of |shapeGlobalOp| in |moduleOp| with the expanded
+  // |dimGlobalOps|.
+  void replaceShapeGlobalUses(mlir::ModuleOp moduleOp,
+                              Shape::RankedShapeType shapeType,
+                              IREE::Util::GlobalOp shapeGlobalOp,
+                              ArrayRef<IREE::Util::GlobalOp> dimGlobalOps) {
+    auto allUses = SymbolTable::getSymbolUses(shapeGlobalOp, moduleOp)
                        .getValueOr(SymbolTable::UseRange({}));
     for (auto use : allUses) {
-      if (auto loadOp = dyn_cast<VariableLoadOp>(use.getUser())) {
+      if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(use.getUser())) {
         OpBuilder builder(loadOp);
         SmallVector<Value, 4> dynamicDimValues;
         for (int i = 0; i < shapeType.getRank(); ++i) {
           if (!shapeType.isDimDynamic(i)) continue;
-          VariableOp dimVarOp = dimVarOps[i];
-          dynamicDimValues.push_back(builder.create<VariableLoadOp>(
-              loadOp.getLoc(), builder.getIndexType(), dimVarOp.getName()));
+          IREE::Util::GlobalOp dimGlobalOp = dimGlobalOps[i];
+          dynamicDimValues.push_back(builder.create<IREE::Util::GlobalLoadOp>(
+              loadOp.getLoc(), builder.getIndexType(), dimGlobalOp.getName()));
         }
         auto shapeValue = builder.create<Shape::MakeRankedShapeOp>(
             loadOp.getLoc(), shapeType, dynamicDimValues);
         loadOp->replaceAllUsesWith(shapeValue);
         loadOp.erase();
-      } else if (auto storeOp = dyn_cast<VariableStoreOp>(use.getUser())) {
+      } else if (auto storeOp =
+                     dyn_cast<IREE::Util::GlobalStoreOp>(use.getUser())) {
         OpBuilder builder(storeOp);
         auto shapeValue = storeOp.value();
         for (int i = 0; i < shapeType.getRank(); ++i) {
           if (!shapeType.isDimDynamic(i)) continue;
-          VariableOp dimVarOp = dimVarOps[i];
+          IREE::Util::GlobalOp dimGlobalOp = dimGlobalOps[i];
           auto dynamicDimValue = builder.createOrFold<Shape::RankedDimOp>(
               storeOp.getLoc(), shapeValue, i);
-          builder.create<VariableStoreOp>(storeOp.getLoc(), dynamicDimValue,
-                                          dimVarOp.getName());
+          builder.create<IREE::Util::GlobalStoreOp>(
+              storeOp.getLoc(), dynamicDimValue, dimGlobalOp.getName());
         }
         storeOp.erase();
       } else {
         // TODO(benvanik): support indirection/addressing - should be fairly
         // easy to do by splitting the address ops to each dim.
         use.getUser()->emitError()
-            << "variable action on shape is not yet supported";
+            << "global action on shape is not yet supported";
         signalPassFailure();
         return;
       }
@@ -129,8 +134,8 @@ class ExpandVariableDynamicDimsPass
 };
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createExpandVariableDynamicDimsPass() {
-  return std::make_unique<ExpandVariableDynamicDimsPass>();
+createExpandGlobalDynamicDimsPass() {
+  return std::make_unique<ExpandGlobalDynamicDimsPass>();
 }
 
 }  // namespace Flow

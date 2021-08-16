@@ -355,6 +355,10 @@ def HAL_ElementType : TypeAlias<I32>;
 def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
 
+def HAL_EncodingType : TypeAlias<I32>;
+def HAL_EncodingTypeAttr : SignlessIntegerAttrBase<
+  I32, "encoding type attribute">;
+
 def HAL_DeviceSize : TypeAlias<Index>;
 def HAL_DeviceSizeAttr : Util_IndexAttrBase<"iree_device_size_t">;
 def HAL_DeviceSizes : Variadic<HAL_DeviceSize>;
@@ -366,9 +370,9 @@ def HAL_TimelineValue : TypeAlias<Index>;
 
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
-def HAL_VariableRefAttr : AliasedSymbolRefAttr;
-def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
-def HAL_VariablePtr : PtrOf<HAL_VariableType>;
+def HAL_GlobalRefAttr : AliasedSymbolRefAttr;
+def HAL_GlobalType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
+def HAL_GlobalPtr : Util_PtrOf<HAL_GlobalType>;
 
 def HAL_IndexAttr : Util_IndexAttrBase<"index">;
 def HAL_IndexArrayAttr : TypedArrayAttrBase<HAL_IndexAttr,

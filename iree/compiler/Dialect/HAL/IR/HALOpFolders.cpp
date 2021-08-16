@@ -35,130 +35,6 @@ OpFoldResult TensorCastOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.variable.*
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Converts variable initializer functions that evaluate to a constant to a
-/// specified initial value.
-struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
-  using OpRewritePattern<VariableOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VariableOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return failure();
-    auto *symbolOp =
-        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
-    auto initializer = cast<FuncOp>(symbolOp);
-    if (initializer.getBlocks().size() == 1 &&
-        initializer.getBlocks().front().getOperations().size() == 2 &&
-        isa<mlir::ReturnOp>(
-            initializer.getBlocks().front().getOperations().back())) {
-      auto &primaryOp = initializer.getBlocks().front().getOperations().front();
-      Attribute constResult;
-      if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
-        auto newOp = rewriter.create<VariableOp>(op.getLoc(), op.sym_name(),
-                                                 op.is_mutable(), op.type(),
-                                                 constResult);
-        newOp.setVisibility(op.getVisibility());
-        rewriter.replaceOp(op, {});
-        return success();
-      }
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {
-  results.insert<InlineConstVariableOpInitializer>(context);
-}
-
-namespace {
-
-class PropagateVariableLoadAddress
-    : public OpRewritePattern<VariableLoadIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
- public:
-  LogicalResult matchAndRewrite(VariableLoadIndirectOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
-            op.variable().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<VariableLoadOp>(op, op.result().getType(),
-                                                  addressOp.variable());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableLoadIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<PropagateVariableLoadAddress>(context);
-}
-
-namespace {
-
-/// Erases hal.variable.store ops that are no-ops.
-/// This can happen if there was a variable load, some DCE'd usage, and a
-/// store back to the same variable: we want to be able to elide the entire load
-/// and store.
-struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
-  using OpRewritePattern<VariableStoreOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VariableStoreOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto loadOp =
-            dyn_cast_or_null<VariableLoadOp>(op.value().getDefiningOp())) {
-      if (loadOp.variable() == op.variable()) {
-        rewriter.eraseOp(op);
-        return success();
-      }
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<EraseUnusedVariableStoreOp>(context);
-}
-
-namespace {
-
-class PropagateVariableStoreAddress
-    : public OpRewritePattern<VariableStoreIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
- public:
-  LogicalResult matchAndRewrite(VariableStoreIndirectOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
-            op.variable().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<VariableStoreOp>(op, op.value(),
-                                                   addressOp.variable());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableStoreIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<PropagateVariableStoreAddress>(context);
-}
-
-//===----------------------------------------------------------------------===//
 // hal.allocator.*
 //===----------------------------------------------------------------------===//
 
@@ -183,6 +59,8 @@ struct ExpandAllocatorComputeSizeOp
                                 PatternRewriter &rewriter) const override {
     // TODO(benvanik): use buffer constraints for alignment.
     BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
+
+    // TODO(#6762): switch based on op.encoding().
 
     auto elementSize =
         getElementByteCount(op.getLoc(), op.element_type(), rewriter);
@@ -212,6 +90,8 @@ struct ExpandAllocatorComputeOffsetOp
                                 PatternRewriter &rewriter) const override {
     // TODO(benvanik): use buffer constraints.
     BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
+
+    // TODO(#6762): switch based on op.encoding().
 
     auto offset = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 0);
     for (size_t i = 0; i < op.indices().size(); ++i) {
@@ -270,10 +150,10 @@ struct ExpandAllocatorComputeRangeOp
 
     auto startByteOffset = rewriter.createOrFold<AllocatorComputeOffsetOp>(
         op.getLoc(), rewriter.getIndexType(), op.allocator(), op.shape(),
-        op.element_type(), op.indices());
+        op.element_type(), op.encoding_type(), op.indices());
     auto endByteOffset = rewriter.createOrFold<AllocatorComputeOffsetOp>(
         op.getLoc(), rewriter.getIndexType(), op.allocator(), op.shape(),
-        op.element_type(), endIndices);
+        op.element_type(), op.encoding_type(), endIndices);
 
     auto elementSize =
         getElementByteCount(op.getLoc(), op.element_type(), rewriter);
@@ -310,6 +190,11 @@ struct ExpandAllocatorConstantOp
     if (!elementType.hasValue()) {
       return rewriter.notifyMatchFailure(op, "unhandled element type");
     }
+    // TODO(#6762): get encoding type.
+    auto encodingType = IREE::HAL::getEncodingTypeValue({});
+    if (!encodingType.hasValue()) {
+      return rewriter.notifyMatchFailure(op, "unhandled encoding type");
+    }
 
     // TODO(benvanik): compute from SSA use-def chain uses.
     IREE::HAL::MemoryTypeBitfield memoryTypes =
@@ -339,7 +224,8 @@ struct ExpandAllocatorConstantOp
         }
       }
       auto bufferView = rewriter.createOrFold<BufferViewCreateOp>(
-          op.getLoc(), deviceBuffer, elementType.getValue(), shape);
+          op.getLoc(), deviceBuffer, elementType.getValue(),
+          encodingType.getValue(), shape);
       rewriter.replaceOp(op, {bufferView});
     } else {
       rewriter.replaceOp(op, {deviceBuffer});
@@ -526,42 +412,6 @@ void BufferAllocatorOp::getCanonicalizationPatterns(
 
 namespace {
 
-/// Expands a hal.buffer_view.subview op into range computation and creation
-/// ops. This allows for greater opportunity to CSE/bypass/etc the buffer view
-/// operations.
-struct ExpandBufferViewSubviewOp
-    : public OpRewritePattern<BufferViewSubviewOp> {
-  using OpRewritePattern<BufferViewSubviewOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewSubviewOp op,
-                                PatternRewriter &rewriter) const override {
-    auto computeRangeOp = rewriter.create<BufferViewComputeRangeOp>(
-        op.getLoc(), op.buffer_view(), op.indices(), op.lengths());
-
-    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
-        op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
-        op.buffer_view());
-    auto subspanValue = rewriter.createOrFold<BufferSubspanOp>(
-        op.getLoc(), bufferValue.getType(), bufferValue,
-        computeRangeOp.offset(), computeRangeOp.length());
-
-    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
-        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
-    rewriter.replaceOpWithNewOp<BufferViewCreateOp>(
-        op, subspanValue, elementTypeValue, op.lengths());
-    return success();
-  }
-};
-
-}  // namespace
-
-void BufferViewSubviewOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandBufferViewSubviewOp>(context);
-}
-
-namespace {
-
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
@@ -583,77 +433,6 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
 void BufferViewBufferOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SkipBufferViewBufferOp>(context);
-}
-
-namespace {
-
-/// Expands a hal.buffer_view.compute_offset op to use
-/// hal.allocator.compute_offset. This allows for all of the shape math to
-/// happen in the VM where we can better optimize it.
-struct ExpandBufferViewComputeOffsetOp
-    : public OpRewritePattern<BufferViewComputeOffsetOp> {
-  using OpRewritePattern<BufferViewComputeOffsetOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewComputeOffsetOp op,
-                                PatternRewriter &rewriter) const override {
-    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
-        op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
-        op.buffer_view());
-    auto allocatorValue = rewriter.createOrFold<BufferAllocatorOp>(
-        op.getLoc(), AllocatorType::get(rewriter.getContext()), bufferValue);
-    int rank = op.indices().size();
-    SmallVector<Type, 4> dimTypes(rank, rewriter.getIndexType());
-    auto dimsOp = rewriter.create<BufferViewDimsOp>(op.getLoc(), dimTypes,
-                                                    op.buffer_view());
-    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
-        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
-    rewriter.replaceOpWithNewOp<AllocatorComputeOffsetOp>(
-        op, allocatorValue, dimsOp.result(), elementTypeValue, op.indices());
-    return success();
-  }
-};
-
-}  // namespace
-
-void BufferViewComputeOffsetOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandBufferViewComputeOffsetOp>(context);
-}
-
-namespace {
-
-/// Expands a hal.buffer_view.compute_range op to use
-/// hal.allocator.compute_range. This allows for all of the shape math to
-/// happen in the VM where we can better optimize it.
-struct ExpandBufferViewComputeRangeOp
-    : public OpRewritePattern<BufferViewComputeRangeOp> {
-  using OpRewritePattern<BufferViewComputeRangeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewComputeRangeOp op,
-                                PatternRewriter &rewriter) const override {
-    auto bufferValue = rewriter.createOrFold<BufferViewBufferOp>(
-        op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
-        op.buffer_view());
-    auto allocatorValue = rewriter.createOrFold<BufferAllocatorOp>(
-        op.getLoc(), AllocatorType::get(rewriter.getContext()), bufferValue);
-    int rank = op.indices().size();
-    SmallVector<Type, 4> dimTypes(rank, rewriter.getIndexType());
-    auto dimsOp = rewriter.create<BufferViewDimsOp>(op.getLoc(), dimTypes,
-                                                    op.buffer_view());
-    auto elementTypeValue = rewriter.createOrFold<BufferViewElementTypeOp>(
-        op.getLoc(), rewriter.getI32Type(), op.buffer_view());
-    rewriter.replaceOpWithNewOp<AllocatorComputeRangeOp>(
-        op, allocatorValue, dimsOp.result(), elementTypeValue, op.indices(),
-        op.lengths());
-    return success();
-  }
-};
-
-}  // namespace
-
-void BufferViewComputeRangeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandBufferViewComputeRangeOp>(context);
 }
 
 namespace {
@@ -851,7 +630,7 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
 
 namespace {
 
-// Resolves hal.constant.buffer ops to their runtime hal.variable buffer.
+// Resolves hal.constant.buffer ops to their runtime util.global buffer.
 struct ResolveConstantPoolLoadToRuntimeBuffer
     : public OpRewritePattern<ConstantPoolLoadOp> {
   using OpRewritePattern<ConstantPoolLoadOp>::OpRewritePattern;

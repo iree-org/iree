@@ -10,6 +10,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -64,7 +66,7 @@ class OutlineLargeConstantsPass
       : minLargeConstantSize(minLargeConstantSize){};
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
@@ -76,36 +78,36 @@ class OutlineLargeConstantsPass
     std::string baseName = "_large_const_";
     int uniqueId = 0;
 
-    // Create all top-level flow.variables from large constants in the module.
+    // Create all top-level util.globals from large constants in the module.
     OpBuilder moduleBuilder(&moduleOp.getBody()->front());
-    std::vector<std::pair<ConstantOp, IREE::Flow::VariableOp>> replacements;
+    std::vector<std::pair<ConstantOp, IREE::Util::GlobalOp>> replacements;
     for (auto &largeConstantOp :
          findLargeConstantsInModule(moduleOp, minLargeConstantSize)) {
       std::string name;
       do {
         name = baseName + std::to_string(uniqueId++);
       } while (moduleSymbols.lookup(name) != nullptr);
-      auto variableOp = moduleBuilder.create<IREE::Flow::VariableOp>(
+      auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           largeConstantOp.getLoc(), name, /*isMutable=*/false,
           largeConstantOp.getType(), largeConstantOp.getValue());
-      variableOp.setPrivate();
-      replacements.emplace_back(largeConstantOp, variableOp);
+      globalOp.setPrivate();
+      replacements.emplace_back(largeConstantOp, globalOp);
 
       // Prevent the variable from being re-inlined if the canonicalizer runs.
       // By the time we've outlined things here we are sure we want them
       // outlined even if the user runs an arbitrary number of passes between
       // now and when we may use that information (HAL constant pooling, etc).
-      variableOp->setAttr("noinline", moduleBuilder.getUnitAttr());
+      globalOp->setAttr("noinline", moduleBuilder.getUnitAttr());
     }
 
     // Replace all of the constants with lookups for the new variables.
     for (auto pair : replacements) {
       auto constantOp = pair.first;
-      auto variableOp = pair.second;
+      auto globalOp = pair.second;
       OpBuilder builder(moduleOp.getContext());
       builder.setInsertionPoint(constantOp);
-      auto lookupOp = builder.create<IREE::Flow::VariableLoadOp>(
-          constantOp.getLoc(), constantOp.getType(), variableOp.getName());
+      auto lookupOp = builder.create<IREE::Util::GlobalLoadOp>(
+          constantOp.getLoc(), constantOp.getType(), globalOp.getName());
       constantOp.getResult().replaceAllUsesWith(lookupOp);
       constantOp.erase();
     }

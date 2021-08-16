@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_UTIL_IR_UTIL_INTERFACES
 #define IREE_DIALECT_UTIL_IR_UTIL_INTERFACES
 
-include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
@@ -168,6 +168,41 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   let verify = [{
     return IREE::Util::detail::verifyTiedOp($_op);
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::GlobalTypeInterface
+//===----------------------------------------------------------------------===//
+
+def Util_GlobalTypeInterface : TypeInterface<"GlobalTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used to mark types as supported for global variables.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the access to a global via a specific type is compatible
+        with the storage type of the global. For example, a storage of
+        `tensor<?xf32>` is compatible with an access as `tensor<4xf32>`.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isAccessStorageCompatible",
+      /*args=*/(ins "Type":$accessType),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // If one is a shaped type, then they both must be and have compatible
+        // shapes.
+        if ($_type.isa<ShapedType>() || accessType.isa<ShapedType>()) {
+          return succeeded(mlir::verifyCompatibleShape($_type, accessType));
+        }
+        // Otherwise, the types must be the same.
+        return $_type == accessType;
+      }]
+    >,
+  ];
 }
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_INTERFACES

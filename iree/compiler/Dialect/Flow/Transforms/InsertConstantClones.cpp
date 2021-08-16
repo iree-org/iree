@@ -62,9 +62,9 @@ class InsertConstantClonesPass
     if (op->hasTrait<OpTrait::ConstantLike>() ||
         isa<IREE::Util::UnfoldableConstantOp>(op)) {
       return true;
-    } else if (auto loadOp = dyn_cast<IREE::Flow::VariableLoadOp>(op)) {
-      return !loadOp.getLoadedVariable().is_mutable();
-    } else if (auto loadOp = dyn_cast<IREE::Flow::VariableLoadIndirectOp>(op)) {
+    } else if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
+      return loadOp.isGlobalImmutable();
+    } else if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadIndirectOp>(op)) {
       return true;  // can't know indirect variable behavior (without DFA)
     } else if (auto sliceOp = dyn_cast<IREE::Flow::TensorSliceOp>(op)) {
       return isLikelyConstant(sliceOp.source());

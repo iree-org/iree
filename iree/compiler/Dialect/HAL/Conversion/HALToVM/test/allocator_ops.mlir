@@ -5,8 +5,10 @@ func @allocatorComputeSizeFoldsAway(%arg0 : !hal.allocator) -> index {
   // CHECK: %c4194304 = vm.const.i32 4194304 : i32
   // CHECK-NOT: hal.allocator.compute_size
   %c1024 = constant 1024 : index
+  %c1_i32 = constant 1 : i32
   %c32_i32 = constant 32 : i32
-  %0 = hal.allocator.compute_size<%arg0 : !hal.allocator> shape([%c1024, %c1024]) type(%c32_i32) : index
+  %0 = hal.allocator.compute_size<%arg0 : !hal.allocator>
+      shape([%c1024, %c1024]) type(%c32_i32) encoding(%c1_i32) : index
   return %0 : index
 }
 

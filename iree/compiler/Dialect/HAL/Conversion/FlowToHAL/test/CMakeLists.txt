@@ -15,9 +15,9 @@ iree_lit_test_suite(
     lit
   SRCS
     "constant_ops.mlir"
+    "global_ops.mlir"
     "stream_ops.mlir"
     "tensor_ops.mlir"
-    "variable_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

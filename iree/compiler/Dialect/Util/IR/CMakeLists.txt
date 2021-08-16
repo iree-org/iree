@@ -22,6 +22,7 @@ iree_cc_library(
     "UtilTypes.h"
   SRCS
     "UtilDialect.cpp"
+    "UtilOpFolders.cpp"
     "UtilOpInterfaces.cpp.inc"
     "UtilOps.cpp"
     "UtilOps.cpp.inc"
@@ -30,11 +31,13 @@ iree_cc_library(
     ::UtilInterfacesGen
     ::UtilOpsGen
     LLVMSupport
+    MLIRControlFlowInterfaces
     MLIRIR
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport
+    MLIRTransforms
   PUBLIC
 )
 
