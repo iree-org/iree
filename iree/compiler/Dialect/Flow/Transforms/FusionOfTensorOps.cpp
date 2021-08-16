@@ -79,12 +79,24 @@ struct FusionOfTensorOpsPass
                           consumer.getOwner()->operand_end());
           if (operands.size() >= kIreeMaxOperandCount) return false;
 
-          llvm::SmallDenseSet<Operation *, 4> numUsers;
-          for (Operation *user : producer.getUsers()) {
-            if (isa<linalg::GenericOp>(user)) continue;
-            numUsers.insert(user);
-          }
-          return numUsers.empty();
+          auto genericProducer =
+              dyn_cast<linalg::GenericOp>(producer.getOwner());
+          bool simpleOp =
+              isa<ConstantOp>(producer.getOwner()) ||
+              (genericProducer &&
+               llvm::all_of(genericProducer.getBody()->getOperations(),
+                            [](Operation &op) {
+                              return isa<linalg::YieldOp>(&op) ||
+                                     OpTrait::hasElementwiseMappableTraits(&op);
+                            }));
+          // For ops that may have high cost, only fuse them if they have a
+          // single user to avoid duplicating them.
+          if (!simpleOp && !llvm::hasSingleElement((producer.getUsers())))
+            return false;
+
+          return llvm::all_of(producer.getUsers(), [](Operation *user) {
+            return isa<linalg::GenericOp>(user);
+          });
         };
     // Simple heuristic to decide if reshaope should be folded in the linalg.
     // If the source of the reshape is a linalg op fold to potentially allow the
