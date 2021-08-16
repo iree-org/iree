@@ -32,28 +32,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    legacy_library_loader
-  HDRS
-    "legacy_library_loader.h"
-  SRCS
-    "legacy_library_loader.c"
-  DEPS
-    iree::base
-    iree::base::core_headers
-    iree::base::internal::dynamic_library
-    iree::base::internal::flatcc
-    iree::base::tracing
-    iree::hal
-    iree::hal::local
-    iree::hal::local::executable_library
-    iree::schemas::dylib_executable_def_c_fbs
-  DEFINES
-    "IREE_HAL_HAVE_LEGACY_LIBRARY_LOADER=1"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     static_library_loader
   HDRS
     "static_library_loader.h"
@@ -67,6 +45,28 @@ iree_cc_library(
     iree::hal::local::executable_library
   DEFINES
     "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    system_library_loader
+  HDRS
+    "system_library_loader.h"
+  SRCS
+    "system_library_loader.c"
+  DEPS
+    iree::base
+    iree::base::core_headers
+    iree::base::internal::dynamic_library
+    iree::base::internal::flatcc
+    iree::base::tracing
+    iree::hal
+    iree::hal::local
+    iree::hal::local::executable_library
+    iree::schemas::dylib_executable_def_c_fbs
+  DEFINES
+    "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
   PUBLIC
 )
 
