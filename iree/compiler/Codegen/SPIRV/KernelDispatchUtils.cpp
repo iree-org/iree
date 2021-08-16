@@ -339,7 +339,6 @@ LogicalResult setDefaultRootConfig(FuncOp entryPoint,
   }
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
-  int64_t lowerTs = workgroupSize[0];
   unsigned loopDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t, 4> workgroupTileSize(loopDepth, 1),
       threadTileSize(loopDepth, 1);
