@@ -137,24 +137,26 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
     }
   }
 
-  // Calculate the problem size to adjust the tile size.
-  int64_t problemSize = 1;
-  entryPoint.walk([&problemSize](IREE::Flow::DispatchTensorStoreOp storeOp) {
-    ArrayRef<int64_t> shape = storeOp.target()
-                                  .getType()
-                                  .cast<IREE::Flow::DispatchTensorType>()
-                                  .getShape();
-    int64_t prod = 1;
-    for (int64_t dim : shape) prod *= dim;
-    problemSize = std::max(prod, problemSize);
-  });
-  // If the problem size is too small or if the op cannot be vectorized, reduce
-  // the vector size to prevent bad memory access patterns.
+  if (isa<linalg::GenericOp>(op)) {
+    // Calculate the problem size to adjust the tile size.
+    int64_t problemSize = 1;
+    entryPoint.walk([&problemSize](IREE::Flow::DispatchTensorStoreOp storeOp) {
+      ArrayRef<int64_t> shape = storeOp.target()
+                                    .getType()
+                                    .cast<IREE::Flow::DispatchTensorType>()
+                                    .getShape();
+      int64_t prod = 1;
+      for (int64_t dim : shape) prod *= dim;
+      problemSize = std::max(prod, problemSize);
+    });
+    // If the problem size is too small or if the op cannot be vectorized,
+    // reduce the vector size to prevent bad memory access patterns.
+    if ((problemSize / (cudaWarpSize * vectorSize)) < 64) vectorSize = 1;
+  }
+  // Pick a vectorSize of 1 for op that we know won't get vectorizedd.
   // TODO(thomasraoux): This could be improved by checking if the linalg op
   // would fail vectorization.
-  if ((problemSize / (cudaWarpSize * vectorSize)) < 64 ||
-      !isa<linalg::LinalgOp>(op))
-    vectorSize = 1;
+  if (!isa<linalg::LinalgOp>(op)) vectorSize = 1;
 
   // Set the inner most parallel loop to `lowerTs`.
   for (int64_t depth = numLoops; depth > 0; depth--) {
