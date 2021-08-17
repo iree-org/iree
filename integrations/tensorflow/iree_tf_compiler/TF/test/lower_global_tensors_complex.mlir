@@ -5,7 +5,7 @@
 // CHECK-LABEL: module attributes {tf_saved_model.semantics}
 module attributes {tf_saved_model.semantics} {
 
-// CHECK:      util.global private mutable [[V:@.+]] = dense<1.000000e+00> : tensor<1xf32>
+// CHECK:      util.global private mutable [[V:@.+]] : tensor<?xf32> = dense<1.000000e+00> : tensor<1xf32>
 // CHECK:      func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
 // CHECK-NEXT:   [[PTR:%.+]] = util.global.address [[V]] : !util.ptr<tensor<?xf32>>
 // CHECK-NEXT:   br ^bb1([[PTR]] : !util.ptr<tensor<?xf32>>)
@@ -28,8 +28,8 @@ module attributes {tf_saved_model.semantics} {
 // CHECK-LABEL: module attributes {tf_saved_model.semantics}
 module attributes {tf_saved_model.semantics} {
 
-// CHECK:      util.global private mutable [[V:@.+]] = dense<1.000000e+00> : tensor<1xf32>
-// CHECK:      util.global private mutable [[V1:@.+]] = dense<1.000000e+00> : tensor<1xf32>
+// CHECK:      util.global private mutable [[V:@.+]] : tensor<?xf32> = dense<1.000000e+00> : tensor<1xf32>
+// CHECK:      util.global private mutable [[V1:@.+]] : tensor<?xf32> = dense<1.000000e+00> : tensor<1xf32>
 // CHECK:      func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) -> (tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
 // CHECK-NEXT:   [[PTR0:%.+]] = util.global.address [[V]] : !util.ptr<tensor<?xf32>>
 // CHECK-NEXT:   [[PTR1:%.+]] = util.global.address [[V1]] : !util.ptr<tensor<?xf32>>
@@ -55,7 +55,7 @@ module attributes {tf_saved_model.semantics} {
 // CHECK-LABEL: module attributes {tf_saved_model.semantics}
 module attributes {tf_saved_model.semantics} {
 
-// CHECK:      util.global private mutable [[V:@.+]] = dense<1.000000e+00> : tensor<1xf32>
+// CHECK:      util.global private mutable [[V:@.+]] : tensor<?xf32> = dense<1.000000e+00> : tensor<1xf32>
 // CHECK:      func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
 // CHECK-NEXT:   [[PTR:%.+]] = util.global.address [[V]] : !util.ptr<tensor<?xf32>>
 // CHECK-NEXT:   br ^bb1([[PTR]], [[PTR]], [[PTR]] : !util.ptr<tensor<?xf32>>, !util.ptr<tensor<?xf32>>, !util.ptr<tensor<?xf32>>)
