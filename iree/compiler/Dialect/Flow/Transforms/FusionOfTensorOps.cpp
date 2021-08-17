@@ -83,8 +83,12 @@ struct FusionOfTensorOpsPass
           // simplistic heuristic to avoid duplicating ops that may be
           // expensive.
           // TODO: Add a cost model to allow ops to be duplicated.
-          if (!llvm::hasSingleElement((producer.getUsers()))) return false;
-          return isa<linalg::GenericOp>(*producer.getUsers().begin());
+          if (!isa<ConstantOp>(producer.getOwner()) &&
+              !llvm::hasSingleElement(producer.getUsers()))
+            return false;
+          return llvm::all_of(producer.getUsers(), [](Operation *user) {
+            return isa<linalg::GenericOp>(user);
+          });
         };
     // Simple heuristic to decide if reshaope should be folded in the linalg.
     // If the source of the reshape is a linalg op fold to potentially allow the
