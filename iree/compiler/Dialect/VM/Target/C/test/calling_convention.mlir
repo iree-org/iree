@@ -24,7 +24,7 @@ vm.module @calling_convention_test {
     // CHECK-NEXT: iree_status_t v6;
     // CHECK-NEXT: v5 = 32;
     %0 = vm.const.i32 32 : i32
-    // CHECK-NEXT: EMITC_DEREF_ASSIGN(v4, v5);
+    // CHECK-NEXT: EMITC_DEREF_ASSIGN_VALUE(v4, v5);
     // CHECK-NEXT: v6 = iree_ok_status();
     // CHECK-NEXT: return v6;
     vm.return %0 : i32
@@ -36,7 +36,7 @@ vm.module @calling_convention_test {
     // CHECK-NEXT: iree_status_t v7;
     // CHECK-NEXT: v6 = 32;
     %0 = vm.const.i32 32 : i32
-    // CHECK-NEXT: EMITC_DEREF_ASSIGN(v5, v6);
+    // CHECK-NEXT: EMITC_DEREF_ASSIGN_VALUE(v5, v6);
     // CHECK-NEXT: v7 = iree_ok_status();
     // CHECK-NEXT: return v7;
     vm.return %0 : i32
