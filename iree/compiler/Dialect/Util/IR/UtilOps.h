@@ -70,6 +70,36 @@ ParseResult parseSizeAwareTypeList(
 void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
                             OperandRange sizes);
 
+//===----------------------------------------------------------------------===//
+// custom<ShapedTiedResult>
+//===----------------------------------------------------------------------===//
+// type{%dim0, %dim1}
+// %arg0 as type{%dim0}
+
+ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands);
+void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
+                           ValueRange resultDims, ArrayAttr tiedOperands);
+
+//===----------------------------------------------------------------------===//
+// custom<ShapedFunctionType>
+//===----------------------------------------------------------------------===//
+// (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
+
+ParseResult parseShapedFunctionType(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
+    SmallVectorImpl<Type> &operandTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &operandDims,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands);
+void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
+                             ValueRange operands, TypeRange operandTypes,
+                             OperandRange operandDims, TypeRange resultTypes,
+                             OperandRange resultDims, ArrayAttr tiedOperands);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

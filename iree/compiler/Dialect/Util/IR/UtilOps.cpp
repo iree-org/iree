@@ -158,6 +158,293 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
   });
 }
 
+//===----------------------------------------------------------------------===//
+// custom<ShapedTiedResult>
+//===----------------------------------------------------------------------===//
+// type{%dim0, %dim1}
+// %arg0 as type{%dim0}
+
+ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands) {
+  OpAsmParser::OperandType tiedResult;
+  auto res = parser.parseOptionalOperand(tiedResult);
+  int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+  if (res.hasValue() && succeeded(res.getValue())) {
+    tiedOperandIndex = 0;
+    if (failed(parser.parseKeyword("as"))) return failure();
+  }
+  if (failed(parser.parseType(resultType))) return failure();
+  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+    if (!shapedType.hasStaticShape()) {
+      SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+      if (failed(parser.parseLBrace()) ||
+          failed(parser.parseOperandList(dynamicDims,
+                                         shapedType.getNumDynamicDims(),
+                                         OpAsmParser::Delimiter::None)) ||
+          failed(parser.parseRBrace())) {
+        return failure();
+      }
+      resultDims.append(dynamicDims);
+    }
+  } else if (auto sizedType =
+                 resultType.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+    OpAsmParser::OperandType size;
+    if (failed(parser.parseOperand(size))) {
+      return failure();
+    }
+    resultDims.push_back(size);
+  }
+  tiedOperands = parser.getBuilder().getIndexArrayAttr({tiedOperandIndex});
+  return success();
+}
+
+void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
+                           ValueRange resultDims, ArrayAttr tiedOperands) {
+  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
+  auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(0);
+  if (tiedOperandIndex.hasValue()) {
+    auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
+    p.printOperand(tiedOperand);
+    p << " as ";
+  }
+  p.printType(resultType);
+  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+    if (!shapedType.hasStaticShape()) {
+      if (resultDims.empty()) {
+        p << "{<<INVALID>>}";
+        return;
+      }
+      p << "{";
+      llvm::interleaveComma(
+          resultDims.take_front(shapedType.getNumDynamicDims()), p,
+          [&](Value value) { p.printOperand(value); });
+      p << "}";
+      resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
+    }
+  } else if (auto sizedType =
+                 resultType.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+    p << "{";
+    p.printOperand(resultDims.front());
+    p << "}";
+    resultDims = resultDims.drop_front(1);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// custom<ShapedFunctionType>
+//===----------------------------------------------------------------------===//
+// (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
+
+static ParseResult parseShapedOperandList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types,
+    SmallVectorImpl<OpAsmParser::OperandType> &dims) {
+  do {
+    Type type;
+    if (failed(parser.parseType(type))) return failure();
+    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+        if (failed(parser.parseLBrace()) ||
+            failed(parser.parseOperandList(dynamicDims,
+                                           shapedType.getNumDynamicDims(),
+                                           OpAsmParser::Delimiter::None)) ||
+            failed(parser.parseRBrace())) {
+          return failure();
+        }
+        dims.append(dynamicDims);
+      }
+    } else if (auto sizedType =
+                   type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+      OpAsmParser::OperandType size;
+      if (failed(parser.parseOperand(size))) {
+        return failure();
+      }
+      dims.push_back(size);
+    }
+    types.push_back(type);
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+// Finds the operand index in |operands| that |tiedResult| references.
+// Returns TiedOpInterface::kUntiedIndex if no operand is found.
+static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
+                               ArrayRef<OpAsmParser::OperandType> operands) {
+  int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+  for (int64_t i = 0; i < operands.size(); ++i) {
+    if (operands[i].name == tiedResult.name) {
+      operandIndex = i;
+      break;
+    }
+  }
+  return operandIndex;
+}
+
+static ParseResult parseShapedResultList(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
+    TypeRange operandTypes, ArrayRef<OpAsmParser::OperandType> operandDims,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands) {
+  SmallVector<int64_t, 4> tiedOperandIndices;
+  do {
+    OpAsmParser::OperandType tiedResult;
+    auto res = parser.parseOptionalOperand(tiedResult);
+    Type type;
+    int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+    if (res.hasValue() && succeeded(res.getValue())) {
+      tiedOperandIndex = findTiedOperand(tiedResult, operands);
+      if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
+        return parser.emitError(tiedResult.location,
+                                "tied operand not found for result reference ")
+               << tiedResult.name;
+      }
+      if (succeeded(parser.parseOptionalKeyword("as"))) {
+        // Type _may_ differ from the operand.
+        if (failed(parser.parseType(type))) return failure();
+      } else {
+        // Use the operands type.
+        type = operandTypes[tiedOperandIndex];
+      }
+    } else if (failed(parser.parseType(type))) {
+      return failure();
+    }
+    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+        if (failed(parser.parseLBrace()) ||
+            failed(parser.parseOperandList(dynamicDims,
+                                           shapedType.getNumDynamicDims(),
+                                           OpAsmParser::Delimiter::None)) ||
+            failed(parser.parseRBrace())) {
+          return failure();
+        }
+        resultDims.append(dynamicDims);
+      }
+    } else if (auto sizedType =
+                   type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+      OpAsmParser::OperandType size;
+      if (failed(parser.parseOperand(size))) {
+        return failure();
+      }
+      resultDims.push_back(size);
+    }
+    resultTypes.push_back(type);
+    tiedOperandIndices.push_back(tiedOperandIndex);
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!tiedOperandIndices.empty()) {
+    tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
+  }
+  return success();
+}
+
+ParseResult parseShapedFunctionType(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
+    SmallVectorImpl<Type> &operandTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &operandDims,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands) {
+  if (failed(parser.parseLParen())) return failure();
+  if (failed(parser.parseOptionalRParen())) {
+    if (failed(parseShapedOperandList(parser, operandTypes, operandDims)) ||
+        failed(parser.parseRParen())) {
+      return failure();
+    }
+  }
+  if (failed(parser.parseArrow())) return failure();
+  if (succeeded(parser.parseOptionalLParen())) {
+    if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                     operandDims, resultTypes, resultDims,
+                                     tiedOperands)) ||
+        failed(parser.parseRParen())) {
+      return failure();
+    }
+  } else {
+    if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                     operandDims, resultTypes, resultDims,
+                                     tiedOperands))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
+void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
+                             ValueRange operands, TypeRange operandTypes,
+                             OperandRange operandDims, TypeRange resultTypes,
+                             OperandRange resultDims, ArrayAttr tiedOperands) {
+  p << "(";
+  llvm::interleaveComma(operandTypes, p, [&](Type type) {
+    p.printType(type);
+    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        if (operandDims.empty()) {
+          p << "{<<INVALID>>}";
+          return;
+        }
+        p << "{";
+        llvm::interleaveComma(
+            operandDims.take_front(shapedType.getNumDynamicDims()), p,
+            [&](Value value) { p.printOperand(value); });
+        p << "}";
+        operandDims = operandDims.drop_front(shapedType.getNumDynamicDims());
+      }
+    } else if (auto sizedType =
+                   type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+      p << "{";
+      p.printOperand(operandDims.front());
+      p << "}";
+      operandDims = operandDims.drop_front(1);
+    }
+  });
+  p << ") -> ";
+  if (resultTypes.size() != 1) p << "(";
+  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
+  for (unsigned i = 0; i < resultTypes.size(); ++i) {
+    auto resultType = resultTypes[i];
+    auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
+    bool printType = true;
+    if (tiedOperandIndex.hasValue()) {
+      auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
+      p.printOperand(tiedOperand);
+      if (tiedOperand.getType() != resultType) {
+        p << " as ";
+      } else {
+        // Type elided as it matches the operand.
+        printType = false;
+      }
+    }
+    if (printType) {
+      p.printType(resultType);
+    }
+    if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        if (resultDims.empty()) {
+          p << "{<<INVALID>>}";
+          return;
+        }
+        p << "{";
+        llvm::interleaveComma(
+            resultDims.take_front(shapedType.getNumDynamicDims()), p,
+            [&](Value value) { p.printOperand(value); });
+        p << "}";
+        resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
+      }
+    } else if (auto sizedType =
+                   resultType.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+      p << "{";
+      p.printOperand(resultDims.front());
+      p << "}";
+      resultDims = resultDims.drop_front(1);
+    }
+    if (i < resultTypes.size() - 1) p << ", ";
+  }
+  if (resultTypes.size() != 1) p << ")";
+}
+
 namespace IREE {
 namespace Util {
 
