@@ -58,8 +58,6 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
 }
 
 void addSPIRVVectorizationPassPipeline(OpPassManager &pm) {
-  // Convert tensor to buffers.
-  addLinalgBufferizePasses(pm, gpuAllocationFunction);
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
@@ -89,8 +87,6 @@ void addSPIRVVectorizationPassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVDistributePassPipeline(OpPassManager &pm) {
-  // Convert tensor to buffers.
-  addLinalgBufferizePasses(pm, gpuAllocationFunction);
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
@@ -118,9 +114,6 @@ void addSPIRVDistributePassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVDistributeToGlobalIDPipeline(OpPassManager &pm) {
-  // Convert tensor to buffers.
-  addLinalgBufferizePasses(pm, gpuAllocationFunction);
-
   // Handle ops that cannot go through the previous tiling, distribution, and
   // vectorization flow. Only perform one level of distribution to map them to
   // GPU global invocation IDs for distribution.
@@ -181,6 +174,10 @@ static void addLowerToSPIRVPasses(OpPassManager &pm) {
 }
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
+  {
+    OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
+    addLinalgBufferizePasses(nestedModulePM, gpuAllocationFunction);
+  }
   pm.addPass(createSPIRVLowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   addLowerToSPIRVPasses(nestedModulePM);
