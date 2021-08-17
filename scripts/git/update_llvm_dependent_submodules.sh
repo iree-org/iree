@@ -65,5 +65,8 @@ if [[ -z "$(which gh)" ]]; then
 fi
 
 # Extract the GitHub owner of the fork from either an ssh or https GitHub URL.
+# Workaround for https://github.com/cli/cli/issues/1820,
+# https://github.com/cli/cli/issues/1985, and
+# https://github.com/cli/cli/issues/575
 FORK_NAME="$(git remote get-url ${FORK_REMOTE?} | sed 's|.*[/:]\([A-Za-z]*\)/iree\(.git\)\?|\1|')"
 gh pr create --base="${BASE_BRANCH?}" --head="${FORK_NAME?}:${PR_BRANCH?}" --title="${TITLE?}" --body="${BODY?}"
