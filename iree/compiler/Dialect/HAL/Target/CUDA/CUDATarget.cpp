@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -44,6 +45,12 @@ static std::string translateModuleToISA(llvm::Module &module,
     llvm::raw_string_ostream stream(targetISA);
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
+    // Workaround for CUDA driver bug
+    // (https://bugs.llvm.org/show_bug.cgi?id=48771), we mark all the loops with
+    // the no unroll metadata. This bug is fixed in cuda 11.4 but since we still
+    // run on older driver we need to keep it.
+    // TODO(thomasraoux): Remove it once we stop supporting older drivers.
+    codegenPasses.add(llvm::createSetNoUnrollPass());
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
                                       llvm::CGFT_AssemblyFile);
     codegenPasses.run(module);
