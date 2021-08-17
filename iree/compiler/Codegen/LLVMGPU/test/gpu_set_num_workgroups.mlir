@@ -143,14 +143,15 @@ hal.executable @reduction_dispatch {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[]{{\]}}}
+//  CHECK-DAG: #[[CONFIG0:.+]] = {passPipeline = 2 : i32}
+//  CHECK-DAG: #[[CONFIG1:.+]] = {tileSizes = {{\[}}[]{{\]}}}
 //      CHECK: hal.executable.entry_point @predict_dispatch_153
-// CHECK-SAME:     passPipeline = 2 : i32
+// CHECK-SAME:     translation.info = #[[CONFIG0]]
 // CHECK-SAME:     workgroup_size = [1 : index, 1 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index,
 //  CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //      CHECK:     hal.return %[[C1]], %[[C1]], %[[C1]]
 //      CHECK: linalg.fill
-// CHECK-SAME:   lowering.config = #[[CONFIG]]
+// CHECK-SAME:   lowering.config = #[[CONFIG1]]
 //      CHECK: linalg.generic
-// CHECK-SAME:   lowering.config = #[[CONFIG]]
+// CHECK-SAME:   lowering.config = #[[CONFIG1]]

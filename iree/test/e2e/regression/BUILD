@@ -65,6 +65,7 @@ iree_check_single_backend_test_suite(
     name = "check_regression_linalg_ops_dylib-llvm-aot",
     srcs = [
         "linalg_ext_ops.mlir",
+        "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "dylib",
