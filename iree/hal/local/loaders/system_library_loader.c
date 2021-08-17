@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/loaders/legacy_library_loader.h"
+#include "iree/hal/local/loaders/system_library_loader.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -61,10 +61,10 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_legacy_executable_t
+// iree_hal_system_executable_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_legacy_executable_t {
+typedef struct iree_hal_system_executable_t {
   iree_hal_local_executable_t base;
 
   // Flatbuffer definition referencing the executable memory.
@@ -83,13 +83,13 @@ typedef struct iree_hal_legacy_executable_t {
   } library;
 
   iree_hal_local_executable_layout_t* layouts[];
-} iree_hal_legacy_executable_t;
+} iree_hal_system_executable_t;
 
 extern const iree_hal_local_executable_vtable_t
-    iree_hal_legacy_executable_vtable;
+    iree_hal_system_executable_vtable;
 
-static iree_status_t iree_hal_legacy_executable_extract_and_load(
-    iree_hal_legacy_executable_t* executable, iree_allocator_t host_allocator) {
+static iree_status_t iree_hal_system_executable_extract_and_load(
+    iree_hal_system_executable_t* executable, iree_allocator_t host_allocator) {
   flatbuffers_uint8_vec_t embedded_library_vec =
       iree_DyLibExecutableDef_library_embedded_get(executable->def);
   IREE_RETURN_IF_ERROR(iree_dynamic_library_load_from_memory(
@@ -114,8 +114,8 @@ static iree_status_t iree_hal_legacy_executable_extract_and_load(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_legacy_executable_query_library(
-    iree_hal_legacy_executable_t* executable) {
+static iree_status_t iree_hal_system_executable_query_library(
+    iree_hal_system_executable_t* executable) {
   // Get the exported symbol used to get the library metadata.
   iree_hal_executable_library_query_fn_t query_fn = NULL;
   IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(
@@ -170,15 +170,15 @@ static iree_status_t iree_hal_legacy_executable_query_library(
   return iree_ok_status();
 }
 
-static int iree_hal_legacy_executable_import_thunk_v0(
+static int iree_hal_system_executable_import_thunk_v0(
     iree_hal_executable_import_v0_t fn_ptr, void* import_params) {
   return fn_ptr(import_params);
 }
 
 // Resolves all of the imports declared by the executable using the given
 // |import_provider|.
-static iree_status_t iree_hal_legacy_executable_resolve_imports(
-    iree_hal_legacy_executable_t* executable,
+static iree_status_t iree_hal_system_executable_resolve_imports(
+    iree_hal_system_executable_t* executable,
     const iree_hal_executable_import_provider_t import_provider) {
   const iree_hal_executable_import_table_v0_t* import_table =
       &executable->library.v0->imports;
@@ -186,7 +186,7 @@ static iree_status_t iree_hal_legacy_executable_resolve_imports(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Pass all imports right through.
-  executable->base.import_thunk = iree_hal_legacy_executable_import_thunk_v0;
+  executable->base.import_thunk = iree_hal_system_executable_import_thunk_v0;
 
   // Allocate storage for the imports.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -211,7 +211,7 @@ static iree_status_t iree_hal_legacy_executable_resolve_imports(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_legacy_executable_create(
+static iree_status_t iree_hal_system_executable_create(
     iree_DyLibExecutableDef_table_t executable_def,
     iree_host_size_t executable_layout_count,
     iree_hal_executable_layout_t* const* executable_layouts,
@@ -223,7 +223,7 @@ static iree_status_t iree_hal_legacy_executable_create(
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_legacy_executable_t* executable = NULL;
+  iree_hal_system_executable_t* executable = NULL;
   iree_host_size_t total_size =
       sizeof(*executable) +
       executable_layout_count * sizeof(*executable->layouts);
@@ -231,7 +231,7 @@ static iree_status_t iree_hal_legacy_executable_create(
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
     iree_hal_local_executable_initialize(
-        &iree_hal_legacy_executable_vtable, executable_layout_count,
+        &iree_hal_system_executable_vtable, executable_layout_count,
         executable_layouts, &executable->layouts[0], host_allocator,
         &executable->base);
     executable->def = executable_def;
@@ -242,16 +242,16 @@ static iree_status_t iree_hal_legacy_executable_create(
     // This is bad, but ehh all this is getting deleted soon and hopefully we
     // can avoid ever touching the disk at all.
     status =
-        iree_hal_legacy_executable_extract_and_load(executable, host_allocator);
+        iree_hal_system_executable_extract_and_load(executable, host_allocator);
   }
   if (iree_status_is_ok(status)) {
     // Query metadata and get the entry point function pointers.
-    status = iree_hal_legacy_executable_query_library(executable);
+    status = iree_hal_system_executable_query_library(executable);
   }
   if (iree_status_is_ok(status)) {
     // Resolve imports, if any.
     status =
-        iree_hal_legacy_executable_resolve_imports(executable, import_provider);
+        iree_hal_system_executable_resolve_imports(executable, import_provider);
   }
   if (iree_status_is_ok(status)) {
     // Check to make sure that the entry point count matches the layouts
@@ -274,10 +274,10 @@ static iree_status_t iree_hal_legacy_executable_create(
   return status;
 }
 
-static void iree_hal_legacy_executable_destroy(
+static void iree_hal_system_executable_destroy(
     iree_hal_executable_t* base_executable) {
-  iree_hal_legacy_executable_t* executable =
-      (iree_hal_legacy_executable_t*)base_executable;
+  iree_hal_system_executable_t* executable =
+      (iree_hal_system_executable_t*)base_executable;
   iree_allocator_t host_allocator = executable->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -290,12 +290,12 @@ static void iree_hal_legacy_executable_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_legacy_executable_issue_call(
+static iree_status_t iree_hal_system_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
     const iree_hal_vec3_t* workgroup_id, iree_byte_span_t local_memory) {
-  iree_hal_legacy_executable_t* executable =
-      (iree_hal_legacy_executable_t*)base_executable;
+  iree_hal_system_executable_t* executable =
+      (iree_hal_system_executable_t*)base_executable;
   const iree_hal_executable_library_v0_t* library = executable->library.v0;
 
   if (IREE_UNLIKELY(ordinal >= library->exports.count)) {
@@ -334,27 +334,27 @@ static iree_status_t iree_hal_legacy_executable_issue_call(
                         ret);
 }
 
-const iree_hal_local_executable_vtable_t iree_hal_legacy_executable_vtable = {
-    /*.base=*/
-    {
-        /*.destroy=*/iree_hal_legacy_executable_destroy,
-    },
-    /*.issue_call=*/iree_hal_legacy_executable_issue_call,
+const iree_hal_local_executable_vtable_t iree_hal_system_executable_vtable = {
+    .base =
+        {
+            .destroy = iree_hal_system_executable_destroy,
+        },
+    .issue_call = iree_hal_system_executable_issue_call,
 };
 
 //===----------------------------------------------------------------------===//
-// iree_hal_legacy_library_loader_t
+// iree_hal_system_library_loader_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_legacy_library_loader_t {
+typedef struct iree_hal_system_library_loader_t {
   iree_hal_executable_loader_t base;
   iree_allocator_t host_allocator;
-} iree_hal_legacy_library_loader_t;
+} iree_hal_system_library_loader_t;
 
 extern const iree_hal_executable_loader_vtable_t
-    iree_hal_legacy_library_loader_vtable;
+    iree_hal_system_library_loader_vtable;
 
-iree_status_t iree_hal_legacy_library_loader_create(
+iree_status_t iree_hal_system_library_loader_create(
     iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
@@ -362,12 +362,12 @@ iree_status_t iree_hal_legacy_library_loader_create(
   *out_executable_loader = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_legacy_library_loader_t* executable_loader = NULL;
+  iree_hal_system_library_loader_t* executable_loader = NULL;
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*executable_loader), (void**)&executable_loader);
   if (iree_status_is_ok(status)) {
     iree_hal_executable_loader_initialize(
-        &iree_hal_legacy_library_loader_vtable, import_provider,
+        &iree_hal_system_library_loader_vtable, import_provider,
         &executable_loader->base);
     executable_loader->host_allocator = host_allocator;
     *out_executable_loader = (iree_hal_executable_loader_t*)executable_loader;
@@ -377,10 +377,10 @@ iree_status_t iree_hal_legacy_library_loader_create(
   return status;
 }
 
-static void iree_hal_legacy_library_loader_destroy(
+static void iree_hal_system_library_loader_destroy(
     iree_hal_executable_loader_t* base_executable_loader) {
-  iree_hal_legacy_library_loader_t* executable_loader =
-      (iree_hal_legacy_library_loader_t*)base_executable_loader;
+  iree_hal_system_library_loader_t* executable_loader =
+      (iree_hal_system_library_loader_t*)base_executable_loader;
   iree_allocator_t host_allocator = executable_loader->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -397,7 +397,7 @@ static void iree_hal_legacy_library_loader_destroy(
 #define IREE_PLATFORM_DYLIB_TYPE "elf"
 #endif  // IREE_PLATFORM_*
 
-static bool iree_hal_legacy_library_loader_query_support(
+static bool iree_hal_system_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format) {
@@ -406,12 +406,12 @@ static bool iree_hal_legacy_library_loader_query_support(
       iree_make_cstring_view("system-" IREE_PLATFORM_DYLIB_TYPE "-" IREE_ARCH));
 }
 
-static iree_status_t iree_hal_legacy_library_loader_try_load(
+static iree_status_t iree_hal_system_library_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
     const iree_hal_executable_spec_t* executable_spec,
     iree_hal_executable_t** out_executable) {
-  iree_hal_legacy_library_loader_t* executable_loader =
-      (iree_hal_legacy_library_loader_t*)base_executable_loader;
+  iree_hal_system_library_loader_t* executable_loader =
+      (iree_hal_system_library_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Verify and fetch the executable flatbuffer wrapper.
@@ -423,7 +423,7 @@ static iree_status_t iree_hal_legacy_library_loader_try_load(
 
   // Perform the load (and requisite disgusting hackery).
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_legacy_executable_create(
+      z0, iree_hal_system_executable_create(
               executable_def, executable_spec->executable_layout_count,
               executable_spec->executable_layouts,
               base_executable_loader->import_provider,
@@ -434,8 +434,8 @@ static iree_status_t iree_hal_legacy_library_loader_try_load(
 }
 
 const iree_hal_executable_loader_vtable_t
-    iree_hal_legacy_library_loader_vtable = {
-        /*.destroy=*/iree_hal_legacy_library_loader_destroy,
-        /*.query_support=*/iree_hal_legacy_library_loader_query_support,
-        /*.try_load=*/iree_hal_legacy_library_loader_try_load,
+    iree_hal_system_library_loader_vtable = {
+        .destroy = iree_hal_system_library_loader_destroy,
+        .query_support = iree_hal_system_library_loader_query_support,
+        .try_load = iree_hal_system_library_loader_try_load,
 };

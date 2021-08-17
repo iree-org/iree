@@ -20,18 +20,34 @@ namespace iree_compiler {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// Hints
+// Utilities
 //===----------------------------------------------------------------------===//
 
-class PreserveDoNotOptimize
-    : public OpConversionPattern<IREE::Util::DoNotOptimizeOp> {
+template <typename T>
+class GenericConvertTypesConversion : public OpConversionPattern<T> {
  public:
-  using OpConversionPattern<IREE::Util::DoNotOptimizeOp>::OpConversionPattern;
+  using OpConversionPattern<T>::OpConversionPattern;
+
   LogicalResult matchAndRewrite(
-      IREE::Util::DoNotOptimizeOp op, llvm::ArrayRef<Value> operands,
+      T op, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::Util::DoNotOptimizeOp>(op, operands,
-                                                             op->getAttrs());
+    SmallVector<Type> newTypes;
+    bool anyChanged = false;
+    for (auto oldNew : llvm::zip(op->getOperands(), newOperands)) {
+      auto oldValue = std::get<0>(oldNew);
+      auto newValue = std::get<1>(oldNew);
+      if (oldValue.getType() != newValue.getType()) {
+        anyChanged = true;
+        break;
+      }
+    }
+    for (auto oldType : op.getOperation()->getResultTypes()) {
+      auto newType = this->getTypeConverter()->convertType(oldType);
+      if (oldType != newType) anyChanged = true;
+      newTypes.push_back(newType);
+    }
+    if (!anyChanged) return failure();
+    rewriter.replaceOpWithNewOp<T>(op, newTypes, newOperands, op->getAttrs());
     return success();
   }
 };
@@ -41,7 +57,17 @@ class PreserveDoNotOptimize
 void populateUtilConversionPatterns(MLIRContext *context,
                                     TypeConverter &typeConverter,
                                     OwningRewritePatternList &patterns) {
-  patterns.insert<PreserveDoNotOptimize>(context);
+  patterns.insert<GenericConvertTypesConversion<IREE::Util::DoNotOptimizeOp>>(
+      typeConverter, context);
+
+  typeConverter.addConversion([&](IREE::Util::ListType type) {
+    auto elementType = typeConverter.convertType(type.getElementType());
+    return IREE::Util::ListType::get(elementType);
+  });
+  patterns.insert<GenericConvertTypesConversion<IREE::Util::ListCreateOp>,
+                  GenericConvertTypesConversion<IREE::Util::ListGetOp>,
+                  GenericConvertTypesConversion<IREE::Util::ListSetOp>>(
+      typeConverter, context);
 }
 
 void populateUtilConversionPatterns(MLIRContext *context,
@@ -53,6 +79,19 @@ void populateUtilConversionPatterns(MLIRContext *context,
         return llvm::all_of(op.getResultTypes(), [&typeConverter](Type t) {
           return typeConverter.isLegal(t);
         });
+      });
+
+  conversionTarget.addDynamicallyLegalOp<IREE::Util::ListCreateOp>(
+      [&](IREE::Util::ListCreateOp op) {
+        return typeConverter.isLegal(op.getType());
+      });
+  conversionTarget.addDynamicallyLegalOp<IREE::Util::ListGetOp>(
+      [&](IREE::Util::ListGetOp op) {
+        return typeConverter.isLegal(op.getType());
+      });
+  conversionTarget.addDynamicallyLegalOp<IREE::Util::ListSetOp>(
+      [&](IREE::Util::ListSetOp op) {
+        return typeConverter.isLegal(op.value().getType());
       });
 
   populateUtilConversionPatterns(context, typeConverter, patterns);

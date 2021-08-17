@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -129,6 +130,8 @@ class ConversionPass
     }
 
     OwningRewritePatternList conversionPatterns(&getContext());
+    populateUtilConversionPatterns(context, conversionTarget, typeConverter,
+                                   conversionPatterns);
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
                              conversionPatterns);
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
@@ -150,8 +153,6 @@ class ConversionPass
           importSymbols, conversionPatterns, typeConverter);
     }
     Shape::populateFoldConversionPatterns(context, conversionPatterns);
-    populateUtilConversionPatterns(context, conversionTarget, typeConverter,
-                                   conversionPatterns);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
                                       std::move(conversionPatterns)))) {

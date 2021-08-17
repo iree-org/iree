@@ -122,6 +122,7 @@ class ListSetOpConversion : public OpConversionPattern<IREE::Util::ListSetOp> {
 }  // namespace
 
 void populateUtilListToVMPatterns(MLIRContext *context,
+                                  ConversionTarget &conversionTarget,
                                   TypeConverter &typeConverter,
                                   OwningRewritePatternList &patterns) {
   typeConverter.addConversion(
@@ -135,6 +136,11 @@ void populateUtilListToVMPatterns(MLIRContext *context,
         if (!elementType) return llvm::None;
         return IREE::VM::RefType::get(IREE::VM::ListType::get(elementType));
       });
+
+  conversionTarget.addIllegalOp<
+      IREE::Util::ListCreateOp, IREE::Util::ListSizeOp,
+      IREE::Util::ListResizeOp, IREE::Util::ListGetOp, IREE::Util::ListSetOp>();
+
   patterns
       .insert<ListCreateOpConversion, ListSizeOpConversion,
               ListResizeOpConversion, ListGetOpConversion, ListSetOpConversion>(
