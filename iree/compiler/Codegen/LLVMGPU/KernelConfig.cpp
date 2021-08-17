@@ -137,7 +137,15 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
     }
   }
 
-  if (isa<linalg::GenericOp>(op)) {
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  bool outputSizeIsProblemSize =
+      genericOp &&
+      llvm::all_of(genericOp.getOutputOperands(),
+                   [&genericOp](OpOperand *outputOperand) {
+                     return genericOp.getTiedIndexingMap(outputOperand)
+                         .isProjectedPermutation();
+                   });
+  if (outputSizeIsProblemSize) {
     // Calculate the problem size to adjust the tile size.
     int64_t problemSize = 1;
     entryPoint.walk([&problemSize](IREE::Flow::DispatchTensorStoreOp storeOp) {
