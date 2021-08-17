@@ -14,6 +14,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/SubElementInterfaces.h"
 #include "mlir/IR/TypeSupport.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 
 namespace mlir {
