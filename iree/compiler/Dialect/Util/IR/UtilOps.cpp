@@ -24,8 +24,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Util {
 
 //===----------------------------------------------------------------------===//
 // custom<SymbolVisibility>($sym_visibility)
@@ -35,8 +33,8 @@ namespace Util {
 // some.op @foo
 // some.op private @foo
 
-static ParseResult parseSymbolVisibility(OpAsmParser &parser,
-                                         StringAttr &symVisibilityAttr) {
+ParseResult parseSymbolVisibility(OpAsmParser &parser,
+                                  StringAttr &symVisibilityAttr) {
   StringRef symVisibility;
   parser.parseOptionalKeyword(&symVisibility, {"public", "private", "nested"});
   if (!symVisibility.empty()) {
@@ -45,8 +43,8 @@ static ParseResult parseSymbolVisibility(OpAsmParser &parser,
   return success();
 }
 
-static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
-                                  StringAttr symVisibilityAttr) {
+void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
+                           StringAttr symVisibilityAttr) {
   if (!symVisibilityAttr) {
     p << "public";
   } else {
@@ -63,8 +61,8 @@ static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
 // some.op = 42 : i32
 // some.op : i32 = 42 : index
 
-static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
-                                   Attribute &attr) {
+ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
+                            Attribute &attr) {
   if (succeeded(parser.parseOptionalEqual())) {
     if (failed(parser.parseAttribute(attr))) {
       return parser.emitError(parser.getCurrentLocation())
@@ -90,8 +88,8 @@ static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
   return success();
 }
 
-static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
-                            Attribute attr) {
+void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
+                     Attribute attr) {
   if (!attr || attr.getType() != type.getValue()) {
     p << " : ";
     p.printAttribute(type);
@@ -101,6 +99,67 @@ static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
     p.printAttribute(attr);
   }
 }
+
+//===----------------------------------------------------------------------===//
+// custom<SizeAwareType>
+//===----------------------------------------------------------------------===//
+// type{%size}
+
+ParseResult parseSizeAwareType(OpAsmParser &parser, Type &type,
+                               OpAsmParser::OperandType &size) {
+  if (failed(parser.parseType(type)) || failed(parser.parseLBrace()) ||
+      failed(parser.parseOperand(size)) || failed(parser.parseRBrace())) {
+    return failure();
+  }
+  return success();
+}
+
+void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
+  p.printType(type);
+  p << "{";
+  p.printOperand(size);
+  p << "}";
+}
+
+//===----------------------------------------------------------------------===//
+// custom<SizeAwareTypeList>
+//===----------------------------------------------------------------------===//
+// (type{%size0}, type, type{%size1})
+
+ParseResult parseSizeAwareTypeList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types,
+    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
+  do {
+    Type type;
+    if (failed(parser.parseType(type))) return failure();
+    if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
+      OpAsmParser::OperandType size;
+      if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
+          failed(parser.parseRBrace())) {
+        return failure();
+      }
+      sizes.push_back(size);
+    }
+    types.push_back(type);
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
+                            OperandRange sizes) {
+  int sizeIndex = 0;
+  llvm::interleaveComma(types, p, [&](Type type) {
+    p.printType(type);
+    if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
+      p << "{";
+      p.printOperand(sizes[sizeIndex++]);
+      p << "}";
+    }
+  });
+}
+
+namespace IREE {
+namespace Util {
 
 //===----------------------------------------------------------------------===//
 // util.do_not_optimize

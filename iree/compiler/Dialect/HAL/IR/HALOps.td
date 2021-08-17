@@ -267,7 +267,7 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
 
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    DeclareOpInterfaceMethods<HAL_SizeAwareOp>,
+    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{empty buffer allocation operation}];
   let description = [{
@@ -331,7 +331,7 @@ def HAL_AllocatorConstantOp : HAL_Op<"allocator.constant", [
 
 def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    DeclareOpInterfaceMethods<HAL_SizeAwareOp>,
+    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{allocator-supported host buffer wrapping operation}];
   let description = [{
@@ -498,7 +498,7 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
 
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    DeclareOpInterfaceMethods<HAL_SizeAwareOp>,
+    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{buffer subspan operation}];
   let description = [{
