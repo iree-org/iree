@@ -71,12 +71,19 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
 // custom<TiedResult>
 //===----------------------------------------------------------------------===//
 // type{%dim0, %dim1}
-// %arg0
+// %arg0 as type{%dim0}
 
-static ParseResult parseTiedResult(
+static ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
     SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
     ArrayAttr &tiedOperands) {
+  OpAsmParser::OperandType tiedResult;
+  auto res = parser.parseOptionalOperand(tiedResult);
+  int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+  if (res.hasValue() && succeeded(res.getValue())) {
+    tiedOperandIndex = 0;
+    if (failed(parser.parseKeyword("as"))) return failure();
+  }
   if (failed(parser.parseType(resultType))) return failure();
   if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
     if (!shapedType.hasStaticShape()) {
@@ -91,12 +98,20 @@ static ParseResult parseTiedResult(
       resultDims.append(dynamicDims);
     }
   }
-  tiedOperands = parser.getBuilder().getIndexArrayAttr({0});
+  tiedOperands = parser.getBuilder().getIndexArrayAttr({tiedOperandIndex});
   return success();
 }
 
-static void printTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
-                            ValueRange resultDims, ArrayAttr tiedOperands) {
+static void printShapedTiedResult(OpAsmPrinter &p, Operation *op,
+                                  Type resultType, ValueRange resultDims,
+                                  ArrayAttr tiedOperands) {
+  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
+  auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(0);
+  if (tiedOperandIndex.hasValue()) {
+    auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
+    p.printOperand(tiedOperand);
+    p << " as ";
+  }
   p.printType(resultType);
   if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
     if (!shapedType.hasStaticShape()) {
@@ -109,6 +124,7 @@ static void printTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
           resultDims.take_front(shapedType.getNumDynamicDims()), p,
           [&](Value value) { p.printOperand(value); });
       p << "}";
+      resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
     }
   }
 }

@@ -284,7 +284,7 @@ func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> te
     // CHECK-SAME:   source(%[[UBUF]] : !hal.buffer)[%c0]
     // CHECK-SAME:   target(%[[RET_BUF]] : !hal.buffer)[%c204]
     // CHECK-SAME:   length(%c40)
-    %1 = flow.tensor.update %arg2, %clone[%arg4, %arg5, %arg5] : tensor<1x1x10xf32> -> tensor<5x1x10xf32>
+    %1 = flow.tensor.update %arg2, %clone[%arg4, %arg5, %arg5] : tensor<1x1x10xf32> -> %clone as tensor<5x1x10xf32>
     flow.return %1 : tensor<5x1x10xf32>
   }
   // CHECK: hal.command_buffer.end<%[[CMD]]
@@ -571,7 +571,7 @@ func @cloneFromLargeBufferToSmallBuffer(%input: tensor<2xi32>) -> tensor<7xi32> 
     // CHECK: %[[CSTBUF:.+]] = util.global.load @_const_pool_splats : !hal.buffer
     // CHECK: hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer> source(%[[CSTBUF]] : !hal.buffer)[%[[C0]]] target(%[[DSTBUF]] : !hal.buffer)[%[[C0]]] length(%[[C28]])
     %2 = flow.tensor.clone %const_span : tensor<7xi32>
-    %3 = flow.tensor.update %arg0, %2[%c3] : tensor<2xi32> -> tensor<7xi32>
+    %3 = flow.tensor.update %arg0, %2[%c3] : tensor<2xi32> -> %2 as tensor<7xi32>
     flow.return %3 : tensor<7xi32>
   }
   return %1 : tensor<7xi32>

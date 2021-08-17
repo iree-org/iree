@@ -96,7 +96,7 @@ func @dynamicUpdateSliceImmutability(
     %workload = constant 8 : index
     //      CHECK: %[[TARGET_CLONE:.+]] = flow.tensor.clone %[[TARGET]] : tensor<2x4xi32>
     //      CHECK: %[[UPDATED:.+]] = flow.tensor.update %[[UPDATE]], %[[TARGET]]
-    %t0 = flow.tensor.update %stream_update, %stream_target[%start0, %start1] : tensor<1x1xi32> -> tensor<2x4xi32>
+    %t0 = flow.tensor.update %stream_update, %stream_target[%start0, %start1] : tensor<1x1xi32> -> %stream_target as tensor<2x4xi32>
     // CHECK-NEXT: %[[RETURN:.+]] = flow.dispatch @ex::@entry[%c8](%[[TARGET_CLONE]], %[[UPDATED]])
     %t1 = flow.dispatch @ex::@entry[%workload](%stream_target, %t0) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
     // CHECK-NEXT: flow.return %[[RETURN]]
@@ -165,7 +165,7 @@ func @insertCloneForUpdatedConstant(%input: tensor<2xi32>) -> tensor<7xi32> {
     %5 = util.global.load @_large_const : tensor<7xi32>
     // CHECK: %[[CLONE:.+]] = flow.tensor.clone %[[LOAD]]
     // CHECK: flow.tensor.update %{{.+}}, %[[CLONE]]
-    %6 = flow.tensor.update %arg0, %5[%c3] : tensor<2xi32> -> tensor<7xi32>
+    %6 = flow.tensor.update %arg0, %5[%c3] : tensor<2xi32> -> %5 as tensor<7xi32>
     flow.return %6 : tensor<7xi32>
   }
   return %4 : tensor<7xi32>

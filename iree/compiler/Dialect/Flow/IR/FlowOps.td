@@ -874,7 +874,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    custom<TiedResult>(type($result), $target_dims, $tied_operands)
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
     attr-dict-with-keyword
   }];
 
