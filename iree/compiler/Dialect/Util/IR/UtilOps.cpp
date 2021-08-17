@@ -61,6 +61,7 @@ static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
 // ->
 // some.op : i32
 // some.op = 42 : i32
+// some.op : i32 = 42 : index
 
 static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
                                    Attribute &attr) {
@@ -70,24 +71,34 @@ static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
              << "expected attribute";
     }
     typeAttr = TypeAttr::get(attr.getType());
-  } else {
-    Type type;
-    if (failed(parser.parseColonType(type))) {
-      return parser.emitError(parser.getCurrentLocation()) << "expected type";
-    }
-    typeAttr = TypeAttr::get(type);
+    return success();
   }
+
+  Type type;
+  if (failed(parser.parseColonType(type))) {
+    return parser.emitError(parser.getCurrentLocation()) << "expected type";
+  }
+  typeAttr = TypeAttr::get(type);
+
+  if (succeeded(parser.parseOptionalEqual())) {
+    if (failed(parser.parseAttribute(attr))) {
+      return parser.emitError(parser.getCurrentLocation())
+             << "expected attribute";
+    }
+  }
+
   return success();
 }
 
 static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
                             Attribute attr) {
+  if (!attr || attr.getType() != type.getValue()) {
+    p << " : ";
+    p.printAttribute(type);
+  }
   if (attr) {
     p << " = ";
     p.printAttribute(attr);
-  } else {
-    p << " : ";
-    p.printAttribute(type);
   }
 }
 
@@ -222,7 +233,9 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
     return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
   }
 
-  // TODO(benvanik): use GlobalOpInterface.
+  if (auto knownType = globalType.dyn_cast<GlobalTypeInterface>()) {
+    return knownType.isAccessStorageCompatible(accessType);
+  }
 
   // Otherwise, the types must be the same.
   return globalType == accessType;

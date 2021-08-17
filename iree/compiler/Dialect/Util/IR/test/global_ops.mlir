@@ -19,6 +19,12 @@ util.global public @v_initialized_const2 = 40 : i64
 // CHECK: util.global public @v_initialized_const3 = dense<4> : tensor<4xi32>
 util.global public @v_initialized_const3 = dense<4> : tensor<4xi32>
 
+// CHECK: util.global public @v_initialized_const4 = dense<4> : tensor<4xi32>
+util.global public @v_initialized_const4 : tensor<4xi32> = dense<4> : tensor<4xi32>
+
+// CHECK: util.global public @v_initialized_const5 : tensor<4xf32> = dense<4> : tensor<4xi32>
+util.global public @v_initialized_const5 : tensor<4xf32> = dense<4> : tensor<4xi32>
+
 // -----
 
 // CHECK: util.global private @v_initialized initializer(@initializer) : tensor<4xi32>

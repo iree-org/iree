@@ -148,6 +148,8 @@ void excludeTiedOperandAndResultIndices(
 }  // namespace iree_compiler
 }  // namespace mlir
 
+#include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.h.inc"  // IWYU pragma: export
 #include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.h.inc"  // IWYU pragma: export
 
 #endif  // IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_

@@ -242,12 +242,14 @@ void excludeTiedOperandAndResultIndices(
   }
 }
 
-// At the end so it can use functions above:
-#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
-
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
 //===----------------------------------------------------------------------===//
+
+// At the end so it can use functions above:
+#include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.cpp.inc"
+#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
+#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.cpp.inc"
 
 void UtilDialect::registerTypes() {
   addTypes<IREE::Util::ByteBufferType, IREE::Util::ListType,
