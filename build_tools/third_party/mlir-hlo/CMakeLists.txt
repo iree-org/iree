@@ -20,7 +20,7 @@ external_cc_library(
     ${TF_MLIR_HLO_SOURCE_DIR}
   DEPS
     MhloDialect
-    MhloInferFusibilityOpInterface
+    MhloInferShapeEqualityOpInterface
     LmhloDialect
     ChloPasses
     MhloToStandard

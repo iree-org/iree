@@ -140,9 +140,8 @@ static void removeFusionGroupsAttribute(Operation *op) {
 static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
   return op.iterator_types()
       .getValue()
-      .take_while([](Attribute attr) -> bool {
-        return linalg::isParallelIteratorType(attr);
-      })
+      .take_while(
+          [](Attribute attr) -> bool { return isParallelIterator(attr); })
       .size();
 }
 
