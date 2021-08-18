@@ -100,7 +100,7 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
 
   output << "struct " << moduleName << "_t {\n";
   output << "iree_allocator_t allocator;\n";
-  output << "};\n ";
+  output << "};\n";
 
   output << "struct " << moduleName << "_state_t {\n";
 
@@ -236,7 +236,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
              << "(iree_vm_native_function_shim_t)";
 
       if (failed(printShim(funcOp, output))) {
-        return funcOp.emitError("Error generatiing shim");
+        return funcOp.emitError("Error generating shim");
       }
       output << ", "
              << "(iree_vm_native_function_target_t)" << funcName << "},\n";

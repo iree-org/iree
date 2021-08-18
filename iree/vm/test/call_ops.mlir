@@ -55,14 +55,14 @@ vm.module @call_ops {
 
   vm.func @_i_v(%arg : i32) attributes {noinline} {
     %c1 = vm.const.i32 1 : i32
-    vm.check.eq %arg, %c1, "_i_v(1)" : i32
+    vm.check.eq %arg, %c1, "Expected %arg to be 1" : i32
     vm.return
   }
 
   vm.func @_r_v(%arg : !vm.ref<?>) attributes {noinline} {
     %ref = vm.const.ref.zero : !vm.ref<?>
     %ref_dno = util.do_not_optimize(%ref) : !vm.ref<?>
-    vm.check.eq %arg, %ref_dno, "_r_v(NULL)" : !vm.ref<?>
+    vm.check.eq %arg, %ref_dno, "Expected %arg to be NULL" : !vm.ref<?>
     vm.return
   }
 

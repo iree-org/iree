@@ -1186,33 +1186,10 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     updatedOperands = {stackArg, moduleArg, moduleStateArg};
 
-    for (const Value &operand : operands) updatedOperands.push_back(operand);
-
-    // Create a variable for every result and a pointer to it as output
-    // parameter to the call.
-    for (OpResult result : op.getResults()) {
-      if (result.getType().isa<IREE::VM::RefType>()) {
-        return op.emitError() << "Ref results not supported yet";
-      } else {
-        auto resultOp = rewriter.create<emitc::ConstantOp>(
-            /*location=*/loc,
-            /*resultType=*/result.getType(),
-            /*value=*/emitc::OpaqueAttr::get(ctx, ""));
-
-        Optional<std::string> cType = getCType(result.getType());
-        if (!cType.hasValue()) return op.emitError() << "unable to emit C type";
-
-        std::string cPtrType = cType.getValue() + std::string("*");
-        auto resultPtrOp = rewriter.create<emitc::ApplyOp>(
-            /*location=*/loc,
-            /*type=*/emitc::OpaqueType::get(ctx, cPtrType),
-            /*applicableOperator=*/StringAttr::get(ctx, "&"),
-            /*operand=*/resultOp);
-
-        resultOperands.push_back(resultOp.getResult());
-        updatedOperands.push_back(resultPtrOp.getResult());
-      }
-    }
+    if (failed(updateOperands(op, operands, rewriter, updatedOperands,
+                              resultOperands))) {
+      return failure();
+    };
 
     auto callOp = returnIfError(
         /*rewriter=*/rewriter,
@@ -1277,28 +1254,9 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     updatedOperands = {stackArg, import.getResult(0)};
 
-    for (const Value &operand : operands) updatedOperands.push_back(operand);
-
-    // Create a variable for every result and a pointer to it as output
-    // parameter to the call.
-    for (OpResult result : op.getResults()) {
-      auto resultOp = rewriter.create<emitc::ConstantOp>(
-          /*location=*/loc,
-          /*resultType=*/result.getType(),
-          /*value=*/emitc::OpaqueAttr::get(ctx, ""));
-
-      Optional<std::string> cType = getCType(result.getType());
-      if (!cType.hasValue()) return op.emitError() << "unable to emit C type";
-
-      std::string cPtrType = cType.getValue() + std::string("*");
-      auto resultPtrOp = rewriter.create<emitc::ApplyOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, cPtrType),
-          /*applicableOperator=*/StringAttr::get(ctx, "&"),
-          /*operand=*/resultOp);
-
-      resultOperands.push_back(resultOp.getResult());
-      updatedOperands.push_back(resultPtrOp.getResult());
+    if (failed(updateOperands(op, operands, rewriter, updatedOperands,
+                              resultOperands))) {
+      return failure();
     }
 
     auto callOp = returnIfError(
@@ -1318,8 +1276,44 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
     rewriter.eraseOp(op);
 
     return success();
+  }
 
-    return op.emitError() << "calls to imported function not supported yet";
+  LogicalResult updateOperands(IREE::VM::CallOp op, ArrayRef<Value> operands,
+                               ConversionPatternRewriter &rewriter,
+                               SmallVector<Value, 4> &updatedOperands,
+                               SmallVector<Value, 4> &resultOperands) const {
+    auto ctx = op.getContext();
+    auto loc = op.getLoc();
+
+    for (const Value &operand : operands) updatedOperands.push_back(operand);
+
+    // Create a variable for every non-ref result and a pointer to it as output
+    // parameter to the call.
+    for (OpResult result : op.getResults()) {
+      if (result.getType().isa<IREE::VM::RefType>()) {
+        return op.emitError() << "ref results not supported yet";
+      } else {
+        auto resultOp = rewriter.create<emitc::ConstantOp>(
+            /*location=*/loc,
+            /*resultType=*/result.getType(),
+            /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+
+        Optional<std::string> cType = getCType(result.getType());
+        if (!cType.hasValue()) return op.emitError() << "unable to emit C type";
+
+        std::string cPtrType = cType.getValue() + std::string("*");
+        auto resultPtrOp = rewriter.create<emitc::ApplyOp>(
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, cPtrType),
+            /*applicableOperator=*/StringAttr::get(ctx, "&"),
+            /*operand=*/resultOp);
+
+        resultOperands.push_back(resultOp.getResult());
+        updatedOperands.push_back(resultPtrOp.getResult());
+      }
+    }
+
+    return success();
   }
 
   VMAnalysisCache &vmAnalysisCache;
