@@ -530,7 +530,7 @@ LogicalResult setRootConfig(FuncOp entryPoint,
       succeeded(setMaliSpecificConfig(entryPoint, op))) {
     return success();
   }
-  return success();
+  return setDefaultRootConfig(entryPoint, targetEnv, op);
 }
 
 static LogicalResult setMaliSpecificConfig(
@@ -618,7 +618,7 @@ static LogicalResult setRootConfig(
       succeeded(setMaliSpecificConfig(entryPoint, op))) {
     return success();
   }
-  return success();
+  return setDefaultRootConfig(entryPoint, targetEnv, op);
 }
 
 /// Helper function to generate the number of workgroups when the
