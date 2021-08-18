@@ -530,7 +530,7 @@ LogicalResult setRootConfig(FuncOp entryPoint,
       succeeded(setMaliSpecificConfig(entryPoint, op))) {
     return success();
   }
-  return success();
+  return setDefaultRootConfig(entryPoint, targetEnv, op);
 }
 
 static LogicalResult setMaliSpecificConfig(
@@ -550,6 +550,7 @@ static LogicalResult setMaliSpecificConfig(
       {{2, 2, 32}, {8, 2, 2}},
       {{1, 4, 16}, {4, 4, 1}},
       {{1, 1, 64}, {16, 1, 1}},
+      {{4, 4, 8}, {2, 4, 2}},
   };
 
   for (const auto &pair : tileWorkgroupSizePairs) {
@@ -617,7 +618,7 @@ static LogicalResult setRootConfig(
       succeeded(setMaliSpecificConfig(entryPoint, op))) {
     return success();
   }
-  return success();
+  return setDefaultRootConfig(entryPoint, targetEnv, op);
 }
 
 /// Helper function to generate the number of workgroups when the
@@ -665,7 +666,9 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     int64_t subgroupSize =
         targetEnv.getResourceLimits().subgroup_size().getValue().getSExtValue();
 
-    if (computeOps.empty()) {
+    if (computeOps.empty() || llvm::none_of(computeOps, [](Operation *op) {
+          return hasMarker(op, getWorkgroupMarker());
+        })) {
       // TODO(ravishankarm): `tensor.insert_slice` is not a compute op but still
       // needs to be handled in dispatch region. For now it is handled in
       // ConvertToGPU pass. Eventually this will be handled as a compute
@@ -690,8 +693,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     }
 
     Operation *rootOperation = nullptr;
-    for (Operation *computeOp : reverse(computeOps)) {
-      if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
+    for (Operation *computeOp : computeOps) {
       auto setConfigFn = [&](Operation *rootOp) -> LogicalResult {
         return TypeSwitch<Operation *, LogicalResult>(rootOp)
             .Case<linalg::BatchMatmulOp,
@@ -715,8 +717,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
 
     // If there are still no roots, check for any generic op.
     if (!rootOperation) {
-      for (Operation *computeOp : reverse(computeOps)) {
-        if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
+      for (Operation *computeOp : computeOps) {
         if (isa<linalg::FillOp, linalg::CopyOp>(computeOp)) continue;
         if (failed(setDefaultRootConfig(funcOp, targetEnv, computeOp))) {
           return failure();
@@ -729,31 +730,6 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
           rootOperation = computeOp;
         }
       }
-    }
-
-    if (!rootOperation) {
-      /// TODO(ravishankarm): This is setting the configuration for ops that are
-      /// directly distributed to global invocation IDs. Remove this when
-      /// SPIRVConvertToGPU is deprecated.
-      for (Operation *computeOp : reverse(computeOps)) {
-        if (hasMarker(computeOp, getWorkgroupMarker())) continue;
-        if (isa<linalg::FillOp, linalg::CopyOp, linalg::GenericOp>(computeOp)) {
-          std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-          auto linalgOp = cast<linalg::LinalgOp>(computeOp);
-          if (getNumOuterParallelLoops(linalgOp)) {
-            workgroupSize = {subgroupSize, 1, 1};
-          }
-          if (failed(setTranslationUsingDistributeToGlobalId(funcOp,
-                                                             workgroupSize))) {
-            return computeOp->emitOpError(
-                "failed to set translation info for distributing to global "
-                "IDs");
-          }
-          rootOperation = computeOp;
-          break;
-        }
-      }
-      if (rootOperation) continue;
     }
 
     // Propogate the configuration to the other ops.
