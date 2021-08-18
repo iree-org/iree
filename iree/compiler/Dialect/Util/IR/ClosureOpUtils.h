@@ -4,8 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#ifndef IREE_COMPILER_DIALECT_UTIL_IR_CLOSUREOPUTILS_H_
+#define IREE_COMPILER_DIALECT_UTIL_IR_CLOSUREOPUTILS_H_
+
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Builders.h"
@@ -15,7 +19,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Flow {
+namespace Util {
 
 //------------------------------------------------------------------------------
 // Closure optimization
@@ -50,7 +54,7 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
 // Duplicate operands will be combined and unused operands and results will be
 // removed.
 //
-// T must implement the IREE::Flow::ClosureOpInterface.
+// T must implement the IREE::Util::ClosureOpInterface.
 template <typename T>
 struct ClosureOptimizationPattern : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
@@ -62,7 +66,9 @@ struct ClosureOptimizationPattern : public OpRewritePattern<T> {
   }
 };
 
-}  // namespace Flow
+}  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#endif  // IREE_COMPILER_DIALECT_UTIL_IR_CLOSUREOPUTILS_H_

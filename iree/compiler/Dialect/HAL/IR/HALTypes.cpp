@@ -380,7 +380,7 @@ IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context) {
 
 // Returns the SSA value containing the size of the given |value|.
 static Value lookupValueSize(Value value) {
-  assert(value.getType().isa<SizeAwareTypeInterface>());
+  assert(value.getType().isa<IREE::Util::SizeAwareTypeInterface>());
 
   auto definingOp = value.getDefiningOp();
   if (!definingOp) {
@@ -402,7 +402,7 @@ static Value lookupValueSize(Value value) {
     }
   }
   assert(resultIndex != -1 && "result not in results");
-  auto sizeAwareOp = dyn_cast<SizeAwareOpInterface>(definingOp);
+  auto sizeAwareOp = dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp);
   if (!sizeAwareOp) return {};
   return sizeAwareOp.getResultSize(resultIndex);
 }

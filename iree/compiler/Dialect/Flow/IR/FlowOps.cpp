@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -41,13 +41,6 @@ namespace Flow {
 // Op utilities used within the Flow dialect
 //===----------------------------------------------------------------------===//
 
-// Returns true if the given |accessType| is compatible with the |variableType|.
-// For example, this will return true if the variable type is a tensor<?xf32>
-// and the access is tensor<4xf32>.
-static bool isVariableTypeCompatible(Type variableType, Type accessType) {
-  return succeeded(mlir::verifyCompatibleShape(variableType, accessType));
-}
-
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
 // of the dynamic dimensions in |values|.
 static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
@@ -65,241 +58,6 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
            << " dimension values are attached";
   }
   return success();
-}
-
-//===----------------------------------------------------------------------===//
-// custom<TiedResult>
-//===----------------------------------------------------------------------===//
-// type{%dim0, %dim1}
-// %arg0
-
-static ParseResult parseTiedResult(
-    OpAsmParser &parser, Type &resultType,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
-    ArrayAttr &tiedOperands) {
-  if (failed(parser.parseType(resultType))) return failure();
-  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
-    if (!shapedType.hasStaticShape()) {
-      SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
-      if (failed(parser.parseLBrace()) ||
-          failed(parser.parseOperandList(dynamicDims,
-                                         shapedType.getNumDynamicDims(),
-                                         OpAsmParser::Delimiter::None)) ||
-          failed(parser.parseRBrace())) {
-        return failure();
-      }
-      resultDims.append(dynamicDims);
-    }
-  }
-  tiedOperands = parser.getBuilder().getIndexArrayAttr({0});
-  return success();
-}
-
-static void printTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
-                            ValueRange resultDims, ArrayAttr tiedOperands) {
-  p.printType(resultType);
-  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
-    if (!shapedType.hasStaticShape()) {
-      if (resultDims.empty()) {
-        p << "{<<INVALID>>}";
-        return;
-      }
-      p << "{";
-      llvm::interleaveComma(
-          resultDims.take_front(shapedType.getNumDynamicDims()), p,
-          [&](Value value) { p.printOperand(value); });
-      p << "}";
-    }
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// custom<ShapedFunctionType>
-//===----------------------------------------------------------------------===//
-// (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
-
-static ParseResult parseShapedOperandList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::OperandType> &dims) {
-  do {
-    Type type;
-    if (failed(parser.parseType(type))) return failure();
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
-        if (failed(parser.parseLBrace()) ||
-            failed(parser.parseOperandList(dynamicDims,
-                                           shapedType.getNumDynamicDims(),
-                                           OpAsmParser::Delimiter::None)) ||
-            failed(parser.parseRBrace())) {
-          return failure();
-        }
-        dims.append(dynamicDims);
-      }
-    }
-    types.push_back(type);
-  } while (succeeded(parser.parseOptionalComma()));
-  return success();
-}
-
-// Finds the operand index in |operands| that |tiedResult| references.
-// Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
-                               ArrayRef<OpAsmParser::OperandType> operands) {
-  int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
-  for (int64_t i = 0; i < operands.size(); ++i) {
-    if (operands[i].name == tiedResult.name) {
-      operandIndex = i;
-      break;
-    }
-  }
-  return operandIndex;
-}
-
-static ParseResult parseShapedResultList(
-    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
-    TypeRange operandTypes, ArrayRef<OpAsmParser::OperandType> operandDims,
-    SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
-    ArrayAttr &tiedOperands) {
-  SmallVector<int64_t, 4> tiedOperandIndices;
-  do {
-    OpAsmParser::OperandType tiedResult;
-    auto res = parser.parseOptionalOperand(tiedResult);
-    Type type;
-    int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
-    if (res.hasValue() && succeeded(res.getValue())) {
-      tiedOperandIndex = findTiedOperand(tiedResult, operands);
-      if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
-        return parser.emitError(tiedResult.location,
-                                "tied operand not found for result reference ")
-               << tiedResult.name;
-      }
-      if (succeeded(parser.parseOptionalKeyword("as"))) {
-        // Type _may_ differ from the operand.
-        if (failed(parser.parseType(type))) return failure();
-      } else {
-        // Use the operands type.
-        type = operandTypes[tiedOperandIndex];
-      }
-    } else if (failed(parser.parseType(type))) {
-      return failure();
-    }
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
-        if (failed(parser.parseLBrace()) ||
-            failed(parser.parseOperandList(dynamicDims,
-                                           shapedType.getNumDynamicDims(),
-                                           OpAsmParser::Delimiter::None)) ||
-            failed(parser.parseRBrace())) {
-          return failure();
-        }
-        resultDims.append(dynamicDims);
-      }
-    }
-    resultTypes.push_back(type);
-    tiedOperandIndices.push_back(tiedOperandIndex);
-  } while (succeeded(parser.parseOptionalComma()));
-  if (!tiedOperandIndices.empty()) {
-    tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
-  }
-  return success();
-}
-
-static ParseResult parseShapedFunctionType(
-    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
-    SmallVectorImpl<Type> &operandTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &operandDims,
-    SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
-    ArrayAttr &tiedOperands) {
-  if (failed(parser.parseLParen())) return failure();
-  if (failed(parser.parseOptionalRParen())) {
-    if (failed(parseShapedOperandList(parser, operandTypes, operandDims)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  }
-  if (failed(parser.parseArrow())) return failure();
-  if (succeeded(parser.parseOptionalLParen())) {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandDims, resultTypes, resultDims,
-                                     tiedOperands)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  } else {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandDims, resultTypes, resultDims,
-                                     tiedOperands))) {
-      return failure();
-    }
-  }
-  return success();
-}
-
-static void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
-                                    ValueRange operands, TypeRange operandTypes,
-                                    OperandRange operandDims,
-                                    TypeRange resultTypes,
-                                    OperandRange resultDims,
-                                    ArrayAttr tiedOperands) {
-  p << "(";
-  llvm::interleaveComma(operandTypes, p, [&](Type type) {
-    p.printType(type);
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        if (operandDims.empty()) {
-          p << "{<<INVALID>>}";
-          return;
-        }
-        p << "{";
-        llvm::interleaveComma(
-            operandDims.take_front(shapedType.getNumDynamicDims()), p,
-            [&](Value value) { p.printOperand(value); });
-        p << "}";
-        operandDims = operandDims.drop_front(shapedType.getNumDynamicDims());
-      }
-    }
-  });
-  p << ") -> ";
-  if (resultTypes.size() != 1) p << "(";
-  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
-  for (unsigned i = 0; i < resultTypes.size(); ++i) {
-    auto resultType = resultTypes[i];
-    auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
-    bool printType = true;
-    if (tiedOperandIndex.hasValue()) {
-      auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
-      p.printOperand(tiedOperand);
-      if (tiedOperand.getType() != resultType) {
-        p << " as ";
-      } else {
-        // Type elided as it matches the operand.
-        printType = false;
-      }
-    }
-    if (printType) {
-      p.printType(resultType);
-    }
-    if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        if (resultDims.empty()) {
-          p << "{<<INVALID>>}";
-          return;
-        }
-        p << "{";
-        llvm::interleaveComma(
-            resultDims.take_front(shapedType.getNumDynamicDims()), p,
-            [&](Value value) { p.printOperand(value); });
-        p << "}";
-        resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
-      }
-    }
-    if (i < resultTypes.size() - 1) p << ", ";
-  }
-  if (resultTypes.size() != 1) p << ")";
 }
 
 //===----------------------------------------------------------------------===//
@@ -565,27 +323,66 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   return canDispatchRegionContainOp(op);
 }
 
-bool DispatchWorkgroupsOp::isOutputReadWithinRegion(unsigned resultIndex) {
-  unsigned startIndex = getBody()->getNumArguments() - getNumResults();
-  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
-  // If argument is of `writeonly` access, then it is not read by construction.
-  if (arg.getType().cast<DispatchTensorType>().getAccess() ==
-      TensorAccess::WriteOnly) {
-    return false;
-  }
-  // If the argument is a result with `readwrite` access, return false if the
-  // value is only written to. Check this by looking at the uses of the argument
-  // being only the `target` of `flow.dispatch.tensor.store` ops.
-  for (OpOperand &uses : arg.getUses()) {
-    auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
-    if (!(storeOp && storeOp.target() == uses.get())) {
-      return true;
+// Refines the tensor access from what is declared on |type| based on actual
+// usage. We expect that the access was set correctly to begin with but today
+// we sometimes specify things too wide.
+static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
+  auto tensorAccess = type.getAccess();
+  if (tensorAccess == TensorAccess::ReadWrite) {
+    // If the argument is a result with `readwrite` access, return false if the
+    // value is only written to. Check this by looking at the uses of the
+    // argument being only the `target` of `flow.dispatch.tensor.store` ops.
+    bool onlyWrites = true;
+    for (OpOperand &uses : value.getUses()) {
+      auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
+      if (!(storeOp && storeOp.target() == uses.get())) {
+        onlyWrites = false;
+        break;
+      }
     }
+    if (onlyWrites) tensorAccess = TensorAccess::WriteOnly;
   }
-  return false;
+  return tensorAccess;
 }
 
-ClosureOpInterface
+IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
+    unsigned operandIndex) {
+  BlockArgument arg = body().front().getArgument(operandIndex);
+  if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
+    auto tensorAccess = refineTensorAccess(arg, tensorType);
+    return IREE::Util::ValueAccess(
+        /*isRead=*/(tensorAccess == TensorAccess::ReadOnly) ||
+            (tensorAccess == TensorAccess::ReadWrite),
+        /*isWrite=*/(tensorAccess == TensorAccess::ReadWrite) ||
+            (tensorAccess == TensorAccess::WriteOnly),
+        /*isDiscard=*/(tensorAccess == TensorAccess::WriteOnly));
+  } else {
+    return IREE::Util::ValueAccess(/*isRead=*/!arg.use_empty(),
+                                   /*isWrite=*/false,
+                                   /*isDiscard=*/false);
+  }
+}
+
+IREE::Util::ValueAccess DispatchWorkgroupsOp::getResultAccess(
+    unsigned resultIndex) {
+  unsigned startIndex = getBody()->getNumArguments() - getNumResults();
+  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
+  if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
+    auto tensorAccess = refineTensorAccess(arg, tensorType);
+    return IREE::Util::ValueAccess(
+        /*isRead=*/(tensorAccess == TensorAccess::ReadOnly) ||
+            (tensorAccess == TensorAccess::ReadWrite),
+        /*isWrite=*/(tensorAccess == TensorAccess::ReadWrite) ||
+            (tensorAccess == TensorAccess::WriteOnly),
+        /*isDiscard=*/(tensorAccess == TensorAccess::WriteOnly));
+  } else {
+    return IREE::Util::ValueAccess(/*isRead=*/!arg.use_empty(),
+                                   /*isWrite=*/false,
+                                   /*isDiscard=*/false);
+  }
+}
+
+IREE::Util::ClosureOpInterface
 DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
@@ -593,9 +390,9 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
   SmallVector<Value, 4> newOperandDims = llvm::to_vector<4>(operand_dims());
-  excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
-                                   excludedOperandIndices, newResultTypes,
-                                   newResultDims, excludedResultIndices);
+  IREE::Util::excludeClosureOperandsAndResults(
+      newOperandsValues, newOperandDims, excludedOperandIndices, newResultTypes,
+      newResultDims, excludedResultIndices);
 
   auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
@@ -1151,11 +948,20 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   return false;
 }
 
-bool ExStreamFragmentOp::isOutputReadWithinRegion(unsigned resultIndex) {
-  return false;
+IREE::Util::ValueAccess ExStreamFragmentOp::getOperandAccess(
+    unsigned operandIndex) {
+  return !isOperandTied(operandIndex) ? IREE::Util::ValueAccess::ReadOnly()
+                                      : IREE::Util::ValueAccess::ReadWrite();
 }
 
-ClosureOpInterface
+IREE::Util::ValueAccess ExStreamFragmentOp::getResultAccess(
+    unsigned resultIndex) {
+  return getTiedResultOperandIndex(resultIndex).hasValue()
+             ? IREE::Util::ValueAccess::ReadWrite()
+             : IREE::Util::ValueAccess::DiscardWrite();
+}
+
+IREE::Util::ClosureOpInterface
 ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
@@ -1163,9 +969,9 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
   SmallVector<Value, 4> newOperandDims = llvm::to_vector<4>(operand_dims());
-  excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
-                                   excludedOperandIndices, newResultTypes,
-                                   newResultDims, excludedResultIndices);
+  IREE::Util::excludeClosureOperandsAndResults(
+      newOperandsValues, newOperandDims, excludedOperandIndices, newResultTypes,
+      newResultDims, excludedResultIndices);
 
   auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
@@ -1179,7 +985,7 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
       newOperandDims, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
-  eraseRegionResults(newBody, excludedResultIndices);
+  IREE::Util::eraseRegionResults(newBody, excludedResultIndices);
   newBody.front().eraseArguments(excludedOperandIndices);
   return newOp;
 }

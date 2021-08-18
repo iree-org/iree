@@ -8,9 +8,9 @@
 #include <numeric>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
@@ -228,7 +228,8 @@ struct TieStreamResults : public OpRewritePattern<ExStreamFragmentOp> {
 
 void ExStreamFragmentOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ClosureOptimizationPattern<ExStreamFragmentOp>>(context);
+  results.insert<IREE::Util::ClosureOptimizationPattern<ExStreamFragmentOp>>(
+      context);
   results.insert<InsertImmutabilityPreservingStreamClones>(context);
   // TODO(#6420): fix HAL lowering of this (or wait until streams are gone).
   // results.insert<TieStreamResults>(context);
@@ -240,7 +241,8 @@ void ExStreamFragmentOp::getCanonicalizationPatterns(
 
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>>(context);
+  results.insert<IREE::Util::ClosureOptimizationPattern<DispatchWorkgroupsOp>>(
+      context);
 }
 
 //===----------------------------------------------------------------------===//

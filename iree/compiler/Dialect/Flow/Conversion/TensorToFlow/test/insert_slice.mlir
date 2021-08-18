@@ -16,7 +16,7 @@ func @insert_slice_convert
 //   CHECK-DAG:   %[[C4:.+]] = constant 4
 //   CHECK-DAG:   %[[DIM0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[ARG1]], %[[ARG0]][%[[C4]], %[[C2]], %[[C0]]]
-//  CHECK-SAME:     : tensor<1x4x48xf32> -> tensor<?x24x48xf32>{%[[DIM0]]}
+//  CHECK-SAME:     : tensor<1x4x48xf32> -> %[[ARG0]] as tensor<?x24x48xf32>{%[[DIM0]]}
 
 // -----
 
@@ -37,7 +37,7 @@ func @insert_slice_convert_rank_reducing
 //   CHECK-DAG:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[ARG1]] : tensor<4x48xf32> -> tensor<1x4x48xf32>
 //   CHECK-DAG:   %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[RESHAPE]], %[[ARG0]][%[[C4]], %[[C2]], %[[C0]]]
-//  CHECK-SAME:     : tensor<1x4x48xf32> -> tensor<?x24x48xf32>{%[[DIM]]}
+//  CHECK-SAME:     : tensor<1x4x48xf32> -> %[[ARG0]] as tensor<?x24x48xf32>{%[[DIM]]}
 
 // -----
 
@@ -50,7 +50,7 @@ func @rank_reducing_insert_slice_trailing_unit_dims
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
 //       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %{{.+}} : tensor<49x20xf32> -> tensor<1x49x20x1xf32>
-//       CHECK:   flow.tensor.update %[[RESHAPE]], %{{.+}}[%[[C0]], %[[C1]], %[[C0]], %[[C0]]] : tensor<1x49x20x1xf32> -> tensor<1x50x20x1xf32>
+//       CHECK:   flow.tensor.update %[[RESHAPE]], %{{.+}}[%[[C0]], %[[C1]], %[[C0]], %[[C0]]] : tensor<1x49x20x1xf32> -> %{{.+}} as tensor<1x50x20x1xf32>
 
 
 // -----

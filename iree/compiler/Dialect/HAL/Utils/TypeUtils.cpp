@@ -67,16 +67,17 @@ Value getValueSize(Location loc, Value value, OpBuilder &builder) {
         loc, builder.getIndexType(), value);
   }
 
-  if (auto awareOp = dyn_cast_or_null<SizeAwareOpInterface>(definingOp)) {
+  if (auto awareOp =
+          dyn_cast_or_null<IREE::Util::SizeAwareOpInterface>(definingOp)) {
     return awareOp.getResultSizeFromValue(value);
   }
 
   auto type = value.getType();
-  if (auto awareType = type.dyn_cast<SizeAwareTypeInterface>()) {
+  if (auto awareType = type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
     auto sizeValue = awareType.getSize(value);
     if (sizeValue) return sizeValue;
   }
-  if (auto inferType = type.dyn_cast<InferTypeSizeInterface>()) {
+  if (auto inferType = type.dyn_cast<IREE::Util::InferTypeSizeInterface>()) {
     return inferType.inferSizeFromValue(loc, value, builder);
   }
 

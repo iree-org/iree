@@ -13,6 +13,7 @@ include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
@@ -28,7 +29,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
   SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
-  DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+  DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
   ]>,
@@ -421,7 +422,7 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
   let hasCanonicalizer = 1;
 }
 
-def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
+def FLOW_ReturnOp : FLOW_Op<"return", [NoSideEffect, ReturnLike, Terminator]> {
   let summary = [{return from a flow.dispatch_region}];
   let description = [{
     Returns the given values from the region and back to the host code.
@@ -874,7 +875,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    custom<TiedResult>(type($result), $target_dims, $tied_operands)
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
     attr-dict-with-keyword
   }];
 
@@ -921,7 +922,7 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+  DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface>,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
 ]> {
