@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
@@ -25,70 +26,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
-
-//===----------------------------------------------------------------------===//
-// custom<SymbolVisibility>($sym_visibility)
-//===----------------------------------------------------------------------===//
-// some.op custom<SymbolVisibility>($sym_visibility) $sym_name
-// ->
-// some.op @foo
-// some.op private @foo
-
-static ParseResult parseSymbolVisibility(OpAsmParser &parser,
-                                         StringAttr &symVisibilityAttr) {
-  StringRef symVisibility;
-  parser.parseOptionalKeyword(&symVisibility, {"public", "private", "nested"});
-  if (!symVisibility.empty()) {
-    symVisibilityAttr = parser.getBuilder().getStringAttr(symVisibility);
-  }
-  return success();
-}
-
-static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
-                                  StringAttr symVisibilityAttr) {
-  if (!symVisibilityAttr) {
-    p << "public";
-  } else {
-    p << symVisibilityAttr.getValue();
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// custom<TypeOrAttr>($type, $attr)
-//===----------------------------------------------------------------------===//
-// some.op custom<TypeOrAttr>($type, $attr)
-// ->
-// some.op : i32
-// some.op = 42 : i32
-
-static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
-                                   Attribute &attr) {
-  if (succeeded(parser.parseOptionalEqual())) {
-    if (failed(parser.parseAttribute(attr))) {
-      return parser.emitError(parser.getCurrentLocation())
-             << "expected attribute";
-    }
-    typeAttr = TypeAttr::get(attr.getType());
-  } else {
-    Type type;
-    if (failed(parser.parseColonType(type))) {
-      return parser.emitError(parser.getCurrentLocation()) << "expected type";
-    }
-    typeAttr = TypeAttr::get(type);
-  }
-  return success();
-}
-
-static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
-                            Attribute attr) {
-  if (attr) {
-    p << " = ";
-    p.printAttribute(attr);
-  } else {
-    p << " : ";
-    p.printAttribute(type);
-  }
-}
 
 //===----------------------------------------------------------------------===//
 // Structural ops

@@ -4,14 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
+#include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Flow {
+namespace Util {
 
 //------------------------------------------------------------------------------
 // Closure optimization
@@ -53,6 +54,8 @@ void excludeClosureOperandsAndResults(
     auto type = it.value().getType();
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       numDynamicDims = shapedType.getNumDynamicDims();
+    } else if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
+      numDynamicDims = 1;
     }
     if (!llvm::count(excludedOperandIndices, it.index())) {
       operandValues.push_back(it.value());
@@ -73,6 +76,8 @@ void excludeClosureOperandsAndResults(
     auto type = it.value();
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       numDynamicDims = shapedType.getNumDynamicDims();
+    } else if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
+      numDynamicDims = 1;
     }
     if (!llvm::count(excludedResultIndices, it.index())) {
       resultTypes.push_back(type);
@@ -86,15 +91,18 @@ void excludeClosureOperandsAndResults(
 
 void eraseRegionResults(Region &region,
                         ArrayRef<unsigned> excludedResultIndices) {
-  region.walk([&](IREE::Flow::ReturnOp terminator) {
-    llvm::SmallVector<Value, 4> newReturns;
-    for (auto it : llvm::enumerate(terminator.getOperands())) {
-      if (!llvm::count(excludedResultIndices, it.index())) {
-        newReturns.push_back(it.value());
+  for (auto &block : region.getBlocks()) {
+    auto *terminatorOp = block.getTerminator();
+    if (terminatorOp && terminatorOp->hasTrait<OpTrait::ReturnLike>()) {
+      llvm::SmallVector<Value, 4> newReturns;
+      for (auto it : llvm::enumerate(terminatorOp->getOperands())) {
+        if (!llvm::count(excludedResultIndices, it.index())) {
+          newReturns.push_back(it.value());
+        }
       }
+      terminatorOp->setOperands(newReturns);
     }
-    terminator.getOperation()->setOperands(newReturns);
-  });
+  }
 }
 
 // Returns true if |constantOp| represents a (logically) small constant value.
@@ -173,14 +181,11 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
     auto *sourceOp = outerValue.getDefiningOp();
     if (!sourceOp) continue;  // can't clone block arguments into closures
 
-    BlockArgument blockArg = entryBlock.getArgument(opArg.index());
-    if (auto type = blockArg.getType().dyn_cast<DispatchTensorType>()) {
-      // We cannot just simply inline and replace all users if this is an
-      // argument that can be written; for example, the region might perform
-      // work after loading a initial constant from the argument and then
-      // write back.
-      if (type.getAccess() != TensorAccess::ReadOnly) continue;
-    }
+    // We cannot just simply inline and replace all users if this is an
+    // argument that can be written; for example, the region might perform
+    // work after loading a initial constant from the argument and then
+    // write back.
+    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly()) continue;
 
     if (closureOp.canClosureContainOp(sourceOp) &&
         shouldInlineIntoClosure(outerValue)) {
@@ -197,6 +202,7 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
       auto newValue = clonedOp->getResult(resultIndex);
 
       // Replace all of the uses inside of the closure.
+      BlockArgument blockArg = entryBlock.getArgument(opArg.index());
       blockArg.replaceAllUsesWith(newValue);
     }
   }
@@ -245,7 +251,7 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
     // You can drop a result if the use is empty, and that it is only written to
     // within the dispatch region.
     if (result.value().use_empty() &&
-        !closureOp.isOutputReadWithinRegion(result.index())) {
+        !closureOp.getResultAccess(result.index()).isRead) {
       elidedResults.push_back(result.index());
     } else {
       preservedResults.push_back(result.value());
@@ -293,7 +299,7 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   return success();
 }
 
-}  // namespace Flow
+}  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -14,16 +14,23 @@ iree_cc_library(
   NAME
     IR
   HDRS
+    "ClosureOpUtils.h"
     "UtilDialect.h"
-    "UtilOpInterfaces.h.inc"
     "UtilOps.h"
     "UtilOps.h.inc"
     "UtilTraits.h"
     "UtilTypes.h"
+  TEXTUAL_HDRS
+    "UtilAttrInterfaces.cpp.inc"
+    "UtilAttrInterfaces.h.inc"
+    "UtilOpInterfaces.cpp.inc"
+    "UtilOpInterfaces.h.inc"
+    "UtilTypeInterfaces.cpp.inc"
+    "UtilTypeInterfaces.h.inc"
   SRCS
+    "ClosureOpUtils.cpp"
     "UtilDialect.cpp"
     "UtilOpFolders.cpp"
-    "UtilOpInterfaces.cpp.inc"
     "UtilOps.cpp"
     "UtilOps.cpp.inc"
     "UtilTypes.cpp"
@@ -47,8 +54,12 @@ iree_tablegen_library(
   TD_FILE
     "UtilInterfaces.td"
   OUTS
+    -gen-attr-interface-decls UtilAttrInterfaces.h.inc
+    -gen-attr-interface-defs UtilAttrInterfaces.cpp.inc
     -gen-op-interface-decls UtilOpInterfaces.h.inc
     -gen-op-interface-defs UtilOpInterfaces.cpp.inc
+    -gen-type-interface-decls UtilTypeInterfaces.h.inc
+    -gen-type-interface-defs UtilTypeInterfaces.cpp.inc
 )
 
 iree_tablegen_library(

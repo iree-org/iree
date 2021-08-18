@@ -334,7 +334,7 @@ func @dont_fuse_tensor_update_with_fill(
   %4 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%2)[%arg3, %arg5]
   %5 = linalg.init_tensor [%3, %4] : tensor<?x?xf32>
   %6 = linalg.fill(%0, %5) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-  %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32>{%1, %2} -> tensor<?x?xf32>{%3, %4}
+  %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32>{%1, %2} -> %6 as tensor<?x?xf32>{%3, %4}
   return %7 : tensor<?x?xf32>
 }
 
@@ -639,7 +639,7 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
   %c5_i32 = constant 5 : i32
   %c0_i32 = constant 0 : i32
   %c9_i32 = constant 9 : i32
-  %245 = flow.tensor.update %240, %244[%c9] : tensor<9xi32> -> tensor<18xi32>
+  %245 = flow.tensor.update %240, %244[%c9] : tensor<9xi32> -> %244 as tensor<18xi32>
   %248 = tensor.extract %247[] : tensor<i32>
   %249 = cmpi slt, %248, %c9_i32 : i32
   %250 = select %249, %248, %c9_i32 : i32

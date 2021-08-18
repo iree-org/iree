@@ -79,16 +79,18 @@ class AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
   using Base::Base;
 };
 
-class BufferType : public Type::TypeBase<BufferType, Type, TypeStorage,
-                                         InferTypeSizeInterface::Trait> {
+class BufferType
+    : public Type::TypeBase<BufferType, Type, TypeStorage,
+                            IREE::Util::InferTypeSizeInterface::Trait> {
  public:
   using Base::Base;
 
   Value inferSizeFromValue(Location loc, Value value, OpBuilder &builder) const;
 };
 
-class BufferViewType : public Type::TypeBase<BufferViewType, Type, TypeStorage,
-                                             InferTypeSizeInterface::Trait> {
+class BufferViewType
+    : public Type::TypeBase<BufferViewType, Type, TypeStorage,
+                            IREE::Util::InferTypeSizeInterface::Trait> {
  public:
   using Base::Base;
 

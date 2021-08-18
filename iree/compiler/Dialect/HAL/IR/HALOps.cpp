@@ -51,65 +51,6 @@ static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<SizeAwareType>
-//===----------------------------------------------------------------------===//
-// type{%size}
-
-static ParseResult parseSizeAwareType(OpAsmParser &parser, Type &type,
-                                      OpAsmParser::OperandType &size) {
-  if (failed(parser.parseType(type)) || failed(parser.parseLBrace()) ||
-      failed(parser.parseOperand(size)) || failed(parser.parseRBrace())) {
-    return failure();
-  }
-  return success();
-}
-
-static void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type,
-                               Value size) {
-  p.printType(type);
-  p << "{";
-  p.printOperand(size);
-  p << "}";
-}
-
-//===----------------------------------------------------------------------===//
-// custom<SizeAwareTypeList>
-//===----------------------------------------------------------------------===//
-// (type{%size0}, type, type{%size1})
-
-static ParseResult parseSizeAwareTypeList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
-  do {
-    Type type;
-    if (failed(parser.parseType(type))) return failure();
-    if (type.isa<SizeAwareTypeInterface>()) {
-      OpAsmParser::OperandType size;
-      if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
-          failed(parser.parseRBrace())) {
-        return failure();
-      }
-      sizes.push_back(size);
-    }
-    types.push_back(type);
-  } while (succeeded(parser.parseOptionalComma()));
-  return success();
-}
-
-static void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op,
-                                   TypeRange types, OperandRange sizes) {
-  int sizeIndex = 0;
-  llvm::interleaveComma(types, p, [&](Type type) {
-    p.printType(type);
-    if (type.isa<SizeAwareTypeInterface>()) {
-      p << "{";
-      p.printOperand(sizes[sizeIndex++]);
-      p << "}";
-    }
-  });
-}
-
-//===----------------------------------------------------------------------===//
 // custom<DescriptorSetBindings>($binding_ordinals,
 //                               $binding_buffers,
 //                               type($binding_buffers),

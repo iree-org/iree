@@ -181,6 +181,24 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
   return baseValue;
 }
 
+bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
+  auto storageAttr =
+      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
+  if (!storageAttr) return false;
+  auto valueAttrs = storageAttr.getValue();
+  if (valueAttrs.empty()) return false;
+  auto tiedOp = cast<TiedOpInterface>(op);
+  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+  for (unsigned i = 0; i < valueAttrs.size(); ++i) {
+    int64_t index = valueAttrs[i].cast<IntegerAttr>().getInt();
+    index = index != TiedOpInterface::kUntiedIndex
+                ? tiedOperandsOffset + index
+                : TiedOpInterface::kUntiedIndex;
+    if (index == operandIndex) return true;
+  }
+  return false;
+}
+
 LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
   auto storageAttr =
       tiedOp->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
@@ -242,12 +260,14 @@ void excludeTiedOperandAndResultIndices(
   }
 }
 
-// At the end so it can use functions above:
-#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
-
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
 //===----------------------------------------------------------------------===//
+
+// At the end so it can use functions above:
+#include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.cpp.inc"
+#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
+#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.cpp.inc"
 
 void UtilDialect::registerTypes() {
   addTypes<IREE::Util::ByteBufferType, IREE::Util::ListType,
