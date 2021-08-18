@@ -666,7 +666,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     int64_t subgroupSize =
         targetEnv.getResourceLimits().subgroup_size().getValue().getSExtValue();
 
-    if (computeOps.empty() || !llvm::any_of(computeOps, [](Operation *op) {
+    if (computeOps.empty() || llvm::none_of(computeOps, [](Operation *op) {
           return hasMarker(op, getWorkgroupMarker());
         })) {
       // TODO(ravishankarm): `tensor.insert_slice` is not a compute op but still
