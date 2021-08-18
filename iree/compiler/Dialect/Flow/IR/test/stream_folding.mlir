@@ -47,13 +47,32 @@ func @removeUnusedDupCapture(%arg: index) -> index {
 
 // -----
 
-// CHECK-LABEL: func @removeUnusedResult
+// CHECK-LABEL: func @removeUnusedProducedResult
+// CHECK-SAME: (%[[ARG0:.+]]: index)
+func @removeUnusedProducedResult(%arg0: index) -> index {
+  // CHECK: flow.ex.stream.fragment(%[[ARG0]]) : (index) -> index =
+  %0:2 = flow.ex.stream.fragment(%arg0) : (index) -> (index, index) =
+      (%arg0_in: index) -> (index, index) {
+    // CHECK: %[[T:.+]] = addi
+    %t = addi %arg0_in, %arg0_in : index
+    %unused = muli %arg0_in, %arg0_in : index
+    // CHECK: flow.return %[[T]] : index
+    flow.return %t, %unused : index, index
+  }
+  return %0#0 : index
+}
+
+// -----
+
+// CHECK-LABEL: func @removeUnusedPassThroughResult
 // CHECK-SAME: (%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-func @removeUnusedResult(%arg0: index, %arg1: index) -> index {
+func @removeUnusedPassThroughResult(%arg0: index, %arg1: index) -> index {
   // CHECK: flow.ex.stream.fragment(%[[ARG1]])
   %0:2 = flow.ex.stream.fragment(%arg0, %arg1) : (index, index) -> (index, index) =
-      (%unused: index, %arg1: index) -> (index, index) {
-    %t = addi %arg1, %arg1 : index
+      (%unused: index, %arg1_in: index) -> (index, index) {
+    // CHECK: %[[T:.+]] = addi
+    %t = addi %arg1_in, %arg1_in : index
+    // CHECK: flow.return %[[T]] : index
     flow.return %t, %unused : index, index
   }
   return %0#0 : index
@@ -69,7 +88,7 @@ func @removeUnusedDynamicResult(%arg0: tensor<4x?xf32>, %dim0: index,
   // CHECK: flow.ex.stream.fragment(%[[ARG1]]) :
   %0:2 = flow.ex.stream.fragment(%arg0, %arg1) :
       // CHECK-SAME: (tensor<8x?xf32>{%[[DIM1]]}) -> %[[ARG1]]{%[[DIM1]]} =
-      (tensor<4x?xf32>{%dim0}, tensor<8x?xf32>{%dim1}) -> (%arg0{%dim0}, %arg1{%dim1}) =
+      (tensor<4x?xf32>{%dim0}, tensor<8x?xf32>{%dim1}) -> (tensor<4x?xf32>{%dim0}, %arg1{%dim1}) =
       // CHECK-NEXT: (%[[INNER_ARG:.+]]: tensor<8x?xf32>) -> tensor<8x?xf32>
       (%unused: tensor<4x?xf32>, %arg1: tensor<8x?xf32>) -> (tensor<4x?xf32>, tensor<8x?xf32>) {
     // CHECK-NEXT: flow.return %[[INNER_ARG]] : tensor<8x?xf32>

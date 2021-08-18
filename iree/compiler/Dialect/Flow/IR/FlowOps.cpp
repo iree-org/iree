@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -323,27 +323,66 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   return canDispatchRegionContainOp(op);
 }
 
-bool DispatchWorkgroupsOp::isOutputReadWithinRegion(unsigned resultIndex) {
-  unsigned startIndex = getBody()->getNumArguments() - getNumResults();
-  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
-  // If argument is of `writeonly` access, then it is not read by construction.
-  if (arg.getType().cast<DispatchTensorType>().getAccess() ==
-      TensorAccess::WriteOnly) {
-    return false;
-  }
-  // If the argument is a result with `readwrite` access, return false if the
-  // value is only written to. Check this by looking at the uses of the argument
-  // being only the `target` of `flow.dispatch.tensor.store` ops.
-  for (OpOperand &uses : arg.getUses()) {
-    auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
-    if (!(storeOp && storeOp.target() == uses.get())) {
-      return true;
+// Refines the tensor access from what is declared on |type| based on actual
+// usage. We expect that the access was set correctly to begin with but today
+// we sometimes specify things too wide.
+static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
+  auto tensorAccess = type.getAccess();
+  if (tensorAccess == TensorAccess::ReadWrite) {
+    // If the argument is a result with `readwrite` access, return false if the
+    // value is only written to. Check this by looking at the uses of the
+    // argument being only the `target` of `flow.dispatch.tensor.store` ops.
+    bool onlyWrites = true;
+    for (OpOperand &uses : value.getUses()) {
+      auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
+      if (!(storeOp && storeOp.target() == uses.get())) {
+        onlyWrites = false;
+        break;
+      }
     }
+    if (onlyWrites) tensorAccess = TensorAccess::WriteOnly;
   }
-  return false;
+  return tensorAccess;
 }
 
-ClosureOpInterface
+IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
+    unsigned operandIndex) {
+  BlockArgument arg = body().front().getArgument(operandIndex);
+  if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
+    auto tensorAccess = refineTensorAccess(arg, tensorType);
+    return IREE::Util::ValueAccess(
+        /*isRead=*/(tensorAccess == TensorAccess::ReadOnly) ||
+            (tensorAccess == TensorAccess::ReadWrite),
+        /*isWrite=*/(tensorAccess == TensorAccess::ReadWrite) ||
+            (tensorAccess == TensorAccess::WriteOnly),
+        /*isDiscard=*/(tensorAccess == TensorAccess::WriteOnly));
+  } else {
+    return IREE::Util::ValueAccess(/*isRead=*/!arg.use_empty(),
+                                   /*isWrite=*/false,
+                                   /*isDiscard=*/false);
+  }
+}
+
+IREE::Util::ValueAccess DispatchWorkgroupsOp::getResultAccess(
+    unsigned resultIndex) {
+  unsigned startIndex = getBody()->getNumArguments() - getNumResults();
+  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
+  if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
+    auto tensorAccess = refineTensorAccess(arg, tensorType);
+    return IREE::Util::ValueAccess(
+        /*isRead=*/(tensorAccess == TensorAccess::ReadOnly) ||
+            (tensorAccess == TensorAccess::ReadWrite),
+        /*isWrite=*/(tensorAccess == TensorAccess::ReadWrite) ||
+            (tensorAccess == TensorAccess::WriteOnly),
+        /*isDiscard=*/(tensorAccess == TensorAccess::WriteOnly));
+  } else {
+    return IREE::Util::ValueAccess(/*isRead=*/!arg.use_empty(),
+                                   /*isWrite=*/false,
+                                   /*isDiscard=*/false);
+  }
+}
+
+IREE::Util::ClosureOpInterface
 DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
@@ -351,9 +390,9 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
   SmallVector<Value, 4> newOperandDims = llvm::to_vector<4>(operand_dims());
-  excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
-                                   excludedOperandIndices, newResultTypes,
-                                   newResultDims, excludedResultIndices);
+  IREE::Util::excludeClosureOperandsAndResults(
+      newOperandsValues, newOperandDims, excludedOperandIndices, newResultTypes,
+      newResultDims, excludedResultIndices);
 
   auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
@@ -909,11 +948,20 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   return false;
 }
 
-bool ExStreamFragmentOp::isOutputReadWithinRegion(unsigned resultIndex) {
-  return false;
+IREE::Util::ValueAccess ExStreamFragmentOp::getOperandAccess(
+    unsigned operandIndex) {
+  return !isOperandTied(operandIndex) ? IREE::Util::ValueAccess::ReadOnly()
+                                      : IREE::Util::ValueAccess::ReadWrite();
 }
 
-ClosureOpInterface
+IREE::Util::ValueAccess ExStreamFragmentOp::getResultAccess(
+    unsigned resultIndex) {
+  return getTiedResultOperandIndex(resultIndex).hasValue()
+             ? IREE::Util::ValueAccess::ReadWrite()
+             : IREE::Util::ValueAccess::DiscardWrite();
+}
+
+IREE::Util::ClosureOpInterface
 ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
@@ -921,9 +969,9 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
   SmallVector<Value, 4> newOperandDims = llvm::to_vector<4>(operand_dims());
-  excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
-                                   excludedOperandIndices, newResultTypes,
-                                   newResultDims, excludedResultIndices);
+  IREE::Util::excludeClosureOperandsAndResults(
+      newOperandsValues, newOperandDims, excludedOperandIndices, newResultTypes,
+      newResultDims, excludedResultIndices);
 
   auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
@@ -937,7 +985,7 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
       newOperandDims, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
-  eraseRegionResults(newBody, excludedResultIndices);
+  IREE::Util::eraseRegionResults(newBody, excludedResultIndices);
   newBody.front().eraseArguments(excludedOperandIndices);
   return newOp;
 }

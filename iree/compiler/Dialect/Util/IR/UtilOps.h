@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_IREE_IR_IREEOPS_H_
-#define IREE_COMPILER_DIALECT_IREE_IR_IREEOPS_H_
+#ifndef IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
+#define IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -103,4 +103,4 @@ void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_IREE_IR_IREEOPS_H_
+#endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_

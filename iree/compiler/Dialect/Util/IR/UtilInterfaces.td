@@ -10,6 +10,91 @@
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::ClosureOpInterface
+//===----------------------------------------------------------------------===//
+
+def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface for ops that follow the util dialect closure semantics (explicit
+    captures, dynamic-shape awareness, and normal operand/result SSA behavior).
+
+    Implementing this interface enables optimizations that perform manipulation
+    across the closure capture boundary (outside of the op <-> regions within
+    the op).
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the body region of the closure (may have multiple blocks).
+      }],
+      /*retTy=*/"Region &",
+      /*methodName=*/"getClosureBodyRegion",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return this->getOperation()->getRegion(0);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{Returns all closure operand values.}],
+      /*retTy=*/"Operation::operand_range",
+      /*methodName=*/"getClosureOperands",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{Returns all closure result values.}],
+      /*retTy=*/"Operation::result_range",
+      /*methodName=*/"getClosureResults",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the given operation can exist in the closure.
+        Not all operations that a closure can contain are guaranteed to be folded
+        into the closure, such as when the operation may have side-effects.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"canClosureContainOp",
+      /*args=*/(ins "Operation *":$op)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Clones the op while removing specified operands and results.
+        The body of the op will be transferred to the new op and the entry block
+        will have its arguments removed.
+
+        The returned op will be free standing. Callers must insert it into a block
+        where desired (most often just replacing the current op).
+      }],
+      /*retTy=*/"IREE::Util::ClosureOpInterface",
+      /*methodName=*/"cloneReplacementExcludingOperandsAndResults",
+      /*args=*/(ins "ArrayRef<unsigned>":$excludedOperandIndices,
+                    "ArrayRef<unsigned>":$excludedResultIndices,
+                    "PatternRewriter &":$rewriter)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a bitfield indicating how an operand is used within the closure.
+      }],
+      /*retTy=*/"IREE::Util::ValueAccess",
+      /*methodName=*/"getOperandAccess",
+      /*args=*/(ins "unsigned":$operandIndex)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a bitfield indicating how a result is used within the closure.
+      }],
+      /*retTy=*/"IREE::Util::ValueAccess",
+      /*methodName=*/"getResultAccess",
+      /*args=*/(ins "unsigned":$resultIndex)
+    >
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
@@ -149,6 +234,19 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         return IREE::Util::detail::getTiedResultOperandIndices($_op);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the given flattened operand index is tied to one or more
+        results.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isOperandTied",
+      /*args=*/(ins "unsigned":$operandIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return IREE::Util::detail::isOperandTied($_op, operandIndex);
       }]
     >,
   ];

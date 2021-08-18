@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     IR
   HDRS
+    "ClosureOpUtils.h"
     "UtilDialect.h"
     "UtilOps.h"
     "UtilOps.h.inc"
@@ -27,6 +28,7 @@ iree_cc_library(
     "UtilTypeInterfaces.cpp.inc"
     "UtilTypeInterfaces.h.inc"
   SRCS
+    "ClosureOpUtils.cpp"
     "UtilDialect.cpp"
     "UtilOpFolders.cpp"
     "UtilOps.cpp"

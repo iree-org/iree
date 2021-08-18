@@ -35,6 +35,7 @@ td_library(
 cc_library(
     name = "IR",
     srcs = [
+        "ClosureOpUtils.cpp",
         "UtilDialect.cpp",
         "UtilOpFolders.cpp",
         "UtilOps.cpp",
@@ -42,6 +43,7 @@ cc_library(
         "UtilTypes.cpp",
     ],
     hdrs = [
+        "ClosureOpUtils.h",
         "UtilDialect.h",
         "UtilOps.h",
         "UtilOps.h.inc",
