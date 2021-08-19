@@ -13,9 +13,8 @@ vm.module @call_ops {
     vm.return
   }
 
-  // TODO(simon-camp): The EmitC conversion doesn't support ref types on function boundaries.
-  vm.export @test_call_r_v attributes {emitc.exclude}
-  vm.func private @test_call_r_v() {
+  vm.export @test_call_r_v
+  vm.func @test_call_r_v() {
     %ref = vm.const.ref.zero : !vm.ref<?>
     vm.call @_r_v(%ref) : (!vm.ref<?>) -> ()
     vm.return
@@ -29,12 +28,12 @@ vm.module @call_ops {
     vm.return
   }
 
-  // TODO(simon-camp): The EmitC conversion doesn't support ref types on function boundaries.
-  vm.export @test_call_v_r attributes {emitc.exclude}
-  vm.func private @test_call_v_r() {
+  vm.export @test_call_v_r
+  vm.func @test_call_v_r() {
     %ref = vm.const.ref.zero : !vm.ref<?>
+    %ref_dno = util.do_not_optimize(%ref) : !vm.ref<?>
     %res = vm.call @_v_r() : () -> (!vm.ref<?>)
-    vm.check.eq %ref, %res, "_v_r()=NULL" : !vm.ref<?>
+    vm.check.eq %ref_dno, %res, "_v_r()=NULL" : !vm.ref<?>
     vm.return
   }
 
@@ -55,10 +54,15 @@ vm.module @call_ops {
   }
 
   vm.func @_i_v(%arg : i32) attributes {noinline} {
+    %c1 = vm.const.i32 1 : i32
+    vm.check.eq %arg, %c1, "Expected %arg to be 1" : i32
     vm.return
   }
 
-  vm.func private @_r_v(%arg : !vm.ref<?>) attributes {noinline} {
+  vm.func @_r_v(%arg : !vm.ref<?>) attributes {noinline} {
+    %ref = vm.const.ref.zero : !vm.ref<?>
+    %ref_dno = util.do_not_optimize(%ref) : !vm.ref<?>
+    vm.check.eq %arg, %ref_dno, "Expected %arg to be NULL" : !vm.ref<?>
     vm.return
   }
 

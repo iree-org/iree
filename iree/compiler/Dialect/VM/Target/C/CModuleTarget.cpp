@@ -77,11 +77,11 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
       return rodataOp.emitError() << "error during serialization";
     }
 
-    std::string buffer_name =
+    std::string bufferName =
         moduleOp.getName().str() + "_" + rodataOp.getName().str();
 
     output << "iree_alignas(" << alignment << ") static const uint8_t "
-           << buffer_name << "[] = {";
+           << bufferName << "[] = {";
     llvm::interleaveComma(byteBuffer, output, [&](uint8_t value) {
       output << static_cast<unsigned int>(value);
     });
@@ -98,7 +98,10 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   llvm::raw_ostream &output = emitter.ostream();
   std::string moduleName = moduleOp.getName().str();
 
-  output << "struct " << moduleName << "_t {};\n";
+  output << "struct " << moduleName << "_t {\n";
+  output << "iree_allocator_t allocator;\n";
+  output << "};\n";
+
   output << "struct " << moduleName << "_state_t {\n";
 
   // Returns |count| or 1 if |count| == 0.
@@ -129,31 +132,13 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
 
 static LogicalResult printShim(mlir::FuncOp &funcOp,
                                llvm::raw_ostream &output) {
-  StringAttr callingConvention =
-      funcOp.getOperation()->getAttr("calling_convention").cast<StringAttr>();
+  StringAttr callingConvention = funcOp.getOperation()
+                                     ->getAttr("vm.calling_convention")
+                                     .cast<StringAttr>();
   if (!callingConvention) {
-    return funcOp.emitError("Couldn't create calling convention string");
+    return funcOp.emitError("Couldn't find calling convention attribute");
   }
   output << "call_" << callingConvention.getValue() << "_shim";
-  return success();
-}
-
-static LogicalResult initializeState(IREE::VM::ModuleOp moduleOp,
-                                     mlir::emitc::CppEmitter &emitter) {
-  llvm::raw_ostream &output = emitter.ostream();
-
-  for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-    std::string buffer_name =
-        moduleOp.getName().str() + "_" + rodataOp.getName().str();
-    output << "iree_vm_buffer_initialize("
-           << "IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, "
-           << "iree_make_byte_span("
-           << "(void*)" << buffer_name << ", sizeof(" << buffer_name << ")), "
-           << "iree_allocator_null(), "
-           << "&state->rodata_buffers[" << rodataOp.ordinal() << "]"
-           << ");\n";
-  }
-
   return success();
 }
 
@@ -190,11 +175,10 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
         return exportOp.emitError("Couldn't find referenced FuncOp");
       }
       StringAttr callingConvention = funcOp.getOperation()
-                                         ->getAttr("calling_convention")
+                                         ->getAttr("vm.calling_convention")
                                          .cast<StringAttr>();
       if (!callingConvention) {
-        return exportOp.emitError(
-            "Couldn't create calling convention string for referenced FuncOp");
+        return exportOp.emitError("Couldn't find calling convention attribute");
       }
 
       // TODO(simon-camp): support function-level reflection attributes
@@ -252,7 +236,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
              << "(iree_vm_native_function_shim_t)";
 
       if (failed(printShim(funcOp, output))) {
-        return funcOp.emitError("Couldn't create calling convention string");
+        return funcOp.emitError("Error generating shim");
       }
       output << ", "
              << "(iree_vm_native_function_target_t)" << funcName << "},\n";
@@ -276,65 +260,6 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "0,\n"
          << "NULL,\n"
          << "};\n";
-
-  // destroy
-  // TODO(simon-camp):
-
-  // alloc_state
-  output << "static iree_status_t " << moduleName
-         << "_alloc_state(void* self, iree_allocator_t allocator, "
-            "iree_vm_module_state_t** out_module_state) {\n"
-         << moduleName << "_state_t* state = NULL;\n"
-         << "IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, "
-            "sizeof(*state), (void**)&state));\n "
-         << "memset(state, 0, sizeof(*state));\n"
-         << "state->allocator = allocator;\n";
-
-  // initialize globals
-  if (failed(initializeState(moduleOp, emitter))) {
-    return moduleOp.emitError() << "Failed to emit state members";
-  }
-
-  output << "*out_module_state = (iree_vm_module_state_t*)state;\n"
-         << "return iree_ok_status();\n"
-         << "}\n";
-
-  // free_state
-  output << "static void " << moduleName
-         << "_free_state(void* self, iree_vm_module_state_t* "
-            "module_state) {\n"
-         << moduleName << "_state_t* state = (" << moduleName
-         << "_state_t*)module_state;\n"
-         << "iree_allocator_free(state->allocator, state);\n"
-         << "}\n";
-
-  // resolve_imports
-  output << "static iree_status_t " << moduleName << "_resolve_import("
-         << "void* self, iree_vm_module_state_t* module_state, "
-            "iree_host_size_t ordinal, const iree_vm_function_t* function, "
-            "const iree_vm_function_signature_t* signature) {\n"
-         << moduleName << "_state_t* state = (" << moduleName
-         << "_state_t*)module_state;\n"
-         << "state->imports[ordinal] = *function;\n"
-         << "return iree_ok_status();\n}";
-
-  output << "\n";
-
-  // create
-  output << "static iree_status_t " << moduleName << "_create("
-         << "iree_allocator_t allocator, iree_vm_module_t** "
-            "out_module) {\n"
-         << "iree_vm_module_t interface;\n"
-         << "IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, "
-            "NULL));\n"
-         << "interface.destroy = NULL;\n"
-         << "interface.alloc_state = " << moduleName << "_alloc_state;\n"
-         << "interface.free_state = " << moduleName << "_free_state;\n"
-         << "interface.resolve_import = " << moduleName << "_resolve_import;\n"
-         << "return iree_vm_native_module_create(&interface, "
-            "&"
-         << descriptorName << ", allocator, out_module);\n"
-         << "}\n";
 
   output << "\n";
   return success();
@@ -440,7 +365,6 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printInclude("iree/vm/ops.h");
   printInclude("iree/vm/ops_emitc.h");
   printInclude("iree/vm/shims_emitc.h");
-  printInclude("iree/vm/value.h");
   output << "\n";
 
   printCompilerConfigurationBlock(output);
@@ -487,23 +411,31 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 
   output << "// DEFINE FUNCTIONS\n";
 
+  // Emit code for functions skipping those marked with `vm.emit_at_end`.
   for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
     Operation *op = funcOp.getOperation();
+    if (op->hasAttr("vm.emit_at_end")) continue;
     if (op->hasAttr("emitc.static")) output << "static ";
     if (failed(emitter.emitOperation(*funcOp.getOperation(),
-                                     /*trailingSemicolon=*/
-                                     false)))
+                                     /*trailingSemicolon=*/false)))
       return failure();
   }
 
-  printSeparatingComment(output);
-
-  printModuleComment(moduleOp, output);
   output << "\n";
 
   // generate module descriptors
   if (failed(buildModuleDescriptors(moduleOp, emitter))) {
     return failure();
+  }
+
+  // Emit code for functions marked with `vm.emit_at_end`.
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    Operation *op = funcOp.getOperation();
+    if (!op->hasAttr("vm.emit_at_end")) continue;
+    if (op->hasAttr("emitc.static")) output << "static ";
+    if (failed(emitter.emitOperation(*funcOp.getOperation(),
+                                     /*trailingSemicolon=*/false)))
+      return failure();
   }
 
   return success();
