@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
+include(iree_installed_test)
 
 ###############################################################################
 # Main user rules
@@ -256,7 +257,6 @@ endfunction()
 # NAME: name of test
 # SRCS: Test source file
 # ARGS: Command line arguments to the Python source file.
-# DEPS: List of deps the test requires
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 # GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
@@ -269,8 +269,8 @@ function(iree_py_test)
   cmake_parse_arguments(
     _RULE
     "GENERATED_IN_BINARY_DIR"
-    "NAME"
-    "ARGS;DEPS;LABELS;SRCS"
+    "NAME;SRCS"
+    "ARGS;LABELS"
     ${ARGN}
   )
 
@@ -288,17 +288,26 @@ function(iree_py_test)
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
 
-  add_test(
-    NAME ${_NAME}
+  iree_add_installed_test(
+    TEST_NAME "${_NAME_PATH}"
+    LABELS "${_RULE_LABELS}"
+    ENVIRONMENT
+      "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
     COMMAND
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      "${_SRC_DIR}/${_RULE_SRCS}"
+      ${_RULE_ARGS}
+    INSTALLED_COMMAND
+      python
+      "${_PACKAGE_PATH}/${_RULE_SRCS}"
   )
 
-  set_property(TEST ${_NAME} PROPERTY LABELS "${_RULE_LABELS}")
-  set_property(TEST ${_NAME} PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH};TEST_TMPDIR=${_NAME}_${V}_test_tmpdir")
+  install(FILES ${_RULE_SRCS}
+    DESTINATION "tests/${_PACKAGE_PATH}"
+    COMPONENT Tests
+  )
+
   # TODO(marbre): Find out how to add deps to tests.
   #               Similar to _RULE_DATA in iree_lit_test().
 endfunction()
