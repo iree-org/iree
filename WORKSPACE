@@ -31,34 +31,18 @@ bazel_skylib_workspace()
 ###############################################################################
 # llvm-project
 
-maybe(
-    local_repository,
-    name = "llvm_bazel",
-    path = "third_party/llvm-project/utils/bazel",
+new_local_repository(
+    name = "llvm-raw",
+    build_file_content = "# empty",
+    path = "third_party/llvm-project",
 )
 
-load("@llvm_bazel//:zlib.bzl", "llvm_zlib_disable")
+load("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure", "llvm_disable_optional_support_deps")
 
-maybe(
-    llvm_zlib_disable,
-    name = "llvm_zlib",
-)
+llvm_configure(name = "llvm-project")
 
-load("@llvm_bazel//:terminfo.bzl", "llvm_terminfo_disable")
+llvm_disable_optional_support_deps()
 
-maybe(
-    llvm_terminfo_disable,
-    name = "llvm_terminfo",
-)
-
-load("@llvm_bazel//:configure.bzl", "llvm_configure")
-
-maybe(
-    llvm_configure,
-    name = "llvm-project",
-    src_path = "third_party/llvm-project",
-    src_workspace = "@iree_core//:WORKSPACE",
-)
 ###############################################################################
 
 ###############################################################################
