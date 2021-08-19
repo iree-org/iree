@@ -11,8 +11,8 @@ vm.module @add_module {
     %0 = vm.add.i32 %arg0, %arg1 : i32
     // CHECK-NEXT: v9 = vm_add_i32(v8, v8);
     %1 = vm.add.i32 %0, %0 : i32
-    // CHECK-NEXT: EMITC_DEREF_ASSIGN(v6, v8);
-    // CHECK-NEXT: EMITC_DEREF_ASSIGN(v7, v9);
+    // CHECK-NEXT: EMITC_DEREF_ASSIGN_VALUE(v6, v8);
+    // CHECK-NEXT: EMITC_DEREF_ASSIGN_VALUE(v7, v9);
     // CHECK-NEXT: v10 = iree_ok_status();
     // CHECK-NEXT: return v10;
     vm.return %0, %1 : i32, i32

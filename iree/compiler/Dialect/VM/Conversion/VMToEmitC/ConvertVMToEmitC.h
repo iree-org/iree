@@ -17,13 +17,43 @@ namespace mlir {
 namespace iree_compiler {
 
 struct VMAnalysis {
-  RegisterAllocation registerAllocation;
-  ValueLiveness valueLiveness;
+ public:
+  VMAnalysis(RegisterAllocation &&registerAllocation,
+             ValueLiveness &&valueLiveness)
+      : registerAllocation(std::move(registerAllocation)),
+        valueLiveness(std::move(valueLiveness)) {}
 
   VMAnalysis(VMAnalysis &&) = default;
   VMAnalysis &operator=(VMAnalysis &&) = default;
   VMAnalysis(const VMAnalysis &) = delete;
   VMAnalysis &operator=(const VMAnalysis &) = delete;
+
+  int getNumRefRegisters() {
+    return registerAllocation.getMaxRefRegisterOrdinal() + 1;
+  }
+
+  int getRefRegisterOrdinal(Value ref) {
+    return registerAllocation.mapToRegister(originalValue(ref)).ordinal();
+  }
+
+  bool isLastValueUse(Value ref, Operation *op) {
+    return valueLiveness.isLastValueUse(originalValue(ref), op);
+  }
+
+  void remapValue(Value original, Value replacement) {
+    mapping[replacement] = original;
+    return;
+  }
+
+ private:
+  RegisterAllocation registerAllocation;
+  ValueLiveness valueLiveness;
+  DenseMap<Value, Value> mapping;
+
+  Value originalValue(Value ref) {
+    auto ptr = mapping.find(ref);
+    return ptr == mapping.end() ? ref : ptr->second;
+  }
 };
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
