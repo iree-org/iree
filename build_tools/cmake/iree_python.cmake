@@ -234,11 +234,18 @@ function(iree_py_library)
 
   # Symlink each file as its own target.
   foreach(SRC_FILE ${ARG_SRCS})
+    # SRC_FILE could have other path components in it, so we need to make a
+    # directory for it. Ninja does this automatically, but make doesn't. See
+    # https://github.com/google/iree/issues/6801
+    set(_SRC_BIN_PATH "${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}")
+    get_filename_component(_SRC_BIN_DIR "${_SRC_BIN_PATH}" DIRECTORY)
     add_custom_command(
       TARGET ${_NAME}
+      COMMAND
+        ${CMAKE_COMMAND} -E make_directory "${_SRC_BIN_DIR}"
       COMMAND ${CMAKE_COMMAND} -E create_symlink
-        "${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}" "${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}"
-      BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}" "${_SRC_BIN_PATH}"
+      BYPRODUCTS "${_SRC_BIN_PATH}"
     )
   endforeach()
 
