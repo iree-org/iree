@@ -319,9 +319,7 @@ LogicalResult setDefaultRootConfig(FuncOp entryPoint,
       vectorize = true;
     }
     SmallVector<int64_t, 4> candidateTileSizes;
-    if (vectorize) {
-      candidateTileSizes.append({4 * subgroupSize, 2 * subgroupSize});
-    }
+    if (vectorize) candidateTileSizes.push_back(4 * subgroupSize);
     candidateTileSizes.push_back(subgroupSize);
     for (int64_t size : candidateTileSizes) {
       if (outputShape.back() % size != 0) continue;
@@ -339,15 +337,24 @@ LogicalResult setDefaultRootConfig(FuncOp entryPoint,
   }
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
+
   unsigned loopDepth = partitionedLoops.back() + 1;
-  SmallVector<int64_t, 4> workgroupTileSize(loopDepth, 1),
-      threadTileSize(loopDepth, 1);
+  SmallVector<int64_t, 4> workgroupTileSize(loopDepth, 0);
+  SmallVector<int64_t, 4> threadTileSize(loopDepth, 0);
+
+  // Tiling along partitioned loops with size 1.
+  for (int64_t loopIndex : partitionedLoops) {
+    workgroupTileSize[loopIndex] = threadTileSize[loopIndex] = 1;
+  }
+  // Overwrite the configuration for the innermost dimension.
   workgroupTileSize.back() = lowerWorkgroupTs;
   threadTileSize.back() = lowerThreadTs;
+
   TileSizesListType tileSizes;
   tileSizes.emplace_back(workgroupTileSize);  // Workgroup level
   tileSizes.emplace_back();                   // Subgroup level
   tileSizes.emplace_back(threadTileSize);     // Invocation level
+
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       /*nativeVectorSize =*/ArrayRef<int64_t>{}, pipeline, workgroupSize);
