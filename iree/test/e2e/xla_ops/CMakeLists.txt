@@ -138,6 +138,7 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
     "-iree-llvm-link-embedded=true"
+    "-iree-llvm-embedded-linker-path=$(location @llvm-project//lld:ld.lld)"
 )
 
 iree_check_single_backend_test_suite(
