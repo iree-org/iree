@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -594,16 +595,25 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
   if (isMutable) {
-    result.addAttribute("is_mutable", builder.getUnitAttr());
+    result.addAttribute(is_mutableAttrName(result.name), builder.getUnitAttr());
   }
   if (initializer.hasValue()) {
-    result.addAttribute("initializer",
+    result.addAttribute(initializerAttrName(result.name),
                         builder.getSymbolRefAttr(initializer.getValue()));
   } else if (initialValue.hasValue()) {
-    result.addAttribute("initial_value", initialValue.getValue());
+    result.addAttribute(initial_valueAttrName(result.name),
+                        initialValue.getValue());
   }
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
+  result.addAttribute(typeAttrName(result.name), TypeAttr::get(type));
+  llvm::StringSet<> elidedAttrs;
+  auto opAttributes = getAttributeNames();
+  elidedAttrs.insert(opAttributes.begin(), opAttributes.end());
+  SmallVector<NamedAttribute> additionalAttrs;
+  for (auto attr : attrs) {
+    if (elidedAttrs.count(attr.first.strref())) continue;
+    additionalAttrs.push_back(attr);
+  }
+  result.addAttributes(additionalAttrs);
 }
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,

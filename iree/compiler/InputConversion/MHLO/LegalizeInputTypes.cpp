@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/Transforms/TypeConverter.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
@@ -70,10 +71,12 @@ Attribute convertAttribute(Location loc, Attribute value,
 
 LogicalResult convertRegion(Region &oldRegion, Region &newRegion,
                             FlowTypeConverter &typeConverter,
+                            llvm::StringMap<StringRef> &symbolRename,
                             BlockAndValueMapping &mapping);
 
 LogicalResult convertOperation(Operation *oldOp,
                                FlowTypeConverter &typeConverter,
+                               llvm::StringMap<StringRef> &symbolRename,
                                BlockAndValueMapping &mapping,
                                OpBuilder &builder) {
   if (llvm::isa<linalg::LinalgOp>(oldOp)) {
@@ -101,7 +104,18 @@ LogicalResult convertOperation(Operation *oldOp,
     }
     state.addAttribute("value", newValue);
   } else {
-    state.attributes = llvm::to_vector<4>(oldOp->getAttrs());
+    for (auto attr : oldOp->getAttrs()) {
+      if (auto symbolRefAttr = attr.second.dyn_cast<FlatSymbolRefAttr>()) {
+        StringRef replaceSymbolName =
+            symbolRename.lookup(symbolRefAttr.getValue());
+        if (!replaceSymbolName.empty()) {
+          state.addAttribute(attr.first,
+                             builder.getSymbolRefAttr(replaceSymbolName));
+          continue;
+        }
+      }
+      state.addAttribute(attr.first, attr.second);
+    }
   }
 
   for (auto oldOperand : oldOp->getOperands()) {
@@ -115,7 +129,8 @@ LogicalResult convertOperation(Operation *oldOp,
 
   for (auto &oldRegion : oldOp->getRegions()) {
     auto *newRegion = state.addRegion();
-    if (failed(convertRegion(oldRegion, *newRegion, typeConverter, mapping))) {
+    if (failed(convertRegion(oldRegion, *newRegion, typeConverter, symbolRename,
+                             mapping))) {
       return failure();
     }
   }
@@ -143,11 +158,13 @@ LogicalResult convertOperation(Operation *oldOp,
 
 LogicalResult convertBlock(Block &oldBlock, Block &newBlock,
                            FlowTypeConverter &typeConverter,
+                           llvm::StringMap<StringRef> &symbolRename,
                            BlockAndValueMapping &mapping) {
   OpBuilder builder(oldBlock.getParent()->getContext());
   builder.setInsertionPointToEnd(&newBlock);
   for (auto &oldOp : oldBlock) {
-    if (failed(convertOperation(&oldOp, typeConverter, mapping, builder))) {
+    if (failed(convertOperation(&oldOp, typeConverter, symbolRename, mapping,
+                                builder))) {
       return oldOp.emitOpError() << "unable to legalize operation types";
     }
   }
@@ -156,6 +173,7 @@ LogicalResult convertBlock(Block &oldBlock, Block &newBlock,
 
 LogicalResult convertRegion(Region &oldRegion, Region &newRegion,
                             FlowTypeConverter &typeConverter,
+                            llvm::StringMap<StringRef> &symbolRename,
                             BlockAndValueMapping &mapping) {
   OpBuilder builder(oldRegion.getContext());
   for (auto &oldBlock : oldRegion) {
@@ -174,7 +192,7 @@ LogicalResult convertRegion(Region &oldRegion, Region &newRegion,
   }
   for (auto &oldBlock : oldRegion) {
     if (failed(convertBlock(oldBlock, *mapping.lookup(&oldBlock), typeConverter,
-                            mapping))) {
+                            symbolRename, mapping))) {
       return failure();
     }
   }
@@ -188,11 +206,37 @@ class LegalizeInputTypesPass
  public:
   void runOnOperation() override {
     auto moduleOp = getOperation();
+    OpBuilder moduleBuilder(moduleOp);
     FlowTypeConverter typeConverter;
 
+    // Legalize types of util.global objects.
+    llvm::StringMap<StringRef> symbolRename;
+    SmallVector<IREE::Util::GlobalOp> replacedGlobals;
+    for (auto oldGlobal : moduleOp.getOps<IREE::Util::GlobalOp>()) {
+      auto newType = typeConverter.convertType(oldGlobal.type());
+      if (!newType || newType == oldGlobal.type()) continue;
+
+      // Create a new global with a valid type.
+      moduleBuilder.setInsertionPoint(oldGlobal);
+      auto name = oldGlobal.sym_name().str() + "__legalized__";
+
+      // Legalize the initial value attribute if present.
+      Optional<Attribute> initialValue;
+      if (auto initialValueAttr = oldGlobal.initial_value()) {
+        if (auto attr = initialValueAttr.getValue()) {
+          initialValue =
+              convertAttribute(oldGlobal.getLoc(), attr, typeConverter);
+        }
+      }
+      auto newGlobal = moduleBuilder.create<IREE::Util::GlobalOp>(
+          oldGlobal.getLoc(), name, oldGlobal.isMutable(), newType,
+          oldGlobal.initializer(), initialValue, oldGlobal->getAttrs());
+      newGlobal.setVisibility(oldGlobal.getVisibility());
+      symbolRename[oldGlobal.sym_name()] = newGlobal.sym_name();
+      replacedGlobals.push_back(oldGlobal);
+    }
     auto oldFuncOps = llvm::to_vector<16>(moduleOp.getOps<FuncOp>());
     for (auto oldFuncOp : oldFuncOps) {
-      OpBuilder moduleBuilder(moduleOp);
       moduleBuilder.setInsertionPoint(oldFuncOp);
 
       auto oldType = oldFuncOp.getType();
@@ -218,11 +262,26 @@ class LegalizeInputTypesPass
 
       BlockAndValueMapping mapping;
       if (failed(convertRegion(oldFuncOp.getBody(), newFuncOp.getBody(),
-                               typeConverter, mapping))) {
+                               typeConverter, symbolRename, mapping))) {
         return signalPassFailure();
       }
 
       oldFuncOp.erase();
+    }
+
+    // Go over all symbols and remap intializers that refer to legalized
+    // globals.
+    for (auto global : moduleOp.getOps<IREE::Util::GlobalOp>()) {
+      Optional<StringRef> initializer = global.initializer();
+      if (!initializer) continue;
+      StringRef newInitializer = symbolRename.lookup(initializer.getValue());
+      if (newInitializer.empty()) continue;
+      global.initializerAttr(moduleBuilder.getSymbolRefAttr(newInitializer));
+    }
+
+    // Delete the legalized globals.
+    for (auto global : replacedGlobals) {
+      global.erase();
     }
   }
 };
