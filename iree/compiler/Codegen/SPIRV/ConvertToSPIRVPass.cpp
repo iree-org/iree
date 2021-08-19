@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -296,6 +297,27 @@ struct ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
 void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
+
+  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
+      getAllEntryPoints(moduleOp);
+  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+    auto entryPointOp = entryPoints.lookup(funcOp.getName());
+    if (!entryPointOp) continue;
+    // TODO(ravishankarm): This needs to be removed after ConvertToGPU is
+    // deprecated. All passes must set the `workgroup_size` on the
+    // `hal.executable.entry_point` directly and not on the function.
+    if (funcOp->hasAttr(spirv::getEntryPointABIAttrName())) continue;
+    SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
+    if (workgroupSize.empty()) {
+      entryPointOp.emitOpError(
+          "expected workgroup_size attribute to be set for SPIR-V lowering");
+      return signalPassFailure();
+    }
+    auto workgroupSize32 = llvm::to_vector<4>(llvm::map_range(
+        workgroupSize, [](int64_t v) { return static_cast<int32_t>(v); }));
+    funcOp->setAttr(spirv::getEntryPointABIAttrName(),
+                    spirv::getEntryPointABIAttr(workgroupSize32, context));
+  }
 
   auto targetAttr = spirv::lookupTargetEnv(moduleOp);
   SPIRVTypeConverter typeConverter(targetAttr);

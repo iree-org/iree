@@ -1,4 +1,6 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-hlo-to-spirv-pipeline))' -iree-spirv-workgroup-tile-size=8,64,4 -iree-spirv-invocation-tile-size=8,4,4 -iree-spirv-workgroup-size=16,1,1 %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | IreeFileCheck %s
+
+#config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
 
 hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -8,8 +10,9 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {
-      interface = @io,
-      ordinal = 0 : index
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [16: index, 1: index, 1: index],
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
     }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @fuse_and_vectorize_fill_matmul() {
@@ -40,8 +43,8 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
             %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg0)[%workgroup_size_y]
             %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %16 = linalg.fill(%cst, %15) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>
           }
         }
@@ -66,6 +69,8 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
 
 // -----
 
+#config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
+
 hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -74,8 +79,9 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {
-      interface = @io,
-      ordinal = 0 : index
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [16: index, 1: index, 1: index],
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
     }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @fuse_and_vectorize_matmul_add() {
@@ -112,9 +118,9 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
             %18 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg0)[%workgroup_size_y]
             %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 256, s0)>(%arg1)[%workgroup_size_x]
             %20 = linalg.init_tensor [%18, %19] : tensor<?x?xf32>
-            %21 = linalg.fill(%cst, %20) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %22 = linalg.matmul ins(%15, %17 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%21 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%13 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+            %21 = linalg.fill(%cst, %20) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %22 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%15, %17 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%21 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%13 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = #config} {
             ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
               %24 = addf %arg2, %arg3 : f32
               linalg.yield %24 : f32

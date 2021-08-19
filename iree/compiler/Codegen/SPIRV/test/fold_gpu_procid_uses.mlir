@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-fold-gpu-procid-uses))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-fold-gpu-procid-uses))))' %s | IreeFileCheck %s
 
 hal.executable @fold_block_id attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -76,11 +76,11 @@ hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @fold_thread_id attributes {
       interface = @io,
-      ordinal = 0 : index
+      ordinal = 0 : index,
+      workgroup_size = [8: index, 2: index, 1: index]
     }
     module {
-      func @fold_thread_id() -> (index, index, index)
-        attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
+      func @fold_thread_id() -> (index, index, index) {
         %0 = "gpu.thread_id"() {dimension = "x"} : () -> index
         %1 = "gpu.thread_id"() {dimension = "y"} : () -> index
         %2 = "gpu.thread_id"() {dimension = "z"} : () -> index
@@ -106,10 +106,11 @@ hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @does_not_fold_mod attributes {
       interface = @io,
-      ordinal = 0 : index
+      ordinal = 0 : index,
+      workgroup_size = [8: index, 2: index, 1: index]
     }
     module {
-      func @does_not_fold_mod() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
+      func @does_not_fold_mod() -> index {
         %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
         %1 = affine.min affine_map<()[s0] -> (21, s0 mod 5)>()[%0]
         return %1: index
@@ -128,10 +129,11 @@ hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @does_not_fold_div attributes {
       interface = @io,
-      ordinal = 0 : index
+      ordinal = 0 : index,
+      workgroup_size = [8: index, 2: index, 1: index]
     }
     module {
-      func @does_not_fold_div() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
+      func @does_not_fold_div() -> index {
         %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
         %1 = affine.min affine_map<()[s0] -> (21, s0 ceildiv 5)>()[%0]
         return %1: index
@@ -150,10 +152,11 @@ hal.executable @does_not_fold_symbol_mul_symbol attributes {sym_visibility = "pr
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @does_not_fold_symbol_mul_symbol attributes {
       interface = @io,
-      ordinal = 0 : index
+      ordinal = 0 : index,
+      workgroup_size = [8: index, 2: index, 1: index]
     }
     module {
-      func @does_not_fold_symbol_mul_symbol() -> index attributes {spv.entry_point_abi = {local_size = dense<[8, 2, 1]> : vector<3xi32>}} {
+      func @does_not_fold_symbol_mul_symbol() -> index {
         // 5 is in %0's range of [0,7] so we cannot fold the following into 5 or 0.
         %0 = "gpu.thread_id"() {dimension = "z"} : () -> index
         %1 = affine.min affine_map<()[s0] -> (21, s0 * s0)>()[%0]

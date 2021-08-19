@@ -257,16 +257,17 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
 // SPIRV Passes
 //------------------------------------------------------------------------------
 
-// Options that can be used to configure SPIR-V code generation.
-struct SPIRVCodegenOptions {
-  llvm::SmallVector<unsigned, 3> workgroupSize = {};
-  llvm::SmallVector<unsigned, 3> workgroupTileSizes = {};
-  llvm::SmallVector<unsigned, 3> invocationTileSizes = {};
+/// Pass pipeline to lower executable obtained from Linalg tile + distribute to
+/// scalar + vector code. Does distribution to threads (no vectorization).
+void addSPIRVDistributePassPipeline(OpPassManager &pm);
 
-  bool useWorkgroupMemory = false;
+/// Pass pipeline to lower executables that contain operations that are not
+/// tiled + distributed.
+void addSPIRVDistributeToGlobalIDPipeline(OpPassManager &pm);
 
-  static SPIRVCodegenOptions getFromCLOptions();
-};
+/// pipeline to lower executable obtained from Linalg tile + distribute to
+/// scalar + vector code. Does distribution to threads and vectorization.
+void addSPIRVVectorizationPassPipeline(OpPassManager &pm);
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 /// This pass converts remaining interface ops into SPIR-V global variables,
@@ -274,24 +275,31 @@ struct SPIRVCodegenOptions {
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
-/// Creates a pass to concretize hal.interface.workgroup.* ops with concrete
-/// tiling and distribution scheme.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVConcretizeWorkgroupTilesPass(const SPIRVCodegenOptions &options);
-
 /// Pass to add the synchronizations and attributes needed to lower from PLoops
 /// to GPU dialect.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVConvertToGPUPass();
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVConvertToGPUPass();
 
 /// Creates a pass to fold processor ID uses where possible.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
+
+/// Main pass to lower executables to scalar + vector code on SPIR-V
+/// path. Invokes one of the pass pipelines that translate the executable to
+/// scalar + vector code.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVFoldProcessorIDUsesPass();
+createSPIRVLowerExecutableTargetPass();
+
+/// Pass to remove loop generated at Flow for tile + distribute when the loop is
+/// known to have a single trip count. NOTE: DO NOT USE. This is a legacy pass
+/// that is to be deprecated.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVRemoveOneTripTiledLoopPass();
+
+/// Pass to tile and distribute Linalg operations on buffers in a single
+/// workgroup.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
 
 /// Pass to tile and vectorize Linalg operations on buffers in a single
 /// workgroup.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVTileAndVectorizePass(const SPIRVCodegenOptions &options);
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndVectorizePass();
 
 /// Pass to convert vector read/write/arithmetic operations to the corresponding
 /// cooperative matrix ops when possible.
@@ -310,10 +318,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
 
-/// Populates passes need to lower from Linalf to SPIR-V.
-void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
-                                    const SPIRVCodegenOptions &options);
-
 /// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
 /// structured ops path. The pass manager `pm` in here operate on the module
 /// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to
@@ -321,8 +325,7 @@ void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
 /// testing purposes only. The pass pipeline will set an appropriate workgroup
 /// size.
 /// TODO: Are both of these needed and does this one still work on HLO?
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm,
-                                   const SPIRVCodegenOptions &options);
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
 
 //----------------------------------------------------------------------------//
 // SPIRV Codegen specific patterns.

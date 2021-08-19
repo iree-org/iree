@@ -20,6 +20,12 @@ def LLVMGPU_Vectorize
     : I32EnumAttrCase<"LLVMGPUVectorize", 3>;
 def LLVMGPU_MatmulSimt
     : I32EnumAttrCase<"LLVMGPUMatmulSimt", 4>;
+def SPIRV_SimpleDistribute
+    : I32EnumAttrCase<"SPIRVDistribute", 5>;
+def SPIRV_Vectorize
+    : I32EnumAttrCase<"SPIRVVectorize", 6>;
+def SPIRV_DistributeToGlobalID
+    : I32EnumAttrCase<"SPIRVDistributeToGlobalID", 7>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
@@ -27,7 +33,8 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     "DispatchLoweringPassPipeline",
     "identifier for pass pipeline use to lower dispatch region",
     [CPU_Default, CPU_Vectorization, LLVMGPU_SimpleDistribute,
-     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt]> {
+     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, SPIRV_SimpleDistribute, SPIRV_Vectorize,
+     SPIRV_DistributeToGlobalID]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
