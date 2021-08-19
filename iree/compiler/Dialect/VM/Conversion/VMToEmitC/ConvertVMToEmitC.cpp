@@ -88,7 +88,14 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
     if (!cType.hasValue()) {
       return funcOp.emitError() << "unable to emit C type";
     }
-    std::string cPtrType = cType.getValue() + std::string("*");
+    std::string cPtrType;
+    // We pass refs as iree_vm_ref_t* regardless of whether it is an in or out
+    // parameter
+    if (resultType.isa<IREE::VM::RefType>()) {
+      cPtrType = cType.getValue();
+    } else {
+      cPtrType = cType.getValue() + std::string("*");
+    }
     Type type = emitc::OpaqueType::get(ctx, cPtrType);
     inputTypes.push_back(type);
     outputTypes.push_back(type);
@@ -129,9 +136,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   const int numRefArgs = llvm::count_if(inputTypes, [](Type inputType) {
     return inputType.isa<IREE::VM::RefType>();
   });
-  const int numRefs =
-      ptr->second.registerAllocation.getMaxRefRegisterOrdinal() + 1 -
-      numRefArgs;
+  const int numRefs = ptr->second.getNumRefRegisters() - numRefArgs;
 
   builder.setInsertionPointToStart(&entryBlock);
 
@@ -256,9 +261,8 @@ Optional<Value> findRef(mlir::FuncOp &parentFuncOp,
     parentFuncOp.emitError() << "parent func op not found in cache.";
     return None;
   }
-  RegisterAllocation &registerAllocation = ptr->second.registerAllocation;
 
-  int32_t ordinal = registerAllocation.mapToRegister(refResult).ordinal();
+  int32_t ordinal = ptr->second.getRefRegisterOrdinal(refResult);
 
   for (auto constantOp : parentFuncOp.getOps<emitc::ConstantOp>()) {
     Operation *op = constantOp.getOperation();
@@ -1197,10 +1201,8 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
         /*callee=*/funcOp,
         /*operands=*/updatedOperands);
 
-    for (auto &pair : llvm::enumerate(op.getResults())) {
-      size_t index = pair.index();
-      OpResult result = pair.value();
-      result.replaceAllUsesWith(resultOperands[index]);
+    if (failed(updateResults(op, resultOperands))) {
+      return failure();
     }
 
     rewriter.eraseOp(op);
@@ -1267,10 +1269,8 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/updatedOperands);
 
-    for (auto &pair : llvm::enumerate(op.getResults())) {
-      size_t index = pair.index();
-      OpResult result = pair.value();
-      result.replaceAllUsesWith(resultOperands[index]);
+    if (failed(updateResults(op, resultOperands))) {
+      return failure();
     }
 
     rewriter.eraseOp(op);
@@ -1285,32 +1285,78 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    for (const Value &operand : operands) updatedOperands.push_back(operand);
+    auto funcOp = op.getOperation()->template getParentOfType<mlir::FuncOp>();
+
+    for (const Value &operand : operands) {
+      updatedOperands.push_back(operand);
+    }
 
     // Create a variable for every non-ref result and a pointer to it as output
     // parameter to the call.
     for (OpResult result : op.getResults()) {
-      if (result.getType().isa<IREE::VM::RefType>()) {
-        return op.emitError() << "ref results not supported yet";
-      } else {
-        auto resultOp = rewriter.create<emitc::ConstantOp>(
-            /*location=*/loc,
-            /*resultType=*/result.getType(),
-            /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+      emitc::ConstantOp resultOp;
 
-        Optional<std::string> cType = getCType(result.getType());
-        if (!cType.hasValue()) return op.emitError() << "unable to emit C type";
+      if (result.getType().isa<IREE::VM::RefType>()) {
+        auto ref = findRef(funcOp, vmAnalysisCache, result);
+
+        if (!ref.hasValue()) {
+          return failure();
+        }
+
+        // Keep track of the replaced value in the analysis to keep the value
+        // liveness working.
+        auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+        if (ptr == vmAnalysisCache.end()) {
+          return op.emitError() << "parent func op not found in cache.";
+        }
+
+        Optional<std::string> cType = getCType(ref.getValue().getType());
+        if (!cType.hasValue()) {
+          return op.emitError() << "unable to emit C type";
+        }
 
         std::string cPtrType = cType.getValue() + std::string("*");
         auto resultPtrOp = rewriter.create<emitc::ApplyOp>(
             /*location=*/loc,
             /*type=*/emitc::OpaqueType::get(ctx, cPtrType),
             /*applicableOperator=*/StringAttr::get(ctx, "&"),
-            /*operand=*/resultOp);
+            /*operand=*/ref.getValue());
+
+        ptr->second.remapValue(result, resultPtrOp.getResult());
+
+        resultOperands.push_back(resultPtrOp.getResult());
+        updatedOperands.push_back(resultPtrOp.getResult());
+      } else {
+        resultOp = rewriter.create<emitc::ConstantOp>(
+            /*location=*/loc,
+            /*resultType=*/result.getType(),
+            /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+
+        Optional<std::string> cType = getCType(resultOp.getType());
+        if (!cType.hasValue()) {
+          return op.emitError() << "unable to emit C type";
+        }
+
+        std::string cPtrType = cType.getValue() + std::string("*");
+        auto resultPtrOp = rewriter.create<emitc::ApplyOp>(
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, cPtrType),
+            /*applicableOperator=*/StringAttr::get(ctx, "&"),
+            /*operand=*/resultOp.getResult());
 
         resultOperands.push_back(resultOp.getResult());
         updatedOperands.push_back(resultPtrOp.getResult());
       }
+    }
+    return success();
+  }
+
+  LogicalResult updateResults(IREE::VM::CallOp op,
+                              SmallVector<Value, 4> &resultOperands) const {
+    for (auto &pair : llvm::enumerate(op.getResults())) {
+      size_t index = pair.index();
+      OpResult result = pair.value();
+      result.replaceAllUsesWith(resultOperands[index]);
     }
 
     return success();
@@ -1343,12 +1389,11 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
     if (ptr == vmAnalysisCache.end()) {
       return cmpOp.emitError() << "parent func op not found in cache.";
     }
-    ValueLiveness &valueLiveness = ptr->second.valueLiveness;
 
     bool moveLhs =
-        valueLiveness.isLastValueUse(cmpOp.lhs(), cmpOp.getOperation());
+        ptr->second.isLastValueUse(cmpOp.lhs(), cmpOp.getOperation());
     bool moveRhs =
-        valueLiveness.isLastValueUse(cmpOp.rhs(), cmpOp.getOperation());
+        ptr->second.isLastValueUse(cmpOp.rhs(), cmpOp.getOperation());
 
     rewriter.replaceOpWithNewOp<emitc::CallOp>(
         /*op=*/cmpOp,
@@ -1409,10 +1454,9 @@ class CompareRefNotZeroOpConversion
     if (ptr == vmAnalysisCache.end()) {
       return cmpOp.emitError() << "parent func op not found in cache.";
     }
-    ValueLiveness &valueLiveness = ptr->second.valueLiveness;
 
     bool move =
-        valueLiveness.isLastValueUse(cmpOp.operand(), cmpOp.getOperation());
+        ptr->second.isLastValueUse(cmpOp.operand(), cmpOp.getOperation());
 
     rewriter.replaceOpWithNewOp<emitc::CallOp>(
         /*op=*/cmpOp,
@@ -1672,14 +1716,18 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
       unsigned int argumentIndex = firstOutputArgumentIndex + operand.index();
       BlockArgument resultArgument = funcOp.getArgument(argumentIndex);
 
-      if (operand.value().getType().isa<IREE::VM::RefType>()) {
-        return op.emitError("ref types are not supported as function results.");
-      }
+      auto isRef = [&ctx](Type type) {
+        return type == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*");
+      };
+
+      StringRef assignMacro = isRef(operand.value().getType())
+                                  ? "EMITC_ASSIGN_VALUE"
+                                  : "EMITC_DEREF_ASSIGN_VALUE";
 
       rewriter.create<emitc::CallOp>(
           /*location=*/loc,
           /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "EMITC_DEREF_ASSIGN_VALUE"),
+          /*callee=*/StringAttr::get(ctx, assignMacro),
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{resultArgument, operand.value()});
@@ -2476,15 +2524,16 @@ class ListSetRefOpConversion
     if (ptr == vmAnalysisCache.end()) {
       return setOp.emitError() << "parent func op not found in cache.";
     }
-    ValueLiveness &valueLiveness = ptr->second.valueLiveness;
 
-    bool move =
-        valueLiveness.isLastValueUse(setOp.value(), setOp.getOperation());
+    bool move = ptr->second.isLastValueUse(setOp.value(), setOp.getOperation());
+
+    StringRef callee =
+        move ? "iree_vm_list_set_ref_move" : "iree_vm_list_set_ref_retain";
 
     auto callOp = returnIfError(
         /*rewriter=*/rewriter,
         /*location=*/loc,
-        /*callee=*/StringAttr::get(ctx, "iree_vm_list_set_ref_retain"),
+        /*callee=*/StringAttr::get(ctx, callee),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
@@ -2791,6 +2840,28 @@ namespace VM {
 namespace {
 
 // A pass converting IREE VM operations into the EmitC dialect.
+// vm.func ops get converted to std.func with the calling convention used by
+// EmitC. Each function gets three additional arguments a `iree_vm_stack_t*` as
+// well as two module specific struct pointers (`{module_name}_t*` and
+// `{module_name}_state_t`). These are followed by the original function
+// arguments and out arguments for the vm.func results. The result type of the
+// function is `iree_status_t`. Ref types are always passed as pointers.
+//
+// Examples:
+//   () -> () => (iree_vm_stack_t*, module_t*, module_state_t*) -> iree_status_t
+//
+//   (i) -> () => (iree_vm_stack_t*, module_t*, module_state_t*, int32_t) ->
+//                  iree_status_t
+//
+//   (r) -> () => (iree_vm_stack_t*, module_t*, module_state_t*, iree_vm_ref_t*)
+//                  -> iree_status_t
+//
+//   () -> (r) => (iree_vm_stack_t*, module_t*, module_state_t*, iree_vm_ref_t*)
+//                  -> iree_status_t
+//
+//   (iir) -> (ri) => (iree_vm_stack_t*, module_t*, module_state_t*, int32_t,
+//                      int32_t, iree_vm_ref_t*, iree_vm_ref_t*, int32_t*) ->
+//                      iree_status_t
 class ConvertVMToEmitCPass
     : public PassWrapper<ConvertVMToEmitCPass,
                          OperationPass<IREE::VM::ModuleOp>> {
@@ -2814,7 +2885,7 @@ class ConvertVMToEmitCPass
     // Run analysis passes
     VMAnalysisCache vmAnalysisCache;
 
-    // Convert vm.func ops to std.func with the calling convntion used by
+    // Convert vm.func ops to std.func with the calling convention used by
     // EmitC. We convert these upfront to make sure vm.call ops always
     // reference std.func ops with the correct calling convention during the
     // conversion.

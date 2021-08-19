@@ -28,12 +28,12 @@ vm.module @call_ops {
     vm.return
   }
 
-  // TODO(simon-camp): The EmitC conversion doesn't support ref types on function boundaries.
-  vm.export @test_call_v_r attributes {emitc.exclude}
-  vm.func private @test_call_v_r() {
+  vm.export @test_call_v_r
+  vm.func @test_call_v_r() {
     %ref = vm.const.ref.zero : !vm.ref<?>
+    %ref_dno = util.do_not_optimize(%ref) : !vm.ref<?>
     %res = vm.call @_v_r() : () -> (!vm.ref<?>)
-    vm.check.eq %ref, %res, "_v_r()=NULL" : !vm.ref<?>
+    vm.check.eq %ref_dno, %res, "_v_r()=NULL" : !vm.ref<?>
     vm.return
   }
 
