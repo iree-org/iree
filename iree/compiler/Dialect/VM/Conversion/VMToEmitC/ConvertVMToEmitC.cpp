@@ -315,13 +315,17 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
     Type objType = elementType.cast<IREE::VM::RefType>().getObjectType();
 
     std::string typeName;
-    if (objType.isa<IREE::VM::BufferType>())
-      typeName = "\"vm.buffer\"";
-    else if (objType.isa<IREE::VM::ListType>())
-      typeName = "\"vm.list\"";
-    else {
-      return None;
+
+    if (objType.isa<IREE::VM::ListType>()) {
+      typeName = "!vm.list";
+    } else {
+      llvm::raw_string_ostream sstream(typeName);
+      objType.print(sstream);
+      sstream.flush();
     }
+
+    // Remove leading '!' and wrap in quotes
+    typeName = std::string("\"") + typeName.substr(1) + std::string("\"");
 
     auto typeNameCStringView = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
