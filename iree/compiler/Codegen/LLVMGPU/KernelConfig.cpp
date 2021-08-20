@@ -211,14 +211,17 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     if (getTranslationInfo(entryPointOp)) continue;
     SmallVector<Operation *, 4> computeOps;
     SmallVector<Operation *, 4> tiledLoops;
-    if (succeeded(getComputeOps(funcOp, computeOps, tiledLoops)) &&
-        !computeOps.empty()) {
+    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+      return funcOp.emitOpError("failed to get compute ops");
     }
 
     if (computeOps.empty()) {
+      // TODO(ravishankarm): Maybe this should just return without setting
+      // anything. Without any compute ops, this shouldnt be using tile and
+      // distribute.
       setTranslationInfo(
           funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          {1, 1, 1});
+          {1, 1, 1}, /*workloadPerWorkgroup=*/{});
       continue;
     }
 
@@ -241,8 +244,16 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       }
     }
 
+    if (!rootOperation) {
+      // TODO(ravishankarm): Maybe this should just return without setting
+      // anything. Without any compute ops, this shouldnt be using tile and
+      // distribute.
+      setTranslationInfo(
+          funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+          {1, 1, 1}, /*workloadPerWorkgroup=*/{});
+      continue;
+    }
     if (failed(setRootConfig(funcOp, rootOperation))) continue;
-    IREE::HAL::LoweringConfig config = getLoweringConfig(rootOperation);
 
     // Propogate the configuration to the other ops.
     // TODO(ravishankarm, thomasraoux): This is a very specific use (and
@@ -250,6 +261,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     // and distributed. The rest of the compilation must be structured to either
     // use `TileAndFuse` or they are independent configurations that are
     // determined based on the op.
+    IREE::HAL::LoweringConfig config = getLoweringConfig(rootOperation);
     for (auto op : computeOps) {
       if (op == rootOperation) continue;
       setLoweringConfig(op, config);

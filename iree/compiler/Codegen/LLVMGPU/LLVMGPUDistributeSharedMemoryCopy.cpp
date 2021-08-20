@@ -123,7 +123,7 @@ static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.
-static Value createFlatId(FuncOp funcOp, std::array<int64_t, 3> workgroupSize) {
+static Value createFlatId(FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
   OpBuilder b(funcOp.getBody());
   Type indexType = b.getIndexType();
   AffineExpr d0 = getAffineDimExpr(0, b.getContext());
@@ -196,7 +196,10 @@ class LLVMGPUDistributeSharedMemoryCopyPass
   }
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
-    std::array<int64_t, 3> workgroupSize = getWorkgroupSize(funcOp);
+    auto entryPointOp = getEntryPoint(funcOp);
+    if (!entryPointOp) return;
+    auto workgroupSize = getWorkgroupSize(entryPointOp);
+    workgroupSize.resize(3, 1);
     MLIRContext *context = &getContext();
     SmallVector<linalg::CopyOp> copiesToWorkgroupMem;
     funcOp.walk([&](linalg::CopyOp copyOp) {

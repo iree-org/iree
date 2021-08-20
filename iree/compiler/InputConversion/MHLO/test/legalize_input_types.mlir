@@ -154,3 +154,23 @@ func @linalg_non_structured_op(%arg0: tensor<9xi64>) -> tensor<1x9xi64> {
   %0 = linalg.tensor_expand_shape %arg0 [[0, 1]] : tensor<9xi64> into tensor<1x9xi64>
   return %0 : tensor<1x9xi64>
 }
+
+// -----
+
+// CHECK: util.global public mutable @[[VAR:.+]] = dense<0> : tensor<i32>
+// CHECK: util.global.load @[[VAR]]
+// CHECK: util.global.store %{{.+}}, @[[VAR]]
+util.global mutable @readwritevar = dense<0> : tensor<i64>
+builtin.func @foo(%arg0 : tensor<i64>) {
+  %0 = util.global.load @readwritevar : tensor<i64>
+  %1 = chlo.broadcast_add %0, %arg0 : (tensor<i64>, tensor<i64>) -> tensor<i64>
+  util.global.store %1, @readwritevar : tensor<i64>
+  return
+}
+
+// -----
+
+// CHECK: util.global private @{{.+}} initializer(@initializer) : tensor<4xi32>
+util.global private @v_initializer initializer(@initializer) : tensor<4xi64>
+// CHECK: func private @initializer() -> tensor<4xi32>
+func private @initializer() -> tensor<4xi64>

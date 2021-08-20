@@ -36,6 +36,9 @@ typedef struct iree_elf_import_table_t {
 
 // An ELF module mapped directly from memory.
 typedef struct iree_elf_module_t {
+  // Allocator used for additional dynamic memory when needed.
+  iree_allocator_t host_allocator;
+
   // Base host virtual address the module is loaded into.
   uint8_t* vaddr_base;
   // Total size, in bytes, of the virtual address space reservation.

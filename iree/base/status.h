@@ -407,12 +407,6 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
                                         char* buffer,
                                         iree_host_size_t* out_buffer_length);
 
-// Converts the status to an allocated string value.
-// The caller must free the buffer with the system allocator.
-IREE_API_EXPORT bool iree_status_to_string(iree_status_t status,
-                                           char** out_buffer,
-                                           iree_host_size_t* out_buffer_length);
-
 // Prints |status| to the given |file| as a string with all available
 // annotations. This will produce multiple lines of output and should be used
 // only when dumping a status on failure.

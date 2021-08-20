@@ -143,11 +143,12 @@ typedef uint32_t iree_memory_view_flags_t;
 // Implemented by VirtualAlloc+MEM_RESERVE/mmap+PROT_NONE.
 iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
                                        iree_host_size_t total_length,
+                                       iree_allocator_t allocator,
                                        void** out_base_address);
 
 // Releases a range of virtual address
-void iree_memory_view_release(void* base_address,
-                              iree_host_size_t total_length);
+void iree_memory_view_release(void* base_address, iree_host_size_t total_length,
+                              iree_allocator_t allocator);
 
 // Commits pages overlapping the byte ranges defined by |byte_ranges|.
 // Ranges will be adjusted to the page granularity of the view.

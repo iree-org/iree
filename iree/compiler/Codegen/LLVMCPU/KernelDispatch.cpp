@@ -230,7 +230,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
             "unhandled multiple roots in dispatch region");
       }
       rootOp = computeOp;
-      continue;
     }
   }
 
@@ -251,7 +250,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
               "unhandled multiple roots in dispatch region");
         }
         rootOp = computeOp;
-        continue;
       }
     }
   }
@@ -279,7 +277,8 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     // on it, just add the default.
     if (!getTranslationInfo(entryPointOp)) {
       setTranslationInfo(funcOp,
-                         IREE::HAL::DispatchLoweringPassPipeline::CPUDefault);
+                         IREE::HAL::DispatchLoweringPassPipeline::CPUDefault,
+                         /*workgroupSize =*/{}, /*workloadPerWorkgroup =*/{});
     }
   }
   return success();

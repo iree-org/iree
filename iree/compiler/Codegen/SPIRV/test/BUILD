@@ -19,16 +19,13 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "concretize_workgroup_tiles.mlir",
-            "concretize_workgroup_tiles_dynamic.mlir",
             "convert_to_gpu.mlir",
             "convert_to_spirv.mlir",
             "fold_gpu_procid_uses.mlir",
-            "materialize_launch_configuration.mlir",
-            "materialize_launch_configuration2.mlir",
             "pipeline_matmul_cooperative_matrix.mlir",
             "pipeline_matmul_vectorization.mlir",
             "promote_workgroup_memory.mlir",
+            "remove_one_trip_tiled_loop.mlir",
             "tile_and_vectorize.mlir",
             "tile_and_vectorize_batch_matmul.mlir",
             "tile_and_vectorize_conv.mlir",

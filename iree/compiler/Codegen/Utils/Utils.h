@@ -34,7 +34,8 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 /// set.
 void setTranslationInfo(FuncOp entryPointFn,
                         IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-                        ArrayRef<int64_t> workgroupSize = {});
+                        ArrayRef<int64_t> workgroupSize,
+                        ArrayRef<int64_t> workloadPerWorkgroup);
 
 /// Returns the loops that are partitioned during dispatch region formations, in
 /// order, i.e. starting from the outer-most to innermost.
@@ -71,6 +72,12 @@ Type getUntiledType(Value tiledView);
 /// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
 /// `subtensor` op chain (for tensors).
 ArrayRef<int64_t> getUntiledShape(Value tiledView);
+
+/// Returns the shape of the result of the untiled operation for
+/// `LinalgOp`s. First looks at definitions of the corresponding `outs`
+/// operands. If that fails, then looks at uses of the `result`.
+ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
+                                        unsigned resultNum);
 
 /// Assuming that `funcOp` contains a single nested scf.for that represented the
 /// tiled+fused+distributed loops with the distribution being across workgroups,
