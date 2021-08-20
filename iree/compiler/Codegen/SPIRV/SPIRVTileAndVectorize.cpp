@@ -478,30 +478,6 @@ static void populateTilingConvFilterPatterns(
 }
 
 //====---------------------------------------------------------------------===//
-// Patterns to lower linalg ops to loops
-//====---------------------------------------------------------------------===//
-
-template <typename OpTy>
-struct LowerToLoops final : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(OpTy op,
-                                PatternRewriter &rewriter) const override {
-    // Only handle the cases where tiling to invocations was done, where tiling
-    // convolution filters or vectorization is expected.
-    if (!hasMarker(op, {getConvFilterTileMarker(), getVectorizeMarker()}))
-      return failure();
-
-    if (linalg::linalgOpToLoops(rewriter, op)) {
-      rewriter.eraseOp(op);
-      return success();
-    }
-
-    return failure();
-  }
-};
-
-//====---------------------------------------------------------------------===//
 // Main pass implementation
 //====---------------------------------------------------------------------===//
 
@@ -618,27 +594,6 @@ void SPIRVTileAndVectorizePass::runOnOperation() {
   });
 
   applyVectorTransformation(funcOp);
-
-  // Lower ops that were tiled to invocations but not vectorized to loops.
-  // TODO(antiagainst): This is here now to simplify the interaction with
-  // ConvertToGPUPass, where we finally lower away all Linalg ops. Once that
-  // pass is cleaned up, we can invoke createConvertLinalgToLoopsPass
-  // directly.
-  {
-    RewritePatternSet patterns(context);
-    patterns.add<LowerToLoops<linalg::BatchMatmulOp>,
-                 LowerToLoops<linalg::ConvInputNWCFilterWCFOp>,
-                 LowerToLoops<linalg::ConvInputNHWCFilterHWCFOp>,
-                 LowerToLoops<linalg::ConvInputNDHWCFilterDHWCFOp>,
-                 LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
-                 LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
-                 LowerToLoops<linalg::FillOp>, LowerToLoops<linalg::GenericOp>,
-                 LowerToLoops<linalg::MatmulOp>,
-                 LowerToLoops<linalg::PoolingNhwcMaxOp>,
-                 LowerToLoops<linalg::PoolingNhwcMinOp>,
-                 LowerToLoops<linalg::PoolingNhwcSumOp>>(context);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
-  }
 }
 
 //===----------------------------------------------------------------------===//

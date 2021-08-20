@@ -56,7 +56,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
           %18 = memref.subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
           linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config}
             ins(%7, %13 : memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
-           outs(%18 : memref<?x?xf32, #map3>)
+            outs(%18 : memref<?x?xf32, #map3>)
         }
         return
       }
@@ -98,7 +98,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
       translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
     }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-      func @conv_1d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
+      func @conv_1d() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index
         %0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<3x6x1xf32>
@@ -132,9 +132,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
 }
 
 // CHECK-LABEL: func @conv_1d
-//   CHECK-DAG: %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG: %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG: %[[C3:.+]] = constant 3 : index
+//       CHECK: %[[C0:.+]] = constant 0 : index
 //       CHECK: %[[RET:.+]] = hal.interface.binding.subspan @io::@ret0
 //       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
@@ -151,11 +149,10 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
 //       CHECK:     %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[TIDZ]], %[[IV0]], 0] [1, %{{.+}}, 1]
 //       CHECK:     %[[ARG1SV2:.+]] = memref.subview %[[ARG1SV1]][0, 0, %[[IV1]]] [3, 1, 1]
 //       CHECK:     %[[RETSV2:.+]] = memref.subview %[[RETSV1]][%[[TIDZ]], %[[IV0]], %[[IV1]]] [1, 1, 1]
-//       CHECK:     scf.for %[[IV2:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
-//       CHECK:       memref.load %[[ARG0SV2]][%[[C0]], %[[IV2]], %[[C0]]]
-//       CHECK:       memref.load %[[ARG1SV2]][%[[IV2]], %[[C0]], %[[C0]]]
-//       CHECK:       memref.load %[[RETSV2]][%[[C0]], %[[C0]], %[[C0]]]
-//       CHECK:       memref.store %{{.+}}, %[[RETSV2]][%[[C0]], %[[C0]], %[[C0]]]
+//       CHECK:     linalg.conv_1d_input_nwc_filter_wcf
+//  CHECK-SAME:       __internal_linalg_transform__ = "vectorize"
+//  CHECK-SAME:       ins(%[[ARG0SV2]], %[[ARG1SV2]]
+//  CHECK-SAME:       outs(%[[RETSV2]]
 
 
 // -----
@@ -270,22 +267,25 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 //         CHECK:   %[[BSTEPY:.+]] = affine.apply #[[MAP0]]()[%[[NBLOCKSY]]]
 //         CHECK:   %[[BOFFSETX:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
 //         CHECK:   %[[BSTEPX:.+]] = affine.apply #[[MAP1]]()[%[[NBLOCKSX]]]
-//         CHECK:   scf.for %[[IV3:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
-//         CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
-//         CHECK:       scf.for %[[IV5:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
-//         CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//         CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
+//         CHECK:   scf.for %[[IV0:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
+//         CHECK:     scf.for %[[IV1:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
+//         CHECK:       scf.for %[[IV2:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
+//         CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV0]], %[[IV1]], %[[IV2]], 0]
+//         CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV0]], %[[IV1]], %[[IV2]], 0]
 //     CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //     CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //     CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //     CHECK-DAG:         %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //     CHECK-DAG:         %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //     CHECK-DAG:         %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//         CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//         CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//         CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-// CHECK-COUNT-3:               scf.for
-//     CHECK-NOT:               linalg.conv_2d_input_nhwc_filter_hwcf
+//         CHECK:         scf.for %[[IV3:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:           scf.for %[[IV4:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:             scf.for %[[IV5:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//         CHECK:               %[[OUT:.+]] = memref.subview %[[SV2]][0, %[[IV3]], %[[IV4]], %[[IV5]]]
+//         CHECK:               linalg.conv_2d_input_nhwc_filter_hwcf
+//    CHECK-SAME:                 __internal_linalg_transform__ = "tile_conv_filter"
+//    CHECK-SAME:                 outs(%[[OUT]]
+
 
 // -----
 
@@ -304,7 +304,7 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
       translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
     }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-      func @conv_3d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
+      func @conv_3d() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index
         %0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<2x7x7x7x2xf32>
@@ -343,11 +343,14 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
 //     CHECK-DAG:         %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //     CHECK-DAG:         %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //     CHECK-DAG:         %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//         CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//         CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//         CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-// CHECK-COUNT-5:               scf.for
-//     CHECK-NOT:               linalg.conv_3d_input_ndhwc_filter_dhwcf
+//         CHECK:         scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:           scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:             scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//         CHECK:               %[[OUT:.+]] = memref.subview %{{.+}}[0, 0, %[[IV0]], %[[IV1]], %[[IV2]]]
+//         CHECK:               linalg.conv_3d_input_ndhwc_filter_dhwcf
+//    CHECK-SAME:                 __internal_linalg_transform__ = "vectorize"
+//    CHECK-SAME:                 outs(%[[OUT]]
+
 
 // -----
 
@@ -376,7 +379,7 @@ module  {
         translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}  {
-        func @pooling_nhwc_max() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
+        func @pooling_nhwc_max() {
           %c0 = constant 0 : index
           %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<2x16x16x6xf32>
           %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x4xf32>
@@ -422,8 +425,12 @@ module  {
 //     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//         CHECK:   scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//         CHECK:     scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//         CHECK:       scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-// CHECK-COUNT-3:         scf.for
-//     CHECK-NOT:           linalg.pooling_nhwc_max
+//         CHECK:   scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:     scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:       scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//         CHECK:         %[[IN:.+]] = memref.subview %[[SV1]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, %{{.+}}, %{{.+}}, 6]
+//         CHECK:         %[[OUT:.+]] = memref.subview %[[SV2]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, 1, 1, 6]
+//         CHECK:         linalg.pooling_nhwc_max
+//    CHECK-SAME:           __internal_linalg_transform__ = "vectorize"
+//    CHECK-SAME:           ins(%[[IN]], %[[ARG1]]
+//    CHECK-SAME:           outs(%[[OUT]]
