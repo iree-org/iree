@@ -768,15 +768,6 @@ void TensorSplatOp::getCanonicalizationPatterns(
   results.insert<FoldSplatReshapeIntoSplat>(context);
 }
 
-OpFoldResult TensorSplatOp::fold(ArrayRef<Attribute> operands) {
-  if (operands.size() == 1 && operands.front()) {
-    // Splat value is constant and we can fold the operation.
-    return SplatElementsAttr::get(result().getType().cast<ShapedType>(),
-                                  operands[0]);
-  }
-  return {};
-}
-
 OpFoldResult TensorCloneOp::fold(ArrayRef<Attribute> operands) {
   if (operands[0]) {
     // Constants always fold.
