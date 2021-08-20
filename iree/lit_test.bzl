@@ -25,23 +25,23 @@ def iree_lit_test(
     """
     data = data if data else []
 
-    # First argument is the test. The rest are tools to add to the path.
-    args = [test_file] + data
-
     # Always include llvm-sybmolizer so we get useful stack traces. Maybe it
     # would be better to force everyone to do this explicitly, but since
     # forgetting wouldn't cause the test to fail, only make debugging harder
     # when it does, I think better to hardcode it here.
     llvm_symbolizer = "@llvm-project//llvm:llvm-symbolizer"
-    if llvm_symbolizer not in args:
-        args.append(llvm_symbolizer)
+    if llvm_symbolizer not in data:
+        data.append(llvm_symbolizer)
+
+    # First argument is the test. The rest are tools to add to the path.
+    data = [test_file] + data
 
     native.sh_test(
         name = name,
         srcs = [driver],
         size = size,
-        data = args,
-        args = ["$(location {})".format(file) for file in args],
+        data = data,
+        args = ["$(location {})".format(file) for file in data],
         **kwargs
     )
 
