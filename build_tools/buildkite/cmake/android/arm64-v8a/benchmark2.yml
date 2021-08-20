@@ -51,7 +51,7 @@ steps:
     agents:
       - "android-soc=exynos-990"
       - "android-version=11"
-      - "queue=benchmark-android"
+      - "queue=benchmark-android2"
     artifact_paths: "benchmark-results-galaxy-s20.json"
     timeout_in_minutes: "30"
 
