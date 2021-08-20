@@ -251,11 +251,11 @@ Optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
   return std::string("call_") + callingConvention.getValue() + "_import";
 }
 
-template <typename SrcOpTy>
 Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
-                                            SrcOpTy srcOp, Type elementType) {
-  auto ctx = srcOp.getContext();
-  auto loc = srcOp.getLoc();
+                                            Operation *srcOp,
+                                            Type elementType) {
+  auto ctx = srcOp->getContext();
+  auto loc = srcOp->getLoc();
 
   // Map from type to enum values of type iree_vm_value_type_t and
   // iree_vm_ref_type_t
@@ -365,7 +365,7 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
                         typeDescriptorType.getResult(0)});
   }
 
-  auto elementTypePtrOp = rewriter.template create<emitc::ApplyOp>(
+  auto elementTypePtrOp = rewriter.create<emitc::ApplyOp>(
       /*location=*/loc,
       /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t*"),
       /*applicableOperator=*/StringAttr::get(ctx, "&"),
@@ -374,8 +374,13 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
   return elementTypePtrOp;
 }
 
-Optional<Value> findRef(mlir::FuncOp &parentFuncOp,
+/// Find a local ref of type `iree_vm_ref_t*` matching the ordinal of the given
+/// `IREE::VM::Ref` value.
+Optional<Value> findRef(OpBuilder builder, Location location,
+                        mlir::FuncOp &parentFuncOp,
                         VMAnalysisCache &vmAnalysisCache, Value refResult) {
+  auto ctx = builder.getContext();
+
   assert(refResult.getType().isa<IREE::VM::RefType>());
 
   auto ptr = vmAnalysisCache.find(parentFuncOp.getOperation());
@@ -393,7 +398,14 @@ Optional<Value> findRef(mlir::FuncOp &parentFuncOp,
             .cast<IntegerAttr>()
             .getValue()
             .getZExtValue() == ordinal) {
-      return constantOp.getResult();
+      // Get address of constant
+      auto ptrOp = builder.create<emitc::ApplyOp>(
+          /*location=*/location,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+          /*applicableOperator=*/StringAttr::get(ctx, "&"),
+          /*operand=*/constantOp.getResult());
+
+      return ptrOp.getResult();
     }
   }
 
@@ -697,7 +709,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp) {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    auto statePtr = builder.template create<emitc::ApplyOp>(
+    auto statePtr = builder.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*result=*/emitc::OpaqueType::get(ctx, moduleStateTypeName + "*"),
         /*applicableOperator=*/StringAttr::get(ctx, "&"),
@@ -1064,7 +1076,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp) {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    auto modulePtr = builder.template create<emitc::ApplyOp>(
+    auto modulePtr = builder.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*result=*/emitc::OpaqueType::get(ctx, moduleTypeName + "*"),
         /*applicableOperator=*/StringAttr::get(ctx, "&"),
@@ -1113,7 +1125,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp) {
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_module_t"),
         /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
-    auto vmModulePtr = builder.template create<emitc::ApplyOp>(
+    auto vmModulePtr = builder.create<emitc::ApplyOp>(
         /*location=*/loc,
         /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_module_t*"),
         /*applicableOperator=*/StringAttr::get(ctx, "&"),
@@ -1216,15 +1228,13 @@ SmallVector<Attribute, 4> indexSequence(int64_t n, MLIRContext *ctx) {
       }));
 }
 
-template <typename AccessOpTy, typename ResultOpTy>
-ResultOpTy lookupSymbolRef(AccessOpTy accessOp, StringRef attrName) {
+template <typename ResultOpTy>
+ResultOpTy lookupSymbolRef(Operation *accessOp, StringRef attrName) {
   FlatSymbolRefAttr globalAttr =
-      accessOp.getOperation()->template getAttrOfType<FlatSymbolRefAttr>(
-          attrName);
+      accessOp->getAttrOfType<FlatSymbolRefAttr>(attrName);
   ResultOpTy globalOp =
-      accessOp.getOperation()
-          ->template getParentOfType<IREE::VM::ModuleOp>()
-          .template lookupSymbol<ResultOpTy>(globalAttr.getValue());
+      accessOp->getParentOfType<IREE::VM::ModuleOp>().lookupSymbol<ResultOpTy>(
+          globalAttr.getValue());
   return globalOp;
 }
 
@@ -1324,9 +1334,9 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
       IREE::VM::CallOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     mlir::FuncOp funcOp =
-        lookupSymbolRef<IREE::VM::CallOp, mlir::FuncOp>(op, "callee");
+        lookupSymbolRef<mlir::FuncOp>(op.getOperation(), "callee");
     IREE::VM::ImportOp importOp =
-        lookupSymbolRef<IREE::VM::CallOp, IREE::VM::ImportOp>(op, "callee");
+        lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "callee");
 
     if (!funcOp && !importOp)
       return op.emitError() << "lookup of callee failed";
@@ -1358,7 +1368,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     updatedOperands = {stackArg, moduleArg, moduleStateArg};
 
-    if (failed(updateOperands(op, operands, rewriter, updatedOperands,
+    if (failed(updateOperands(rewriter, op, operands, rewriter, updatedOperands,
                               resultOperands))) {
       return failure();
     };
@@ -1398,7 +1408,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     int importOrdinal = importOp.ordinal().getValue().getZExtValue();
 
-    auto funcOp = op.getOperation()->template getParentOfType<mlir::FuncOp>();
+    auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
     BlockArgument stackArg = funcOp.getArgument(0);
     BlockArgument stateArg = funcOp.getArgument(2);
 
@@ -1424,7 +1434,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     updatedOperands = {stackArg, import.getResult(0)};
 
-    if (failed(updateOperands(op, operands, rewriter, updatedOperands,
+    if (failed(updateOperands(rewriter, op, operands, rewriter, updatedOperands,
                               resultOperands))) {
       return failure();
     }
@@ -1446,14 +1456,15 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
     return success();
   }
 
-  LogicalResult updateOperands(IREE::VM::CallOp op, ArrayRef<Value> operands,
+  LogicalResult updateOperands(OpBuilder builder, IREE::VM::CallOp op,
+                               ArrayRef<Value> operands,
                                ConversionPatternRewriter &rewriter,
                                SmallVector<Value, 4> &updatedOperands,
                                SmallVector<Value, 4> &resultOperands) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    auto funcOp = op.getOperation()->template getParentOfType<mlir::FuncOp>();
+    auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
 
     for (const Value &operand : operands) {
       updatedOperands.push_back(operand);
@@ -1465,7 +1476,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
       emitc::ConstantOp resultOp;
 
       if (result.getType().isa<IREE::VM::RefType>()) {
-        auto ref = findRef(funcOp, vmAnalysisCache, result);
+        auto ref = findRef(builder, loc, funcOp, vmAnalysisCache, result);
 
         if (!ref.hasValue()) {
           return failure();
@@ -1478,22 +1489,10 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
           return op.emitError() << "parent func op not found in cache.";
         }
 
-        Optional<std::string> cType = getCType(ref.getValue().getType());
-        if (!cType.hasValue()) {
-          return op.emitError() << "unable to emit C type";
-        }
+        ptr->second.remapValue(result, ref.getValue());
 
-        std::string cPtrType = cType.getValue() + std::string("*");
-        auto resultPtrOp = rewriter.create<emitc::ApplyOp>(
-            /*location=*/loc,
-            /*type=*/emitc::OpaqueType::get(ctx, cPtrType),
-            /*applicableOperator=*/StringAttr::get(ctx, "&"),
-            /*operand=*/ref.getValue());
-
-        ptr->second.remapValue(result, resultPtrOp.getResult());
-
-        resultOperands.push_back(resultPtrOp.getResult());
-        updatedOperands.push_back(resultPtrOp.getResult());
+        resultOperands.push_back(ref.getValue());
+        updatedOperands.push_back(ref.getValue());
       } else {
         resultOp = rewriter.create<emitc::ConstantOp>(
             /*location=*/loc,
@@ -1704,17 +1703,12 @@ class ConstRefZeroOpConversion
     auto funcOp =
         constRefZeroOp.getOperation()->getParentOfType<mlir::FuncOp>();
 
-    auto ref = findRef(funcOp, vmAnalysisCache, constRefZeroOp.getResult());
+    auto ref = findRef(rewriter, loc, funcOp, vmAnalysisCache,
+                       constRefZeroOp.getResult());
 
     if (!ref.hasValue()) {
       return failure();
     }
-
-    auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::ApplyOp>(
-        /*op=*/constRefZeroOp,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*applicableOperator=*/StringAttr::get(ctx, "&"),
-        /*operand=*/ref.getValue());
 
     rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1722,7 +1716,10 @@ class ConstRefZeroOpConversion
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refPtrOp.result()});
+        /*operands=*/ArrayRef<Value>{ref.getValue()});
+
+    rewriter.replaceOp(constRefZeroOp, ref.getValue());
+
     return success();
   }
 
@@ -1745,15 +1742,14 @@ class ConstRefRodataOpConversion
     auto ctx = constRefRodataOp.getContext();
     auto loc = constRefRodataOp.getLoc();
 
-    auto rodataOp =
-        lookupSymbolRef<IREE::VM::ConstRefRodataOp, IREE::VM::RodataOp>(
-            constRefRodataOp, "rodata");
+    auto rodataOp = lookupSymbolRef<IREE::VM::RodataOp>(
+        constRefRodataOp.getOperation(), "rodata");
     if (!rodataOp) {
       return constRefRodataOp.emitError() << "Unable to find RodataOp";
     }
 
-    auto funcOp = constRefRodataOp.getOperation()
-                      ->template getParentOfType<mlir::FuncOp>();
+    auto funcOp =
+        constRefRodataOp.getOperation()->getParentOfType<mlir::FuncOp>();
 
     BlockArgument stateArg = funcOp.getArgument(2);
     auto rodataBuffersPtr = rewriter.create<emitc::CallOp>(
@@ -1786,15 +1782,10 @@ class ConstRefRodataOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    auto ref = findRef(funcOp, vmAnalysisCache, constRefRodataOp.getResult());
+    auto ref = findRef(rewriter, loc, funcOp, vmAnalysisCache,
+                       constRefRodataOp.getResult());
 
     if (!ref.hasValue()) return failure();
-
-    auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::ApplyOp>(
-        /*op=*/constRefRodataOp,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*applicableOperator=*/StringAttr::get(ctx, "&"),
-        /*operand=*/ref.getValue());
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -1804,7 +1795,9 @@ class ConstRefRodataOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{byteBufferPtrOp.getResult(0), typeIdOp.getResult(0),
-                        refPtrOp.getResult()});
+                        ref.getValue()});
+
+    rewriter.replaceOp(constRefRodataOp, ref.getValue());
 
     return success();
   }
@@ -2042,7 +2035,7 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
     auto loc = loadOp.getLoc();
 
     GlobalOpTy globalOp =
-        lookupSymbolRef<LoadOpTy, GlobalOpTy>(loadOp, "global");
+        lookupSymbolRef<GlobalOpTy>(loadOp.getOperation(), "global");
     if (!globalOp) {
       return loadOp.emitError() << "Unable to find GlobalOp";
     }
@@ -2096,52 +2089,45 @@ class GlobalLoadStoreRefOpConversion
       LoadStoreOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (isa<IREE::VM::GlobalLoadRefOp>(op)) {
-      auto loadOp = cast<IREE::VM::GlobalLoadRefOp>(op);
-      return rewriteLoadOp(loadOp, operands, rewriter);
+      return rewriteOp(op.getOperation(), operands, rewriter, true);
     } else if (isa<IREE::VM::GlobalStoreRefOp>(op)) {
-      auto storeOp = cast<IREE::VM::GlobalStoreRefOp>(op);
-      return rewriteStoreOp(storeOp, operands, rewriter);
+      return rewriteOp(op.getOperation(), operands, rewriter, false);
     }
 
     return op.emitError() << "op must be one of `vm.global.load.ref` or "
                              "`vm.global.store.ref`";
   }
 
-  LogicalResult rewriteLoadOp(IREE::VM::GlobalLoadRefOp op,
-                              ArrayRef<Value> operands,
-                              ConversionPatternRewriter &rewriter) const {
-    auto ctx = op.getContext();
-    auto loc = op.getLoc();
+  LogicalResult rewriteOp(Operation *op, ArrayRef<Value> operands,
+                          ConversionPatternRewriter &rewriter,
+                          bool isLoad) const {
+    auto ctx = op->getContext();
+    auto loc = op->getLoc();
 
     IREE::VM::GlobalRefOp globalOp =
-        lookupSymbolRef<IREE::VM::GlobalLoadRefOp, IREE::VM::GlobalRefOp>(
-            op, "global");
+        lookupSymbolRef<IREE::VM::GlobalRefOp>(op, "global");
     if (!globalOp) {
-      return op.emitError() << "Unable to find GlobalOp";
+      return op->emitError() << "Unable to find GlobalOp";
     }
 
     auto globalOrdinal = globalOp.ordinal().getValue().getZExtValue();
 
-    auto funcOp = op.getOperation()->template getParentOfType<mlir::FuncOp>();
+    auto funcOp = op->getParentOfType<mlir::FuncOp>();
 
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
-      return op.emitError() << "parent func op not found in cache.";
+      return op->emitError() << "parent func op not found in cache.";
     }
 
-    bool move = ptr->second.isLastValueUse(op.value(), op.getOperation());
+    Value localValue = isLoad ? op->getResult(0) : op->getOperand(0);
 
-    auto resultRef = findRef(funcOp, vmAnalysisCache, op.getResult());
+    bool move = ptr->second.isLastValueUse(localValue, op);
 
-    if (!resultRef.hasValue()) {
+    auto localRef = findRef(rewriter, loc, funcOp, vmAnalysisCache, localValue);
+
+    if (!localRef.hasValue()) {
       return failure();
     }
-
-    auto resultRefPtr = rewriter.create<emitc::ApplyOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*applicableOperator=*/StringAttr::get(ctx, "&"),
-        /*operand=*/resultRef.getValue());
 
     BlockArgument stateArg = funcOp.getArgument(2);
     auto refs = rewriter.create<emitc::CallOp>(
@@ -2154,7 +2140,7 @@ class GlobalLoadStoreRefOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{stateArg});
 
-    auto globalRef = rewriter.create<emitc::CallOp>(
+    auto stateRef = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
         /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
@@ -2164,12 +2150,12 @@ class GlobalLoadStoreRefOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{refs.getResult(0)});
 
-    Type elementType = op.getResult().getType();
+    Type elementType = localValue.getType();
 
     auto elementTypePtrOp = createVmTypeDefPtr(rewriter, op, elementType);
 
     if (!elementTypePtrOp.hasValue()) {
-      return op.emitError() << "generating iree_vm_type_def_t* failed";
+      return op->emitError() << "generating iree_vm_type_def_t* failed";
     }
 
     auto typedefRefType = rewriter.create<emitc::CallOp>(
@@ -2184,100 +2170,8 @@ class GlobalLoadStoreRefOpConversion
         /*operands=*/
         ArrayRef<Value>{elementTypePtrOp.getValue().getResult()});
 
-    returnIfError(
-        /*rewriter=*/rewriter,
-        /*location=*/loc,
-        /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain_or_move_checked"),
-        /*args=*/
-        ArrayAttr::get(ctx,
-                       {rewriter.getBoolAttr(move), rewriter.getIndexAttr(0),
-                        rewriter.getIndexAttr(1), rewriter.getIndexAttr(2)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{globalRef.getResult(0), typedefRefType.getResult(0),
-                        resultRefPtr.getResult()});
-
-    rewriter.replaceOp(op, resultRefPtr.getResult());
-
-    return success();
-  }
-
-  LogicalResult rewriteStoreOp(IREE::VM::GlobalStoreRefOp op,
-                               ArrayRef<Value> operands,
-                               ConversionPatternRewriter &rewriter) const {
-    auto ctx = op.getContext();
-    auto loc = op.getLoc();
-
-    IREE::VM::GlobalRefOp globalOp =
-        lookupSymbolRef<IREE::VM::GlobalStoreRefOp, IREE::VM::GlobalRefOp>(
-            op, "global");
-    if (!globalOp) {
-      return op.emitError() << "Unable to find GlobalOp";
-    }
-
-    auto globalOrdinal = globalOp.ordinal().getValue().getZExtValue();
-
-    auto funcOp = op.getOperation()->template getParentOfType<mlir::FuncOp>();
-
-    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
-    if (ptr == vmAnalysisCache.end()) {
-      return op.emitError() << "parent func op not found in cache.";
-    }
-
-    bool move = ptr->second.isLastValueUse(op.value(), op.getOperation());
-
-    auto sourceRef = findRef(funcOp, vmAnalysisCache, op.value());
-
-    if (!sourceRef.hasValue()) {
-      return failure();
-    }
-
-    auto sourceRefPtr = rewriter.create<emitc::ApplyOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*applicableOperator=*/StringAttr::get(ctx, "&"),
-        /*operand=*/sourceRef.getValue());
-
-    BlockArgument stateArg = funcOp.getArgument(2);
-    auto refs = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "refs")}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{stateArg});
-
-    auto globalRef = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             rewriter.getUI32IntegerAttr(globalOrdinal)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refs.getResult(0)});
-
-    Type elementType = op.value().getType();
-
-    auto elementTypePtrOp = createVmTypeDefPtr(rewriter, op, elementType);
-
-    if (!elementTypePtrOp.hasValue()) {
-      return op.emitError() << "generating iree_vm_type_def_t* failed";
-    }
-
-    auto typedefRefType = rewriter.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/
-        emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
-        /*args=*/
-        ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "ref_type")}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{elementTypePtrOp.getValue().getResult()});
+    Value srcRef = isLoad ? stateRef.getResult(0) : localRef.getValue();
+    Value destRef = isLoad ? localRef.getValue() : stateRef.getResult(0);
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -2289,10 +2183,13 @@ class GlobalLoadStoreRefOpConversion
                         rewriter.getIndexAttr(1), rewriter.getIndexAttr(2)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{sourceRefPtr.getResult(), typedefRefType.getResult(0),
-                        globalRef.getResult(0)});
+        ArrayRef<Value>{srcRef, typedefRefType.getResult(0), destRef});
 
-    rewriter.eraseOp(op);
+    if (isLoad) {
+      rewriter.replaceOp(op, localRef.getValue());
+    } else {
+      rewriter.eraseOp(op);
+    }
 
     return success();
   }
@@ -2316,7 +2213,7 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
     auto loc = storeOp.getLoc();
 
     GlobalOpTy globalOp =
-        lookupSymbolRef<StoreOpTy, GlobalOpTy>(storeOp, "global");
+        lookupSymbolRef<GlobalOpTy>(storeOp.getOperation(), "global");
     if (!globalOp) {
       return storeOp.emitError() << "Unable to find GlobalOp";
     }
@@ -2471,7 +2368,7 @@ class ListAllocOpConversion
                            .getElementType();
 
     Optional<emitc::ApplyOp> elementTypePtrOp =
-        createVmTypeDefPtr(rewriter, allocOp, elementType);
+        createVmTypeDefPtr(rewriter, allocOp.getOperation(), elementType);
 
     if (!elementTypePtrOp.hasValue()) {
       return allocOp.emitError() << "generating iree_vm_type_def_t* failed";
@@ -2488,8 +2385,7 @@ class ListAllocOpConversion
         /*applicableOperator=*/StringAttr::get(ctx, "&"),
         /*operand=*/listOp.getResult());
 
-    auto funcOp =
-        allocOp.getOperation()->template getParentOfType<mlir::FuncOp>();
+    auto funcOp = allocOp.getOperation()->getParentOfType<mlir::FuncOp>();
 
     BlockArgument stateArg = funcOp.getArgument(2);
     auto allocatorOp = rewriter.create<emitc::CallOp>(
@@ -2512,15 +2408,10 @@ class ListAllocOpConversion
         ArrayRef<Value>{elementTypePtrOp.getValue().getResult(), operands[0],
                         allocatorOp.getResult(0), listPtrOp.getResult()});
 
-    auto ref = findRef(funcOp, vmAnalysisCache, allocOp.getResult());
+    auto ref =
+        findRef(rewriter, loc, funcOp, vmAnalysisCache, allocOp.getResult());
 
     if (!ref.hasValue()) return failure();
-
-    auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::ApplyOp>(
-        /*op=*/allocOp,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*applicableOperator=*/StringAttr::get(ctx, "&"),
-        /*operand=*/ref.getValue());
 
     auto refTypeOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -2538,7 +2429,9 @@ class ListAllocOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listOp.getResult(), refTypeOp.getResult(0),
-                        refPtrOp.getResult()});
+                        ref.getValue()});
+
+    rewriter.replaceOp(allocOp, ref.getValue());
 
     return success();
   }
@@ -2663,15 +2556,10 @@ class ListGetRefOpConversion
 
     auto funcOp = getOp.getOperation()->getParentOfType<mlir::FuncOp>();
 
-    auto ref = findRef(funcOp, vmAnalysisCache, getOp.getResult());
+    auto ref =
+        findRef(rewriter, loc, funcOp, vmAnalysisCache, getOp.getResult());
 
     if (!ref.hasValue()) return failure();
-
-    auto refPtrOp = rewriter.replaceOpWithNewOp<emitc::ApplyOp>(
-        /*op=*/getOp,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*applicableOperator=*/StringAttr::get(ctx, "&"),
-        /*operand=*/ref.getValue());
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -2681,11 +2569,12 @@ class ListGetRefOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), getOp.index(),
-                        refPtrOp.getResult()});
+                        ref.getValue()});
 
     Type elementType = getOp.getResult().getType();
 
-    auto elementTypePtrOp = createVmTypeDefPtr(rewriter, getOp, elementType);
+    auto elementTypePtrOp =
+        createVmTypeDefPtr(rewriter, getOp.getOperation(), elementType);
 
     if (!elementTypePtrOp.hasValue()) {
       return getOp.emitError() << "generating iree_vm_type_def_t* failed";
@@ -2707,7 +2596,7 @@ class ListGetRefOpConversion
                                emitc::OpaqueAttr::get(ctx, "type")}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/
-          ArrayRef<Value>{refPtrOp.getResult()});
+          ArrayRef<Value>{ref.getValue()});
 
       auto refTypeNull = rewriter.create<emitc::ConstantOp>(
           /*location=*/loc,
@@ -2794,7 +2683,7 @@ class ListGetRefOpConversion
           /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{refPtrOp.getResult()});
+          /*operands=*/ArrayRef<Value>{ref.getValue()});
 
       rewriter.create<mlir::BranchOp>(loc, continuationBlock);
     }
@@ -2802,6 +2691,8 @@ class ListGetRefOpConversion
     rewriter.setInsertionPointToEnd(condBlock);
     auto branchOp = rewriter.create<CondBranchOp>(
         loc, invalidType.getResult(0), failureBlock, continuationBlock);
+
+    rewriter.replaceOp(getOp, ref.getValue());
 
     return success();
   }
@@ -2938,10 +2829,12 @@ class ListSetRefOpConversion
 }  // namespace
 
 void populateVMToEmitCPatterns(MLIRContext *context,
+                               ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
                                OwningRewritePatternList &patterns,
                                VMAnalysisCache &vmAnalysisCache) {
-  populateUtilConversionPatterns(context, typeConverter, patterns);
+  populateUtilConversionPatterns(context, conversionTarget, typeConverter,
+                                 patterns);
 
   // CFG
   patterns.insert<BranchOpConversion>(context);
@@ -3305,7 +3198,7 @@ class ConvertVMToEmitCPass
     }
 
     OwningRewritePatternList patterns(&getContext());
-    populateVMToEmitCPatterns(&getContext(), typeConverter, patterns,
+    populateVMToEmitCPatterns(&getContext(), target, typeConverter, patterns,
                               vmAnalysisCache);
 
     target.addLegalDialect<emitc::EmitCDialect, mlir::BuiltinDialect,
@@ -3314,11 +3207,6 @@ class ConvertVMToEmitCPass
     target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
       return typeConverter.isSignatureLegal(op.getType());
     });
-
-    target.addDynamicallyLegalOp<IREE::Util::DoNotOptimizeOp>(
-        [&](IREE::Util::DoNotOptimizeOp op) {
-          return typeConverter.isLegal(op.getResultTypes());
-        });
 
     // Structural ops
     target.addLegalOp<IREE::VM::ModuleOp>();
