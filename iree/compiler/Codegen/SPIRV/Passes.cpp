@@ -73,6 +73,7 @@ void addSPIRVVectorizationPassPipeline(OpPassManager &pm) {
   // GPU global invocation IDs for distribution.
   // TODO(antiagainst): Handle all the cases uniformly and remove this pass.
   pm.addNestedPass<FuncOp>(createSPIRVCopyToWorkgroupMemoryPass());
+  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
