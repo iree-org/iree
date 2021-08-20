@@ -41,7 +41,7 @@ class WrapEntryPointsPass
   }
 
   StringRef getDescription() const override {
-    return " Wraps all entry points in a function that is compatible with the "
+    return "Wraps all entry points in a function that is compatible with the "
            "expected invocation semantics of bindings following the native "
            "IREE ABI.";
   }
@@ -51,7 +51,9 @@ class WrapEntryPointsPass
 
     SmallVector<FuncOp, 4> entryFuncOps;
     for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-      if (funcOp.isPublic()) entryFuncOps.push_back(funcOp);
+      if (funcOp.isPublic() && !funcOp->hasAttr("iree.abi.stub")) {
+        entryFuncOps.push_back(funcOp);
+      }
     }
 
     // Create a wrapper function for each entry point.

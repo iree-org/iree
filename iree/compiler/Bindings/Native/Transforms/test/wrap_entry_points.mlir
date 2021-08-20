@@ -26,3 +26,13 @@ func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) ->
   %1 = "mhlo.add"(%0, %arg0) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
   return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @wrappedAlready
+//  CHECK-SAME: (%arg0: !hal.buffer_view) -> !hal.buffer_view
+//  CHECK-SAME: attributes {iree.abi.stub}
+func @wrappedAlready(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+  return %arg0 : !hal.buffer_view
+}
+// CHECK-NOT: func @_wrappedAlready
