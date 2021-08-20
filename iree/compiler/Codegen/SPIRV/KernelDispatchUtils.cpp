@@ -148,7 +148,7 @@ static LogicalResult setMaliSpecificConfig(FuncOp entryPoint,
         batchTs[2] / pair.workgroupSize[0], batchTs[3]};
     tileSizes.emplace_back(invocationLevelTs);
     return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+        entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
         IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize,
         pair.workgroupSize);
   }
@@ -185,7 +185,7 @@ static LogicalResult setRootConfig(FuncOp entryPoint,
   tileSizes.emplace_back();  // subgroup level
   tileSizes.emplace_back(std::move(invocationLevel));
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute, workgroupSize);
 }
 
@@ -269,7 +269,7 @@ static LogicalResult setConfigForCooperativeMatmul(
       numVecMatmulPerSubgroupX * (*coopMatmulSize)[1]};
   tileSizes.emplace_back(std::move(subgroupTs));
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize, workgroupSize);
 }
 
@@ -282,7 +282,7 @@ LogicalResult setDefaultRootConfig(FuncOp entryPoint,
     // Serialized computation.
     return setOpConfigAndEntryPointFnTranslation(
         entryPoint, op, /*tileSizes =*/TileSizesListType{{}},
-        /*nativeVectorSize=*/ArrayRef<int64_t>{},
+        /*nativeVectorSizes=*/ArrayRef<int64_t>{},
         IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize, {1, 1, 1});
   }
 
@@ -357,7 +357,7 @@ LogicalResult setDefaultRootConfig(FuncOp entryPoint,
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
-      /*nativeVectorSize =*/ArrayRef<int64_t>{}, pipeline, workgroupSize);
+      /*nativeVectorSizes =*/ArrayRef<int64_t>{}, pipeline, workgroupSize);
 }
 
 /// Launch configuration for different known GPU configuration.
@@ -400,7 +400,7 @@ static LogicalResult setTargetSpecificConfig(FuncOp entryPoint,
     tileSizes.emplace_back(invocationLevelTs);
     return setOpConfigAndEntryPointFnTranslation(
         entryPoint, op, tileSizes,
-        /*nativeVectorSize =*/ArrayRef<int64_t>{},
+        /*nativeVectorSizes =*/ArrayRef<int64_t>{},
         IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize,
         pair.workgroupSize);
   }
@@ -445,7 +445,7 @@ LogicalResult setRootConfig(FuncOp entryPoint,
   tileSizes.emplace_back();  // subgroup level
   tileSizes.emplace_back(std::move(invocationLevel));
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSize =*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes, /*nativeVectorSizes =*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute, workgroupSize);
 }
 
@@ -505,7 +505,7 @@ static LogicalResult setMaliSpecificConfig(
     tileSizes.emplace_back(fourthLevel);
 
     if (failed(setOpConfigAndEntryPointFnTranslation(
-            entryFn, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+            entryFn, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
             IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize,
             workgroupSize)))
       return failure();
@@ -593,7 +593,7 @@ static LogicalResult setMaliSpecificConfig(
     tileSizes.emplace_back(fourthLevel);
 
     if (failed(setOpConfigAndEntryPointFnTranslation(
-            entryFn, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+            entryFn, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
             IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize,
             workgroupSize)))
       return failure();

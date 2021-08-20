@@ -82,11 +82,11 @@ SmallVector<unsigned> getPartitionedLoops(Operation *op) {
 
 LogicalResult setOpConfigAndEntryPointFnTranslation(
     FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
-    ArrayRef<int64_t> nativeVectorSize,
+    ArrayRef<int64_t> nativeVectorSizes,
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize) {
   IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, nativeVectorSize, op->getContext());
+      buildConfigAttr(tileSizes, nativeVectorSizes, op->getContext());
   setLoweringConfig(op, config);
   auto partitionedLoops = getPartitionedLoops(op);
   SmallVector<int64_t, 3> workloadPerWorkgroup;

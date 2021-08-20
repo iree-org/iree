@@ -103,7 +103,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       {tileX / workgroupSize[1], tileY / workgroupSize[0]});
   tileSizes.push_back(invocationLevelTs);  // Thread level.
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt,
       workgroupSize);
 }
@@ -184,7 +184,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   tileSizes.push_back({});                                // Subgroup level.
   tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
 }
 
