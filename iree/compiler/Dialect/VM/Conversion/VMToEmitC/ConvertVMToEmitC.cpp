@@ -3289,15 +3289,20 @@ class ConvertVMToEmitCPass
       vmAnalysisCache.insert(std::make_pair(
           op, VMAnalysis{RegisterAllocation(op), ValueLiveness(op)}));
 
-      if (failed(convertFuncOp(funcOp, vmAnalysisCache)))
+      if (failed(convertFuncOp(funcOp, vmAnalysisCache))) {
         return signalPassFailure();
+      }
       funcsToRemove.push_back(funcOp);
     }
 
-    for (auto &funcOp : funcsToRemove) funcOp.erase();
+    for (auto &funcOp : funcsToRemove) {
+      funcOp.erase();
+    }
 
     // Generate func ops that implement the C API.
-    if (failed(createAPIFunctions(module))) return signalPassFailure();
+    if (failed(createAPIFunctions(module))) {
+      return signalPassFailure();
+    }
 
     OwningRewritePatternList patterns(&getContext());
     populateVMToEmitCPatterns(&getContext(), typeConverter, patterns,
@@ -3318,19 +3323,32 @@ class ConvertVMToEmitCPass
     // Structural ops
     target.addLegalOp<IREE::VM::ModuleOp>();
     target.addLegalOp<IREE::VM::ModuleTerminatorOp>();
+    // These ops are needed to build arrays for the module descriptor. There is
+    // no way to generate this directly with the EmitC dialect at the moment.
     target.addLegalOp<IREE::VM::ExportOp>();
     target.addLegalOp<IREE::VM::ImportOp>();
 
     // Global ops
+    // The global ops are dead after the conversion and will get removed.
     target.addLegalOp<IREE::VM::GlobalI32Op>();
     target.addLegalOp<IREE::VM::GlobalI64Op>();
     target.addLegalOp<IREE::VM::GlobalF32Op>();
     target.addLegalOp<IREE::VM::GlobalRefOp>();
+
+    // This op is needed in the printer to emit an array holding the data.
     target.addLegalOp<IREE::VM::RodataOp>();
 
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       return signalPassFailure();
     }
+
+    // Global ops are dead now
+    module.walk([](Operation *op) {
+      if (isa<IREE::VM::GlobalI32Op, IREE::VM::GlobalI64Op,
+              IREE::VM::GlobalF32Op, IREE::VM::GlobalRefOp>(op)) {
+        op->erase();
+      }
+    });
   }
 };
 
