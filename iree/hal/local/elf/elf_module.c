@@ -245,7 +245,7 @@ static iree_status_t iree_elf_module_load_segments(
       vaddr_range.length, load_state->memory_info.normal_page_size);
   IREE_RETURN_IF_ERROR(iree_memory_view_reserve(
       IREE_MEMORY_VIEW_FLAG_MAY_EXECUTE, module->vaddr_size,
-      (void**)&module->vaddr_base));
+      module->host_allocator, (void**)&module->vaddr_base));
   module->vaddr_bias = module->vaddr_base - vaddr_range.offset;
 
   // Commit and load all of the segments.
@@ -351,7 +351,8 @@ static iree_status_t iree_elf_module_protect_segments(
 static void iree_elf_module_unload_segments(iree_elf_module_t* module) {
   // Decommit/unreserve the entire memory space.
   if (module->vaddr_base != NULL) {
-    iree_memory_view_release(module->vaddr_base, module->vaddr_size);
+    iree_memory_view_release(module->vaddr_base, module->vaddr_size,
+                             module->host_allocator);
   }
   module->vaddr_base = NULL;
   module->vaddr_bias = NULL;
@@ -582,6 +583,7 @@ iree_status_t iree_elf_module_initialize_from_memory(
   iree_elf_module_load_state_t load_state;
   iree_status_t status =
       iree_elf_module_parse_headers(raw_data, &load_state, out_module);
+  out_module->host_allocator = host_allocator;
 
   // Allocate and load the ELF into memory.
   iree_memory_jit_context_begin();
