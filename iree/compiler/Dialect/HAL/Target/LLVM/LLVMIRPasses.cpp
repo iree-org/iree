@@ -100,8 +100,8 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
                 compileKernel, recover, moduleUseAfterScope, useOdrIndicator));
             modulePassManager.addPass(
                 createModuleToFunctionPassAdaptor(llvm::AddressSanitizerPass(
-                    {compileKernel, recover, useAfterScope,
-                     llvm::AsanDetectStackUseAfterReturnMode::Runtime})));
+                    compileKernel, recover, useAfterScope,
+                    llvm::AsanDetectStackUseAfterReturnMode::Runtime)));
           });
     } break;
   }
