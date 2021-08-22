@@ -14,10 +14,19 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Pipelines
+//===----------------------------------------------------------------------===//
+
+// Performs common input legalization after specific input dialect conversions
+// have taken place.
+void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
+
+//===----------------------------------------------------------------------===//
 // Passes
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<FuncOp>> createTopLevelSCFToCFGPass();
+std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

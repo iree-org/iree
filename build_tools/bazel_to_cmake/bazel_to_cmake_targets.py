@@ -12,6 +12,11 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:default_linkopts": [],
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
+    # IREE llvm-external-projects
+    "//llvm-external-projects/iree-dialects:IREEDialect": [
+        "IREEDialectsIREEDialect"
+    ],
+
     # LLVM
     "@llvm-project//llvm:IPO": ["LLVMipo"],
     # MLIR
