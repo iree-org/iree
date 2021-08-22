@@ -45,14 +45,17 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    IREEDialectsIREEDialect
+    MLIRIR
+    MLIRLinalg
+    MLIRPass
+    MLIRSCF
+    MLIRSCFToStandard
+    MLIRStandard
+    MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
-    IREEDialectsIREEDialect
-    MLIRIR
-    MLIRPass
-    MLIRStandard
-    MLIRTransforms
   PUBLIC
 )
 
