@@ -99,7 +99,7 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createSPIRVConvertToGPUPass());
+  pm.addNestedPass<FuncOp>(createSPIRVDistributeToGlobalIDPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

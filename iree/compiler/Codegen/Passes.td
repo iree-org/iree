@@ -222,10 +222,12 @@ def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
 }
 
 // TODO: Rename argument to be fully qualified.
-def SPIRVConvertToGPU : Pass<"iree-spirv-convert-to-gpu", "FuncOp"> {
+def SPIRVDistributeToGlobalID :
+    Pass<"iree-spirv-distribute-to-global-id", "FuncOp"> {
   let summary = "Distribute Linalg ops with buffer semantics to global "
                 "invocations";
-  let constructor = "mlir::iree_compiler::createSPIRVConvertToGPUPass()";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVDistributeToGlobalIDPass()";
 }
 
 // TODO: Rename argument to be fully qualified.
