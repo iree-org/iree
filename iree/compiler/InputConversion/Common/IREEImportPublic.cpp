@@ -43,8 +43,8 @@ constexpr const char *kRetainedAttributes[] = {
 struct IREEImportPublicPass
     : public IREEImportPublicBase<IREEImportPublicPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, IREE::HAL::HALDialect,
-                    IREE::Util::UtilDialect>();
+    registry.insert<mlir::iree::IREEDialect, IREE::Flow::FlowDialect,
+                    IREE::HAL::HALDialect, IREE::Util::UtilDialect>();
   }
   void runOnOperation() override;
 };
