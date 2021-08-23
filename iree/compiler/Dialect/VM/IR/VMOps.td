@@ -44,6 +44,7 @@ def VM_ModuleOp : VM_Op<"module", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
+    ``
     regions
   }];
 
@@ -241,6 +242,50 @@ def VM_ImportOp : VM_Op<"import", [
   }];
 }
 
+def VM_InitializerOp : VM_Op<"initializer", [
+    IsolatedFromAbove,
+    HasParent<"IREE::VM::ModuleOp">,
+    NativeOpTrait<"FunctionLike">,
+    CallableOpInterface,
+  ]> {
+  let summary = [{global initialization function}];
+  let description = [{
+    A function that is called in definition order upon module initialization.
+    Must not load any globals that are defined or initialized after it in the
+    module.
+  }];
+
+  let arguments = (ins
+    TypeAttr:$type
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Add an entry block to an empty function and set up the block arguments
+    /// to match the signature of the function.
+    Block *addEntryBlock();
+    Block *addBlock();
+
+    unsigned getNumFuncArguments() { return 0; }
+    unsigned getNumFuncResults() { return 0; }
+
+    LogicalResult verifyType() { return success(); }
+
+    Region *getCallableRegion() { return &body(); }
+    ArrayRef<Type> getCallableResults() { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
@@ -259,7 +304,6 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
-    OptionalAttr<FlatSymbolRefAttr>:$initializer,
     OptionalAttr<attr_type>:$initial_value,
     OptionalAttr<VM_Ordinal>:$ordinal
   );
@@ -269,25 +313,23 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     (`mutable` $is_mutable^)?
     $sym_name
     attr-dict
-    (`initializer` `(` $initializer^ `)`):(``)?
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
-      "Optional<StringRef>":$initializer, "Optional<Attribute>":$initialValue,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
+    OpBuilder<(ins
+      "StringRef":$name, "bool":$isMutable, "Type":$type,
+      "Optional<Attribute>":$initialValue,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    ),
     [{
       $_state.addAttribute(SymbolTable::getSymbolAttrName(),
                           $_builder.getStringAttr(name));
       if (isMutable) {
         $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
       }
-      if (initializer.hasValue()) {
-        $_state.addAttribute("initializer",
-                            $_builder.getSymbolRefAttr(initializer.getValue()));
-      } else if (initialValue.hasValue() &&
+      if (initialValue.hasValue() &&
                  (initialValue.getValue().isa<IntegerAttr>() ||
                   initialValue.getValue().isa<FloatAttr>())) {
         $_state.addAttribute("initial_value", initialValue.getValue());
@@ -295,25 +337,12 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
       $_state.addAttribute("type", TypeAttr::get(type));
       $_state.attributes.append(attrs.begin(), attrs.end());
     }]>,
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable,
-      "IREE::VM::FuncOp":$initializer,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
+    OpBuilder<(ins
+      "StringRef":$name, "bool":$isMutable, "Type":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    ),
     [{
-      build($_builder, $_state, name, isMutable,
-            initializer.getType().getResult(0), initializer.getName(),
-            llvm::None, attrs);
-    }]>,
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
-      "Attribute":$initialValue, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
-    [{
-      build($_builder, $_state, name, isMutable, type, llvm::None, initialValue,
-            attrs);
-    }]>,
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs),
-    [{
-      build($_builder, $_state, name, isMutable, type, llvm::None, llvm::None,
-            attrs);
+      build($_builder, $_state, name, isMutable, type, llvm::None, attrs);
     }]>,
   ];
 
@@ -322,9 +351,8 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     Type getStorageType() { return type(); }
     bool isMutable() { return is_mutable(); }
     void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
-    Optional<StringRef> getInitializerAttr() { return initializer(); }
-    void clearInitializer() { (*this)->removeAttr("initializer"); }
     Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
+    void setInitialValue(Attribute value) { (*this)->setAttr("initial_value", (value)); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
     Optional<IntegerAttr> getOrdinalAttr() { return ordinalAttr(); }
   }];
@@ -3485,7 +3513,6 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-    HasParent<"IREE::VM::FuncOp">,
     Terminator,
   ]> {
   let summary = "return operation";
@@ -3493,7 +3520,7 @@ def VM_ReturnOp : VM_Op<"return", [
     Represents a return operation within a function.
 
     ```
-    vm.func @foo(%0, %1) : (i32, f8) {
+    vm.func @foo(%0: i32, %1: f8) -> (i32, f8) {
       vm.return %0, %1 : i32, f8
     }
     ```

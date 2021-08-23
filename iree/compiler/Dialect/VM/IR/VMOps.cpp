@@ -281,6 +281,47 @@ LogicalResult ImportOp::verifyType() {
   return success();
 }
 
+void InitializerOp::build(OpBuilder &builder, OperationState &result,
+                          ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute(
+      "type", TypeAttr::get(FunctionType::get(builder.getContext(), {}, {})));
+  result.addRegion();
+  result.attributes.append(attrs.begin(), attrs.end());
+}
+
+static ParseResult parseInitializerOp(OpAsmParser &parser,
+                                      OperationState *result) {
+  result->addAttribute(
+      "type", TypeAttr::get(FunctionType::get(result->getContext(), {}, {})));
+  if (parser.parseOptionalAttrDictWithKeyword(result->attributes)) {
+    return failure();
+  }
+  auto &body = *result->addRegion();
+  if (failed(parser.parseRegion(body))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
+  p << "vm.initializer";
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p.printRegion(op.body());
+}
+
+Block *InitializerOp::addEntryBlock() {
+  assert(empty() && "function already has an entry block");
+  auto *entry = new Block();
+  push_back(entry);
+  return entry;
+}
+
+Block *InitializerOp::addBlock() {
+  assert(!empty() && "function should at least have an entry block");
+  push_back(new Block());
+  return &back();
+}
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
@@ -375,13 +416,13 @@ static LogicalResult verifyGlobalLoadOp(Operation *op) {
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
   if (!globalOp) {
-    return op->emitOpError() << "Undefined global: " << globalAttr;
+    return op->emitOpError() << "undefined global: " << globalAttr;
   }
   auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
   auto loadType = op->getResult(0).getType();
   if (globalType.getValue() != loadType) {
     return op->emitOpError()
-           << "Global type mismatch; global " << globalAttr << " is "
+           << "global type mismatch; global " << globalAttr << " is "
            << globalType << " but load is " << loadType;
   }
   return success();
@@ -392,18 +433,21 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
   if (!globalOp) {
-    return op->emitOpError() << "Undefined global: " << globalAttr;
+    return op->emitOpError() << "undefined global: " << globalAttr;
   }
   auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
   auto storeType = op->getOperand(0).getType();
   if (globalType.getValue() != storeType) {
     return op->emitOpError()
-           << "Global type mismatch; global " << globalAttr << " is "
+           << "global type mismatch; global " << globalAttr << " is "
            << globalType << " but store is " << storeType;
   }
   if (!globalOp->getAttrOfType<UnitAttr>("is_mutable")) {
-    return op->emitOpError() << "Global " << globalAttr
-                             << " is not mutable and cannot be stored to";
+    // Allow stores to immutable globals in initializers.
+    if (!op->getParentOfType<IREE::VM::InitializerOp>()) {
+      return op->emitOpError() << "global " << globalAttr
+                               << " is not mutable and cannot be stored to";
+    }
   }
   return success();
 }
