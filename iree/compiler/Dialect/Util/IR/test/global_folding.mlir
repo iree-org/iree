@@ -1,10 +1,12 @@
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK: util.global private @v_initialized = dense<4> : tensor<4xi32>
-util.global private @v_initialized initializer(@initializer) : tensor<4xi32>
-func private @initializer() -> tensor<4xi32> {
+util.global private @v_initialized : tensor<4xi32>
+// CHECK-NOT: util.initializer
+util.initializer {
   %0 = constant dense<4> : tensor<4xi32>
-  return %0 : tensor<4xi32>
+  util.global.store %0, @v_initialized : tensor<4xi32>
+  util.initializer.return
 }
 
 // -----

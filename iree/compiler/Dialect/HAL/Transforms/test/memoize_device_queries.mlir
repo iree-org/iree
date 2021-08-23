@@ -1,16 +1,16 @@
 // RUN: iree-opt -split-input-file -iree-hal-memoize-device-queries -canonicalize %s | IreeFileCheck %s
 
-//      CHECK: util.global private @_device_query_0 initializer(@_device_query_0_initializer) : i1
-//      CHECK: func private @_device_query_0_initializer() -> i1
+//      CHECK: util.global private @_device_query_0 : i1
+// CHECK-NEXT: util.initializer {
 // CHECK-NEXT:   %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %[[OK0:.+]], %[[VALUE0:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "id0*") : i1, i1 = false
-// CHECK-NEXT:   return %[[VALUE0]] : i1
+// CHECK-NEXT:   util.global.store %[[VALUE0]], @_device_query_0 : i1
 
-//      CHECK: util.global private @_device_query_1 initializer(@_device_query_1_initializer) : i1
-//      CHECK: func private @_device_query_1_initializer() -> i1
+//      CHECK: util.global private @_device_query_1 : i1
+// CHECK-NEXT: util.initializer {
 // CHECK-NEXT:   %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %[[OK1:.+]], %[[VALUE1:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "id1") : i1, i1 = false
-// CHECK-NEXT:   return %[[VALUE1]] : i1
+// CHECK-NEXT:   util.global.store %[[VALUE1]], @_device_query_1 : i1
 
 // CHECK: util.global private @_device_query_2
 

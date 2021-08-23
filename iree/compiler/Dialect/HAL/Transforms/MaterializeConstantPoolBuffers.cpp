@@ -104,63 +104,56 @@ class MaterializeConstantPoolBuffersPass
       spanOp.runtime_rangeAttr(spanOp.storage_range());
     }
 
-    auto initializerFunc = makeStorageBufferRuntimeInitializerFunc(
-        globalOp.getName(), storageOp, poolOp.buffer_constraints());
-    moduleSymbolTable.insert(initializerFunc, insertionPoint);
-    globalOp.initializerAttr(
-        SymbolRefAttr::get(context, initializerFunc.getName()));
+    makeStorageBufferRuntimeInitializer(globalOp, storageOp,
+                                        poolOp.buffer_constraints());
   }
 
   // Creates an initializer function that unpacks the given storage op into a
   // new buffer.
-  FuncOp makeStorageBufferRuntimeInitializerFunc(
-      StringRef variableName, ConstantStorageOp storageOp,
+  void makeStorageBufferRuntimeInitializer(
+      IREE::Util::GlobalOp globalOp, ConstantStorageOp storageOp,
       BufferConstraintsAttr bufferConstraints) {
+    auto loc = globalOp.getLoc();
     auto *context = storageOp.getContext();
-    OpBuilder builder(context);
-    auto initializerName = (variableName + "_initializer").str();
-    auto initializerFunc = FuncOp::create(
-        storageOp.getLoc(), initializerName,
-        builder.getFunctionType({}, {IREE::HAL::BufferType::get(context)}));
-    initializerFunc.setPrivate();
+    OpBuilder moduleBuilder(context);
+    moduleBuilder.setInsertionPointAfter(globalOp);
+    auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
 
-    auto funcBuilder = OpBuilder::atBlockBegin(initializerFunc.addEntryBlock());
+    auto builder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
 
     // HACK: use default allocator.
-    auto deviceValue = funcBuilder.createOrFold<IREE::HAL::ExSharedDeviceOp>(
-        storageOp.getLoc());
+    auto deviceValue = builder.createOrFold<IREE::HAL::ExSharedDeviceOp>(loc);
     auto allocatorValue =
-        funcBuilder.createOrFold<IREE::HAL::DeviceAllocatorOp>(
-            storageOp.getLoc(), deviceValue);
+        builder.createOrFold<IREE::HAL::DeviceAllocatorOp>(loc, deviceValue);
 
     // Today we always map the buffer directly. We should be using a device
     // switch to schedule the upload if needed.
     // TODO(benvanik): allocate based on usage tracking.
-    auto sourceValue =
-        funcBuilder.createOrFold<IREE::HAL::ConstantStorageLookupOp>(
-            storageOp.getLoc(), IREE::Util::ByteBufferType::get(context),
-            funcBuilder.getSymbolRefAttr(
-                storageOp->getParentOfType<ConstantPoolOp>().getName(),
-                {funcBuilder.getSymbolRefAttr(storageOp)}));
-    auto offsetValue =
-        funcBuilder.createOrFold<mlir::ConstantIndexOp>(storageOp.getLoc(), 0);
+    auto sourceValue = builder.createOrFold<IREE::HAL::ConstantStorageLookupOp>(
+        loc, IREE::Util::ByteBufferType::get(context),
+        builder.getSymbolRefAttr(
+            storageOp->getParentOfType<ConstantPoolOp>().getName(),
+            {builder.getSymbolRefAttr(storageOp)}));
+    auto offsetValue = builder.createOrFold<mlir::ConstantIndexOp>(loc, 0);
     auto storageValueAttr =
         storageOp.value().cast<IREE::Util::SerializableAttrInterface>();
     uint64_t runtimeLength =
         align(storageValueAttr.getStorageSize(),
               bufferConstraints.min_buffer_range_alignment());
-    auto lengthValue = funcBuilder.createOrFold<mlir::ConstantIndexOp>(
-        storageOp.getLoc(), runtimeLength);
+    auto lengthValue =
+        builder.createOrFold<mlir::ConstantIndexOp>(loc, runtimeLength);
     auto memoryType = IREE::HAL::MemoryTypeBitfield::DeviceLocal |
                       IREE::HAL::MemoryTypeBitfield::HostVisible;
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::Constant |
                        IREE::HAL::BufferUsageBitfield::All;
-    auto bufferValue = funcBuilder.createOrFold<IREE::HAL::AllocatorMapOp>(
-        storageOp.getLoc(), IREE::HAL::BufferType::get(context), allocatorValue,
-        memoryType, bufferUsage, sourceValue, offsetValue, lengthValue);
-    funcBuilder.create<mlir::ReturnOp>(storageOp.getLoc(), bufferValue);
+    auto bufferValue = builder.createOrFold<IREE::HAL::AllocatorMapOp>(
+        loc, IREE::HAL::BufferType::get(context), allocatorValue, memoryType,
+        bufferUsage, sourceValue, offsetValue, lengthValue);
 
-    return initializerFunc;
+    builder.create<IREE::Util::GlobalStoreOp>(loc, bufferValue,
+                                              globalOp.getName());
+
+    builder.create<IREE::Util::InitializerReturnOp>(loc);
   }
 
   // Creates a runtime buffer for the given constant pool splats and constructs
@@ -178,14 +171,14 @@ class MaterializeConstantPoolBuffersPass
     // things.
     auto variableType = IREE::HAL::BufferType::get(context);
 
-    auto variableLoc =
+    auto globalLoc =
         FusedLoc::get(context, llvm::to_vector<8>(llvm::map_range(
                                    splatOps, [](ConstantPoolSplatOp splatOp) {
                                      return splatOp.getLoc();
                                    })));
     auto variableName = (poolOp.getName() + "_splats").str();
     auto globalOp = OpBuilder(context).create<IREE::Util::GlobalOp>(
-        variableLoc, variableName, /*isMutable=*/false, variableType);
+        globalLoc, variableName, /*isMutable=*/false, variableType);
     moduleSymbolTable.insert(globalOp, insertionPoint);
     globalOp.setPrivate();
 
@@ -219,81 +212,70 @@ class MaterializeConstantPoolBuffersPass
           << " - contents may not be accessible at runtime";
     }
 
-    auto initializerFunc = makeSplatRuntimeInitializerFunc(
-        globalOp.getLoc(), globalOp.getName(), splatOps, bufferLength);
-    moduleSymbolTable.insert(initializerFunc, insertionPoint);
-    globalOp.initializerAttr(
-        SymbolRefAttr::get(context, initializerFunc.getName()));
+    makeSplatRuntimeInitializer(globalOp, splatOps, bufferLength);
   }
 
   // Creates an initializer function that allocates the runtime buffer and
   // splats the values into it.
-  FuncOp makeSplatRuntimeInitializerFunc(Location variableLoc,
-                                         StringRef variableName,
-                                         ArrayRef<ConstantPoolSplatOp> splatOps,
-                                         uint64_t bufferLength) {
-    auto *context = variableLoc.getContext();
-    OpBuilder builder(context);
-    auto initializerName = (variableName + "_initializer").str();
-    auto initializerFunc = FuncOp::create(
-        variableLoc, initializerName,
-        builder.getFunctionType({}, {IREE::HAL::BufferType::get(context)}));
-    initializerFunc.setPrivate();
+  void makeSplatRuntimeInitializer(IREE::Util::GlobalOp globalOp,
+                                   ArrayRef<ConstantPoolSplatOp> splatOps,
+                                   uint64_t bufferLength) {
+    auto loc = globalOp.getLoc();
+    auto *context = loc.getContext();
+    OpBuilder moduleBuilder(context);
+    moduleBuilder.setInsertionPointAfter(globalOp);
+    auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
 
-    auto funcBuilder = OpBuilder::atBlockBegin(initializerFunc.addEntryBlock());
+    auto builder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
 
     // HACK: use default allocator.
-    auto deviceValue =
-        funcBuilder.createOrFold<IREE::HAL::ExSharedDeviceOp>(variableLoc);
+    auto deviceValue = builder.createOrFold<IREE::HAL::ExSharedDeviceOp>(loc);
     auto allocatorValue =
-        funcBuilder.createOrFold<IREE::HAL::DeviceAllocatorOp>(variableLoc,
-                                                               deviceValue);
+        builder.createOrFold<IREE::HAL::DeviceAllocatorOp>(loc, deviceValue);
 
     // Allocate buffer with empty contents.
     auto memoryType = IREE::HAL::MemoryTypeBitfield::DeviceLocal |
                       IREE::HAL::MemoryTypeBitfield::HostVisible;
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::Constant |
                        IREE::HAL::BufferUsageBitfield::All;
-    auto allocationSizeValue = funcBuilder.createOrFold<mlir::ConstantIndexOp>(
-        variableLoc, bufferLength);
-    auto bufferValue = funcBuilder.createOrFold<IREE::HAL::AllocatorAllocateOp>(
-        variableLoc, IREE::HAL::BufferType::get(context), allocatorValue,
-        memoryType, bufferUsage, allocationSizeValue);
+    auto allocationSizeValue =
+        builder.createOrFold<mlir::ConstantIndexOp>(loc, bufferLength);
+    auto bufferValue = builder.createOrFold<IREE::HAL::AllocatorAllocateOp>(
+        loc, IREE::HAL::BufferType::get(context), allocatorValue, memoryType,
+        bufferUsage, allocationSizeValue);
 
     // Fill the buffers (memset).
     // We do this with a command buffer so that we can allow the device to
     // fill them in asynchronously and without memory mapping.
     auto commandBufferValue =
-        funcBuilder.createOrFold<IREE::HAL::CommandBufferCreateOp>(
-            variableLoc, IREE::HAL::CommandBufferType::get(context),
-            deviceValue,
+        builder.createOrFold<IREE::HAL::CommandBufferCreateOp>(
+            loc, IREE::HAL::CommandBufferType::get(context), deviceValue,
             IREE::HAL::CommandBufferModeBitfield::OneShot |
                 IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution,
             IREE::HAL::CommandCategoryBitfield::Transfer);
-    funcBuilder.create<IREE::HAL::CommandBufferBeginOp>(variableLoc,
-                                                        commandBufferValue);
+    builder.create<IREE::HAL::CommandBufferBeginOp>(loc, commandBufferValue);
     for (auto splatOp : splatOps) {
       auto runtimeRange = splatOp.runtime_range().getValue();
-      auto offsetValue = funcBuilder.createOrFold<mlir::ConstantIndexOp>(
+      auto offsetValue = builder.createOrFold<mlir::ConstantIndexOp>(
           splatOp.getLoc(), runtimeRange.getOffset());
-      auto lengthValue = funcBuilder.createOrFold<mlir::ConstantIndexOp>(
+      auto lengthValue = builder.createOrFold<mlir::ConstantIndexOp>(
           splatOp.getLoc(), runtimeRange.getLength());
       uint32_t pattern = makePatternFromSplatValue(
           splatOp.value().cast<SplatElementsAttr>().getSplatValue());
-      auto patternValue = funcBuilder.createOrFold<mlir::ConstantIntOp>(
-          variableLoc, static_cast<int64_t>(pattern), 32);
-      funcBuilder.create<IREE::HAL::CommandBufferFillBufferOp>(
+      auto patternValue = builder.createOrFold<mlir::ConstantIntOp>(
+          loc, static_cast<int64_t>(pattern), 32);
+      builder.create<IREE::HAL::CommandBufferFillBufferOp>(
           splatOp.getLoc(), commandBufferValue, bufferValue, offsetValue,
           lengthValue, patternValue);
     }
-    funcBuilder.create<IREE::HAL::CommandBufferEndOp>(variableLoc,
-                                                      commandBufferValue);
-    funcBuilder.create<IREE::HAL::ExSubmitAndWaitOp>(variableLoc, deviceValue,
-                                                     commandBufferValue);
+    builder.create<IREE::HAL::CommandBufferEndOp>(loc, commandBufferValue);
+    builder.create<IREE::HAL::ExSubmitAndWaitOp>(loc, deviceValue,
+                                                 commandBufferValue);
 
-    funcBuilder.create<mlir::ReturnOp>(variableLoc, bufferValue);
+    builder.create<IREE::Util::GlobalStoreOp>(loc, bufferValue,
+                                              globalOp.getName());
 
-    return initializerFunc;
+    builder.create<IREE::Util::InitializerReturnOp>(loc);
   }
 
   // Makes a 4-byte pattern from a splat value for use at runtime.

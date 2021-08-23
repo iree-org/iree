@@ -14,6 +14,41 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+struct InitializerOpConversion
+    : public OpConversionPattern<IREE::Util::InitializerOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::Util::InitializerOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto newOp = rewriter.create<IREE::VM::InitializerOp>(op.getLoc());
+    rewriter.cloneRegionBefore(op.body(), newOp.body(), newOp.body().begin());
+
+    // Tell the rewriter to convert the region signature.
+    TypeConverter &typeConverter = *getTypeConverter();
+    TypeConverter::SignatureConversion signatureConversion(0);
+    if (failed(rewriter.convertRegionTypes(&newOp.body(), typeConverter,
+                                           &signatureConversion))) {
+      return rewriter.notifyMatchFailure(op, "failed to convert region types");
+    }
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+struct InitializerReturnOpConversion
+    : public OpConversionPattern<IREE::Util::InitializerReturnOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IREE::Util::InitializerReturnOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(op);
+    return success();
+  }
+};
+
 class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
  public:
   GlobalOpConversion(MLIRContext *context, TypeConverter &typeConverter)
@@ -75,50 +110,10 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
     // New global carries the same visibility as the original.
     cast<SymbolOpInterface>(newOp).setVisibility(op.getVisibility());
 
-    // If there was an initializer function specified we turn that into a
-    // vm.initializer now.
-    if (op.initializer()) {
-      auto initializerOp =
-          rewriter.create<IREE::VM::InitializerOp>(op.getLoc());
-      auto ip = rewriter.saveInsertionPoint();
-      rewriter.setInsertionPointToStart(initializerOp.addEntryBlock());
-      SmallVector<Type> resultTypes;
-      resultTypes.push_back(convertedType);
-      auto callOp = rewriter.create<IREE::VM::CallOp>(
-          op.getLoc(), op.initializer().getValue(), resultTypes,
-          /*operands=*/ValueRange{});
-      storeToGlobal(callOp.getResult(0), newOp, rewriter);
-      rewriter.create<IREE::VM::ReturnOp>(op.getLoc());
-      rewriter.restoreInsertionPoint(ip);
-    }
-
     return success();
   }
 
  private:
-  void storeToGlobal(Value value, Operation *globalOp,
-                     ConversionPatternRewriter &rewriter) const {
-    auto globalName = cast<SymbolOpInterface>(globalOp).getName();
-    if (value.getType().isa<IREE::VM::RefType>()) {
-      rewriter.create<IREE::VM::GlobalStoreRefOp>(globalOp->getLoc(), value,
-                                                  globalName);
-    } else if (value.getType().isInteger(32)) {
-      rewriter.create<IREE::VM::GlobalStoreI32Op>(globalOp->getLoc(), value,
-                                                  globalName);
-    } else if (value.getType().isInteger(64)) {
-      rewriter.create<IREE::VM::GlobalStoreI64Op>(globalOp->getLoc(), value,
-                                                  globalName);
-    } else if (value.getType().isF32()) {
-      rewriter.create<IREE::VM::GlobalStoreF32Op>(globalOp->getLoc(), value,
-                                                  globalName);
-    } else if (value.getType().isF64()) {
-      rewriter.create<IREE::VM::GlobalStoreF64Op>(globalOp->getLoc(), value,
-                                                  globalName);
-    } else {
-      llvm_unreachable("unhandled vm type");
-    }
-  }
-
   TypeConverter &typeConverter;
 };
 
@@ -286,6 +281,11 @@ void populateUtilGlobalToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     OwningRewritePatternList &patterns) {
+  conversionTarget.addIllegalOp<IREE::Util::InitializerOp,
+                                IREE::Util::InitializerReturnOp>();
+  patterns.insert<InitializerOpConversion, InitializerReturnOpConversion>(
+      typeConverter, context);
+
   conversionTarget.addIllegalOp<
       IREE::Util::GlobalOp, IREE::Util::GlobalAddressOp,
       IREE::Util::GlobalLoadOp, IREE::Util::GlobalLoadIndirectOp,

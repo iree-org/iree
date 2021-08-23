@@ -62,6 +62,7 @@ class MaterializeResourceCachesPass
     // Declare executable variables so that we can reference them during lookup
     // replacement.
     for (auto executableOp : executableOps) {
+      if (executableOp.getOps<IREE::HAL::InterfaceOp>().empty()) continue;
       if (!defineExecutableOp(executableOp)) {
         signalPassFailure();
         return;
@@ -96,26 +97,24 @@ class MaterializeResourceCachesPass
     auto symbolName = (StringRef("_descriptor_set_layout_") +
                        std::to_string(nextUniqueDescriptorSetLayoutId++))
                           .str();
-    auto initializerName = symbolName + "_initializer";
 
     auto layoutType = DescriptorSetLayoutType::get(loc.getContext());
     auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
         loc, symbolName,
-        /*isMutable=*/false, layoutType, StringRef(initializerName),
-        llvm::None);
+        /*isMutable=*/false, layoutType);
     globalOp.setPrivate();
     descriptorSetLayoutCache_.try_emplace(bindingsAttr, globalOp);
 
-    auto initializerOp = moduleBuilder.create<FuncOp>(
-        loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}));
-    initializerOp.setPrivate();
-    auto *block = initializerOp.addEntryBlock();
-    OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
+    auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+    OpBuilder blockBuilder =
+        OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
     auto layoutUsage = IREE::HAL::DescriptorSetLayoutUsageType::PushOnly;
     auto layoutValue = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
         loc, layoutType, deviceValue, layoutUsage, bindingsAttr);
-    blockBuilder.create<mlir::ReturnOp>(loc, layoutValue);
+    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layoutValue,
+                                                   globalOp.getName());
+    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
 
     return globalOp;
   }
@@ -149,20 +148,16 @@ class MaterializeResourceCachesPass
     auto symbolName = (StringRef("_executable_layout_") +
                        std::to_string(nextUniqueExecutableLayoutId++))
                           .str();
-    auto initializerName = symbolName + "_initializer";
 
     auto layoutType = ExecutableLayoutType::get(loc.getContext());
     auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-        loc, symbolName, /*isMutable=*/false, layoutType,
-        StringRef(initializerName), llvm::None);
+        loc, symbolName, /*isMutable=*/false, layoutType);
     globalOp.setPrivate();
     executableLayoutCache_.try_emplace(cacheKey, globalOp);
 
-    auto initializerOp = moduleBuilder.create<FuncOp>(
-        loc, initializerName, moduleBuilder.getFunctionType({}, {layoutType}));
-    initializerOp.setPrivate();
-    auto *block = initializerOp.addEntryBlock();
-    OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
+    auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+    OpBuilder blockBuilder =
+        OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
     SmallVector<Value, 4> setLayoutValues;
     for (auto setLayoutGlobalOp : setLayoutGlobalOps) {
       auto setLayoutValue = blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
@@ -173,7 +168,9 @@ class MaterializeResourceCachesPass
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
     auto layoutValue = blockBuilder.createOrFold<ExecutableLayoutCreateOp>(
         loc, layoutType, deviceValue, pushConstantsAttr, setLayoutValues);
-    blockBuilder.create<mlir::ReturnOp>(loc, layoutValue);
+    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layoutValue,
+                                                   globalOp.getName());
+    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
 
     return globalOp;
   }
@@ -182,21 +179,16 @@ class MaterializeResourceCachesPass
     auto loc = executableOp.getLoc();
     auto symbolName =
         (StringRef("_executable_") + executableOp.sym_name()).str();
-    auto initializerName = symbolName + "_initializer";
 
     auto executableType = ExecutableType::get(executableOp.getContext());
     auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-        loc, symbolName, /*isMutable=*/false, executableType,
-        StringRef(initializerName), llvm::None);
+        loc, symbolName, /*isMutable=*/false, executableType);
     globalOp.setPrivate();
     executableCache_.try_emplace(executableOp.sym_name(), globalOp);
 
-    auto initializerOp = moduleBuilder.create<FuncOp>(
-        loc, initializerName,
-        moduleBuilder.getFunctionType({}, {executableType}));
-    initializerOp.setPrivate();
-    auto *block = initializerOp.addEntryBlock();
-    OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
+    auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+    OpBuilder blockBuilder =
+        OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
 
     // Create a switch statement with a case for each variant.
@@ -251,7 +243,9 @@ class MaterializeResourceCachesPass
 
     auto switchOp = switchBuilder.build();
     auto executableValue = switchOp.getResult(0);
-    blockBuilder.create<mlir::ReturnOp>(loc, executableValue);
+    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableValue,
+                                                   globalOp.getName());
+    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
 
     return globalOp;
   }

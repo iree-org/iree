@@ -78,17 +78,13 @@ class MemoizeDeviceQueriesPass
       // variable.
       std::string variableName =
           "_device_query_" + std::to_string(queryKey.index());
-      auto initializerOp = moduleBuilder.create<FuncOp>(
-          fusedLoc, variableName + "_initializer",
-          moduleBuilder.getFunctionType({}, {queryType}));
-      initializerOp.setPrivate();
-      moduleBuilder.setInsertionPoint(initializerOp);
       auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           fusedLoc, variableName,
-          /*isMutable=*/false, initializerOp);
+          /*isMutable=*/false, queryType);
       globalOp.setPrivate();
-      moduleBuilder.setInsertionPointAfter(initializerOp);
 
+      auto initializerOp =
+          moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
       auto device =
           funcBuilder.createOrFold<IREE::HAL::ExSharedDeviceOp>(fusedLoc);
@@ -96,7 +92,9 @@ class MemoizeDeviceQueriesPass
           fusedLoc, funcBuilder.getI1Type(), queryType, device,
           anyQueryOp.categoryAttr(), anyQueryOp.keyAttr(),
           anyQueryOp.default_valueAttr());
-      funcBuilder.create<mlir::ReturnOp>(fusedLoc, queryOp.value());
+      funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.value(),
+                                                    globalOp.getName());
+      funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);
 
       for (auto queryOp : queryOps) {
         OpBuilder replaceBuilder(queryOp);
