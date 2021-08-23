@@ -27,8 +27,8 @@ iree_cc_library(
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVRemoveOneTripTiledLoops.cpp"
     "SPIRVTileAndDistribute.cpp"
-    "SPIRVTileAndVectorize.cpp"
     "SPIRVVectorToCooperativeMatrix.cpp"
+    "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
   DEPS

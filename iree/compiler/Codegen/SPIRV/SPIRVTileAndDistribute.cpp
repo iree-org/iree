@@ -4,38 +4,32 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- SPIRVTileAndDistribute.cpp
-//------------------------------------------===//
+//===- SPIRVTileAndDistribute.cpp -----------------------------------------===//
 //
-// This pass tiles and vectorizes Linalg ops on buffers within in a single
-// workgroup.
+// This pass tiles and distributes Linalg ops with buffer semantics to subgroups
+// and invocations.
 //
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelDispatchUtils.h"
-#include "iree/compiler/Codegen/SPIRV/MemorySpace.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/Linalg/Analysis/DependenceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/Identifier.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -43,7 +37,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopUtils.h"
 
-#define DEBUG_TYPE "iree-spirv-tile-and-vectorize"
+#define DEBUG_TYPE "iree-spirv-tile-and-distribute"
 
 namespace mlir {
 namespace iree_compiler {
@@ -72,29 +66,7 @@ static unsigned dimToIndex(StringRef dim) {
 }
 
 //===----------------------------------------------------------------------===//
-// Main pass
-//===----------------------------------------------------------------------===//
-
-namespace {
-/// Function pass that implements tiling and fusion in Linalg on buffers.
-class SPIRVTileAndDistributePass
-    : public SPIRVTileAndDistributeBase<SPIRVTileAndDistributePass> {
- public:
-  SPIRVTileAndDistributePass() = default;
-  SPIRVTileAndDistributePass(const SPIRVTileAndDistributePass &pass) = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::HAL::HALDialect, gpu::GPUDialect,
-                    linalg::LinalgDialect, memref::MemRefDialect,
-                    scf::SCFDialect, ShapeDialect, vector::VectorDialect>();
-  }
-
-  void runOnOperation() override;
-};
-}  // namespace
-
-//===----------------------------------------------------------------------===//
-// Patterns to tile computation to map to subgroups
+// Subgroup tiling patterns
 //===----------------------------------------------------------------------===//
 
 /// Computes the Value for subgroupID along each dimension given number of
@@ -169,7 +141,7 @@ static void populateTilingToSubgroupPatterns(MLIRContext *context,
 }
 
 //===----------------------------------------------------------------------===//
-// Patterns and methods for thread tiling.
+// Invocation tiling patterns
 //===----------------------------------------------------------------------===//
 
 /// Patterns for third level tiling to target invocations.
@@ -184,8 +156,8 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
             }));
       };
 
-  auto getThreadProcInfoFn = [&](OpBuilder &builder, Location loc,
-                                 ArrayRef<Range> parallelLoopRanges) {
+  auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
+                                ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
         builder, loc, parallelLoopRanges.size());
   };
@@ -248,7 +220,7 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getThreadRange(
 }
 
 //====---------------------------------------------------------------------===//
-// Patterns to tile convolution window dimensions
+// Convolution filter tiling patterns
 //====---------------------------------------------------------------------===//
 
 static void populateTilingConvFilterPatterns(
@@ -277,29 +249,28 @@ static void populateTilingConvFilterPatterns(
       context, tilingOptions, marker);
 }
 
-//====---------------------------------------------------------------------===//
-// Patterns to lower linalg ops to loops
-//====---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+// Main pass
+//===----------------------------------------------------------------------===//
 
-template <typename OpTy>
-struct LowerToLoops final : public OpRewritePattern<OpTy> {
-  using OpRewritePattern<OpTy>::OpRewritePattern;
+namespace {
+/// Function pass that implements tiling and distributing Linalg ops with
+/// buffer semantics.
+class SPIRVTileAndDistributePass
+    : public SPIRVTileAndDistributeBase<SPIRVTileAndDistributePass> {
+ public:
+  SPIRVTileAndDistributePass() = default;
+  SPIRVTileAndDistributePass(const SPIRVTileAndDistributePass &pass) = default;
 
-  LogicalResult matchAndRewrite(OpTy op,
-                                PatternRewriter &rewriter) const override {
-    // Only handle the cases where tiling to invocations was done, where tiling
-    // convolution filters or vectorization is expected.
-    if (!hasMarker(op, {getConvFilterTileMarker(), getVectorizeMarker()}))
-      return failure();
-
-    if (linalg::linalgOpToLoops(rewriter, op)) {
-      rewriter.eraseOp(op);
-      return success();
-    }
-
-    return failure();
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
+                    memref::MemRefDialect, scf::SCFDialect,
+                    vector::VectorDialect>();
   }
+
+  void runOnOperation() override;
 };
+}  // namespace
 
 //====---------------------------------------------------------------------===//
 // Main pass implementation
@@ -312,16 +283,40 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   if (!entryPointOp) return;
 
   {
-    RewritePatternSet thirdLevelTilingPatterns(&getContext());
-    populateTilingToInvocationPatterns(context, thirdLevelTilingPatterns);
+    RewritePatternSet subgroupTilingPatterns(&getContext());
+    populateTilingToSubgroupPatterns(context, subgroupTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(thirdLevelTilingPatterns));
+                                       std::move(subgroupTilingPatterns));
+
+    RewritePatternSet canonicalizationPatterns =
+        linalg::getLinalgTilingCanonicalizationPatterns(context);
+    populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns));
+    promoteSingleIterationLoops(funcOp);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tiling to subgroups ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
+
+  {
+    RewritePatternSet invocationTilingPatterns(&getContext());
+    populateTilingToInvocationPatterns(context, invocationTilingPatterns);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(invocationTilingPatterns));
 
     // Remove trip-one loops created during cyclic loop distribution if we can
     // prove the tiling was perfect.
     RewritePatternSet canoncalizationPatterns(context);
     populateAffineMinSCFCanonicalizationPattern(canoncalizationPatterns);
-    auto workgroupSize = getWorkgroupSize(entryPointOp);
+    SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
+    if (workgroupSize.empty()) {
+      entryPointOp.emitError("expected to have workgroup_size attribute");
+      return signalPassFailure();
+    }
     auto getThreadRangeFn = [workgroupSize](Value processorValue,
                                             SmallVectorImpl<Value> &dims,
                                             SmallVectorImpl<Value> &symbols) {
@@ -348,47 +343,27 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   }
 
   {
-    RewritePatternSet tilingPatterns(&getContext());
+    RewritePatternSet convFilterTilingPatterns(&getContext());
     auto marker = getLinalgMatchAndReplaceMarker(getConvFilterTileMarker(),
                                                  getVectorizeMarker(), context);
-    populateTilingConvFilterPatterns(context, tilingPatterns, marker);
-    populateFoldGPUProcessorIDUsesPatterns(context, tilingPatterns);
-    tilingPatterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(context);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(tilingPatterns));
+    populateTilingConvFilterPatterns(context, convFilterTilingPatterns, marker);
+    populateFoldGPUProcessorIDUsesPatterns(context, convFilterTilingPatterns);
+    convFilterTilingPatterns
+        .insert<linalg::AffineMinSCFCanonicalizationPattern>(context);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(convFilterTilingPatterns));
 
-    RewritePatternSet convTilingCanonicalizationPatterns =
+    RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
-    populateAffineMinCanonicalizationPattern(
-        convTilingCanonicalizationPatterns);
-    (void)applyPatternsAndFoldGreedily(
-        funcOp, std::move(convTilingCanonicalizationPatterns));
+    populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns));
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tiling convolution filter  ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
-  }
-
-  // Lower ops that were tiled to invocations but not vectorized to loops.
-  // TODO(antiagainst): This is here now to simplify the interaction with
-  // ConvertToGPUPass, where we finally lower away all Linalg ops. Once that
-  // pass is cleaned up, we can invoke createConvertLinalgToLoopsPass
-  // directly.
-  {
-    RewritePatternSet patterns(context);
-    patterns.add<LowerToLoops<linalg::BatchMatmulOp>,
-                 LowerToLoops<linalg::ConvInputNWCFilterWCFOp>,
-                 LowerToLoops<linalg::ConvInputNHWCFilterHWCFOp>,
-                 LowerToLoops<linalg::ConvInputNDHWCFilterDHWCFOp>,
-                 LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
-                 LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
-                 LowerToLoops<linalg::FillOp>, LowerToLoops<linalg::GenericOp>,
-                 LowerToLoops<linalg::MatmulOp>,
-                 LowerToLoops<linalg::PoolingNhwcMaxOp>,
-                 LowerToLoops<linalg::PoolingNhwcMinOp>,
-                 LowerToLoops<linalg::PoolingNhwcSumOp>>(context);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 }
 
