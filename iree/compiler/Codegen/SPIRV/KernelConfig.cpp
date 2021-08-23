@@ -13,7 +13,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/SPIRV/KernelDispatchUtils.h"
+#include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -752,125 +752,6 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     }
   }
   return success();
-}
-
-template <typename OpTy>
-static Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize(OpTy op) {
-  return llvm::None;
-}
-
-template <>
-Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::ContractionOp>(
-    vector::ContractionOp op) {
-  auto targetEnvAttr = spirv::lookupTargetEnv(op);
-  auto targetEnv = spirv::TargetEnv(targetEnvAttr);
-  if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
-      targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
-    return getCooperativeMatmulSubgroupSize(
-        targetEnv.getResourceLimits(), op.getLhsType().getElementType(),
-        op.getRhsType().getElementType(),
-        op.getAccType().cast<VectorType>().getElementType(),
-        op.getResultType().cast<VectorType>().getElementType());
-  } else {
-    unsigned lastParalleldim = 0;
-    for (auto it : llvm::enumerate(op.iterator_types())) {
-      if (isParallelIterator(it.value())) lastParalleldim = it.index();
-    }
-    SmallVector<int64_t, 4> nativeSize(op.iterator_types().size(), 1);
-    nativeSize[lastParalleldim] = 4;
-    // Map to vec4 fma operations.
-    return nativeSize;
-  }
-}
-
-template <>
-Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::FMAOp>(
-    vector::FMAOp op) {
-  SmallVector<int64_t, 4> size(op.getType().getRank(), 1);
-  size.back() = 4;
-  return size;
-}
-
-template <>
-Optional<SmallVector<int64_t, 4>> getOpNativeVectorSize<vector::TransferReadOp>(
-    vector::TransferReadOp op) {
-  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
-  if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
-      targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
-    // Unroll cooperative martrix load based on the size of the contract.
-    VectorType dstVec;
-    for (Operation *users : op->getUsers()) {
-      auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-      if (!extract) return llvm::None;
-      auto vecType = extract.getResult().getType().cast<VectorType>();
-      if (dstVec && dstVec != vecType) return llvm::None;
-      dstVec = vecType;
-    }
-    return SmallVector<int64_t, 4>(dstVec.getShape().begin(),
-                                   dstVec.getShape().end());
-  }
-
-  // Map to load4.
-  auto rank = op.getVectorType().getRank();
-  SmallVector<int64_t, 4> nativeSize(rank, 1);
-  // Load 4 elements on the most inner dimension.
-  for (auto dim : llvm::enumerate(op.permutation_map().getResults())) {
-    if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
-      if (dimExpr.getPosition() == op.permutation_map().getNumDims() - 1)
-        nativeSize[dim.index()] = 4;
-    }
-  }
-  return nativeSize;
-}
-
-template <>
-Optional<SmallVector<int64_t, 4>>
-getOpNativeVectorSize<vector::TransferWriteOp>(vector::TransferWriteOp op) {
-  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
-  if (targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
-      targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
-    // Unroll cooperative martrix store based on the size of the contract.
-    auto insert = op.vector().getDefiningOp<vector::InsertStridedSliceOp>();
-    if (!insert) return llvm::None;
-    ArrayRef<int64_t> shape = insert.getSourceVectorType().getShape();
-    return SmallVector<int64_t, 4>(shape.begin(), shape.end());
-  }
-
-  // Map to store4.
-  auto rank = op.getVectorType().getRank();
-  SmallVector<int64_t, 4> nativeSize(rank, 1);
-  // Store 4 elements on the most inner dimension.
-  for (auto dim : llvm::enumerate(op.permutation_map().getResults())) {
-    if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
-      if (dimExpr.getPosition() == op.permutation_map().getNumDims() - 1)
-        nativeSize[dim.index()] = 4;
-    }
-  }
-  return nativeSize;
-}
-
-Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
-#define DISPATCH(opname)                            \
-  if (isa<opname>(op)) {                            \
-    return getOpNativeVectorSize(cast<opname>(op)); \
-  }
-
-  DISPATCH(vector::ContractionOp)
-  DISPATCH(vector::FMAOp)
-  DISPATCH(vector::TransferReadOp)
-  DISPATCH(vector::TransferWriteOp)
-
-#undef DISPATCH
-
-  if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
-    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
-      // Map elementwise ops to vec4.
-      SmallVector<int64_t, 4> nativeSize(vecType.getRank() - 1, 1);
-      nativeSize.push_back(4);
-      return nativeSize;
-    }
-  }
-  return llvm::None;
 }
 
 }  // namespace iree_compiler
