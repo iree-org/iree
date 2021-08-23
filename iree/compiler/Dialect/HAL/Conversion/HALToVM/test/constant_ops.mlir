@@ -11,8 +11,13 @@ hal.constant_pool @pool attributes {buffer_constraints = #hal.buffer_constraints
   hal.constant_storage @_storage1 = dense<[6, 7, 8, 0]> : vector<4xi8>
 }
 
-// CHECK: vm.global.ref private @pool_storage0_buffer initializer(@pool_storage0_buffer_initializer) : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref private @pool_storage0_buffer : !vm.ref<!hal.buffer>
 util.global private @pool_storage0_buffer initializer(@pool_storage0_buffer_initializer) : !hal.buffer
+// CHECK-NEXT: vm.initializer {
+// CHECK-NEXT:   %[[REF:.+]] = vm.call @pool_storage0_buffer_initializer() : () -> !vm.ref<!hal.buffer>
+// CHECK-NEXT:   vm.global.store.ref %[[REF]], @pool_storage0_buffer : !vm.ref<!hal.buffer>
+// CHECK-NEXT:   vm.return
+// CHECK-NEXT: }
 // CHECK: vm.func private @pool_storage0_buffer_initializer() -> !vm.ref<!hal.buffer>
 func private @pool_storage0_buffer_initializer() -> !hal.buffer {
   %c0 = constant 0 : index
@@ -29,11 +34,11 @@ func private @pool_storage0_buffer_initializer() -> !hal.buffer {
   return %mapped : !hal.buffer
 }
 
-// CHECK: vm.global.ref private @pool_storage1_buffer initializer(@pool_storage1_buffer_initializer) : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref private @pool_storage1_buffer : !vm.ref<!hal.buffer>
 util.global private @pool_storage1_buffer initializer(@pool_storage1_buffer_initializer) : !hal.buffer
 func private @pool_storage1_buffer_initializer() -> !hal.buffer
 
-// CHECK: vm.global.ref private @pool_splats initializer(@pool_splats_initializer) : !vm.ref<!hal.buffer>
+// CHECK: vm.global.ref private @pool_splats : !vm.ref<!hal.buffer>
 util.global private @pool_splats initializer(@pool_splats_initializer) : !hal.buffer
 // CHECK: vm.func private @pool_splats_initializer() -> !vm.ref<!hal.buffer>
 func private @pool_splats_initializer() -> !hal.buffer {
