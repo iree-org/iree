@@ -262,8 +262,8 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
 /// distribution to threads without vectorization.
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm);
 
-/// Pass pipeline to lower IREE HAL executables with not tiled/distributed
-/// Linalg ops. Performs distribution to global invocations.
+/// Pass pipeline to lower IREE HAL executables that contain Linalg ops that are
+/// not tiled/distributed. Performs distribution to global invocations.
 void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables with workgroup tiled and
