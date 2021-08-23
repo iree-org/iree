@@ -26,7 +26,7 @@ namespace iree_compiler {
 
 namespace {
 
-/// Vectorizes linalg.conv_2d_input_nhwc_filter_hwcf for a single GPU
+/// Vectorizes linalg.conv_2d_nhwc_hwcf for a single GPU
 /// invocation. Therefore, the linalg.conv op should have a very specific form;
 /// other patterns are expected to tile and distribute larger convolutions into
 /// this form for a single GPU invocation.
@@ -47,11 +47,10 @@ namespace {
 /// Output channel is requried to be a multiple of 4 so that we can process
 /// them with load4/store4, which is native to GPUs. Similarly for the input
 /// channel size requirement.
-struct VectorizeLinalgConv
-    : OpRewritePattern<linalg::ConvInputNHWCFilterHWCFOp> {
+struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::ConvInputNHWCFilterHWCFOp convOp,
+  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "inspecting " << convOp << "\n");
 
@@ -206,12 +205,12 @@ struct VectorizeLinalgConv
   }
 };
 
-/// Vectorizes linalg.depthwise_conv_2d_input_nhwc_filter_hwc for a single GPU
-/// invocation. Therefore, the linalg.depthwise_conv_2d_input_nhwc_filter_hwc op
+/// Vectorizes linalg.depthwise_conv2D_nhw for a single GPU
+/// invocation. Therefore, the linalg.depthwise_conv2D_nhw op
 /// should have a very specific form; other patterns are expected to tile and
 /// distribute larger convolutions into this form for a single GPU invocation.
 ///
-/// The linalg.depthwise_conv_2d_input_nhwc_filter_hwc op should follow:
+/// The linalg.depthwise_conv2D_nhw op should follow:
 /// - Filter: HfWfC format
 /// - Input : NHiWiC format
 /// - Output: NHoWoC format
@@ -227,12 +226,11 @@ struct VectorizeLinalgConv
 /// Channel is requried to be a multiple of 4 so that we can process them with
 /// load4/store4, which is native to GPUs.
 struct VectorizeLinalgDepthwiseConv
-    : OpRewritePattern<linalg::DepthwiseConvInputNHWCFilterHWCOp> {
+    : OpRewritePattern<linalg::DepthwiseConv2DNhwOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(
-      linalg::DepthwiseConvInputNHWCFilterHWCOp convOp,
-      PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwOp convOp,
+                                PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "inspecting " << convOp << "\n");
 
     auto inputViewOp =
