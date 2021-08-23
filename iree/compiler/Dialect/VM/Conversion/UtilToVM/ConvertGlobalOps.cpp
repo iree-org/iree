@@ -22,67 +22,103 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
   LogicalResult matchAndRewrite(
       IREE::Util::GlobalOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    Operation *newOp = nullptr;
     auto convertedType = typeConverter.convertType(op.type());
     if (convertedType.isa<IREE::VM::RefType>() ||
         IREE::VM::RefType::isCompatible(convertedType)) {
-      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
-          op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
-          op.initial_value(), llvm::to_vector<4>(op->getDialectAttrs()));
-      newOp.setVisibility(op.getVisibility());
-      return success();
+      newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
+          op, op.sym_name(), op.is_mutable(), convertedType, op.initial_value(),
+          llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(32)) {
-      auto convertedValue =
-          op.initial_value().hasValue()
-              ? rewriter.getI32IntegerAttr(static_cast<int32_t>(
-                    op.initial_value().getValue().cast<IntegerAttr>().getInt()))
-              : Attribute{};
-      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
-          op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
-          convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
-      newOp.setVisibility(op.getVisibility());
-      return success();
+      llvm::Optional<Attribute> convertedValue = llvm::None;
+      if (op.initial_value().hasValue()) {
+        convertedValue = rewriter.getI32IntegerAttr(static_cast<int32_t>(
+            op.initial_value().getValue().cast<IntegerAttr>().getInt()));
+      }
+      newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
+          op, op.sym_name(), op.is_mutable(), convertedType, convertedValue,
+          llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(64)) {
-      auto convertedValue =
-          op.initial_value().hasValue()
-              ? rewriter.getI64IntegerAttr(
-                    op.initial_value().getValue().cast<IntegerAttr>().getInt())
-              : Attribute{};
-      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
-          op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
-          convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
-      newOp.setVisibility(op.getVisibility());
-      return success();
+      llvm::Optional<Attribute> convertedValue = llvm::None;
+      if (op.initial_value().hasValue()) {
+        convertedValue = rewriter.getI64IntegerAttr(
+            op.initial_value().getValue().cast<IntegerAttr>().getInt());
+      }
+      newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
+          op, op.sym_name(), op.is_mutable(), convertedType, convertedValue,
+          llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF32()) {
-      auto convertedValue = op.initial_value().hasValue()
-                                ? rewriter.getF32FloatAttr(static_cast<float>(
-                                      op.initial_value()
-                                          .getValue()
-                                          .cast<FloatAttr>()
-                                          .getValueAsDouble()))
-                                : Attribute{};
-      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF32Op>(
-          op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
-          convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
-      newOp.setVisibility(op.getVisibility());
-      return success();
+      llvm::Optional<Attribute> convertedValue = llvm::None;
+      if (op.initial_value().hasValue()) {
+        convertedValue = rewriter.getF32FloatAttr(
+            static_cast<float>(op.initial_value()
+                                   .getValue()
+                                   .cast<FloatAttr>()
+                                   .getValueAsDouble()));
+      }
+      newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF32Op>(
+          op, op.sym_name(), op.is_mutable(), convertedType, convertedValue,
+          llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF64()) {
-      auto convertedValue =
-          op.initial_value().hasValue()
-              ? rewriter.getF64FloatAttr(op.initial_value()
-                                             .getValue()
-                                             .cast<FloatAttr>()
-                                             .getValueAsDouble())
-              : Attribute{};
-      auto newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF64Op>(
-          op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
-          convertedValue, llvm::to_vector<4>(op->getDialectAttrs()));
-      newOp.setVisibility(op.getVisibility());
-      return success();
+      llvm::Optional<Attribute> convertedValue = llvm::None;
+      if (op.initial_value().hasValue()) {
+        convertedValue = rewriter.getF64FloatAttr(
+            op.initial_value().getValue().cast<FloatAttr>().getValueAsDouble());
+      }
+      newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF64Op>(
+          op, op.sym_name(), op.is_mutable(), convertedType, convertedValue,
+          llvm::to_vector<4>(op->getDialectAttrs()));
+    } else {
+      return op.emitOpError("unsupported global type");
     }
-    return op.emitOpError("unsupported global type");
+
+    // New global carries the same visibility as the original.
+    cast<SymbolOpInterface>(newOp).setVisibility(op.getVisibility());
+
+    // If there was an initializer function specified we turn that into a
+    // vm.initializer now.
+    if (op.initializer()) {
+      auto initializerOp =
+          rewriter.create<IREE::VM::InitializerOp>(op.getLoc());
+      auto ip = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPointToStart(initializerOp.addEntryBlock());
+      SmallVector<Type> resultTypes;
+      resultTypes.push_back(convertedType);
+      auto callOp = rewriter.create<IREE::VM::CallOp>(
+          op.getLoc(), op.initializer().getValue(), resultTypes,
+          /*operands=*/ValueRange{});
+      storeToGlobal(callOp.getResult(0), newOp, rewriter);
+      rewriter.create<IREE::VM::ReturnOp>(op.getLoc());
+      rewriter.restoreInsertionPoint(ip);
+    }
+
+    return success();
   }
 
  private:
+  void storeToGlobal(Value value, Operation *globalOp,
+                     ConversionPatternRewriter &rewriter) const {
+    auto globalName = cast<SymbolOpInterface>(globalOp).getName();
+    if (value.getType().isa<IREE::VM::RefType>()) {
+      rewriter.create<IREE::VM::GlobalStoreRefOp>(globalOp->getLoc(), value,
+                                                  globalName);
+    } else if (value.getType().isInteger(32)) {
+      rewriter.create<IREE::VM::GlobalStoreI32Op>(globalOp->getLoc(), value,
+                                                  globalName);
+    } else if (value.getType().isInteger(64)) {
+      rewriter.create<IREE::VM::GlobalStoreI64Op>(globalOp->getLoc(), value,
+                                                  globalName);
+    } else if (value.getType().isF32()) {
+      rewriter.create<IREE::VM::GlobalStoreF32Op>(globalOp->getLoc(), value,
+                                                  globalName);
+    } else if (value.getType().isF64()) {
+      rewriter.create<IREE::VM::GlobalStoreF64Op>(globalOp->getLoc(), value,
+                                                  globalName);
+    } else {
+      llvm_unreachable("unhandled vm type");
+    }
+  }
+
   TypeConverter &typeConverter;
 };
 

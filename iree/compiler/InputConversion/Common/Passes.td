@@ -15,4 +15,10 @@ def TopLevelSCFToCFG :
   let constructor = "mlir::iree_compiler::createTopLevelSCFToCFGPass()";
 }
 
+def IREEImportPublic :
+    Pass<"iree-import-public", "ModuleOp"> {
+  let summary = "Imports IREE public dialect to internal implementation.";
+  let constructor = "mlir::iree_compiler::createIREEImportPublicPass()";
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES

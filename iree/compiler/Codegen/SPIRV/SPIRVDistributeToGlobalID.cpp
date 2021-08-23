@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- SPIRVConvertToGPUPass.cpp ------------------------------------------===//
+//===- SPIRVDistributeToGlobalIDPass.cpp ----------------------------------===//
 //
-// Partition computation within dispatch function to workgroups/workitems.
+// This pass distributes Linalg ops with buffer semantics to global invocations.
 //
 //===----------------------------------------------------------------------===//
 
@@ -15,7 +15,6 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -121,8 +120,8 @@ static LogicalResult distributeSingleIterationPerProcessor(
 
 namespace {
 /// Pass to convert from tiled and fused linalg ops into gpu.func.
-struct SPIRVConvertToGPUPass
-    : public SPIRVConvertToGPUBase<SPIRVConvertToGPUPass> {
+struct SPIRVDistributeToGlobalIDPass
+    : public SPIRVDistributeToGlobalIDBase<SPIRVDistributeToGlobalIDPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect, memref::MemRefDialect,
                     scf::SCFDialect, ShapeDialect>();
@@ -186,9 +185,10 @@ struct MapLinalgOpToGlobalInvocationId
 
 }  // namespace
 
-void SPIRVConvertToGPUPass::runOnOperation() {
+void SPIRVDistributeToGlobalIDPass::runOnOperation() {
   FuncOp funcOp = getOperation();
   if (!isEntryPoint(funcOp)) return;
+
   MLIRContext *context = &getContext();
   ConversionTarget target(*context);
   // After this pass Linalg and scf.parallel ops should be gone.
@@ -217,8 +217,8 @@ void SPIRVConvertToGPUPass::runOnOperation() {
     return signalPassFailure();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVConvertToGPUPass() {
-  return std::make_unique<SPIRVConvertToGPUPass>();
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVDistributeToGlobalIDPass() {
+  return std::make_unique<SPIRVDistributeToGlobalIDPass>();
 }
 
 }  // namespace iree_compiler

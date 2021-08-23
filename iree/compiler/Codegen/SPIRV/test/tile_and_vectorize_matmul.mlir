@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
 #config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
 

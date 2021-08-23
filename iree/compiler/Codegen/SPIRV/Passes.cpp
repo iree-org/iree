@@ -4,9 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- Passes.cpp - Pipeline from HLO to Linalg to SPIR-V -----------------===//
+//===- Passes.cpp - Pipelines from Linalg ops to SPIR-V -------------------===//
 //
-// Implementation of conversion from XLA-HLO to Linalg to SPIR-V dialect.
+// This file contains various pipelines to lower IREE HAL executables containing
+// Linalg ops to SPIR-V.
 //
 //===----------------------------------------------------------------------===//
 
@@ -57,74 +58,51 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
 }
 
-void addSPIRVVectorizationPassPipeline(OpPassManager &pm) {
-  //===--------------------------------------------------------------------===//
-  // Initial clean up.
-  //===--------------------------------------------------------------------===//
+void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
   pm.addNestedPass<FuncOp>(createSPIRVRemoveOneTripTiledLoopPass());
   //  Tile and distribute to GPU subgroups/invocations and vectorize.
-  pm.addNestedPass<FuncOp>(createSPIRVTileAndVectorizePass());
+  pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
   pm.addPass(createCanonicalizerPass());
 
-  // Handle ops that cannot go through the previous tiling, distribution, and
-  // vectorization flow. Only perform one level of distribution to map them to
-  // GPU global invocation IDs for distribution.
-  // TODO(antiagainst): Handle all the cases uniformly and remove this pass.
   pm.addNestedPass<FuncOp>(createSPIRVCopyToWorkgroupMemoryPass());
+  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-
-  //===--------------------------------------------------------------------===//
-  // Optimizations and cleanups
-  //===--------------------------------------------------------------------===//
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
   pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
 
-void addSPIRVDistributePassPipeline(OpPassManager &pm) {
-  //===--------------------------------------------------------------------===//
-  // Initial clean up.
-  //===--------------------------------------------------------------------===//
+void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  // Tile and distribute to GPU subgroups/invocations and vectorize.
+
+  // Tile and distribute to GPU subgroups/invocations.
   pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
   pm.addPass(createCanonicalizerPass());
 
-  // Handle ops that cannot go through the previous tiling, distribution, and
-  // vectorization flow. Only perform one level of distribution to map them to
-  // GPU global invocation IDs for distribution.
-  // TODO(antiagainst): Handle all the cases uniformly and remove this pass.
   pm.addNestedPass<FuncOp>(createSPIRVCopyToWorkgroupMemoryPass());
+  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  //===--------------------------------------------------------------------===//
-  // Optimizations and cleanups
-  //===--------------------------------------------------------------------===//
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
   pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
 
-void addSPIRVDistributeToGlobalIDPipeline(OpPassManager &pm) {
-  // Handle ops that cannot go through the previous tiling, distribution, and
-  // vectorization flow. Only perform one level of distribution to map them to
-  // GPU global invocation IDs for distribution.
-  // TODO(antiagainst): Handle all the cases uniformly and remove this pass.
-  pm.addNestedPass<FuncOp>(createSPIRVConvertToGPUPass());
+void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createSPIRVDistributeToGlobalIDPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  //===--------------------------------------------------------------------===//
-  // Optimizations and cleanups
-  //===--------------------------------------------------------------------===//
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
@@ -158,10 +136,6 @@ static void addLowerToSPIRVPasses(OpPassManager &pm) {
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-
-  //===--------------------------------------------------------------------===//
-  // SPIR-V conversions
-  //===--------------------------------------------------------------------===//
 
   // Finally convert everything to SPIR-V.
   pm.addPass(createConvertToSPIRVPass());

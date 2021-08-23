@@ -14,8 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "convert_to_gpu.mlir"
     "convert_to_spirv.mlir"
+    "distribute_to_global_id.mlir"
     "fold_gpu_procid_uses.mlir"
     "pipeline_matmul_cooperative_matrix.mlir"
     "pipeline_matmul_vectorization.mlir"

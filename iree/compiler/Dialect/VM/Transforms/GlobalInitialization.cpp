@@ -13,6 +13,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Transforms/Utils.h"
 
 namespace mlir {
@@ -31,7 +32,6 @@ namespace VM {
 // point in the lowering though we cannot know that so we rely on dialects
 // providing their own initialization functions for those cases.
 //
-// TODO(benvanik): add initializer functions to make dialect init possible.
 // TODO(benvanik): combine i32 initializers to store more efficiently.
 class GlobalInitializationPass
     : public PassWrapper<GlobalInitializationPass, OperationPass<ModuleOp>> {
@@ -53,6 +53,7 @@ class GlobalInitializationPass
         moduleBuilder.create<FuncOp>(moduleBuilder.getUnknownLoc(), "__init",
                                      moduleBuilder.getFunctionType({}, {}));
     OpBuilder initBuilder = OpBuilder::atBlockEnd(initFuncOp.addEntryBlock());
+
     auto deinitFuncOp =
         moduleBuilder.create<FuncOp>(moduleBuilder.getUnknownLoc(), "__deinit",
                                      moduleBuilder.getFunctionType({}, {}));
@@ -64,6 +65,8 @@ class GlobalInitializationPass
     // module op order). If we ever want to make this more deterministic we
     // could gather the ops, sort them (by some rule), and then build the
     // initialization function.
+    InlinerInterface inlinerInterface(&getContext());
+    SmallVector<Operation *> deadOps;
     for (auto &op : getOperation().getBlock().getOperations()) {
       if (auto globalOp = dyn_cast<GlobalRefOp>(op)) {
         if (failed(appendRefInitialization(globalOp, initBuilder))) {
@@ -75,8 +78,21 @@ class GlobalInitializationPass
           globalOp.emitOpError() << "unable to be initialized";
           return signalPassFailure();
         }
+      } else if (auto initializerOp = dyn_cast<InitializerOp>(op)) {
+        if (failed(appendInitializer(initializerOp, inlinerInterface,
+                                     initBuilder))) {
+          initializerOp.emitOpError() << "unable to be initialized";
+          return signalPassFailure();
+        }
+        deadOps.push_back(initializerOp);
       }
     }
+    for (auto deadOp : deadOps) {
+      deadOp->erase();
+    }
+
+    // Correct mutability of all globals.
+    fixupGlobalMutability(getOperation());
 
     initBuilder.create<ReturnOp>(initBuilder.getUnknownLoc());
     deinitBuilder.create<ReturnOp>(deinitBuilder.getUnknownLoc());
@@ -112,12 +128,6 @@ class GlobalInitializationPass
                << "unable to create initializer constant for global";
       }
       globalOp.clearInitialValue();
-    } else if (globalOp.getInitializerAttr().hasValue()) {
-      auto callOp = builder.create<CallOp>(
-          globalOp.getLoc(), globalOp.getInitializerAttr().getValue(),
-          ArrayRef<Type>{globalOp.getStorageType()}, ArrayRef<Value>{});
-      value = callOp.getResult(0);
-      globalOp.clearInitializer();
     }
     if (!value) {
       // Globals are zero-initialized by default so we can just strip the
@@ -195,16 +205,89 @@ class GlobalInitializationPass
 
   LogicalResult appendRefInitialization(GlobalRefOp globalOp,
                                         OpBuilder &builder) {
-    if (globalOp.initializer().hasValue()) {
-      auto callOp = builder.create<CallOp>(
-          globalOp.getLoc(), globalOp.initializerAttr(),
-          ArrayRef<Type>{globalOp.type()}, ArrayRef<Value>{});
-      builder.create<GlobalStoreRefOp>(globalOp.getLoc(), callOp.getResult(0),
-                                       globalOp.sym_name());
-      globalOp.clearInitializer();
-      globalOp.makeMutable();
-    }
+    // NOTE: nothing yet, though if we had attribute initialization we'd do it
+    // here (for example, #vm.magic.initial.ref<foo>).
     return success();
+  }
+
+  LogicalResult appendInitializer(InitializerOp initializerOp,
+                                  InlinerInterface &inlinerInterface,
+                                  OpBuilder &builder) {
+    // mlir::inlineRegion takes the op to inline _after_, which as we are
+    // building things doesn't exist yet. To work around this we create a dummy
+    // op, inline after it, and then delete it.
+    auto dummyOp =
+        builder.create<IREE::VM::ConstI32ZeroOp>(builder.getUnknownLoc());
+    auto result = mlir::inlineRegion(
+        inlinerInterface, &initializerOp.body(), dummyOp,
+        /*inlinedOperands=*/ValueRange{},
+        /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/llvm::None,
+        /*shouldCloneInlinedRegion=*/false);
+    builder.setInsertionPointToEnd(dummyOp->getBlock());
+    dummyOp.erase();
+    return result;
+  }
+
+  void fixupGlobalMutability(Operation *moduleOp) {
+    SymbolTable symbolTable(moduleOp);
+    SmallVector<Operation *> deadOps;
+    for (auto &op : moduleOp->getRegion(0).front()) {
+      auto globalOp = dyn_cast<IREE::VM::VMGlobalOp>(op);
+      if (!globalOp) continue;
+      if (!cast<SymbolOpInterface>(op).isPrivate()) {
+        // May be used outside the module; treat as used and mutable.
+        globalOp.makeMutable();
+        continue;
+      }
+      auto uses = symbolTable.getSymbolUses(globalOp, moduleOp);
+      if (!uses.hasValue()) {
+        // No uses - erase the global entirely.
+        deadOps.push_back(globalOp);
+        continue;
+      }
+      bool isIndirect = false;
+      bool isLoaded = false;
+      bool isStored = false;
+      for (auto use : uses.getValue()) {
+        if (isa<IREE::VM::GlobalAddressOp>(use.getUser())) {
+          // Can't analyze indirect variables; assume mutated.
+          isLoaded = true;
+          isStored = true;
+          isIndirect = true;
+          break;
+        } else if (isGlobalLoadOp(use.getUser())) {
+          isLoaded = true;
+        } else if (isGlobalStoreOp(use.getUser())) {
+          isStored = true;
+        }
+      }
+      // NOTE: we could erase globals never loaded if we know that computing
+      // their value has no side effects.
+      if (isStored) {
+        globalOp.makeMutable();
+      }
+    }
+    for (auto *deadOp : deadOps) {
+      deadOp->erase();
+    }
+  }
+
+  bool isGlobalLoadOp(Operation *op) const {
+    // TODO(benvanik): trait/interface to make this more generic?
+    return isa<IREE::VM::GlobalLoadI32Op>(op) ||
+           isa<IREE::VM::GlobalLoadI64Op>(op) ||
+           isa<IREE::VM::GlobalLoadF32Op>(op) ||
+           isa<IREE::VM::GlobalLoadF64Op>(op) ||
+           isa<IREE::VM::GlobalLoadRefOp>(op);
+  }
+
+  bool isGlobalStoreOp(Operation *op) const {
+    // TODO(benvanik): trait/interface to make this more generic?
+    return isa<IREE::VM::GlobalStoreI32Op>(op) ||
+           isa<IREE::VM::GlobalStoreI64Op>(op) ||
+           isa<IREE::VM::GlobalStoreF32Op>(op) ||
+           isa<IREE::VM::GlobalStoreF64Op>(op) ||
+           isa<IREE::VM::GlobalStoreRefOp>(op);
   }
 };
 
