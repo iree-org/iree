@@ -95,7 +95,7 @@ def IREE_PtrType : IREE_Type<"Ptr"> {
   let parameters = (ins IREE_PtrTargetTypeParameter:$targetType);
 
   let printer = [{
-    $_printer << "list<" << getTargetType() << ">";
+    $_printer << "ptr<" << getTargetType() << ">";
   }];
 
   let parser = [{

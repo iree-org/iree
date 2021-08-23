@@ -30,7 +30,7 @@ def IREE_NullOp : IREE_PureOp<"null"> {
 // Casts
 //===----------------------------------------------------------------------===//
 
-def IREE_TensorToBufferView : IREE_PureOp<"cast.tensor_to_buffer_view"> {
+def IREE_TensorToBufferViewOp : IREE_PureOp<"cast.tensor_to_buffer_view"> {
   let summary = "Casts a tensor to a BufferView, capturing dynamic dims";
   let arguments = (ins
     IREE_Tensor:$source,
@@ -44,7 +44,7 @@ def IREE_TensorToBufferView : IREE_PureOp<"cast.tensor_to_buffer_view"> {
   }];
 }
 
-def IREE_BufferViewToTensor : IREE_PureOp<"cast.buffer_view_to_tensor"> {
+def IREE_BufferViewToTensorOp : IREE_PureOp<"cast.buffer_view_to_tensor"> {
   let summary = "Casts a BufferView to a tensor, providing dynamic dims";
   let arguments = (ins
     IREE_BufferViewType:$source,
@@ -81,15 +81,14 @@ def IREE_GlobalOp : IREE_Op<"global", [
     OptionalAttr<AnyAttr>:$initial_value
   );
 
-  // TODO(laurenzo): copy SymbolVisibility/TypeOrAttr from UtilOps.cpp.
-  // let assemblyFormat = [{
-  //   custom<SymbolVisibility>($sym_visibility)
-  //   (`mutable` $is_mutable^)?
-  //   $sym_name
-  //   attr-dict
-  //   (`initializer` `(` $initializer^ `)`):(``)?
-  //   custom<TypeOrAttr>($type, $initial_value)
-  // }];
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    (`mutable` $is_mutable^)?
+    $sym_name
+    attr-dict
+    (`initializer` `(` $initializer^ `)`):(``)?
+    custom<TypeOrAttr>($type, $initial_value)
+  }];
 }
 
 def IREE_GlobalAddressOp : IREE_PureOp<"global.address"> {
@@ -485,8 +484,7 @@ def IREE_TensorUpdateOp : IREE_PureOp<"tensor.update", [
     IREE_ShapeDynamicDims:$target_dims,
     Variadic<IREE_Dim>:$start_indices,
     IREE_Tensor:$update,
-    IREE_ShapeDynamicDims:$update_dims,
-    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
+    IREE_ShapeDynamicDims:$update_dims
   );
   let results = (outs
     IREE_Tensor:$result
@@ -495,7 +493,7 @@ def IREE_TensorUpdateOp : IREE_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    `(` type($result) `,` $target_dims `,` $tied_operands `)`
+    type($result) (`{` $target_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
@@ -521,7 +519,7 @@ def IREE_TensorTraceOp : IREE_Op<"tensor.trace", []> {
     Variadic<IREE_Tensor>:$operands
   );
 
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = "$key attr-dict ($operands^ `:` type($operands))?";
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_OPS_TD
