@@ -12,7 +12,6 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/KernelDispatchUtils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -21,7 +20,9 @@
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -31,6 +32,103 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+/// Returns the cooperative matrix (M, N, K) sizes that are supported by the
+/// target environment and match the given parameters.
+static Optional<SmallVector<int64_t, 4>> getCooperativeMatmulSubgroupSize(
+    spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
+    Type initType, Type resultType) {
+  auto range = resourceLimits.cooperative_matrix_properties_nv()
+                   .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  for (auto coopMatmulProperties : range) {
+    if (coopMatmulProperties.a_type().getValue() == lhsType &&
+        coopMatmulProperties.b_type().getValue() == rhsType &&
+        coopMatmulProperties.c_type().getValue() == initType &&
+        coopMatmulProperties.result_type().getValue() == resultType &&
+        coopMatmulProperties.scope().getValue() == spirv::Scope::Subgroup) {
+      return SmallVector<int64_t, 4>{
+          coopMatmulProperties.m_size().getValue().getSExtValue(),
+          coopMatmulProperties.n_size().getValue().getSExtValue(),
+          coopMatmulProperties.k_size().getValue().getSExtValue()};
+    }
+  }
+  return llvm::None;
+}
+
+/// Returns true if the target environment attached to `op`'s ancestor op
+/// supports cooperative matrix.
+bool useCooperativeMatrix(Operation *op) {
+  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+  return targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
+         targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix);
+}
+
+Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
+  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+  bool useCoopMatrix = useCooperativeMatrix(op);
+
+  if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
+    if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
+      // Use 4-element vectors for elementwise ops.
+      SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
+      nativeSize.back() = 4;
+      return nativeSize;
+    }
+  } else if (auto vtOp = dyn_cast<VectorTransferOpInterface>(op)) {
+    if (useCoopMatrix) {
+      if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+        // Unroll cooperative martrix store based on the size of the contract.
+        auto insert =
+            writeOp.vector().getDefiningOp<vector::InsertStridedSliceOp>();
+        if (!insert) return llvm::None;
+        ArrayRef<int64_t> shape = insert.getSourceVectorType().getShape();
+        return SmallVector<int64_t, 4>(shape.begin(), shape.end());
+      } else if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
+        // Unroll cooperative martrix load based on the size of the contract.
+        VectorType dstVec;
+        for (Operation *users : op->getUsers()) {
+          auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
+          if (!extract) return llvm::None;
+          auto vecType = extract.getResult().getType().cast<VectorType>();
+          if (dstVec && dstVec != vecType) return llvm::None;
+          dstVec = vecType;
+        }
+        return SmallVector<int64_t, 4>(dstVec.getShape().begin(),
+                                       dstVec.getShape().end());
+      }
+    } else {
+      auto rank = vtOp.getVectorType().getRank();
+      SmallVector<int64_t, 4> nativeSize(rank, 1);
+      for (auto dim : llvm::enumerate(vtOp.permutation_map().getResults())) {
+        if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
+          if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1)
+            nativeSize[dim.index()] = 4;
+        }
+      }
+      return nativeSize;
+    }
+  } else if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
+    if (useCoopMatrix) {
+      return getCooperativeMatmulSubgroupSize(
+          targetEnv.getResourceLimits(),
+          contractOp.getLhsType().getElementType(),
+          contractOp.getRhsType().getElementType(),
+          contractOp.getAccType().cast<VectorType>().getElementType(),
+          contractOp.getResultType().cast<VectorType>().getElementType());
+    } else {
+      unsigned lastParalleldim = 0;
+      for (auto it : llvm::enumerate(contractOp.iterator_types())) {
+        if (isParallelIterator(it.value())) lastParalleldim = it.index();
+      }
+      SmallVector<int64_t, 4> nativeSize(contractOp.iterator_types().size(), 1);
+      nativeSize[lastParalleldim] = 4;
+      // Map to vec4 fma operations.
+      return nativeSize;
+    }
+  }
+  return llvm::None;
+}
+
+/// Add patterns to vectorize Linalg ops with vectorization marker.
 void populateVectorizationPatterns(MLIRContext *context,
                                    RewritePatternSet &patterns) {
   linalg::insertVectorizationPatterns<linalg::FillOp, linalg::GenericOp,
@@ -40,6 +138,7 @@ void populateVectorizationPatterns(MLIRContext *context,
           Identifier::get(getVectorizeMarker(), context)));
 }
 
+/// Adds patterns to unroll vector ops to SPIR-V native vector size.
 void populateVectorUnrollPatterns(MLIRContext *context,
                                   RewritePatternSet &patterns) {
   vector::populateVectorUnrollPatterns(
@@ -139,11 +238,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
         op->replaceAllUsesWith(contract);
     });
 
-    auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(funcOp));
-    bool useCooperativeMatrix =
-        targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
-        targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix);
-
     {
       RewritePatternSet vectorUnrollPatterns(funcOp.getContext());
       populateVectorUnrollPatterns(funcOp.getContext(), vectorUnrollPatterns);
@@ -168,7 +262,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns));
 
-      if (useCooperativeMatrix) {
+      if (useCooperativeMatrix(funcOp)) {
         // When using cooperative matrix we don't want to lower the contract,
         // instead we want to merge contract and transpose so that they can be
         // converted to cooperative matrix matmul op.

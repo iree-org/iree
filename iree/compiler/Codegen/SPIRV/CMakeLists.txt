@@ -14,12 +14,12 @@ iree_cc_library(
   NAME
     SPIRV
   HDRS
-    "KernelDispatchUtils.h"
+    "KernelConfig.h"
     "MemorySpace.h"
     "Utils.h"
   SRCS
     "ConvertToSPIRVPass.cpp"
-    "KernelDispatchUtils.cpp"
+    "KernelConfig.cpp"
     "Passes.cpp"
     "SPIRVCopyToWorkgroupMemory.cpp"
     "SPIRVDistributeToGlobalID.cpp"
@@ -61,6 +61,7 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransforms
     MLIRVector
+    MLIRVectorInterfaces
     MLIRVectorToSPIRV
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::PassHeaders

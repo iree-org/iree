@@ -14,7 +14,7 @@ cc_library(
     name = "SPIRV",
     srcs = [
         "ConvertToSPIRVPass.cpp",
-        "KernelDispatchUtils.cpp",
+        "KernelConfig.cpp",
         "Passes.cpp",
         "SPIRVCopyToWorkgroupMemory.cpp",
         "SPIRVDistributeToGlobalID.cpp",
@@ -28,7 +28,7 @@ cc_library(
         "Utils.cpp",
     ],
     hdrs = [
-        "KernelDispatchUtils.h",
+        "KernelConfig.h",
         "MemorySpace.h",
         "Utils.h",
     ],
@@ -74,6 +74,7 @@ cc_library(
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToStandard",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorInterfaces",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToSPIRV",
         "@mlir-hlo//:hlo",
