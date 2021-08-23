@@ -449,8 +449,8 @@ LogicalResult setRootConfig(FuncOp entryPoint,
       IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute, workgroupSize);
 }
 
-static LogicalResult setMaliSpecificConfig(
-    FuncOp entryFn, linalg::ConvInputNHWCFilterHWCFOp op) {
+static LogicalResult setMaliSpecificConfig(FuncOp entryFn,
+                                           linalg::Conv2DNhwcHwcfOp op) {
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape =
       getUntiledResultShape(cast<linalg::LinalgOp>(op.getOperation()), 0);
@@ -532,7 +532,7 @@ static LogicalResult setMaliSpecificConfig(
 
 LogicalResult setRootConfig(FuncOp entryPoint,
                             const spirv::TargetEnv &targetEnv,
-                            linalg::ConvInputNHWCFilterHWCFOp op) {
+                            linalg::Conv2DNhwcHwcfOp op) {
   if (targetEnv.getVendorID() == spirv::Vendor::ARM &&
       succeeded(setMaliSpecificConfig(entryPoint, op))) {
     return success();
@@ -540,8 +540,8 @@ LogicalResult setRootConfig(FuncOp entryPoint,
   return setDefaultRootConfig(entryPoint, targetEnv, op);
 }
 
-static LogicalResult setMaliSpecificConfig(
-    FuncOp entryFn, linalg::DepthwiseConvInputNHWCFilterHWCOp op) {
+static LogicalResult setMaliSpecificConfig(FuncOp entryFn,
+                                           linalg::DepthwiseConv2DNhwOp op) {
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape =
       getUntiledResultShape(cast<linalg::LinalgOp>(op.getOperation()), 0);
@@ -618,9 +618,9 @@ static LogicalResult setMaliSpecificConfig(
   return failure();
 }
 
-static LogicalResult setRootConfig(
-    FuncOp entryPoint, const spirv::TargetEnv &targetEnv,
-    linalg::DepthwiseConvInputNHWCFilterHWCOp op) {
+static LogicalResult setRootConfig(FuncOp entryPoint,
+                                   const spirv::TargetEnv &targetEnv,
+                                   linalg::DepthwiseConv2DNhwOp op) {
   if (targetEnv.getVendorID() == spirv::Vendor::ARM &&
       succeeded(setMaliSpecificConfig(entryPoint, op))) {
     return success();
@@ -703,9 +703,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     for (Operation *computeOp : computeOps) {
       auto setConfigFn = [&](Operation *rootOp) -> LogicalResult {
         return TypeSwitch<Operation *, LogicalResult>(rootOp)
-            .Case<linalg::BatchMatmulOp,
-                  linalg::DepthwiseConvInputNHWCFilterHWCOp,
-                  linalg::ConvInputNHWCFilterHWCFOp, linalg::MatmulOp>(
+            .Case<linalg::BatchMatmulOp, linalg::DepthwiseConv2DNhwOp,
+                  linalg::Conv2DNhwcHwcfOp, linalg::MatmulOp>(
                 [&](auto op) { return setRootConfig(funcOp, targetEnv, op); })
             .Default([&](Operation *) { return success(); });
       };

@@ -39,7 +39,7 @@ func @operand_fusion() {
   %init = linalg.init_tensor [1, 112, 112, 16] : tensor<1x112x112x16xf32>
   %cst = constant 0.0 : f32
   %fill = linalg.fill(%cst, %init) : f32, tensor<1x112x112x16xf32> -> tensor<1x112x112x16xf32>
-  %conv = linalg.conv_2d_input_nhwc_filter_hwcf
+  %conv = linalg.conv_2d_nhwc_hwcf
       {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
       ins(%input, %filter : tensor<1x225x225x3xf32>, tensor<3x3x3x16xf32>)
       outs(%fill : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>

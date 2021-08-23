@@ -47,7 +47,7 @@ hal.executable @static_shaped_conv attributes {sym_visibility = "private"} {
               %17 = affine.min affine_map<(d0) -> (4, -d0 + 112)>(%arg1)
               %18 = memref.subview %2[0, %arg0, %arg1, %arg2] [1, %16, %17, %14] [1, 1, 1, 1] : memref<1x112x112x32xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
               linalg.fill(%cst, %18) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
-              linalg.conv_2d_input_nhwc_filter_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}, strides = dense<2> : tensor<2xi64>}
+              linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}, strides = dense<2> : tensor<2xi64>}
                 ins(%13, %15 : memref<1x?x?x3xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 151875 + s0 + d1 * 675 + d2 * 3 + d3)>>, memref<3x3x3x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 288 + s0 + d1 * 96 + d2 * 32 + d3)>>)
                 outs(%18 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>)
             }
@@ -82,5 +82,5 @@ hal.executable @static_shaped_conv attributes {sym_visibility = "private"} {
 //   CHECK-DAG: %[[SIZE_X:.+]] = affine.min #[[MAP2]](%[[OFFSET_X]])
 //       CHECK: %[[OUTPUT:.+]] = memref.subview %{{.+}}[0, %[[OFFSET_Z]], %[[OFFSET_Y]], %[[OFFSET_X]]] [1, %[[SIZE_Z]], %[[SIZE_Y]], %[[SIZE_X]]]
 //       CHECK: linalg.fill(%{{.+}}, %[[OUTPUT]])
-//       CHECK: linalg.conv_2d_input_nhwc_filter_hwcf
+//       CHECK: linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:   outs(%[[OUTPUT]]

@@ -202,8 +202,8 @@ class SPIRVRemoveOneTripTiledLoopPass
     if (failed(getFilteredOps(
             funcOp,
             [](Operation *op) {
-              return isa<linalg::DepthwiseConvInputNHWCFilterHWCOp,
-                         linalg::ConvInputNHWCFilterHWCFOp>(op);
+              return isa<linalg::DepthwiseConv2DNhwOp,
+                         linalg::Conv2DNhwcHwcfOp>(op);
             },
             rootOp, tiledLoops))) {
       return;

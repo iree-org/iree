@@ -201,25 +201,23 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  patterns.insert<
-      linalg::LinalgTilingPattern<linalg::MatmulOp>,
-      linalg::LinalgTilingPattern<linalg::FillOp>,
-      linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-      linalg::LinalgTilingPattern<linalg::ConvInputNWCFilterWCFOp>,
-      linalg::LinalgTilingPattern<linalg::ConvInputNDHWCFilterDHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::GenericOp>,
-      linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
-      linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
-      linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
+  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::FillOp>,
+                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::Conv1DNwcWcfOp>,
+                  linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
+                  linalg::LinalgTilingPattern<linalg::GenericOp>,
+                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
+                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
+                  linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
           getVectorizeMarker(), context));
 
-  patterns.insert<
-      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
+  patterns.insert<linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(
           {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
@@ -270,10 +268,9 @@ static void populateTilingConvFilterPatterns(
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getTileSizeFn);
 
-  patterns.insert<
-      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>>(
+  patterns.insert<linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>>(
       context, tilingOptions, marker);
 }
 
@@ -378,11 +375,11 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     patterns.add<LowerToLoops<linalg::BatchMatmulOp>,
-                 LowerToLoops<linalg::ConvInputNWCFilterWCFOp>,
-                 LowerToLoops<linalg::ConvInputNHWCFilterHWCFOp>,
-                 LowerToLoops<linalg::ConvInputNDHWCFilterDHWCFOp>,
-                 LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
-                 LowerToLoops<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
+                 LowerToLoops<linalg::Conv1DNwcWcfOp>,
+                 LowerToLoops<linalg::Conv2DNhwcHwcfOp>,
+                 LowerToLoops<linalg::Conv3DNdhwcDhwcfOp>,
+                 LowerToLoops<linalg::DepthwiseConv2DNhwOp>,
+                 LowerToLoops<linalg::DepthwiseConv2DNhwcOp>,
                  LowerToLoops<linalg::FillOp>, LowerToLoops<linalg::GenericOp>,
                  LowerToLoops<linalg::MatmulOp>,
                  LowerToLoops<linalg::PoolingNhwcMaxOp>,
