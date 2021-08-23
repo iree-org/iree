@@ -279,7 +279,7 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
 /// Pass to distribute Linalg ops with buffer semantics to global invocations.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVConvertToGPUPass();
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVDistributeToGlobalIDPass();
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
