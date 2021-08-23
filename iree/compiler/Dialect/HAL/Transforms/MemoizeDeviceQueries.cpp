@@ -78,10 +78,14 @@ class MemoizeDeviceQueriesPass
       // variable.
       std::string variableName =
           "_device_query_" + std::to_string(queryKey.index());
-      auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
+      auto valueGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           fusedLoc, variableName,
           /*isMutable=*/false, queryType);
-      globalOp.setPrivate();
+      valueGlobalOp.setPrivate();
+      auto okGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
+          fusedLoc, variableName + "_ok",
+          /*isMutable=*/false, moduleBuilder.getI1Type());
+      okGlobalOp.setPrivate();
 
       auto initializerOp =
           moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
@@ -92,18 +96,21 @@ class MemoizeDeviceQueriesPass
           fusedLoc, funcBuilder.getI1Type(), queryType, device,
           anyQueryOp.categoryAttr(), anyQueryOp.keyAttr(),
           anyQueryOp.default_valueAttr());
+      funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.ok(),
+                                                    okGlobalOp.getName());
       funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.value(),
-                                                    globalOp.getName());
+                                                    valueGlobalOp.getName());
       funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);
 
       for (auto queryOp : queryOps) {
         OpBuilder replaceBuilder(queryOp);
-        auto loadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
-            fusedLoc, queryType, globalOp.getName());
+        auto okLoadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
+            fusedLoc, okGlobalOp.type(), okGlobalOp.getName());
+        auto resultLoadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
+            fusedLoc, valueGlobalOp.type(), valueGlobalOp.getName());
         queryOp.replaceAllUsesWith(ValueRange{
-            replaceBuilder.createOrFold<ConstantIntOp>(
-                loadOp.getLoc(), /*value=*/1, /*width=*/1),
-            loadOp.result(),
+            okLoadOp.result(),
+            resultLoadOp.result(),
         });
         queryOp.erase();
       }
