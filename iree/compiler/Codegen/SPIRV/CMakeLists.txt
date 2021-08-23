@@ -61,6 +61,7 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransforms
     MLIRVector
+    MLIRVectorInterfaces
     MLIRVectorToSPIRV
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::PassHeaders
