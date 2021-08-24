@@ -67,3 +67,34 @@ vm.module @import_funcs {
   // CHECK-NEXT: vm.import @my.fn_varargs(%foo : vector<3xi32> ..., %bar : tuple<i32, i32> ...) -> i32
   vm.import @my.fn_varargs(%foo : vector<3xi32> ..., %bar : tuple<i32, i32> ...) -> i32
 }
+
+// -----
+
+// CHECK-LABEL: @initializers
+vm.module @initializers {
+  // CHECK-NEXT: vm.initializer {
+  // CHECK-NEXT:   vm.return
+  // CHECK-NEXT: }
+  vm.initializer {
+    vm.return
+  }
+
+  // CHECK-NEXT: vm.initializer attributes {foo} {
+  // CHECK-NEXT:   vm.return
+  // CHECK-NEXT: }
+  vm.initializer attributes {foo} {
+    vm.return
+  }
+
+  // CHECK-NEXT: vm.initializer {
+  vm.initializer {
+    // CHECK-NEXT: %zero = vm.const.i32 0 : i32
+    %zero = vm.const.i32 0 : i32
+    // CHECK-NEXT:   vm.br ^bb1(%zero : i32)
+    vm.br ^bb1(%zero: i32)
+    // CHECK-NEXT: ^bb1(%0: i32):
+  ^bb1(%0: i32):
+    // CHECK-NEXT:   vm.return
+    vm.return
+  }
+}

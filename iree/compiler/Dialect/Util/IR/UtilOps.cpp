@@ -90,12 +90,15 @@ ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
 
 void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
                      Attribute attr) {
+  bool needsSpace = false;
   if (!attr || attr.getType() != type.getValue()) {
-    p << " : ";
+    p << ": ";
     p.printAttribute(type);
+    needsSpace = true;  // subsequent attr value needs a space separator
   }
   if (attr) {
-    p << " = ";
+    if (needsSpace) p << ' ';
+    p << "= ";
     p.printAttribute(attr);
   }
 }

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-vectorize,canonicalize,cse))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))' %s | IreeFileCheck %s
 // TODO(antiagainst): Fix promotion to workgroup and enable the test.
 // | IreeFileCheck %s -check-prefix=PROMOTE
 
