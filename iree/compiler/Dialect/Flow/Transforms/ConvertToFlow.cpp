@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -18,7 +19,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-convert-linalg-tensor-ops"
+#define DEBUG_TYPE "iree-flow-convert-to-flow"
 
 namespace mlir {
 namespace iree_compiler {
@@ -90,16 +91,9 @@ struct LinalgFillToFlowTensorSplat final
   }
 };
 
-/// Converts linalg operations that can map to flow.tensor.* operations.
-struct ConvertLinalgTensorOpsPass
-    : public ConvertLinalgTensorOpsBase<ConvertLinalgTensorOpsPass> {
-  ConvertLinalgTensorOpsPass(bool runBefore) {
-    runBeforeDispatchRegionFormation = runBefore;
-  }
-  ConvertLinalgTensorOpsPass(const ConvertLinalgTensorOpsPass &that) {
-    runBeforeDispatchRegionFormation = that.runBeforeDispatchRegionFormation;
-  }
-
+struct ConvertToFlowBeforeDispatchFormation
+    : public ConvertToFlowBeforeDispatchFormationBase<
+          ConvertToFlowBeforeDispatchFormation> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
                     linalg::LinalgDialect, mlir::StandardOpsDialect>();
@@ -109,26 +103,52 @@ struct ConvertLinalgTensorOpsPass
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
-    if (runBeforeDispatchRegionFormation) {
-      patterns.insert<
-          LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
-          LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(
-          context);
-    } else {
-      patterns.insert<LinalgFillToFlowTensorSplat>(context);
-    }
+
+    patterns.insert<
+        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
+        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(
+        context);
+    populateTensorToFlowPatterns(context, patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
+
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 };
+
+struct ConvertToFlowAfterDispatchFormation
+    : public ConvertToFlowAfterDispatchFormationBase<
+          ConvertToFlowAfterDispatchFormation> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
+                    linalg::LinalgDialect, mlir::StandardOpsDialect>();
+  }
+  void runOnOperation() override {
+    auto funcOp = getOperation();
+    MLIRContext *context = funcOp->getContext();
+    context->allowUnregisteredDialects(true);
+    RewritePatternSet patterns(&getContext());
+
+    patterns.insert<LinalgFillToFlowTensorSplat>(context);
+    IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
+
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+};
+
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertLinalgTensorOpsPass(
-    bool runBeforeDispatchRegionFormation) {
-  return std::make_unique<ConvertLinalgTensorOpsPass>(
-      runBeforeDispatchRegionFormation);
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createConvertToFlowBeforeDispatchFormation() {
+  return std::make_unique<ConvertToFlowBeforeDispatchFormation>();
+}
+
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createConvertToFlowAfterDispatchFormation() {
+  return std::make_unique<ConvertToFlowAfterDispatchFormation>();
 }
 
 }  // namespace Flow
