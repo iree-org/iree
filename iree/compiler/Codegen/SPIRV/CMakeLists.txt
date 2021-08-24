@@ -20,6 +20,8 @@ iree_cc_library(
   SRCS
     "ConvertToSPIRVPass.cpp"
     "KernelConfig.cpp"
+    "MaliConfig.cpp"
+    "NVIDIAConfig.cpp"
     "Passes.cpp"
     "SPIRVCopyToWorkgroupMemory.cpp"
     "SPIRVDistributeToGlobalID.cpp"
