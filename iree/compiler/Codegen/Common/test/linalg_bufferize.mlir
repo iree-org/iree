@@ -1301,7 +1301,7 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
   %cst = constant 0.0 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
-  %2 = linalg.conv_2d_input_nhwc_filter_hwcf
+  %2 = linalg.conv_2d_nhwc_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>)
@@ -1334,7 +1334,7 @@ hal.interface @interface_io attributes {sym_visibility = "private"} {
 //  CHECK-NOT: memref.alloc
 //      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @interface_io::@wo3
 //      CHECK: linalg.fill(%{{.+}}, %[[OUTPUT]])
-// CHECK-NEXT: linalg.conv_2d_input_nhwc_filter_hwcf
+// CHECK-NEXT: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
 // CHECK-NEXT: linalg.generic
 // CHECK-SAME:   ins(%[[OUTPUT]], %{{.+}} : memref<1x112x112x32xf32>, memref<32xf32>)
@@ -1358,7 +1358,7 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
   %cst1 = constant 1.0 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst0, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
-  %2 = linalg.conv_2d_input_nhwc_filter_hwcf
+  %2 = linalg.conv_2d_nhwc_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>)
@@ -1385,7 +1385,7 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
 //      CHECK: %[[ALLOC:.+]] = memref.alloc
 //      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @interface_io::@wo3
 //      CHECK: linalg.fill(%{{.+}}, %[[ALLOC]])
-// CHECK-NEXT: linalg.conv_2d_input_nhwc_filter_hwcf
+// CHECK-NEXT: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:   outs(%[[ALLOC]] : memref<1x112x112x32xf32>)
 // CHECK-NEXT: linalg.fill(%{{.+}}, %[[OUTPUT]])
 // CHECK-NEXT: linalg.generic
