@@ -216,6 +216,22 @@ struct ConvertTensorExtractSlicePattern
   }
 };
 
+struct ConvertTensorExtractPattern
+    : public OpRewritePattern<tensor::ExtractOp> {
+  using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
+        op, op.getResult().getType(), op.tensor(), op.indices());
+    return success();
+  }
+};
+
 struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
   using OpRewritePattern<tensor::CastOp>::OpRewritePattern;
 
@@ -307,12 +323,17 @@ struct ConvertTensorFromElementsPattern
 
 }  // namespace
 
-void populateTensorToFlowPatterns(MLIRContext *context,
-                                  OwningRewritePatternList &patterns) {
+void populateTensorToFlowPatternsBeforeDispatchFormation(
+    MLIRContext *context, OwningRewritePatternList &patterns) {
   patterns
       .insert<ConvertTensorInsertSlicePattern, ConvertTensorExtractSlicePattern,
               ConvertTensorCastPattern, ConvertTensorFromElementsPattern>(
           context);
+}
+
+void populateTensorToFlowPatternsAfterDispatchFormation(
+    MLIRContext *context, OwningRewritePatternList &patterns) {
+  patterns.insert<ConvertTensorExtractPattern>(context);
 }
 
 }  // namespace Flow

@@ -50,7 +50,6 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.cpp"
     "PromoteI1ToI8Pass.cpp"
-    "PromoteTensorLoads.cpp"
     "StripAndSplatConstantVariables.cpp"
     "TypeConverter.cpp"
     "VerifyInputLegality.cpp"

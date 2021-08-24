@@ -18,6 +18,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "cast.mlir",
+            "extract.mlir",
             "extract_slice.mlir",
             "from_elements.mlir",
             "insert_slice.mlir",

@@ -131,12 +131,6 @@ def PromoteI1ToI8 :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
 }
 
-def PromoteTensorLoads :
-    Pass<"iree-flow-promote-tensor-loads", "mlir::FuncOp"> {
-  let summary = "Converts standard ops which match to flow.tensor.load (typically causing a read-back)";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteTensorLoadsPass()";
-}
-
 def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
   let summary = "Strips constant util.globals and replaces them with splats.";
