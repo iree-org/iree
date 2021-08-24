@@ -113,9 +113,7 @@ static void populateTilingToInvocationPatterns(
               linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
               linalg::LinalgTilingPattern<linalg::GenericOp>,
               linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
-              linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
+              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
               linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
               linalg_ext::TiledOpInterfaceTilingPattern<linalg_ext::ScatterOp>>(
           context, tilingOptions,
