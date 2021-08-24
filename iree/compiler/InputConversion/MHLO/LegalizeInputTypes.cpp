@@ -79,11 +79,10 @@ static LogicalResult convertOperation(Operation *oldOp,
                                       FlowTypeConverter &typeConverter,
                                       BlockAndValueMapping &mapping,
                                       OpBuilder &builder) {
-  if (llvm::isa<linalg::LinalgOp>(oldOp)) {
+  if (isa<linalg::LinalgDialect>(oldOp->getDialect()) &&
+      !isa<linalg::TensorCollapseShapeOp>(oldOp) &&
+      !isa<linalg::TensorExpandShapeOp>(oldOp)) {
     // Currently we assume all Linalg structured ops only contain valid types.
-    // We allow to convert non-structured operation like
-    // linalg.tensor_expand_shape.
-    // TODO: Support converting Linalg types when unsupported.
     builder.clone(*oldOp, mapping);
     return success();
   }

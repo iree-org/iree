@@ -26,7 +26,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace IREEPublic = mlir::iree;
-namespace IREE = mlir::iree_compiler::IREE;
 
 namespace mlir {
 namespace iree_compiler {
@@ -58,10 +57,10 @@ class IREETypeConverter : public TypeConverter {
 // It does not support regions or ops with successors.
 class OneToOneConverionPattern : public ConversionPattern {
  public:
-  OneToOneConverionPattern(TypeConverter &typeConverter, StringRef srcName,
+  OneToOneConverionPattern(TypeConverter &converter, StringRef srcName,
                            StringRef targetName, MLIRContext *context,
                            PatternBenefit benefit)
-      : ConversionPattern(typeConverter, srcName, benefit, context),
+      : ConversionPattern(converter, srcName, benefit, context),
         targetName(targetName) {}
   LogicalResult matchAndRewrite(
       Operation *srcOp, ArrayRef<Value> operands,
