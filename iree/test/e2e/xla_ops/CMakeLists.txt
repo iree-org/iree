@@ -31,7 +31,7 @@ iree_check_single_backend_test_suite(
     "dot.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
+    # "dynamic_update_slice.mlir"  # DO NOT SUBMIT
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
@@ -98,7 +98,7 @@ iree_check_single_backend_test_suite(
     "dot.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
+    # "dynamic_update_slice.mlir"  # DO NOT SUBMIT
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
@@ -160,7 +160,7 @@ iree_check_single_backend_test_suite(
     "dot.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
+    # "dynamic_update_slice.mlir"  # DO NOT SUBMIT
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "finite.mlir"
@@ -218,7 +218,7 @@ iree_check_single_backend_test_suite(
     "dot.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
+    # "dynamic_update_slice.mlir"  # DO NOT SUBMIT
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "finite.mlir"
@@ -282,7 +282,7 @@ iree_check_single_backend_test_suite(
     "dot.mlir"
     "dot_general.mlir"
     "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
+    # "dynamic_update_slice.mlir"  # DO NOT SUBMIT
     "exponential.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"

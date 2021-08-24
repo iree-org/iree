@@ -143,14 +143,16 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createConvertTensorOpsPass());
-  passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createConvertLinalgTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/true));
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
+  // Convert `tensor` ops to `flow` ops *after* dispatch region formation, so
+  // codegen can work with the original ops within `flow.dispatch.workgroups`.
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Flow::createConvertTensorOpsPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createConvertLinalgTensorOpsPass(
           /*runBeforeDispatchRegionFormation=*/false));
