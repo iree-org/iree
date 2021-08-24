@@ -53,6 +53,12 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
   return success();
 }
 
+void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp) {
+  if (importOp->hasAttr("nosideeffects")) {
+    callOp->setAttr("nosideeffects", UnitAttr::get(importOp.getContext()));
+  }
+}
+
 namespace detail {
 
 // Makes a human-readable symbol name for the given string value.

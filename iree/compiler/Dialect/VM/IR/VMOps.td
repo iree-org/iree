@@ -3383,6 +3383,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
 class VM_CallBaseOp<string mnemonic, list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
       CallOpInterface,
     ])> {
   let extraClassDeclaration = [{

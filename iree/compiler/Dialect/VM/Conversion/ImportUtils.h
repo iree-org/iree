@@ -39,6 +39,11 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     ConversionPatternRewriter &rewriter);
 }  // namespace detail
 
+// Copies known attributes from the |importOp| to the |callOp|.
+// This allows for passes to quickly query the properties of the import such as
+// nosideeffects.
+void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp);
+
 // Rewrites the op T to a VM call to |importOp|.
 // Automatically handles type conversion and special logic for variadic operands
 // and special types (such as ranked shape).
@@ -123,6 +128,7 @@ Optional<SmallVector<Value>> rewriteToCall(
   }
 
   auto *callOp = rewriter.createOperation(state);
+  copyImportAttrs(importOp, callOp);
   return SmallVector<Value>(callOp->getResults());
 }
 
