@@ -21,7 +21,7 @@ namespace {
 
 // clang-format off
 //
-// Convert linalg.conv_2d_input_nhwc_filter_hwcf op into img2col packing
+// Convert linalg.conv_2d_nhwc_hwcf op into img2col packing
 // operation (linalg.generic) + linalg.matmul. See details below:
 // A convolution operaton can be written as a matrix-matrix multiplication by
 // unfolding the cross corrolation between input and filter and explicitly copy
@@ -49,11 +49,11 @@ namespace {
 //
 // clang-format on
 class Conv2DImg2ColMatmulConversion
-    : public OpRewritePattern<linalg::ConvInputNHWCFilterHWCFOp> {
+    : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
  public:
-  using OpRewritePattern<linalg::ConvInputNHWCFilterHWCFOp>::OpRewritePattern;
+  using OpRewritePattern<linalg::Conv2DNhwcHwcfOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::ConvInputNHWCFilterHWCFOp convOp,
+  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
     ShapedType inputShapeType =
         convOp.getInputOperand(0)->get().getType().cast<ShapedType>();
@@ -170,14 +170,12 @@ class Conv2DImg2ColMatmulConversion
 // by transposing both input filter so channles are outer most the computation
 // is a batched matrix-vector product.
 class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
-    : public OpRewritePattern<linalg::DepthwiseConvInputNHWCFilterHWCOp> {
+    : public OpRewritePattern<linalg::DepthwiseConv2DNhwOp> {
  public:
-  using OpRewritePattern<
-      linalg::DepthwiseConvInputNHWCFilterHWCOp>::OpRewritePattern;
+  using OpRewritePattern<linalg::DepthwiseConv2DNhwOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(
-      linalg::DepthwiseConvInputNHWCFilterHWCOp convOp,
-      PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwOp convOp,
+                                PatternRewriter &rewriter) const override {
     RankedTensorType inputTensorType =
         convOp.getInputOperand(0)->get().getType().dyn_cast<RankedTensorType>();
     RankedTensorType filterTensorType =

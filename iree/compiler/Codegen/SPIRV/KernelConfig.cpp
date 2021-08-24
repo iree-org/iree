@@ -257,8 +257,8 @@ Optional<detail::SPIRVCodeGenConfig> getSPIRVOpConfig(
     config = getOpConfig(limits, matmulOp);
   } else if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
     config = getOpConfig(limits, matmulOp);
-  } else if (isa<linalg::DepthwiseConvInputNHWCFilterHWCOp,
-                 linalg::ConvInputNHWCFilterHWCFOp>(rootOp)) {
+  } else if (isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
+                 rootOp)) {
     config = getDefaultOpConfig(limits, rootOp);
   }
 

@@ -178,7 +178,7 @@ Optional<SPIRVCodeGenConfig> getOpConfig(linalg::MatmulOp op) {
 // Convolution
 //===----------------------------------------------------------------------===//
 
-Optional<SPIRVCodeGenConfig> getOpConfig(linalg::ConvInputNHWCFilterHWCFOp op) {
+Optional<SPIRVCodeGenConfig> getOpConfig(linalg::Conv2DNhwcHwcfOp op) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
@@ -247,8 +247,7 @@ Optional<SPIRVCodeGenConfig> getOpConfig(linalg::ConvInputNHWCFilterHWCFOp op) {
   return llvm::None;
 }
 
-Optional<SPIRVCodeGenConfig> getOpConfig(
-    linalg::DepthwiseConvInputNHWCFilterHWCOp op) {
+Optional<SPIRVCodeGenConfig> getOpConfig(linalg::DepthwiseConv2DNhwOp op) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
@@ -328,10 +327,10 @@ Optional<SPIRVCodeGenConfig> getMaliCodeGenConfig(const spirv::TargetEnv &,
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(op)) {
     return getOpConfig(matmulOp);
   }
-  if (auto convOp = dyn_cast<linalg::ConvInputNHWCFilterHWCFOp>(op)) {
+  if (auto convOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(op)) {
     return getOpConfig(convOp);
   }
-  if (auto convOp = dyn_cast<linalg::DepthwiseConvInputNHWCFilterHWCOp>(op)) {
+  if (auto convOp = dyn_cast<linalg::DepthwiseConv2DNhwOp>(op)) {
     return getOpConfig(convOp);
   }
   return llvm::None;
