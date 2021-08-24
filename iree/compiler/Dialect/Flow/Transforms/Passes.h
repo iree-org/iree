@@ -93,7 +93,7 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteTensorLoadsPass();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createExpandVariableDynamicDimsPass();
+createExpandGlobalDynamicDimsPass();
 
 /// Verified if the input to the Flow transformation passes has operations from
 /// dialects that are expected to be legalized before this pass.
@@ -130,7 +130,7 @@ createPadLinalgOpsToIntegerMultiplePass(int paddingSize = 4);
 // Optimizations
 //===----------------------------------------------------------------------===//
 
-// Outlines large tensor constants into flow.variables at the module level.
+// Outlines large tensor constants into util.globals at the module level.
 //
 // TODO(#5493): implement the support for inlining constants into the command
 // buffer and raise this value to one that is measured to be good.
@@ -152,11 +152,6 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createFormStreamsPass();
 // Reorders blocks to hoist ops that cannot be put into streams.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createHoistUnstreamableOpsPass();
 
-// Hoists loads and sinks stores to variables to decrease data dependency
-// regions.
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createSimplifyVariableAccessesPass();
-
 // TODO(benvanik): cross-function stream flows.
 
 // Inserts clones of constant values where they may be required.
@@ -170,7 +165,7 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createInsertConstantClonesPass();
 // Simplification and Development Tools
 //===----------------------------------------------------------------------===//
 
-// Strips constant flow.variables and replaces them with splats.
+// Strips constant util.globals and replaces them with splats.
 // This destructively removes data (often model weights and other parameters)
 // and is intended for use as a development tool.
 // TODO(scotttodd): pass pipeline with this and other development passes to

@@ -360,13 +360,27 @@ Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
       c8);
 }
 
+llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
+  // TODO(#6762): encoding attribute handling/mapping to enums.
+  assert(!attr && "encoding types other than default not yet supported");
+  // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
+  return 1;
+}
+
+IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context) {
+  auto encodingType = getEncodingTypeValue(attr);
+  if (!encodingType) return {};
+  return IntegerAttr::get(IntegerType::get(context, 32),
+                          encodingType.getValue());
+}
+
 //===----------------------------------------------------------------------===//
 // Size-aware type utils
 //===----------------------------------------------------------------------===//
 
 // Returns the SSA value containing the size of the given |value|.
 static Value lookupValueSize(Value value) {
-  assert(value.getType().isa<SizeAwareTypeInterface>());
+  assert(value.getType().isa<IREE::Util::SizeAwareTypeInterface>());
 
   auto definingOp = value.getDefiningOp();
   if (!definingOp) {
@@ -388,7 +402,7 @@ static Value lookupValueSize(Value value) {
     }
   }
   assert(resultIndex != -1 && "result not in results");
-  auto sizeAwareOp = dyn_cast<SizeAwareOpInterface>(definingOp);
+  auto sizeAwareOp = dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp);
   if (!sizeAwareOp) return {};
   return sizeAwareOp.getResultSize(resultIndex);
 }

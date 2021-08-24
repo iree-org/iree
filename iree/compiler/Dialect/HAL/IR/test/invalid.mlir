@@ -1,17 +1,17 @@
 // RUN: iree-opt -split-input-file -verify-diagnostics %s
 
-hal.variable @var mutable : !hal.buffer
+util.global mutable @var : !hal.buffer
 func @fn(%arg0: !hal.buffer_view) {
-  // expected-error @+1 {{variable var is '!hal.buffer' but store is '!hal.buffer_view'}}
-  hal.variable.store %arg0, @var : !hal.buffer_view
+  // expected-error @+1 {{global var is '!hal.buffer' but store is '!hal.buffer_view'}}
+  util.global.store %arg0, @var : !hal.buffer_view
   return
 }
 
 // -----
-hal.variable @var mutable : !hal.buffer
+util.global mutable @var : !hal.buffer
 func @fn(%arg0: !hal.buffer_view) {
-  %0 = hal.variable.address @var_indirect_with_buffer_view_store : !util.ptr<!hal.buffer>
-  // expected-error @+1 {{variable pointer is '!hal.buffer' but store is '!hal.buffer_view'}}
-  hal.variable.store.indirect %arg0, %0 : !hal.buffer_view -> !util.ptr<!hal.buffer>
+  %0 = util.global.address @var : !util.ptr<!hal.buffer>
+  // expected-error @+1 {{global pointer is '!hal.buffer' but store is '!hal.buffer_view'}}
+  util.global.store.indirect %arg0, %0 : !hal.buffer_view -> !util.ptr<!hal.buffer>
   return
 }

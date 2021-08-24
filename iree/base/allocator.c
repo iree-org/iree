@@ -10,8 +10,9 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
-IREE_API_EXPORT iree_status_t iree_allocator_malloc(
-    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
+static iree_status_t iree_allocator_issue_alloc(
+    iree_allocator_t allocator, iree_allocator_command_t command,
+    iree_host_size_t byte_length, void** inout_ptr) {
   if (IREE_UNLIKELY(!allocator.ctl)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocator has no control routine");
@@ -19,35 +20,26 @@ IREE_API_EXPORT iree_status_t iree_allocator_malloc(
   iree_allocator_alloc_params_t params = {
       .byte_length = byte_length,
   };
-  return allocator.ctl(allocator.self, IREE_ALLOCATOR_COMMAND_CALLOC, &params,
-                       out_ptr);
+  return allocator.ctl(allocator.self, command, &params, inout_ptr);
+}
+
+IREE_API_EXPORT iree_status_t iree_allocator_malloc(
+    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
+  return iree_allocator_issue_alloc(allocator, IREE_ALLOCATOR_COMMAND_CALLOC,
+                                    byte_length, out_ptr);
 }
 
 IREE_API_EXPORT iree_status_t iree_allocator_malloc_uninitialized(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
-  if (IREE_UNLIKELY(!allocator.ctl)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "allocator has no control routine");
-  }
-  iree_allocator_alloc_params_t params = {
-      .byte_length = byte_length,
-  };
-  return allocator.ctl(allocator.self, IREE_ALLOCATOR_COMMAND_MALLOC, &params,
-                       out_ptr);
+  return iree_allocator_issue_alloc(allocator, IREE_ALLOCATOR_COMMAND_MALLOC,
+                                    byte_length, out_ptr);
 }
 
 IREE_API_EXPORT iree_status_t
 iree_allocator_realloc(iree_allocator_t allocator, iree_host_size_t byte_length,
                        void** inout_ptr) {
-  if (IREE_UNLIKELY(!allocator.ctl)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "allocator has no control routine");
-  }
-  iree_allocator_alloc_params_t params = {
-      .byte_length = byte_length,
-  };
-  return allocator.ctl(allocator.self, IREE_ALLOCATOR_COMMAND_REALLOC, &params,
-                       inout_ptr);
+  return iree_allocator_issue_alloc(allocator, IREE_ALLOCATOR_COMMAND_REALLOC,
+                                    byte_length, inout_ptr);
 }
 
 IREE_API_EXPORT iree_status_t

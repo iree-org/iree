@@ -47,13 +47,32 @@ func @removeUnusedDupCapture(%arg: index) -> index {
 
 // -----
 
-// CHECK-LABEL: func @removeUnusedResult
+// CHECK-LABEL: func @removeUnusedProducedResult
+// CHECK-SAME: (%[[ARG0:.+]]: index)
+func @removeUnusedProducedResult(%arg0: index) -> index {
+  // CHECK: flow.ex.stream.fragment(%[[ARG0]]) : (index) -> index =
+  %0:2 = flow.ex.stream.fragment(%arg0) : (index) -> (index, index) =
+      (%arg0_in: index) -> (index, index) {
+    // CHECK: %[[T:.+]] = addi
+    %t = addi %arg0_in, %arg0_in : index
+    %unused = muli %arg0_in, %arg0_in : index
+    // CHECK: flow.return %[[T]] : index
+    flow.return %t, %unused : index, index
+  }
+  return %0#0 : index
+}
+
+// -----
+
+// CHECK-LABEL: func @removeUnusedPassThroughResult
 // CHECK-SAME: (%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-func @removeUnusedResult(%arg0: index, %arg1: index) -> index {
+func @removeUnusedPassThroughResult(%arg0: index, %arg1: index) -> index {
   // CHECK: flow.ex.stream.fragment(%[[ARG1]])
   %0:2 = flow.ex.stream.fragment(%arg0, %arg1) : (index, index) -> (index, index) =
-      (%unused: index, %arg1: index) -> (index, index) {
-    %t = addi %arg1, %arg1 : index
+      (%unused: index, %arg1_in: index) -> (index, index) {
+    // CHECK: %[[T:.+]] = addi
+    %t = addi %arg1_in, %arg1_in : index
+    // CHECK: flow.return %[[T]] : index
     flow.return %t, %unused : index, index
   }
   return %0#0 : index
@@ -69,7 +88,7 @@ func @removeUnusedDynamicResult(%arg0: tensor<4x?xf32>, %dim0: index,
   // CHECK: flow.ex.stream.fragment(%[[ARG1]]) :
   %0:2 = flow.ex.stream.fragment(%arg0, %arg1) :
       // CHECK-SAME: (tensor<8x?xf32>{%[[DIM1]]}) -> %[[ARG1]]{%[[DIM1]]} =
-      (tensor<4x?xf32>{%dim0}, tensor<8x?xf32>{%dim1}) -> (%arg0{%dim0}, %arg1{%dim1}) =
+      (tensor<4x?xf32>{%dim0}, tensor<8x?xf32>{%dim1}) -> (tensor<4x?xf32>{%dim0}, %arg1{%dim1}) =
       // CHECK-NEXT: (%[[INNER_ARG:.+]]: tensor<8x?xf32>) -> tensor<8x?xf32>
       (%unused: tensor<4x?xf32>, %arg1: tensor<8x?xf32>) -> (tensor<4x?xf32>, tensor<8x?xf32>) {
     // CHECK-NEXT: flow.return %[[INNER_ARG]] : tensor<8x?xf32>
@@ -96,7 +115,7 @@ func @dynamicUpdateSliceImmutability(
     %workload = constant 8 : index
     //      CHECK: %[[TARGET_CLONE:.+]] = flow.tensor.clone %[[TARGET]] : tensor<2x4xi32>
     //      CHECK: %[[UPDATED:.+]] = flow.tensor.update %[[UPDATE]], %[[TARGET]]
-    %t0 = flow.tensor.update %stream_update, %stream_target[%start0, %start1] : tensor<1x1xi32> -> tensor<2x4xi32>
+    %t0 = flow.tensor.update %stream_update, %stream_target[%start0, %start1] : tensor<1x1xi32> -> %stream_target as tensor<2x4xi32>
     // CHECK-NEXT: %[[RETURN:.+]] = flow.dispatch @ex::@entry[%c8](%[[TARGET_CLONE]], %[[UPDATED]])
     %t1 = flow.dispatch @ex::@entry[%workload](%stream_target, %t0) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
     // CHECK-NEXT: flow.return %[[RETURN]]
@@ -142,8 +161,8 @@ func @insertCloneForUpdatedConstant(%input: tensor<2x2xi32>) -> tensor<4x4xi32> 
       (%arg0: tensor<2x2xi32>) -> tensor<4x4xi32> {
     %c4 = constant 4 : index
     %c1 = constant 1 : index
-    // CHECK: %[[LOAD:.+]] = flow.variable.load @_large_const
-    %5 = flow.variable.load @_large_const : tensor<4x4xi32>
+    // CHECK: %[[LOAD:.+]] = util.global.load @_large_const
+    %5 = util.global.load @_large_const : tensor<4x4xi32>
     // CHECK: %[[CLONE:.+]] = flow.tensor.clone %[[LOAD]]
     // CHECK: flow.dispatch @pad_dispatch::@pad_dispatch[{{.+}}](%{{.+}}, %[[CLONE]])
     %6 = flow.dispatch @pad_dispatch::@pad_dispatch[%c4, %c4, %c1](%arg0, %5) : (tensor<2x2xi32>, tensor<4x4xi32>) -> %5
@@ -152,7 +171,7 @@ func @insertCloneForUpdatedConstant(%input: tensor<2x2xi32>) -> tensor<4x4xi32> 
   return %4 : tensor<4x4xi32>
 }
 
-flow.variable @_large_const dense<0> : tensor<4x4xi32> attributes {noinline, sym_visibility = "private"}
+util.global private @_large_const {noinline} = dense<0> : tensor<4x4xi32>
 
 // -----
 
@@ -161,14 +180,14 @@ func @insertCloneForUpdatedConstant(%input: tensor<2xi32>) -> tensor<7xi32> {
   %4 = flow.ex.stream.fragment(%input) : (tensor<2xi32>) -> tensor<7xi32> =
       (%arg0: tensor<2xi32>) -> tensor<7xi32> {
     %c3 = constant 3 : index
-    // CHECK: %[[LOAD:.+]] = flow.variable.load @_large_const
-    %5 = flow.variable.load @_large_const : tensor<7xi32>
+    // CHECK: %[[LOAD:.+]] = util.global.load @_large_const
+    %5 = util.global.load @_large_const : tensor<7xi32>
     // CHECK: %[[CLONE:.+]] = flow.tensor.clone %[[LOAD]]
     // CHECK: flow.tensor.update %{{.+}}, %[[CLONE]]
-    %6 = flow.tensor.update %arg0, %5[%c3] : tensor<2xi32> -> tensor<7xi32>
+    %6 = flow.tensor.update %arg0, %5[%c3] : tensor<2xi32> -> %5 as tensor<7xi32>
     flow.return %6 : tensor<7xi32>
   }
   return %4 : tensor<7xi32>
 }
 
-flow.variable @_large_const dense<0> : tensor<7xi32> attributes {noinline, sym_visibility = "private"}
+util.global private @_large_const {noinline} = dense<0> : tensor<7xi32>

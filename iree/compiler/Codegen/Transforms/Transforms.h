@@ -32,18 +32,6 @@ LogicalResult defineWorkgroupCountRegion(
     OpBuilder &builder, FuncOp funcOp,
     WorkgroupCountRegionBuilder regionBuilder);
 
-/// Using linalg on tensors for dispatch region creation does first-level of
-/// tile (fuse and distribute) during dispatch region formation. At that point
-/// the workload per workgroup is set to the dynamic value represented by
-/// `flow.dispatch.workgroup.size` and is later lowered to
-/// `hal.dispatch.workgroup.size`. This method is to materialize the static
-/// information of the workload per workgroup determined based on target
-/// architecture.  Note that the value of hal.dispatch.workgroup.size is now
-/// different after this function is called and represents the actual value used
-/// at runtime.
-LogicalResult materializeStaticLaunchInformation(
-    FuncOp funcOp, ArrayRef<int64_t> workloadPerWorkgroup);
-
 /// Return a fused vector::ContractionOp which represents a patterns such as:
 ///
 /// ```mlir

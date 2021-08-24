@@ -19,6 +19,7 @@ struct iree_hal_buffer_view_t {
   iree_atomic_ref_count_t ref_count;
   iree_hal_buffer_t* buffer;
   iree_hal_element_type_t element_type;
+  iree_hal_encoding_type_t encoding_type;
   iree_device_size_t byte_length;
   iree_host_size_t shape_rank;
   iree_hal_dim_t shape[];
@@ -27,6 +28,7 @@ struct iree_hal_buffer_view_t {
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
@@ -54,6 +56,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     buffer_view->buffer = buffer;
     iree_hal_buffer_retain(buffer_view->buffer);
     buffer_view->element_type = element_type;
+    buffer_view->encoding_type = encoding_type;
     buffer_view->byte_length =
         iree_hal_element_byte_count(buffer_view->element_type);
     buffer_view->shape_rank = shape_rank;
@@ -94,7 +97,8 @@ IREE_API_EXPORT void iree_hal_buffer_view_destroy(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage,
     iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
@@ -102,7 +106,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
 
   iree_device_size_t allocation_size = 0;
   iree_status_t status = iree_hal_buffer_compute_view_size(
-      shape, shape_rank, element_type, &allocation_size);
+      shape, shape_rank, element_type, encoding_type, &allocation_size);
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
@@ -111,8 +115,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
   }
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_create(buffer, shape, shape_rank,
-                                         element_type, out_buffer_view);
+    status =
+        iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
+                                    encoding_type, out_buffer_view);
   }
 
   iree_hal_buffer_release(buffer);
@@ -123,8 +128,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_clone_heap_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
-    iree_const_byte_span_t data, iree_hal_buffer_view_t** out_buffer_view) {
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage, iree_const_byte_span_t data,
+    iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -132,9 +138,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_clone_heap_buffer(
   // Allocate the buffer.
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_buffer_view_allocate_buffer(allocator, shape, shape_rank,
-                                               element_type, memory_type,
-                                               allowed_usage, &buffer_view));
+      z0, iree_hal_buffer_view_allocate_buffer(
+              allocator, shape, shape_rank, element_type, encoding_type,
+              memory_type, allowed_usage, &buffer_view));
 
   // Copy all of the data into it in the worst way possible.
   // If you find yourself coming here from profiling:
@@ -156,7 +162,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_clone_heap_buffer(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(allocator);
@@ -170,8 +177,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
       data_allocator, &buffer);
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_create(buffer, shape, shape_rank,
-                                         element_type, out_buffer_view);
+    status =
+        iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
+                                    encoding_type, out_buffer_view);
   }
 
   iree_hal_buffer_release(buffer);
@@ -182,7 +190,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(allocator);
@@ -200,39 +209,14 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
       compatibility, IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE);
   if (wrap_allowed) {
     return iree_hal_buffer_view_wrap_heap_buffer(
-        allocator, shape, shape_rank, element_type, memory_type, allowed_access,
-        allowed_usage, data, data_allocator, out_buffer_view);
+        allocator, shape, shape_rank, element_type, encoding_type, memory_type,
+        allowed_access, allowed_usage, data, data_allocator, out_buffer_view);
   } else {
     return iree_hal_buffer_view_clone_heap_buffer(
-        allocator, shape, shape_rank, element_type, memory_type, allowed_usage,
-        iree_make_const_byte_span(data.data, data.data_length),
+        allocator, shape, shape_rank, element_type, encoding_type, memory_type,
+        allowed_usage, iree_make_const_byte_span(data.data, data.data_length),
         out_buffer_view);
   }
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_subview(
-    const iree_hal_buffer_view_t* buffer_view,
-    const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
-    const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
-    iree_hal_buffer_view_t** out_buffer_view) {
-  IREE_ASSERT_ARGUMENT(out_buffer_view);
-
-  // NOTE: we rely on the compute range call to do parameter validation.
-  iree_device_size_t start_offset = 0;
-  iree_device_size_t subview_length = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_range(
-      buffer_view, start_indices, indices_count, lengths, lengths_count,
-      &start_offset, &subview_length));
-
-  iree_hal_buffer_t* subview_buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(
-      buffer_view->buffer, start_offset, subview_length, &subview_buffer));
-
-  iree_status_t status =
-      iree_hal_buffer_view_create(subview_buffer, lengths, lengths_count,
-                                  buffer_view->element_type, out_buffer_view);
-  iree_hal_buffer_release(subview_buffer);
-  return status;
 }
 
 IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_view_buffer(
@@ -341,6 +325,12 @@ iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view) {
   return iree_hal_element_byte_count(buffer_view->element_type);
 }
 
+IREE_API_EXPORT iree_hal_encoding_type_t
+iree_hal_buffer_view_encoding_type(const iree_hal_buffer_view_t* buffer_view) {
+  IREE_ASSERT_ARGUMENT(buffer_view);
+  return buffer_view->encoding_type;
+}
+
 IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer_view);
@@ -353,7 +343,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_offset(
   IREE_ASSERT_ARGUMENT(buffer_view);
   return iree_hal_buffer_compute_view_offset(
       buffer_view->shape, buffer_view->shape_rank, buffer_view->element_type,
-      indices, indices_count, out_offset);
+      buffer_view->encoding_type, indices, indices_count, out_offset);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
@@ -364,33 +354,51 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
   IREE_ASSERT_ARGUMENT(buffer_view);
   return iree_hal_buffer_compute_view_range(
       buffer_view->shape, buffer_view->shape_rank, buffer_view->element_type,
-      start_indices, indices_count, lengths, lengths_count, out_start_offset,
-      out_length);
+      buffer_view->encoding_type, start_indices, indices_count, lengths,
+      lengths_count, out_start_offset, out_length);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
     iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type,
     iree_device_size_t* out_allocation_size) {
   IREE_ASSERT_ARGUMENT(shape);
   IREE_ASSERT_ARGUMENT(out_allocation_size);
   *out_allocation_size = 0;
-  iree_device_size_t byte_length = iree_hal_element_byte_count(element_type);
-  for (iree_host_size_t i = 0; i < shape_rank; ++i) {
-    byte_length *= shape[i];
+
+  iree_device_size_t byte_length = 0;
+
+  switch (encoding_type) {
+    case IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR:
+      byte_length = iree_hal_element_byte_count(element_type);
+      for (iree_host_size_t i = 0; i < shape_rank; ++i) {
+        byte_length *= shape[i];
+      }
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unimplemented encoding type size calculation");
   }
+
   *out_allocation_size = byte_length;
   return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
-    iree_hal_element_type_t element_type, const iree_hal_dim_t* indices,
+    iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type, const iree_hal_dim_t* indices,
     iree_host_size_t indices_count, iree_device_size_t* out_offset) {
   IREE_ASSERT_ARGUMENT(shape);
   IREE_ASSERT_ARGUMENT(indices);
   IREE_ASSERT_ARGUMENT(out_offset);
   *out_offset = 0;
+  if (encoding_type != IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "only dense encodings support view range computation");
+  }
   if (IREE_UNLIKELY(shape_rank != indices_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "shape rank/indices mismatch: %zu != %zu",
@@ -418,7 +426,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
     const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
-    iree_hal_element_type_t element_type, const iree_hal_dim_t* start_indices,
+    iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type, const iree_hal_dim_t* start_indices,
     iree_host_size_t indices_count, const iree_hal_dim_t* lengths,
     iree_host_size_t lengths_count, iree_device_size_t* out_start_offset,
     iree_device_size_t* out_length) {
@@ -429,6 +438,11 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
   IREE_ASSERT_ARGUMENT(out_length);
   *out_start_offset = 0;
   *out_length = 0;
+  if (encoding_type != IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "only dense encodings support view range computation");
+  }
   if (IREE_UNLIKELY(indices_count != lengths_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "indices/lengths mismatch: %zu != %zu",
@@ -451,11 +465,11 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
 
   iree_device_size_t start_byte_offset = 0;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_compute_view_offset(
-      shape, shape_rank, element_type, start_indices, indices_count,
-      &start_byte_offset));
+      shape, shape_rank, element_type, encoding_type, start_indices,
+      indices_count, &start_byte_offset));
   iree_device_size_t end_byte_offset = 0;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_compute_view_offset(
-      shape, shape_rank, element_type, end_indices, shape_rank,
+      shape, shape_rank, element_type, encoding_type, end_indices, shape_rank,
       &end_byte_offset));
 
   // Non-contiguous regions not yet implemented. Will be easier to detect when
@@ -507,10 +521,6 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
                                        IREE_STRING_VIEW_NPOS);
   }
 
-  // f32, i32, etc
-  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
-  IREE_RETURN_IF_ERROR(iree_hal_parse_element_type(type_str, &element_type));
-
   // AxBxC...
   iree_host_size_t shape_rank = 0;
   iree_status_t shape_result =
@@ -529,10 +539,18 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
   IREE_RETURN_IF_ERROR(
       iree_hal_parse_shape(shape_str, shape_rank, shape, &shape_rank));
 
+  // f32, i32, etc
+  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+  IREE_RETURN_IF_ERROR(iree_hal_parse_element_type(type_str, &element_type));
+
+  // TODO(benvanik): allow specifying the encoding.
+  iree_hal_encoding_type_t encoding_type =
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
+
   // Allocate the buffer we will parse into from the provided allocator.
   iree_device_size_t buffer_length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_compute_view_size(
-      shape, shape_rank, element_type, &buffer_length));
+      shape, shape_rank, element_type, encoding_type, &buffer_length));
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
       buffer_allocator,
@@ -560,7 +578,7 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
 
   // Wrap and pass ownership of the buffer to the buffer view.
   status = iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
-                                       out_buffer_view);
+                                       encoding_type, out_buffer_view);
   iree_hal_buffer_release(buffer);
   return status;
 }
@@ -636,6 +654,8 @@ static iree_status_t iree_hal_buffer_view_format_impl(
   } else if (!iree_status_is_ok(status)) {
     return status;
   }
+
+  // TODO(benvanik): allow printing the encoding.
 
   // Separator: <meta>=<value>
   APPEND_CHAR('=');

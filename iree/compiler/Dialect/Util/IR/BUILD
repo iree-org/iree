@@ -35,29 +35,41 @@ td_library(
 cc_library(
     name = "IR",
     srcs = [
+        "ClosureOpUtils.cpp",
         "UtilDialect.cpp",
-        "UtilOpInterfaces.cpp.inc",
+        "UtilOpFolders.cpp",
         "UtilOps.cpp",
         "UtilOps.cpp.inc",
         "UtilTypes.cpp",
     ],
     hdrs = [
+        "ClosureOpUtils.h",
         "UtilDialect.h",
-        "UtilOpInterfaces.h.inc",
         "UtilOps.h",
         "UtilOps.h.inc",
         "UtilTraits.h",
         "UtilTypes.h",
     ],
+    textual_hdrs = [
+        "UtilAttrInterfaces.cpp.inc",
+        "UtilAttrInterfaces.h.inc",
+        "UtilOpInterfaces.cpp.inc",
+        "UtilOpInterfaces.h.inc",
+        "UtilTypeInterfaces.cpp.inc",
+        "UtilTypeInterfaces.h.inc",
+    ],
     deps = [
         ":UtilInterfacesGen",
         ":UtilOpsGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
     ],
 )
 
@@ -65,12 +77,28 @@ gentbl_cc_library(
     name = "UtilInterfacesGen",
     tbl_outs = [
         (
+            ["-gen-attr-interface-decls"],
+            "UtilAttrInterfaces.h.inc",
+        ),
+        (
+            ["-gen-attr-interface-defs"],
+            "UtilAttrInterfaces.cpp.inc",
+        ),
+        (
             ["-gen-op-interface-decls"],
             "UtilOpInterfaces.h.inc",
         ),
         (
             ["-gen-op-interface-defs"],
             "UtilOpInterfaces.cpp.inc",
+        ),
+        (
+            ["-gen-type-interface-decls"],
+            "UtilTypeInterfaces.h.inc",
+        ),
+        (
+            ["-gen-type-interface-defs"],
+            "UtilTypeInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",

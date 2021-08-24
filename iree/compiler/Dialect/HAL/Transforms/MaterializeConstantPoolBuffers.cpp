@@ -62,16 +62,16 @@ class MaterializeConstantPoolBuffersPass
 
       // 1:1 storage to runtime buffers.
       for (auto storageOp : poolOp.getOps<ConstantStorageOp>()) {
-        makeStorageBufferRuntimeVariable(poolOp, storageOp, moduleSymbolTable,
-                                         insertionPoint);
+        makeStorageBufferRuntimeGlobal(poolOp, storageOp, moduleSymbolTable,
+                                       insertionPoint);
       }
 
       // We currently put all splats on their own so that we are always able to
       // map the storage buffers above as read-only.
       auto splatOps = llvm::to_vector<4>(poolOp.getOps<ConstantPoolSplatOp>());
       if (!splatOps.empty()) {
-        makeSplatRuntimeVariable(poolOp, splatOps, moduleSymbolTable,
-                                 insertionPoint);
+        makeSplatRuntimeGlobal(poolOp, splatOps, moduleSymbolTable,
+                               insertionPoint);
       }
     }
   }
@@ -79,23 +79,23 @@ class MaterializeConstantPoolBuffersPass
  private:
   // Creates a runtime buffer into which the storage buffer will be mapped or
   // uploaded.
-  void makeStorageBufferRuntimeVariable(ConstantPoolOp poolOp,
-                                        ConstantStorageOp storageOp,
-                                        SymbolTable &moduleSymbolTable,
-                                        Block::iterator insertionPoint) {
+  void makeStorageBufferRuntimeGlobal(ConstantPoolOp poolOp,
+                                      ConstantStorageOp storageOp,
+                                      SymbolTable &moduleSymbolTable,
+                                      Block::iterator insertionPoint) {
     auto *context = poolOp.getContext();
     auto variableName =
         (poolOp.getName() + storageOp.getName() + "_buffer").str();
     auto variableType = IREE::HAL::BufferType::get(context);
-    auto variableOp = OpBuilder(context).create<IREE::HAL::VariableOp>(
+    auto globalOp = OpBuilder(context).create<IREE::Util::GlobalOp>(
         storageOp.getLoc(), variableName, /*isMutable=*/false, variableType);
-    moduleSymbolTable.insert(variableOp, insertionPoint);
-    variableOp.setPrivate();
+    moduleSymbolTable.insert(globalOp, insertionPoint);
+    globalOp.setPrivate();
 
     // Find all the spans in the pool that map into this storage buffer so that
     // we can update them with their runtime offsets. Note that since we are
     // uploading 1:1 today all the offsets are the same as their storage ones.
-    auto variableSymRef = SymbolRefAttr::get(context, variableOp.getName());
+    auto variableSymRef = SymbolRefAttr::get(context, globalOp.getName());
     for (auto spanOp : poolOp.getOps<ConstantPoolSpanOp>()) {
       if (spanOp.storage_buffer().getLeafReference() != storageOp.getName()) {
         continue;
@@ -105,9 +105,9 @@ class MaterializeConstantPoolBuffersPass
     }
 
     auto initializerFunc = makeStorageBufferRuntimeInitializerFunc(
-        variableOp.getName(), storageOp, poolOp.buffer_constraints());
+        globalOp.getName(), storageOp, poolOp.buffer_constraints());
     moduleSymbolTable.insert(initializerFunc, insertionPoint);
-    variableOp.initializerAttr(
+    globalOp.initializerAttr(
         SymbolRefAttr::get(context, initializerFunc.getName()));
   }
 
@@ -163,10 +163,10 @@ class MaterializeConstantPoolBuffersPass
 
   // Creates a runtime buffer for the given constant pool splats and constructs
   // its initializer to fill the contents.
-  void makeSplatRuntimeVariable(ConstantPoolOp poolOp,
-                                ArrayRef<ConstantPoolSplatOp> splatOps,
-                                SymbolTable &moduleSymbolTable,
-                                Block::iterator insertionPoint) {
+  void makeSplatRuntimeGlobal(ConstantPoolOp poolOp,
+                              ArrayRef<ConstantPoolSplatOp> splatOps,
+                              SymbolTable &moduleSymbolTable,
+                              Block::iterator insertionPoint) {
     auto *context = poolOp.getContext();
 
     // TODO(benvanik): we don't need host-visible here as we could require that
@@ -182,15 +182,15 @@ class MaterializeConstantPoolBuffersPass
                                      return splatOp.getLoc();
                                    })));
     auto variableName = (poolOp.getName() + "_splats").str();
-    auto variableOp = OpBuilder(context).create<IREE::HAL::VariableOp>(
+    auto globalOp = OpBuilder(context).create<IREE::Util::GlobalOp>(
         variableLoc, variableName, /*isMutable=*/false, variableType);
-    moduleSymbolTable.insert(variableOp, insertionPoint);
-    variableOp.setPrivate();
+    moduleSymbolTable.insert(globalOp, insertionPoint);
+    globalOp.setPrivate();
 
     // Compute the ranges for all the splats at runtime and the required buffer
     // size based on the constraints provided.
     auto bufferConstraints = poolOp.buffer_constraints();
-    auto variableSymRef = SymbolRefAttr::get(context, variableOp.getName());
+    auto variableSymRef = SymbolRefAttr::get(context, globalOp.getName());
     uint64_t bufferLength = 0;
     for (auto splatOp : poolOp.getOps<ConstantPoolSplatOp>()) {
       uint64_t splatOffset =
@@ -210,7 +210,7 @@ class MaterializeConstantPoolBuffersPass
     // TODO(benvanik): if we spill here we'll need to create more buffers. We
     // could flip this loop inside out and first allocate the splats.
     if (bufferLength > bufferConstraints.max_buffer_range().getZExtValue()) {
-      variableOp.emitError()
+      globalOp.emitError()
           << "constant splat buffer length " << bufferLength
           << " spills max buffer range of "
           << bufferConstraints.max_buffer_range().getZExtValue()
@@ -218,9 +218,9 @@ class MaterializeConstantPoolBuffersPass
     }
 
     auto initializerFunc = makeSplatRuntimeInitializerFunc(
-        variableOp.getLoc(), variableOp.getName(), splatOps, bufferLength);
+        globalOp.getLoc(), globalOp.getName(), splatOps, bufferLength);
     moduleSymbolTable.insert(initializerFunc, insertionPoint);
-    variableOp.initializerAttr(
+    globalOp.initializerAttr(
         SymbolRefAttr::get(context, initializerFunc.getName()));
   }
 

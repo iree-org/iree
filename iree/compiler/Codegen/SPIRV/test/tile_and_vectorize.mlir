@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))' %s | IreeFileCheck %s
 
 #map0 = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<()[s0, s1] -> (8, s1 - s0 * 8)>
@@ -8,6 +8,8 @@
 #map5 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
+#config = {tileSizes = [[8, 16, 0], [], [1, 1, 1]]}
+
 hal.executable @matmul attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -15,7 +17,11 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @matmul attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @matmul attributes {
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [16: index, 8: index, 1: index],
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [8, 16]}
+    }
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
@@ -48,9 +54,9 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
           %16 = memref.dim %arg2, %c1 : memref<?x?xf32>
           %17 = affine.min #map1()[%1, %16]
           %18 = memref.subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config}
             ins(%7, %13 : memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
-           outs(%18 : memref<?x?xf32, #map3>)
+            outs(%18 : memref<?x?xf32, #map3>)
         }
         return
       }
@@ -77,6 +83,8 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 
 // -----
 
+#config = {tileSizes = [[1, 4, 32], [], [1, 1, 1]]}
+
 hal.executable @conv_1d attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -84,9 +92,13 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_1d attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @conv_1d attributes {
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 4: index, 1: index],
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
+    }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-      func @conv_1d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
+      func @conv_1d() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index
         %0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<3x6x1xf32>
@@ -107,7 +119,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
         %15 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 1)>()[%3]
         %16 = memref.subview %0[%5, %12, %14] [1, %13, %15] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
         %17 = memref.subview %0[%5, %12, %9] [1, %13, %10] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
-        linalg.conv_1d_input_nwc_filter_wcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
+        linalg.conv_1d_input_nwc_filter_wcf { __internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
         return
       }
       hal.interface @io attributes {sym_visibility = "private"} {
@@ -120,9 +132,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
 }
 
 // CHECK-LABEL: func @conv_1d
-//   CHECK-DAG: %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG: %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG: %[[C3:.+]] = constant 3 : index
+//       CHECK: %[[C0:.+]] = constant 0 : index
 //       CHECK: %[[RET:.+]] = hal.interface.binding.subspan @io::@ret0
 //       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
@@ -139,11 +149,10 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
 //       CHECK:     %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[TIDZ]], %[[IV0]], 0] [1, %{{.+}}, 1]
 //       CHECK:     %[[ARG1SV2:.+]] = memref.subview %[[ARG1SV1]][0, 0, %[[IV1]]] [3, 1, 1]
 //       CHECK:     %[[RETSV2:.+]] = memref.subview %[[RETSV1]][%[[TIDZ]], %[[IV0]], %[[IV1]]] [1, 1, 1]
-//       CHECK:     scf.for %[[IV2:.+]] = %[[C0]] to %[[C3]] step %[[C1]]
-//       CHECK:       memref.load %[[ARG0SV2]][%[[C0]], %[[IV2]], %[[C0]]]
-//       CHECK:       memref.load %[[ARG1SV2]][%[[IV2]], %[[C0]], %[[C0]]]
-//       CHECK:       memref.load %[[RETSV2]][%[[C0]], %[[C0]], %[[C0]]]
-//       CHECK:       memref.store %{{.+}}, %[[RETSV2]][%[[C0]], %[[C0]], %[[C0]]]
+//       CHECK:     linalg.conv_1d_input_nwc_filter_wcf
+//  CHECK-SAME:       __internal_linalg_transform__ = "vectorize"
+//  CHECK-SAME:       ins(%[[ARG0SV2]], %[[ARG1SV2]]
+//  CHECK-SAME:       outs(%[[RETSV2]]
 
 
 // -----
@@ -157,6 +166,8 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
 #map6 = affine_map<(d0)[s0] -> (4, -d0 + s0)>
 #map7 = affine_map<(d0)[s0] -> (32, -d0 + s0)>
 
+#config = {tileSizes = [[0, 1, 4, 32], [], [0, 1, 1, 1]]}
+
 hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -164,7 +175,11 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_no_padding attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @conv_no_padding attributes {
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 4: index, 1: index],
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
+    }
     module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
@@ -213,6 +228,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
                       : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map5>
               linalg.conv_2d_input_nhwc_filter_hwcf {
                 __internal_linalg_transform__ = "workgroup",
+                lowering.config = #config,
                 dilations = dense<1> : tensor<2xi64>,
                 strides = dense<2> : tensor<2xi64>}
                  ins(%21, %arg0 : memref<?x?x?x?xf32, #map5>, memref<?x?x?x?xf32>)
@@ -251,24 +267,29 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 //         CHECK:   %[[BSTEPY:.+]] = affine.apply #[[MAP0]]()[%[[NBLOCKSY]]]
 //         CHECK:   %[[BOFFSETX:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
 //         CHECK:   %[[BSTEPX:.+]] = affine.apply #[[MAP1]]()[%[[NBLOCKSX]]]
-//         CHECK:   scf.for %[[IV3:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
-//         CHECK:     scf.for %[[IV4:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
-//         CHECK:       scf.for %[[IV5:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
-//         CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
-//         CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV3]], %[[IV4]], %[[IV5]], 0]
+//         CHECK:   scf.for %[[IV0:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
+//         CHECK:     scf.for %[[IV1:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
+//         CHECK:       scf.for %[[IV2:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
+//         CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV0]], %[[IV1]], %[[IV2]], 0]
+//         CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV0]], %[[IV1]], %[[IV2]], 0]
 //     CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //     CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //     CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //     CHECK-DAG:         %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //     CHECK-DAG:         %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //     CHECK-DAG:         %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//         CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//         CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//         CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-// CHECK-COUNT-3:               scf.for
-//     CHECK-NOT:               linalg.conv_2d_input_nhwc_filter_hwcf
+//         CHECK:         scf.for %[[IV3:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:           scf.for %[[IV4:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:             scf.for %[[IV5:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//         CHECK:               %[[OUT:.+]] = memref.subview %[[SV2]][0, %[[IV3]], %[[IV4]], %[[IV5]]]
+//         CHECK:               linalg.conv_2d_input_nhwc_filter_hwcf
+//    CHECK-SAME:                 __internal_linalg_transform__ = "tile_conv_filter"
+//    CHECK-SAME:                 outs(%[[OUT]]
+
 
 // -----
+
+#config = {tileSizes = [[0, 0, 1, 4, 32], [], [0, 0, 1, 1, 1]]}
 
 hal.executable @conv_3d attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -277,9 +298,13 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_3d attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @conv_3d attributes {
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 4: index, 1: index],
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
+    }
     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative], [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32, max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}  {
-      func @conv_3d() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
+      func @conv_3d() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index
         %0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<2x7x7x7x2xf32>
@@ -299,7 +324,7 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
         %14 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 7)>()[%3]
         %15 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
         %16 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
-        linalg.conv_3d_input_ndhwc_filter_dhwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
+        linalg.conv_3d_input_ndhwc_filter_dhwcf {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
         return
       }
       hal.interface @io attributes {sym_visibility = "private"} {
@@ -318,11 +343,14 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
 //     CHECK-DAG:         %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //     CHECK-DAG:         %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //     CHECK-DAG:         %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//         CHECK:         scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//         CHECK:           scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//         CHECK:             scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-// CHECK-COUNT-5:               scf.for
-//     CHECK-NOT:               linalg.conv_3d_input_ndhwc_filter_dhwcf
+//         CHECK:         scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:           scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:             scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//         CHECK:               %[[OUT:.+]] = memref.subview %{{.+}}[0, 0, %[[IV0]], %[[IV1]], %[[IV2]]]
+//         CHECK:               linalg.conv_3d_input_ndhwc_filter_dhwcf
+//    CHECK-SAME:                 __internal_linalg_transform__ = "vectorize"
+//    CHECK-SAME:                 outs(%[[OUT]]
+
 
 // -----
 
@@ -334,6 +362,9 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
 #map5 = affine_map<()[s0] -> (4, s0 * -4 + 14)>
 #map6 = affine_map<()[s0] -> (32, s0 * -32 + 13)>
 #map7 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1092 + s0 + d1 * 78 + d2 * 6 + d3)>
+
+#config = {tileSizes = [[1, 4, 32], [], [1, 1, 1]]}
+
 module  {
   hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
     hal.interface @io {
@@ -342,14 +373,13 @@ module  {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
     hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-      hal.executable.entry_point @pooling_nhwc_max attributes {interface = @io, ordinal = 0 : index} {
-      ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-        %c4 = constant 4 : index
-        %c1 = constant 1 : index
-        hal.return %c1, %c4, %c1 : index, index, index
+      hal.executable.entry_point @pooling_nhwc_max attributes {
+        interface = @io, ordinal = 0 : index,
+        workgroup_size = [32: index, 4: index, 1: index],
+        translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
       }
       module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}  {
-        func @pooling_nhwc_max() attributes {spv.entry_point_abi = {local_size = dense<[32, 4, 1]> : vector<3xi32>}} {
+        func @pooling_nhwc_max() {
           %c0 = constant 0 : index
           %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<2x16x16x6xf32>
           %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x4xf32>
@@ -364,7 +394,7 @@ module  {
           %10 = affine.min #map5()[%4]
           %11 = affine.min #map6()[%3]
           %12 = memref.subview %2[0, %5, %7, 0] [2, %10, %11, 6] [1, 1, 1, 1] : memref<2x14x13x6xf32> to memref<2x?x?x6xf32, #map7>
-          linalg.pooling_nhwc_max {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>) outs(%12 : memref<2x?x?x6xf32, #map7>)
+          linalg.pooling_nhwc_max {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>) outs(%12 : memref<2x?x?x6xf32, #map7>)
           return
         }
         hal.interface @io attributes {sym_visibility = "private"} {
@@ -395,8 +425,12 @@ module  {
 //     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//         CHECK:   scf.for %{{.+}} = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//         CHECK:     scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//         CHECK:       scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-// CHECK-COUNT-3:         scf.for
-//     CHECK-NOT:           linalg.pooling_nhwc_max
+//         CHECK:   scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:     scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:       scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//         CHECK:         %[[IN:.+]] = memref.subview %[[SV1]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, %{{.+}}, %{{.+}}, 6]
+//         CHECK:         %[[OUT:.+]] = memref.subview %[[SV2]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, 1, 1, 6]
+//         CHECK:         linalg.pooling_nhwc_max
+//    CHECK-SAME:           __internal_linalg_transform__ = "vectorize"
+//    CHECK-SAME:           ins(%[[IN]], %[[ARG1]]
+//    CHECK-SAME:           outs(%[[OUT]]

@@ -36,6 +36,23 @@ static inline uintptr_t iree_page_align_end(uintptr_t addr,
   return iree_page_align_start(addr + (page_alignment - 1), page_alignment);
 }
 
+// Computes a page-aligned range base and total length from a range.
+// This will produce a starting address <= the range offset and a length >=
+// the range length.
+static inline void iree_page_align_range(void* base_address,
+                                         iree_byte_range_t range,
+                                         iree_host_size_t page_alignment,
+                                         void** out_start_address,
+                                         iree_host_size_t* out_aligned_length) {
+  void* range_start = (void*)iree_page_align_start(
+      (uintptr_t)base_address + range.offset, page_alignment);
+  void* range_end = (void*)iree_page_align_end(
+      (uintptr_t)base_address + range.offset + range.length, page_alignment);
+  *out_start_address = range_start;
+  *out_aligned_length =
+      (iree_host_size_t)range_end - (iree_host_size_t)range_start;
+}
+
 //==============================================================================
 // Memory subsystem information and control
 //==============================================================================
@@ -126,11 +143,12 @@ typedef uint32_t iree_memory_view_flags_t;
 // Implemented by VirtualAlloc+MEM_RESERVE/mmap+PROT_NONE.
 iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
                                        iree_host_size_t total_length,
+                                       iree_allocator_t allocator,
                                        void** out_base_address);
 
 // Releases a range of virtual address
-void iree_memory_view_release(void* base_address,
-                              iree_host_size_t total_length);
+void iree_memory_view_release(void* base_address, iree_host_size_t total_length,
+                              iree_allocator_t allocator);
 
 // Commits pages overlapping the byte ranges defined by |byte_ranges|.
 // Ranges will be adjusted to the page granularity of the view.

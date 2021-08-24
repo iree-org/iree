@@ -47,7 +47,8 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
   // Block names are their order in the function.
   DenseMap<Block *, int> blockOrdinals;
   for (auto &block : funcOp.getBlocks()) {
-    blockOrdinals[&block] = blockOrdinals.size();
+    int ordinal = blockOrdinals.size();
+    blockOrdinals[std::addressof(block)] = ordinal;
   }
 
   // Keep asm state to make getting the SSA value names fast.
@@ -264,6 +265,7 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
       Operation *lastUse = &block.front();
       for (auto &use : value.getUses()) {
         if (use.getOwner()->getBlock() != &block) continue;
+        if (lastUse == use.getOwner()) continue;
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }

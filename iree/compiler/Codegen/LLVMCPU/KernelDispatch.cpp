@@ -79,7 +79,7 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
     "iree-codegen-llvm-generic-ops-workgroup-size",
     llvm::cl::desc(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
-    llvm::cl::init(128));
+    llvm::cl::init(64));
 
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
@@ -230,7 +230,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
             "unhandled multiple roots in dispatch region");
       }
       rootOp = computeOp;
-      continue;
     }
   }
 
@@ -251,7 +250,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
               "unhandled multiple roots in dispatch region");
         }
         rootOp = computeOp;
-        continue;
       }
     }
   }
@@ -279,7 +277,8 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     // on it, just add the default.
     if (!getTranslationInfo(entryPointOp)) {
       setTranslationInfo(funcOp,
-                         IREE::HAL::DispatchLoweringPassPipeline::CPUDefault);
+                         IREE::HAL::DispatchLoweringPassPipeline::CPUDefault,
+                         /*workgroupSize =*/{}, /*workloadPerWorkgroup =*/{});
     }
   }
   return success();

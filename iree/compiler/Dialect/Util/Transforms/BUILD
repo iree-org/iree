@@ -12,13 +12,18 @@ package(
 
 cc_library(
     name = "Transforms",
-    srcs = ["DropCompilerHints.cpp"],
+    srcs = [
+        "DropCompilerHints.cpp",
+        "SimplifyGlobalAccesses.cpp",
+    ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Util/IR",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
     ],
 )

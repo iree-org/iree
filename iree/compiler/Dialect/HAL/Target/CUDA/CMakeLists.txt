@@ -33,10 +33,13 @@ iree_cc_library(
     CUDA
   HDRS
     "CUDATarget.h"
+    "LLVMPasses.h"
   SRCS
     "CUDATarget.cpp"
+    "NoLoopUnrollPass.cpp"
   DEPS
     ::cuda_libdevice
+    LLVMAnalysis
     LLVMBitReader
     LLVMCore
     LLVMipo

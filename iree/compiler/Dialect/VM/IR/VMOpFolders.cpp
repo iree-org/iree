@@ -58,38 +58,77 @@ Attribute oneOfType(Type type) {
 // Structural ops
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Deletes empty vm.initializer ops.
+struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(InitializerOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.body().getBlocks().size() != 1) return failure();
+    auto &block = op.body().front();
+    if (block.empty() || isa<ReturnOp>(block.front())) {
+      rewriter.eraseOp(op);
+      return success();
+    }
+    return failure();
+  }
+};
+
+// Inlines constant stores from initializers into the global initializer.
+// This is not strictly required but can help our initialization code perform
+// more efficient initialization of large numbers of primitive values.
+struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(InitializerOp op,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Operation *> deadOps;
+    op.walk([&](Operation *op) {
+      if (!isGlobalStoreOp(op)) return;
+      auto value = op->getOperand(0);
+      Attribute valueAttr;
+      if (!matchPattern(value, m_Constant(&valueAttr))) return;
+      auto globalRefAttr = op->getAttrOfType<SymbolRefAttr>("global");
+      assert(globalRefAttr);
+      auto globalOp =
+          SymbolTable::lookupNearestSymbolFrom<IREE::VM::VMGlobalOp>(
+              op, globalRefAttr);
+      if (valueAttr && !valueAttr.isa<UnitAttr>()) {
+        globalOp.setInitialValue(valueAttr);
+      } else {
+        globalOp.clearInitialValue();
+      }
+      deadOps.push_back(op);
+    });
+    if (deadOps.empty()) return failure();
+    for (auto deadOp : deadOps) rewriter.eraseOp(deadOp);
+    return success();
+  }
+
+  bool isGlobalStoreOp(Operation *op) const {
+    // TODO(benvanik): trait/interface to make this more generic?
+    return isa<IREE::VM::GlobalStoreI32Op>(op) ||
+           isa<IREE::VM::GlobalStoreI64Op>(op) ||
+           isa<IREE::VM::GlobalStoreF32Op>(op) ||
+           isa<IREE::VM::GlobalStoreF64Op>(op) ||
+           isa<IREE::VM::GlobalStoreRefOp>(op);
+  }
+};
+
+}  // namespace
+
+void InitializerOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<DropEmptyInitializerOp, InlineConstGlobalInitializer>(context);
+}
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-/// Converts global initializer functions that evaluate to a constant to a
-/// specified initial value.
-template <typename T>
-struct InlineConstGlobalOpInitializer : public OpRewritePattern<T> {
-  using OpRewritePattern<T>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(T op,
-                                PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return failure();
-    auto initializer = dyn_cast_or_null<FuncOp>(
-        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue()));
-    if (!initializer) return failure();
-    if (initializer.getBlocks().size() == 1 &&
-        initializer.getBlocks().front().getOperations().size() == 2 &&
-        isa<ReturnOp>(initializer.getBlocks().front().getOperations().back())) {
-      auto &primaryOp = initializer.getBlocks().front().getOperations().front();
-      Attribute constResult;
-      if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
-        rewriter.replaceOpWithNewOp<T>(op, op.sym_name(), op.is_mutable(),
-                                       op.type(), constResult);
-        return success();
-      }
-    }
-    return failure();
-  }
-};
 
 /// Drops initial_values from globals where the value is 0, as by default all
 /// globals are zero-initialized upon module load.
@@ -116,32 +155,26 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
 
 void GlobalI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
-  results.insert<InlineConstGlobalOpInitializer<GlobalI32Op>,
-                 DropDefaultConstGlobalOpInitializer<GlobalI32Op>>(context);
+  results.insert<DropDefaultConstGlobalOpInitializer<GlobalI32Op>>(context);
 }
 
 void GlobalI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
-  results.insert<InlineConstGlobalOpInitializer<GlobalI64Op>,
-                 DropDefaultConstGlobalOpInitializer<GlobalI64Op>>(context);
+  results.insert<DropDefaultConstGlobalOpInitializer<GlobalI64Op>>(context);
 }
 
 void GlobalF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
-  results.insert<InlineConstGlobalOpInitializer<GlobalF32Op>,
-                 DropDefaultConstGlobalOpInitializer<GlobalF32Op>>(context);
+  results.insert<DropDefaultConstGlobalOpInitializer<GlobalF32Op>>(context);
 }
 
 void GlobalF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
-  results.insert<InlineConstGlobalOpInitializer<GlobalF64Op>,
-                 DropDefaultConstGlobalOpInitializer<GlobalF64Op>>(context);
+  results.insert<DropDefaultConstGlobalOpInitializer<GlobalF64Op>>(context);
 }
 
 void GlobalRefOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<InlineConstGlobalOpInitializer<GlobalRefOp>>(context);
-}
+                                              MLIRContext *context) {}
 
 namespace {
 

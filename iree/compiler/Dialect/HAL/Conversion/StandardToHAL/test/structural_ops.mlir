@@ -37,10 +37,10 @@ func @tensor_cast_does_not_alias_metadata_update(%arg0: !hal.buffer_view) -> !ha
     // CHECK: %[[C1_1:.*]] = constant 1 : index
     // CHECK: %[[C4:.*]] = constant 4 : index
     // CHECK: %[[C1_2:.*]] = constant 1 : index
-    // CHECK: %[[ET:.*]] = constant {{.*}} : i32
+    // CHECK: %[[ET:.*]] = constant 50331680 : i32
     // CHECK: %[[VIEW:.*]] = hal.buffer_view.create
-    //   CHECK-SAME: element_type = %[[ET]],
-    //   CHECK-SAME: shape = [%[[C3]], %[[C2]], %[[C1_1]], %[[C4]], %[[C1_2]]]
+    //   CHECK-SAME: shape([%[[C3]], %[[C2]], %[[C1_1]], %[[C4]], %[[C1_2]]])
+    //   CHECK-SAME: type(%[[ET]])
     // CHECK: return %[[VIEW]]
     %2 = hal.tensor.cast %1 : tensor<3x2x1x4x1xf32> -> !hal.buffer_view
     return %2 : !hal.buffer_view

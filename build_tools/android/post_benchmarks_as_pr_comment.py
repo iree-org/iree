@@ -49,6 +49,8 @@ GITHUB_IREE_API_PREFIX = "https://api.github.com/repos/google/iree"
 GITHUB_IREE_REPO_PREFIX = "https://github.com/google/iree"
 GITHUB_USER = "iree-github-actions-bot"
 IREE_PROJECT_ID = 'IREE'
+# The maximal numbers of trials when querying base commit benchmark results.
+MAX_BASE_COMMIT_QUERY_COUNT = 10
 # The ratio below which benchmarks will be considered as similar with base.
 SIMILAR_BECNHMARK_THRESHOLD = 0.05
 # The max number of rows to show per table.
@@ -79,13 +81,14 @@ def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   return int(count)
 
 
-def get_origin_tree_top_commit(verbose: bool = False) -> str:
-  """Returns the top of the tree commit for the origin base branch."""
+def get_origin_tree_commit(distance: int, verbose: bool = False) -> str:
+  """Returns the hash for the commit with the given distance from top of the
+  tree for the origin base branch."""
   base_branch = get_required_env_var("BUILDKITE_PULL_REQUEST_BASE_BRANCH")
   get_output(['git', 'fetch', '--prune', '--', 'origin', base_branch],
              cwd=THIS_DIRECTORY,
              verbose=verbose)
-  return get_git_commit_hash(f'origin/{base_branch}', verbose)
+  return get_git_commit_hash(f'origin/{base_branch}~{distance}', verbose)
 
 
 def get_from_dashboard(url: str,
@@ -299,18 +302,28 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
   pr_commit = get_required_env_var("BUILDKITE_COMMIT")
   pr_commit = md.link(pr_commit,
                       f"{GITHUB_IREE_REPO_PREFIX}/commit/{pr_commit}")
+
+  commit_info = f"@ commit {pr_commit}"
   if query_base:
-    # Update the aggregate benchmarks with base numbers.
-    base_commit = get_origin_tree_top_commit(verbose)
-    base_benchmarks = query_base_benchmark_results(base_commit, verbose)
-    for bench in base_benchmarks:
-      if bench in all_benchmarks:
-        all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
-    base_commit = md.link(base_commit,
-                          f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
-    commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"
-  else:
-    commit_info = f"@ commit {pr_commit}"
+    # Try to query some base benchmark to diff against, from the top of the
+    # tree. Bail out if the maximal trial number is exceeded.
+    for i in range(MAX_BASE_COMMIT_QUERY_COUNT):
+      base_commit = get_origin_tree_commit(i, verbose)
+      base_benchmarks = query_base_benchmark_results(base_commit, verbose)
+      base_commit = md.link(base_commit,
+                            f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
+
+      if len(base_benchmarks) == 0:
+        commit_info = (f"@ commit {pr_commit} (no previous benchmark results to"
+                       f" compare against since {base_commit})")
+        continue
+
+      # Update the aggregate benchmarks with base numbers.
+      for bench in base_benchmarks:
+        if bench in all_benchmarks:
+          all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
+      commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"
+      break
 
   pr_info = md.link("Pull request",
                     f"{GITHUB_IREE_REPO_PREFIX}/pull/{pr_number}")

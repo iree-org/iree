@@ -17,7 +17,6 @@ iree_cc_library(
     "FlowDialect.h"
     "FlowEnums.h.inc"
     "FlowOpInterfaces.h.inc"
-    "FlowOpUtils.h"
     "FlowOps.h"
     "FlowOps.h.inc"
     "FlowTypeInterfaces.h.inc"
@@ -28,7 +27,6 @@ iree_cc_library(
     "FlowEnums.cpp.inc"
     "FlowOpFolders.cpp"
     "FlowOpInterfaces.cpp.inc"
-    "FlowOpUtils.cpp"
     "FlowOps.cpp"
     "FlowOps.cpp.inc"
     "FlowTypeInterfaces.cpp.inc"
@@ -40,6 +38,7 @@ iree_cc_library(
     ::FlowOpsGen
     ::FlowTypesGen
     LLVMSupport
+    MLIRControlFlowInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRMemRef

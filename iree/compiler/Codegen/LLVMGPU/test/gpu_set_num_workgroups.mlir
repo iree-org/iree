@@ -1,50 +1,40 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass{test-lowering-configuration}))' %s | IreeFileCheck %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (d0 + s0)>
-#map2 = affine_map<(d0) -> (d0)>
-#map3 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
-hal.executable @add_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable @add_dispatch_0 {
+  hal.interface @io {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    module  {
-      func @add_dispatch_0() {
-        %c0 = constant 0 : index
-        %c1024 = constant 1024 : index
-        %0 = hal.interface.binding.subspan @io::@ro0[%c0] : memref<1024xf32>
-        %1 = hal.interface.binding.subspan @io::@ro1[%c0] : memref<1024xf32>
-        %2 = hal.interface.binding.subspan @io::@wo2[%c0] : memref<1024xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %3 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
-        %4 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
-        scf.for %arg0 = %3 to %c1024 step %4 {
-          %5 = affine.min #map3(%arg0)[%workgroup_size_x]
-          %6 = memref.subview %0[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, #map1>
-          %7 = memref.subview %1[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, #map1>
-          %8 = memref.subview %2[%arg0] [%5] [1] : memref<1024xf32> to memref<?xf32, #map1>
-          linalg.generic {
-              indexing_maps = [#map2, #map2, #map2],
-              iterator_types = ["parallel"]}
-              ins(%6, %7 : memref<?xf32, #map1>, memref<?xf32, #map1>)
-              outs(%8 : memref<?xf32, #map1>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
-            ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-              %9 = addf %arg1, %arg2 : f32
-              linalg.yield %9 : f32
-          }
-        }
+  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+  module  {
+    func @add_dispatch_0() {
+      %c0 = constant 0 : index
+      %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
+      %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
+      %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:16384xf32>
+      %3 = linalg.init_tensor [16384] : tensor<16384xf32>
+      %4 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<16384xf32>
+      %5 = flow.dispatch.tensor.load %1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<16384xf32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16384xf32>, tensor<16384xf32>) outs(%3 : tensor<16384xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
+          %7 = addf %arg0, %arg1 : f32
+          linalg.yield %7 : f32
+        } -> tensor<16384xf32>
+        flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16384xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
         return
+      }
+      hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
       }
     }
   }
 }
+
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[128], [], [4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 128)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
-//  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0) -> (d0)>
 //      CHECK: hal.executable.entry_point @add_dispatch_0
 // CHECK-SAME:     passPipeline = 3 : i32
 // CHECK-SAME:     workloadPerWorkgroup = [128]
@@ -102,13 +92,13 @@ hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[2, 256, 4], [], [2, 4]{{\]}}}
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 256)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
+//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[4, 2, 4], [], [1, 1]{{\]}}}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
 //      CHECK: hal.executable.entry_point @dot_dispatch_1
 // CHECK-SAME:     passPipeline = 4 : i32
-// CHECK-SAME:     workloadPerWorkgroup = [256, 2]
-// CHECK-SAME:     workgroup_size = [64 : index, 1 : index, 1 : index]
+// CHECK-SAME:     workloadPerWorkgroup = [2, 4]
+// CHECK-SAME:     workgroup_size = [2 : index, 4 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index,
 //  CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //  CHECK-DAG:     %[[NWGS_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]

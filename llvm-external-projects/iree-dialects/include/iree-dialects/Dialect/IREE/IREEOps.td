@@ -30,7 +30,7 @@ def IREE_NullOp : IREE_PureOp<"null"> {
 // Casts
 //===----------------------------------------------------------------------===//
 
-def IREE_TensorToBufferView : IREE_PureOp<"cast.tensor_to_buffer_view"> {
+def IREE_TensorToBufferViewOp : IREE_PureOp<"cast.tensor_to_buffer_view"> {
   let summary = "Casts a tensor to a BufferView, capturing dynamic dims";
   let arguments = (ins
     IREE_Tensor:$source,
@@ -44,7 +44,7 @@ def IREE_TensorToBufferView : IREE_PureOp<"cast.tensor_to_buffer_view"> {
   }];
 }
 
-def IREE_BufferViewToTensor : IREE_PureOp<"cast.buffer_view_to_tensor"> {
+def IREE_BufferViewToTensorOp : IREE_PureOp<"cast.buffer_view_to_tensor"> {
   let summary = "Casts a BufferView to a tensor, providing dynamic dims";
   let arguments = (ins
     IREE_BufferViewType:$source,
@@ -62,108 +62,120 @@ def IREE_BufferViewToTensor : IREE_PureOp<"cast.buffer_view_to_tensor"> {
 // Global variables
 //===----------------------------------------------------------------------===//
 
-def IREE_VariableOp : IREE_Op<"variable", [
+def IREE_GlobalOp : IREE_Op<"global", [
     Symbol,
   ]> {
-  let summary = [{stateful variable declaration}];
+  let summary = [{stateful global variable declaration}];
   let description = [{
-    Declares a persistent variable that maintains its value.
+    Declares a global variable that maintains its value across invocations.
+    The value is tied to the execution context of the module and different
+    contexts will have different global storage.
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
     OptionalAttr<FlatSymbolRefAttr>:$initializer,
     OptionalAttr<AnyAttr>:$initial_value
   );
 
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable,
-      "FuncOp":$initializer, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
-      "Attribute":$initialValue, CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-  ];
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    (`mutable` $is_mutable^)?
+    $sym_name
+    attr-dict
+    (`initializer` `(` $initializer^ `)`):(``)?
+    custom<TypeOrAttr>($type, $initial_value)
+  }];
 }
 
-def IREE_VariableAddressOp : IREE_PureOp<"variable.address"> {
-  let summary = [{returns an address reference to a variable}];
+def IREE_GlobalAddressOp : IREE_PureOp<"global.address"> {
+  let summary = [{returns an address reference to a global}];
   let description = [{
-    Returns the address of a variable as a typed reference. Can be used with the
-    variable load and store indirect ops.
+    Returns the address of a global as a typed reference. Can be used with the
+    global load and store indirect ops.
   }];
 
   let arguments = (ins
-    IREE_VariableRefAttr:$variable
+    IREE_GlobalRefAttr:$global
   );
   let results = (outs
-    IREE_VariablePtr:$result
+    IREE_AnyGlobalPtr:$result
   );
 
-  let assemblyFormat = "$variable attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    $global attr-dict `:` type($result)
+  }];
 }
 
-def IREE_VariableLoadOp : IREE_Op<"variable.load"> {
+def IREE_GlobalLoadOp : IREE_Op<"global.load"> {
   let summary = [{loads a value from a global variable}];
   let description = [{
-    Returns a copy of the variable value.
+    Returns a copy of the global value.
   }];
 
   let arguments = (ins
-    IREE_VariableRefAttr:$variable
+    IREE_GlobalRefAttr:$global
   );
   let results = (outs
     AnyType:$result
   );
 
-  let assemblyFormat = "$variable attr-dict `:` type($result)";
+  let assemblyFormat = [{
+    $global attr-dict `:` type($result)
+  }];
 }
 
-def IREE_VariableLoadIndirectOp : IREE_Op<"variable.load.indirect"> {
+def IREE_GlobalLoadIndirectOp : IREE_Op<"global.load.indirect"> {
   let summary = [{loads a value from a global variable}];
   let description = [{
-    Returns a copy of the variable value.
+    Returns a copy of the global value.
   }];
 
   let arguments = (ins
-    IREE_VariablePtr:$variable
+    IREE_AnyGlobalPtr:$global
   );
   let results = (outs
     AnyType:$result
   );
 
-  let assemblyFormat = "$variable attr-dict `:` type($variable) `->` type($result)";
+  let assemblyFormat = [{
+    $global attr-dict `:` type($global) `->` type($result)
+  }];
 }
 
-def IREE_VariableStoreOp : IREE_Op<"variable.store"> {
+def IREE_GlobalStoreOp : IREE_Op<"global.store"> {
   let summary = [{stores a value into a global variable}];
   let description = [{
-    Stores a copy of the value into a variable.
+    Stores a copy of the value into a global.
   }];
 
   let arguments = (ins
     AnyType:$value,
-    IREE_VariableRefAttr:$variable
+    IREE_GlobalRefAttr:$global
   );
 
-  let assemblyFormat = "$value `,` $variable attr-dict `:` type($value)";
+  let assemblyFormat = [{
+    $value `,` $global attr-dict `:` type($value)
+  }];
 }
 
-def IREE_VariableStoreIndirectOp : IREE_Op<"variable.store.indirect"> {
+def IREE_GlobalStoreIndirectOp : IREE_Op<"global.store.indirect"> {
   let summary = [{stores a value into a global variable}];
   let description = [{
-    Stores a copy of the value into a variable.
+    Stores a copy of the value into a global.
   }];
 
   let arguments = (ins
     AnyType:$value,
-    IREE_VariablePtr:$variable
+    IREE_AnyGlobalPtr:$global
   );
 
-  let assemblyFormat = "$value `,` $variable attr-dict `:` type($value) `->` type($variable)";
+  let assemblyFormat = [{
+    $value `,` $global attr-dict `:` type($value) `->` type($global)
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -472,8 +484,7 @@ def IREE_TensorUpdateOp : IREE_PureOp<"tensor.update", [
     IREE_ShapeDynamicDims:$target_dims,
     Variadic<IREE_Dim>:$start_indices,
     IREE_Tensor:$update,
-    IREE_ShapeDynamicDims:$update_dims,
-    OptionalAttr<IREE_TiedOpStorageAttr>:$tied_operands
+    IREE_ShapeDynamicDims:$update_dims
   );
   let results = (outs
     IREE_Tensor:$result
@@ -482,7 +493,7 @@ def IREE_TensorUpdateOp : IREE_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    `(` type($result) `,` $target_dims `,` $tied_operands `)`
+    type($result) (`{` $target_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
@@ -508,7 +519,7 @@ def IREE_TensorTraceOp : IREE_Op<"tensor.trace", []> {
     Variadic<IREE_Tensor>:$operands
   );
 
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = "$key attr-dict ($operands^ `:` type($operands))?";
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_OPS_TD

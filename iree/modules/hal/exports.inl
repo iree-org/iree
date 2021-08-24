@@ -34,9 +34,10 @@ EXPORT_FN("buffer.subspan", iree_hal_module_buffer_subspan, rii, r)
 
 EXPORT_FN("buffer_view.buffer", iree_hal_module_buffer_view_buffer, r, r)
 EXPORT_FN("buffer_view.byte_length", iree_hal_module_buffer_view_byte_length, r, i)
-EXPORT_FN("buffer_view.create", iree_hal_module_buffer_view_create, riCiD, r)
+EXPORT_FN("buffer_view.create", iree_hal_module_buffer_view_create, riiCiD, r)
 EXPORT_FN("buffer_view.dim", iree_hal_module_buffer_view_dim, ri, i)
 EXPORT_FN("buffer_view.element_type", iree_hal_module_buffer_view_element_type, r, i)
+EXPORT_FN("buffer_view.encoding_type", iree_hal_module_buffer_view_encoding_type, r, i)
 EXPORT_FN("buffer_view.rank", iree_hal_module_buffer_view_rank, r, i)
 EXPORT_FN("buffer_view.trace", iree_hal_module_buffer_view_trace, rCrD, v)
 

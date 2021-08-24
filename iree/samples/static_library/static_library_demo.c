@@ -133,8 +133,8 @@ iree_status_t Run() {
   if (iree_status_is_ok(status)) {
     iree_hal_buffer_view_clone_heap_buffer(
         iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_32, input_memory_type,
-        IREE_HAL_BUFFER_USAGE_ALL,
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        input_memory_type, IREE_HAL_BUFFER_USAGE_ALL,
         iree_make_const_byte_span((void*)kFloat4,
                                   sizeof(float) * kElementCount),
         &arg0_buffer_view);
@@ -142,8 +142,8 @@ iree_status_t Run() {
   if (iree_status_is_ok(status)) {
     iree_hal_buffer_view_clone_heap_buffer(
         iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_32, input_memory_type,
-        IREE_HAL_BUFFER_USAGE_ALL,
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        input_memory_type, IREE_HAL_BUFFER_USAGE_ALL,
         iree_make_const_byte_span((void*)kFloat2,
                                   sizeof(float) * kElementCount),
         &arg1_buffer_view);

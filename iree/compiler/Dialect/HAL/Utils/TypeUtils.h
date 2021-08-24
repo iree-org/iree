@@ -83,6 +83,10 @@ class TensorRewriteAdaptor {
   int32_t getElementType();
   IntegerAttr getElementTypeAttr();
 
+  // Returns the encoding type of the tensor as an int32 enum value.
+  int32_t getEncodingType();
+  IntegerAttr getEncodingTypeAttr();
+
   // Returns the I32 shape dimensions of the tensor.
   llvm::Optional<SmallVector<Value, 4>> getShapeDims();
   llvm::Optional<SmallVector<Value, 4>> getShapeDims(
@@ -91,7 +95,7 @@ class TensorRewriteAdaptor {
   // Performs the equivalent of a hal.buffer_view.byte_length.
   Value getByteLength();
 
-  // Performs the equivalent of a hal.buffer_view.compute_offset.
+  // Performs the equivalent of a hal.allocator.compute_offset.
   Value computeOffset(ValueRange indices);
 
   struct Range {
@@ -99,7 +103,7 @@ class TensorRewriteAdaptor {
     Value length;
   };
 
-  // Performs the equivalent of a hal.buffer_view.compute_range.
+  // Performs the equivalent of a hal.allocator.compute_range.
   llvm::Optional<Range> computeRange(ValueRange indices, ValueRange lengths);
 
  private:

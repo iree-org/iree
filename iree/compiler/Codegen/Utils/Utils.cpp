@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/SymbolTable.h"
@@ -21,15 +22,13 @@ bool isEntryPoint(FuncOp func) { return func.isPublic(); }
 unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
   return op.iterator_types()
       .getValue()
-      .take_while([](Attribute attr) -> bool {
-        return linalg::isParallelIteratorType(attr);
-      })
+      .take_while(
+          [](Attribute attr) -> bool { return isParallelIterator(attr); })
       .size();
 }
 
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
-  auto variantOp =
-      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
       return op;
@@ -40,8 +39,7 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
 
 llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
     ModuleOp module) {
-  auto variantOp =
-      module.getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  auto variantOp = module->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     entryPointOps[op.sym_name()] = op;
@@ -51,11 +49,11 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 
 void setTranslationInfo(FuncOp entryPointFn,
                         IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-                        ArrayRef<int64_t> workgroupSize) {
+                        ArrayRef<int64_t> workgroupSize,
+                        ArrayRef<int64_t> workloadPerWorkgroup) {
   auto entryPointOp = getEntryPoint(entryPointFn);
   auto translationInfo = buildTranslationInfo(
-      passPipeline, /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
-      entryPointFn.getContext());
+      passPipeline, workloadPerWorkgroup, entryPointFn.getContext());
   setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
 }
 
@@ -84,11 +82,11 @@ SmallVector<unsigned> getPartitionedLoops(Operation *op) {
 
 LogicalResult setOpConfigAndEntryPointFnTranslation(
     FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
-    ArrayRef<int64_t> nativeVectorSize,
+    ArrayRef<int64_t> nativeVectorSizes,
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize) {
   IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, nativeVectorSize, op->getContext());
+      buildConfigAttr(tileSizes, nativeVectorSizes, op->getContext());
   setLoweringConfig(op, config);
   auto partitionedLoops = getPartitionedLoops(op);
   SmallVector<int64_t, 3> workloadPerWorkgroup;
@@ -160,6 +158,30 @@ ArrayRef<int64_t> getUntiledShape(Value tiledView) {
       .Case<ShapedType, IREE::Flow::DispatchTensorType>(
           [&](auto shapedType) { return shapedType.getShape(); })
       .Default([&](Type type) { return ArrayRef<int64_t>{}; });
+}
+
+/// Returns the untiled shape of the output of a `LinalgOp`.
+// TODO(ravishankarm): Using the result shape for vectorization should be
+// avoided. Ideally the tile size is enough. But there is a phase ordering issue
+// which prevents the tile size from being known at this point.
+ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
+                                        unsigned resultNum) {
+  // Check the shape of the `outs` operand.
+  ArrayRef<int64_t> outputShape =
+      getUntiledShape(linalgOp.outputs()[resultNum]);
+  if (!llvm::any_of(outputShape, ShapedType::isDynamic)) return outputShape;
+  // Try to use the result value and check if the untiled shape can be obtained
+  // based on the uses.
+  Value result = linalgOp->getResult(resultNum);
+  for (Operation *user : result.getUsers()) {
+    if (auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(user)) {
+      return storeOp.target()
+          .getType()
+          .cast<IREE::Flow::DispatchTensorType>()
+          .getShape();
+    }
+  }
+  return result.getType().cast<ShapedType>().getShape();
 }
 
 LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,

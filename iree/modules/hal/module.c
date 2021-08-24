@@ -400,18 +400,20 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
                    iree_hal_module_state_t,             //
-                   riCiD, r) {
+                   riiCiD, r) {
   iree_hal_buffer_t* source_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &source_buffer));
   iree_hal_element_type_t element_type = (iree_hal_element_type_t)args->i1;
+  iree_hal_encoding_type_t encoding_type = (iree_hal_encoding_type_t)args->i2;
   iree_host_size_t shape_rank = 0;
   iree_hal_dim_t* shape_dims = NULL;
-  IREE_VM_ABI_VLA_STACK_CAST(args, a2_count, a2, iree_hal_dim_t, 128,
+  IREE_VM_ABI_VLA_STACK_CAST(args, a3_count, a3, iree_hal_dim_t, 128,
                              &shape_rank, &shape_dims);
 
   iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      source_buffer, shape_dims, shape_rank, element_type, &buffer_view));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_view_create(source_buffer, shape_dims, shape_rank,
+                                  element_type, encoding_type, &buffer_view));
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
 }
@@ -444,6 +446,16 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_element_type,  //
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
   rets->i0 = (uint32_t)iree_hal_buffer_view_element_type(buffer_view);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_encoding_type,  //
+                   iree_hal_module_state_t,                    //
+                   r, i) {
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
+  rets->i0 = (uint32_t)iree_hal_buffer_view_encoding_type(buffer_view);
   return iree_ok_status();
 }
 

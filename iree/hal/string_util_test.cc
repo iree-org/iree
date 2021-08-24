@@ -427,9 +427,12 @@ struct BufferView final
   static StatusOr<BufferView> Create(Buffer buffer,
                                      iree::span<const iree_hal_dim_t> shape,
                                      iree_hal_element_type_t element_type) {
+    iree_hal_encoding_type_t encoding_type =
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
     BufferView buffer_view;
-    iree_status_t status = iree_hal_buffer_view_create(
-        buffer, shape.data(), shape.size(), element_type, &buffer_view);
+    iree_status_t status =
+        iree_hal_buffer_view_create(buffer, shape.data(), shape.size(),
+                                    element_type, encoding_type, &buffer_view);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }

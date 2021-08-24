@@ -7,7 +7,9 @@
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
@@ -30,8 +32,10 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{64, 128, 8}, {32, 4, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 16}, {64, 2, 1}}));
+
   tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}}));
 }
 
 static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
@@ -61,6 +65,12 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   int64_t tileY = 256;
   int64_t tileK = 4;
   SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  // Special case for very small matrices.
+  if (sizeM * sizeN <= cudaWarpSize) {
+    tileX = sizeN;
+    tileY = sizeM;
+    workgroupSize = {sizeM, sizeN, 1};
+  }
   SmallVector<TileWorkgroupSizePair> tileSizeConfig;
   // Query the best configuration.
   getMatmulConfig(tileSizeConfig);
@@ -93,7 +103,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       {tileX / workgroupSize[1], tileY / workgroupSize[0]});
   tileSizes.push_back(invocationLevelTs);  // Thread level.
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt,
       workgroupSize);
 }
@@ -114,7 +124,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   size_t numLoops = partitionedLoops.back() + 1;
 
   std::array<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
-  static constexpr unsigned vectorSize = 4;
+  unsigned vectorSize = 4;
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1),
       threadTileSizes(numLoops, 1);
   // Set all non-parallel loops to zero tile size.
@@ -126,6 +136,36 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
       threadTileSizes[depth] = 0;
     }
   }
+
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  bool outputSizeIsProblemSize =
+      genericOp &&
+      llvm::all_of(genericOp.getOutputOperands(),
+                   [&genericOp](OpOperand *outputOperand) {
+                     return genericOp.getTiedIndexingMap(outputOperand)
+                         .isProjectedPermutation();
+                   });
+  if (outputSizeIsProblemSize) {
+    // Calculate the problem size to adjust the tile size.
+    int64_t problemSize = 1;
+    entryPoint.walk([&problemSize](IREE::Flow::DispatchTensorStoreOp storeOp) {
+      ArrayRef<int64_t> shape = storeOp.target()
+                                    .getType()
+                                    .cast<IREE::Flow::DispatchTensorType>()
+                                    .getShape();
+      int64_t prod = 1;
+      for (int64_t dim : shape) prod *= dim;
+      problemSize = std::max(prod, problemSize);
+    });
+    // If the problem size is too small or if the op cannot be vectorized,
+    // reduce the vector size to prevent bad memory access patterns.
+    if ((problemSize / (cudaWarpSize * vectorSize)) < 64) vectorSize = 1;
+  }
+  // Pick a vectorSize of 1 for op that we know won't get vectorizedd.
+  // TODO(thomasraoux): This could be improved by checking if the linalg op
+  // would fail vectorization.
+  if (!isa<linalg::LinalgOp>(op)) vectorSize = 1;
+
   // Set the inner most parallel loop to `lowerTs`.
   for (int64_t depth = numLoops; depth > 0; depth--) {
     if (partitionedLoopsSet.count(depth - 1)) {
@@ -144,7 +184,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   tileSizes.push_back({});                                // Subgroup level.
   tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
 }
 
@@ -171,14 +211,17 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     if (getTranslationInfo(entryPointOp)) continue;
     SmallVector<Operation *, 4> computeOps;
     SmallVector<Operation *, 4> tiledLoops;
-    if (succeeded(getComputeOps(funcOp, computeOps, tiledLoops)) &&
-        !computeOps.empty()) {
+    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+      return funcOp.emitOpError("failed to get compute ops");
     }
 
     if (computeOps.empty()) {
+      // TODO(ravishankarm): Maybe this should just return without setting
+      // anything. Without any compute ops, this shouldnt be using tile and
+      // distribute.
       setTranslationInfo(
           funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          {1, 1, 1});
+          {1, 1, 1}, /*workloadPerWorkgroup=*/{});
       continue;
     }
 
@@ -201,8 +244,16 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       }
     }
 
+    if (!rootOperation) {
+      // TODO(ravishankarm): Maybe this should just return without setting
+      // anything. Without any compute ops, this shouldnt be using tile and
+      // distribute.
+      setTranslationInfo(
+          funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+          {1, 1, 1}, /*workloadPerWorkgroup=*/{});
+      continue;
+    }
     if (failed(setRootConfig(funcOp, rootOperation))) continue;
-    IREE::HAL::LoweringConfig config = getLoweringConfig(rootOperation);
 
     // Propogate the configuration to the other ops.
     // TODO(ravishankarm, thomasraoux): This is a very specific use (and
@@ -210,6 +261,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     // and distributed. The rest of the compilation must be structured to either
     // use `TileAndFuse` or they are independent configurations that are
     // determined based on the op.
+    IREE::HAL::LoweringConfig config = getLoweringConfig(rootOperation);
     for (auto op : computeOps) {
       if (op == rootOperation) continue;
       setLoweringConfig(op, config);

@@ -214,7 +214,7 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 // There is nothing to verify here except that correct IR is generated (if
 // constants are not handled properly, it will produce illegally ordered IR).
 func @tensorReshapeWithTiedConstant(%arg0: !hal.buffer_view) -> !hal.buffer_view {
-  %0 = hal.buffer_view.dim %arg0, 0 : index
+  %0 = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
   %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?xf32>{%0}
   %2 = flow.ex.stream.fragment(%1) : (tensor<?xf32>{%0}) -> tensor<4xf32> =
       (%arg1: tensor<?xf32>) -> tensor<4xf32> {
@@ -284,7 +284,7 @@ func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> te
     // CHECK-SAME:   source(%[[UBUF]] : !hal.buffer)[%c0]
     // CHECK-SAME:   target(%[[RET_BUF]] : !hal.buffer)[%c204]
     // CHECK-SAME:   length(%c40)
-    %1 = flow.tensor.update %arg2, %clone[%arg4, %arg5, %arg5] : tensor<1x1x10xf32> -> tensor<5x1x10xf32>
+    %1 = flow.tensor.update %arg2, %clone[%arg4, %arg5, %arg5] : tensor<1x1x10xf32> -> %clone as tensor<5x1x10xf32>
     flow.return %1 : tensor<5x1x10xf32>
   }
   // CHECK: hal.command_buffer.end<%[[CMD]]
@@ -557,7 +557,7 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 
 // Test that when we copy a subspan of a large constant pool into a buffer,
 // we use the correct size.
-hal.variable @_const_pool_splats : !hal.buffer attributes {sym_visibility = "private"}
+util.global private @_const_pool_splats : !hal.buffer
 
 // CHECK-LABEL: func @cloneFromLargeBufferToSmallBuffer
 func @cloneFromLargeBufferToSmallBuffer(%input: tensor<2xi32>) -> tensor<7xi32> {
@@ -568,10 +568,10 @@ func @cloneFromLargeBufferToSmallBuffer(%input: tensor<2xi32>) -> tensor<7xi32> 
     // CHECK: %[[C0:.+]] = constant 0 : index
     // CHECK: %[[C28:.+]] = constant 28 : index
     // CHECK: %[[DSTBUF:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[C28]]}
-    // CHECK: %[[CSTBUF:.+]] = hal.variable.load @_const_pool_splats : !hal.buffer
+    // CHECK: %[[CSTBUF:.+]] = util.global.load @_const_pool_splats : !hal.buffer
     // CHECK: hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer> source(%[[CSTBUF]] : !hal.buffer)[%[[C0]]] target(%[[DSTBUF]] : !hal.buffer)[%[[C0]]] length(%[[C28]])
     %2 = flow.tensor.clone %const_span : tensor<7xi32>
-    %3 = flow.tensor.update %arg0, %2[%c3] : tensor<2xi32> -> tensor<7xi32>
+    %3 = flow.tensor.update %arg0, %2[%c3] : tensor<2xi32> -> %2 as tensor<7xi32>
     flow.return %3 : tensor<7xi32>
   }
   return %1 : tensor<7xi32>

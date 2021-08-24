@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -41,13 +41,6 @@ namespace Flow {
 // Op utilities used within the Flow dialect
 //===----------------------------------------------------------------------===//
 
-// Returns true if the given |accessType| is compatible with the |variableType|.
-// For example, this will return true if the variable type is a tensor<?xf32>
-// and the access is tensor<4xf32>.
-static bool isVariableTypeCompatible(Type variableType, Type accessType) {
-  return succeeded(mlir::verifyCompatibleShape(variableType, accessType));
-}
-
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
 // of the dynamic dimensions in |values|.
 static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
@@ -63,486 +56,6 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
            << "value set has " << requiredCount
            << " dynamic dimensions but only " << dynamicDims.size()
            << " dimension values are attached";
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// custom<TiedResult>
-//===----------------------------------------------------------------------===//
-// type{%dim0, %dim1}
-// %arg0
-
-static ParseResult parseTiedResult(
-    OpAsmParser &parser, Type &resultType,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
-    ArrayAttr &tiedOperands) {
-  if (failed(parser.parseType(resultType))) return failure();
-  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
-    if (!shapedType.hasStaticShape()) {
-      SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
-      if (failed(parser.parseLBrace()) ||
-          failed(parser.parseOperandList(dynamicDims,
-                                         shapedType.getNumDynamicDims(),
-                                         OpAsmParser::Delimiter::None)) ||
-          failed(parser.parseRBrace())) {
-        return failure();
-      }
-      resultDims.append(dynamicDims);
-    }
-  }
-  tiedOperands = parser.getBuilder().getIndexArrayAttr({0});
-  return success();
-}
-
-static void printTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
-                            ValueRange resultDims, ArrayAttr tiedOperands) {
-  p.printType(resultType);
-  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
-    if (!shapedType.hasStaticShape()) {
-      if (resultDims.empty()) {
-        p << "{<<INVALID>>}";
-        return;
-      }
-      p << "{";
-      llvm::interleaveComma(
-          resultDims.take_front(shapedType.getNumDynamicDims()), p,
-          [&](Value value) { p.printOperand(value); });
-      p << "}";
-    }
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// custom<ShapedFunctionType>
-//===----------------------------------------------------------------------===//
-// (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
-
-static ParseResult parseShapedOperandList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::OperandType> &dims) {
-  do {
-    Type type;
-    if (failed(parser.parseType(type))) return failure();
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
-        if (failed(parser.parseLBrace()) ||
-            failed(parser.parseOperandList(dynamicDims,
-                                           shapedType.getNumDynamicDims(),
-                                           OpAsmParser::Delimiter::None)) ||
-            failed(parser.parseRBrace())) {
-          return failure();
-        }
-        dims.append(dynamicDims);
-      }
-    }
-    types.push_back(type);
-  } while (succeeded(parser.parseOptionalComma()));
-  return success();
-}
-
-// Finds the operand index in |operands| that |tiedResult| references.
-// Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
-                               ArrayRef<OpAsmParser::OperandType> operands) {
-  int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
-  for (int64_t i = 0; i < operands.size(); ++i) {
-    if (operands[i].name == tiedResult.name) {
-      operandIndex = i;
-      break;
-    }
-  }
-  return operandIndex;
-}
-
-static ParseResult parseShapedResultList(
-    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
-    TypeRange operandTypes, ArrayRef<OpAsmParser::OperandType> operandDims,
-    SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
-    ArrayAttr &tiedOperands) {
-  SmallVector<int64_t, 4> tiedOperandIndices;
-  do {
-    OpAsmParser::OperandType tiedResult;
-    auto res = parser.parseOptionalOperand(tiedResult);
-    Type type;
-    int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
-    if (res.hasValue() && succeeded(res.getValue())) {
-      tiedOperandIndex = findTiedOperand(tiedResult, operands);
-      if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
-        return parser.emitError(tiedResult.location,
-                                "tied operand not found for result reference ")
-               << tiedResult.name;
-      }
-      if (succeeded(parser.parseOptionalKeyword("as"))) {
-        // Type _may_ differ from the operand.
-        if (failed(parser.parseType(type))) return failure();
-      } else {
-        // Use the operands type.
-        type = operandTypes[tiedOperandIndex];
-      }
-    } else if (failed(parser.parseType(type))) {
-      return failure();
-    }
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
-        if (failed(parser.parseLBrace()) ||
-            failed(parser.parseOperandList(dynamicDims,
-                                           shapedType.getNumDynamicDims(),
-                                           OpAsmParser::Delimiter::None)) ||
-            failed(parser.parseRBrace())) {
-          return failure();
-        }
-        resultDims.append(dynamicDims);
-      }
-    }
-    resultTypes.push_back(type);
-    tiedOperandIndices.push_back(tiedOperandIndex);
-  } while (succeeded(parser.parseOptionalComma()));
-  if (!tiedOperandIndices.empty()) {
-    tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
-  }
-  return success();
-}
-
-static ParseResult parseShapedFunctionType(
-    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
-    SmallVectorImpl<Type> &operandTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &operandDims,
-    SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
-    ArrayAttr &tiedOperands) {
-  if (failed(parser.parseLParen())) return failure();
-  if (failed(parser.parseOptionalRParen())) {
-    if (failed(parseShapedOperandList(parser, operandTypes, operandDims)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  }
-  if (failed(parser.parseArrow())) return failure();
-  if (succeeded(parser.parseOptionalLParen())) {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandDims, resultTypes, resultDims,
-                                     tiedOperands)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  } else {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandDims, resultTypes, resultDims,
-                                     tiedOperands))) {
-      return failure();
-    }
-  }
-  return success();
-}
-
-static void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
-                                    ValueRange operands, TypeRange operandTypes,
-                                    OperandRange operandDims,
-                                    TypeRange resultTypes,
-                                    OperandRange resultDims,
-                                    ArrayAttr tiedOperands) {
-  p << "(";
-  llvm::interleaveComma(operandTypes, p, [&](Type type) {
-    p.printType(type);
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        if (operandDims.empty()) {
-          p << "{<<INVALID>>}";
-          return;
-        }
-        p << "{";
-        llvm::interleaveComma(
-            operandDims.take_front(shapedType.getNumDynamicDims()), p,
-            [&](Value value) { p.printOperand(value); });
-        p << "}";
-        operandDims = operandDims.drop_front(shapedType.getNumDynamicDims());
-      }
-    }
-  });
-  p << ") -> ";
-  if (resultTypes.size() != 1) p << "(";
-  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
-  for (unsigned i = 0; i < resultTypes.size(); ++i) {
-    auto resultType = resultTypes[i];
-    auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
-    bool printType = true;
-    if (tiedOperandIndex.hasValue()) {
-      auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
-      p.printOperand(tiedOperand);
-      if (tiedOperand.getType() != resultType) {
-        p << " as ";
-      } else {
-        // Type elided as it matches the operand.
-        printType = false;
-      }
-    }
-    if (printType) {
-      p.printType(resultType);
-    }
-    if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        if (resultDims.empty()) {
-          p << "{<<INVALID>>}";
-          return;
-        }
-        p << "{";
-        llvm::interleaveComma(
-            resultDims.take_front(shapedType.getNumDynamicDims()), p,
-            [&](Value value) { p.printOperand(value); });
-        p << "}";
-        resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
-      }
-    }
-    if (i < resultTypes.size() - 1) p << ", ";
-  }
-  if (resultTypes.size() != 1) p << ")";
-}
-
-//===----------------------------------------------------------------------===//
-// flow.variable
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseVariableOp(OpAsmParser &parser,
-                                   OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes))) {
-    return failure();
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("mutable"))) {
-    result->addAttribute("is_mutable", UnitAttr::get(result->getContext()));
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("init"))) {
-    FlatSymbolRefAttr initializerAttr;
-    if (failed(parser.parseLParen()) ||
-        failed(parser.parseAttribute(initializerAttr, "initializer",
-                                     result->attributes)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  }
-
-  if (failed(parser.parseOptionalColon())) {
-    Attribute initialValueAttr;
-    if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
-                                     result->attributes))) {
-      return failure();
-    }
-    result->addAttribute("type", TypeAttr::get(initialValueAttr.getType()));
-  } else {
-    Type type;
-    if (failed(parser.parseType(type))) {
-      return failure();
-    }
-    result->addAttribute("type", TypeAttr::get(type));
-  }
-
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  return success();
-}
-
-static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
-  p << op.getOperationName() << ' ';
-  p.printSymbolName(op.sym_name());
-  if (op.is_mutable()) {
-    p << " mutable";
-  }
-  if (op.initializer().hasValue()) {
-    p << " init(";
-    p.printSymbolName(op.initializer().getValue());
-    p << ')';
-  }
-  if (op.initial_value().hasValue()) {
-    p << ' ';
-    p.printAttribute(op.initial_value().getValue());
-  } else {
-    p << " : ";
-    p.printType(op.type());
-  }
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
-                                         "sym_name",
-                                         "type",
-                                         "is_mutable",
-                                         "initializer",
-                                         "initial_value",
-                                     });
-}
-
-static LogicalResult verifyVariableOp(VariableOp op) {
-  if (op.initializer().hasValue() && op.initial_value().hasValue()) {
-    return op.emitOpError()
-           << "variables can have either an initializer or an initial value";
-  } else if (op.initializer().hasValue()) {
-    // Ensure initializer returns the same type as the variable.
-    auto *symbolOp =
-        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
-    if (!symbolOp) {
-      return op.emitOpError() << "initializer function "
-                              << op.initializer().getValue() << " not found";
-    }
-    auto initializerOp = dyn_cast<mlir::FuncOp>(symbolOp);
-    if (initializerOp.getNumArguments() != 0 ||
-        initializerOp.getNumResults() != 1 ||
-        initializerOp.getType().getResult(0) != op.type()) {
-      return op.emitOpError()
-             << "initializer type mismatch; variable " << op.sym_name()
-             << " is " << op.type() << " but initializer function "
-             << initializerOp.getName() << " is " << initializerOp.getType();
-    }
-  } else if (op.initial_value().hasValue()) {
-    // Ensure the value is something we can store in the variable
-    if (!isVariableTypeCompatible(op.type(), op.initial_value()->getType())) {
-      return op.emitOpError()
-             << "initial value type mismatch; variable " << op.sym_name()
-             << " is " << op.type() << " but initial value provided is "
-             << op.initial_value()->getType();
-    }
-  }
-  return success();
-}
-
-void VariableOp::build(OpBuilder &builder, OperationState &state,
-                       StringRef name, bool isMutable, FuncOp initializer,
-                       ArrayRef<NamedAttribute> attrs) {
-  state.addAttribute(SymbolTable::getSymbolAttrName(),
-                     builder.getStringAttr(name));
-  if (isMutable) {
-    state.addAttribute("is_mutable", builder.getUnitAttr());
-  }
-  state.addAttribute("initializer", builder.getSymbolRefAttr(initializer));
-  state.addAttribute("type", TypeAttr::get(initializer.getType().getResult(0)));
-  state.attributes.append(attrs.begin(), attrs.end());
-}
-
-void VariableOp::build(OpBuilder &builder, OperationState &result,
-                       StringRef name, bool isMutable, Type type,
-                       Attribute initialValue, ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder.getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder.getUnitAttr());
-  }
-  result.addAttribute("initial_value", initialValue);
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
-}
-
-void VariableOp::build(OpBuilder &builder, OperationState &result,
-                       StringRef name, bool isMutable, Type type,
-                       ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder.getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder.getUnitAttr());
-  }
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
-}
-
-//===----------------------------------------------------------------------===//
-// flow.variable.load
-//===----------------------------------------------------------------------===//
-
-void VariableLoadOp::build(OpBuilder &builder, OperationState &state,
-                           VariableOp variableOp,
-                           ArrayRef<NamedAttribute> attrs) {
-  state.addTypes({variableOp.type()});
-  state.addAttribute("variable", builder.getSymbolRefAttr(variableOp));
-  state.attributes.append(attrs.begin(), attrs.end());
-}
-
-void VariableLoadOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  // HACK: works around the lack of symbol side effects in mlir by only saying
-  // we have a side-effect if the variable we are loading is mutable.
-  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(*this, variable());
-  assert(symbolOp);
-  auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  if (variableOp.is_mutable()) {
-    effects.emplace_back(MemoryEffects::Read::get());
-  }
-}
-
-static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
-  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
-  if (!symbolOp) {
-    return op.emitOpError() << "undefined variable: " << op.variable();
-  }
-  auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  auto loadType = op.result().getType();
-  if (!isVariableTypeCompatible(variableOp.type(), loadType)) {
-    return op.emitOpError()
-           << "variable type mismatch; variable " << op.variable() << " is "
-           << variableOp.type() << " but load is " << loadType;
-  }
-  return success();
-}
-
-VariableOp VariableLoadOp::getLoadedVariable() {
-  return SymbolTable::lookupNearestSymbolFrom<IREE::Flow::VariableOp>(
-      getOperation()->getParentOp(), variable());
-}
-
-//===----------------------------------------------------------------------===//
-// flow.variable.load.indirect
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyVariableLoadIndirectOp(VariableLoadIndirectOp &op) {
-  auto variableType =
-      op.variable().getType().cast<IREE::Util::PtrType>().getTargetType();
-  auto loadType = op.result().getType();
-  if (!isVariableTypeCompatible(variableType, loadType)) {
-    return op.emitOpError() << "variable type mismatch; variable pointer is "
-                            << variableType << " but load is " << loadType;
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.variable.store
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
-  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
-  if (!symbolOp) {
-    return op.emitOpError() << "undefined variable: " << op.variable();
-  }
-  auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  auto storeType = op.value().getType();
-  if (!isVariableTypeCompatible(variableOp.type(), storeType)) {
-    return op.emitOpError()
-           << "variable type mismatch; variable " << op.variable() << " is "
-           << variableOp.type() << " but store is " << storeType;
-  }
-  if (!variableOp.is_mutable()) {
-    return op.emitOpError() << "variable " << op.variable()
-                            << " is not mutable and cannot be stored to";
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// flow.variable.store.indirect
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyVariableStoreIndirectOp(
-    VariableStoreIndirectOp &op) {
-  auto variableType =
-      op.variable().getType().cast<IREE::Util::PtrType>().getTargetType();
-  auto storeType = op.value().getType();
-  if (!isVariableTypeCompatible(variableType, storeType)) {
-    return op.emitOpError() << "variable type mismatch; variable pointer is "
-                            << variableType << " but store is " << storeType;
   }
   return success();
 }
@@ -810,27 +323,66 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   return canDispatchRegionContainOp(op);
 }
 
-bool DispatchWorkgroupsOp::isOutputReadWithinRegion(unsigned resultIndex) {
-  unsigned startIndex = getBody()->getNumArguments() - getNumResults();
-  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
-  // If argument is of `writeonly` access, then it is not read by construction.
-  if (arg.getType().cast<DispatchTensorType>().getAccess() ==
-      TensorAccess::WriteOnly) {
-    return false;
-  }
-  // If the argument is a result with `readwrite` access, return false if the
-  // value is only written to. Check this by looking at the uses of the argument
-  // being only the `target` of `flow.dispatch.tensor.store` ops.
-  for (OpOperand &uses : arg.getUses()) {
-    auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
-    if (!(storeOp && storeOp.target() == uses.get())) {
-      return true;
+// Refines the tensor access from what is declared on |type| based on actual
+// usage. We expect that the access was set correctly to begin with but today
+// we sometimes specify things too wide.
+static TensorAccess refineTensorAccess(Value value, DispatchTensorType type) {
+  auto tensorAccess = type.getAccess();
+  if (tensorAccess == TensorAccess::ReadWrite) {
+    // If the argument is a result with `readwrite` access, return false if the
+    // value is only written to. Check this by looking at the uses of the
+    // argument being only the `target` of `flow.dispatch.tensor.store` ops.
+    bool onlyWrites = true;
+    for (OpOperand &uses : value.getUses()) {
+      auto storeOp = dyn_cast<DispatchTensorStoreOp>(uses.getOwner());
+      if (!(storeOp && storeOp.target() == uses.get())) {
+        onlyWrites = false;
+        break;
+      }
     }
+    if (onlyWrites) tensorAccess = TensorAccess::WriteOnly;
   }
-  return false;
+  return tensorAccess;
 }
 
-ClosureOpInterface
+IREE::Util::ValueAccess DispatchWorkgroupsOp::getOperandAccess(
+    unsigned operandIndex) {
+  BlockArgument arg = body().front().getArgument(operandIndex);
+  if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
+    auto tensorAccess = refineTensorAccess(arg, tensorType);
+    return IREE::Util::ValueAccess(
+        /*isRead=*/(tensorAccess == TensorAccess::ReadOnly) ||
+            (tensorAccess == TensorAccess::ReadWrite),
+        /*isWrite=*/(tensorAccess == TensorAccess::ReadWrite) ||
+            (tensorAccess == TensorAccess::WriteOnly),
+        /*isDiscard=*/(tensorAccess == TensorAccess::WriteOnly));
+  } else {
+    return IREE::Util::ValueAccess(/*isRead=*/!arg.use_empty(),
+                                   /*isWrite=*/false,
+                                   /*isDiscard=*/false);
+  }
+}
+
+IREE::Util::ValueAccess DispatchWorkgroupsOp::getResultAccess(
+    unsigned resultIndex) {
+  unsigned startIndex = getBody()->getNumArguments() - getNumResults();
+  BlockArgument arg = body().front().getArgument(startIndex + resultIndex);
+  if (auto tensorType = arg.getType().dyn_cast<DispatchTensorType>()) {
+    auto tensorAccess = refineTensorAccess(arg, tensorType);
+    return IREE::Util::ValueAccess(
+        /*isRead=*/(tensorAccess == TensorAccess::ReadOnly) ||
+            (tensorAccess == TensorAccess::ReadWrite),
+        /*isWrite=*/(tensorAccess == TensorAccess::ReadWrite) ||
+            (tensorAccess == TensorAccess::WriteOnly),
+        /*isDiscard=*/(tensorAccess == TensorAccess::WriteOnly));
+  } else {
+    return IREE::Util::ValueAccess(/*isRead=*/!arg.use_empty(),
+                                   /*isWrite=*/false,
+                                   /*isDiscard=*/false);
+  }
+}
+
+IREE::Util::ClosureOpInterface
 DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
@@ -838,9 +390,9 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
   SmallVector<Value, 4> newOperandDims = llvm::to_vector<4>(operand_dims());
-  excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
-                                   excludedOperandIndices, newResultTypes,
-                                   newResultDims, excludedResultIndices);
+  IREE::Util::excludeClosureOperandsAndResults(
+      newOperandsValues, newOperandDims, excludedOperandIndices, newResultTypes,
+      newResultDims, excludedResultIndices);
 
   auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
@@ -1383,7 +935,7 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   if (auto constantOp = dyn_cast<ConstantOp>(op)) {
     return constantOp.getType().isIntOrIndexOrFloat();
   }
-  if (auto loadOp = dyn_cast<VariableLoadOp>(op)) {
+  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
     // Only allow loads of immutable variables to move into the stream.
     // As they are immutable it's always safe to do so as no synchronization at
     // the stream entry/exit boundary is required.
@@ -1391,18 +943,25 @@ bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
     // Loads of mutable variables may sometimes be safe to move in as well
     // however that is best done when we have better cross-stream
     // synchronization support and can make those guarantees structurally.
-    auto variableOp =
-        SymbolTable::lookupNearestSymbolFrom<VariableOp>(op, loadOp.variable());
-    return variableOp.is_mutable() == false;
+    return loadOp.isGlobalImmutable();
   }
   return false;
 }
 
-bool ExStreamFragmentOp::isOutputReadWithinRegion(unsigned resultIndex) {
-  return false;
+IREE::Util::ValueAccess ExStreamFragmentOp::getOperandAccess(
+    unsigned operandIndex) {
+  return !isOperandTied(operandIndex) ? IREE::Util::ValueAccess::ReadOnly()
+                                      : IREE::Util::ValueAccess::ReadWrite();
 }
 
-ClosureOpInterface
+IREE::Util::ValueAccess ExStreamFragmentOp::getResultAccess(
+    unsigned resultIndex) {
+  return getTiedResultOperandIndex(resultIndex).hasValue()
+             ? IREE::Util::ValueAccess::ReadWrite()
+             : IREE::Util::ValueAccess::DiscardWrite();
+}
+
+IREE::Util::ClosureOpInterface
 ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
@@ -1410,9 +969,9 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
   SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
   SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
   SmallVector<Value, 4> newOperandDims = llvm::to_vector<4>(operand_dims());
-  excludeClosureOperandsAndResults(newOperandsValues, newOperandDims,
-                                   excludedOperandIndices, newResultTypes,
-                                   newResultDims, excludedResultIndices);
+  IREE::Util::excludeClosureOperandsAndResults(
+      newOperandsValues, newOperandDims, excludedOperandIndices, newResultTypes,
+      newResultDims, excludedResultIndices);
 
   auto newTiedOperandIndices =
       llvm::to_vector<4>(getTiedResultOperandIndices());
@@ -1426,7 +985,7 @@ ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
       newOperandDims, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
-  eraseRegionResults(newBody, excludedResultIndices);
+  IREE::Util::eraseRegionResults(newBody, excludedResultIndices);
   newBody.front().eraseArguments(excludedOperandIndices);
   return newOp;
 }

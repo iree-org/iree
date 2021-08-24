@@ -24,6 +24,21 @@ PyObject* ApiStatusToPyExcClass(iree_status_t status) {
   }
 }
 
+static std::string ApiStatusToString(iree_status_t status) {
+  iree_host_size_t buffer_length = 0;
+  if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
+                                        /*buffer=*/NULL, &buffer_length))) {
+    return "";
+  }
+  std::string result;
+  result.resize(buffer_length);
+  // NOTE: buffer capacity needs to be +1 for the NUL terminator in snprintf.
+  return iree_status_format(status, result.size() + 1,
+                            const_cast<char*>(result.data()), &buffer_length)
+             ? result
+             : "";
+}
+
 }  // namespace
 
 pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
@@ -31,15 +46,12 @@ pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
   assert(!iree_status_is_ok(status));
   std::string full_message;
 
-  char* iree_message;
-  size_t iree_message_length;
-  if (iree_status_to_string(status, &iree_message, &iree_message_length)) {
-    full_message = std::string(message) + ": " +
-                   std::string(iree_message, iree_message_length);
-    iree_allocator_free(iree_allocator_system(), iree_message);
-  } else {
+  auto status_str = ApiStatusToString(status);
+  if (status_str.empty()) {
     full_message = std::string(message) + ": " +
                    iree_status_code_string(iree_status_code(status));
+  } else {
+    full_message = std::string(message) + ": " + status_str;
   }
 
   PyErr_SetString(ApiStatusToPyExcClass(status), full_message.c_str());

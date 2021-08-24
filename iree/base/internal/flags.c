@@ -392,12 +392,8 @@ void iree_flags_parse_checked(iree_flags_parse_mode_t mode, int* argc,
   if (iree_status_is_ok(status)) return;
 
   fprintf(stderr, "\x1b[31mFLAGS ERROR: (╯°□°)╯︵👻\x1b[0m\n");
-  char* buffer = NULL;
-  iree_host_size_t buffer_length = 0;
-  iree_status_to_string(status, &buffer, &buffer_length);
-  fprintf(stderr, "%.*s\n\n", (int)buffer_length, buffer);
+  iree_status_fprint(stderr, status);
   fflush(stderr);
-  iree_allocator_free(iree_allocator_system(), buffer);
 
   exit(EXIT_FAILURE);
 }

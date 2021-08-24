@@ -31,3 +31,29 @@ func @multi_result() {
       [189, 220, 253, 288]]> : tensor<3x4xi32>) : tensor<3x4xi32>
   return
 }
+
+func @operand_fusion() {
+  %input = util.unfoldable_constant dense<1.0> : tensor<1x225x225x3xf32>
+  %filter = util.unfoldable_constant dense<1.0> : tensor<3x3x3x16xf32>
+  %bias = util.unfoldable_constant dense<1.0> : tensor<16xf32>
+  %init = linalg.init_tensor [1, 112, 112, 16] : tensor<1x112x112x16xf32>
+  %cst = constant 0.0 : f32
+  %fill = linalg.fill(%cst, %init) : f32, tensor<1x112x112x16xf32> -> tensor<1x112x112x16xf32>
+  %conv = linalg.conv_2d_input_nhwc_filter_hwcf
+      {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
+      ins(%input, %filter : tensor<1x225x225x3xf32>, tensor<3x3x3x16xf32>)
+      outs(%fill : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%conv, %bias : tensor<1x112x112x16xf32>, tensor<16xf32>)
+      outs(%init : tensor<1x112x112x16xf32>) {
+      ^bb0(%arg0 : f32, %arg1 : f32, %arg2 : f32):
+        %0 = addf %arg0, %arg1 : f32
+        linalg.yield %0 : f32
+      } -> tensor<1x112x112x16xf32>
+  check.expect_eq_const(%result, dense<28.0> : tensor<1x112x112x16xf32>) : tensor<1x112x112x16xf32>
+  return
+}

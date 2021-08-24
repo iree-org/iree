@@ -238,13 +238,16 @@ void VmVariantList::PushBufferView(HalDevice& device,
                        "Dependent buffer arguments not implemented");
   }
 
+  iree_hal_encoding_type_t encoding_type =
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
+
   // Create the buffer_view. (note that numpy shape is ssize_t)
   std::vector<int> dims(py_view.ndim);
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* buffer_view;
   CheckApiStatus(
       iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
-                                  element_type, &buffer_view),
+                                  element_type, encoding_type, &buffer_view),
       "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);

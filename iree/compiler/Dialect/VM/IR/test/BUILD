@@ -36,6 +36,7 @@ iree_lit_test_suite(
             "list_op_verification.mlir",
             "list_ops.mlir",
             "shift_ops.mlir",
+            "structural_folding.mlir",
             "structural_ops.mlir",
         ],
         include = ["*.mlir"],

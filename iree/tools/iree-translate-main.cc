@@ -57,6 +57,12 @@ static llvm::cl::opt<bool> splitInputFile(
                    "process each chunk independently"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> printMainAddress(
+    "print-main-address",
+    llvm::cl::desc("Print the address of main to stderr to aid in symbolizing "
+                   "stack traces after the fact"),
+    llvm::cl::init(false));
+
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   mlir::DialectRegistry registry;
@@ -88,6 +94,11 @@ int main(int argc, char **argv) {
                            llvm::cl::Required);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "IREE translation driver\n");
+
+  if (printMainAddress) {
+    llvm::errs() << "iree-translate main is at "
+                 << reinterpret_cast<void *>(&main) << "\n";
+  }
 
   std::string errorMessage;
   auto input = mlir::openInputFile(inputFilename, &errorMessage);

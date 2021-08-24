@@ -13,159 +13,13 @@ include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
     FLOW_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
-
-//===----------------------------------------------------------------------===//
-// Variables
-//===----------------------------------------------------------------------===//
-
-def FLOW_VariableOp : FLOW_Op<"variable", [
-  Symbol,
-]> {
-  let summary = [{stateful variable declaration}];
-  let description = [{
-    Declares a persistent variable that maintains its value.
-  }];
-
-  let arguments = (ins
-    StrAttr:$sym_name,
-    // TODO(benvanik): verify AnyRankedTensor.
-    TypeAttr:$type,
-    UnitAttr:$is_mutable,
-    // TODO(benvanik): verify matches $type.
-    OptionalAttr<FlatSymbolRefAttr>:$initializer,
-    // TODO(benvanik): verify matches $type.
-    OptionalAttr<AnyAttr>:$initial_value
-  );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable,
-      "mlir::FuncOp":$initializer,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
-      "Attribute":$initialValue,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-    OpBuilder<(ins "StringRef":$name, "bool":$isMutable, "Type":$type,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
-  ];
-
-  let verifier = [{ return verifyVariableOp(*this); }];
-
-  let hasCanonicalizer = 1;
-}
-
-def FLOW_VariableAddressOp : FLOW_PureOp<"variable.address"> {
-  let summary = [{returns an address reference to a variable}];
-  let description = [{
-    Returns the address of a variable as a typed reference. Can be used with the
-    variable load and store indirect ops.
-  }];
-
-  let arguments = (ins
-    FLOW_VariableRefAttr:$variable
-  );
-  let results = (outs
-    FLOW_VariablePtr:$result
-  );
-
-  let assemblyFormat = "$variable attr-dict `:` type($result)";
-}
-
-def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [
-  // HACK: works around the lack of symbol side effects in C++.
-  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-]> {
-  let summary = [{loads a value from a global variable}];
-  let description = [{
-    Returns a copy of the variable value.
-  }];
-
-  let arguments = (ins
-    Arg<FLOW_VariableRefAttr, "", [MemRead]>:$variable
-  );
-  let results = (outs
-    AnyType:$result
-  );
-
-  let assemblyFormat = "$variable attr-dict `:` type($result)";
-
-  let builders = [
-    OpBuilder<(ins "IREE::Flow::VariableOp":$variableOp,
-                   CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
-  ];
-
-  let verifier = [{ return verifyVariableLoadOp(*this); }];
-
-  let hasFolder = 1;
-
-  let extraClassDeclaration = [{
-    IREE::Flow::VariableOp getLoadedVariable();
-  }];
-}
-
-def FLOW_VariableLoadIndirectOp : FLOW_Op<"variable.load.indirect"> {
-  let summary = [{loads a value from a global variable}];
-  let description = [{
-    Returns a copy of the variable value.
-  }];
-
-  let arguments = (ins
-    FLOW_VariablePtr:$variable
-  );
-  let results = (outs
-    AnyType:$result
-  );
-
-  let assemblyFormat = "$variable attr-dict `:` type($variable) `->` type($result)";
-
-  let verifier = [{ return verifyVariableLoadIndirectOp(*this); }];
-
-  let hasCanonicalizer = 1;
-}
-
-def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
-  let summary = [{stores a value into a global variable}];
-  let description = [{
-    Stores a copy of the value into a variable.
-  }];
-
-  let arguments = (ins
-    AnyType:$value,
-    Arg<FLOW_VariableRefAttr, "", [MemWrite]>:$variable
-  );
-
-  let assemblyFormat = "$value `,` $variable attr-dict `:` type($value)";
-
-  let verifier = [{ return verifyVariableStoreOp(*this); }];
-
-  let hasCanonicalizer = 1;
-}
-
-def FLOW_VariableStoreIndirectOp : FLOW_Op<"variable.store.indirect"> {
-  let summary = [{stores a value into a global variable}];
-  let description = [{
-    Stores a copy of the value into a variable.
-  }];
-
-  let arguments = (ins
-    AnyType:$value,
-    FLOW_VariablePtr:$variable
-  );
-
-  let assemblyFormat = "$value `,` $variable attr-dict `:` type($value) `->` type($variable)";
-
-  let verifier = [{ return verifyVariableStoreIndirectOp(*this); }];
-
-  let hasCanonicalizer = 1;
-}
-
-// TODO(benvanik): additional resource variable ops (like scatter/gather).
 
 //===----------------------------------------------------------------------===//
 // Partitioned regions
@@ -175,7 +29,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
   SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
-  DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+  DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
   ]>,
@@ -568,7 +422,7 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
   let hasCanonicalizer = 1;
 }
 
-def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
+def FLOW_ReturnOp : FLOW_Op<"return", [NoSideEffect, ReturnLike, Terminator]> {
   let summary = [{return from a flow.dispatch_region}];
   let description = [{
     Returns the given values from the region and back to the host code.
@@ -1021,7 +875,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    custom<TiedResult>(type($result), $target_dims, $tied_operands)
+    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
     attr-dict-with-keyword
   }];
 
@@ -1068,7 +922,7 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<FLOW_ClosureOpInterface>,
+  DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface>,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
 ]> {

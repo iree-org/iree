@@ -4,14 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
-#define IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
+#ifndef IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_
+#define IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_
 
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SubElementInterfaces.h"
 #include "mlir/IR/TypeSupport.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 
 namespace mlir {
@@ -49,6 +53,22 @@ enum class StatusCode : int32_t {
   DataLoss = 15,
   Unauthenticated = 16,
   DoNotUseReservedForFutureExpansionUseDefaultInSwitchInstead_ = 20
+};
+
+struct ValueAccess {
+  bool isRead : 1;
+  bool isWrite : 1;
+  bool isDiscard : 1;
+  bool isNone() const { return !isRead && !isWrite && !isDiscard; }
+  bool isReadOnly() const { return isRead && !isWrite && !isDiscard; }
+  ValueAccess() : isRead(false), isWrite(false), isDiscard(false) {}
+  ValueAccess(bool isRead, bool isWrite, bool isDiscard)
+      : isRead(isRead), isWrite(isWrite), isDiscard(isDiscard) {}
+  static ValueAccess None() { return ValueAccess(false, false, false); }
+  static ValueAccess ReadOnly() { return ValueAccess(true, false, false); }
+  static ValueAccess ReadWrite() { return ValueAccess(true, true, false); }
+  static ValueAccess WriteOnly() { return ValueAccess(false, true, false); }
+  static ValueAccess DiscardWrite() { return ValueAccess(false, true, true); }
 };
 
 /// Placeholder for a variant type (`?`).
@@ -93,7 +113,8 @@ class ListType
 };
 
 /// Base for typed pointer-like references.
-class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
+class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage,
+                                      mlir::SubElementTypeInterface::Trait> {
  public:
   static PtrType get(Type targetType);
   static PtrType getChecked(Type targetType, Location location);
@@ -102,7 +123,13 @@ class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
 
   using Base::Base;
 
-  Type getTargetType();
+  Type getTargetType() const;
+
+  void walkImmediateSubElements(
+      llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+      llvm::function_ref<void(mlir::Type)> walkTypesFn) const {
+    walkTypesFn(getTargetType());
+  }
 };
 
 /// A buffer of constant mapped memory.
@@ -125,6 +152,7 @@ llvm::Optional<unsigned> getTiedResultOperandIndex(Operation *op,
 void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
                                llvm::Optional<unsigned> operandIndex);
 SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op);
+bool isOperandTied(Operation *tiedOp, unsigned operandIndex);
 LogicalResult verifyTiedOp(TiedOpInterface tiedOp);
 }  // namespace detail
 
@@ -140,6 +168,8 @@ void excludeTiedOperandAndResultIndices(
 }  // namespace iree_compiler
 }  // namespace mlir
 
+#include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.h.inc"  // IWYU pragma: export
 #include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.h.inc"  // IWYU pragma: export
 
-#endif  // IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
+#endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_

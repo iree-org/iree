@@ -12,6 +12,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -33,6 +35,7 @@ class IdentifyConstantPoolsPass
     registry.insert<mlir::StandardOpsDialect>();
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<IREE::HAL::HALDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
   }
 
   StringRef getArgument() const override {
@@ -40,27 +43,27 @@ class IdentifyConstantPoolsPass
   }
 
   StringRef getDescription() const override {
-    return "Combines constant variables into one or more hal.constant_pools "
+    return "Combines constant globals into one or more hal.constant_pools "
            "based on usage semantics.";
   }
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    // Gather constant variables. We assume that prior passes/pipelines have
-    // hoisted anything worth pooling to flow.variables at the module scope.
-    // We expect that immutable variables have already been de-duped and that
-    // mutable variables that remain may have identical initializers.
-    SmallVector<IREE::Flow::VariableOp, 16> mutableOps;
-    SmallVector<IREE::Flow::VariableOp, 16> immutableOps;
-    for (auto variableOp : moduleOp.getOps<IREE::Flow::VariableOp>()) {
-      if (!variableOp.initial_value().hasValue()) continue;
-      auto variableType = variableOp.type().dyn_cast<RankedTensorType>();
-      if (!variableType) continue;
-      if (variableOp.is_mutable()) {
-        mutableOps.push_back(variableOp);
+    // Gather constant globals. We assume that prior passes/pipelines have
+    // hoisted anything worth pooling to util.globals at the module scope.
+    // We expect that immutable globals have already been de-duped and that
+    // mutable globals that remain may have identical initializers.
+    SmallVector<IREE::Util::GlobalOp, 16> mutableOps;
+    SmallVector<IREE::Util::GlobalOp, 16> immutableOps;
+    for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOp>()) {
+      if (!globalOp.initial_value().hasValue()) continue;
+      auto globalType = globalOp.type().dyn_cast<RankedTensorType>();
+      if (!globalType) continue;
+      if (globalOp.is_mutable()) {
+        mutableOps.push_back(globalOp);
       } else {
-        immutableOps.push_back(variableOp);
+        immutableOps.push_back(globalOp);
       }
     }
     if (mutableOps.empty() && immutableOps.empty()) {
@@ -74,20 +77,18 @@ class IdentifyConstantPoolsPass
 
     SymbolTable moduleSymbolTable(moduleOp);
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
-    auto variableUsages = gatherVariableUsages(moduleOp);
+    auto globalUsages = gatherGlobalUsages(moduleOp);
 
     // Process the mutable ops where each constant is only used as an
     // initializer. The lifetime of these is short as we only use them to
-    // populate the initial variable buffer contents.
+    // populate the initial global buffer contents.
     makeConstantPool("_const_pool_init", mutableOps, bufferConstraints,
-                     variableUsages, moduleOp, moduleSymbolTable,
-                     moduleBuilder);
+                     globalUsages, moduleOp, moduleSymbolTable, moduleBuilder);
 
     // Process the immutable ops where the same buffer will be used for the
     // lifetime of the module.
     makeConstantPool("_const_pool", immutableOps, bufferConstraints,
-                     variableUsages, moduleOp, moduleSymbolTable,
-                     moduleBuilder);
+                     globalUsages, moduleOp, moduleSymbolTable, moduleBuilder);
 
     // NOTE: pools now contain the values but they are in an undefined order.
     // We should have following passes that reorder the values to cluster them
@@ -96,32 +97,31 @@ class IdentifyConstantPoolsPass
   }
 
  private:
-  enum VariableUsage {
+  enum GlobalUsage {
     kAddress = 1 << 0,
     kLoad = 1 << 1,
   };
 
-  // Gathers information about the usage of all variables in the module.
-  DenseMap<StringRef, VariableUsage> gatherVariableUsages(
-      mlir::ModuleOp moduleOp) {
-    DenseMap<StringRef, VariableUsage> uses;
+  // Gathers information about the usage of all globals in the module.
+  DenseMap<StringRef, GlobalUsage> gatherGlobalUsages(mlir::ModuleOp moduleOp) {
+    DenseMap<StringRef, GlobalUsage> uses;
     for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
       funcOp.walk([&](Operation *op) {
-        if (auto addressOp = dyn_cast<IREE::Flow::VariableAddressOp>(op)) {
-          auto it = uses.find(addressOp.variable());
+        if (auto addressOp = dyn_cast<IREE::Util::GlobalAddressOp>(op)) {
+          auto it = uses.find(addressOp.global());
           if (it == uses.end()) {
-            uses[addressOp.variable()] = VariableUsage::kAddress;
+            uses[addressOp.global()] = GlobalUsage::kAddress;
           } else {
-            uses[addressOp.variable()] = static_cast<VariableUsage>(
-                it->second | VariableUsage::kAddress);
+            uses[addressOp.global()] =
+                static_cast<GlobalUsage>(it->second | GlobalUsage::kAddress);
           }
-        } else if (auto loadOp = dyn_cast<IREE::Flow::VariableLoadOp>(op)) {
-          auto it = uses.find(loadOp.variable());
+        } else if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
+          auto it = uses.find(loadOp.global());
           if (it == uses.end()) {
-            uses[loadOp.variable()] = VariableUsage::kLoad;
+            uses[loadOp.global()] = GlobalUsage::kLoad;
           } else {
-            uses[loadOp.variable()] =
-                static_cast<VariableUsage>(it->second | VariableUsage::kLoad);
+            uses[loadOp.global()] =
+                static_cast<GlobalUsage>(it->second | GlobalUsage::kLoad);
           }
         }
       });
@@ -130,14 +130,13 @@ class IdentifyConstantPoolsPass
   }
 
   // Makes a new hal.constant_pool containing the values of the given
-  // variable ops. The variables will be erased and all variable loads will be
+  // global ops. The globals will be erased and all global loads will be
   // replaced with constant loads. Returns the constant pool, if it was created.
   Optional<ConstantPoolOp> makeConstantPool(
-      StringRef poolName, ArrayRef<IREE::Flow::VariableOp> variableOps,
+      StringRef poolName, ArrayRef<IREE::Util::GlobalOp> globalOps,
       BufferConstraintsAttr bufferConstraints,
-      DenseMap<StringRef, VariableUsage> &variableUsages,
-      mlir::ModuleOp moduleOp, SymbolTable &moduleSymbolTable,
-      OpBuilder &moduleBuilder) {
+      DenseMap<StringRef, GlobalUsage> &globalUsages, mlir::ModuleOp moduleOp,
+      SymbolTable &moduleSymbolTable, OpBuilder &moduleBuilder) {
     // Create the pool to be filled with constant values.
     auto poolOp = OpBuilder(moduleBuilder.getContext())
                       .create<ConstantPoolOp>(moduleBuilder.getUnknownLoc(),
@@ -145,47 +144,45 @@ class IdentifyConstantPoolsPass
     moduleSymbolTable.insert(poolOp, moduleBuilder.getInsertionPoint());
     poolOp.setPrivate();
 
-    // Replace each variable and keep track of the mapping from variable->value.
+    // Replace each global and keep track of the mapping from global->value.
     // This allows us to do one run through the module to replace usages as a
     // post-processing step.
     DenseMap<StringRef, IREE::HAL::ConstantPoolValueOp> constantReplacements;
     SmallVector<Operation *, 4> deadOps;
     auto poolBuilder = OpBuilder::atBlockBegin(poolOp.getBody());
-    for (auto variableOp : variableOps) {
-      // Grab the constant value from the variable that we'll be pooling.
-      auto value = variableOp.initial_value()
-                       .getValue()
-                       .dyn_cast_or_null<ElementsAttr>();
+    for (auto globalOp : globalOps) {
+      // Grab the constant value from the global that we'll be pooling.
+      auto value =
+          globalOp.initial_value().getValue().dyn_cast_or_null<ElementsAttr>();
       assert(value && "value precondition not met: must be elements attr");
 
       // Create the constant in the pool.
       auto valueOp = poolBuilder.create<ConstantPoolValueOp>(
-          variableOp.getLoc(), variableOp.getName(), value);
+          globalOp.getLoc(), globalOp.getName(), value);
       valueOp.setNested();
 
-      // If the variable is an immutable constant and used in compatible
+      // If the global is an immutable constant and used in compatible
       // ways we can turn them into constant loads instead. These will avoid
-      // the additional runtime overhead of variable lifetime tracking and
+      // the additional runtime overhead of global lifetime tracking and
       // allow further optimizations at use sites where we know the values
       // come from constant memory.
-      auto variableUsage = variableUsages[variableOp.getName()];
-      if (!variableOp.is_mutable() &&
-          (variableUsage & VariableUsage::kAddress)) {
-        variableOp.emitWarning() << "variable is used indirectly; currently "
-                                    "unsupported for constant pooling";
+      auto globalUsage = globalUsages[globalOp.getName()];
+      if (!globalOp.is_mutable() && (globalUsage & GlobalUsage::kAddress)) {
+        globalOp.emitWarning() << "global is used indirectly; currently "
+                                  "unsupported for constant pooling";
         continue;
       }
 
-      if (!variableOp.is_mutable()) {
-        // Replace all loads of the variable with loads of the constant.
+      if (!globalOp.is_mutable()) {
+        // Replace all loads of the global with loads of the constant.
         // We do the actual replacement in a post-processing step so we don't
         // modify the IR during this loop.
-        constantReplacements[variableOp.getName()] = valueOp;
-        deadOps.push_back(variableOp);
+        constantReplacements[globalOp.getName()] = valueOp;
+        deadOps.push_back(globalOp);
       } else {
-        // Build an initializer function to populate the variable with the
+        // Build an initializer function to populate the global with the
         // constant value on startup.
-        changeToVariableInitializerFunc(variableOp, valueOp);
+        changeToGlobalInitializerFunc(globalOp, valueOp);
       }
     }
 
@@ -196,9 +193,9 @@ class IdentifyConstantPoolsPass
     }
 
     // Process pending usage replacements.
-    replaceConstantVariableLoads(moduleOp, constantReplacements);
+    replaceConstantGlobalLoads(moduleOp, constantReplacements);
 
-    // Cleanup any inlined variables we no longer need after replacement.
+    // Cleanup any inlined globals we no longer need after replacement.
     for (auto deadOp : deadOps) {
       deadOp->erase();
     }
@@ -206,69 +203,67 @@ class IdentifyConstantPoolsPass
     return poolOp;
   }
 
-  // Constructs a function that can be used as an initializer for a variable
-  // and inserts it by the variable op in the module.
-  FuncOp changeToVariableInitializerFunc(
-      IREE::Flow::VariableOp variableOp,
-      IREE::HAL::ConstantPoolValueOp valueOp) {
-    // Create the function and make the variable point to it for init.
-    OpBuilder moduleBuilder(variableOp.getContext());
-    moduleBuilder.setInsertionPointAfter(variableOp);
-    auto initializerName = (variableOp.getName() + "_initializer").str();
+  // Constructs a function that can be used as an initializer for a global
+  // and inserts it by the global op in the module.
+  FuncOp changeToGlobalInitializerFunc(IREE::Util::GlobalOp globalOp,
+                                       IREE::HAL::ConstantPoolValueOp valueOp) {
+    // Create the function and make the global point to it for init.
+    OpBuilder moduleBuilder(globalOp.getContext());
+    moduleBuilder.setInsertionPointAfter(globalOp);
+    auto initializerName = (globalOp.getName() + "_initializer").str();
     auto initializerFunc = moduleBuilder.create<FuncOp>(
-        variableOp.getLoc(), initializerName,
-        moduleBuilder.getFunctionType({}, {variableOp.type()}));
+        globalOp.getLoc(), initializerName,
+        moduleBuilder.getFunctionType({}, {globalOp.type()}));
     initializerFunc.setPrivate();
-    variableOp->removeAttr("initial_value");
-    variableOp->setAttr("initializer",
-                        moduleBuilder.getSymbolRefAttr(initializerFunc));
+    globalOp->removeAttr("initial_value");
+    globalOp->setAttr("initializer",
+                      moduleBuilder.getSymbolRefAttr(initializerFunc));
 
     // Emit a constant load that will later on be turned into a runtime buffer
     // reference.
     auto funcBuilder = OpBuilder::atBlockBegin(initializerFunc.addEntryBlock());
     auto constValue = funcBuilder.createOrFold<IREE::HAL::ConstantPoolLoadOp>(
-        variableOp.getLoc(), variableOp.type(),
+        globalOp.getLoc(), globalOp.type(),
         funcBuilder.getSymbolRefAttr(
             valueOp->getParentOfType<ConstantPoolOp>().getName(),
             {funcBuilder.getSymbolRefAttr(valueOp)}));
-    funcBuilder.create<mlir::ReturnOp>(variableOp.getLoc(), constValue);
+    funcBuilder.create<mlir::ReturnOp>(globalOp.getLoc(), constValue);
 
     return initializerFunc;
   }
 
-  // Replaces uses of each variable with references to the constant pool value.
-  void replaceConstantVariableLoads(
+  // Replaces uses of each global with references to the constant pool value.
+  void replaceConstantGlobalLoads(
       mlir::ModuleOp moduleOp,
       DenseMap<StringRef, IREE::HAL::ConstantPoolValueOp> &replacements) {
     SmallVector<
-        std::pair<IREE::Flow::VariableLoadOp, IREE::HAL::ConstantPoolValueOp>,
-        8>
+        std::pair<IREE::Util::GlobalLoadOp, IREE::HAL::ConstantPoolValueOp>, 8>
         loadValues;
     for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-      funcOp.walk([&](IREE::Flow::VariableLoadOp loadOp) {
-        auto replacement = replacements.find(loadOp.variable());
+      funcOp.walk([&](IREE::Util::GlobalLoadOp loadOp) {
+        auto replacement = replacements.find(loadOp.global());
         if (replacement != replacements.end()) {
           loadValues.push_back(std::make_pair(loadOp, replacement->second));
         }
       });
     }
     for (auto &loadValue : loadValues) {
-      replaceVariableLoadWithConstantLoad(loadValue.first, loadValue.second);
+      replaceGlobalLoadWithConstantLoad(loadValue.first, loadValue.second);
     }
   }
 
-  // Replaces a flow.variable.load with a hal.constant_pool.load of a pooled
+  // Replaces a util.global.load with a hal.constant_pool.load of a pooled
   // value.
-  void replaceVariableLoadWithConstantLoad(
-      IREE::Flow::VariableLoadOp variableLoadOp, ConstantPoolValueOp valueOp) {
-    OpBuilder builder(variableLoadOp);
-    auto loadOp = builder.create<ConstantPoolLoadOp>(
-        variableLoadOp.getLoc(), variableLoadOp.getType(),
+  void replaceGlobalLoadWithConstantLoad(IREE::Util::GlobalLoadOp globalLoadOp,
+                                         ConstantPoolValueOp valueOp) {
+    OpBuilder builder(globalLoadOp);
+    auto poolLoadOp = builder.create<ConstantPoolLoadOp>(
+        globalLoadOp.getLoc(), globalLoadOp.getType(),
         builder.getSymbolRefAttr(
             valueOp->getParentOfType<ConstantPoolOp>().getName(),
             {builder.getSymbolRefAttr(valueOp)}));
-    variableLoadOp.replaceAllUsesWith(loadOp.result());
-    variableLoadOp.erase();
+    globalLoadOp.replaceAllUsesWith(poolLoadOp.result());
+    globalLoadOp.erase();
   }
 };
 
