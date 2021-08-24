@@ -76,7 +76,7 @@ class AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
 }
 
 //===----------------------------------------------------------------------===//
-// NamedTuple type constraint
+// Util_NamedTuple type constraint
 //===----------------------------------------------------------------------===//
 
 class Util_NamedTupleElement<int thisOrdinal, string thisName, Type thisType> {
@@ -135,7 +135,7 @@ class Util_StructAttr<string thisKind, string name, Dialect dialect,
 }
 
 //===----------------------------------------------------------------------===//
-// ptr types
+// util.ptr<T> types
 //===----------------------------------------------------------------------===//
 
 def Util_AnyPtr : DialectType<
@@ -172,7 +172,7 @@ class Util_AnyPtrOf<list<Type> types> :
 }
 
 //===----------------------------------------------------------------------===//
-// Variable types
+// Global types
 //===----------------------------------------------------------------------===//
 
 def Util_GlobalRefAttr : Confined<FlatSymbolRefAttr, [
@@ -186,6 +186,15 @@ class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtr>;
 //===----------------------------------------------------------------------===//
 // Buffer types
 //===----------------------------------------------------------------------===//
+
+def Util_AnySerializableAttr : Attr<Or<[
+  CPred<"$_self.isa<mlir::DenseElementsAttr>()">,
+  CPred<"$_self.isa<IREE::Util::SerializableAttrInterface>()">,
+]>, "buffer-like constant attribute values"> {
+  let storageType = [{ ::mlir::Attribute }];
+  let returnType = [{ ::mlir::Attribute }];
+  let convertFromStorage = "$_self";
+}
 
 // TODO(benvanik): rework these as a single type with an access mode attr.
 

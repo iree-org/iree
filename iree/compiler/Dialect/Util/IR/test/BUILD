@@ -17,6 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "attributes.mlir",
             "byte_buffer_ops.mlir",
             "global_folding.mlir",
             "global_ops.mlir",

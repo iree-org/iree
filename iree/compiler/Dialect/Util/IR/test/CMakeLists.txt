@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "attributes.mlir"
     "byte_buffer_ops.mlir"
     "global_folding.mlir"
     "global_ops.mlir"
