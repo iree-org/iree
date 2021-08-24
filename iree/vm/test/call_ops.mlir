@@ -22,7 +22,7 @@ vm.module @call_ops {
     vm.return
   }
 
-  // Check that unused ref argument slots are handled properly
+  // Check that reused ref argument slots are handled properly
   vm.export @test_call_r_v_reuse_reg
   vm.func @test_call_r_v_reuse_reg() {
     %ref = vm.const.ref.zero : !vm.buffer
@@ -31,13 +31,9 @@ vm.module @call_ops {
     vm.return
   }
 
-  // Check passing ref arguments doesn't alter values on the call site
-  // TODO(simon-camp): This doesn't work with the current pass pipeline defined
-  // in the CModuleTarget. We run the reigster allocation pass before removing
-  // do_not_optimize ops to prevent constant folding of the tests happening
-  // during the vm to emitc conversion. 
-  vm.export @test_call_r_v_preserve_ref attributes {emitc.exclude}
-  vm.func private @test_call_r_v_preserve_ref() {
+  // Check passing refs as arguments doesn't alter values on the call site
+  vm.export @test_call_r_v_preserve_ref
+  vm.func @test_call_r_v_preserve_ref() {
     %ref = vm.const.ref.zero : !vm.buffer
     %unused = vm.const.ref.rodata @buffer : !vm.buffer
     %unusued_dno_1 = util.do_not_optimize(%unused) : !vm.buffer

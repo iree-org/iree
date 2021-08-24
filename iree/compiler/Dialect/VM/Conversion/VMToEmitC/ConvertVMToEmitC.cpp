@@ -403,6 +403,7 @@ Optional<Value> findRef(OpBuilder builder, Location location,
 
     if (arg.getType() == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*")) {
       if (ordinal == refArgCounter++) {
+        ptr->second.remapValue(refResult, arg);
         return arg;
       }
     }
@@ -422,6 +423,8 @@ Optional<Value> findRef(OpBuilder builder, Location location,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
           /*applicableOperator=*/StringAttr::get(ctx, "&"),
           /*operand=*/constantOp.getResult());
+
+      ptr->second.remapValue(refResult, ptrOp.getResult());
 
       return ptrOp.getResult();
     }
@@ -1396,7 +1399,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     updatedOperands = {stackArg, moduleArg, moduleStateArg};
 
-    if (failed(updateOperands(rewriter, op, operands, rewriter, updatedOperands,
+    if (failed(updateOperands(op, operands, rewriter, updatedOperands,
                               resultOperands))) {
       return failure();
     };
@@ -1462,7 +1465,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     updatedOperands = {stackArg, import.getResult(0)};
 
-    if (failed(updateOperands(rewriter, op, operands, rewriter, updatedOperands,
+    if (failed(updateOperands(op, operands, rewriter, updatedOperands,
                               resultOperands))) {
       return failure();
     }
@@ -1484,8 +1487,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
     return success();
   }
 
-  LogicalResult updateOperands(OpBuilder builder, IREE::VM::CallOp op,
-                               ArrayRef<Value> operands,
+  LogicalResult updateOperands(IREE::VM::CallOp op, ArrayRef<Value> operands,
                                ConversionPatternRewriter &rewriter,
                                SmallVector<Value, 4> &updatedOperands,
                                SmallVector<Value, 4> &resultOperands) const {
@@ -1494,31 +1496,41 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
     auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
 
+    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
+    if (ptr == vmAnalysisCache.end()) {
+      return op.emitError() << "parent func op not found in cache.";
+    }
+
     for (Value operand : operands) {
       assert(!operand.getType().isa<IREE::VM::RefType>());
 
       if (operand.getType() == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*")) {
-        auto refOp = builder.create<emitc::ConstantOp>(
+        auto refOp = rewriter.create<emitc::ConstantOp>(
             /*location=*/loc,
             /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
             /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
-        auto refPtrOp = builder.create<emitc::ApplyOp>(
+        auto refPtrOp = rewriter.create<emitc::ApplyOp>(
             /*location=*/loc,
             /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
             /*applicableOperator=*/StringAttr::get(ctx, "&"),
             /*operand=*/refOp.getResult());
 
-        if (failed(clearStruct(builder, refPtrOp.getResult(),
+        if (failed(clearStruct(rewriter, refPtrOp.getResult(),
                                /*isPointer=*/true))) {
           return failure();
         }
 
-        auto assignOp = builder.create<emitc::CallOp>(
+        bool move = ptr->second.isLastValueUse(operand, op.getOperation());
+
+        auto assignOp = rewriter.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain"),
-            /*args=*/ArrayAttr{},
+            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain_or_move"),
+            /*args=*/
+            ArrayAttr::get(
+                ctx, {rewriter.getBoolAttr(move), rewriter.getIndexAttr(0),
+                      rewriter.getIndexAttr(1)}),
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{operand, refPtrOp.getResult()});
 
@@ -1534,7 +1546,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
       emitc::ConstantOp resultOp;
 
       if (result.getType().isa<IREE::VM::RefType>()) {
-        auto ref = findRef(builder, loc, funcOp, vmAnalysisCache, result);
+        auto ref = findRef(rewriter, loc, funcOp, vmAnalysisCache, result);
 
         if (!ref.hasValue()) {
           return op.emitError() << "local ref not found";
@@ -1876,6 +1888,15 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
+    if (llvm::any_of(operands, [&ctx](Value operand) {
+          Type type = operand.getType();
+          assert(!type.isa<IREE::VM::RefType>());
+          return type == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*");
+        })) {
+      return op.emitError()
+             << "basic block arguments with ref type not supported";
+    }
+
     rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.dest(),
                                                 op.destOperands());
 
@@ -1893,6 +1914,15 @@ class CondBranchOpConversion
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
+
+    if (llvm::any_of(operands, [&ctx](Value operand) {
+          Type type = operand.getType();
+          assert(!type.isa<IREE::VM::RefType>());
+          return type == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*");
+        })) {
+      return op.emitError()
+             << "basic block arguments with ref type not supported";
+    }
 
     Type boolType = rewriter.getI1Type();
 
@@ -1928,8 +1958,6 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
 
     auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
 
-    releaseLocalRefs(rewriter, loc, funcOp);
-
     // The result variables are the last N arguments of the function.
     unsigned int firstOutputArgumentIndex =
         funcOp.getNumArguments() - operands.size();
@@ -1957,6 +1985,8 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
             /*operands=*/ArrayRef<Value>{resultArgument, operand.value()});
       }
     }
+
+    releaseLocalRefs(rewriter, loc, funcOp);
 
     auto status = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
