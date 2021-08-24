@@ -329,7 +329,6 @@ PYTHON_TO_VM_CONVERTERS = {
 
 def _vm_to_ndarray(inv: Invocation, vm_list: VmVariantList, vm_index: int,
                    desc):
-  # return vm_list.get_as_ndarray(vm_index)
   # The descriptor for an ndarray is like:
   #   ["ndarray", "<dtype>", <rank>, <dim>...]
   #   ex: ['ndarray', 'i32', 1, 25948]
