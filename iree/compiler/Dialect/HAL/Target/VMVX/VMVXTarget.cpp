@@ -163,7 +163,7 @@ void registerVMVXTargetBackends() {
   // #hal.device.target<"vmvx", ...
   // #hal.executable.target<"vmvx", ...
   static TargetBackendRegistration registration(
-      "vmvx", [=]() { return std::make_unique<VMVXTargetBackend>(); });
+      "vmvx", [=]() { return std::make_shared<VMVXTargetBackend>(); });
 }
 
 }  // namespace HAL

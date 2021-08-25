@@ -154,6 +154,10 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       ConstantOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto targetType = typeConverter.convertType(srcOp.getType());
+    if (!targetType) {
+      return srcOp.emitError() << "could not convert type: " << srcOp.getType()
+                               << " (check -iree-vm-target-* options)";
+    }
     if (targetType.isa<IntegerType>()) {
       auto integerAttr = srcOp.getValue().dyn_cast<IntegerAttr>();
       if (!integerAttr) {

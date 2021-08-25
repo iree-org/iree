@@ -23,15 +23,23 @@ TargetOptions getTargetOptionsFromFlags() {
       llvm::cl::desc("Bit width of index types."),
       llvm::cl::cat(vmTargetOptionsCategory),
   };
-  static auto *extensionsFlag = new llvm::cl::list<OpcodeExtension>{
-      "iree-vm-target-extension",
-      llvm::cl::ZeroOrMore,
-      llvm::cl::desc("Supported target opcode extensions."),
+  static auto *i64ExtensionFlag = new llvm::cl::opt<bool>{
+      "iree-vm-target-extension-i64",
+      llvm::cl::init(false),
+      llvm::cl::desc("Support i64 target opcode extensions."),
       llvm::cl::cat(vmTargetOptionsCategory),
-      llvm::cl::values(
-          clEnumValN(OpcodeExtension::kI64, "i64", "i64 type support"),
-          clEnumValN(OpcodeExtension::kF32, "f32", "f32 type support"),
-          clEnumValN(OpcodeExtension::kF64, "f64", "f64 type support")),
+  };
+  static auto *f32ExtensionFlag = new llvm::cl::opt<bool>{
+      "iree-vm-target-extension-f32",
+      llvm::cl::init(true),
+      llvm::cl::desc("Support f32 target opcode extensions."),
+      llvm::cl::cat(vmTargetOptionsCategory),
+  };
+  static auto *f64ExtensionFlag = new llvm::cl::opt<bool>{
+      "iree-vm-target-extension-f64",
+      llvm::cl::init(false),
+      llvm::cl::desc("Support f64 target opcode extensions."),
+      llvm::cl::cat(vmTargetOptionsCategory),
   };
   static auto *truncateUnsupportedIntegersFlag = new llvm::cl::opt<bool>{
       "iree-vm-target-truncate-unsupported-integers",
@@ -48,18 +56,14 @@ TargetOptions getTargetOptionsFromFlags() {
 
   TargetOptions targetOptions;
   targetOptions.indexBits = *indexBitsFlag;
-  for (auto ext : *extensionsFlag) {
-    switch (ext) {
-      case OpcodeExtension::kI64:
-        targetOptions.i64Extension = true;
-        break;
-      case OpcodeExtension::kF32:
-        targetOptions.f32Extension = true;
-        break;
-      case OpcodeExtension::kF64:
-        targetOptions.f64Extension = true;
-        break;
-    }
+  if (*i64ExtensionFlag) {
+    targetOptions.i64Extension = true;
+  }
+  if (*f32ExtensionFlag) {
+    targetOptions.f32Extension = true;
+  }
+  if (*f64ExtensionFlag) {
+    targetOptions.f64Extension = true;
   }
   targetOptions.truncateUnsupportedIntegers = *truncateUnsupportedIntegersFlag;
   targetOptions.truncateUnsupportedFloats = *truncateUnsupportedFloatsFlag;

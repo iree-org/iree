@@ -435,14 +435,6 @@ def HAL_BufferConstraintsAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_ByteRangeAttr :
-  Util_StructAttr<"byte_range", "ByteRangeAttr", HAL_Dialect, [
-    Util_StructFieldAttr<"offset", HAL_DeviceSizeAttr>,
-    Util_StructFieldAttr<"length", HAL_DeviceSizeAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-
 def HAL_DescriptorSetLayoutBindingAttr :
   Util_StructAttr<"descriptor_set_layout_binding",
                   "DescriptorSetLayoutBindingAttr",

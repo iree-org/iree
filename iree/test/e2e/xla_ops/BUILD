@@ -27,6 +27,7 @@ iree_check_single_backend_test_suite(
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
             "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
@@ -171,6 +172,7 @@ iree_check_single_backend_test_suite(
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
             "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
@@ -237,6 +239,7 @@ iree_check_single_backend_test_suite(
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
             "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
@@ -350,6 +353,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "bitcast_convert.mlir",
             "round.mlir",
             "scatter.mlir",  # TODO(GH-6388): Enable the test.
             "scatter_dynamic.mlir",  # TODO(GH-6388): Enable the test.

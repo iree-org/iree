@@ -23,18 +23,22 @@ iree_cc_library(
   TEXTUAL_HDRS
     "UtilAttrInterfaces.cpp.inc"
     "UtilAttrInterfaces.h.inc"
+    "UtilAttrs.cpp.inc"
+    "UtilAttrs.h.inc"
     "UtilOpInterfaces.cpp.inc"
     "UtilOpInterfaces.h.inc"
     "UtilTypeInterfaces.cpp.inc"
     "UtilTypeInterfaces.h.inc"
   SRCS
     "ClosureOpUtils.cpp"
+    "UtilAttrs.cpp"
     "UtilDialect.cpp"
     "UtilOpFolders.cpp"
     "UtilOps.cpp"
     "UtilOps.cpp.inc"
     "UtilTypes.cpp"
   DEPS
+    ::UtilAttrsGen
     ::UtilInterfacesGen
     ::UtilOpsGen
     LLVMSupport
@@ -46,6 +50,16 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    UtilAttrsGen
+  TD_FILE
+    "UtilAttrs.td"
+  OUTS
+    -gen-attrdef-decls UtilAttrs.h.inc
+    -gen-attrdef-defs UtilAttrs.cpp.inc
 )
 
 iree_tablegen_library(

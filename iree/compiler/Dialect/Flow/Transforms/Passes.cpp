@@ -143,17 +143,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createConvertTensorOpsPass());
-  passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createConvertLinalgTensorOpsPass(
-          /*runBeforeDispatchRegionFormation=*/true));
+      IREE::Flow::createConvertToFlowBeforeDispatchFormation());
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Flow::createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createConvertLinalgTensorOpsPass(
-          /*runBeforeDispatchRegionFormation=*/false));
+      IREE::Flow::createConvertToFlowAfterDispatchFormation());
   // NOTE: required because the current dispatch-linalg-on-tensors pass
   // creates a lot of dead IR that needs to be cleaned up.
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
@@ -170,12 +166,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
-
-  // TODO: Prune and rename this pass. This runs after sending everything
-  // possible to the device and then legalizes any remaining h<->d loads,
-  // typically coming from top level flow control.
-  passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createPromoteTensorLoadsPass());
 
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as

@@ -30,8 +30,7 @@ iree_cc_library(
   SRCS
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
-    "ConvertLinalgTensorOps.cpp"
-    "ConvertTensorOps.cpp"
+    "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchLinalgOnTensors.cpp"
@@ -51,7 +50,6 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.cpp"
     "PromoteI1ToI8Pass.cpp"
-    "PromoteTensorLoads.cpp"
     "StripAndSplatConstantVariables.cpp"
     "TypeConverter.cpp"
     "VerifyInputLegality.cpp"

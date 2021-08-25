@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-convert-linalg-tensor-ops-pass='run-before-dispatch-region-formation=false' -canonicalize -cse -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -iree-flow-convert-to-flow-after-dispatch-formation -canonicalize -cse -split-input-file %s | IreeFileCheck %s
 
 func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
   %c0 = constant 0 : index
@@ -24,7 +24,7 @@ func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: in
 //  CHECK-SAME:   %[[ARG5:[a-zA-Z0-9]+]]: index
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//       CHECK:   %[[VAL:.+]] = tensor.extract %[[ARG1]][]
+//       CHECK:   %[[VAL:.+]] = flow.tensor.load %[[ARG1]] : tensor<f32>
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP]]()[%[[ARG2]], %[[ARG4]], %[[D0]]]

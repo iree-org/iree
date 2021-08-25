@@ -1,5 +1,7 @@
 vm.module @call_ops {
 
+  vm.rodata private @buffer dense<[1, 2, 3]> : tensor<3xi8>
+
   vm.export @fail_call_v_v
   vm.func @fail_call_v_v() {
     vm.call @_v_v_fail() : () -> ()
@@ -17,6 +19,28 @@ vm.module @call_ops {
   vm.func @test_call_r_v() {
     %ref = vm.const.ref.zero : !vm.ref<?>
     vm.call @_r_v(%ref) : (!vm.ref<?>) -> ()
+    vm.return
+  }
+
+  // Check that reused ref argument slots are handled properly
+  vm.export @test_call_r_v_reuse_reg
+  vm.func @test_call_r_v_reuse_reg() {
+    %ref = vm.const.ref.zero : !vm.buffer
+    %unused = vm.const.ref.zero : !vm.buffer
+    vm.call @_r_v_reuse_reg(%ref, %unused) : (!vm.buffer, !vm.buffer) -> ()
+    vm.return
+  }
+
+  // Check passing refs as arguments doesn't alter values on the call site
+  vm.export @test_call_r_v_preserve_ref
+  vm.func @test_call_r_v_preserve_ref() {
+    %ref = vm.const.ref.zero : !vm.buffer
+    %unused = vm.const.ref.rodata @buffer : !vm.buffer
+    %unusued_dno_1 = util.do_not_optimize(%unused) : !vm.buffer
+    vm.check.nz %unused : !vm.buffer
+    vm.call @_r_v_preserve_reg(%ref, %unused) : (!vm.buffer, !vm.buffer) -> ()
+    %unusued_dno_2 = util.do_not_optimize(%unused) : !vm.buffer
+    vm.check.nz %unusued_dno_2 : !vm.buffer
     vm.return
   }
 
@@ -66,12 +90,27 @@ vm.module @call_ops {
     vm.return
   }
 
+  vm.func @_r_v_reuse_reg(%arg : !vm.ref<?>, %unused : !vm.ref<?>) attributes {noinline} {
+    %ref = vm.const.ref.zero : !vm.ref<?>
+    %ref_dno = util.do_not_optimize(%ref) : !vm.ref<?>
+    vm.check.eq %arg, %ref_dno, "Expected %arg to be NULL" : !vm.ref<?>
+    vm.return
+  }
+
+  vm.func @_r_v_preserve_reg(%arg1 : !vm.ref<?>, %arg2 : !vm.ref<?>) attributes {noinline} {
+    %ref = vm.const.ref.zero : !vm.ref<?>
+    %ref_dno = util.do_not_optimize(%ref) : !vm.ref<?>
+    vm.check.eq %arg1, %ref_dno, "Expected %arg1 to be NULL" : !vm.ref<?>
+    vm.check.nz %arg2, "Expected %arg2 to be not NULL" : !vm.ref<?>
+    vm.return
+  }
+
   vm.func @_v_i() -> i32 attributes {noinline} {
     %c1 = vm.const.i32 1 : i32
     vm.return %c1 : i32
   }
 
-  vm.func private @_v_r() -> !vm.ref<?> attributes {noinline} {
+  vm.func @_v_r() -> !vm.ref<?> attributes {noinline} {
     %ref = vm.const.ref.zero : !vm.ref<?>
     vm.return %ref : !vm.ref<?>
   }

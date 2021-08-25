@@ -707,14 +707,13 @@ static void defineConstantBindings(FuncOp entryFuncOp,
     for (auto &operandInfo : constantInfo.getSecond()) {
       storageUsages.resize(operandInfo.constantRanges.size());
       for (auto attr : llvm::enumerate(operandInfo.constantRanges)) {
-        auto byteRangeAttr = attr.value().cast<ByteRangeAttr>();
+        auto byteRangeAttr = attr.value().cast<IREE::Util::ByteRangeAttr>();
         auto &usage = storageUsages[attr.index()];
         usage.constantBuffer = operandInfo.constantBuffer;
-        usage.minimumOffset = std::min(byteRangeAttr.offset().getSExtValue(),
-                                       usage.minimumOffset);
+        usage.minimumOffset =
+            std::min(byteRangeAttr.getOffset(), usage.minimumOffset);
         usage.maximumOffset = std::max(
-            (byteRangeAttr.offset() + byteRangeAttr.length()).getSExtValue() -
-                1,
+            (byteRangeAttr.getOffset() + byteRangeAttr.getLength()) - 1,
             usage.maximumOffset);
       }
     }
@@ -745,10 +744,9 @@ static void defineConstantBindings(FuncOp entryFuncOp,
     for (auto &operandInfo : constantInfo.getSecond()) {
       auto &operandOffset = storageOffsets[operandInfo.operandIndex];
       for (auto attr : llvm::enumerate(operandInfo.constantRanges)) {
-        auto byteRangeAttr = attr.value().cast<ByteRangeAttr>();
+        auto byteRangeAttr = attr.value().cast<IREE::Util::ByteRangeAttr>();
         auto &usage = storageUsages[attr.index()];
-        int64_t offset =
-            byteRangeAttr.offset().getSExtValue() - usage.minimumOffset;
+        int64_t offset = byteRangeAttr.getOffset() - usage.minimumOffset;
         switch (operandOffset) {
           case INT64_MIN:
             // First use; take offset directly as a starting point.
@@ -1119,10 +1117,6 @@ class MaterializeInterfacesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackends = getTargetBackends(getRegisteredTargetBackends());
-    for (auto &targetBackend : targetBackends) {
-      targetBackend->getDependentDialects(registry);
-    }
   }
 
   StringRef getArgument() const override {
@@ -1144,7 +1138,6 @@ class MaterializeInterfacesPass
         llvm::to_vector<32>(getOperation().getOps<IREE::Flow::ExecutableOp>());
     for (auto sourceOp : sourceOps) {
       // Only manipulate tiled executables.
-      // TODO(benvanik): remove this check once linalg-on-tensors is default.
       auto entryOps = sourceOp.getOps<IREE::Flow::DispatchEntryOp>();
       if (entryOps.empty()) continue;
       auto anyEntryOp = *entryOps.begin();

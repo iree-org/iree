@@ -33,14 +33,19 @@ struct VMAnalysis {
   }
 
   int getRefRegisterOrdinal(Value ref) {
-    return registerAllocation.mapToRegister(originalValue(ref)).ordinal();
+    auto originalRef = originalValue(ref);
+    assert(originalRef.getType().isa<IREE::VM::RefType>());
+    return registerAllocation.mapToRegister(originalRef).ordinal();
   }
 
   bool isLastValueUse(Value ref, Operation *op) {
-    return valueLiveness.isLastValueUse(originalValue(ref), op);
+    auto originalRef = originalValue(ref);
+    assert(originalRef.getType().isa<IREE::VM::RefType>());
+    return valueLiveness.isLastValueUse(originalRef, op);
   }
 
   void remapValue(Value original, Value replacement) {
+    assert(original.getType().isa<IREE::VM::RefType>());
     mapping[replacement] = original;
     return;
   }

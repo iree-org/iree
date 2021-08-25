@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.h"
 
+#include <mutex>
+
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/MC/SubtargetFeature.h"
@@ -20,35 +22,36 @@ namespace IREE {
 namespace HAL {
 
 LLVMTargetOptions getDefaultLLVMTargetOptions() {
-  LLVMTargetOptions targetOptions;
-
-  // Host target triple.
-  targetOptions.targetTriple = llvm::sys::getDefaultTargetTriple();
-  targetOptions.targetCPU = llvm::sys::getHostCPUName().str();
-  {
-    llvm::SubtargetFeatures features;
-    llvm::StringMap<bool> hostFeatures;
-    if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
-      for (auto &feature : hostFeatures) {
-        features.AddFeature(feature.first(), feature.second);
+  static LLVMTargetOptions targetOptions;
+  static std::once_flag onceFlag;
+  std::call_once(onceFlag, [&]() {
+    // Host target triple.
+    targetOptions.targetTriple = llvm::sys::getDefaultTargetTriple();
+    targetOptions.targetCPU = llvm::sys::getHostCPUName().str();
+    {
+      llvm::SubtargetFeatures features;
+      llvm::StringMap<bool> hostFeatures;
+      if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
+        for (auto &feature : hostFeatures) {
+          features.AddFeature(feature.first(), feature.second);
+        }
       }
+      targetOptions.targetCPUFeatures = features.getString();
     }
-    targetOptions.targetCPUFeatures = features.getString();
-  }
 
-  // LLVM loop optimization options.
-  targetOptions.pipelineTuningOptions.LoopInterleaving = true;
-  targetOptions.pipelineTuningOptions.LoopVectorization = true;
-  targetOptions.pipelineTuningOptions.LoopUnrolling = true;
+    // LLVM loop optimization options.
+    targetOptions.pipelineTuningOptions.LoopInterleaving = true;
+    targetOptions.pipelineTuningOptions.LoopVectorization = true;
+    targetOptions.pipelineTuningOptions.LoopUnrolling = true;
 
-  // LLVM SLP Auto vectorizer.
-  targetOptions.pipelineTuningOptions.SLPVectorization = true;
+    // LLVM SLP Auto vectorizer.
+    targetOptions.pipelineTuningOptions.SLPVectorization = true;
 
-  // LLVM -O3.
-  // TODO(benvanik): add an option for this.
-  targetOptions.optLevel = llvm::OptimizationLevel::O3;
-  targetOptions.options.FloatABIType = llvm::FloatABI::Hard;
-
+    // LLVM -O3.
+    // TODO(benvanik): add an option for this.
+    targetOptions.optLevel = llvm::OptimizationLevel::O3;
+    targetOptions.options.FloatABIType = llvm::FloatABI::Hard;
+  });
   return targetOptions;
 }
 

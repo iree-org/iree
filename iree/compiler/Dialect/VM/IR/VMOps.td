@@ -930,7 +930,7 @@ def VM_RodataOp : VM_Op<"rodata", [
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    ElementsAttr:$value,
+    Util_AnySerializableAttr:$value,
     OptionalAttr<I64Attr>:$alignment,
     OptionalAttr<VM_Ordinal>:$ordinal,
     OptionalAttr<StrAttr>:$mime_type
@@ -944,7 +944,7 @@ def VM_RodataOp : VM_Op<"rodata", [
   let builders = [
     OpBuilder<(ins
       "StringRef":$name,
-      "ElementsAttr":$value,
+      "Attribute":$value,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,
   ];
@@ -985,7 +985,6 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-
 def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
     VM_PseudoOp,
   ]> {
@@ -997,7 +996,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$name,
-    ElementsAttr:$value,
+    Util_AnySerializableAttr:$value,
     OptionalAttr<I64Attr>:$alignment
   );
 
@@ -1008,7 +1007,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   let assemblyFormat = "($name^)? attr-dict `:` type($result) `=` $value";
 
   let builders = [
-    OpBuilder<(ins "Type":$resultType, "ElementsAttr":$value),
+    OpBuilder<(ins "Type":$resultType, "Attribute":$value),
     [{
       $_state.addTypes({resultType});
       $_state.addAttribute("value", value);

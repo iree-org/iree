@@ -698,7 +698,7 @@ void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
 }
 
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     ElementsAttr value, ArrayRef<NamedAttribute> attrs) {
+                     Attribute value, ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("sym_name", builder.getStringAttr(name));
   result.addAttribute("value", value);
   result.addAttributes(attrs);

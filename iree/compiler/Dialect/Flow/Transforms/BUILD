@@ -33,8 +33,7 @@ cc_library(
     srcs = [
         "ConvertConv2D1x1ToMatmulPass.cpp",
         "ConvertConv2DToImg2ColPass.cpp",
-        "ConvertLinalgTensorOps.cpp",
-        "ConvertTensorOps.cpp",
+        "ConvertToFlow.cpp",
         "DeduplicateExecutables.cpp",
         "DestructiveUpdateUtils.cpp",
         "DispatchLinalgOnTensors.cpp",
@@ -54,7 +53,6 @@ cc_library(
         "PassDetail.h",
         "Passes.cpp",
         "PromoteI1ToI8Pass.cpp",
-        "PromoteTensorLoads.cpp",
         "StripAndSplatConstantVariables.cpp",
         "TypeConverter.cpp",
         "VerifyInputLegality.cpp",
