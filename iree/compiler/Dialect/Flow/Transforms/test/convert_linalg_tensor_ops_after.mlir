@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-convert-linalg-tensor-ops-pass='run-before-dispatch-region-formation=false' -canonicalize -cse -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -iree-flow-convert-to-flow-after-dispatch-formation -canonicalize -cse -split-input-file %s | IreeFileCheck %s
 
 func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
   %c0 = constant 0 : index
