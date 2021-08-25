@@ -250,9 +250,9 @@ build:_rbe_base --remote_instance_name=projects/iree-oss/instances/default_insta
 build:_rbe_base --disk_cache=""
 
 ### Remote Caching ###
-# remote_cache config for executing locally and caching the results to the
-# remote cache. This requires permissions to write to the remote cache, which
-# only the CI machines have.
+# Config for executing locally and caching the results to the remote cache.
+# This requires permissions to write to the remote cache, which only the CI
+# machines have.
 build:_remote_cache_base --config=_rbe_base
 build:_remote_cache_base --remote_cache=grpcs://remotebuildexecution.googleapis.com
 
