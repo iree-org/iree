@@ -84,9 +84,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.nest<IREE::HAL::ExecutableOp>()
       .addNestedPass<IREE::HAL::ExecutableVariantOp>(
           createPropagateConstantWorkgroupInfoPass());
-  passManager.nest<IREE::HAL::ExecutableOp>()
-      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
-          createTranslateExecutableVariantsPass());
+  passManager.addNestedPass<IREE::HAL::ExecutableOp>(
+      createTranslateExecutablesPass());
   passManager.addPass(createVerifyTargetEnvironmentPass());
 
   // Convert supported input dialects (std, flow, etc) into the HAL dialect.
@@ -113,7 +112,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // ordinals, we allow the backends to link executables together. For example,
   // the LLVM AOT backend may combine all executable targets for the same
   // architecture into a single executable and link it as a shared library.
-  // TODO(scotttodd): Move after createTranslateExecutableVariantsPass
+  // TODO(scotttodd): Move after createTranslateExecutablesPass
   //   * ConvertStreamOps under ConvertFlowToHALPass assumes one entry point.
   //     Adjust it to handle multiple entry points then this can move up.
   if (transformOptions.linkExecutables) {

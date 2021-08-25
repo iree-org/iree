@@ -73,7 +73,7 @@ TargetOptions getTargetOptionsFromFlags();
 //      filter="spirv-v1.2-desktop*"
 //          hal.executable.entry_point @my_entry
 //          module { ... }
-//   [[-iree-hal-translate-executable-variants]]
+//   [[-iree-hal-translate-executables]]
 //   -> hal.executable @my_exe
 //      + hal.executable.variant @spirv-v1.1-mobile filter="spirv-v1.1-mobile*"
 //          hal.executable.entry_point @my_entry_1
