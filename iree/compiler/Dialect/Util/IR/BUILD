@@ -20,6 +20,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
+            "UtilAttrs.td",
             "UtilBase.td",
             "UtilInterfaces.td",
             "UtilOps.td",
@@ -29,6 +30,7 @@ td_library(
     deps = [
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
+        "@llvm-project//mlir:SubElementInterfacesTdFiles",
     ],
 )
 
@@ -36,6 +38,7 @@ cc_library(
     name = "IR",
     srcs = [
         "ClosureOpUtils.cpp",
+        "UtilAttrs.cpp",
         "UtilDialect.cpp",
         "UtilOpFolders.cpp",
         "UtilOps.cpp",
@@ -51,6 +54,8 @@ cc_library(
         "UtilTypes.h",
     ],
     textual_hdrs = [
+        "UtilAttrs.cpp.inc",
+        "UtilAttrs.h.inc",
         "UtilAttrInterfaces.cpp.inc",
         "UtilAttrInterfaces.h.inc",
         "UtilOpInterfaces.cpp.inc",
@@ -59,6 +64,7 @@ cc_library(
         "UtilTypeInterfaces.h.inc",
     ],
     deps = [
+        ":UtilAttrsGen",
         ":UtilInterfacesGen",
         ":UtilOpsGen",
         "@llvm-project//llvm:Support",
@@ -71,6 +77,23 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
     ],
+)
+
+gentbl_cc_library(
+    name = "UtilAttrsGen",
+    tbl_outs = [
+        (
+            ["-gen-attrdef-decls"],
+            "UtilAttrs.h.inc",
+        ),
+        (
+            ["-gen-attrdef-defs"],
+            "UtilAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "UtilAttrs.td",
+    deps = [":td_files"],
 )
 
 gentbl_cc_library(

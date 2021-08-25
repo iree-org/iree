@@ -575,10 +575,11 @@ static LogicalResult allocateTransientBuffers(
     auto bufferValue = schedulingState.loadGlobal(
         IREE::HAL::BufferType::get(rewriter.getContext()),
         subspanOp.runtime_buffer().getLeafReference(), rewriter);
-    auto offsetValue = schedulingState.lookupOrCreateIndex(
-        subspanOp.runtime_range().offset().getSExtValue(), rewriter);
-    auto lengthValue = schedulingState.lookupOrCreateIndex(
-        subspanOp.runtime_range().length().getSExtValue(), rewriter);
+    auto runtimeRange = subspanOp.runtime_range();
+    auto offsetValue =
+        schedulingState.lookupOrCreateIndex(runtimeRange.getOffset(), rewriter);
+    auto lengthValue =
+        schedulingState.lookupOrCreateIndex(runtimeRange.getLength(), rewriter);
     auto subspanValue = rewriter.createOrFold<IREE::HAL::BufferSubspanOp>(
         subspanOp.getLoc(), bufferValue.getType(), bufferValue, offsetValue,
         lengthValue);

@@ -144,8 +144,10 @@ class MaterializeConstantPoolBuffersPass
                 {funcBuilder.getSymbolRefAttr(storageOp)}));
     auto offsetValue =
         funcBuilder.createOrFold<mlir::ConstantIndexOp>(storageOp.getLoc(), 0);
+    auto storageValueAttr =
+        storageOp.value().cast<IREE::Util::SerializableAttrInterface>();
     uint64_t runtimeLength =
-        align(storageOp.value().getNumElements(),
+        align(storageValueAttr.getStorageSize(),
               bufferConstraints.min_buffer_range_alignment());
     auto lengthValue = funcBuilder.createOrFold<mlir::ConstantIndexOp>(
         storageOp.getLoc(), runtimeLength);
@@ -202,8 +204,8 @@ class MaterializeConstantPoolBuffersPass
       uint64_t splatLength =
           align(unpaddedLength, bufferConstraints.min_buffer_range_alignment());
       splatOp.runtime_bufferAttr(variableSymRef);
-      splatOp.runtime_rangeAttr(ByteRangeAttr::get(
-          APInt(64, splatOffset), APInt(64, splatLength), context));
+      splatOp.runtime_rangeAttr(
+          IREE::Util::ByteRangeAttr::get(context, splatOffset, splatLength));
       bufferLength = splatOffset + splatLength;
     }
 
@@ -271,10 +273,11 @@ class MaterializeConstantPoolBuffersPass
     funcBuilder.create<IREE::HAL::CommandBufferBeginOp>(variableLoc,
                                                         commandBufferValue);
     for (auto splatOp : splatOps) {
-      auto offsetValue = funcBuilder.createOrFold<mlir::ConstantOp>(
-          splatOp.getLoc(), splatOp.runtime_rangeAttr().offsetAttr());
-      auto lengthValue = funcBuilder.createOrFold<mlir::ConstantOp>(
-          splatOp.getLoc(), splatOp.runtime_rangeAttr().lengthAttr());
+      auto runtimeRange = splatOp.runtime_range().getValue();
+      auto offsetValue = funcBuilder.createOrFold<mlir::ConstantIndexOp>(
+          splatOp.getLoc(), runtimeRange.getOffset());
+      auto lengthValue = funcBuilder.createOrFold<mlir::ConstantIndexOp>(
+          splatOp.getLoc(), runtimeRange.getLength());
       uint32_t pattern = makePatternFromSplatValue(
           splatOp.value().cast<SplatElementsAttr>().getSplatValue());
       auto patternValue = funcBuilder.createOrFold<mlir::ConstantIntOp>(

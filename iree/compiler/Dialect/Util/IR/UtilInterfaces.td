@@ -371,4 +371,83 @@ def Util_GlobalTypeInterface : TypeInterface<"GlobalTypeInterface"> {
   ];
 }
 
+//===----------------------------------------------------------------------===//
+// IREE::Util::SerializableAttrInterface
+//===----------------------------------------------------------------------===//
+
+def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used to serialize constant values in binary format.
+    Implementations are responsible for encoding and may do so in any form they
+    desire. For example, an array of dense float32 elements may be written
+    directly as the elements while sparse float32 elements may have a sparsity
+    header in a defined format.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the total storage size required by the serialized value.
+        Any of the serialization methods will write precisely this number of
+        bytes.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getStorageSize",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Serializes the attribute to the given byte vector. The vector will be
+        resized to the total storage size upon return.
+      }],
+      /*retTy=*/"LogicalResult",
+      /*methodName=*/"serializeToVector",
+      /*args=*/(ins
+        "llvm::support::endianness":$endian,
+        "SmallVectorImpl<char> &":$buffer
+      ),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        buffer.resize($_attr.getStorageSize());
+        return $_attr.serializeToBuffer(endian, buffer);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Serializes the attribute to the given byte buffer. The buffer must have
+        a capacity of at least that returned by getStorageSize.
+      }],
+      /*retTy=*/"LogicalResult",
+      /*methodName=*/"serializeToBuffer",
+      /*args=*/(ins
+        "llvm::support::endianness":$endian,
+        "ArrayRef<char>":$buffer
+      )
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Serializes the attribute to the given output stream. Where possible
+        implementations are encouraged to avoid allocations on this path.
+      }],
+      /*retTy=*/"LogicalResult",
+      /*methodName=*/"serializeToStream",
+      /*args=*/(ins
+        "llvm::support::endianness":$endian,
+        "llvm::raw_ostream &":$os
+      ),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        SmallVector<char> buffer;
+        if (failed($_attr.serializeToVector(endian, buffer))) {
+          return failure();
+        }
+        os.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());
+        return success();
+      }]
+    >,
+  ];
+}
+
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_INTERFACES

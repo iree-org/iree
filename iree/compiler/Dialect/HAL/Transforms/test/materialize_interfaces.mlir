@@ -354,10 +354,10 @@ util.global @storage1 : !hal.buffer
 func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
   %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
       (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
-    %const_span_0a = hal.constant.subspan @storage0[#hal.byte_range<0, 128>] : tensor<8x4xf32>
-    %const_span_0b = hal.constant.subspan @storage0[#hal.byte_range<128, 128>] : tensor<8x4xf32>
-    %const_span_0c = hal.constant.subspan @storage0[#hal.byte_range<256, 128>] : tensor<8x4xf32>
-    %const_span_1a = hal.constant.subspan @storage1[#hal.byte_range<0, 128>] : tensor<8x4xf32>
+    %const_span_0a = hal.constant.subspan @storage0[#util.byte_range<0, 128>] : tensor<8x4xf32>
+    %const_span_0b = hal.constant.subspan @storage0[#util.byte_range<128, 128>] : tensor<8x4xf32>
+    %const_span_0c = hal.constant.subspan @storage0[#util.byte_range<256, 128>] : tensor<8x4xf32>
+    %const_span_1a = hal.constant.subspan @storage1[#util.byte_range<0, 128>] : tensor<8x4xf32>
     %c1 = constant 1 : index
     // CHECK: = flow.dispatch @constant_dispatch::@entry
     // CHECK-SAME: hal.bindings = [

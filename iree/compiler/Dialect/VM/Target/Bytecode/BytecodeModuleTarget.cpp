@@ -8,6 +8,7 @@
 
 #include <algorithm>
 
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -16,7 +17,6 @@
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
-#include "iree/compiler/Dialect/VM/Target/Bytecode/ConstantEncoder.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -24,6 +24,7 @@
 #include "iree/schemas/bytecode_module_def_builder.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/CRC.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/IR/Attributes.h"
@@ -51,6 +52,61 @@ struct TypeDef {
   Type type;
   std::string full_name;
 };
+
+struct SerializedConstantRef {
+  flatbuffers_uint8_vec_ref_t ref = 0;
+  int64_t totalSize = 0;
+  uint32_t crc32 = 0;
+};
+
+// Serializes a constant attribute to the FlatBuffer as a binary blob.
+// Returns the size in bytes of the serialized value and the flatbuffers offset
+// to the uint8 vec containing the data. If |calculateCRC32| is provided then a
+// CRC32 of the data will be computed and returned as well.
+SerializedConstantRef serializeConstant(Location loc, Attribute valueAttr,
+                                        size_t alignment, bool calculateCRC32,
+                                        FlatbufferBuilder &fbb) {
+  flatcc_builder_start_vector(fbb, 1, alignment, FLATBUFFERS_COUNT_MAX(1));
+
+  auto value = valueAttr.dyn_cast<IREE::Util::SerializableAttrInterface>();
+  assert(value && "expected a serializable rodata value");
+
+  // TODO(benvanik): use fbb.streamUint8Vec + value.serializeToStream.
+  // Right now this will allocate a single slab of the entire storage size and
+  // write the contents into it. streamUint8Vec also does the same thing but
+  // we could extend it with custom fbb storage such that we could reserve the
+  // size in the file and then fix it up after we write it. The complication is
+  // that we need the CRC below and thus have to have the bytes in memory at
+  // some point. An interface member for computeCRC() could be useful as even
+  // though slow it would avoid the need to malloc everything. We could also
+  // switch implementations based on calculateCRC32 - models with GB of params
+  // are probably fine not to have nice hackability :)
+  uint64_t actualSize = value.getStorageSize();
+  if (actualSize > SIZE_MAX) {
+    mlir::emitError(loc) << "constant size " << actualSize
+                         << " exceeds native size_t; unable to serialize";
+    return {};
+  }
+  size_t size = static_cast<size_t>(value.getStorageSize());
+  uint8_t *bytePtr = flatbuffers_uint8_vec_extend(fbb, size);
+  if (failed(value.serializeToBuffer(llvm::support::endianness::little,
+                                     ArrayRef<char>((char *)bytePtr, size)))) {
+    return {};
+  }
+
+  uint8_t *dataPtr =
+      reinterpret_cast<uint8_t *>(flatcc_builder_vector_edit(fbb));
+  size_t totalSize = flatcc_builder_vector_count(fbb);
+  uint32_t crc32Value = 0;
+  if (calculateCRC32) {
+    crc32Value = llvm::crc32(0u, ArrayRef<uint8_t>(dataPtr, totalSize));
+  }
+  return SerializedConstantRef{
+      flatbuffers_uint8_vec_end(fbb),
+      static_cast<int64_t>(totalSize),
+      crc32Value,
+  };
+}
 
 LLVM_PACKED_START
 struct ZIPEndOfCentralDirectoryRecord {
@@ -731,6 +787,8 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
 LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                                         BytecodeTargetOptions targetOptions,
                                         llvm::raw_ostream &output) {
+  moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
+
   uint64_t startOffset = output.tell();
 
   if (failed(canonicalizeModule(targetOptions, moduleOp))) {

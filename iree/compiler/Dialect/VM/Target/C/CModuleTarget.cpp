@@ -7,13 +7,13 @@
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
 #include "emitc/Target/Cpp/CppEmitter.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
-#include "iree/compiler/Dialect/VM/Utils/ConstantEncoding.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -48,31 +48,28 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
   std::string moduleName = moduleOp.getName().str();
 
   for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-    ElementsAttr value = rodataOp.value();
-    auto bitwidth = value.getType().getElementTypeBitWidth();
-    size_t size = value.getNumElements() * (bitwidth / 8);
-    SmallVector<uint8_t, 32> byteBuffer;
-    byteBuffer.resize(size);
+    auto value =
+        rodataOp.value().dyn_cast<IREE::Util::SerializableAttrInterface>();
+    assert(value && "expected a serializable rodata value");
+    SmallVector<char> byteBuffer;
+    if (failed(value.serializeToVector(llvm::support::endianness::little,
+                                       byteBuffer))) {
+      return rodataOp.emitError() << "error during serialization";
+    }
 
     constexpr size_t kDefaultRodataAlignment = 16;
-
     size_t alignment =
         rodataOp.alignment()
             ? static_cast<size_t>(rodataOp.alignment().getValue())
             : 0;
     if (alignment == 0) alignment = kDefaultRodataAlignment;
 
-    if (failed(serializeConstantArray(rodataOp.getLoc(), value, alignment,
-                                      byteBuffer.data()))) {
-      return rodataOp.emitError() << "error during serialization";
-    }
-
     std::string bufferName =
         moduleOp.getName().str() + "_" + rodataOp.getName().str();
 
     output << "iree_alignas(" << alignment << ") static const uint8_t "
            << bufferName << "[] = {";
-    llvm::interleaveComma(byteBuffer, output, [&](uint8_t value) {
+    llvm::interleaveComma(byteBuffer, output, [&](char value) {
       output << static_cast<unsigned int>(value);
     });
     output << "};\n";
@@ -335,6 +332,8 @@ static LogicalResult canonicalizeModule(
 LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
                                  CTargetOptions targetOptions,
                                  llvm::raw_ostream &output) {
+  moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
+
   if (failed(canonicalizeModule(moduleOp, targetOptions))) {
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";

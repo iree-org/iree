@@ -20,8 +20,6 @@ iree_cc_library(
     "BytecodeEncoder.cpp"
     "BytecodeEncoder.h"
     "BytecodeModuleTarget.cpp"
-    "ConstantEncoder.cpp"
-    "ConstantEncoder.h"
     "DebugDatabaseBuilder.cpp"
     "DebugDatabaseBuilder.h"
     "TranslationFlags.cpp"
@@ -39,7 +37,6 @@ iree_cc_library(
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VM::Utils::CallingConvention
-    iree::compiler::Dialect::VM::Utils::ConstantEncoding
     iree::compiler::Utils
     iree::schemas::bytecode_module_def_c_fbs
   PUBLIC

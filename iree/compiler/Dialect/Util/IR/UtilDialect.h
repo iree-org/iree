@@ -20,14 +20,14 @@ class UtilDialect : public Dialect {
   explicit UtilDialect(MLIRContext* context);
   static StringRef getDialectNamespace() { return "util"; }
 
-  /// Parses a type registered to this dialect.
-  Type parseType(DialectAsmParser& parser) const override;
+  Attribute parseAttribute(DialectAsmParser& parser, Type type) const override;
+  void printAttribute(Attribute attr, DialectAsmPrinter& p) const override;
 
-  /// Prints a type registered to this dialect.
+  Type parseType(DialectAsmParser& parser) const override;
   void printType(Type type, DialectAsmPrinter& os) const override;
 
  private:
-  /// Register the types of this dialect.
+  void registerAttributes();
   void registerTypes();
 };
 
