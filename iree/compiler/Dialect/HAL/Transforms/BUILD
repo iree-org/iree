@@ -29,7 +29,7 @@ cc_library(
         "PropagateConstantWorkgroupInfo.cpp",
         "ResolveEntryPointOrdinals.cpp",
         "SerializeExecutables.cpp",
-        "TranslateExecutableVariants.cpp",
+        "TranslateExecutables.cpp",
         "VerifyTargetEnvironment.cpp",
     ],
     hdrs = [
