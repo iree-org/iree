@@ -10,9 +10,6 @@
 // This file contains utility macros used for things that EmitC  can't handle
 // directly.
 
-// Assign a value to a variable
-#define EMITC_ASSIGN_VALUE(var, value) (var) = (value)
-
 // Assign a value through a pointer variable
 #define EMITC_DEREF_ASSIGN_VALUE(ptr, value) *(ptr) = (value)
 

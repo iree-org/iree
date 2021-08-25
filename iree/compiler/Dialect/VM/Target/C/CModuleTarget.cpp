@@ -42,16 +42,6 @@ static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
          << std::string(77, '=') << "\n";
 }
 
-static void printSeparatingComment(llvm::raw_ostream &output) {
-  output << "//" << std::string(77, '=')
-         << "\n"
-            "// The code below setups functions and lookup tables to "
-            "implement the vm\n"
-            "// interface\n"
-            "//"
-         << std::string(77, '=') << "\n";
-}
-
 static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
                                         mlir::emitc::CppEmitter &emitter) {
   llvm::raw_ostream &output = emitter.ostream();
