@@ -51,7 +51,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
     "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
     # Vulkan
-    "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
+    "@vulkan_headers": ["Vulkan::Headers"],
     # Cuda
     "@cuda//:cuda_headers": ["cuda_headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
