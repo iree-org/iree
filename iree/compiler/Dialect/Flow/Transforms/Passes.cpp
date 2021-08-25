@@ -65,12 +65,10 @@ static llvm::cl::opt<bool> clEnableMatmulToMMT4d(
     llvm::cl::desc("Enable converting linalg.matmul into linalg.mmt4d"),
     llvm::cl::init(false));
 
-// TODO(#1159): enable by default or remove this option once it works on
-//              a broader set of programs
 static llvm::cl::opt<bool> clEnableLinalgDetensorize(
     "iree-flow-enable-linalg-detensorize",
     llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 namespace mlir {
 namespace iree_compiler {
