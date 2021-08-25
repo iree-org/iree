@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/SCF/Transforms.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -98,8 +99,7 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
         canonicalizationPatterns);
     memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                context);
-    canonicalizationPatterns.add<linalg::AffineMinSCFCanonicalizationPattern>(
-        &getContext());
+    scf::populateSCFLoopBodyCanonicalizationPatterns(canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
       return signalPassFailure();
@@ -132,8 +132,7 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
         canonicalizationPatterns);
     memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                context);
-    canonicalizationPatterns.add<linalg::AffineMinSCFCanonicalizationPattern>(
-        &getContext());
+    scf::populateSCFLoopBodyCanonicalizationPatterns(canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
       return signalPassFailure();

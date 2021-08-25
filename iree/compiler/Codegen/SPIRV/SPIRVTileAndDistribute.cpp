@@ -26,6 +26,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/Transforms.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -344,8 +345,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
                                                  getVectorizeMarker(), context);
     populateTilingConvFilterPatterns(context, convFilterTilingPatterns, marker);
     populateFoldGPUProcessorIDUsesPatterns(context, convFilterTilingPatterns);
-    convFilterTilingPatterns
-        .insert<linalg::AffineMinSCFCanonicalizationPattern>(context);
+    scf::populateSCFLoopBodyCanonicalizationPatterns(convFilterTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(convFilterTilingPatterns));
 
