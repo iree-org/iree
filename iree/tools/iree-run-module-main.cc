@@ -35,7 +35,7 @@ IREE_FLAG(string, entry_function, "",
 
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
-IREE_FLAG(bool, print_statistics, true,
+IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
 static iree_status_t parse_function_input(iree_string_view_t flag_name,
