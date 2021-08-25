@@ -20,6 +20,29 @@ func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 
 // -----
 
+func @sort_with_cst(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
+  %0 = mhlo.constant dense<0> : tensor<i32>
+  %1 = "mhlo.sort"(%arg0) ( {
+  ^bb0(%arg1: tensor<i32>, %arg3: tensor<i32>):  // no predecessors
+    %2 = "mhlo.compare"(%arg1, %0) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    "mhlo.return"(%2) : (tensor<i1>) -> ()
+  }) {dimension = 1 : i64, is_stable = true} : (tensor<1x10xi32>) -> tensor<1x10xi32>
+  return %1 : tensor<1x10xi32>
+}
+
+// CHECK-LABEL: func @sort_with_cst
+// CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[CST:.+]] = mhlo.constant dense<0> : tensor<i32>
+// CHECK:         %{{.+}} = linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
+// CHECK:         ^bb0(%[[ARG1:.+]]: i32, %{{.*}}: i32)
+// CHECK:           %[[SCALAR:.+]] = tensor.extract %[[CST]][] : tensor<i32>
+// CHECK:           %[[RES:.+]] = cmpi slt, %[[ARG1]], %[[SCALAR]] : i32
+// CHECK:           linalg_ext.yield %[[RES]] : i1
+// CHECK:         } -> tensor<1x10xi32>
+// CHECK:       }
+
+// -----
+
 func @sort_2d(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
   %0 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):  // no predecessors

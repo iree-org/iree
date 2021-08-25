@@ -24,7 +24,6 @@ iree_lit_test_suite(
             "fold_gpu_procid_uses.mlir",
             "pipeline_matmul_cooperative_matrix.mlir",
             "pipeline_matmul_vectorization.mlir",
-            "promote_workgroup_memory.mlir",
             "remove_one_trip_tiled_loop.mlir",
             "tile_and_vectorize.mlir",
             "tile_and_vectorize_batch_matmul.mlir",
@@ -37,6 +36,7 @@ iree_lit_test_suite(
             "vectorize_load_store.mlir",
         ],
         include = ["*.mlir"],
+        exclude = ["promote_workgroup_memory.mlir"],
     ),
     data = [
         "//iree/tools:IreeFileCheck",

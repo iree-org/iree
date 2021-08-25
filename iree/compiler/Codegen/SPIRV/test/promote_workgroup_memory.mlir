@@ -1,6 +1,5 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))'
 // TODO(antiagainst): Fix promotion to workgroup and enable the test.
-// | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))' | IreeFileCheck %s
 
 hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "private"} {
   hal.interface @io {
