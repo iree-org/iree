@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
 
+#include <mutex>
+
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -29,24 +31,26 @@ namespace IREE {
 namespace HAL {
 
 ROCMTargetOptions getROCMTargetOptionsFromFlags() {
-  ROCMTargetOptions targetOptions;
-  static llvm::cl::opt<std::string> clROCMTargetChip(
-      "iree-rocm-target-chip", llvm::cl::desc("ROCm target Chip"),
-      llvm::cl::init("gfx908"));
+  static ROCMTargetOptions targetOptions;
+  static std::once_flag onceFlag;
+  std::call_once(onceFlag, [&]() {
+    static llvm::cl::opt<std::string> clROCMTargetChip(
+        "iree-rocm-target-chip", llvm::cl::desc("ROCm target Chip"),
+        llvm::cl::init("gfx908"));
 
-  static llvm::cl::opt<bool> clROCMLinkBC(
-      "iree-rocm-link-bc",
-      llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
-      llvm::cl::init(false));
+    static llvm::cl::opt<bool> clROCMLinkBC(
+        "iree-rocm-link-bc",
+        llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
+        llvm::cl::init(false));
 
-  static llvm::cl::opt<std::string> clROCMBitcodeDir(
-      "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
-      llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
+    static llvm::cl::opt<std::string> clROCMBitcodeDir(
+        "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
+        llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
 
-  targetOptions.ROCMTargetChip = clROCMTargetChip;
-  targetOptions.ROCMLinkBC = clROCMLinkBC;
-  targetOptions.ROCMBitcodeDir = clROCMBitcodeDir;
-
+    targetOptions.ROCMTargetChip = clROCMTargetChip;
+    targetOptions.ROCMLinkBC = clROCMLinkBC;
+    targetOptions.ROCMBitcodeDir = clROCMBitcodeDir;
+  });
   return targetOptions;
 }
 
