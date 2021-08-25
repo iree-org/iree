@@ -108,7 +108,7 @@ struct ConvertToFlowBeforeDispatchFormation
         LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
         LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(
         context);
-    populateTensorToFlowPatterns(context, patterns);
+    populateTensorToFlowPatternsBeforeDispatchFormation(context, patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
 
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
@@ -131,6 +131,7 @@ struct ConvertToFlowAfterDispatchFormation
     RewritePatternSet patterns(&getContext());
 
     patterns.insert<LinalgFillToFlowTensorSplat>(context);
+    populateTensorToFlowPatternsAfterDispatchFormation(context, patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
 
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

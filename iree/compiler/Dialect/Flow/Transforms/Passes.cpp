@@ -167,12 +167,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // an argument if two executables differ only in that one dimension).
   passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
-  // TODO: Prune and rename this pass. This runs after sending everything
-  // possible to the device and then legalizes any remaining h<->d loads,
-  // typically coming from top level flow control.
-  passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createPromoteTensorLoadsPass());
-
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as
   // exporting all original model entry points.

@@ -80,13 +80,6 @@ createConvertToFlowAfterDispatchFormation();
 // Promote I1 tensor constants to I8 tensors to match later operations.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
 
-// Converts standard ops which match to flow.tensor.load (typically causing a
-// read-back).
-// Note that there are typically very specific phase ordering issues with
-// performing such a conversion, so even though it is of fine granularity,
-// this is maintained separately.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteTensorLoadsPass();
-
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createExpandGlobalDynamicDimsPass();
