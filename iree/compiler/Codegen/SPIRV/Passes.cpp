@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/MemorySpace.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -69,6 +70,7 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<FuncOp>(createSPIRVCopyToWorkgroupMemoryPass());
+  pm.addNestedPass<FuncOp>(linalg_ext::createLinalgExtToLoopsPass());
   pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());

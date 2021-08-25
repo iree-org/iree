@@ -61,13 +61,19 @@ struct LinalgExtRegionHLOOpConversion : public OpConversionPattern<OpTy> {
       ConversionPatternRewriter &rewriter) const final {
     if (!isInBodyOfLinalgExtOps(op)) return failure();
     if (!op.getResult().getType().template isa<TensorType>()) return failure();
-    if (llvm::all_of(args, [](Value arg) {
-          return arg.getType().template isa<TensorType>();
-        })) {
-      return failure();
+    SmallVector<Value> scalarArgs;
+    for (auto arg : args) {
+      if (auto ty = arg.getType().template dyn_cast<TensorType>()) {
+        assert(ty.hasRank() && ty.getRank() == 0 &&
+               "Have non-0D tensors in the region?");
+        scalarArgs.push_back(
+            rewriter.create<tensor::ExtractOp>(op.getLoc(), arg));
+      } else {
+        scalarArgs.push_back(arg);
+      }
     }
     Value result = lmhlo::HloOpToStdScalarOp::map<OpTy>(
-        op, getElementTypeOrSelf(op.getType()), args, &rewriter);
+        op, getElementTypeOrSelf(op.getType()), scalarArgs, &rewriter);
     rewriter.replaceOp(op, result);
     return success();
   }
@@ -396,6 +402,8 @@ struct ConvertMHLOToLinalgExtPass
         context);
     patterns.insert<LinalgExtRegionHLOOpConversion<mhlo::CompareOp>,
                     LinalgExtRegionHLOOpConversion<mhlo::AddOp>,
+                    LinalgExtRegionHLOOpConversion<mhlo::SubOp>,
+                    LinalgExtRegionHLOOpConversion<mhlo::BitcastConvertOp>,
                     LinalgExtRegionReturnOpConversion>(context,
                                                        PatternBenefit(1000));
 
