@@ -164,7 +164,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
 
 void registerMetalSPIRVTargetBackends() {
   auto backendFactory = [=]() {
-    return std::make_unique<MetalSPIRVTargetBackend>();
+    return std::make_shared<MetalSPIRVTargetBackend>();
   };
   // #hal.device.target<"metal", ...
   static TargetBackendRegistration registration0("metal", backendFactory);

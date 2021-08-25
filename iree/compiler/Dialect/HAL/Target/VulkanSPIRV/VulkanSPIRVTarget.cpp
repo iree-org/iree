@@ -348,7 +348,7 @@ void registerVulkanSPIRVTargetBackends(
     std::function<VulkanSPIRVTargetOptions()> queryOptions) {
   getVulkanSPIRVTargetOptionsFromFlags();
   auto backendFactory = [=]() {
-    return std::make_unique<VulkanSPIRVTargetBackend>(queryOptions());
+    return std::make_shared<VulkanSPIRVTargetBackend>(queryOptions());
   };
   // #hal.device.target<"vulkan", ...
   static TargetBackendRegistration registration0("vulkan", backendFactory);

@@ -606,7 +606,7 @@ void registerLLVMAOTTargetBackends(
     INIT_LLVM_TARGET(AArch64)
     INIT_LLVM_TARGET(RISCV)
     INIT_LLVM_TARGET(WebAssembly)
-    return std::make_unique<LLVMAOTTargetBackend>(queryOptions());
+    return std::make_shared<LLVMAOTTargetBackend>(queryOptions());
   };
 
   // #hal.device.target<"cpu", ...

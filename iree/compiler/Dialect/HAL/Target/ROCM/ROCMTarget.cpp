@@ -255,7 +255,7 @@ void registerROCMTargetBackends(
         LLVMInitializeAMDGPUTargetMC();
         LLVMInitializeAMDGPUTargetInfo();
         LLVMInitializeAMDGPUAsmPrinter();
-        return std::make_unique<ROCMTargetBackend>(queryOptions());
+        return std::make_shared<ROCMTargetBackend>(queryOptions());
       });
 }
 
