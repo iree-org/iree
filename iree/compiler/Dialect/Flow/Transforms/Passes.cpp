@@ -78,6 +78,8 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
+
   // Simplify util.global accesses early on; this can help with dispatch
   // region formation as redundant store-loads are removed.
   passManager.addNestedPass<mlir::FuncOp>(

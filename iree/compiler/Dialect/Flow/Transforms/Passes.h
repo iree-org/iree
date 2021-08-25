@@ -84,8 +84,9 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createExpandGlobalDynamicDimsPass();
 
-/// Verified if the input to the Flow transformation passes has operations from
-/// dialects that are expected to be legalized before this pass.
+/// Verifies that the input to the Flow transformation pipeline is legal.
+/// This includes checking for operations from dialects that are expected
+/// to be legalized before this pass.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createVerifyInputLegalityPass();
 
 //===----------------------------------------------------------------------===//
