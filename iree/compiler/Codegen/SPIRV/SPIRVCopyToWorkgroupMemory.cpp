@@ -28,6 +28,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SCF/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -288,8 +289,7 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
   RewritePatternSet canonicalizePatterns =
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   populateAffineMinCanonicalizationPattern(canonicalizePatterns);
-  canonicalizePatterns.insert<linalg::AffineMinSCFCanonicalizationPattern>(
-      context);
+  scf::populateSCFLoopBodyCanonicalizationPatterns(canonicalizePatterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizePatterns));
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
