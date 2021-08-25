@@ -1,0 +1,6 @@
+steps:
+  - label: "Build TF"
+    agents:
+      - "queue=tf-bazel-build"
+    commands:
+      - ./build_tools/buildkite/bazel/tf_integrations/outside_docker.sh
