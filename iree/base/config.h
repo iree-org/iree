@@ -135,6 +135,18 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #endif  // !IREE_FILE_IO_ENABLE
 
 //===----------------------------------------------------------------------===//
+// Statistics/reporting
+//===----------------------------------------------------------------------===//
+// Conditionally enables programmatic access to aggregate statistics. When
+// enabled statistics requires additional per-operation logic and per-resource
+// state that can bloat otherwise minimal structures. Shared resources may also
+// require synchronization where there otherwise would not be any.
+
+#if !defined(IREE_STATISTICS_ENABLE)
+#define IREE_STATISTICS_ENABLE 1
+#endif  // !IREE_STATISTICS_ENABLE
+
+//===----------------------------------------------------------------------===//
 // IREE HAL configuration
 //===----------------------------------------------------------------------===//
 // Enables optional HAL features. Each of these may add several KB to the final
