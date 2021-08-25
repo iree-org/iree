@@ -22,6 +22,9 @@ typedef struct iree_hal_vulkan_vma_allocator_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   VmaAllocator vma;
+
+  IREE_STATISTICS(VkPhysicalDeviceMemoryProperties memory_props;)
+  IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_vulkan_vma_allocator_t;
 
 extern const iree_hal_allocator_vtable_t iree_hal_vulkan_vma_allocator_vtable;
@@ -32,6 +35,49 @@ static iree_hal_vulkan_vma_allocator_t* iree_hal_vulkan_vma_allocator_cast(
   return (iree_hal_vulkan_vma_allocator_t*)base_value;
 }
 
+#if IREE_STATISTICS_ENABLE
+
+static iree_hal_memory_type_t iree_hal_vulkan_vma_allocator_lookup_memory_type(
+    iree_hal_vulkan_vma_allocator_t* allocator, uint32_t memory_type_ordinal) {
+  // We could better map the types however today we only use the
+  // device/host-local bits.
+  VkMemoryPropertyFlags flags =
+      allocator->memory_props.memoryTypes[memory_type_ordinal].propertyFlags;
+  if (iree_all_bits_set(flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+    return IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  } else {
+    return IREE_HAL_MEMORY_TYPE_HOST_LOCAL;
+  }
+}
+
+// Callback function called before vkAllocateMemory.
+static void VKAPI_PTR iree_hal_vulkan_vma_allocate_callback(
+    VmaAllocator VMA_NOT_NULL vma, uint32_t memoryType,
+    VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory, VkDeviceSize size,
+    void* VMA_NULLABLE pUserData) {
+  iree_hal_vulkan_vma_allocator_t* allocator =
+      (iree_hal_vulkan_vma_allocator_t*)pUserData;
+  iree_hal_allocator_statistics_record_alloc(
+      &allocator->statistics,
+      iree_hal_vulkan_vma_allocator_lookup_memory_type(allocator, memoryType),
+      (iree_device_size_t)size);
+}
+
+// Callback function called before vkFreeMemory.
+static void VKAPI_PTR iree_hal_vulkan_vma_free_callback(
+    VmaAllocator VMA_NOT_NULL vma, uint32_t memoryType,
+    VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory, VkDeviceSize size,
+    void* VMA_NULLABLE pUserData) {
+  iree_hal_vulkan_vma_allocator_t* allocator =
+      (iree_hal_vulkan_vma_allocator_t*)pUserData;
+  iree_hal_allocator_statistics_record_free(
+      &allocator->statistics,
+      iree_hal_vulkan_vma_allocator_lookup_memory_type(allocator, memoryType),
+      (iree_device_size_t)size);
+}
+
+#endif  // IREE_STATISTICS_ENABLE
+
 iree_status_t iree_hal_vulkan_vma_allocator_create(
     VkInstance instance, VkPhysicalDevice physical_device,
     VkDeviceHandle* logical_device, VmaRecordSettings record_settings,
@@ -41,6 +87,15 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_allocator_t host_allocator = logical_device->host_allocator();
+  iree_hal_vulkan_vma_allocator_t* allocator = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*allocator),
+                                (void**)&allocator));
+  iree_hal_resource_initialize(&iree_hal_vulkan_vma_allocator_vtable,
+                               &allocator->resource);
+  allocator->host_allocator = host_allocator;
 
   const auto& syms = logical_device->syms();
   VmaVulkanFunctions vulkan_fns;
@@ -67,6 +122,14 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   vulkan_fns.vkDestroyImage = syms->vkDestroyImage;
   vulkan_fns.vkCmdCopyBuffer = syms->vkCmdCopyBuffer;
 
+  VmaDeviceMemoryCallbacks device_memory_callbacks;
+  memset(&device_memory_callbacks, 0, sizeof(device_memory_callbacks));
+  IREE_STATISTICS({
+    device_memory_callbacks.pfnAllocate = iree_hal_vulkan_vma_allocate_callback;
+    device_memory_callbacks.pfnFree = iree_hal_vulkan_vma_free_callback;
+    device_memory_callbacks.pUserData = allocator;
+  });
+
   VmaAllocatorCreateInfo create_info;
   memset(&create_info, 0, sizeof(create_info));
   create_info.flags = 0;
@@ -75,32 +138,32 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   create_info.instance = instance;
   create_info.preferredLargeHeapBlockSize = 64 * 1024 * 1024;
   create_info.pAllocationCallbacks = logical_device->allocator();
-  create_info.pDeviceMemoryCallbacks = NULL;
+  create_info.pDeviceMemoryCallbacks = &device_memory_callbacks;
   create_info.frameInUseCount = 0;
   create_info.pHeapSizeLimit = NULL;
   create_info.pVulkanFunctions = &vulkan_fns;
   create_info.pRecordSettings = &record_settings;
   VmaAllocator vma = VK_NULL_HANDLE;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, VK_RESULT_TO_STATUS(vmaCreateAllocator(&create_info, &vma),
-                              "vmaCreateAllocator"));
+  iree_status_t status = VK_RESULT_TO_STATUS(
+      vmaCreateAllocator(&create_info, &vma), "vmaCreateAllocator");
 
-  iree_allocator_t host_allocator = logical_device->host_allocator();
-  iree_hal_vulkan_vma_allocator_t* allocator = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      host_allocator, sizeof(*allocator), (void**)&allocator);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_vulkan_vma_allocator_vtable,
-                                 &allocator->resource);
-    allocator->host_allocator = host_allocator;
     allocator->vma = vma;
+
+    IREE_STATISTICS({
+      const VkPhysicalDeviceMemoryProperties* memory_props = NULL;
+      vmaGetMemoryProperties(allocator->vma, &memory_props);
+      memcpy(&allocator->memory_props, memory_props,
+             sizeof(allocator->memory_props));
+    });
+
     *out_allocator = (iree_hal_allocator_t*)allocator;
   } else {
     vmaDestroyAllocator(vma);
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_vulkan_vma_allocator_destroy(
@@ -126,7 +189,11 @@ static iree_allocator_t iree_hal_vulkan_vma_allocator_host_allocator(
 static void iree_hal_vulkan_vma_allocator_query_statistics(
     iree_hal_allocator_t* base_allocator,
     iree_hal_allocator_statistics_t* out_statistics) {
-  // TODO(*): track allocation statistics (if desired).
+  IREE_STATISTICS({
+    iree_hal_vulkan_vma_allocator_t* allocator =
+        iree_hal_vulkan_vma_allocator_cast(base_allocator);
+    memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
+  });
 }
 
 static iree_hal_buffer_compatibility_t
