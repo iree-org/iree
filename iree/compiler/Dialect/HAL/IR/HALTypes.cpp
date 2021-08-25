@@ -73,7 +73,7 @@ static LogicalResult parseMemoryType(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<MemoryTypeBitfield>(fullString);
     if (!symbolized.hasValue()) {
@@ -158,7 +158,7 @@ static LogicalResult parseMemoryAccess(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<MemoryAccessBitfield>(fullString);
     if (!symbolized.hasValue()) {
@@ -227,7 +227,7 @@ static LogicalResult parseBufferUsage(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<BufferUsageBitfield>(fullString);
     if (!symbolized.hasValue()) {
