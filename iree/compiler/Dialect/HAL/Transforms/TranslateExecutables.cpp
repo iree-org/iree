@@ -34,20 +34,20 @@ class TranslateTargetExecutableVariantsPass
     this->target = target.str();
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackend = getTargetBackend(target);
-    if (targetBackend) {
-      targetBackend->getDependentDialects(registry);
-    }
-  }
-
   StringRef getArgument() const override {
     return "iree-hal-translate-target-executable-variants";
   }
 
   StringRef getDescription() const override {
     return "Serializes hal.executable.variant ops to hal.executable.binary ops";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    auto targetBackend = getTargetBackend(target);
+    if (targetBackend) {
+      targetBackend->getDependentDialects(registry);
+    }
   }
 
   void runOnOperation() override {
@@ -98,6 +98,14 @@ class TranslateExecutablesPass
 
   StringRef getDescription() const override {
     return "Serializes hal.executable.variant ops to hal.executable.binary ops";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    auto targetBackends = getTargetBackends(getRegisteredTargetBackends());
+    for (auto &targetBackend : targetBackends) {
+      targetBackend->getDependentDialects(registry);
+    }
   }
 
   void runOnOperation() override {
