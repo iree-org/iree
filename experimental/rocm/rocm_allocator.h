@@ -23,8 +23,9 @@ iree_status_t iree_hal_rocm_allocator_create(
 
 // Free an allocation represent by the given device or host pointer.
 void iree_hal_rocm_allocator_free(iree_hal_allocator_t* allocator,
+                                  iree_hal_memory_type_t memory_type,
                                   hipDeviceptr_t device_ptr, void* host_ptr,
-                                  iree_hal_memory_type_t memory_type);
+                                  iree_device_size_t allocation_size);
 
 #ifdef __cplusplus
 }  // extern "C"

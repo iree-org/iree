@@ -31,6 +31,7 @@
 #ifndef IREE_BASE_CONFIG_H_
 #define IREE_BASE_CONFIG_H_
 
+#include <inttypes.h>
 #include <stddef.h>
 
 #include "iree/base/target_platform.h"
@@ -77,6 +78,7 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
 
 #if !defined(IREE_DEVICE_SIZE_T)
 #define IREE_DEVICE_SIZE_T uint64_t
+#define PRIdsz PRIu64
 #endif  // !IREE_DEVICE_SIZE_T
 
 // Size, in bytes, of a buffer on remote devices.
@@ -133,6 +135,18 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #if !defined(IREE_FILE_IO_ENABLE)
 #define IREE_FILE_IO_ENABLE 1
 #endif  // !IREE_FILE_IO_ENABLE
+
+//===----------------------------------------------------------------------===//
+// Statistics/reporting
+//===----------------------------------------------------------------------===//
+// Conditionally enables programmatic access to aggregate statistics. When
+// enabled statistics requires additional per-operation logic and per-resource
+// state that can bloat otherwise minimal structures. Shared resources may also
+// require synchronization where there otherwise would not be any.
+
+#if !defined(IREE_STATISTICS_ENABLE)
+#define IREE_STATISTICS_ENABLE 1
+#endif  // !IREE_STATISTICS_ENABLE
 
 //===----------------------------------------------------------------------===//
 // IREE HAL configuration
