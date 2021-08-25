@@ -54,7 +54,7 @@ else
   SWIFTSHADER_INSTALL_DIR="${BASE_DIR?}"'\.swiftshader'
 fi
 
-SWIFTSHADER_COMMIT=84f5eeb6dd9b225f465f93737fa76aad7de355cf
+SWIFTSHADER_COMMIT=e32890c54793664e21891a504793cc8c0c7a34fb
 SWIFTSHADER_DIR="$(mktemp --directory --tmpdir swiftshader_XXXXXX)"
 
 #  Clone swiftshader and checkout the appropriate commit.
