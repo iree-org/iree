@@ -28,6 +28,8 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
+        "@llvm-project//mlir:CallInterfacesTdFiles",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectTdFiles",
         "@llvm-project//mlir:SubElementInterfacesTdFiles",

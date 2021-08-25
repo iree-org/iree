@@ -77,7 +77,7 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    NativeOpTrait<"FunctionLike">,
+    FunctionLike,
     CallableOpInterface,
     Symbol,
   ]> {
@@ -173,7 +173,7 @@ def VM_ExportOp : VM_Op<"export", [
 
 def VM_ImportOp : VM_Op<"import", [
     Symbol,
-    NativeOpTrait<"FunctionLike">,
+    FunctionLike,
     CallableOpInterface,
   ]> {
   let summary = [{imports a function from an external module}];
@@ -245,7 +245,7 @@ def VM_ImportOp : VM_Op<"import", [
 def VM_InitializerOp : VM_Op<"initializer", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    NativeOpTrait<"FunctionLike">,
+    FunctionLike,
     CallableOpInterface,
   ]> {
   let summary = [{global initialization function}];
@@ -3383,6 +3383,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
 class VM_CallBaseOp<string mnemonic, list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
       CallOpInterface,
     ])> {
   let extraClassDeclaration = [{
@@ -3512,6 +3513,8 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    NoSideEffect,
+    ReturnLike,
     Terminator,
   ]> {
   let summary = "return operation";

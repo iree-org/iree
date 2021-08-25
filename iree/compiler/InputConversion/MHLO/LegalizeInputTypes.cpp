@@ -126,15 +126,6 @@ static LogicalResult convertOperation(Operation *oldOp,
   }
 
   auto *newOp = builder.createOperation(state);
-  if (failed(mlir::verify(newOp))) {
-    // TODO(benvanik): we could possibly try again with a different set of type
-    // conversions to see if that works. For example, we could lean toward
-    // materializing conversions/inserting cases instead of directly doing the
-    // conversions here. Unfortunately ops don't allow us to query what types
-    // they support so this is trial-and-error.
-    return newOp->emitOpError()
-           << "post-conversion verification failed - unsupported types";
-  }
 
   for (auto oldNewResult :
        llvm::zip(oldOp->getResults(), newOp->getResults())) {
@@ -242,6 +233,17 @@ class LegalizeInputTypesPass
         }
         oldOp->erase();
       }
+    }
+
+    if (failed(mlir::verify(moduleOp))) {
+      // TODO(benvanik): we could possibly try again with a different set of
+      // type conversions to see if that works. For example, we could lean
+      // toward materializing conversions/inserting cases instead of directly
+      // doing the conversions here. Unfortunately ops don't allow us to query
+      // what types they support so this is trial-and-error.
+      moduleOp.emitOpError()
+          << "post-conversion verification failed - unsupported types";
+      return signalPassFailure();
     }
   }
 };

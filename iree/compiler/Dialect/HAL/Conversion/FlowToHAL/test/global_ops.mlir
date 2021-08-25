@@ -37,13 +37,14 @@ func @fn() {
 }
 
 // -----
+
 // Checks that an initializer function is generated, used and operates on
 // a hal.buffer (versus tensor).
-// CHECK: util.global public mutable @var_with_tensor_initializer
-// CHECK-SAME: initializer(@__var_with_tensor_initializer_initializer)
-// CHECK-SAME: : !hal.buffer
-// CHECK-LABEL: func @__var_with_tensor_initializer_initializer() -> !hal.buffer
+
+// CHECK: util.global public mutable @var_with_tensor_initializer : !hal.buffer
 util.global public mutable @var_with_tensor_initializer = dense<0.000000e+00> : tensor<f32>
+// CHECK-NEXT: util.initializer {
+// CHECK: util.global.store %{{.+}}, @var_with_tensor_initializer : !hal.buffer
 func @fn() {
   %0 = util.global.load @var_with_tensor_initializer : tensor<f32>
   util.global.store %0, @var_with_tensor_initializer : tensor<f32>
@@ -51,20 +52,10 @@ func @fn() {
 }
 
 // -----
-// TODO(b/145839814): It should not be possible to produce a name collision
-// expected-error @+3 {{redefinition of symbol named '__var_with_initializer_initializer'}}
-// expected-note @+1 {{see existing symbol definition here}}
-func private @__var_with_initializer_initializer() -> ()
-util.global public mutable @var_with_initializer = dense<0.000000e+00> : tensor<f32>
-func @fn() {
-  %0 = util.global.load @var_with_initializer : tensor<f32>
-  util.global.store %0, @var_with_initializer : tensor<f32>
-  return
-}
 
-// -----
 // Checks that the implicit cast allowing a buffer_view to store into a variable
 // that maps to a buffer is permitted.
+
 // CHECK-LABEL: util.global public mutable @var_with_buffer_view_store
 // CHECK: %[[BUFFER:.*]] = hal.buffer_view.buffer<%arg0 : !hal.buffer_view> : !hal.buffer
 // CHECK: util.global.store %[[BUFFER]], @var_with_buffer_view_store : !hal.buffer

@@ -43,32 +43,52 @@ class HoistInlinedRodataPass
     SymbolTable moduleSymbolTable(moduleOp);
 
     // Find all inline byte buffers in the module.
-    auto funcOps = llvm::to_vector<4>(moduleOp.getOps<IREE::VM::FuncOp>());
-    for (auto funcOp : funcOps) {
-      auto inlineOps =
-          llvm::to_vector<4>(funcOp.getOps<IREE::VM::RodataInlineOp>());
-      if (inlineOps.empty()) continue;
+    SmallVector<IREE::VM::RodataInlineOp> inlineOps;
+    moduleOp.walk([&](IREE::VM::RodataInlineOp inlineOp) {
+      inlineOps.push_back(inlineOp);
+    });
 
+    for (auto inlineOp : inlineOps) {
+      auto *parentOp = findParentContainer(inlineOp);
       OpBuilder moduleBuilder(moduleOp.getContext());
-      moduleBuilder.setInsertionPoint(funcOp);
-      for (auto inlineOp : inlineOps) {
-        std::string name = inlineOp.name().hasValue()
-                               ? inlineOp.name().getValue().str()
-                               : (funcOp.getName() + "_const").str();
-        auto rodataOp = OpBuilder(moduleOp.getContext())
-                            .create<IREE::VM::RodataOp>(inlineOp.getLoc(), name,
-                                                        inlineOp.value());
-        if (inlineOp.alignmentAttr()) {
-          rodataOp.alignmentAttr(inlineOp.alignmentAttr());
-        }
-        moduleSymbolTable.insert(rodataOp, moduleBuilder.getInsertionPoint());
-        rodataOp.setPrivate();
-        replaceInlineOpWithRodataRef(inlineOp, rodataOp);
+      if (parentOp) {
+        moduleBuilder.setInsertionPoint(parentOp);
+      } else {
+        moduleBuilder.setInsertionPointToStart(moduleOp.getBody());
       }
+      auto rodataOp = moduleBuilder.create<IREE::VM::RodataOp>(
+          inlineOp.getLoc(), inferConstantName(parentOp, inlineOp),
+          inlineOp.value());
+      if (inlineOp.alignmentAttr()) {
+        rodataOp.alignmentAttr(inlineOp.alignmentAttr());
+      }
+      moduleSymbolTable.insert(rodataOp);
+      rodataOp.setPrivate();
+      replaceInlineOpWithRodataRef(inlineOp, rodataOp);
     }
   }
 
  private:
+  Operation *findParentContainer(IREE::VM::RodataInlineOp inlineOp) {
+    if (auto parentOp = inlineOp->getParentOfType<IREE::VM::InitializerOp>()) {
+      return parentOp;
+    } else if (auto parentOp = inlineOp->getParentOfType<IREE::VM::FuncOp>()) {
+      return parentOp;
+    }
+    return nullptr;
+  }
+
+  std::string inferConstantName(Operation *parentOp,
+                                IREE::VM::RodataInlineOp inlineOp) {
+    if (inlineOp.name().hasValue()) {
+      return inlineOp.name().getValue().str();
+    }
+    if (auto symbolOp = dyn_cast<SymbolOpInterface>(parentOp)) {
+      return (symbolOp.getName() + "_const").str();
+    }
+    return "_const";
+  }
+
   // Replaces a vm.rodata.inline op with a vm.const.ref.rodata op that
   // references the module-level |rodataOp|.
   void replaceInlineOpWithRodataRef(IREE::VM::RodataInlineOp inlineOp,

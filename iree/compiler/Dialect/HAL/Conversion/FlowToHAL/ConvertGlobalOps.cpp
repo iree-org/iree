@@ -23,24 +23,20 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-static FuncOp createInitializerFromImmediate(
+static void createInitializerFromImmediate(
     IREE::Util::GlobalOp globalOp, ElementsAttr immediateElements,
     ConversionPatternRewriter &rewriter) {
   auto loc = globalOp.getLoc();
-  auto initializerType = FunctionType::get(rewriter.getContext(), {},
-                                           {immediateElements.getType()});
-  // TODO(b/145839814): It is presently possible to collide with user
-  // provided symbols and it seems like it shouldn't be.
-  auto uniqueName = (Twine("__") + globalOp.getName() + "_initializer").str();
-  auto initializerFuncOp =
-      rewriter.create<FuncOp>(globalOp.getLoc(), uniqueName, initializerType);
-  rewriter.createBlock(&initializerFuncOp.getBody(), initializerFuncOp.begin(),
-                       initializerType.getInputs());
+  auto initializerOp =
+      rewriter.create<IREE::Util::InitializerOp>(globalOp.getLoc());
+  rewriter.setInsertionPointToStart(initializerOp.addEntryBlock());
 
-  // Create const and return ops.
+  // Create const and store ops.
   auto constValue = rewriter.create<ConstantOp>(loc, immediateElements);
-  rewriter.create<mlir::ReturnOp>(loc, constValue.getResult());
-  return initializerFuncOp;
+  rewriter.create<IREE::Util::GlobalStoreOp>(loc, constValue.getResult(),
+                                             globalOp.getName());
+
+  rewriter.create<IREE::Util::InitializerReturnOp>(loc);
 }
 
 class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
@@ -52,7 +48,6 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       IREE::Util::GlobalOp globalOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple globals.
-    Optional<StringRef> initializer = globalOp.initializer();
     Optional<Attribute> initialValue = globalOp.initial_value();
 
     // Hoist any immediate initial_value elements to an initializer function
@@ -60,17 +55,17 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
     // an appropriate HAL Buffer-based initializer.
     if (auto initialValueElements =
             globalOp.initial_valueAttr().dyn_cast_or_null<ElementsAttr>()) {
+      auto ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointAfter(globalOp);
-      auto initializerFunc = createInitializerFromImmediate(
-          globalOp, initialValueElements, rewriter);
-      initializer = initializerFunc.getName();
+      createInitializerFromImmediate(globalOp, initialValueElements, rewriter);
+      rewriter.restoreInsertionPoint(ip);
       initialValue = llvm::None;
     }
 
     rewriter.setInsertionPoint(globalOp);
     auto newOp = rewriter.create<IREE::Util::GlobalOp>(
         globalOp.getLoc(), globalOp.sym_name(), globalOp.is_mutable(),
-        converter.convertType(globalOp.type()), initializer, initialValue,
+        converter.convertType(globalOp.type()), initialValue,
         llvm::to_vector<4>(globalOp->getDialectAttrs()));
     newOp.setVisibility(globalOp.getVisibility());
     rewriter.replaceOp(globalOp, {});

@@ -28,41 +28,62 @@ namespace Util {
 
 namespace {
 
-/// Converts global initializer functions that evaluate to a constant to a
-/// specified initial value.
-struct InlineConstantGlobalOpInitializer : public OpRewritePattern<GlobalOp> {
-  using OpRewritePattern<GlobalOp>::OpRewritePattern;
+// Deletes empty vm.initializer ops.
+struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
+  using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(GlobalOp op,
+  LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return failure();
-    auto *symbolOp =
-        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
-    auto initializer = cast<mlir::FuncOp>(symbolOp);
-    if (initializer.getBlocks().size() != 1) return failure();
-    auto &entryBlock = initializer.getBlocks().front();
-    if (entryBlock.getOperations().size() == 2 &&
-        entryBlock.getTerminator()->hasTrait<OpTrait::ReturnLike>()) {
-      auto &primaryOp = entryBlock.front();
-      Attribute constResult;
-      if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
-        auto visibility = op.getVisibility();
-        auto newOp = rewriter.replaceOpWithNewOp<GlobalOp>(
-            op, op.sym_name(), op.is_mutable(), op.type(), constResult);
-        newOp.setVisibility(visibility);
-        return success();
-      }
+    if (op.body().getBlocks().size() != 1) return failure();
+    auto &block = op.body().front();
+    if (block.empty() || isa<InitializerReturnOp>(block.front())) {
+      rewriter.eraseOp(op);
+      return success();
     }
     return failure();
   }
 };
 
+// Inlines constant stores from initializers into the global initializer.
+// This is not strictly required but can help our initialization code perform
+// more efficient initialization of large numbers of primitive values.
+struct InlineConstInitializer : public OpRewritePattern<InitializerOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(InitializerOp op,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Operation *> deadOps;
+    op.walk([&](Operation *op) {
+      if (!isa<GlobalStoreOp>(op)) return;
+      auto value = op->getOperand(0);
+      Attribute valueAttr;
+      if (!matchPattern(value, m_Constant(&valueAttr))) return;
+      auto globalRefAttr = op->getAttrOfType<SymbolRefAttr>("global");
+      assert(globalRefAttr);
+      auto globalOp =
+          SymbolTable::lookupNearestSymbolFrom<GlobalOp>(op, globalRefAttr);
+      if (valueAttr && !valueAttr.isa<UnitAttr>()) {
+        globalOp.initial_valueAttr(valueAttr);
+      } else {
+        globalOp.clearInitialValue();
+      }
+      deadOps.push_back(op);
+    });
+    if (deadOps.empty()) return failure();
+    for (auto deadOp : deadOps) rewriter.eraseOp(deadOp);
+    return success();
+  }
+};
+
 }  // namespace
 
-void GlobalOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                           MLIRContext *context) {
-  results.insert<InlineConstantGlobalOpInitializer>(context);
+void InitializerOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<DropEmptyInitializerOp, InlineConstInitializer>(context);
 }
+
+void GlobalOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                           MLIRContext *context) {}
 
 OpFoldResult GlobalLoadOp::fold(ArrayRef<Attribute> operands) {
   auto globalOp =

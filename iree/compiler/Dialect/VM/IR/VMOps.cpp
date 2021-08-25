@@ -854,6 +854,24 @@ Optional<MutableOperandRange> BranchOp::getMutableSuccessorOperands(
   return destOperandsMutable();
 }
 
+void CallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  if (!getOperation()->hasAttr("nosideeffects")) {
+    // TODO(benvanik): actually annotate this.
+    effects.emplace_back(MemoryEffects::Read::get());
+    effects.emplace_back(MemoryEffects::Write::get());
+  }
+}
+
+void CallVariadicOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  if (!getOperation()->hasAttr("nosideeffects")) {
+    // TODO(benvanik): actually annotate this.
+    effects.emplace_back(MemoryEffects::Read::get());
+    effects.emplace_back(MemoryEffects::Write::get());
+  }
+}
+
 static ParseResult parseCallVariadicOp(OpAsmParser &parser,
                                        OperationState *result) {
   FlatSymbolRefAttr calleeAttr;

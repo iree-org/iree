@@ -21,6 +21,8 @@ iree_lit_test_suite(
     "hint_folding.mlir"
     "hint_ops.mlir"
     "list_ops.mlir"
+    "structural_folding.mlir"
+    "structural_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

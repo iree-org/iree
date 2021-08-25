@@ -85,9 +85,10 @@ class GlobalInitializationPass
           return signalPassFailure();
         }
         deadOps.push_back(initializerOp);
+        initBuilder.setInsertionPointToEnd(&initFuncOp.back());
       }
     }
-    for (auto deadOp : deadOps) {
+    for (auto *deadOp : deadOps) {
       deadOp->erase();
     }
 
@@ -223,7 +224,6 @@ class GlobalInitializationPass
         /*inlinedOperands=*/ValueRange{},
         /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/llvm::None,
         /*shouldCloneInlinedRegion=*/false);
-    builder.setInsertionPointToEnd(dummyOp->getBlock());
     dummyOp.erase();
     return result;
   }
