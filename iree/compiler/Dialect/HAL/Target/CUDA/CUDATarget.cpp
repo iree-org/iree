@@ -322,7 +322,7 @@ void registerCUDATargetBackends() {
     LLVMInitializeNVPTXTargetMC();
     LLVMInitializeNVPTXTargetInfo();
     LLVMInitializeNVPTXAsmPrinter();
-    return std::make_unique<CUDATargetBackend>();
+    return std::make_shared<CUDATargetBackend>();
   });
 }
 

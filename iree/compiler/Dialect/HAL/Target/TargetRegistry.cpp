@@ -14,23 +14,30 @@ namespace IREE {
 namespace HAL {
 
 // Returns the static registry of translator names to translation functions.
-static llvm::StringMap<CreateTargetBackendFn> &getMutableTargetRegistry() {
-  static llvm::StringMap<CreateTargetBackendFn> registry;
+static llvm::StringMap<TargetBackendRegistration *>
+    &getMutableTargetRegistry() {
+  static llvm::StringMap<TargetBackendRegistration *> registry;
   return registry;
 }
 
 TargetBackendRegistration::TargetBackendRegistration(llvm::StringRef name,
-                                                     CreateTargetBackendFn fn) {
+                                                     CreateTargetBackendFn fn)
+    : initFn(std::move(fn)) {
   auto &registry = getMutableTargetRegistry();
   if (registry.count(name) > 0) {
     llvm::report_fatal_error(
         "Attempting to overwrite an existing translation backend");
   }
-  assert(fn && "Attempting to register an empty translation function");
-  registry[name] = std::move(fn);
+  assert(initFn && "Attempting to register an empty translation function");
+  registry[name] = this;
 }
 
-const llvm::StringMap<CreateTargetBackendFn> &getTargetRegistry() {
+std::shared_ptr<TargetBackend> TargetBackendRegistration::acquire() {
+  std::call_once(initFlag, [&]() { cachedValue = initFn(); });
+  return cachedValue;
+}
+
+const llvm::StringMap<TargetBackendRegistration *> &getTargetRegistry() {
   return getMutableTargetRegistry();
 }
 
@@ -44,18 +51,18 @@ std::vector<std::string> getRegisteredTargetBackends() {
   return result;
 }
 
-std::unique_ptr<TargetBackend> getTargetBackend(StringRef targetName) {
+std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName) {
   for (auto &entry : getTargetRegistry()) {
     if (entry.getKey() == targetName) {
-      return entry.getValue()();
+      return entry.getValue()->acquire();
     }
   }
   return {};
 }
 
-SmallVector<std::unique_ptr<TargetBackend>> getTargetBackends(
+SmallVector<std::shared_ptr<TargetBackend>> getTargetBackends(
     ArrayRef<std::string> targetNames) {
-  SmallVector<std::unique_ptr<TargetBackend>> matches;
+  SmallVector<std::shared_ptr<TargetBackend>> matches;
   for (auto targetName : targetNames) {
     auto targetBackend = getTargetBackend(targetName);
     if (targetBackend) {

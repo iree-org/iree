@@ -1119,10 +1119,6 @@ class MaterializeInterfacesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackends = getTargetBackends(getRegisteredTargetBackends());
-    for (auto &targetBackend : targetBackends) {
-      targetBackend->getDependentDialects(registry);
-    }
   }
 
   StringRef getArgument() const override {
@@ -1144,7 +1140,6 @@ class MaterializeInterfacesPass
         llvm::to_vector<32>(getOperation().getOps<IREE::Flow::ExecutableOp>());
     for (auto sourceOp : sourceOps) {
       // Only manipulate tiled executables.
-      // TODO(benvanik): remove this check once linalg-on-tensors is default.
       auto entryOps = sourceOp.getOps<IREE::Flow::DispatchEntryOp>();
       if (entryOps.empty()) continue;
       auto anyEntryOp = *entryOps.begin();
