@@ -65,6 +65,12 @@ static iree_allocator_t iree_hal_rocm_allocator_host_allocator(
   return allocator->context->host_allocator;
 }
 
+static void iree_hal_rocm_allocator_query_statistics(
+    iree_hal_allocator_t* base_allocator,
+    iree_hal_allocator_statistics_t* out_statistics) {
+  // TODO(*): track allocation statistics (if desired).
+}
+
 static iree_hal_buffer_compatibility_t
 iree_hal_rocm_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
@@ -174,6 +180,7 @@ static iree_status_t iree_hal_rocm_allocator_wrap_buffer(
 const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable = {
     .destroy = iree_hal_rocm_allocator_destroy,
     .host_allocator = iree_hal_rocm_allocator_host_allocator,
+    .query_statistics = iree_hal_rocm_allocator_query_statistics,
     .query_buffer_compatibility =
         iree_hal_rocm_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_rocm_allocator_allocate_buffer,

@@ -31,6 +31,7 @@
 #ifndef IREE_BASE_CONFIG_H_
 #define IREE_BASE_CONFIG_H_
 
+#include <inttypes.h>
 #include <stddef.h>
 
 #include "iree/base/target_platform.h"
@@ -77,6 +78,7 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
 
 #if !defined(IREE_DEVICE_SIZE_T)
 #define IREE_DEVICE_SIZE_T uint64_t
+#define PRIdsz PRIu64
 #endif  // !IREE_DEVICE_SIZE_T
 
 // Size, in bytes, of a buffer on remote devices.

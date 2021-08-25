@@ -17,9 +17,15 @@ typedef struct iree_hal_heap_allocator_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_string_view_t identifier;
+  IREE_STATISTICS(iree_hal_heap_allocator_statistics_t statistics;)
 } iree_hal_heap_allocator_t;
 
 static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable;
+
+iree_hal_heap_allocator_t* iree_hal_heap_allocator_cast(
+    iree_hal_allocator_t* base_value) {
+  return (iree_hal_heap_allocator_t*)base_value;
+}
 
 IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
     iree_string_view_t identifier, iree_allocator_t host_allocator,
@@ -39,6 +45,12 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
     iree_string_view_append_to_buffer(
         identifier, &allocator->identifier,
         (char*)allocator + iree_sizeof_struct(*allocator));
+
+    IREE_STATISTICS({
+      // All start initialized to zero.
+      iree_slim_mutex_initialize(&allocator->statistics.mutex);
+    });
+
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -49,9 +61,11 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
 static void iree_hal_heap_allocator_destroy(
     iree_hal_allocator_t* base_allocator) {
   iree_hal_heap_allocator_t* allocator =
-      (iree_hal_heap_allocator_t*)base_allocator;
+      iree_hal_heap_allocator_cast(base_allocator);
   iree_allocator_t host_allocator = allocator->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_STATISTICS(iree_slim_mutex_deinitialize(&allocator->statistics.mutex));
 
   iree_allocator_free(host_allocator, allocator);
 
@@ -63,6 +77,19 @@ static iree_allocator_t iree_hal_heap_allocator_host_allocator(
   iree_hal_heap_allocator_t* allocator =
       (iree_hal_heap_allocator_t*)base_allocator;
   return allocator->host_allocator;
+}
+
+static void iree_hal_heap_allocator_query_statistics(
+    iree_hal_allocator_t* base_allocator,
+    iree_hal_allocator_statistics_t* out_statistics) {
+  iree_hal_heap_allocator_t* allocator =
+      iree_hal_heap_allocator_cast(base_allocator);
+  IREE_STATISTICS({
+    iree_slim_mutex_lock(&allocator->statistics.mutex);
+    memcpy(out_statistics, &allocator->statistics.base,
+           sizeof(*out_statistics));
+    iree_slim_mutex_unlock(&allocator->statistics.mutex);
+  });
 }
 
 static iree_hal_buffer_compatibility_t
@@ -121,16 +148,18 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
     iree_hal_buffer_t** out_buffer) {
   iree_hal_heap_allocator_t* allocator =
-      (iree_hal_heap_allocator_t*)base_allocator;
+      iree_hal_heap_allocator_cast(base_allocator);
 
   // Coerce options into those required for use by heap-based devices.
   iree_hal_memory_access_t allowed_access = IREE_HAL_MEMORY_ACCESS_ALL;
   IREE_RETURN_IF_ERROR(iree_hal_heap_allocator_make_compatible(
       &memory_type, &allowed_access, &allowed_usage));
 
-  // Allocate and return the buffer.
+  // Allocate the buffer (both the wrapper and the contents).
+  iree_hal_heap_allocator_statistics_t* statistics = NULL;
+  IREE_STATISTICS(statistics = &allocator->statistics);
   return iree_hal_heap_buffer_create(
-      base_allocator, memory_type, allowed_access, allowed_usage,
+      base_allocator, statistics, memory_type, allowed_access, allowed_usage,
       allocation_size, allocator->host_allocator, out_buffer);
 }
 
@@ -151,6 +180,7 @@ static iree_status_t iree_hal_heap_allocator_wrap_buffer(
 static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable = {
     .destroy = iree_hal_heap_allocator_destroy,
     .host_allocator = iree_hal_heap_allocator_host_allocator,
+    .query_statistics = iree_hal_heap_allocator_query_statistics,
     .query_buffer_compatibility =
         iree_hal_heap_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_heap_allocator_allocate_buffer,

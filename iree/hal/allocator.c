@@ -7,10 +7,40 @@
 #include "iree/hal/allocator.h"
 
 #include <stddef.h>
+#include <stdio.h>
 
 #include "iree/base/tracing.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/resource.h"
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_format(
+    const iree_hal_allocator_statistics_t* statistics,
+    iree_string_builder_t* builder) {
+#if IREE_STATISTICS_ENABLE
+
+  // This could be prettier/have nice number formatting/etc.
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder,
+      "  HOST_LOCAL: %12" PRIdsz "b peak / %12" PRIdsz
+      "b allocated / %12" PRIdsz "b freed / %12" PRIdsz "b live\n",
+      statistics->host_bytes_peak, statistics->host_bytes_allocated,
+      statistics->host_bytes_freed,
+      (statistics->host_bytes_allocated - statistics->host_bytes_freed)));
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder,
+      "DEVICE_LOCAL: %12" PRIdsz "b peak / %12" PRIdsz
+      "b allocated / %12" PRIdsz "b freed / %12" PRIdsz "b live\n",
+      statistics->device_bytes_peak, statistics->device_bytes_allocated,
+      statistics->device_bytes_freed,
+      (statistics->device_bytes_allocated - statistics->device_bytes_freed)));
+
+#else
+  // No-op when disabled.
+#endif  // IREE_STATISTICS_ENABLE
+  return iree_ok_status();
+}
 
 #define _VTABLE_DISPATCH(allocator, method_name) \
   IREE_HAL_VTABLE_DISPATCH(allocator, iree_hal_allocator, method_name)
@@ -21,6 +51,16 @@ IREE_API_EXPORT iree_allocator_t
 iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator) {
   IREE_ASSERT_ARGUMENT(allocator);
   return _VTABLE_DISPATCH(allocator, host_allocator)(allocator);
+}
+
+IREE_API_EXPORT void iree_hal_allocator_query_statistics(
+    iree_hal_allocator_t* allocator,
+    iree_hal_allocator_statistics_t* out_statistics) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  memset(out_statistics, 0, sizeof(*out_statistics));
+  IREE_STATISTICS({
+    _VTABLE_DISPATCH(allocator, query_statistics)(allocator, out_statistics);
+  });
 }
 
 IREE_API_EXPORT iree_hal_buffer_compatibility_t
@@ -62,4 +102,34 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
       data_allocator, out_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
+    FILE* file, iree_hal_allocator_t* allocator) {
+#if IREE_STATISTICS_ENABLE
+  iree_hal_allocator_statistics_t statistics;
+  iree_hal_allocator_query_statistics(allocator, &statistics);
+
+  iree_string_builder_t builder;
+  iree_string_builder_initialize(iree_allocator_system(), &builder);
+
+  // TODO(benvanik): query identifier for the allocator so we can denote which
+  // device is being reported.
+  iree_status_t status = iree_string_builder_append_cstring(
+      &builder, "[[ iree_hal_allocator_t memory statistics ]]\n");
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_statistics_format(&statistics, &builder);
+  }
+
+  if (iree_status_is_ok(status)) {
+    fprintf(file, "%.*s", (int)iree_string_builder_size(&builder),
+            iree_string_builder_buffer(&builder));
+  }
+  iree_string_builder_deinitialize(&builder);
+  return status;
+#else
+  // No-op.
+  return iree_ok_status();
+#endif  // IREE_STATISTICS_ENABLE
 }
