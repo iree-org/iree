@@ -17,6 +17,8 @@
 typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
+
+  IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_cuda_allocator_t;
 
 extern const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable;
@@ -68,7 +70,11 @@ static iree_allocator_t iree_hal_cuda_allocator_host_allocator(
 static void iree_hal_cuda_allocator_query_statistics(
     iree_hal_allocator_t* base_allocator,
     iree_hal_allocator_statistics_t* out_statistics) {
-  // TODO(*): track allocation statistics (if desired).
+  IREE_STATISTICS({
+    iree_hal_cuda_allocator_t* allocator =
+        iree_hal_cuda_allocator_cast(base_allocator);
+    memcpy(out_statistics, &allocator->statistics, sizeof(*out_statistics));
+  });
 }
 
 static iree_hal_buffer_compatibility_t
@@ -142,6 +148,8 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
     }
   }
   if (iree_status_is_ok(status)) {
+    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
+        &allocator->statistics, memory_type, allocation_size));
     status = iree_hal_cuda_buffer_wrap(
         (iree_hal_allocator_t*)allocator, memory_type,
         IREE_HAL_MEMORY_ACCESS_ALL, allowed_usage, allocation_size,
@@ -149,15 +157,16 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
         /*byte_length=*/allocation_size, device_ptr, host_ptr, out_buffer);
   }
   if (!iree_status_is_ok(status)) {
-    iree_hal_cuda_allocator_free(base_allocator, device_ptr, host_ptr,
-                                 memory_type);
+    iree_hal_cuda_allocator_free(base_allocator, memory_type, device_ptr,
+                                 host_ptr, allocation_size);
   }
   return status;
 }
 
 void iree_hal_cuda_allocator_free(iree_hal_allocator_t* base_allocator,
+                                  iree_hal_memory_type_t memory_type,
                                   CUdeviceptr device_ptr, void* host_ptr,
-                                  iree_hal_memory_type_t memory_type) {
+                                  iree_device_size_t allocation_size) {
   iree_hal_cuda_allocator_t* allocator =
       iree_hal_cuda_allocator_cast(base_allocator);
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
@@ -166,6 +175,8 @@ void iree_hal_cuda_allocator_free(iree_hal_allocator_t* base_allocator,
     // Host local.
     CUDA_IGNORE_ERROR(allocator->context->syms, cuMemFreeHost(host_ptr));
   }
+  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
+      &allocator->statistics, memory_type, allocation_size));
 }
 
 static iree_status_t iree_hal_cuda_allocator_wrap_buffer(
