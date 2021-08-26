@@ -34,7 +34,8 @@ class VerifyOutputLegalityPass
       }
       // Certain standard ops for flow control are okay to operate on tensors.
       if (dyn_cast<mlir::ReturnOp>(op) || dyn_cast<mlir::CallOp>(op) ||
-          dyn_cast<mlir::BranchOp>(op) || dyn_cast<mlir::CondBranchOp>(op)) {
+          dyn_cast<mlir::BranchOp>(op) || dyn_cast<mlir::CondBranchOp>(op) ||
+          dyn_cast<mlir::ConstantOp>(op)) {
         return WalkResult::advance();
       }
 
