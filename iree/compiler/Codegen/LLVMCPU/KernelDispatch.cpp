@@ -42,9 +42,6 @@ static llvm::cl::opt<int> matmulL1TileSize(
     llvm::cl::desc(
         "linalg.matmul tile size for L1 spliting of M, N, K dimension"),
     llvm::cl::init(32));
-static llvm::cl::opt<int> matmulVectorSize(
-    "iree-codegen-llvm-matmul-vector-size",
-    llvm::cl::desc("linalg.matmul vector tile size"), llvm::cl::init(4));
 
 static llvm::cl::opt<int> batchMatmulWorkgroupTileSize(
     "iree-codegen-llvm-batch-matmul-workgroup-size",
@@ -56,9 +53,6 @@ static llvm::cl::opt<int> batchMatmulL1TileSize(
     llvm::cl::desc("linalg.batch_matmul tile size for L1 spliting of M, N, K "
                    "dimensions"),
     llvm::cl::init(16));
-static llvm::cl::opt<int> batchMatmulL2TileSize(
-    "iree-codegen-llvm-batch-matmul-vector-size",
-    llvm::cl::desc("linalg.batch_matmul vector tile size"), llvm::cl::init(4));
 
 static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
     "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
@@ -81,11 +75,30 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
+static Optional<int64_t> getNativeVectorSize(FuncOp entryPointFn,
+                                             Type elementType) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+  auto nativeVectorSize =
+      targetAttr.getConfiguration().getAs<IntegerAttr>("native_vector_size");
+  if (!nativeVectorSize) return {};
+  if (!elementType.isIntOrFloat()) return {};
+  unsigned bitWidth = elementType.getIntOrFloatBitWidth() / 8;
+  return nativeVectorSize.getInt() / bitWidth;
+}
+
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp) {
   if (getLoweringConfig(contractionOp)) return success();
+  Type elementType =
+      contractionOp.lhs().getType().cast<ShapedType>().getElementType();
+  auto vectorSize = getNativeVectorSize(entryPointFn, elementType);
+  if (!vectorSize) return success();
+  int64_t vectorSizeVal = *vectorSize;
+
   if (contractionOp.isRowMajorMatmul()) {
     int mWorkgroupSize = matmulWorkgroupTileSize;
     int nWorkgroupSize = matmulWorkgroupTileSize;
@@ -94,13 +107,14 @@ static LogicalResult setRootConfig(
     int kL1TileSize = matmulL1TileSize;
     auto lhsShape = getUntiledShape(contractionOp.lhs());
     auto rhsShape = getUntiledShape(contractionOp.rhs());
+    if (!vectorSize) return success();
     if (!lhsShape.empty() && !rhsShape.empty()) {
       // Find largest tile size that is a multiple of the vector size.
-      auto getTileSize = [](int dim, int maxSize) {
+      auto getTileSize = [vectorSizeVal](int dim, int maxSize) -> int {
         if (dim == ShapedType::kDynamicSize) return maxSize;
-        if (dim < matmulVectorSize) return matmulVectorSize.getValue();
+        if (dim < vectorSizeVal) return vectorSizeVal;
         for (int i = std::min(maxSize, dim); i > 0; --i) {
-          if (dim % i == 0 && i % matmulVectorSize == 0) {
+          if (dim % i == 0 && i % vectorSizeVal == 0) {
             return i;
           }
         }
@@ -115,9 +129,9 @@ static LogicalResult setRootConfig(
     TileSizesListType tileSizes = {
         {mWorkgroupSize, nWorkgroupSize},
         {mL1TileSize, nL1TileSize, kL1TileSize},
-        {matmulVectorSize, matmulVectorSize, matmulVectorSize}};
-    SmallVector<int64_t, 4> nativeVectorSize = {
-        matmulVectorSize, matmulVectorSize, matmulVectorSize};
+        {vectorSizeVal, vectorSizeVal, vectorSizeVal}};
+    SmallVector<int64_t, 4> nativeVectorSize = {vectorSizeVal, vectorSizeVal,
+                                                vectorSizeVal};
     return setOpConfigAndEntryPointFnTranslation(
         entryPointFn, contractionOp, tileSizes, nativeVectorSize,
         IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
@@ -129,10 +143,9 @@ static LogicalResult setRootConfig(
         {1, batchMatmulWorkgroupTileSize, batchMatmulWorkgroupTileSize},
         {1, batchMatmulL1TileSize, batchMatmulL1TileSize,
          batchMatmulL1TileSize},
-        {1, batchMatmulL2TileSize, batchMatmulL2TileSize,
-         batchMatmulL2TileSize}};
-    SmallVector<int64_t, 4> nativeVectorSize = {
-        1, batchMatmulL2TileSize, batchMatmulL2TileSize, batchMatmulL2TileSize};
+        {1, vectorSizeVal, vectorSizeVal, vectorSizeVal}};
+    SmallVector<int64_t, 4> nativeVectorSize = {1, vectorSizeVal, vectorSizeVal,
+                                                vectorSizeVal};
     return setOpConfigAndEntryPointFnTranslation(
         entryPointFn, contractionOp, tileSizes, nativeVectorSize,
         IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);

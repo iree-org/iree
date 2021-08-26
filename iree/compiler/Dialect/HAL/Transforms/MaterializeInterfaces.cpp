@@ -60,15 +60,6 @@ static LogicalResult declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
     targetSymbolTable.insert(targetContainerOp);
     OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
     auto moduleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
-
-    // TODO(benvanik): something more structured here; for now we just copy over
-    // any dialect attrs from the configuration to the inner module.
-    auto configAttr = targetAttr.getConfiguration();
-    if (configAttr) {
-      for (auto item : configAttr) {
-        moduleOp->setAttr(item.first, item.second);
-      }
-    }
   }
 
   // Ensure that at least one target op got created. If it didn't that means

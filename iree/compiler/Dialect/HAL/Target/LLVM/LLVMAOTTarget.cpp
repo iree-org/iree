@@ -27,6 +27,8 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
+#define DEBUG_TYPE "iree-llvmaot-target"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -86,26 +88,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    auto targetMachine = createTargetMachine(options_);
-    if (!targetMachine) {
-      llvm::errs() << "failed to create target machine for target triple '"
-                   << options_.targetTriple << "'";
-      return;
-    }
-    passManager.addPass(createLLVMCPULowerExecutableTargetPass());
-    // Set target specific options.
-    LLVMCPUCodegenPassPipelineOptions codeGenOptions;
-    codeGenOptions.targetTriple = options_.targetTriple;
-    codeGenOptions.targetDataLayout =
-        targetMachine->createDataLayout().getStringRepresentation();
-
-    // TODO(ataei): This is temporary here, should move when target specific
-    // overrides options grows.
-    if (targetMachine->getTargetTriple().isWasm()) {
-      codeGenOptions.unfuseFMAOps = true;
-    }
-
-    buildLLVMCPUCodegenPassPipeline(passManager, codeGenOptions);
+    buildLLVMCPUCodegenPassPipeline(passManager);
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
@@ -512,8 +495,53 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
 
     // TODO(benvanik): pack in the LLVMTargetOptions into the config dict.
+    auto targetMachine = createTargetMachine(options_);
+    SmallVector<NamedAttribute> config;
+    auto addConfig = [&](StringRef name, Attribute value) {
+      config.emplace_back(
+          std::make_pair(Identifier::get(name, context), value));
+    };
 
-    return IREE::HAL::ExecutableTargetAttr::get(context, "llvm", format);
+    // Set target triple.
+    const std::string &targetTripleStr = targetMachine->getTargetTriple().str();
+    addConfig("target_triple", StringAttr::get(context, targetTripleStr));
+
+    // Set data layout
+    llvm::DataLayout DL = targetMachine->createDataLayout();
+    std::string dataLayoutStr = DL.getStringRepresentation();
+    addConfig("data_layout", StringAttr::get(context, dataLayoutStr));
+
+    // Set the native vector size. This creates a dummy llvm module just to
+    // build the TTI the right way.
+    llvm::LLVMContext llvmContext;
+    auto llvmModule =
+        std::make_unique<llvm::Module>("dummy_module", llvmContext);
+    llvm::Type *voidType = llvm::Type::getVoidTy(llvmContext);
+    llvmModule->setDataLayout(DL);
+    llvm::Function *dummyFunc = llvm::Function::Create(
+        llvm::FunctionType::get(voidType, false),
+        llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
+    llvm::TargetTransformInfo tti =
+        targetMachine->getTargetTransformInfo(*dummyFunc);
+    int64_t vectorSize = tti.getRegisterBitWidth(
+                             llvm::TargetTransformInfo::RGK_FixedWidthVector) /
+                         8;
+    addConfig("native_vector_size",
+              IntegerAttr::get(IndexType::get(context), vectorSize));
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
+      llvm::dbgs() << "Target Triple : "
+                   << targetMachine->getTargetTriple().normalize() << "\n";
+      llvm::dbgs() << "Target Feature string : "
+                   << targetMachine->getTargetFeatureString() << "\n";
+      llvm::dbgs() << "Data Layout : " << dataLayoutStr << "\n";
+      llvm::dbgs() << "Vector Width : " << vectorSize << "\n";
+    });
+
+    return IREE::HAL::ExecutableTargetAttr::get(
+        context, StringAttr::get(context, "llvm"),
+        StringAttr::get(context, format), DictionaryAttr::get(context, config));
   }
 
   static void overridePlatformGlobal(llvm::Module &module, StringRef globalName,
