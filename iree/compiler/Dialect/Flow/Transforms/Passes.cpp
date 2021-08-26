@@ -218,6 +218,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(mlir::createSymbolDCEPass());
+
+  passManager.addNestedPass<mlir::FuncOp>(createVerifyOutputLegalityPass());
 }
 
 void registerFlowTransformPassPipeline() {

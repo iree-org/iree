@@ -53,6 +53,7 @@ iree_cc_library(
     "StripAndSplatConstantVariables.cpp"
     "TypeConverter.cpp"
     "VerifyInputLegality.cpp"
+    "VerifyOutputLegality.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport

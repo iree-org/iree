@@ -41,6 +41,7 @@ iree_lit_test_suite(
             "strip_and_splat_constant_variables.mlir",
             "transformation.mlir",
             "verify_input_ir.mlir",
+            "verify_output_ir.mlir",
         ],
         include = ["*.mlir"],
     ),

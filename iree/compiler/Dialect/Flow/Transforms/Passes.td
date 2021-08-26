@@ -142,4 +142,9 @@ def VerifyInputLegality: Pass<"iree-verify-input-legality", "mlir::FuncOp"> {
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
 }
 
+def VerifyOutputLegality: Pass<"iree-verify-output-legality", "mlir::FuncOp"> {
+  let summary = "Checks the legality of the IR at the end of IREE flow transformation pipeline.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyOutputLegalityPass()";
+}
+
 #endif  // IREE_DIALECT_FLOW_PASSES

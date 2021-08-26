@@ -89,6 +89,9 @@ createExpandGlobalDynamicDimsPass();
 /// to be legalized before this pass.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createVerifyInputLegalityPass();
 
+/// Verifies that the output from the Flow transformation pipeline is legal.
+std::unique_ptr<OperationPass<mlir::FuncOp>> createVerifyOutputLegalityPass();
+
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
 //===----------------------------------------------------------------------===//
