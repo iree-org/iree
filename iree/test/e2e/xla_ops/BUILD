@@ -344,6 +344,7 @@ iree_check_single_backend_test_suite(
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
+            "sort.mlir",
             "sqrt.mlir",
             "subtract.mlir",
             "tanh.mlir",
@@ -357,7 +358,6 @@ iree_check_single_backend_test_suite(
             "round.mlir",
             "scatter.mlir",  # TODO(GH-6388): Enable the test.
             "scatter_dynamic.mlir",  # TODO(GH-6388): Enable the test.
-            "sort.mlir",
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
