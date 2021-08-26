@@ -59,7 +59,6 @@ PartitionSet partitionStreamableOpsReference(
           op.dump();
         });
         usableBuilders.reset();
-        continue;
       }
       // Even though not a streamable op we still want to track it below.
     }

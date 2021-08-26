@@ -72,6 +72,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());
   nestedModulePM.addPass(createNormalizeMemRefsPass());
   nestedModulePM.addNestedPass<FuncOp>(createAffineScalarReplacementPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
 }
 
 static void buildLoopOptimizationVMVXTransformPassPipeline(
@@ -97,6 +98,8 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
 
   passManager.addNestedPass<mlir::ModuleOp>(createConversionPass());
+  passManager.nest<mlir::ModuleOp>().addNestedPass<FuncOp>(
+      memref::createFoldSubViewOpsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 

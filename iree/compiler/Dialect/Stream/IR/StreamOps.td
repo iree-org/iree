@@ -1141,6 +1141,24 @@ def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
   let hasCanonicalizer = 1;
 }
 
+def Stream_TensorTraceOp : Stream_Op<"tensor.trace", []> {
+  let summary = [{trace value(s) operation}];
+  let description = [{
+    Traces out to a runtime trace sink (console, log file, etc) the given
+    tensors and titles them with the given key. The key is informational only
+    and useful for titling/marking specific sets of tensors for easier
+    searching.
+  }];
+
+  let arguments = (ins
+    StrAttr:$key,
+    Variadic<AnyTensor>:$operands
+  );
+
+  // TODO(benvanik): stream.tensor.trace assembly format (custom).
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+}
+
 //===----------------------------------------------------------------------===//
 // Resource transfer ops
 //===----------------------------------------------------------------------===//

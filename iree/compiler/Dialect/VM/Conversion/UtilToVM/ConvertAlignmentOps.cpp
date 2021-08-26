@@ -23,7 +23,7 @@ template <typename CONST_OP, typename SUB_OP, typename ADD_OP, typename NOT_OP,
           typename AND_OP>
 void insertAlignOps(IREE::Util::AlignOp srcOp,
                     ConversionPatternRewriter &rewriter,
-                    IREE::Util::AlignOpAdaptor operands,
+                    IREE::Util::AlignOpAdaptor adaptor,
                     IntegerType integerType) {
   // Aligns |value| up to the given power-of-two |alignment| if required.
   // (value + (alignment - 1)) & ~(alignment - 1)
@@ -31,34 +31,34 @@ void insertAlignOps(IREE::Util::AlignOp srcOp,
   auto oneConstant = rewriter.createOrFold<CONST_OP>(srcOp.getLoc(), 1);
   // (alignment - 1)
   auto alignmentValue = rewriter.createOrFold<SUB_OP>(
-      srcOp.getLoc(), integerType, operands.alignment(), oneConstant);
+      srcOp.getLoc(), integerType, adaptor.alignment(), oneConstant);
   // value + (alignment - 1)
   auto valueAddedValue = rewriter.createOrFold<ADD_OP>(
-      srcOp.getLoc(), integerType, operands.value(), alignmentValue);
+      srcOp.getLoc(), integerType, adaptor.value(), alignmentValue);
   // ~(alignment - 1)
   auto notAlignmentValue = rewriter.createOrFold<NOT_OP>(
       srcOp.getLoc(), integerType, alignmentValue);
-
-  rewriter.replaceOpWithNewOp<AND_OP>(srcOp, integerType, valueAddedValue,
-                                      notAlignmentValue);
+  // (value + (alignment - 1)) & ~(alignment - 1)
+  auto andValue = rewriter.createOrFold<AND_OP>(
+      srcOp.getLoc(), integerType, valueAddedValue, notAlignmentValue);
+  rewriter.replaceOp(srcOp, andValue);
 }
 
-class UtilAlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
+struct AlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::AlignOp srcOp, IREE::Util::AlignOpAdaptor operands,
+      IREE::Util::AlignOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Type valueType = operands.value().getType();
-
+    Type valueType = adaptor.value().getType();
     if (valueType.isInteger(32)) {
       insertAlignOps<IREE::VM::ConstI32Op, IREE::VM::SubI32Op,
                      IREE::VM::AddI32Op, IREE::VM::NotI32Op,
-                     IREE::VM::AndI32Op>(srcOp, rewriter, operands,
+                     IREE::VM::AndI32Op>(srcOp, rewriter, adaptor,
                                          rewriter.getI32Type());
     } else if (valueType.isInteger(64)) {
       insertAlignOps<IREE::VM::ConstI64Op, IREE::VM::SubI64Op,
                      IREE::VM::AddI64Op, IREE::VM::NotI64Op,
-                     IREE::VM::AndI64Op>(srcOp, rewriter, operands,
+                     IREE::VM::AndI64Op>(srcOp, rewriter, adaptor,
                                          rewriter.getI64Type());
     } else {
       return srcOp.emitError()
@@ -76,7 +76,7 @@ void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                        OwningRewritePatternList &patterns) {
   conversionTarget.addIllegalOp<IREE::Util::AlignOp>();
 
-  patterns.insert<UtilAlignOpConversion>(typeConverter, context);
+  patterns.insert<AlignOpConversion>(typeConverter, context);
 }
 
 }  // namespace iree_compiler

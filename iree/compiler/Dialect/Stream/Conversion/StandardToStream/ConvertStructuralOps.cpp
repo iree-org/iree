@@ -24,7 +24,7 @@ namespace {
 struct FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::FuncOp funcOp, OpAdaptor operands,
+      mlir::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto &typeConverter = *getTypeConverter();
 
@@ -85,11 +85,11 @@ static SmallVector<Value> expandResourceOperands(
 struct CallOpConversion : public OpConversionPattern<mlir::CallOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::CallOp op, OpAdaptor operands,
+      mlir::CallOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto expandedOperands =
-        expandResourceOperands(op.getLoc(), operands.getOperands(), rewriter);
+        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
 
     // Expand any resource results to resource + size.
     SmallVector<Type> expandedTypes;
@@ -143,11 +143,11 @@ struct CallOpConversion : public OpConversionPattern<mlir::CallOp> {
 struct ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::ReturnOp op, OpAdaptor operands,
+      mlir::ReturnOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto expandedOperands =
-        expandResourceOperands(op.getLoc(), operands.getOperands(), rewriter);
+        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
     rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, expandedOperands);
     return success();
   }
@@ -156,11 +156,11 @@ struct ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
 struct BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::BranchOp op, OpAdaptor operands,
+      mlir::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto expandedOperands =
-        expandResourceOperands(op.getLoc(), operands.destOperands(), rewriter);
+        expandResourceOperands(op.getLoc(), adaptor.destOperands(), rewriter);
     rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.dest(),
                                                 expandedOperands);
     return success();
@@ -170,15 +170,15 @@ struct BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
 struct CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::CondBranchOp op, OpAdaptor operands,
+      mlir::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto trueDestOperands = expandResourceOperands(
-        op.getLoc(), operands.trueDestOperands(), rewriter);
+        op.getLoc(), adaptor.trueDestOperands(), rewriter);
     auto falseDestOperands = expandResourceOperands(
-        op.getLoc(), operands.falseDestOperands(), rewriter);
+        op.getLoc(), adaptor.falseDestOperands(), rewriter);
     rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
-        op, operands.condition(), op.trueDest(), trueDestOperands,
+        op, adaptor.condition(), op.trueDest(), trueDestOperands,
         op.falseDest(), falseDestOperands);
     return success();
   }
@@ -187,22 +187,22 @@ struct CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
 struct SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::SelectOp op, mlir::SelectOp::Adaptor operands,
+      mlir::SelectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Only handle selects where the operands are tensors (resources).
     if (!op.true_value().getType().isa<TensorType>()) return failure();
     auto trueOperand =
-        consumeTensorOperand(op.getLoc(), operands.true_value(), rewriter);
+        consumeTensorOperand(op.getLoc(), adaptor.true_value(), rewriter);
     auto falseOperand =
-        consumeTensorOperand(op.getLoc(), operands.false_value(), rewriter);
+        consumeTensorOperand(op.getLoc(), adaptor.false_value(), rewriter);
     auto resourceSelectOp = rewriter.create<mlir::SelectOp>(
-        op.getLoc(), operands.condition(), trueOperand.resource,
+        op.getLoc(), adaptor.condition(), trueOperand.resource,
         falseOperand.resource);
     auto sizeSelectOp = rewriter.create<mlir::SelectOp>(
-        op.getLoc(), operands.condition(), trueOperand.resourceSize,
+        op.getLoc(), adaptor.condition(), trueOperand.resourceSize,
         falseOperand.resourceSize);
     rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
-        op, operands.true_value().getType(),
+        op, adaptor.true_value().getType(),
         ValueRange{resourceSelectOp.result(), sizeSelectOp.result()});
     return success();
   }

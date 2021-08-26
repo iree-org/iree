@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/ADT/StringMap.h"
@@ -37,6 +36,8 @@ namespace HAL {
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    const TargetOptions &targetOptions);
+void buildHALTransformPassPipeline2(OpPassManager &passManager,
+                                    const TargetOptions &targetOptions);
 
 void registerHALTransformPassPipeline();
 
@@ -46,6 +47,7 @@ void registerHALTransformPassPipeline();
 
 // Converts input flow/std/etc dialects to the IREE HAL dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToHAL2Pass();
 
 //===----------------------------------------------------------------------===//
 // Device management
@@ -74,6 +76,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass();
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass();
 
 // Propagates hal.interface.workload.* information when constant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -156,6 +159,7 @@ inline void registerHALPasses() {
   createAssignTargetDevicesPass({});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createConvertToHALPass();
+  createConvertToHAL2Pass();
   createElideRedundantCommandsPass();
   createIdentifyConstantPoolsPass();
   createInlineDeviceSwitchesPass();
@@ -163,6 +167,7 @@ inline void registerHALPasses() {
   createLinkTargetExecutablesPass("");
   createMaterializeConstantPoolBuffersPass();
   createMaterializeInterfacesPass();
+  createMaterializeInterfaces2Pass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
   createPackAllocationsPass();

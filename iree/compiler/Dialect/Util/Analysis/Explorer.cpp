@@ -115,7 +115,9 @@ void Explorer::initializeInverseCallGraph() {
       isCallGraphIncomplete = true;
     } else {
       auto *node = callGraph.resolveCallable(callOp, symbolTables);
-      callGraphInv[node->getCallableRegion()].push_back(callOp);
+      if (!node->isExternal()) {
+        callGraphInv[node->getCallableRegion()].push_back(callOp);
+      }
     }
   });
 }

@@ -114,6 +114,7 @@ void buildIREEVMTransformPassPipeline(
   if (enableNewStreamsDialect) {
     IREE::Stream::TransformOptions streamOptions;
     IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
+    IREE::HAL::buildHALTransformPassPipeline2(passManager, executableOptions);
   } else {
     IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   }
