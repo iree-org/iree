@@ -40,11 +40,11 @@ DOCKER_RUN_ARGS+=(--user="$(id -u):$(id -g)")
 # such that they don't contain the information about normal users and we
 # want these scripts to be runnable locally for debugging.
 # Instead we dump the results of `getent` to some fake files.
-local fake_etc_dir="/tmp/fake_etc"
+fake_etc_dir="/tmp/fake_etc"
 mkdir -p "${fake_etc_dir?}"
 
-local fake_group="${fake_etc_dir?}/group"
-local fake_passwd="${fake_etc_dir?}/passwd"
+fake_group="${fake_etc_dir?}/group"
+fake_passwd="${fake_etc_dir?}/passwd"
 
 getent group > "${fake_group?}"
 getent passwd > "${fake_passwd?}"
@@ -63,13 +63,13 @@ DOCKER_RUN_ARGS+=(
 # for two reasons:
 #   1. We probably don't want Docker to just write into the user's home
 #      directory when running locally.
-#   TODO: Set up local scratch dirs for Buildkite and use that
-#   2. When running with Kokoro, we mount a local scratch SSD to KOKORO_ROOT
+#   TODO: Set up scratch dirs for Buildkite and use that
+#   2. When running with Kokoro, we mount a scratch SSD to KOKORO_ROOT
 #      whereas the home directory is on the persistent SSD boot disk. It
 #      turns out that makes a huge difference in performance for Bazel
-#      running with local execution (not with RBE) because it is IO bound at
+#      running with execution (not with RBE) because it is IO bound at
 #      64 cores.
-local fake_home_dir="/tmp/fake_home"
+fake_home_dir="/tmp/fake_home"
 mkdir -p "${fake_home_dir}"
 
 DOCKER_RUN_ARGS+=(
