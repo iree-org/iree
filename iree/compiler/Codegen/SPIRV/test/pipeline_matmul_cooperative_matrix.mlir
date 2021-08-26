@@ -7,12 +7,7 @@ hal.executable @matmul_cooperative_matrix attributes {sym_visibility = "private"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @matmul_cooperative_matrix attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    module attributes {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
           [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
@@ -29,7 +24,12 @@ hal.executable @matmul_cooperative_matrix attributes {sym_visibility = "private"
            max_compute_shared_memory_size = 49152 : i32,
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-           subgroup_size = 32 : i32}>} {
+           subgroup_size = 32 : i32}>}> {
+    hal.executable.entry_point @matmul_cooperative_matrix attributes {
+      interface = @io,
+      ordinal = 0 : index
+    }
+    module {
       func @matmul_cooperative_matrix() {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index

@@ -79,9 +79,12 @@ static Optional<int64_t> getNativeVectorSize(FuncOp entryPointFn,
                                              Type elementType) {
   auto variantOp =
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  if (!variantOp) return {};
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
-  auto nativeVectorSize =
-      targetAttr.getConfiguration().getAs<IntegerAttr>("native_vector_size");
+  if (!targetAttr) return {};
+  auto config = targetAttr.getConfiguration();
+  if (!config) return {};
+  auto nativeVectorSize = config.getAs<IntegerAttr>("native_vector_size");
   if (!nativeVectorSize) return {};
   if (!elementType.isIntOrFloat()) return {};
   unsigned bitWidth = elementType.getIntOrFloatBitWidth() / 8;
