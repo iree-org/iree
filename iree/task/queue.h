@@ -138,15 +138,19 @@ void iree_task_queue_append_from_lifo_list_unsafe(iree_task_queue_t* queue,
 // Flushes the |source_slist| LIFO mailbox into the task queue in FIFO order.
 // Returns the first task in the queue upon success; the task may be
 // pre-existing or from the newly flushed tasks.
+// |out_empty| is set to true if the queue is empty after the pop.
 //
 // Must only be called from the owning worker's thread.
 iree_task_t* iree_task_queue_flush_from_lifo_slist(
-    iree_task_queue_t* queue, iree_atomic_task_slist_t* source_slist);
+    iree_task_queue_t* queue, iree_atomic_task_slist_t* source_slist,
+    bool* out_empty);
 
 // Pops a task from the front of the queue if any are available.
+// |out_empty| is set to true if the queue is empty after the pop.
 //
 // Must only be called from the owning worker's thread.
-iree_task_t* iree_task_queue_pop_front(iree_task_queue_t* queue);
+iree_task_t* iree_task_queue_pop_front(iree_task_queue_t* queue,
+                                       bool* out_empty);
 
 // Tries to steal up to |max_tasks| from the back of the queue.
 // Returns NULL if no tasks are available and otherwise up to |max_tasks| tasks

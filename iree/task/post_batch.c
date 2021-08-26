@@ -164,6 +164,7 @@ bool iree_task_post_batch_submit(iree_task_post_batch_t* post_batch) {
     int target_index = worker_index + offset;
     worker_index += offset + 1;
     worker_mask = iree_shr(worker_mask, offset + 1);
+    worker_wake_mask |= iree_task_affinity_for_worker(target_index);
 
     iree_task_worker_t* worker = &post_batch->executor->workers[target_index];
     iree_task_list_t* target_pending_lifo =
@@ -177,12 +178,19 @@ bool iree_task_post_batch_submit(iree_task_post_batch_t* post_batch) {
                                                    target_pending_lifo);
     } else {
       iree_task_worker_post_tasks(worker, target_pending_lifo);
-      worker_wake_mask |= iree_task_affinity_for_worker(target_index);
     }
   }
 
+  // Mark workers we are about to wake as having pending work.
+  iree_atomic_task_affinity_set_fetch_or(
+      &post_batch->executor->worker_pending_mask, worker_wake_mask,
+      iree_memory_order_seq_cst);
+
   // Wake all workers that now have pending work. If a worker is not already
-  // waiting this will be cheap (no syscall).
+  // waiting this will be cheap (no syscall). We also don't try to wake the
+  // current worker doing the posting.
+  worker_wake_mask ^=
+      post_batch->current_worker ? post_batch->current_worker->worker_bit : 0;
   if (worker_wake_mask != 0) {
     iree_task_post_batch_wake_workers(post_batch, worker_wake_mask);
   }
