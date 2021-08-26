@@ -92,6 +92,8 @@ DOCKER_RUN_ARGS+=(
   --volume="${SYSTEM_BAZELRC}:/etc/bazel.bazelrc:ro"
 )
 
+echo "Beginning run inside Docker container"
+set -x
 docker run "${DOCKER_RUN_ARGS[@]}" \
   gcr.io/iree-oss/cmake-bazel-frontends-swiftshader@sha256:103676490242311b9fad841294689a7ce1c755b935a21d8d898c25cfe3ec15e8 \
   build_tools/buildkite/bazel/tf_integrations/inside_docker.sh
