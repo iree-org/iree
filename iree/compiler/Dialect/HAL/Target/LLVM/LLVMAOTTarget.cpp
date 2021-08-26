@@ -64,7 +64,9 @@ static std::string guessModuleName(mlir::ModuleOp moduleOp) {
 class LLVMAOTTargetBackend final : public TargetBackend {
  public:
   explicit LLVMAOTTargetBackend(LLVMTargetOptions options)
-      : options_(std::move(options)) {}
+      : options_(std::move(options)) {
+    initConfiguration();
+  }
 
   std::string name() const override { return "llvm"; }
 
@@ -494,8 +496,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
     }
 
-    // TODO(benvanik): pack in the LLVMTargetOptions into the config dict.
-    auto targetMachine = createTargetMachine(options_);
+    // Add some configurations to the `hal.executable.target` attribute.
     SmallVector<NamedAttribute> config;
     auto addConfig = [&](StringRef name, Attribute value) {
       config.emplace_back(
@@ -503,41 +504,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     };
 
     // Set target triple.
-    const std::string &targetTripleStr = targetMachine->getTargetTriple().str();
-    addConfig("target_triple", StringAttr::get(context, targetTripleStr));
+    addConfig("target_triple", StringAttr::get(context, options_.targetTriple));
 
     // Set data layout
-    llvm::DataLayout DL = targetMachine->createDataLayout();
-    std::string dataLayoutStr = DL.getStringRepresentation();
-    addConfig("data_layout", StringAttr::get(context, dataLayoutStr));
+    addConfig("data_layout", StringAttr::get(context, config_.dataLayoutStr));
 
     // Set the native vector size. This creates a dummy llvm module just to
     // build the TTI the right way.
-    llvm::LLVMContext llvmContext;
-    auto llvmModule =
-        std::make_unique<llvm::Module>("dummy_module", llvmContext);
-    llvm::Type *voidType = llvm::Type::getVoidTy(llvmContext);
-    llvmModule->setDataLayout(DL);
-    llvm::Function *dummyFunc = llvm::Function::Create(
-        llvm::FunctionType::get(voidType, false),
-        llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
-    llvm::TargetTransformInfo tti =
-        targetMachine->getTargetTransformInfo(*dummyFunc);
-    int64_t vectorSize = tti.getRegisterBitWidth(
-                             llvm::TargetTransformInfo::RGK_FixedWidthVector) /
-                         8;
     addConfig("native_vector_size",
-              IntegerAttr::get(IndexType::get(context), vectorSize));
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
-      llvm::dbgs() << "Target Triple : "
-                   << targetMachine->getTargetTriple().normalize() << "\n";
-      llvm::dbgs() << "Target Feature string : "
-                   << targetMachine->getTargetFeatureString() << "\n";
-      llvm::dbgs() << "Data Layout : " << dataLayoutStr << "\n";
-      llvm::dbgs() << "Vector Width : " << vectorSize << "\n";
-    });
+              IntegerAttr::get(IndexType::get(context), config_.vectorSize));
 
     return IREE::HAL::ExecutableTargetAttr::get(
         context, StringAttr::get(context, "llvm"),
@@ -614,7 +589,47 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     return success();
   }
 
+  void initConfiguration() {
+    auto targetMachine = createTargetMachine(options_);
+
+    // Data layout
+    llvm::DataLayout DL = targetMachine->createDataLayout();
+    config_.dataLayoutStr = DL.getStringRepresentation();
+
+    // Set the native vector size. This creates a dummy llvm module just to
+    // build the TTI the right way.
+    llvm::LLVMContext llvmContext;
+    auto llvmModule =
+        std::make_unique<llvm::Module>("dummy_module", llvmContext);
+    llvm::Type *voidType = llvm::Type::getVoidTy(llvmContext);
+    llvmModule->setDataLayout(DL);
+    llvm::Function *dummyFunc = llvm::Function::Create(
+        llvm::FunctionType::get(voidType, false),
+        llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
+    llvm::TargetTransformInfo tti =
+        targetMachine->getTargetTransformInfo(*dummyFunc);
+    config_.vectorSize = tti.getRegisterBitWidth(
+                             llvm::TargetTransformInfo::RGK_FixedWidthVector) /
+                         8;
+    LLVM_DEBUG({
+      llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
+      llvm::dbgs() << "Target Triple : "
+                   << targetMachine->getTargetTriple().normalize() << "\n";
+      llvm::dbgs() << "Target Feature string : "
+                   << targetMachine->getTargetFeatureString() << "\n";
+      llvm::dbgs() << "Data Layout : " << config_.dataLayoutStr << "\n";
+      llvm::dbgs() << "Vector Width : " << config_.vectorSize << "\n";
+    });
+  }
+
   LLVMTargetOptions options_;
+
+  // Configuration to be set on each `hal.executable.variant` that only depend
+  // on the `options_`.
+  struct ConfigurationValues {
+    std::string dataLayoutStr;
+    int64_t vectorSize;
+  } config_;
 };
 
 void registerLLVMAOTTargetBackends(
