@@ -42,8 +42,8 @@ Optional<SmallVector<int64_t, 4>> getCooperativeMatrixSize(
   return llvm::None;
 }
 
-Optional<SPIRVCodeGenConfig> getOpConfig(const spirv::TargetEnv &targetEnv,
-                                         linalg::MatmulOp op) {
+Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
+                                    linalg::MatmulOp op) {
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
     return llvm::None;
@@ -87,29 +87,32 @@ Optional<SPIRVCodeGenConfig> getOpConfig(const spirv::TargetEnv &targetEnv,
   const int64_t numVecMatmulPerSubgroupY = 4;
   const int64_t numVecMatmulPerSubgroupK = 2;
 
-  SPIRVCodeGenConfig config = {};
-  config.pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
 
-  config.workgroupTileSizes = {numVecMatmulPerSubgroupY * (*coopMatSize)[0],
-                               numVecMatmulPerSubgroupX * (*coopMatSize)[1],
-                               numVecMatmulPerSubgroupK * (*coopMatSize)[2]};
-
-  config.subgroupTileSizes = {numVecMatmulPerSubgroupY * (*coopMatSize)[0],
-                              numVecMatmulPerSubgroupX * (*coopMatSize)[1]};
+  TileSizesListType tileSizes;
+  // Workgroup level.
+  tileSizes.push_back({numVecMatmulPerSubgroupY * (*coopMatSize)[0],
+                       numVecMatmulPerSubgroupX * (*coopMatSize)[1],
+                       numVecMatmulPerSubgroupK * (*coopMatSize)[2]});
+  // Subgroup level.
+  tileSizes.push_back({numVecMatmulPerSubgroupY * (*coopMatSize)[0],
+                       numVecMatmulPerSubgroupX * (*coopMatSize)[1]});
 
   int64_t subgroupSize =
       resourceLimits.subgroup_size().getValue().getSExtValue();
-  config.workgroupSize = {subgroupSize, 1, 1};
+  std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
-  return config;
+  return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
+                                               op, tileSizes, {}, pipeline,
+                                               workgroupSize);
 }
 
 }  // namespace
 
-Optional<SPIRVCodeGenConfig> getNVIDIACodeGenConfig(
+Optional<LogicalResult> setNVIDIACodeGenConfig(
     const spirv::TargetEnv &targetEnv, Operation *op) {
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(op)) {
-    return getOpConfig(targetEnv, matmulOp);
+    return setOpConfig(targetEnv, matmulOp);
   }
   return llvm::None;
 }

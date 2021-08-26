@@ -72,8 +72,8 @@ LogicalResult setTranslationUsingDistributeToGlobalId(
 // Matmul Default Configuration
 //===----------------------------------------------------------------------===//
 
-Optional<detail::SPIRVCodeGenConfig> getOpConfig(
-    spirv::ResourceLimitsAttr limits, linalg::BatchMatmulOp op) {
+Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
+                                    linalg::BatchMatmulOp op) {
   unsigned maxWorkgroupSize =
       limits.max_compute_workgroup_invocations().getInt();
 
@@ -88,27 +88,26 @@ Optional<detail::SPIRVCodeGenConfig> getOpConfig(
   std::tie(workgroupSize[0], workgroupSize[1]) =
       distributeProcs2D(maxWorkgroupSize);
 
-  detail::SPIRVCodeGenConfig config = {};
-  config.pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute;
+  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute;
 
-  config.workgroupTileSizes = {numBatchesPerThread,
-                               numRowsPerThread * workgroupSize[1],
-                               numColsPerThread * workgroupSize[0], tileSizeK};
+  TileSizesListType tileSizes;
+  // Workgroup level.
+  tileSizes.push_back({numBatchesPerThread, numRowsPerThread * workgroupSize[1],
+                       numColsPerThread * workgroupSize[0], tileSizeK});
+  // No tiling at the subgroup level since this target doesn't use subgroup op
+  // or shared memory.
+  tileSizes.emplace_back();
+  // Invocation level.
+  tileSizes.push_back(
+      {numBatchesPerThread, numRowsPerThread, numColsPerThread, 0});
 
-  config.invocationTileSizes = {numBatchesPerThread, numRowsPerThread,
-                                numColsPerThread, 0};
-
-  config.workgroupSize = {1, 1, 1};
-  std::tie(config.workgroupSize[0], config.workgroupSize[1]) =
-      distributeProcs2D(maxWorkgroupSize);
-
-  config.workgroupSize = workgroupSize;
-
-  return config;
+  return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
+                                               op, tileSizes, {}, pipeline,
+                                               workgroupSize);
 }
 
-Optional<detail::SPIRVCodeGenConfig> getOpConfig(
-    spirv::ResourceLimitsAttr limits, linalg::MatmulOp op) {
+Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
+                                    linalg::MatmulOp op) {
   unsigned maxWorkgroupSize =
       limits.max_compute_workgroup_invocations().getInt();
 
@@ -127,34 +126,38 @@ Optional<detail::SPIRVCodeGenConfig> getOpConfig(
   int64_t N = rhsShape[1];
   int64_t K = lhsShape[1];
 
-  detail::SPIRVCodeGenConfig config = {};
-  config.pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute;
+  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute;
 
-  config.workgroupTileSizes = {
-      getMinIfStaticShape(M, numRowsPerThread * workgroupSize[1]),
-      getMinIfStaticShape(N, numColsPerThread * workgroupSize[0]),
-      getMinIfStaticShape(K, tileSizeK)};
+  TileSizesListType tileSizes;
+  // Workgroup level.
+  tileSizes.push_back(
+      {getMinIfStaticShape(M, numRowsPerThread * workgroupSize[1]),
+       getMinIfStaticShape(N, numColsPerThread * workgroupSize[0]),
+       getMinIfStaticShape(K, tileSizeK)});
+  // No tiling at the subgroup level since this target doesn't use subgroup op
+  // or shared memory.
+  tileSizes.emplace_back();
+  // Invocation level.
+  tileSizes.push_back({1, 1, 0});
 
-  config.invocationTileSizes = {1, 1, 0};
-
-  config.workgroupSize = workgroupSize;
-
-  return config;
+  return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
+                                               op, tileSizes, {}, pipeline,
+                                               workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
 // Default Configuration
 //===----------------------------------------------------------------------===//
 
-Optional<detail::SPIRVCodeGenConfig> getDefaultOpConfig(
-    spirv::ResourceLimitsAttr limits, Operation *op) {
-  detail::SPIRVCodeGenConfig config = {};
-
+Optional<LogicalResult> setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
+                                           Operation *op) {
   auto partitionedLoops = getPartitionedLoops(op);
   if (partitionedLoops.empty()) {
-    config.pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
-    config.workgroupSize = {1, 1, 1};
-    return config;
+    auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+    std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+    auto funcOp = op->getParentOfType<FuncOp>();
+    return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, {}, pipeline,
+                                                 workgroupSize);
   }
 
   const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
@@ -226,43 +229,47 @@ Optional<detail::SPIRVCodeGenConfig> getDefaultOpConfig(
   workgroupTileSize.back() = numElementsPerWorkgroup;
   threadTileSize.back() = numElementsPerThread;
 
-  config.pipeline = pipeline;
-  config.workgroupTileSizes = workgroupTileSize;
-  config.invocationTileSizes = threadTileSize;
-  config.workgroupSize = workgroupSize;
+  TileSizesListType tileSizes;
+  tileSizes.push_back(workgroupTileSize);
+  tileSizes.emplace_back();  // Subgroup level.
+  tileSizes.push_back(threadTileSize);
 
-  return config;
+  return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
+                                               op, tileSizes, {}, pipeline,
+                                               workgroupSize);
 }
 
-Optional<detail::SPIRVCodeGenConfig> getSPIRVOpConfig(
-    const spirv::TargetEnv &targetEnv, Operation *rootOp) {
-  Optional<detail::SPIRVCodeGenConfig> config;
+/// Sets the CodeGen configuration as attributes to the given `rootOp` if it's a
+/// known Linalg matmul/convolution op with good configurations.
+Optional<LogicalResult> setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
+                                         Operation *rootOp) {
+  Optional<LogicalResult> result;
   // First try to find a proper CodeGen configuration for the current
   // target architecture.
   switch (targetEnv.getVendorID()) {
     case spirv::Vendor::ARM:
-      config = detail::getMaliCodeGenConfig(targetEnv, rootOp);
+      result = detail::setMaliCodeGenConfig(targetEnv, rootOp);
       break;
     case spirv::Vendor::NVIDIA:
-      config = detail::getNVIDIACodeGenConfig(targetEnv, rootOp);
+      result = detail::setNVIDIACodeGenConfig(targetEnv, rootOp);
       break;
     default:
       break;
   }
-  if (config) return config;
+  if (result.hasValue()) return result;
 
-  // Then try to use a default configuration.
+  // Otherwise fallback to use a default configuration.
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   if (auto matmulOp = dyn_cast<linalg::BatchMatmulOp>(rootOp)) {
-    config = getOpConfig(limits, matmulOp);
+    result = setOpConfig(limits, matmulOp);
   } else if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
-    config = getOpConfig(limits, matmulOp);
+    result = setOpConfig(limits, matmulOp);
   } else if (isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
                  rootOp)) {
-    config = getDefaultOpConfig(limits, rootOp);
+    result = setDefaultOpConfig(limits, rootOp);
   }
 
-  return config;
+  return result;
 };
 
 }  // namespace
@@ -319,19 +326,19 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     }
 
     Operation *rootOperation = nullptr;
-    Optional<detail::SPIRVCodeGenConfig> spirvConfig;
 
     // Try to find a configuration according to a matmul/convolution op and use
     // it as the root op.
     for (Operation *computeOp : computeOps) {
-      if (auto opConfig = getSPIRVOpConfig(targetEnv, computeOp)) {
-        if (rootOperation) {
-          return computeOp->emitOpError(
-              "unhandled multiple roots in dispatch region");
-        }
-        rootOperation = computeOp;
-        spirvConfig = opConfig;
+      Optional<LogicalResult> result = setSPIRVOpConfig(targetEnv, computeOp);
+      if (!result) continue;
+      if (failed(*result)) return failure();
+
+      if (rootOperation) {
+        return computeOp->emitOpError(
+            "unhandled multiple roots in dispatch region");
       }
+      rootOperation = computeOp;
     }
 
     // If there are still no root op, check for any linalg.generic op.
@@ -339,33 +346,20 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       for (Operation *computeOp : computeOps) {
         if (isa<linalg::FillOp, linalg::CopyOp>(computeOp)) continue;
 
-        if (auto opConfig = getDefaultOpConfig(limits, computeOp)) {
-          if (rootOperation) {
-            return computeOp->emitOpError(
-                "unhandled multiple roots in dispatch region");
-          }
-          rootOperation = computeOp;
-          spirvConfig = opConfig;
+        Optional<LogicalResult> result = setDefaultOpConfig(limits, computeOp);
+        if (!result) continue;
+        if (failed(*result)) return failure();
+
+        if (rootOperation) {
+          return computeOp->emitOpError(
+              "unhandled multiple roots in dispatch region");
         }
+        rootOperation = computeOp;
       }
     }
 
-    // Now compose and attach the `lowering.config` attribute to the root op.
-    assert(rootOperation && "failed to discover root operation!");
-
-    TileSizesListType tileSizes;
-    tileSizes.push_back(spirvConfig->workgroupTileSizes);
-    tileSizes.push_back(spirvConfig->subgroupTileSizes);
-    tileSizes.push_back(spirvConfig->invocationTileSizes);
-    if (!spirvConfig->convFilterTileSizes.empty()) {
-      tileSizes.push_back(spirvConfig->convFilterTileSizes);
-    }
-
-    if (failed(setOpConfigAndEntryPointFnTranslation(
-            funcOp, rootOperation, tileSizes,
-            /*nativeVectorSizes=*/ArrayRef<int64_t>(), spirvConfig->pipeline,
-            spirvConfig->workgroupSize))) {
-      return failure();
+    if (!rootOperation) {
+      return funcOp.emitError("contains no root Linalg operation");
     }
 
     // Propogate the `lowering.config` attribute to the other ops.
@@ -378,27 +372,6 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     for (auto op : computeOps) {
       if (op == rootOperation) continue;
       setLoweringConfig(op, config);
-    }
-
-    if (spirvConfig->workgroupCount) {
-      // Let the entry point region to return fully static number of workgroups.
-      // This is needed for folding `affine.min` ops to expose static-shaped
-      // tiled convolution for vectorization.
-      // TODO(#5034): Use a proper way to prove tilability and fold
-      // `affine.min`s.
-      auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
-                                 std::array<Value, 3>) {
-        std::array<Value, 3> xyz;
-        for (unsigned i = 0; i < 3; ++i) {
-          auto count = spirvConfig->workgroupCount->at(i);
-          xyz[i] = b.create<ConstantIndexOp>(loc, count);
-        }
-        return xyz;
-      };
-
-      OpBuilder builder(rootOperation->getContext());
-      if (failed(defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn)))
-        return failure();
     }
   }
   return success();

@@ -13,6 +13,7 @@
 #include <array>
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 
@@ -81,7 +82,7 @@ void getMatmulTileAndWorkgroupSizes(
 }
 
 /// Launch configuration for Mali GPU configuration.
-Optional<SPIRVCodeGenConfig> getOpConfig(linalg::BatchMatmulOp op) {
+Optional<LogicalResult> setOpConfig(linalg::BatchMatmulOp op) {
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
 
@@ -104,32 +105,32 @@ Optional<SPIRVCodeGenConfig> getOpConfig(linalg::BatchMatmulOp op) {
       continue;
     }
 
-    SPIRVCodeGenConfig config = {};
-    config.pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+    auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
 
     SmallVector<int64_t, 4> numElementsPerWorkgroup;
     numElementsPerWorkgroup = {1, pair.tileSize[0], pair.tileSize[1],
                                pair.tileSize[2]};
 
-    config.workgroupTileSizes = numElementsPerWorkgroup;
-
+    TileSizesListType tileSizes;
+    // Workgroup level.
+    tileSizes.push_back(numElementsPerWorkgroup);
     // No tiling at the subgroup level since this target doesn't use subgroup op
     // or shared memory.
+    tileSizes.emplace_back();
+    // Invocation level.
+    tileSizes.push_back({numElementsPerWorkgroup[0],
+                         numElementsPerWorkgroup[1] / pair.workgroupSize[1],
+                         numElementsPerWorkgroup[2] / pair.workgroupSize[0],
+                         numElementsPerWorkgroup[3]});
 
-    config.invocationTileSizes = {
-        numElementsPerWorkgroup[0],
-        numElementsPerWorkgroup[1] / pair.workgroupSize[1],
-        numElementsPerWorkgroup[2] / pair.workgroupSize[0],
-        numElementsPerWorkgroup[3]};
-
-    config.workgroupSize = pair.workgroupSize;
-
-    return config;
+    return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
+                                                 op, tileSizes, {}, pipeline,
+                                                 pair.workgroupSize);
   }
   return llvm::None;
 }
 
-Optional<SPIRVCodeGenConfig> getOpConfig(linalg::MatmulOp op) {
+Optional<LogicalResult> setOpConfig(linalg::MatmulOp op) {
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
 
@@ -151,25 +152,25 @@ Optional<SPIRVCodeGenConfig> getOpConfig(linalg::MatmulOp op) {
       continue;
     }
 
-    SPIRVCodeGenConfig config = {};
-    config.pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+    auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
 
     SmallVector<int64_t, 4> numElementsPerWorkgroup(pair.tileSize.begin(),
                                                     pair.tileSize.end());
 
-    config.workgroupTileSizes = numElementsPerWorkgroup;
-
+    TileSizesListType tileSizes;
+    // Workgroup level.
+    tileSizes.push_back(numElementsPerWorkgroup);
     // No tiling at the subgroup level since this target doesn't use subgroup op
     // or shared memory.
+    tileSizes.emplace_back();
+    // Invocation level.
+    tileSizes.push_back({numElementsPerWorkgroup[0] / pair.workgroupSize[1],
+                         numElementsPerWorkgroup[1] / pair.workgroupSize[0],
+                         numElementsPerWorkgroup[2]});
 
-    config.invocationTileSizes = {
-        numElementsPerWorkgroup[0] / pair.workgroupSize[1],
-        numElementsPerWorkgroup[1] / pair.workgroupSize[0],
-        numElementsPerWorkgroup[2]};
-
-    config.workgroupSize = pair.workgroupSize;
-
-    return config;
+    return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
+                                                 op, tileSizes, {}, pipeline,
+                                                 pair.workgroupSize);
   }
   return llvm::None;
 }
@@ -178,7 +179,7 @@ Optional<SPIRVCodeGenConfig> getOpConfig(linalg::MatmulOp op) {
 // Convolution
 //===----------------------------------------------------------------------===//
 
-Optional<SPIRVCodeGenConfig> getOpConfig(linalg::Conv2DNhwcHwcfOp op) {
+Optional<LogicalResult> setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
@@ -211,43 +212,53 @@ Optional<SPIRVCodeGenConfig> getOpConfig(linalg::Conv2DNhwcHwcfOp op) {
                            (outputShape[3] % tileSize[2] == 0);
     if (!isOutputTilable) continue;
 
-    SPIRVCodeGenConfig config = {};
-    config.pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+    auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
 
-    config.workgroupTileSizes = {/*batch=*/0, /*output_height=*/tileSize[0],
-                                 /*output_width=*/tileSize[1],
-                                 /*output_channel=*/tileSize[2]};
+    TileSizesListType tileSizes;
+    // Workgroup level.
+    tileSizes.push_back({/*batch=*/0, /*output_height=*/tileSize[0],
+                         /*output_width=*/tileSize[1],
+                         /*output_channel=*/tileSize[2]});
 
     // No tiling at the subgroup level given that we don't use subgroup
     // level syncrhonization or shared memory.
-
-    config.invocationTileSizes = {
-        /*batch=*/0, /*output_height=*/tileSize[0] / workgroupSize[2],
-        /*output_width=*/tileSize[1] / workgroupSize[1],
-        /*output_channel=*/tileSize[2] / workgroupSize[0]};
-
+    tileSizes.emplace_back();
+    // Invocation level.
+    tileSizes.push_back({/*batch=*/0,
+                         /*output_height=*/tileSize[0] / workgroupSize[2],
+                         /*output_width=*/tileSize[1] / workgroupSize[1],
+                         /*output_channel=*/tileSize[2] / workgroupSize[0]});
     // Finally, for each invocation, we use tiling to generate loops to loop
     // over the filter's height (step 1), width (step 1), and input channel
     // (step 4) dimensions.
-    config.convFilterTileSizes = {0, 0, 0, 0, 1, 1, 4};
+    tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});
 
-    config.workgroupSize = workgroupSize;
-
-    // Define fully static number of workgroups. This is needed for folding
-    // `affine.min` ops to expose static-shaped tiled convolution for
-    // vectorization.
-    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
-    config.workgroupCount = std::array<int64_t, 3>();
-    for (unsigned i = 0; i < 3; ++i) {
-      (*config.workgroupCount)[2 - i] = outputShape[i + 1] / tileSize[i];
+    auto funcOp = op->getParentOfType<FuncOp>();
+    if (failed(setOpConfigAndEntryPointFnTranslation(
+            funcOp, op, tileSizes, {}, pipeline, workgroupSize))) {
+      return failure();
     }
 
-    return config;
+    // Let the entry point region to return fully static number of workgroups.
+    // This is needed for folding `affine.min` ops to expose static-shaped tiled
+    // convolution for vectorization.
+    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
+    OpBuilder builder(op.getContext());
+    auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
+                               std::array<Value, 3>) {
+      std::array<Value, 3> xyz;
+      for (unsigned i = 0; i < 3; ++i) {
+        int64_t count = outputShape[i + 1] / tileSize[i];
+        xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
+      }
+      return xyz;
+    };
+    return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
   }
   return llvm::None;
 }
 
-Optional<SPIRVCodeGenConfig> getOpConfig(linalg::DepthwiseConv2DNhwOp op) {
+Optional<LogicalResult> setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
@@ -277,38 +288,47 @@ Optional<SPIRVCodeGenConfig> getOpConfig(linalg::DepthwiseConv2DNhwOp op) {
                            (outputShape[3] % tileSize[2] == 0);
     if (!isOutputTilable) continue;
 
-    SPIRVCodeGenConfig config = {};
-    config.pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+    auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
 
-    config.workgroupTileSizes = {/*batch=*/0,
-                                 /*output_height=*/tileSize[0],
-                                 /*output_width=*/tileSize[1],
-                                 /*output_channel=*/tileSize[2]};
+    TileSizesListType tileSizes;
+    // Workgroup level.
+    tileSizes.push_back({/*batch=*/0,
+                         /*output_height=*/tileSize[0],
+                         /*output_width=*/tileSize[1],
+                         /*output_channel=*/tileSize[2]});
 
     // No tiling at the subgroup level given that we don't use subgroup
     // level syncrhonization  or shared memory.
-
-    config.invocationTileSizes = {
-        /*batch=*/0, /*output_height=*/tileSize[0] / workgroupSize[2],
-        /*output_width=*/tileSize[1] / workgroupSize[1],
-        /*output_channel=*/tileSize[2] / workgroupSize[0]};
-
+    tileSizes.emplace_back();
+    tileSizes.push_back({/*batch=*/0,
+                         /*output_height=*/tileSize[0] / workgroupSize[2],
+                         /*output_width=*/tileSize[1] / workgroupSize[1],
+                         /*output_channel=*/tileSize[2] / workgroupSize[0]});
     // Finally, for each invocation, we use tiling to generate loops to loop
     // over the filter's height (step 1) and width (step 1) dimensions.
-    config.convFilterTileSizes = {0, 0, 0, 0, 1, 1};
+    tileSizes.push_back({0, 0, 0, 0, 1, 1});
 
-    config.workgroupSize = workgroupSize;
-
-    // Define fully static number of workgroups. This is needed for folding
-    // `affine.min` ops to expose static-shaped tiled convolution for
-    // vectorization.
-    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
-    config.workgroupCount = std::array<int64_t, 3>();
-    for (unsigned i = 0; i < 3; ++i) {
-      (*config.workgroupCount)[2 - i] = outputShape[i + 1] / tileSize[i];
+    auto funcOp = op->getParentOfType<FuncOp>();
+    if (failed(setOpConfigAndEntryPointFnTranslation(
+            funcOp, op, tileSizes, {}, pipeline, workgroupSize))) {
+      return failure();
     }
 
-    return config;
+    // Let the entry point region to return fully static number of workgroups.
+    // This is needed for folding `affine.min` ops to expose static-shaped tiled
+    // convolution for vectorization.
+    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
+    OpBuilder builder(op.getContext());
+    auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
+                               std::array<Value, 3>) {
+      std::array<Value, 3> xyz;
+      for (unsigned i = 0; i < 3; ++i) {
+        int64_t count = outputShape[i + 1] / tileSize[i];
+        xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
+      }
+      return xyz;
+    };
+    return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
   }
   return llvm::None;
 }
@@ -319,19 +339,19 @@ Optional<SPIRVCodeGenConfig> getOpConfig(linalg::DepthwiseConv2DNhwOp op) {
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-Optional<SPIRVCodeGenConfig> getMaliCodeGenConfig(const spirv::TargetEnv &,
-                                                  Operation *op) {
+Optional<LogicalResult> setMaliCodeGenConfig(const spirv::TargetEnv &,
+                                             Operation *op) {
   if (auto matmulOp = dyn_cast<linalg::BatchMatmulOp>(op)) {
-    return getOpConfig(matmulOp);
+    return setOpConfig(matmulOp);
   }
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(op)) {
-    return getOpConfig(matmulOp);
+    return setOpConfig(matmulOp);
   }
   if (auto convOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(op)) {
-    return getOpConfig(convOp);
+    return setOpConfig(convOp);
   }
   if (auto convOp = dyn_cast<linalg::DepthwiseConv2DNhwOp>(op)) {
-    return getOpConfig(convOp);
+    return setOpConfig(convOp);
   }
   return llvm::None;
 }
