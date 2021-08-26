@@ -94,6 +94,12 @@ struct iree_task_executor_t {
   // on already woken workers.
   iree_atomic_task_affinity_set_t worker_idle_mask;
 
+  // A bitset indicating which workers have tasks pending in their queues.
+  // This does not include tasks that are in-flight; it's just queue depth > 0.
+  // Note that this may not be coherent with any of the other masks and should
+  // only be used for probabilistic queries ("_could_ we use worker X?" vs can).
+  iree_atomic_task_affinity_set_t worker_pending_mask;
+
   // Specifies how many workers threads there are.
   // For now this number is fixed per executor however if we wanted to enable
   // live join/leave behavior we could change this to a registration mechanism.

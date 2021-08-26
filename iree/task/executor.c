@@ -710,15 +710,21 @@ iree_task_t* iree_task_executor_try_steal_task(
     iree_task_affinity_set_t constructive_sharing_mask,
     uint32_t max_theft_attempts, iree_prng_minilcg128_state_t* theft_prng,
     iree_task_queue_t* local_task_queue) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   // Limit the workers we will steal from to the ones that are currently live
   // and not idle.
   iree_task_affinity_set_t victim_mask =
+      iree_atomic_task_affinity_set_load(&executor->worker_pending_mask,
+                                         iree_memory_order_relaxed) &
       iree_atomic_task_affinity_set_load(&executor->worker_live_mask,
                                          iree_memory_order_relaxed) &
       ~iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
                                           iree_memory_order_relaxed);
+  if (!victim_mask) {
+    // No live workers to steal from; early-exit.
+    return NULL;
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // TODO(benvanik): it may be possible to rework this such that we better
   // use the prng; for example, instead of all this rotating stuff we could just
