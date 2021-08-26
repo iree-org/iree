@@ -34,16 +34,16 @@ hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
 
 // Check that the workgroup size is (1, 1, 1) for serializing the computation.
 
-//          CHECK-LABEL: hal.executable.entry_point @static_1d_sort
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
-//           CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
-//           CHECK-NEXT:   hal.return %[[ONE]], %[[ONE]], %[[ONE]]
+// CHECK-LABEL: hal.executable.entry_point @static_1d_sort
+//  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
+//  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
+//  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
+//  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//  CHECK-NEXT:   hal.return %[[ONE]], %[[ONE]], %[[ONE]]
 
-//                CHECK: func @static_1d_sort()
-//                CHECK:   linalg_ext.sort
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[]]}}
+//       CHECK: func @static_1d_sort()
+//       CHECK:   linalg_ext.sort
+//  CHECK-SAME:     lowering.config = {}
 
 // -----
 
