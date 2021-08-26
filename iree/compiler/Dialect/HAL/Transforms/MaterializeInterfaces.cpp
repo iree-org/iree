@@ -59,7 +59,7 @@ static LogicalResult declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
             sourceOp.getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
     targetSymbolTable.insert(targetContainerOp);
     OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-    auto moduleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
+    containerBuilder.create<ModuleOp>(sourceOp.getLoc());
   }
 
   // Ensure that at least one target op got created. If it didn't that means

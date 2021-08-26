@@ -567,8 +567,8 @@ static std::string getStringAttrFromTargetAttr(ModuleOp module,
           module->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
     if (auto config = targetAttr.getConfiguration()) {
-      if (auto dataLayoutAttr = config.getAs<StringAttr>(attrName)) {
-        return dataLayoutAttr.getValue().str();
+      if (auto attr = config.getAs<StringAttr>(attrName)) {
+        return attr.getValue().str();
       }
     }
   }
