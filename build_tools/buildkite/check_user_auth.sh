@@ -3,6 +3,9 @@
 set -eu
 set -o pipefail
 
+# TODO: Testing. remove this
+exit 1
+
 if [[ "${BUILDKITE_BUILD_CREATOR_EMAIL}" == *@google.com ]]; then
   echo "User '${BUILDKITE_BUILD_CREATOR_EMAIL}' is authorized because email ends in 'google.com'"
   exit 0
