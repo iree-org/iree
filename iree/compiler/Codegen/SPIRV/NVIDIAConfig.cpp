@@ -40,11 +40,11 @@ static Optional<SmallVector<int64_t, 4>> getCooperativeMatrixSize(
   return llvm::None;
 }
 
-static Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
-                                           linalg::MatmulOp op) {
+static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
+                                 linalg::MatmulOp op) {
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
-    return llvm::None;
+    return success();
   }
 
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
@@ -52,7 +52,7 @@ static Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
 
   if (llvm::any_of(lhsShape, ShapedType::isDynamic) ||
       llvm::any_of(rhsShape, ShapedType::isDynamic)) {
-    return llvm::None;
+    return success();
   }
 
   auto resourceLimits = targetEnv.getResourceLimits();
@@ -65,7 +65,7 @@ static Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
   Optional<SmallVector<int64_t, 4>> coopMatSize = getCooperativeMatrixSize(
       resourceLimits, getElementType(op.inputs()[0]),
       getElementType(op.inputs()[1]), outputElementType, outputElementType);
-  if (!coopMatSize) return llvm::None;
+  if (!coopMatSize) return success();
 
   // Check that the matmul sizes are a multiple of the tilesize.
   auto isMultipleOf = [](int64_t s, int64_t ts) {
@@ -76,7 +76,7 @@ static Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
       !isMultipleOf(rhsShape[1], (*coopMatSize)[1]) ||
       !isMultipleOf(lhsShape[1], (*coopMatSize)[2]) ||
       !isMultipleOf(rhsShape[0], (*coopMatSize)[2])) {
-    return llvm::None;
+    return success();
   }
 
   // For now this is being hard-wired to be {4, 4, 2}. This can actually be set
@@ -105,12 +105,12 @@ static Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
                                                workgroupSize);
 }
 
-Optional<LogicalResult> setNVIDIACodeGenConfig(
-    const spirv::TargetEnv &targetEnv, Operation *rootOp) {
+LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
+                                     Operation *rootOp) {
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
     return setOpConfig(targetEnv, matmulOp);
   }
-  return llvm::None;
+  return success();
 }
 
 }  // namespace detail

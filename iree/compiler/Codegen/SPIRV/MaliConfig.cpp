@@ -80,13 +80,13 @@ static void getMatmulTileAndWorkgroupSizes(
 }
 
 /// Launch configuration for Mali GPU configuration.
-static Optional<LogicalResult> setOpConfig(linalg::BatchMatmulOp op) {
+static LogicalResult setOpConfig(linalg::BatchMatmulOp op) {
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
 
   if (llvm::any_of(lhsShape, ShapedType::isDynamic) ||
       llvm::any_of(rhsShape, ShapedType::isDynamic)) {
-    return llvm::None;
+    return success();
   }
 
   // Get a vector of best tile size ordered from best to worst.
@@ -125,16 +125,16 @@ static Optional<LogicalResult> setOpConfig(linalg::BatchMatmulOp op) {
                                                  op, tileSizes, {}, pipeline,
                                                  pair.workgroupSize);
   }
-  return llvm::None;
+  return success();
 }
 
-static Optional<LogicalResult> setOpConfig(linalg::MatmulOp op) {
+static LogicalResult setOpConfig(linalg::MatmulOp op) {
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
 
   if (llvm::any_of(lhsShape, ShapedType::isDynamic) ||
       llvm::any_of(rhsShape, ShapedType::isDynamic)) {
-    return llvm::None;
+    return success();
   }
 
   Type elementType =
@@ -170,25 +170,25 @@ static Optional<LogicalResult> setOpConfig(linalg::MatmulOp op) {
                                                  op, tileSizes, {}, pipeline,
                                                  pair.workgroupSize);
   }
-  return llvm::None;
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
 // Convolution
 //===----------------------------------------------------------------------===//
 
-static Optional<LogicalResult> setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
+static LogicalResult setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
 
   if (llvm::any_of(inputShape, ShapedType::isDynamic) ||
       llvm::any_of(outputShape, ShapedType::isDynamic)) {
-    return llvm::None;
+    return success();
   }
 
   bool isInputTilable = inputShape[3] % 4 == 0 || inputShape[3] < 4;
-  if (!isInputTilable) return llvm::None;
+  if (!isInputTilable) return success();
 
   // A list of preferred tile sizes and workgroup sizes.
   // TODO(antiagainst): This is for Valhall now; need to consider other Mali
@@ -253,17 +253,17 @@ static Optional<LogicalResult> setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
     };
     return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
   }
-  return llvm::None;
+  return success();
 }
 
-static Optional<LogicalResult> setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
+static LogicalResult setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
 
   if (llvm::any_of(inputShape, ShapedType::isDynamic) ||
       llvm::any_of(outputShape, ShapedType::isDynamic)) {
-    return llvm::None;
+    return success();
   }
 
   // A list of preferred tile sizes and workgroup sizes.
@@ -328,20 +328,20 @@ static Optional<LogicalResult> setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
     };
     return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
   }
-  return llvm::None;
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-Optional<LogicalResult> setMaliCodeGenConfig(const spirv::TargetEnv &,
-                                             Operation *rootOp) {
-  return TypeSwitch<Operation *, Optional<LogicalResult>>(rootOp)
+LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &,
+                                   Operation *rootOp) {
+  return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
             linalg::DepthwiseConv2DNhwOp, linalg::MatmulOp>(
           [](auto op) { return setOpConfig(op); })
-      .Default([](Operation *) { return llvm::None; });
+      .Default([](Operation *) { return success(); });
 }
 
 }  // namespace detail

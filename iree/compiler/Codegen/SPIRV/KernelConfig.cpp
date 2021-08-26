@@ -20,7 +20,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
@@ -71,8 +70,8 @@ static LogicalResult setTranslationUsingDistributeToGlobalId(
 // Matmul Default Configuration
 //===----------------------------------------------------------------------===//
 
-static Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
-                                           linalg::BatchMatmulOp op) {
+static LogicalResult setOpConfig(spirv::ResourceLimitsAttr limits,
+                                 linalg::BatchMatmulOp op) {
   unsigned maxWorkgroupSize =
       limits.max_compute_workgroup_invocations().getInt();
 
@@ -105,8 +104,8 @@ static Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
                                                workgroupSize);
 }
 
-static Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
-                                           linalg::MatmulOp op) {
+static LogicalResult setOpConfig(spirv::ResourceLimitsAttr limits,
+                                 linalg::MatmulOp op) {
   unsigned maxWorkgroupSize =
       limits.max_compute_workgroup_invocations().getInt();
 
@@ -148,8 +147,8 @@ static Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
 // Default Configuration
 //===----------------------------------------------------------------------===//
 
-static Optional<LogicalResult> setDefaultOpConfig(
-    spirv::ResourceLimitsAttr limits, Operation *op) {
+static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
+                                        Operation *op) {
   auto partitionedLoops = getPartitionedLoops(op);
   if (partitionedLoops.empty()) {
     auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
@@ -240,9 +239,9 @@ static Optional<LogicalResult> setDefaultOpConfig(
 
 /// Sets the CodeGen configuration as attributes to the given `rootOp` if it's a
 /// known Linalg matmul/convolution op with good configurations.
-static Optional<LogicalResult> setSPIRVOpConfig(
-    const spirv::TargetEnv &targetEnv, Operation *rootOp) {
-  Optional<LogicalResult> result;
+static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
+                                      Operation *rootOp) {
+  LogicalResult result = success();
   // First try to find a proper CodeGen configuration for the current
   // target architecture.
   switch (targetEnv.getVendorID()) {
@@ -255,16 +254,19 @@ static Optional<LogicalResult> setSPIRVOpConfig(
     default:
       break;
   }
-  if (result.hasValue()) return result;
+
+  if (failed(result)) return result;
+  // Check whether there is actually a configuration found. If so, it's done.
+  if (getLoweringConfig(rootOp)) return result;
 
   // Otherwise fallback to use a default configuration.
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  return TypeSwitch<Operation *, Optional<LogicalResult>>(rootOp)
+  return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
           [limits](auto op) { return setOpConfig(limits, op); })
       .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
           [limits](auto op) { return setDefaultOpConfig(limits, op); })
-      .Default([](Operation *) { return llvm::None; });
+      .Default([](Operation *) { return success(); });
 };
 
 //===----------------------------------------------------------------------===//
@@ -323,9 +325,10 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     // Try to find a configuration according to a matmul/convolution op and use
     // it as the root op.
     for (Operation *computeOp : computeOps) {
-      Optional<LogicalResult> result = setSPIRVOpConfig(targetEnv, computeOp);
-      if (!result) continue;
-      if (failed(*result)) return failure();
+      if (failed(setSPIRVOpConfig(targetEnv, computeOp))) return failure();
+
+      // Check if the op configuration was set.
+      if (!getLoweringConfig(computeOp)) continue;
 
       if (rootOperation) {
         return computeOp->emitOpError(
@@ -339,9 +342,10 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       for (Operation *computeOp : computeOps) {
         if (isa<linalg::FillOp, linalg::CopyOp>(computeOp)) continue;
 
-        Optional<LogicalResult> result = setDefaultOpConfig(limits, computeOp);
-        if (!result) continue;
-        if (failed(*result)) return failure();
+        if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
+
+        // Check if the op configuration was set.
+        if (!getLoweringConfig(computeOp)) continue;
 
         if (rootOperation) {
           return computeOp->emitOpError(

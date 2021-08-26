@@ -28,17 +28,21 @@ namespace detail {
 
 /// If the given `rootOp` has known good CodeGen configuration for Mali GPUs,
 /// attaches a `translation.info` attribute to the entry point containing
-/// `rootOp` and a `lowering.config` attribute to `rootOp`. Returns the status
-/// of setting the attributes. Does nothing and returns llvm::None otherwise.
-Optional<LogicalResult> setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
-                                             Operation *rootOp);
+/// `rootOp` and a `lowering.config` attribute to `rootOp`.
+/// Returns success when either no configuration is found or a configuration is
+/// successfullly attached as attribute. Returns failure only when there is an
+/// issue attaching the attribute.
+LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
+                                   Operation *rootOp);
 
 /// If the given `rootOp` has known good CodeGen configuration for NVIDIA GPUs,
 /// attaches a `translation.info` attribute to the entry point containing
-/// `rootOp` and a `lowering.config` attribute to `rootOp`. Returns the status
-/// of setting the attributes. Does nothing and returns llvm::None otherwise.
-Optional<LogicalResult> setNVIDIACodeGenConfig(
-    const spirv::TargetEnv &targetEnv, Operation *rootOp);
+/// `rootOp` and a `lowering.config` attribute to `rootOp`.
+/// Returns success when either no configuration is found or a configuration is
+/// successfullly attached as attribute. Returns failure only when there is an
+/// issue attaching the attribute.
+LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
+                                     Operation *rootOp);
 
 }  // namespace detail
 
