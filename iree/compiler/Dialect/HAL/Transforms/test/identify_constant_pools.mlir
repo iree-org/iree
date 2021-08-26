@@ -37,12 +37,11 @@ func @immutable_variables() -> (tensor<1xf32>, tensor<4xf32>, tensor<3xi8>) {
 //      CHECK: hal.constant_pool @_const_pool_init
 // CHECK-NEXT:   hal.constant_pool.value @variable_0 = dense<3.000000e+00> : tensor<128xf32>
 
-// CHECK: util.global private mutable @variable_0 initializer(@variable_0_initializer)
+// CHECK: util.global private mutable @variable_0
 util.global private mutable @variable_0 = dense<3.0> : tensor<128xf32>
-// CHECK-NEXT: func private @variable_0_initializer() -> tensor<128xf32>
-// CHECK-NEXT:   [[CONST:%.+]] = hal.constant_pool.load @_const_pool_init::@variable_0 : tensor<128xf32>
-// CHECK-NEXT:   return [[CONST]] : tensor<128xf32>
-// CHECK-NEXT: }
+// CHECK-NEXT: util.initializer {
+// CHECK-NEXT:   %[[CONST:.+]] = hal.constant_pool.load @_const_pool_init::@variable_0 : tensor<128xf32>
+// CHECK-NEXT:   util.global.store %[[CONST]], @variable_0 : tensor<128xf32>
 
 // CHECK-LABEL: func @mutable_variables
 func @mutable_variables() -> tensor<128xf32> {

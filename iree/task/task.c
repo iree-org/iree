@@ -24,7 +24,7 @@
 
 void iree_task_initialize(iree_task_type_t type, iree_task_scope_t* scope,
                           iree_task_t* out_task) {
-  //  NOTE: only clears the header, not the task body.
+  // NOTE: only clears the header, not the task body.
   memset(out_task, 0, sizeof(*out_task));
   out_task->scope = scope;
   out_task->affinity_set = iree_task_affinity_for_any_worker();

@@ -124,6 +124,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
                        bool wouldBeCloned) const final {
     return true;
   }
+
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
                        BlockAndValueMapping &valueMapping) const final {
     // TODO(benvanik): disallow inlining across async calls.

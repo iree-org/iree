@@ -40,26 +40,13 @@ func @fn() {
 
 // Checks that an initializer function is generated, used and operates on
 // a hal.buffer (versus tensor).
-// CHECK: util.global public mutable @var_with_tensor_default
-// CHECK-SAME: initializer(@__var_with_tensor_default_initializer)
-// CHECK-SAME: : !hal.buffer
-// CHECK-LABEL: func @__var_with_tensor_default_initializer() -> !hal.buffer
+
+// CHECK: util.global public mutable @var_with_tensor_default : !hal.buffer
+// CHECK-NEXT: util.initializer {
+// CHECK: util.global.store %{{.+}}, @var_with_tensor_default : !hal.buffer
 util.global public mutable @var_with_tensor_default = dense<0.000000e+00> : tensor<f32>
 func @fn() {
   %0 = util.global.load @var_with_tensor_default : tensor<f32>
   util.global.store %0, @var_with_tensor_default : tensor<f32>
-  return
-}
-
-// -----
-
-// TODO(b/145839814): It should not be possible to produce a name collision
-// expected-error @+3 {{redefinition of symbol named '__var_with_initializer_initializer'}}
-// expected-note @+1 {{see existing symbol definition here}}
-func private @__var_with_initializer_initializer() -> ()
-util.global public mutable @var_with_initializer = dense<0.000000e+00> : tensor<f32>
-func @fn() {
-  %0 = util.global.load @var_with_initializer : tensor<f32>
-  util.global.store %0, @var_with_initializer : tensor<f32>
   return
 }

@@ -61,7 +61,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createAssignTargetDevicesPass(
     ArrayRef<std::string> targets);
 
 // Outlines hal.device.switch conditions into functions and inlines conditions.
-std::unique_ptr<OperationPass<FuncOp>> createInlineDeviceSwitchesPass();
+std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass();
 
 // Finds hal.device.query ops and creates variables initialized on startup.
 std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();

@@ -133,6 +133,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Inline hal.device.switch ops and memoize their queries such that we can
   // better CSE/fold dispatch logic.
   passManager.addNestedPass<FuncOp>(createInlineDeviceSwitchesPass());
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      createInlineDeviceSwitchesPass());
   if (benchmarkDispatchRepeatCount != 1) {
     passManager.addNestedPass<FuncOp>(
         createBenchmarkBatchDispatchesPass(benchmarkDispatchRepeatCount));
@@ -141,6 +143,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createMemoizeDeviceQueriesPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
+
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      createCanonicalizerPass());
+  passManager.addNestedPass<IREE::Util::InitializerOp>(createCSEPass());
 
   // Run our own CSE on variable loads before moving on.
   // When specifying side effects can help MLIR's core CSE pass eliminate

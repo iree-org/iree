@@ -36,6 +36,7 @@ class BufferLoadOpConversion
         importType.getResults(),
         ArrayRef<Value>{adaptor.source_buffer(), adaptor.source_offset(),
                         sizeConst});
+    copyImportAttrs(importOp, callOp);
     // If the original result was a floating point type, we want to bitcast
     // from importType (i32) to a matching bit depth floating point type (f32).
     auto originalResultType = op.getResult().getType();
@@ -73,10 +74,11 @@ class BufferStoreOpConversion
         op.getLoc(),
         rewriter.getI32IntegerAttr(
             IREE::HAL::getRoundedElementByteWidth(op.value().getType())));
-    rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.value(), adaptor.target_buffer(),
                         adaptor.target_offset(), sizeConst});
+    copyImportAttrs(importOp, callOp);
     return success();
   }
 

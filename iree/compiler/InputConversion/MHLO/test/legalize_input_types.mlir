@@ -170,7 +170,14 @@ builtin.func @foo(%arg0 : tensor<i64>) {
 
 // -----
 
-// CHECK: util.global private @{{.+}} initializer(@initializer) : tensor<4xi32>
-util.global private @v_initializer initializer(@initializer) : tensor<4xi64>
+// CHECK: util.global private @{{.+}} : tensor<4xi32>
+util.global private @v_initializer : tensor<4xi64>
+util.initializer {
+  // CHECK: %[[VALUE:.+]] = call @initializer() : () -> tensor<4xi32>
+  %0 = call @initializer() : () -> tensor<4xi64>
+  // CHECK: util.global.store %[[VALUE]], @v_initializer : tensor<4xi32>
+  util.global.store %0, @v_initializer : tensor<4xi64>
+  util.initializer.return
+}
 // CHECK: func private @initializer() -> tensor<4xi32>
 func private @initializer() -> tensor<4xi64>

@@ -9,8 +9,8 @@ hal.constant_pool @dense_variable_init attributes {buffer_constraints = #hal.buf
   hal.constant_storage @_storage = dense<1> : vector<768xi8>
 }
 
-//      CHECK: util.global private @dense_variable_init_storage_buffer initializer(@dense_variable_init_storage_buffer_initializer) : !hal.buffer
-// CHECK-NEXT: func private @dense_variable_init_storage_buffer_initializer() -> !hal.buffer
+//      CHECK: util.global private @dense_variable_init_storage_buffer : !hal.buffer
+// CHECK-NEXT: util.initializer {
 //      CHECK: %[[STORAGE:.+]] = hal.constant_storage.lookup @dense_variable_init::@_storage : !util.byte_buffer
 //      CHECK: = hal.allocator.map<%allocator : !hal.allocator>
 // CHECK-SAME:   source(%[[STORAGE]] : !util.byte_buffer)[%c0, %c768]
@@ -26,8 +26,8 @@ hal.constant_pool @splat_variable_init attributes {buffer_constraints = #hal.buf
   hal.constant_pool.splat @cst1 = dense<1234567890> : tensor<8xi32>
 }
 
-//      CHECK: util.global private @splat_variable_init_splats initializer(@splat_variable_init_splats_initializer) : !hal.buffer
-// CHECK-NEXT: func private @splat_variable_init_splats_initializer() -> !hal.buffer
+//      CHECK: util.global private @splat_variable_init_splats : !hal.buffer
+// CHECK-NEXT: util.initializer {
 //      CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator>
 // CHECK-SAME:   type("HostVisible|DeviceVisible|DeviceLocal")
 // CHECK-SAME:   usage("Constant|Transfer|Mapping|Dispatch") : !hal.buffer{%c64}
@@ -54,18 +54,18 @@ hal.constant_pool @pool attributes {buffer_constraints = #hal.buffer_constraints
   hal.constant_storage @_storage1 = dense<[6, 7, 8, 0]> : vector<4xi8>
 }
 
-//      CHECK: util.global private @pool_storage0_buffer initializer(@pool_storage0_buffer_initializer) : !hal.buffer
-// CHECK-NEXT: func private @pool_storage0_buffer_initializer() -> !hal.buffer
+//      CHECK: util.global private @pool_storage0_buffer : !hal.buffer
+// CHECK-NEXT: util.initializer {
 //      CHECK: %[[STORAGE:.+]] = hal.constant_storage.lookup @pool::@_storage0 : !util.byte_buffer
 //      CHECK: = hal.allocator.map<%allocator : !hal.allocator>
 // CHECK-SAME:   source(%[[STORAGE]] : !util.byte_buffer)[%c0, %c16]
 // CHECK-SAME:   : !hal.buffer
 
-//      CHECK: util.global private @pool_storage1_buffer initializer(@pool_storage1_buffer_initializer) : !hal.buffer
-// CHECK-NEXT: func private @pool_storage1_buffer_initializer() -> !hal.buffer
+//      CHECK: util.global private @pool_storage1_buffer : !hal.buffer
+// CHECK-NEXT: util.initializer {
 
-//      CHECK: util.global private @pool_splats initializer(@pool_splats_initializer) : !hal.buffer
-// CHECK-NEXT: func private @pool_splats_initializer() -> !hal.buffer
+//      CHECK: util.global private @pool_splats : !hal.buffer
+// CHECK-NEXT: util.initializer {
 //      CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator>
 // CHECK-SAME:   : !hal.buffer{%c64}
 //      CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>

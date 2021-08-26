@@ -54,10 +54,6 @@ class ExecutableCreateOpConversion
     auto loc = createOp.getLoc();
     IREE::HAL::ExecutableCreateOp::Adaptor newOperands(operands);
 
-    auto funcOp = dyn_cast_or_null<IREE::VM::FuncOp>(
-        rewriter.getInsertionBlock()->getParentOp());
-    assert(funcOp && "prepare op not in a function");
-
     // Materialize vm.rodata for the binary.
     auto executableBinaryOp =
         SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableBinaryOp>(
@@ -65,7 +61,7 @@ class ExecutableCreateOpConversion
     auto executableOp = executableBinaryOp.getOperation()
                             ->getParentOfType<IREE::HAL::ExecutableOp>();
     auto insertPoint = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPoint(funcOp);
+    rewriter.setInsertionPoint(rewriter.getInsertionBlock()->getParentOp());
     std::string rodataName = (StringRef("_") + executableOp.getName() + "_" +
                               executableBinaryOp.getName() + "_binary")
                                  .str();
@@ -103,9 +99,10 @@ class ExecutableCreateOpConversion
                         newOperands.layouts().end());
 
     auto importType = importOp.getType();
-    rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
         createOp, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
         segmentSizes, importType.getInputs(), callOperands);
+    copyImportAttrs(importOp, callOp);
 
     return success();
   }

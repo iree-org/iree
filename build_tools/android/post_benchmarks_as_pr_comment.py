@@ -36,6 +36,8 @@ import argparse
 import json
 import os
 import requests
+
+import urllib.parse
 import markdown_strings as md
 
 from dataclasses import dataclass
@@ -51,6 +53,7 @@ GITHUB_USER = "iree-github-actions-bot"
 IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.
 MAX_BASE_COMMIT_QUERY_COUNT = 10
+PERFBOARD_SERIES_PREFIX = "https://perf.iree.dev/serie?IREE?"
 # The ratio below which benchmarks will be considered as similar with base.
 SIMILAR_BECNHMARK_THRESHOLD = 0.05
 # The max number of rows to show per table.
@@ -174,6 +177,12 @@ def query_base_benchmark_results(commit,
   return get_from_dashboard(f'{url}/apis/getBuild', payload, verbose=verbose)
 
 
+def make_benchmark_clickable(name: str) -> str:
+  """Add link to the given benchmark name."""
+  url = PERFBOARD_SERIES_PREFIX + urllib.parse.quote(name, safe="()[]@,")
+  return md.link(name, url)
+
+
 def add_header_and_get_markdown_table(names: Tuple[str],
                                       means: Tuple[Any],
                                       medians: Tuple[int],
@@ -191,6 +200,7 @@ def add_header_and_get_markdown_table(names: Tuple[str],
     medians = medians[0:size_cut]
     stddevs = stddevs[0:size_cut]
 
+  names = tuple([make_benchmark_clickable(name) for name in names])
   names = ("Benchmark Name",) + names
   means = ("Average Latency (ms)",) + means
   medians = ("Median Latency (ms)",) + medians

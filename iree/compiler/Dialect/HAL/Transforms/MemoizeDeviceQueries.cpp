@@ -78,17 +78,17 @@ class MemoizeDeviceQueriesPass
       // variable.
       std::string variableName =
           "_device_query_" + std::to_string(queryKey.index());
-      auto initializerOp = moduleBuilder.create<FuncOp>(
-          fusedLoc, variableName + "_initializer",
-          moduleBuilder.getFunctionType({}, {queryType}));
-      initializerOp.setPrivate();
-      moduleBuilder.setInsertionPoint(initializerOp);
-      auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
+      auto valueGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           fusedLoc, variableName,
-          /*isMutable=*/false, initializerOp);
-      globalOp.setPrivate();
-      moduleBuilder.setInsertionPointAfter(initializerOp);
+          /*isMutable=*/false, queryType);
+      valueGlobalOp.setPrivate();
+      auto okGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
+          fusedLoc, variableName + "_ok",
+          /*isMutable=*/false, moduleBuilder.getI1Type());
+      okGlobalOp.setPrivate();
 
+      auto initializerOp =
+          moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
       auto device =
           funcBuilder.createOrFold<IREE::HAL::ExSharedDeviceOp>(fusedLoc);
@@ -96,16 +96,21 @@ class MemoizeDeviceQueriesPass
           fusedLoc, funcBuilder.getI1Type(), queryType, device,
           anyQueryOp.categoryAttr(), anyQueryOp.keyAttr(),
           anyQueryOp.default_valueAttr());
-      funcBuilder.create<mlir::ReturnOp>(fusedLoc, queryOp.value());
+      funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.ok(),
+                                                    okGlobalOp.getName());
+      funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.value(),
+                                                    valueGlobalOp.getName());
+      funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);
 
       for (auto queryOp : queryOps) {
         OpBuilder replaceBuilder(queryOp);
-        auto loadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
-            fusedLoc, queryType, globalOp.getName());
+        auto okLoadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
+            fusedLoc, okGlobalOp.type(), okGlobalOp.getName());
+        auto resultLoadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
+            fusedLoc, valueGlobalOp.type(), valueGlobalOp.getName());
         queryOp.replaceAllUsesWith(ValueRange{
-            replaceBuilder.createOrFold<ConstantIntOp>(
-                loadOp.getLoc(), /*value=*/1, /*width=*/1),
-            loadOp.result(),
+            okLoadOp.result(),
+            resultLoadOp.result(),
         });
         queryOp.erase();
       }
