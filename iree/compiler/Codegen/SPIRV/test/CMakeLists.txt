@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "pipeline_matmul_cooperative_matrix.mlir"
     "pipeline_matmul_vectorization.mlir"
     "remove_one_trip_tiled_loop.mlir"
+    "tile_and_distribute_scatter.mlir"
     "tile_and_vectorize.mlir"
     "tile_and_vectorize_batch_matmul.mlir"
     "tile_and_vectorize_conv.mlir"
