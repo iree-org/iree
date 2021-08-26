@@ -26,19 +26,19 @@ namespace iree_compiler {
 
 namespace detail {
 
-/// If the given `op` has known good CodeGen configuration for Mali GPUs,
-/// attaches a `translation.info` attribute to the entry point containing `op`
-/// and a `lowering.config` attribute to `op`. Returns the status of setting the
-/// attributes. Does nothing and returns llvm::None otherwise.
+/// If the given `rootOp` has known good CodeGen configuration for Mali GPUs,
+/// attaches a `translation.info` attribute to the entry point containing
+/// `rootOp` and a `lowering.config` attribute to `rootOp`. Returns the status
+/// of setting the attributes. Does nothing and returns llvm::None otherwise.
 Optional<LogicalResult> setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
-                                             Operation *op);
+                                             Operation *rootOp);
 
-/// If the given `op` has known good CodeGen configuration for NVIDIA GPUs,
-/// attaches a `translation.info` attribute to the entry point containing `op`
-/// and a `lowering.config` attribute to `op`. Returns the status of setting the
-/// attributes. Does nothing and returns llvm::None otherwise.
+/// If the given `rootOp` has known good CodeGen configuration for NVIDIA GPUs,
+/// attaches a `translation.info` attribute to the entry point containing
+/// `rootOp` and a `lowering.config` attribute to `rootOp`. Returns the status
+/// of setting the attributes. Does nothing and returns llvm::None otherwise.
 Optional<LogicalResult> setNVIDIACodeGenConfig(
-    const spirv::TargetEnv &targetEnv, Operation *op);
+    const spirv::TargetEnv &targetEnv, Operation *rootOp);
 
 }  // namespace detail
 

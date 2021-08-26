@@ -18,11 +18,9 @@ namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
-namespace {
-
 /// Returns the cooperative matrix (M, N, K) sizes that are supported by the
 /// target environment and match the given parameters.
-Optional<SmallVector<int64_t, 4>> getCooperativeMatrixSize(
+static Optional<SmallVector<int64_t, 4>> getCooperativeMatrixSize(
     spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
     Type initType, Type resultType) {
   for (auto coopMatmulProperties :
@@ -42,8 +40,8 @@ Optional<SmallVector<int64_t, 4>> getCooperativeMatrixSize(
   return llvm::None;
 }
 
-Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
-                                    linalg::MatmulOp op) {
+static Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
+                                           linalg::MatmulOp op) {
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
     return llvm::None;
@@ -107,11 +105,9 @@ Optional<LogicalResult> setOpConfig(const spirv::TargetEnv &targetEnv,
                                                workgroupSize);
 }
 
-}  // namespace
-
 Optional<LogicalResult> setNVIDIACodeGenConfig(
-    const spirv::TargetEnv &targetEnv, Operation *op) {
-  if (auto matmulOp = dyn_cast<linalg::MatmulOp>(op)) {
+    const spirv::TargetEnv &targetEnv, Operation *rootOp) {
+  if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
     return setOpConfig(targetEnv, matmulOp);
   }
   return llvm::None;

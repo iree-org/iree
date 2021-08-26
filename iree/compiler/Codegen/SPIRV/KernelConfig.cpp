@@ -20,14 +20,13 @@
 namespace mlir {
 namespace iree_compiler {
 
-namespace {
 
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
 
 /// Given `nprocs`, tries to distribute it evenly across 2 logical dimensions.
-std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
+static std::tuple<int64_t, int64_t> distributeProcs2D(int64_t nprocs) {
   int64_t nprocs_x = std::max<int64_t>(
       1, static_cast<int64_t>(
              llvm::PowerOf2Ceil(static_cast<uint64_t>(std::sqrt(nprocs)))));
@@ -44,7 +43,7 @@ int64_t getMinIfStaticShape(int64_t shape, int64_t tileSize) {
 /// Defines the workgroup count region on entry point ops for the
 /// `SPIRVDistributeToGlobalID` pipeline.
 // TODO(ravishankarm): Remove this when that pipeline is deprecated.
-LogicalResult setTranslationUsingDistributeToGlobalId(
+static LogicalResult setTranslationUsingDistributeToGlobalId(
     FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
   auto entryPointOp = getEntryPoint(funcOp);
   MLIRContext *context = entryPointOp.getContext();
@@ -72,8 +71,8 @@ LogicalResult setTranslationUsingDistributeToGlobalId(
 // Matmul Default Configuration
 //===----------------------------------------------------------------------===//
 
-Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
-                                    linalg::BatchMatmulOp op) {
+static Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
+                                           linalg::BatchMatmulOp op) {
   unsigned maxWorkgroupSize =
       limits.max_compute_workgroup_invocations().getInt();
 
@@ -106,8 +105,8 @@ Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
                                                workgroupSize);
 }
 
-Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
-                                    linalg::MatmulOp op) {
+static Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
+                                           linalg::MatmulOp op) {
   unsigned maxWorkgroupSize =
       limits.max_compute_workgroup_invocations().getInt();
 
@@ -149,8 +148,8 @@ Optional<LogicalResult> setOpConfig(spirv::ResourceLimitsAttr limits,
 // Default Configuration
 //===----------------------------------------------------------------------===//
 
-Optional<LogicalResult> setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
-                                           Operation *op) {
+static Optional<LogicalResult> setDefaultOpConfig(
+    spirv::ResourceLimitsAttr limits, Operation *op) {
   auto partitionedLoops = getPartitionedLoops(op);
   if (partitionedLoops.empty()) {
     auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
@@ -241,8 +240,8 @@ Optional<LogicalResult> setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
 /// Sets the CodeGen configuration as attributes to the given `rootOp` if it's a
 /// known Linalg matmul/convolution op with good configurations.
-Optional<LogicalResult> setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
-                                         Operation *rootOp) {
+static Optional<LogicalResult> setSPIRVOpConfig(
+    const spirv::TargetEnv &targetEnv, Operation *rootOp) {
   Optional<LogicalResult> result;
   // First try to find a proper CodeGen configuration for the current
   // target architecture.
@@ -260,19 +259,13 @@ Optional<LogicalResult> setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
 
   // Otherwise fallback to use a default configuration.
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  if (auto matmulOp = dyn_cast<linalg::BatchMatmulOp>(rootOp)) {
-    result = setOpConfig(limits, matmulOp);
-  } else if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
-    result = setOpConfig(limits, matmulOp);
-  } else if (isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
-                 rootOp)) {
-    result = setDefaultOpConfig(limits, rootOp);
-  }
-
-  return result;
+  return TypeSwitch<Operation *, Optional<LogicalResult>>(rootOp)
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
+          [limits](auto op) { return setOpConfig(limits, op); })
+      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
+          [limits](auto op) { return setDefaultOpConfig(limits, op); })
+      .Default([](Operation *) { return llvm::None; });
 };
-
-}  // namespace
 
 //===----------------------------------------------------------------------===//
 // Entry Point

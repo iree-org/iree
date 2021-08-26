@@ -21,8 +21,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
-namespace {
-
 struct TileWorkgroupSizePair {
   // How many scalar elements each workgroup should handle along each dimension.
   std::array<int64_t, 3> tileSize;
@@ -36,7 +34,7 @@ struct TileWorkgroupSizePair {
 
 /// Writes preferred matmul workgroup tile sizes and workgroup size into
 /// `pairs` for the given matmul `scale` (MxNxK) and `elementType`.
-void getMatmulTileAndWorkgroupSizes(
+static void getMatmulTileAndWorkgroupSizes(
     int64_t scale, Type elementType,
     SmallVectorImpl<TileWorkgroupSizePair> &pairs) {
   if (elementType.isF16()) {
@@ -82,7 +80,7 @@ void getMatmulTileAndWorkgroupSizes(
 }
 
 /// Launch configuration for Mali GPU configuration.
-Optional<LogicalResult> setOpConfig(linalg::BatchMatmulOp op) {
+static Optional<LogicalResult> setOpConfig(linalg::BatchMatmulOp op) {
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
 
@@ -130,7 +128,7 @@ Optional<LogicalResult> setOpConfig(linalg::BatchMatmulOp op) {
   return llvm::None;
 }
 
-Optional<LogicalResult> setOpConfig(linalg::MatmulOp op) {
+static Optional<LogicalResult> setOpConfig(linalg::MatmulOp op) {
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
 
@@ -179,7 +177,7 @@ Optional<LogicalResult> setOpConfig(linalg::MatmulOp op) {
 // Convolution
 //===----------------------------------------------------------------------===//
 
-Optional<LogicalResult> setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
+static Optional<LogicalResult> setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
@@ -258,7 +256,7 @@ Optional<LogicalResult> setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
   return llvm::None;
 }
 
-Optional<LogicalResult> setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
+static Optional<LogicalResult> setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   ArrayRef<int64_t> inputShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
@@ -333,27 +331,17 @@ Optional<LogicalResult> setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
   return llvm::None;
 }
 
-}  // namespace
-
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
 
 Optional<LogicalResult> setMaliCodeGenConfig(const spirv::TargetEnv &,
-                                             Operation *op) {
-  if (auto matmulOp = dyn_cast<linalg::BatchMatmulOp>(op)) {
-    return setOpConfig(matmulOp);
-  }
-  if (auto matmulOp = dyn_cast<linalg::MatmulOp>(op)) {
-    return setOpConfig(matmulOp);
-  }
-  if (auto convOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(op)) {
-    return setOpConfig(convOp);
-  }
-  if (auto convOp = dyn_cast<linalg::DepthwiseConv2DNhwOp>(op)) {
-    return setOpConfig(convOp);
-  }
-  return llvm::None;
+                                             Operation *rootOp) {
+  return TypeSwitch<Operation *, Optional<LogicalResult>>(rootOp)
+      .Case<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
+            linalg::DepthwiseConv2DNhwOp, linalg::MatmulOp>(
+          [](auto op) { return setOpConfig(op); })
+      .Default([](Operation *) { return llvm::None; });
 }
 
 }  // namespace detail
