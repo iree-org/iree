@@ -86,6 +86,8 @@ static Optional<int64_t> getNativeVectorSize(FuncOp entryPointFn,
   if (!config) return {};
   auto nativeVectorSize = config.getAs<IntegerAttr>("native_vector_size");
   if (!nativeVectorSize) return {};
+  int64_t nativeVectorSizeVal = nativeVectorSize.getInt();
+  if (nativeVectorSizeVal == 0) return {};
   if (!elementType.isIntOrFloat()) return {};
   unsigned bitWidth = elementType.getIntOrFloatBitWidth() / 8;
   return nativeVectorSize.getInt() / bitWidth;
