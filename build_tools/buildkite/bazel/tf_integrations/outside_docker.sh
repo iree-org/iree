@@ -5,15 +5,17 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set -euo pipefail
+
 ./scripts/git/submodule_versions.py init
 
-# TODO: Pull this into a separate file as with Kokoro
+# TODO: Pull the docker configuration into a separate file as with Kokoro
 
 # Make the source repository available and launch containers in that
 # directory.
 DOCKER_RUN_ARGS=(
-  --volume="${PWD?}:${PWD?}"
-  --workdir="${PWD?}"
+  --volume="${PWD}:${PWD}"
+  --workdir="${PWD}"
 )
 
 # Delete the container after the run is complete.
@@ -42,18 +44,18 @@ DOCKER_RUN_ARGS+=(--user="$(id -u):$(id -g)")
 # such that they don't contain the information about normal users and we
 # want these scripts to be runnable locally for debugging.
 # Instead we dump the results of `getent` to some fake files.
-fake_etc_dir="/tmp/fake_etc"
-mkdir -p "${fake_etc_dir?}"
+fake_etc_dir="${BUILDKITE_LOCAL_SSD}/fake_etc"
+mkdir -p "${fake_etc_dir}"
 
-fake_group="${fake_etc_dir?}/group"
-fake_passwd="${fake_etc_dir?}/passwd"
+fake_group="${fake_etc_dir}/group"
+fake_passwd="${fake_etc_dir}/passwd"
 
-getent group > "${fake_group?}"
-getent passwd > "${fake_passwd?}"
+getent group > "${fake_group}"
+getent passwd > "${fake_passwd}"
 
 DOCKER_RUN_ARGS+=(
-  --volume="${fake_group?}:/etc/group:ro"
-  --volume="${fake_passwd?}:/etc/passwd:ro"
+  --volume="${fake_group}:/etc/group:ro"
+  --volume="${fake_passwd}:/etc/passwd:ro"
 )
 
 
@@ -65,17 +67,31 @@ DOCKER_RUN_ARGS+=(
 # for two reasons:
 #   1. We probably don't want Docker to just write into the user's home
 #      directory when running locally.
-#   TODO: Set up scratch dirs for Buildkite and use that
-#   2. When running with Kokoro, we mount a scratch SSD to KOKORO_ROOT
-#      whereas the home directory is on the persistent SSD boot disk. It
-#      turns out that makes a huge difference in performance for Bazel
-#      running with execution (not with RBE) because it is IO bound at
-#      64 cores.
-fake_home_dir="/tmp/fake_home"test-buildkite
+#   2. BUILDKITE_LOCAL_SSD (configured by agent environment hook) points to a
+#      directory mounted on a local SSD whereas the home directory is on the
+#      persistent boot disk. It turns out that makes a huge difference in
+#      performance for Bazel running with execution (not with RBE) because it is
+#      IO bound with many cores.
+fake_home_dir="${BUILDKITE_LOCAL_SSD}/fake_home"
 DOCKER_RUN_ARGS+=(
-  --volume="${fake_home_dir?}:${HOME?}"
+  --volume="${fake_home_dir}:${HOME}"
 )
 
-docker run "${DOCKER_RUN_ARGS[@]?}" \
+# Add a ramdisk and use the bazelrc to set --sandbox_base to it. This
+# dramatically improves performance with a large number of cores. See
+# https://github.com/bazelbuild/bazel/issues/11868 and
+# https://docs.bazel.build/versions/main/command-line-reference.html#flag--sandbox_base
+# We do this with a bazelrc because it's an environment-specific setting and
+# this keeps the inside_docker.sh script somewhat environment-agnostic (someone
+# on a similar linux box or already in a container can just run it directly)
+
+SYSTEM_BAZELRC="${fake_etc_dir}/bazel.bazelrc"
+echo "build --sandbox_base=/dev/shm" > "${SYSTEM_BAZELRC}"
+DOCKER_RUN_ARGS+=(
+  --tmpfs=/dev/shm
+  --volume="${SYSTEM_BAZELRC}:/etc/bazel.bazelrc:ro"
+)
+
+docker run "${DOCKER_RUN_ARGS[@]}" \
   gcr.io/iree-oss/cmake-bazel-frontends-swiftshader@sha256:103676490242311b9fad841294689a7ce1c755b935a21d8d898c25cfe3ec15e8 \
   build_tools/buildkite/bazel/tf_integrations/inside_docker.sh
