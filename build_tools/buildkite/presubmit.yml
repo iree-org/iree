@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 steps:
-  - label: "Build TF Integrations"
+  - label: ":bazel: :tensorflow: Build TF Integrations"
     agents:
       - "queue=tf-bazel-build"
     commands:
