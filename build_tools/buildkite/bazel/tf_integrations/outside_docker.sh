@@ -1,11 +1,17 @@
+#!/bin/bash
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 ./scripts/git/submodule_versions.py init
 
 # Make the source repository available and launch containers in that
 # directory.
-local workdir="$PWD"
 DOCKER_RUN_ARGS=(
-  --volume="${workdir?}:${workdir?}"
-  --workdir="${workdir?}"
+  --volume="${PWD?}:${PWD?}"
+  --workdir="${PWD?}"
 )
 
 # Delete the container after the run is complete.
@@ -57,6 +63,7 @@ DOCKER_RUN_ARGS+=(
 # for two reasons:
 #   1. We probably don't want Docker to just write into the user's home
 #      directory when running locally.
+#   TODO: Set up local scratch dirs for Buildkite and use that
 #   2. When running with Kokoro, we mount a local scratch SSD to KOKORO_ROOT
 #      whereas the home directory is on the persistent SSD boot disk. It
 #      turns out that makes a huge difference in performance for Bazel
