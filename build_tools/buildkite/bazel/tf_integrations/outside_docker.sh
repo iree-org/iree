@@ -89,7 +89,7 @@ DOCKER_RUN_ARGS+=(
 
 SYSTEM_BAZELRC="${fake_etc_dir}/bazel.bazelrc"
 echo "build --sandbox_base=/dev/shm" > "${SYSTEM_BAZELRC}"
-echo "build --disk_cache=~/.cache/bazel-disk-cache" >> "${SYSTEM_BAZELRC}"
+echo "build --disk_cache=${docker_home_dir}/.cache/bazel-disk-cache" >> "${SYSTEM_BAZELRC}"
 DOCKER_RUN_ARGS+=(
   --tmpfs=/dev/shm
   --volume="${SYSTEM_BAZELRC}:/etc/bazel.bazelrc:ro"
