@@ -8,7 +8,6 @@
 import os
 import sys
 
-AUTHORIZED_USER_EMAILS = ["gcmn@google.com", "marius.brehler@iml.fraunhofer.de"]
 CREATOR_EMAIL_ENV_VAR = "BUILDKITE_BUILD_CREATOR_EMAIL"
 
 
@@ -24,14 +23,7 @@ def main():
     return 0
   print(f"User '{creator_email}' does not end in '@google.com'")
 
-  if creator_email in AUTHORIZED_USER_EMAILS:
-    print(
-        f"User '{creator_email}' is authorized because email is in list of authorized users"
-    )
-    return 0
-  print(
-      f"User '{creator_email}' is not in authorized user list: {AUTHORIZED_USER_EMAILS}"
-  )
+  # TODO(gcmn): More ways a user can be authorized.
 
   print("User is not authorized")
   return 1
