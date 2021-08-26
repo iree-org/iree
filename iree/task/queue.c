@@ -43,8 +43,7 @@ void iree_task_queue_append_from_lifo_list_unsafe(iree_task_queue_t* queue,
 }
 
 iree_task_t* iree_task_queue_flush_from_lifo_slist(
-    iree_task_queue_t* queue, iree_atomic_task_slist_t* source_slist,
-    bool* out_empty) {
+    iree_task_queue_t* queue, iree_atomic_task_slist_t* source_slist) {
   // Perform the flush and swap outside of the lock; acquiring the list is
   // atomic and then we own it exclusively.
   iree_task_list_t suffix;
@@ -57,17 +56,14 @@ iree_task_t* iree_task_queue_flush_from_lifo_slist(
   iree_slim_mutex_lock(&queue->mutex);
   if (did_flush) iree_task_list_append(&queue->list, &suffix);
   iree_task_t* next_task = iree_task_list_pop_front(&queue->list);
-  *out_empty = iree_task_list_is_empty(&queue->list);
   iree_slim_mutex_unlock(&queue->mutex);
 
   return next_task;
 }
 
-iree_task_t* iree_task_queue_pop_front(iree_task_queue_t* queue,
-                                       bool* out_empty) {
+iree_task_t* iree_task_queue_pop_front(iree_task_queue_t* queue) {
   iree_slim_mutex_lock(&queue->mutex);
   iree_task_t* next_task = iree_task_list_pop_front(&queue->list);
-  *out_empty = iree_task_list_is_empty(&queue->list);
   iree_slim_mutex_unlock(&queue->mutex);
   return next_task;
 }

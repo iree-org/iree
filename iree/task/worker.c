@@ -30,7 +30,7 @@ iree_status_t iree_task_worker_initialize(
   out_worker->worker_bit = iree_task_affinity_for_worker(worker_index);
   out_worker->ideal_thread_affinity = topology_group->ideal_thread_affinity;
   out_worker->constructive_sharing_mask =
-      topology_group->constructive_sharing_mask ^ out_worker->worker_bit;
+      topology_group->constructive_sharing_mask;
   out_worker->max_theft_attempts =
       executor->worker_count / IREE_TASK_EXECUTOR_MAX_THEFT_ATTEMPTS_DIVISOR;
   iree_prng_minilcg128_initialize(iree_prng_splitmix64_next(seed_prng),
@@ -216,9 +216,7 @@ static bool iree_task_worker_pump_once(
   // Check the local work queue for any work we know we should start
   // processing immediately. Other workers may try to steal some of this work
   // if we take too long.
-  bool queue_empty = false;
-  iree_task_t* task =
-      iree_task_queue_pop_front(&worker->local_task_queue, &queue_empty);
+  iree_task_t* task = iree_task_queue_pop_front(&worker->local_task_queue);
 
   // Check the mailbox to see if we have incoming work that has been posted.
   // We try to greedily move it to our local work list so that we can work
@@ -230,17 +228,8 @@ static bool iree_task_worker_pump_once(
     // first place (large uneven workloads for various workers, bad distribution
     // in the face of heterogenous multi-core architectures where some workers
     // complete tasks faster than others, etc).
-    task = iree_task_queue_flush_from_lifo_slist(
-        &worker->local_task_queue, &worker->mailbox_slist, &queue_empty);
-  }
-  if (queue_empty) {
-    // Queue depth is 0; we may have gotten a task but we know that there's
-    // nothing else waiting in the next loop so we can tell other workers not
-    // to try to steal tasks from us. New submissions that come in after this
-    // (while we are processing the task we may have gotten) will reset the bit.
-    iree_atomic_task_affinity_set_fetch_and(
-        &worker->executor->worker_pending_mask, ~worker->worker_bit,
-        iree_memory_order_seq_cst);
+    task = iree_task_queue_flush_from_lifo_slist(&worker->local_task_queue,
+                                                 &worker->mailbox_slist);
   }
 
   // If we ran out of work assigned to this specific worker try to steal some

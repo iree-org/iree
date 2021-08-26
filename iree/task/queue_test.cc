@@ -17,25 +17,19 @@ TEST(QueueTest, Lifetime) {
 }
 
 TEST(QueueTest, Empty) {
-  bool empty = false;
-
   iree_task_queue_t queue;
   iree_task_queue_initialize(&queue);
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_FALSE(iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_FALSE(iree_task_queue_pop_front(&queue));
   iree_task_queue_deinitialize(&queue);
 }
 
 TEST(QueueTest, PushPop) {
-  bool empty = false;
-
   iree_task_queue_t queue;
   iree_task_queue_initialize(&queue);
 
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_FALSE(iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_FALSE(iree_task_queue_pop_front(&queue));
 
   iree_task_t task_a = {0};
   iree_task_queue_push_front(&queue, &task_a);
@@ -46,15 +40,13 @@ TEST(QueueTest, PushPop) {
   iree_task_queue_push_front(&queue, &task_b);
 
   EXPECT_FALSE(iree_task_queue_is_empty(&queue));
-  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_FALSE(empty);
+  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&queue));
 
   EXPECT_FALSE(iree_task_queue_is_empty(&queue));
-  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&queue));
 
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_FALSE(iree_task_queue_pop_front(&queue, &empty));
+  EXPECT_FALSE(iree_task_queue_pop_front(&queue));
 
   iree_task_queue_deinitialize(&queue);
 }
@@ -86,9 +78,7 @@ TEST(QueueTest, AppendList1) {
   EXPECT_FALSE(iree_task_queue_is_empty(&queue));
   EXPECT_TRUE(iree_task_list_is_empty(&list));
 
-  bool empty = false;
-  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
 
   iree_task_queue_deinitialize(&queue);
@@ -112,11 +102,8 @@ TEST(QueueTest, AppendListOrdered) {
   EXPECT_TRUE(iree_task_list_is_empty(&list));
 
   // Pop list and ensure order: a->b.
-  bool empty = false;
-  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_FALSE(empty);
-  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&queue));
+  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
 
   iree_task_queue_deinitialize(&queue);
@@ -129,10 +116,8 @@ TEST(QueueTest, FlushSlistEmpty) {
   iree_atomic_task_slist_t slist;
   iree_atomic_task_slist_initialize(&slist);
 
-  bool empty = false;
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_FALSE(iree_task_queue_flush_from_lifo_slist(&queue, &slist, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_FALSE(iree_task_queue_flush_from_lifo_slist(&queue, &slist));
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
 
   iree_atomic_task_slist_deinitialize(&slist);
@@ -149,11 +134,8 @@ TEST(QueueTest, FlushSlist1) {
   iree_task_t task_a = {0};
   iree_atomic_task_slist_push(&slist, &task_a);
 
-  bool empty = false;
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_EQ(&task_a,
-            iree_task_queue_flush_from_lifo_slist(&queue, &slist, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_flush_from_lifo_slist(&queue, &slist));
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
 
   iree_atomic_task_slist_deinitialize(&slist);
@@ -177,18 +159,13 @@ TEST(QueueTest, FlushSlistOrdered) {
 
   // Flush the list to the queue; it should swap LIFO->FIFO and return the
   // first task in the queue.
-  bool empty = false;
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
-  EXPECT_EQ(&task_a,
-            iree_task_queue_flush_from_lifo_slist(&queue, &slist, &empty));
-  EXPECT_FALSE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_flush_from_lifo_slist(&queue, &slist));
   EXPECT_FALSE(iree_task_queue_is_empty(&queue));
 
   // Pop list and ensure order: [a->]b->c.
-  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_FALSE(empty);
-  EXPECT_EQ(&task_c, iree_task_queue_pop_front(&queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&queue));
+  EXPECT_EQ(&task_c, iree_task_queue_pop_front(&queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&queue));
 
   iree_atomic_task_slist_deinitialize(&slist);
@@ -251,11 +228,8 @@ TEST(QueueTest, TrySteal1) {
             iree_task_queue_try_steal(&source_queue, &target_queue, 1));
   EXPECT_TRUE(iree_task_queue_is_empty(&target_queue));
 
-  bool empty = false;
-  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue, &empty));
-  EXPECT_FALSE(empty);
-  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&source_queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue));
+  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&source_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&source_queue));
 
   iree_task_queue_deinitialize(&source_queue);
@@ -279,13 +253,10 @@ TEST(QueueTest, TryStealIntoExisting) {
   EXPECT_EQ(&task_existing,
             iree_task_queue_try_steal(&source_queue, &target_queue, 1));
 
-  bool empty = false;
-  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&source_queue));
 
-  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&target_queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&target_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&target_queue));
 
   iree_task_queue_deinitialize(&source_queue);
@@ -307,17 +278,13 @@ TEST(QueueTest, TryStealMany) {
   iree_task_queue_push_front(&source_queue, &task_b);
   iree_task_queue_push_front(&source_queue, &task_a);
 
-  bool empty = false;
   EXPECT_EQ(&task_c,
             iree_task_queue_try_steal(&source_queue, &target_queue, 2));
-  EXPECT_EQ(&task_d, iree_task_queue_pop_front(&target_queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_d, iree_task_queue_pop_front(&target_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&target_queue));
 
-  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue, &empty));
-  EXPECT_FALSE(empty);
-  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&source_queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue));
+  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&source_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&source_queue));
 
   iree_task_queue_deinitialize(&source_queue);
@@ -339,17 +306,13 @@ TEST(QueueTest, TryStealAll) {
   iree_task_queue_push_front(&source_queue, &task_b);
   iree_task_queue_push_front(&source_queue, &task_a);
 
-  bool empty = false;
   EXPECT_EQ(&task_c,
             iree_task_queue_try_steal(&source_queue, &target_queue, 1000));
-  EXPECT_EQ(&task_d, iree_task_queue_pop_front(&target_queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_d, iree_task_queue_pop_front(&target_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&target_queue));
 
-  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue, &empty));
-  EXPECT_FALSE(empty);
-  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&source_queue, &empty));
-  EXPECT_TRUE(empty);
+  EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue));
+  EXPECT_EQ(&task_b, iree_task_queue_pop_front(&source_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&source_queue));
 
   iree_task_queue_deinitialize(&source_queue);
