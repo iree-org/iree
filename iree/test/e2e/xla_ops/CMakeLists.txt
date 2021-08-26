@@ -242,6 +242,7 @@ iree_check_single_backend_test_suite(
     "reshape.mlir"
     "reverse.mlir"
     "rsqrt.mlir"
+    "scatter.mlir"
     "select.mlir"
     "sine.mlir"
     "slice.mlir"

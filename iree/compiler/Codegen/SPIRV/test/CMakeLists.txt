@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "pipeline_matmul_vectorization.mlir"
     "remove_one_trip_tiled_loop.mlir"
     "set_lowering_config.mlir"
+    "tile_and_distribute_scatter.mlir"
     "tile_and_vectorize.mlir"
     "tile_and_vectorize_batch_matmul.mlir"
     "tile_and_vectorize_conv.mlir"
