@@ -246,8 +246,6 @@ build:x86opt --copt=-mavx2
 build:_rbe_base --google_default_credentials=true
 # Point to the remote instance constructed in the iree-oss project
 build:_rbe_base --remote_instance_name=projects/iree-oss/instances/default_instance
-# Local disk cache is incompatible with remote execution or caching.
-build:_rbe_base --disk_cache=""
 
 ### Remote Caching ###
 # Config for executing locally and caching the results to the remote cache.
@@ -267,6 +265,10 @@ build:remote_cache_tf_integrations --host_platform_remote_properties_override='p
 ### Remote Execution ###
 # --config=rbe Execute and cache builds remotely.
 build:rbe --config=_rbe_base
+
+# Local disk cache is incompatible with remote execution until we are on a Bazel
+# version that includes https://github.com/bazelbuild/bazel/pull/13852.
+build:rbe --disk_cache=""
 
 # Depending on how many machines are in the remote execution instance, setting
 # this higher can make builds faster by allowing more jobs to run in parallel.
