@@ -44,7 +44,7 @@ DOCKER_RUN_ARGS+=(--user="$(id -u):$(id -g)")
 # such that they don't contain the information about normal users and we
 # want these scripts to be runnable locally for debugging.
 # Instead we dump the results of `getent` to some fake files.
-fake_etc_dir="${BUILDKITE_LOCAL_SSD}/fake_etc"
+fake_etc_dir="/tmp/fake_etc"
 mkdir -p "${fake_etc_dir}"
 
 fake_group="${fake_etc_dir}/group"
@@ -72,9 +72,11 @@ DOCKER_RUN_ARGS+=(
 #      persistent boot disk. It turns out that makes a huge difference in
 #      performance for Bazel running with execution (not with RBE) because it is
 #      IO bound with many cores.
-fake_home_dir="${BUILDKITE_LOCAL_SSD}/fake_home"
+fake_home_dir="${BUILDKITE_LOCAL_SSD}/docker_home_dir"
+mkdir -p "${fake_home_dir}"
 DOCKER_RUN_ARGS+=(
-  --volume="${fake_home_dir}:${HOME}"
+  --volume="${fake_home_dir}:${fake_home_dir}"
+  -e "HOME=${fake_home_dir}"
 )
 
 # Add a ramdisk and use the bazelrc to set --sandbox_base to it. This

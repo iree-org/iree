@@ -13,11 +13,12 @@
 set -euo pipefail
 
 cd integrations/tensorflow
-# Ignore user-specific settings from the workspace rc file, but still capture
-# environment settings from the system and home directory ones.
+# Ignore user-specific settings from the workspace rc file (which imports
+# user.bazelrc and configured.bazelrc), but still capture environment settings
+# from the system and home directory ones.
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 "${BAZEL_CMD[@]}" query //iree_tf_compiler/... | \
-   xargs "${BAZEL_CMD[@]}" test
+   xargs "${BAZEL_CMD[@]}" test \
       --config=generic_clang \
       --test_tag_filters="-nokokoro" \
       --build_tag_filters="-nokokoro"
