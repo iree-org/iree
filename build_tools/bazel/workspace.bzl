@@ -42,11 +42,9 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
         path = paths.join(iree_path, "third_party/libyaml"),
     )
 
-    # TODO(scotttodd): TensorFlow is squatting on the vulkan_headers repo name, so
-    # we use a temporary one until resolved. Theirs is set to an outdated version.
     maybe(
         native.new_local_repository,
-        name = "iree_vulkan_headers",
+        name = "vulkan_headers",
         build_file = iree_repo_alias + "//:build_tools/third_party/vulkan_headers/BUILD.overlay",
         path = paths.join(iree_path, "third_party/vulkan_headers"),
     )

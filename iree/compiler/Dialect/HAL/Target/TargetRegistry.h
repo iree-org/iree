@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_TARGETREGISTRY_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_TARGETREGISTRY_H_
 
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -20,7 +21,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-using CreateTargetBackendFn = std::function<std::unique_ptr<TargetBackend>()>;
+using CreateTargetBackendFn = std::function<std::shared_ptr<TargetBackend>()>;
 
 // Registers an executable translation target backend creation function.
 //
@@ -30,18 +31,26 @@ using CreateTargetBackendFn = std::function<std::unique_ptr<TargetBackend>()>;
 //   llvm-jit
 //   vulkan-v1.1-low
 //   vulkan-v1.1-high
-struct TargetBackendRegistration {
+class TargetBackendRegistration {
+ public:
   TargetBackendRegistration(StringRef name, CreateTargetBackendFn fn);
+
+  std::shared_ptr<TargetBackend> acquire();
+
+ private:
+  CreateTargetBackendFn initFn;
+  std::once_flag initFlag;
+  std::shared_ptr<TargetBackend> cachedValue;
 };
 
 // Returns a list of registered target backends.
 std::vector<std::string> getRegisteredTargetBackends();
 
 // Returns the target backend with the given name.
-std::unique_ptr<TargetBackend> getTargetBackend(StringRef targetName);
+std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName);
 
 // Returns one backend per entry in |targetNames|.
-SmallVector<std::unique_ptr<TargetBackend>> getTargetBackends(
+SmallVector<std::shared_ptr<TargetBackend>> getTargetBackends(
     ArrayRef<std::string> targetNames);
 
 // Returns a sorted uniqued set of target backends used in the executable.

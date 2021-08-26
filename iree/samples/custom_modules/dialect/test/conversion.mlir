@@ -20,7 +20,7 @@ func @tensorToMessage(%tensor : tensor<2x4xf32>) {
   // CHECK-SAME:     %arg0, [[TYPE]], [[ENCODING]], [
   // CHECK-SAME:       [[DIM0]], [[DIM1]]
   // CHECK-SAME:     ])
-  // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
+  // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) {nosideeffects} : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !custom.message
   %c1 = constant 1 : i32
   // CHECK: vm.call @custom.print([[MSG]]
@@ -36,7 +36,7 @@ func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : ind
   //  CHECK-DAG: [[ENCODING:%.+]] = vm.const.i32 1 : i32
   // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(
   // CHECK-SAME:     %arg0, [[TYPE]], [[ENCODING]], [%arg1, %arg2])
-  // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
+  // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) {nosideeffects} : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %shape = shapex.make_ranked_shape %arg1, %arg2 : (index, index) -> !shapex.ranked_shape<[?, ?]>
   %shaped_tensor = shapex.tie_shape %arg0, %shape : tensor<?x?xf32>, !shapex.ranked_shape<[?, ?]>
   %0 = "custom.tensor_to_message"(%shaped_tensor) : (tensor<?x?xf32>) -> !custom.message
@@ -54,7 +54,7 @@ func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>, %arg1: !shapex.ranked_sha
   //  CHECK-DAG: [[ENCODING:%.+]] = vm.const.i32 1 : i32
   // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(
   // CHECK-SAME:     %arg0, [[TYPE]], [[ENCODING]], [%arg1, %arg2])
-  // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
+  // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) {nosideeffects} : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %shaped_tensor = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?, ?]>
   %0 = "custom.tensor_to_message"(%shaped_tensor) : (tensor<?x?xf32>) -> !custom.message
   %c1 = constant 1 : i32
@@ -67,9 +67,9 @@ func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>, %arg1: !shapex.ranked_sha
 
 // CHECK-LABEL: @messageToTensor
 func @messageToTensor(%arg0 : !custom.message) -> tensor<2x4xf32> {
-  // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
+  // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<2x4xf32>
-  // CHECK-NEXT: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  // CHECK-NEXT: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]])
   // CHECK-NEXT: vm.return [[BUFFER]]
   return %0 : tensor<2x4xf32>
 }
@@ -81,8 +81,8 @@ func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<?x4xf32>
   %c0 = constant 0 : index
   %1 = tensor.dim %0, %c0 : tensor<?x4xf32>
-  // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
-  // CHECK: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
+  // CHECK: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]])
   // CHECK: %{{.*}} = vm.const.i32.zero
   // CHECK: [[ZERO:%.+]] = vm.const.i32.zero
   // CHECK: [[DIM:%.+]] = vm.call @hal.buffer_view.dim([[VIEW]], [[ZERO]])
@@ -96,8 +96,8 @@ func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
 func @messageToTensorReturnRank(%arg0 : !custom.message) -> index {
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<*xf32>
   %1 = rank %0 : tensor<*xf32>
-  // CHECK-DAG: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
-  // CHECK-DAG: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]]) : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!hal.buffer>
+  // CHECK-DAG: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
+  // CHECK-DAG: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]])
   // CHECK-DAG: [[RANK:%.+]] = vm.call @hal.buffer_view.rank([[VIEW]])
   // CHECK: vm.return [[RANK]]
   return %1 : index
@@ -119,7 +119,7 @@ func @printOp(%arg0 : !custom.message) {
 
 // CHECK-LABEL: @reverseOp
 func @reverseOp(%arg0 : !custom.message) -> !custom.message {
-  // CHECK: %ref = vm.call @custom.reverse(%arg0) : (!vm.ref<!custom.message>) -> !vm.ref<!custom.message>
+  // CHECK: %ref = vm.call @custom.reverse(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!custom.message>
   %0 = "custom.reverse"(%arg0) : (!custom.message) -> !custom.message
   return %0 : !custom.message
 }
@@ -131,7 +131,7 @@ func @reverseOp(%arg0 : !custom.message) -> !custom.message {
 // CHECK: vm.import @custom.get_unique_message
 // CHECK-LABEL: @getUniqueMessageOp
 func @getUniqueMessageOp() -> !custom.message {
-  // CHECK: %ref = vm.call @custom.get_unique_message() : () -> !vm.ref<!custom.message>
+  // CHECK: %ref = vm.call @custom.get_unique_message() {nosideeffects} : () -> !vm.ref<!custom.message>
   %0 = "custom.get_unique_message"() : () -> !custom.message
   return %0 : !custom.message
 }

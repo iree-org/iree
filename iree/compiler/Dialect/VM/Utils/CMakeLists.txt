@@ -25,17 +25,4 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    ConstantEncoding
-  HDRS
-    "ConstantEncoding.h"
-  SRCS
-    "ConstantEncoding.cpp"
-  DEPS
-    MLIRIR
-    MLIRSupport
-  PUBLIC
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

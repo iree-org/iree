@@ -26,6 +26,9 @@
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
 #include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
+#include "tensorflow/compiler/mlir/tosa/tf_passes.h"
+#include "tensorflow/compiler/mlir/tosa/tfl_passes.h"
+#include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
@@ -63,6 +66,11 @@ int main(int argc, char **argv) {
   mlir::TF::CreateDeviceIndexSelectorPass();
   mlir::TF::CreateGuaranteeAllFuncsOneUsePass();
   mlir::TF::CreateTFFunctionalControlFlowToCFG();
+
+  // Tosa related passes.
+  mlir::tosa::registerLegalizeTosaPasses();
+  mlir::tosa::registerTFtoTOSALegalizationPipeline();
+  mlir::tosa::registerTFLtoTOSALegalizationPipeline();
 
   if (failed(MlirOptMain(argc, argv, "IREE-TF modular optimizer driver\n",
                          registry,

@@ -569,6 +569,51 @@ void UnfoldableConstantOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// Structural ops
+//===----------------------------------------------------------------------===//
+
+void InitializerOp::build(OpBuilder &builder, OperationState &result,
+                          ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute(
+      "type", TypeAttr::get(FunctionType::get(builder.getContext(), {}, {})));
+  result.addRegion();
+  result.attributes.append(attrs.begin(), attrs.end());
+}
+
+static ParseResult parseInitializerOp(OpAsmParser &parser,
+                                      OperationState &result) {
+  result.addAttribute(
+      "type", TypeAttr::get(FunctionType::get(result.getContext(), {}, {})));
+  if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
+    return failure();
+  }
+  auto &body = *result.addRegion();
+  if (failed(parser.parseRegion(body))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
+  p << "util.initializer";
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p.printRegion(op.body());
+}
+
+Block *InitializerOp::addEntryBlock() {
+  assert(empty() && "function already has an entry block");
+  auto *entry = new Block();
+  push_back(entry);
+  return entry;
+}
+
+Block *InitializerOp::addBlock() {
+  assert(!empty() && "function should at least have an entry block");
+  push_back(new Block());
+  return &back();
+}
+
+//===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
 
@@ -591,7 +636,7 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
 }
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     bool isMutable, Type type, Optional<StringRef> initializer,
+                     bool isMutable, Type type,
                      Optional<Attribute> initialValue,
                      ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
@@ -599,10 +644,7 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   if (isMutable) {
     result.addAttribute("is_mutable", builder.getUnitAttr());
   }
-  if (initializer.hasValue()) {
-    result.addAttribute("initializer",
-                        builder.getSymbolRefAttr(initializer.getValue()));
-  } else if (initialValue.hasValue()) {
+  if (initialValue.hasValue()) {
     result.addAttribute("initial_value", initialValue.getValue());
   }
   result.addAttribute("type", TypeAttr::get(type));
@@ -610,48 +652,13 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 }
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     bool isMutable, mlir::FuncOp initializer,
-                     ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, initializer.getType().getResult(0),
-        initializer.getName(), llvm::None, attrs);
-}
-
-void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     bool isMutable, Type type, Attribute initialValue,
-                     ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, initialValue,
-        attrs);
-}
-
-void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
                      ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
+  build(builder, result, name, isMutable, type, llvm::None, attrs);
 }
 
 static LogicalResult verifyGlobalOp(GlobalOp op) {
-  if (op.initializer().hasValue() && op.initial_value().hasValue()) {
-    return op->emitOpError()
-           << "globals can have either an initializer or an initial value";
-  } else if (op.initializer().hasValue()) {
-    // Ensure initializer returns the same value as the global.
-    auto initializerFunc = SymbolTable::lookupNearestSymbolFrom<mlir::FuncOp>(
-        op, op.initializerAttr());
-    if (!initializerFunc) {
-      return op.emitOpError() << "initializer function " << op.initializerAttr()
-                              << " not found or wrong type";
-    }
-    if (initializerFunc.getType().getNumInputs() != 0 ||
-        initializerFunc.getType().getNumResults() != 1 ||
-        !isGlobalTypeCompatible(op.type(),
-                                initializerFunc.getType().getResult(0))) {
-      return op->emitOpError()
-             << "initializer type mismatch; global " << op.getSymbolName()
-             << " is " << op.type() << " but initializer function "
-             << initializerFunc.getName() << " is "
-             << initializerFunc.getType();
-    }
-  } else if (op.initial_value().hasValue()) {
+  if (op.initial_value().hasValue()) {
     // Ensure the value is something we can convert to a const.
     if (!isGlobalTypeCompatible(op.type(), op.initial_valueAttr().getType())) {
       return op->emitOpError()
@@ -754,8 +761,11 @@ static LogicalResult verifyGlobalStoreOp(GlobalStoreOp op) {
            << globalOp.type() << " but store is " << storeType;
   }
   if (!globalOp.isMutable()) {
-    return op->emitOpError() << "global " << op.global()
-                             << " is not mutable and cannot be stored to";
+    // Allow stores to immutable globals in initializers.
+    if (!op->getParentOfType<InitializerOp>()) {
+      return op->emitOpError() << "global " << op.global()
+                               << " is not mutable and cannot be stored to";
+    }
   }
   return success();
 }

@@ -698,7 +698,7 @@ void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
 }
 
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     ElementsAttr value, ArrayRef<NamedAttribute> attrs) {
+                     Attribute value, ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("sym_name", builder.getStringAttr(name));
   result.addAttribute("value", value);
   result.addAttributes(attrs);
@@ -852,6 +852,24 @@ Optional<MutableOperandRange> BranchOp::getMutableSuccessorOperands(
     unsigned index) {
   assert(index == 0 && "invalid successor index");
   return destOperandsMutable();
+}
+
+void CallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  if (!getOperation()->hasAttr("nosideeffects")) {
+    // TODO(benvanik): actually annotate this.
+    effects.emplace_back(MemoryEffects::Read::get());
+    effects.emplace_back(MemoryEffects::Write::get());
+  }
+}
+
+void CallVariadicOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  if (!getOperation()->hasAttr("nosideeffects")) {
+    // TODO(benvanik): actually annotate this.
+    effects.emplace_back(MemoryEffects::Read::get());
+    effects.emplace_back(MemoryEffects::Write::get());
+  }
 }
 
 static ParseResult parseCallVariadicOp(OpAsmParser &parser,

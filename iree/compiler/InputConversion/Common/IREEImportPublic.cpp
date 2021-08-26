@@ -19,6 +19,7 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -43,7 +44,8 @@ struct IREEImportPublicPass
     : public IREEImportPublicBase<IREEImportPublicPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::iree::IREEDialect, IREE::Flow::FlowDialect,
-                    IREE::HAL::HALDialect, IREE::Util::UtilDialect>();
+                    IREE::HAL::HALDialect, IREE::Util::UtilDialect,
+                    mlir::StandardOpsDialect>();
   }
   void runOnOperation() override;
 };
@@ -173,6 +175,33 @@ class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
   }
 };
 
+class GlobalOpPattern : public OpConversionPattern<IREEPublic::GlobalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREEPublic::GlobalOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    Type newType = typeConverter->convertType(srcOp.type());
+    if (!newType) return failure();
+    auto globalOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
+        srcOp, srcOp.getName(), srcOp.is_mutable(), newType,
+        srcOp.initial_value());
+    globalOp.setVisibility(srcOp.getVisibility());
+    if (srcOp.initializer().hasValue()) {
+      auto initializerOp =
+          rewriter.create<IREE::Util::InitializerOp>(srcOp.getLoc());
+      auto ip = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPointToStart(initializerOp.addEntryBlock());
+      auto callOp = rewriter.create<mlir::CallOp>(
+          srcOp.getLoc(), srcOp.initializerAttr(), TypeRange{newType});
+      rewriter.create<IREE::Util::GlobalStoreOp>(
+          srcOp.getLoc(), callOp.getResult(0), srcOp.getName());
+      rewriter.create<IREE::Util::InitializerReturnOp>(srcOp.getLoc());
+      rewriter.restoreInsertionPoint(ip);
+    }
+    return success();
+  }
+};
+
 // Matches any op and generically converts types. Matches with benefit 0.
 class GenericTypeConvert : public ConversionPattern {
  public:
@@ -266,6 +295,7 @@ void IREEImportPublicPass::runOnOperation() {
                                              specific_benefit);
   patterns.insert<TensorToBufferViewPattern>(typeConverter, &getContext(),
                                              specific_benefit);
+  patterns.insert<GlobalOpPattern>(typeConverter, &getContext(), 0);
 
 #define ONETOONE(SrcOpTy, TargetOpTy)             \
   patterns.insert<OneToOneConverionPattern>(      \
@@ -288,7 +318,6 @@ void IREEImportPublicPass::runOnOperation() {
   ONETOONE(IREEPublic::TensorStoreOp, IREE::Flow::TensorStoreOp);
   ONETOONE(IREEPublic::TensorUpdateOp, IREE::Flow::TensorUpdateOp);
   ONETOONE(IREEPublic::TensorTraceOp, IREE::Flow::TensorTraceOp);
-  ONETOONE(IREEPublic::GlobalOp, IREE::Util::GlobalOp);
   ONETOONE(IREEPublic::GlobalAddressOp, IREE::Util::GlobalAddressOp);
   ONETOONE(IREEPublic::GlobalLoadOp, IREE::Util::GlobalLoadOp);
   ONETOONE(IREEPublic::GlobalLoadIndirectOp, IREE::Util::GlobalLoadIndirectOp);

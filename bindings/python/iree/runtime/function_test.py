@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import json
+import numpy as np
 
 from absl.testing import absltest
 
@@ -196,6 +197,26 @@ class FunctionTest(absltest.TestCase):
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
     with self.assertRaisesRegexp(ValueError, "specified kwarg 'c' is unknown"):
       result = invoker(-1, a=1, b=2, c=3)
+
+  # TODO: Fill out all return types.
+  def testReturnTypeNdArrayBool(self):
+    result_array = np.asarray([1, 0], dtype=np.int8)
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_buffer_view(self.device, result_array,
+                                rt.HalElementType.UINT_8)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi": json.dumps({
+            "a": [],
+            "r": [["ndarray", "i1", 1, 2]],
+        })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker()
+    # assertEqual on bool arrays is fraught for... reasons.
+    self.assertEqual("array([ True, False])", repr(result))
 
 
 if __name__ == "__main__":

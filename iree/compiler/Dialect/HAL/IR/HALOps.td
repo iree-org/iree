@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
@@ -1284,7 +1285,7 @@ def HAL_ConstantPoolValueOp : HAL_Op<"constant_pool.value", [
 
   let arguments = (ins
     SymbolNameAttr:$sym_name,
-    ElementsAttr:$value
+    Util_AnySerializableAttr:$value
   );
 
   let assemblyFormat = [{
@@ -1307,9 +1308,9 @@ def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
     SymbolNameAttr:$sym_name,
     TypeAttr:$tensor_type,
     SymbolRefAttr:$storage_buffer,
-    HAL_ByteRangeAttr:$storage_range,
+    Util_ByteRangeAttr:$storage_range,
     OptionalAttr<SymbolRefAttr>:$runtime_buffer,
-    OptionalAttr<HAL_ByteRangeAttr>:$runtime_range
+    OptionalAttr<Util_ByteRangeAttr>:$runtime_range
   );
 
   let assemblyFormat = [{
@@ -1334,7 +1335,7 @@ def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
     SymbolNameAttr:$sym_name,
     ElementsAttr:$value,
     OptionalAttr<SymbolRefAttr>:$runtime_buffer,
-    OptionalAttr<HAL_ByteRangeAttr>:$runtime_range
+    OptionalAttr<Util_ByteRangeAttr>:$runtime_range
   );
 
   let assemblyFormat = [{
@@ -1388,7 +1389,7 @@ def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
 
   let arguments = (ins
     SymbolNameAttr:$sym_name,
-    ElementsAttr:$value
+    Util_AnySerializableAttr:$value
   );
 
   let assemblyFormat = [{
@@ -1428,7 +1429,7 @@ def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
 
   let arguments = (ins
     SymbolRefAttr:$runtime_buffer,
-    HAL_ByteRangeAttr:$runtime_range
+    Util_ByteRangeAttr:$runtime_range
   );
   let results = (outs
     AnyRankedTensor:$result

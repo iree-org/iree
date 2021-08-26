@@ -10,6 +10,8 @@
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -151,6 +153,69 @@ def Util_UnreachableOp : Util_Op<"unreachable", [NoSideEffect, Terminator]> {
 }
 
 //===----------------------------------------------------------------------===//
+// Structural ops
+//===----------------------------------------------------------------------===//
+
+def Util_InitializerOp : Util_Op<"initializer", [
+    IsolatedFromAbove,
+    FunctionLike,
+    CallableOpInterface,
+  ]> {
+  let summary = [{global initialization function}];
+  let description = [{
+    A function that is called in definition order upon module initialization.
+    Must not load any globals that are defined or initialized after it in the
+    module.
+  }];
+
+  let arguments = (ins
+    TypeAttr:$type
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Add an entry block to an empty function and set up the block arguments
+    /// to match the signature of the function.
+    Block *addEntryBlock();
+    Block *addBlock();
+
+    unsigned getNumFuncArguments() { return 0; }
+    unsigned getNumFuncResults() { return 0; }
+
+    LogicalResult verifyType() { return success(); }
+
+    Region *getCallableRegion() { return &body(); }
+    ArrayRef<Type> getCallableResults() { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_InitializerReturnOp : Util_Op<"initializer.return", [
+  HasParent<"IREE::Util::InitializerOp">,
+  NoSideEffect,
+  ReturnLike,
+  Terminator,
+]> {
+  let summary = [{return from a util.initializer}];
+  let description = [{
+    Returns control from an initializer function.
+  }];
+
+  let arguments = (ins);
+
+  let assemblyFormat = "attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
 
@@ -169,7 +234,6 @@ def Util_GlobalOp : Util_Op<"global", [
     SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
-    OptionalAttr<FlatSymbolRefAttr>:$initializer,
     OptionalAttr<AnyAttr>:$initial_value
   );
 
@@ -178,7 +242,6 @@ def Util_GlobalOp : Util_Op<"global", [
     (`mutable` $is_mutable^)?
     $sym_name
     attr-dict
-    (`initializer` `(` $initializer^ `)`)?
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
@@ -188,21 +251,7 @@ def Util_GlobalOp : Util_Op<"global", [
       "StringRef":$name,
       "bool":$isMutable,
       "Type":$type,
-      "Optional<StringRef>":$initializer,
       "Optional<Attribute>":$initialValue,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>,
-    OpBuilder<(ins
-      "StringRef":$name,
-      "bool":$isMutable,
-      "mlir::FuncOp":$initializer,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>,
-    OpBuilder<(ins
-      "StringRef":$name,
-      "bool":$isMutable,
-      "Type":$type,
-      "Attribute":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,
     OpBuilder<(ins
@@ -219,14 +268,10 @@ def Util_GlobalOp : Util_Op<"global", [
     bool isMutable() { return is_mutable(); }
     void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
 
-    Optional<StringRef> getInitializerAttr() { return initializer(); }
-    void clearInitializer() { (*this)->removeAttr("initializer"); }
-
     Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
   }];
 
-    // TODO(benvanik): verify matches $type.
   let verifier = [{ return verifyGlobalOp(*this); }];
 
   let hasCanonicalizer = 1;

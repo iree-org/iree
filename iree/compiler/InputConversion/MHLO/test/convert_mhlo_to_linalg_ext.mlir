@@ -18,7 +18,7 @@ func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 // CHECK:             linalg_ext.yield %[[CMP]]
 // CHECK:         return %[[SORT]]
 
-// ----
+// -----
 
 func @sort_with_cst(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
   %0 = mhlo.constant dense<0> : tensor<i32>

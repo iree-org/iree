@@ -77,7 +77,7 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    NativeOpTrait<"FunctionLike">,
+    FunctionLike,
     CallableOpInterface,
     Symbol,
   ]> {
@@ -173,7 +173,7 @@ def VM_ExportOp : VM_Op<"export", [
 
 def VM_ImportOp : VM_Op<"import", [
     Symbol,
-    NativeOpTrait<"FunctionLike">,
+    FunctionLike,
     CallableOpInterface,
   ]> {
   let summary = [{imports a function from an external module}];
@@ -245,7 +245,7 @@ def VM_ImportOp : VM_Op<"import", [
 def VM_InitializerOp : VM_Op<"initializer", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    NativeOpTrait<"FunctionLike">,
+    FunctionLike,
     CallableOpInterface,
   ]> {
   let summary = [{global initialization function}];
@@ -930,7 +930,7 @@ def VM_RodataOp : VM_Op<"rodata", [
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    ElementsAttr:$value,
+    Util_AnySerializableAttr:$value,
     OptionalAttr<I64Attr>:$alignment,
     OptionalAttr<VM_Ordinal>:$ordinal,
     OptionalAttr<StrAttr>:$mime_type
@@ -944,7 +944,7 @@ def VM_RodataOp : VM_Op<"rodata", [
   let builders = [
     OpBuilder<(ins
       "StringRef":$name,
-      "ElementsAttr":$value,
+      "Attribute":$value,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,
   ];
@@ -985,7 +985,6 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-
 def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
     VM_PseudoOp,
   ]> {
@@ -997,7 +996,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$name,
-    ElementsAttr:$value,
+    Util_AnySerializableAttr:$value,
     OptionalAttr<I64Attr>:$alignment
   );
 
@@ -1008,7 +1007,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   let assemblyFormat = "($name^)? attr-dict `:` type($result) `=` $value";
 
   let builders = [
-    OpBuilder<(ins "Type":$resultType, "ElementsAttr":$value),
+    OpBuilder<(ins "Type":$resultType, "Attribute":$value),
     [{
       $_state.addTypes({resultType});
       $_state.addAttribute("value", value);
@@ -3384,6 +3383,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
 class VM_CallBaseOp<string mnemonic, list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
       CallOpInterface,
     ])> {
   let extraClassDeclaration = [{
@@ -3513,6 +3513,8 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    NoSideEffect,
+    ReturnLike,
     Terminator,
   ]> {
   let summary = "return operation";

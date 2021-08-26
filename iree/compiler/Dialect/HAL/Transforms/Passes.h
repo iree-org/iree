@@ -61,7 +61,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createAssignTargetDevicesPass(
     ArrayRef<std::string> targets);
 
 // Outlines hal.device.switch conditions into functions and inlines conditions.
-std::unique_ptr<OperationPass<FuncOp>> createInlineDeviceSwitchesPass();
+std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass();
 
 // Finds hal.device.query ops and creates variables initialized on startup.
 std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
@@ -80,8 +80,12 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createPropagateConstantWorkgroupInfoPass();
 
 // Translates hal.executable.variant ops via a nested translation pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createTranslateExecutablesPass();
+
+// Translates hal.executable.variant ops for the specified |target| backend.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createTranslateExecutableVariantsPass();
+createTranslateTargetExecutableVariantsPass(StringRef target);
 
 // Calls into each target backend to have it link multiple hal.executables
 // together (if that makes sense). For example, the LLVM AOT backend may combine
@@ -163,7 +167,8 @@ inline void registerHALPasses() {
   createResolveEntryPointOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");
-  createTranslateExecutableVariantsPass();
+  createTranslateExecutablesPass();
+  createTranslateTargetExecutableVariantsPass("");
   createVerifyTargetEnvironmentPass();
 }
 

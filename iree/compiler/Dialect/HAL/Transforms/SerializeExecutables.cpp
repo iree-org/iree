@@ -33,20 +33,20 @@ class SerializeTargetExecutablesPass
     this->target = target.str();
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackend = getTargetBackend(target);
-    if (targetBackend) {
-      targetBackend->getDependentDialects(registry);
-    }
-  }
-
   StringRef getArgument() const override {
     return "iree-hal-serialize-target-executables";
   }
 
   StringRef getDescription() const override {
     return "Serializes hal.executable.variant ops to hal.executable.binary ops";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    auto targetBackend = getTargetBackend(target);
+    if (targetBackend) {
+      targetBackend->getDependentDialects(registry);
+    }
   }
 
   void runOnOperation() override {

@@ -68,28 +68,17 @@ std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 /// the most inner loops.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createInterchangeGenericOpsPass();
 
-// Convert tensor operations to equivalent flow.tensor.* operations
-// `runBeforeDispatchRegionFormation` controls whether to run before dispatch
-// region creation. If run after, it will catch operations that were left
-// outside of dispatch regions and could be represented as flow.tensor.* ops.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertTensorOpsPass();
+// Convert operations to equivalent flow ops before dispatch region creation.
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createConvertToFlowBeforeDispatchFormation();
 
-// Convert linalg.tensor operations to equivalent flow.tensor.* ops.
-// `runBeforeDispatchRegionFormation` controls whether to run before dispatch
-// region creation. If run after, it will catch operations that were left
-// outside of dispatch regions and could be represented as flow.tensor.* ops.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertLinalgTensorOpsPass(
-    bool runBeforeDispatchRegionFormation = true);
+// Convert remaining operations that were left outside of dispatch regions to
+// equivalent flow ops.
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createConvertToFlowAfterDispatchFormation();
 
 // Promote I1 tensor constants to I8 tensors to match later operations.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
-
-// Converts standard ops which match to flow.tensor.load (typically causing a
-// read-back).
-// Note that there are typically very specific phase ordering issues with
-// performing such a conversion, so even though it is of fine granularity,
-// this is maintained separately.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteTensorLoadsPass();
 
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>

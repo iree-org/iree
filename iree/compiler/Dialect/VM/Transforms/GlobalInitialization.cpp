@@ -85,9 +85,10 @@ class GlobalInitializationPass
           return signalPassFailure();
         }
         deadOps.push_back(initializerOp);
+        initBuilder.setInsertionPointToEnd(&initFuncOp.back());
       }
     }
-    for (auto deadOp : deadOps) {
+    for (auto *deadOp : deadOps) {
       deadOp->erase();
     }
 
@@ -213,18 +214,13 @@ class GlobalInitializationPass
   LogicalResult appendInitializer(InitializerOp initializerOp,
                                   InlinerInterface &inlinerInterface,
                                   OpBuilder &builder) {
-    // mlir::inlineRegion takes the op to inline _after_, which as we are
-    // building things doesn't exist yet. To work around this we create a dummy
-    // op, inline after it, and then delete it.
-    auto dummyOp =
-        builder.create<IREE::VM::ConstI32ZeroOp>(builder.getUnknownLoc());
     auto result = mlir::inlineRegion(
-        inlinerInterface, &initializerOp.body(), dummyOp,
+        inlinerInterface, &initializerOp.body(), builder.getInsertionBlock(),
+        builder.getInsertionPoint(),
         /*inlinedOperands=*/ValueRange{},
         /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/llvm::None,
         /*shouldCloneInlinedRegion=*/false);
-    builder.setInsertionPointToEnd(dummyOp->getBlock());
-    dummyOp.erase();
+    builder.setInsertionPointToEnd(builder.getInsertionBlock());
     return result;
   }
 

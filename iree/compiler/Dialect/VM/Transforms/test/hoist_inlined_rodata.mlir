@@ -9,3 +9,15 @@ vm.module @module {
     vm.return
   }
 }
+
+// -----
+
+vm.module @module {
+  // CHECK: vm.rodata private @_const dense<[1, 2, 3]> : tensor<3xi32>
+  // CHECK-LABEL: vm.initializer
+  vm.initializer {
+    // CHECK: = vm.const.ref.rodata @_const : !vm.buffer
+    %0 = vm.rodata.inline : !vm.buffer = dense<[1, 2, 3]> : tensor<3xi32>
+    vm.return
+  }
+}
