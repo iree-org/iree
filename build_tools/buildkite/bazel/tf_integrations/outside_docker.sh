@@ -43,19 +43,19 @@ DOCKER_RUN_ARGS+=(--user="$(id -u):$(id -g)")
 # Linux workstations do some interesting stuff with user/group permissions
 # such that they don't contain the information about normal users and we
 # want these scripts to be runnable locally for debugging.
-# Instead we dump the results of `getent` to some fake files.
-fake_etc_dir="/tmp/fake_etc"
-mkdir -p "${fake_etc_dir}"
+# Instead we dump the results of `getent` to some files that we then mount.
+docker_etc_dir="/tmp/docker_etc"
+mkdir -p "${docker_etc_dir}"
 
-fake_group="${fake_etc_dir}/group"
-fake_passwd="${fake_etc_dir}/passwd"
+docker_group="${docker_etc_dir}/group"
+docker_passwd="${docker_etc_dir}/passwd"
 
-getent group > "${fake_group}"
-getent passwd > "${fake_passwd}"
+getent group > "${docker_group}"
+getent passwd > "${docker_passwd}"
 
 DOCKER_RUN_ARGS+=(
-  --volume="${fake_group}:/etc/group:ro"
-  --volume="${fake_passwd}:/etc/passwd:ro"
+  --volume="${docker_group}:/etc/group:ro"
+  --volume="${docker_passwd}:/etc/passwd:ro"
 )
 
 
@@ -72,11 +72,11 @@ DOCKER_RUN_ARGS+=(
 #      persistent boot disk. It turns out that makes a huge difference in
 #      performance for Bazel running with execution (not with RBE) because it is
 #      IO bound with many cores.
-fake_home_dir="${BUILDKITE_LOCAL_SSD}/docker_home_dir"
-mkdir -p "${fake_home_dir}"
+docker_home_dir="${BUILDKITE_LOCAL_SSD}/docker_home_dir"
+mkdir -p "${docker_home_dir}"
 DOCKER_RUN_ARGS+=(
-  --volume="${fake_home_dir}:${fake_home_dir}"
-  -e "HOME=${fake_home_dir}"
+  --volume="${docker_home_dir}:${docker_home_dir}"
+  -e "HOME=${docker_home_dir}"
 )
 
 # Add a ramdisk and use the bazelrc to set --sandbox_base to it. This
@@ -87,7 +87,7 @@ DOCKER_RUN_ARGS+=(
 # this keeps the inside_docker.sh script somewhat environment-agnostic (someone
 # on a similar linux box or already in a container can just run it directly)
 
-SYSTEM_BAZELRC="${fake_etc_dir}/bazel.bazelrc"
+SYSTEM_BAZELRC="${docker_etc_dir}/bazel.bazelrc"
 echo "build --sandbox_base=/dev/shm" > "${SYSTEM_BAZELRC}"
 echo "build --disk_cache=${docker_home_dir}/.cache/bazel-disk-cache" >> "${SYSTEM_BAZELRC}"
 DOCKER_RUN_ARGS+=(
