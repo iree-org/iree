@@ -90,6 +90,7 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<FuncOp>(createSPIRVCopyToWorkgroupMemoryPass());
+  pm.addNestedPass<FuncOp>(linalg_ext::createLinalgExtToLoopsPass());
   pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());

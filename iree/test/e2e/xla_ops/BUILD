@@ -341,6 +341,7 @@ iree_check_single_backend_test_suite(
             "reshape.mlir",
             "reverse.mlir",
             "rsqrt.mlir",
+            "scatter.mlir",
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
@@ -355,7 +356,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "round.mlir",
-            "scatter.mlir",  # TODO(GH-6388): Enable the test.
             "scatter_dynamic.mlir",  # TODO(GH-6388): Enable the test.
             "sort.mlir",
         ],

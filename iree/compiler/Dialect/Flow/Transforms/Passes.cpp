@@ -78,6 +78,8 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
+
   // Simplify util.global accesses early on; this can help with dispatch
   // region formation as redundant store-loads are removed.
   passManager.addNestedPass<mlir::FuncOp>(
@@ -91,7 +93,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Replaces variables with !shapex.ranked_shape types with individual
   // variables for each dimension. This allows for constant dimensions to be
   // DCE'd in following passes.
-  passManager.addPass(IREE::Flow::createExpandGlobalDynamicDimsPass());
+  passManager.addPass(createExpandGlobalDynamicDimsPass());
 
   // Materialize dynamic shapes in the IR, also expanding function signatures
   // such that:
@@ -143,20 +145,19 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createConvertToFlowBeforeDispatchFormation());
+      createConvertToFlowBeforeDispatchFormation());
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createDispatchLinalgOnTensorsPass());
+  passManager.addNestedPass<mlir::FuncOp>(createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createConvertToFlowAfterDispatchFormation());
+      createConvertToFlowAfterDispatchFormation());
   // NOTE: required because the current dispatch-linalg-on-tensors pass
   // creates a lot of dead IR that needs to be cleaned up.
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
 
   // Outline the dispatch regions into their own functions wrapped in
   // executables.
-  passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
+  passManager.addPass(createOutlineDispatchRegionsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
@@ -165,20 +166,19 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Note: this only deduplicates equivalent executables. We could in addition
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
-  passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
+  passManager.addPass(createDeduplicateExecutablesPass());
 
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as
   // exporting all original model entry points.
   if (clExportBenchmarkFuncs) {
-    passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
+    passManager.addPass(createExportBenchmarkFuncsPass());
   }
 
   // Inject tracing that logs both input and output tensors from all dispatches.
   // We do this after deduping so that the executable names match later stages.
   if (clTraceDispatchTensors) {
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createInjectDispatchTracingPass());
+    passManager.addNestedPass<mlir::FuncOp>(createInjectDispatchTracingPass());
   }
 
   //----------------------------------------------------------------------------
@@ -193,8 +193,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Reorder blocks to increase the grouping of streamable ops.
-  passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createHoistUnstreamableOpsPass());
+  passManager.addNestedPass<mlir::FuncOp>(createHoistUnstreamableOpsPass());
 
   // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
   // arbitrary ordering.
@@ -202,15 +201,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Clone constants that escape basic blocks until we have better analysis.
-  passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Flow::createInsertConstantClonesPass());
+  passManager.addNestedPass<mlir::FuncOp>(createInsertConstantClonesPass());
 
   // Group streamable ops into streams.
-  passManager.addNestedPass<mlir::FuncOp>(IREE::Flow::createFormStreamsPass());
+  passManager.addNestedPass<mlir::FuncOp>(createFormStreamsPass());
 
   // Prior to leaving the pipeline we need to clean things up for following
   // layers. These transforms may be undone by subsequent CSE/folding passes.
-  passManager.addPass(IREE::Flow::createOutlineLargeConstantsPass());
+  passManager.addPass(createOutlineLargeConstantsPass());
 
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
