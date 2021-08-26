@@ -67,6 +67,7 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTosa
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
