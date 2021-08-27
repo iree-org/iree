@@ -35,13 +35,6 @@ jobs:
           branch: main
           tags: true
 
-      - name: Updating snapshot branch
-        uses: ad-m/github-push-action@v0.6.0
-        with:
-          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          branch: snapshot
-          tags: false
-
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
