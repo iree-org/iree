@@ -18,7 +18,7 @@ extern "C" {
 
 // Create a cuda allocator.
 iree_status_t iree_hal_cuda_allocator_create(
-    iree_hal_cuda_context_wrapper_t* context,
+    iree_hal_cuda_context_wrapper_t* context, CUdevice device, CUstream stream,
     iree_hal_allocator_t** out_allocator);
 
 // Free an allocation represent by the given device or host pointer.

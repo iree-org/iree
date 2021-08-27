@@ -17,6 +17,8 @@
 typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
+  CUdevice device;
+  CUstream stream;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_cuda_allocator_t;
@@ -30,7 +32,7 @@ static iree_hal_cuda_allocator_t* iree_hal_cuda_allocator_cast(
 }
 
 iree_status_t iree_hal_cuda_allocator_create(
-    iree_hal_cuda_context_wrapper_t* context,
+    iree_hal_cuda_context_wrapper_t* context, CUdevice device, CUstream stream,
     iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -41,6 +43,8 @@ iree_status_t iree_hal_cuda_allocator_create(
     iree_hal_resource_initialize(&iree_hal_cuda_allocator_vtable,
                                  &allocator->resource);
     allocator->context = context;
+    allocator->device = device;
+    allocator->stream = stream;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -127,6 +131,13 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
           CU_RESULT_TO_STATUS(allocator->context->syms,
                               cuMemAllocManaged(&device_ptr, allocation_size,
                                                 CU_MEM_ATTACH_GLOBAL));
+      if (iree_status_is_ok(status)) {
+        // Prefetch the buffer on the GPU device.
+        status = CU_RESULT_TO_STATUS(
+            allocator->context->syms,
+            cuMemPrefetchAsync(device_ptr, allocation_size, allocator->device,
+                               allocator->stream));
+      }
       host_ptr = (void*)device_ptr;
     } else {
       // Device only.
