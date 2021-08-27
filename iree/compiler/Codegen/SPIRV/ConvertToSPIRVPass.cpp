@@ -175,8 +175,9 @@ struct HALInterfaceLoadConstantConverter final
 
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly.
-    auto value =
-        spirv::getPushConstantValue(loadOp, elementCount, offset, rewriter);
+    auto i32Type = rewriter.getIntegerType(32);
+    auto value = spirv::getPushConstantValue(loadOp, elementCount, offset,
+                                             i32Type, rewriter);
 
     rewriter.replaceOp(loadOp, value);
     return success();
@@ -194,10 +195,11 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
       InterfaceOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
-    Value spirvBuiltin = spirv::getBuiltinVariableValue(op, builtin, rewriter);
+    auto i32Type = rewriter.getIntegerType(32);
+    Value spirvBuiltin =
+        spirv::getBuiltinVariableValue(op, builtin, i32Type, rewriter);
     rewriter.replaceOpWithNewOp<spirv::CompositeExtractOp>(
-        op, rewriter.getIntegerType(32), spirvBuiltin,
-        rewriter.getI32ArrayAttr({index}));
+        op, i32Type, spirvBuiltin, rewriter.getI32ArrayAttr({index}));
     return success();
   }
 };
