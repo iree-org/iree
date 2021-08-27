@@ -25,7 +25,11 @@ jobs:
         with:
           release_id: ${{ github.event.inputs.release_id }}
 
-      # Future different releases should publish to different branches
+      - name: Checking out repository
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+
       - name: Updating latest-snapshot branch
         uses: ad-m/github-push-action@v0.6.0
         with:
