@@ -52,4 +52,4 @@
 	url = https://github.com/webgpu-native/webgpu-headers.git
 [submodule "third_party/musl"]
 	path = third_party/musl
-	url = git://git.musl-libc.org/musl
+	url = https://github.com/powderluv/musl.git
