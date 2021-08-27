@@ -619,7 +619,7 @@ void ConvertToLLVMPass::runOnOperation() {
   const auto &dataLayoutAnalysis = getAnalysis<DataLayoutAnalysis>();
   LowerToLLVMOptions options(&getContext(),
                              dataLayoutAnalysis.getAtOrAbove(module));
-  options.dataLayout = llvm::DataLayout(targetDataLayout);
+  options.dataLayout = llvm::DataLayout(dataLayoutStr);
   options.overrideIndexBitwidth(options.dataLayout.getPointerSizeInBits());
   LLVMTypeConverter converter(&getContext(), options, &dataLayoutAnalysis);
 

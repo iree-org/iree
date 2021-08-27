@@ -42,6 +42,9 @@ static llvm::cl::opt<int> matmulL1TileSize(
     llvm::cl::desc(
         "linalg.matmul tile size for L1 spliting of M, N, K dimension"),
     llvm::cl::init(32));
+static llvm::cl::opt<int> matmulVectorSize(
+    "iree-codegen-llvm-matmul-vector-size",
+    llvm::cl::desc("linalg.matmul vector tile size"), llvm::cl::init(4));
 
 static llvm::cl::opt<int> batchMatmulWorkgroupTileSize(
     "iree-codegen-llvm-batch-matmul-workgroup-size",
@@ -77,20 +80,30 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 
 static Optional<int64_t> getNativeVectorSize(FuncOp entryPointFn,
                                              Type elementType) {
-  auto variantOp =
-      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variantOp) return {};
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
-  if (!targetAttr) return {};
-  auto config = targetAttr.getConfiguration();
-  if (!config) return {};
-  auto nativeVectorSize = config.getAs<IntegerAttr>("native_vector_size");
-  if (!nativeVectorSize) return {};
-  int64_t nativeVectorSizeVal = nativeVectorSize.getInt();
-  if (nativeVectorSizeVal == 0) return {};
-  if (!elementType.isIntOrFloat()) return {};
-  unsigned bitWidth = elementType.getIntOrFloatBitWidth() / 8;
-  return nativeVectorSize.getInt() / bitWidth;
+  Optional<int64_t> nativeVectorSizeInBytes = llvm::None;
+  if (auto variantOp =
+          entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    if (IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target()) {
+      if (auto config = targetAttr.getConfiguration()) {
+        if (auto nativeVectorSizeAttr =
+                config.getAs<IntegerAttr>("native_vector_size")) {
+          if (int64_t nativeVectorSizeVal = nativeVectorSizeAttr.getInt()) {
+            nativeVectorSizeInBytes = nativeVectorSizeVal;
+          }
+        }
+      }
+    }
+  }
+  // TODO(ravishankarm): For now still picking the value from the
+  // `iree-codegen-llvm-matmul-vector-size` option to avoid some issues on
+  // RISCV-32 side.
+  if (nativeVectorSizeInBytes) {
+    if (elementType.isIntOrFloat()) {
+      unsigned bitWidth = elementType.getIntOrFloatBitWidth() / 8;
+      return (*nativeVectorSizeInBytes) / bitWidth;
+    }
+  }
+  return matmulVectorSize.getValue();
 }
 
 /// Sets the lowering configuration for dispatch region with root op that
