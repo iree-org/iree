@@ -32,7 +32,7 @@ hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
   }
 }
 
-// Check that the workgroup size is (1, 1, 1) for serializing the computation.
+// Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
 // CHECK-LABEL: hal.executable.entry_point @static_1d_sort
 //  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
@@ -109,3 +109,105 @@ hal.executable @static_3d_sort attributes {sym_visibility = "private"} {
 //                CHECK: func @static_3d_sort()
 //                CHECK:   linalg_ext.sort
 //  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 0, 16], [], [1, 0, 1]]}
+
+// -----
+
+hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
+  hal.interface @io {
+    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+  }
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirvfb"> {
+    hal.executable.entry_point @static_1d_fft attributes {interface = @io, ordinal = 0 : index}
+    builtin.module attributes {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
+        max_compute_shared_memory_size = 32768 : i32,
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+        subgroup_size = 16 : i32}>
+    } {
+      builtin.func @static_1d_fft() {
+        %c0 = constant 0 : index
+        %c2 = constant 2 : index
+        %cst = constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
+        %cst_0 = constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
+        %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
+        %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
+        %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
+        %4:2 = linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
+        flow.dispatch.tensor.store %4#0, %0, offsets = [], sizes = [], strides = [] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:32xf32>
+        flow.dispatch.tensor.store %4#1, %1, offsets = [], sizes = [], strides = [] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:32xf32>
+        return
+      }
+      hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+        hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+      }
+    }
+  }
+}
+
+// Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
+
+// CHECK-LABEL: hal.executable.entry_point @static_1d_fft
+//  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
+//  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
+//  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
+//  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//  CHECK-NEXT:   hal.return %[[ONE]], %[[ONE]], %[[ONE]]
+
+//       CHECK: func @static_1d_fft()
+//       CHECK:   linalg_ext.fft
+//  CHECK-SAME:     lowering.config = {}
+
+// -----
+
+hal.executable @static_3d_fft attributes {sym_visibility = "private"} {
+  hal.interface @io {
+    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+  }
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirvfb"> {
+    hal.executable.entry_point @static_3d_fft attributes {interface = @io, ordinal = 0 : index}
+    builtin.module attributes {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
+        max_compute_shared_memory_size = 32768 : i32,
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+        subgroup_size = 16 : i32}>
+    } {
+      builtin.func @static_3d_fft() {
+        %c0 = constant 0 : index
+        %c2 = constant 2 : index
+        %cst = constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
+        %cst_0 = constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
+        %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:64x128x32xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : !flow.dispatch.tensor<readwrite:64x128x32xf32>
+        %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:64x128x32xf32> -> tensor<64x128x32xf32>
+        %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:64x128x32xf32> -> tensor<64x128x32xf32>
+        %4:2 = linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<64x128x32xf32>, tensor<64x128x32xf32>) : tensor<64x128x32xf32>, tensor<64x128x32xf32>
+        flow.dispatch.tensor.store %4#0, %0, offsets = [], sizes = [], strides = [] : tensor<64x128x32xf32> -> !flow.dispatch.tensor<readwrite:64x128x32xf32>
+        flow.dispatch.tensor.store %4#1, %1, offsets = [], sizes = [], strides = [] : tensor<64x128x32xf32> -> !flow.dispatch.tensor<readwrite:64x128x32xf32>
+        return
+      }
+      hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+        hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+      }
+    }
+  }
+}
+
+// Right now n-D fft does not support tiling too.
+
+// CHECK-LABEL: hal.executable.entry_point @static_3d_fft
+//  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
+//  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
+//  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
+//  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//  CHECK-NEXT:   hal.return %[[ONE]], %[[ONE]], %[[ONE]]
+
+//       CHECK: func @static_3d_fft()
+//       CHECK:   linalg_ext.fft
+//  CHECK-SAME:     lowering.config = {}
