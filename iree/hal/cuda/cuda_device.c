@@ -124,7 +124,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->context_wrapper.syms = syms;
   device->use_deferred_submission = params->use_deferred_submission;
   iree_status_t status = iree_hal_cuda_allocator_create(
-      &device->context_wrapper, &device->device_allocator);
+      &device->context_wrapper, cu_device, stream, &device->device_allocator);
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
