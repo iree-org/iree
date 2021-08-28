@@ -34,7 +34,6 @@ iree_lit_test_suite(
             "dynamic_torch_index_select_scalar.mlir",
             "dynamic_torch_index_select_vector.mlir",
             "globals.mlir",
-            "lowering_config.mlir",
             "scalar.mlir",
             "tensor_cast.mlir",
             "trace_dispatch_tensors.mlir",
@@ -51,6 +50,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
             "linalg_ext_ops.mlir",
+            "lowering_config.mlir",
         ] + BACKEND_TESTS,
     ),
     data = [
