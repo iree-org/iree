@@ -150,6 +150,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           executableLoweringPipeline.nest<ModuleOp>();
       switch (passPipeline.getValue()) {
         case IREE::HAL::DispatchLoweringPassPipeline::CPUDefault:
+        case IREE::HAL::DispatchLoweringPassPipeline::None:
           addCPUDefaultPassPipeline(nestedModulePM);
           break;
         case IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization:

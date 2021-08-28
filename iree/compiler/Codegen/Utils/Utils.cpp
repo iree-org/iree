@@ -81,31 +81,27 @@ SmallVector<unsigned> getPartitionedLoops(Operation *op) {
 }
 
 LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
-    ArrayRef<int64_t> nativeVectorSizes,
+    FuncOp entryPointFn, Operation *op, IREE::HAL::LoweringConfig config,
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize) {
-  IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, nativeVectorSizes, op->getContext());
-  setLoweringConfig(op, config);
   auto partitionedLoops = getPartitionedLoops(op);
   SmallVector<int64_t, 3> workloadPerWorkgroup;
-  if (!tileSizes.empty() && !tileSizes[0].empty() &&
-      !partitionedLoops.empty()) {
+  auto tileSizes = getTileSizes(config, 0);
+  if (!tileSizes.empty() && !partitionedLoops.empty()) {
     for (unsigned depth : partitionedLoops) {
-      if (depth >= tileSizes[0].size()) {
+      if (depth >= tileSizes.size()) {
         return op->emitOpError(
                    "illegal configuration for lowering op, expect first level "
                    "tile size to contain at least ")
                << partitionedLoops.back() << " elements";
       }
-      if (tileSizes[0][depth] == 0) {
+      if (tileSizes[depth] == 0) {
         return op->emitOpError("illegal to set tilesize of loop ")
                << depth
                << " to zero since it is set to be partitioned at the flow "
                   "level";
       }
-      workloadPerWorkgroup.push_back(tileSizes[0][depth]);
+      workloadPerWorkgroup.push_back(tileSizes[depth]);
     }
     if (!workloadPerWorkgroup.empty()) {
       workloadPerWorkgroup =
