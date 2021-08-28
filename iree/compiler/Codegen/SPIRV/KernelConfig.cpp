@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -283,6 +284,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
         "attribute");
   }
   spirv::TargetEnv targetEnv(targetEnvAttr);
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
   for (auto funcOp : module.getOps<FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
