@@ -352,12 +352,9 @@ cc_library(
     name = "iree_translate_main",
     srcs = ["iree-translate-main.cc"],
     deps = [
-        ":init_compiler_modules",
-        ":init_iree_passes_and_dialects",
-        ":init_mlir_passes_and_dialects",
+        ":init_passes_and_dialects",
         ":init_targets",
         ":init_translations",
-        ":init_xla_dialects",
         "//iree/compiler/Codegen",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
