@@ -340,11 +340,16 @@ class ProcessInterfaceBinding final
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = bindingOp.getType().dyn_cast<MemRefType>();
     if (!memrefType) return failure();
+
+    // This should be guaranteed by the analysis step. But just double check.
+    assert(memrefType.getRank() > 0 &&
+           !ShapedType::isDynamic(memrefType.getShape().back()));
+
     auto vecMemRef = getVectorizedMemRefType(rewriter, bindingOp.getResult());
     if (!vecMemRef) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         bindingOp, *vecMemRef, bindingOp.binding(), bindingOp.byte_offset(),
-        bindingOp.byte_length());
+        bindingOp.byte_length(), bindingOp.dynamic_dims());
     return success();
   }
 };

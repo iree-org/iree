@@ -15,6 +15,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -1209,9 +1210,34 @@ llvm::hash_code InterfaceBindingOp::getDescriptorHash() {
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
+static LogicalResult verifyInterfaceBindingSubspanOp(
+    InterfaceBindingSubspanOp op) {
+  if (ShapedType shapedType = op.getType().dyn_cast<ShapedType>()) {
+    if (shapedType.getNumDynamicDims() != op.dynamic_dims().size()) {
+      return op.emitOpError("result type ")
+             << op.getType() << " has " << shapedType.getNumDynamicDims()
+             << " dynamic dimensions but " << op.dynamic_dims().size()
+             << " associated dimension SSA values";
+    }
+  }
+
+  return success();
+}
+
 InterfaceBindingOp InterfaceBindingSubspanOp::queryBindingOp() {
   return dyn_cast_or_null<InterfaceBindingOp>(
       SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
+}
+
+Value InterfaceBindingSubspanOp::buildOperandRankedShape(unsigned idx,
+                                                         OpBuilder &builder) {
+  return {};
+}
+
+Value InterfaceBindingSubspanOp::buildResultRankedShape(unsigned idx,
+                                                        OpBuilder &builder) {
+  return Shape::buildRankedShapeForValue(getLoc(), result(), dynamic_dims(),
+                                         builder);
 }
 
 //===----------------------------------------------------------------------===//

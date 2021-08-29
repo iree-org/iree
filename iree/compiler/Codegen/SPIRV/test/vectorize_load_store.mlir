@@ -113,6 +113,60 @@ hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "priv
 
 // -----
 
+// CHECK-LABEL: func @resource_copy_dynamic_shape()
+func @resource_copy_dynamic_shape() {
+  %cst = constant 0.000000e+00 : f32
+  %c0 = constant 0 : index
+  // CHECK: %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
+  // CHECK: %[[DIM1:.+]] = hal.interface.load.constant offset = 1 : index
+  %dim0 = hal.interface.load.constant offset = 0 : index
+  %dim1 = hal.interface.load.constant offset = 1 : index
+
+  // CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x8x?x32xvector<4xf32>>{%[[DIM0]], %[[DIM1]]}
+  // CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x8x?x32xvector<4xf32>>{%[[DIM0]], %[[DIM1]]}
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x8x?x128xf32>{%dim0, %dim1}
+  %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x8x?x128xf32>{%dim0, %dim1}
+
+  // CHECK: %[[VAL1:.+]] = memref.load %[[INPUT]]
+  // CHECK: memref.store %[[VAL1]], %[[OUTPUT]]
+  %v = vector.transfer_read %0[%c0, %c0, %c0, %c0], %cst : memref<?x8x?x128xf32>, vector<1x4xf32>
+  vector.transfer_write %v, %1[%c0, %c0, %c0, %c0] : vector<1x4xf32>, memref<?x8x?x128xf32>
+
+  // CHECK: %[[VAL2:.+]] = vector.transfer_read %[[INPUT]]
+  // CHECK: vector.transfer_write %[[VAL2]], %[[OUTPUT]]
+  %mat = vector.transfer_read %0[%c0, %c0, %c0, %c0], %cst : memref<?x8x?x128xf32>, vector<32x8xf32>
+  vector.transfer_write %mat, %1[%c0, %c0, %c0, %c0] : vector<32x8xf32>, memref<?x8x?x128xf32>
+  return
+}
+
+hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+}
+
+// -----
+
+// CHECK-LABEL: func @resource_copy_dynamic_last_dim()
+func @resource_copy_dynamic_last_dim() {
+  %cst = constant 0.000000e+00 : f32
+  %c0 = constant 0 : index
+  %dim = hal.interface.load.constant offset = 0 : index
+  // CHECK: hal.interface.binding.subspan @io::@arg0[{{.+}}] : memref<4096x?xf32>
+  // CHECK: hal.interface.binding.subspan @io::@ret0[{{.+}}] : memref<4096x?xf32>
+  %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x?xf32>{%dim}
+  %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x?xf32>{%dim}
+  %v = vector.transfer_read %0[%c0, %c0], %cst : memref<4096x?xf32>, vector<1x4xf32>
+  vector.transfer_write %v, %1[%c0, %c0] : vector<1x4xf32>, memref<4096x?xf32>
+  return
+}
+
+hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+}
+
+// -----
+
 // CHECK-LABEL: func @do_not_vectorize_odd_vector_size
 func @do_not_vectorize_odd_vector_size() {
   %cst = constant 0.0 : f32
@@ -186,5 +240,3 @@ func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) {
   vector.transfer_write %arg, %2[%c3] : vector<3xf32>, memref<20xf32>
   return %3: vector<3xf32>
 }
-
-
