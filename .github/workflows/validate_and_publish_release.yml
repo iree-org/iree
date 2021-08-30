@@ -24,3 +24,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
+
+      - name: Checking out repository
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+
+      - name: Updating latest-snapshot branch
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          branch: latest-snapshot
