@@ -87,7 +87,7 @@ void GlobalOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 
 OpFoldResult GlobalLoadOp::fold(ArrayRef<Attribute> operands) {
   auto globalOp =
-      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, global());
+      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, globalAttr());
   if (!globalOp) return {};
   if (globalOp->getAttr("noinline")) {
     // Inlining of the constant has been disabled.

@@ -62,14 +62,17 @@ class WrapEntryPointsPass
       // name in its public definition.
       auto publicName = entryFuncOp.getName().str();
       auto privateName = "_" + publicName;
-      entryFuncOp.setName(privateName);
+      mlir::StringAttr privateNameAttr =
+          mlir::StringAttr::get(entryFuncOp.getContext(), privateName);
+      entryFuncOp.setName(privateNameAttr);
       entryFuncOp.setPrivate();
 
       // Create the wrapper function that conforms to the IREE native ABI and
       // marshals arguments/results to the original function.
       auto wrapperFuncOp = createWrapperFunc(entryFuncOp);
       wrapperFuncOp.setPublic();
-      wrapperFuncOp.setName(publicName);
+      wrapperFuncOp.setName(
+          mlir::StringAttr::get(entryFuncOp.getContext(), publicName));
       moduleOp.insert(Block::iterator(entryFuncOp), wrapperFuncOp);
 
       wrapperFuncOp.getOperation()->setAttr("iree.abi.stub",

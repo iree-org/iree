@@ -561,7 +561,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   ];
 
   let extraClassDeclaration = [{
-    StringRef executable();
+    StringAttr executable();
     FunctionType getEntryPointType();
 
     // StreamableOpInterface:

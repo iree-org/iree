@@ -640,8 +640,7 @@ void InterfaceBuilder::applyUsageMappings() {
         case DispatchBinding::Type::CONSTANT_STORAGE:
           attrs.push_back(IREE::HAL::ExConstantStorageAttr::get(
               builder.getStringAttr(usage.bindingOp.getName()),
-              builder.getStringAttr(
-                  usage.constant.constantBuffer.getLeafReference()),
+              usage.constant.constantBuffer.getLeafReference(),
               builder.getIndexAttr(usage.constant.minimumOffset),
               builder.getIndexAttr(usage.constant.maximumOffset -
                                    usage.constant.minimumOffset + 1)));

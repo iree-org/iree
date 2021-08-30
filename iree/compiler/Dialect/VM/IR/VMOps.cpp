@@ -374,7 +374,7 @@ static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
 
 template <typename T>
 static void addMemoryEffectsForGlobal(
-    Operation *op, StringRef global,
+    Operation *op, mlir::FlatSymbolRefAttr global,
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   // HACK: works around the lack of symbol side effects in mlir by only saying
   // we have a side-effect if the variable we are loading is mutable.
@@ -388,27 +388,27 @@ static void addMemoryEffectsForGlobal(
 
 void GlobalLoadI32Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalI32Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalI32Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadI64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalI64Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalI64Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadF32Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalF32Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalF32Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadF64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalF64Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalF64Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadRefOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalRefOp>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalRefOp>(*this, globalAttr(), effects);
 }
 
 static LogicalResult verifyGlobalLoadOp(Operation *op) {

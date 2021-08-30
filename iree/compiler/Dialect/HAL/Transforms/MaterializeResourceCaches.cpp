@@ -212,7 +212,7 @@ class MaterializeResourceCachesPass
            executableVariantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
         auto interfaceOp =
             SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
-                executableOp, entryPointOp.interface());
+                executableOp, entryPointOp.interfaceAttr());
         assert(interfaceOp && "must have an interface available");
         auto executableLayoutGlobalOp = defineExecutableLayoutOp(
             executableOp.getLoc(), interfaceOp.getExecutableSetLayoutsAttr(),
@@ -226,9 +226,8 @@ class MaterializeResourceCachesPass
       auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
           loc, ExecutableType::get(loc.getContext()), deviceValue,
           SymbolRefAttr::get(
-              loc.getContext(), executableOp.sym_name(),
-              {SymbolRefAttr::get(loc.getContext(),
-                                  executableVariantOp.sym_name())}),
+              executableOp.sym_nameAttr(),
+              {SymbolRefAttr::get(executableVariantOp.sym_nameAttr())}),
           executableLayoutValues);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);
