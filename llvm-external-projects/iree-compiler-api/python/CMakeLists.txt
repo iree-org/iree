@@ -1,5 +1,9 @@
 include(AddMLIRPython)
 
+# Specifies that all MLIR packages are co-located under npcomp.
+# TODO: Add an upstream cmake param for this vs having a global here.
+add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
+
 ################################################################################
 # Sources
 ################################################################################
