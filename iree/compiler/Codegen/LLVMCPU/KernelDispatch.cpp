@@ -183,7 +183,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
 /// Sets the lowering configuration for dispatch region with root op being a
 /// generic op.
 static LogicalResult setDefaultRootConfig(FuncOp entryPointFn, Operation *op) {
-  if (getLoweringConfig(op)) return success();
   auto partitionedLoops = getPartitionedLoops(op);
   if (partitionedLoops.empty()) {
     // Return success without doing anything. Eventually default will be used.
@@ -213,15 +212,42 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
   for (auto computeOp : computeOps) {
     if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
 
-    auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
-      return TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface>(
-              [&](auto op) { return setRootConfig(entryPointFn, op); })
-          .Default([&](Operation *op) { return success(); });
-    };
-
-    if (failed(setRootConfigFn(computeOp))) {
-      return failure();
+    /// If the op already has a lowering config, then check for whether it
+    /// specifies a pass-pipeline and workgroup size as well. If so use those.
+    if (auto config = getLoweringConfig(computeOp)) {
+      IREE::HAL::DispatchLoweringPassPipeline passPipeline =
+          IREE::HAL::DispatchLoweringPassPipeline::CPUDefault;
+      if (auto passPipelineAttr = config.passPipeline()) {
+        passPipeline = passPipelineAttr.getValue();
+      }
+      SmallVector<int64_t, 4> workgroupSize;
+      if (auto workgroupSizeAttr = config.workgroupSize()) {
+        workgroupSize = llvm::to_vector<4>(
+            llvm::map_range(workgroupSizeAttr, [](Attribute intAttr) {
+              return intAttr.cast<IntegerAttr>().getInt();
+            }));
+      }
+      if (failed(setOpConfigAndEntryPointFnTranslation(
+              entryPointFn, computeOp, config, passPipeline, workgroupSize))) {
+        return failure();
+      }
+      // Reset the op configuration to drop the pass-pipeline and workgroup size
+      // info. The op does not carry that information anymore.
+      auto resetConfig = IREE::HAL::LoweringConfig::get(
+          config.tileSizes(), config.nativeVectorSize(),
+          /*passPipeline =*/nullptr,
+          /*workgroupSize =*/nullptr, computeOp->getContext());
+      setLoweringConfig(computeOp, resetConfig);
+    } else {
+      auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
+        return TypeSwitch<Operation *, LogicalResult>(op)
+            .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface>(
+                [&](auto op) { return setRootConfig(entryPointFn, op); })
+            .Default([&](Operation *op) { return success(); });
+      };
+      if (failed(setRootConfigFn(computeOp))) {
+        return failure();
+      }
     }
 
     if (getLoweringConfig(computeOp)) {

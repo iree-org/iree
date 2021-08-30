@@ -20,6 +20,7 @@
 #include "iree/tools/init_compiler_modules.h"
 #include "iree/tools/init_iree_dialects.h"
 #include "iree/tools/init_mlir_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
 #include "iree/tools/init_translations.h"
 #include "iree/tools/init_xla_dialects.h"
@@ -69,6 +70,7 @@ int main(int argc, char **argv) {
   mlir::registerMlirDialects(registry);
   mlir::registerLLVMDialectTranslation(registry);
   mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerAllPasses();
   mlir::iree_compiler::registerIreeDialects(registry);
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();

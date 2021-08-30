@@ -109,7 +109,8 @@ IREE::HAL::LoweringConfig buildConfigAttr(TileSizesListTypeRef tileSizes,
     nativeVectorSizeAttr = builder.getI64ArrayAttr(nativeVectorSize);
   }
   return IREE::HAL::LoweringConfig::get(tileSizesAttr, nativeVectorSizeAttr,
-                                        context);
+                                        /*passPipeline = */ nullptr,
+                                        /*workgroupSize = */ nullptr, context);
 }
 
 TileSizesListType getTileSizes(IREE::HAL::LoweringConfig config) {

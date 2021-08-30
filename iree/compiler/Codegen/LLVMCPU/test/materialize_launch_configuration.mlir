@@ -67,7 +67,11 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 
 // -----
 
-// CHECK-NOT: #config
+//      CHECK: #[[CONFIG:.+]] = {passPipeline = 0 : i32}
+//  CHECK-NOT: #config
+//      CHECK: hal.executable.entry_point @add_no_config
+// CHECK-SAME:     translation.info = #[[CONFIG]]
+//  CHECK-NOT:     #config
 
 hal.executable @add_no_config attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -352,3 +356,80 @@ hal.executable @batch_matmul_tensors attributes {sym_visibility = "private"} {
 //      CHECK:  hal.return %[[D0]], %[[D1]], %[[ARG2]]
 //      CHECK:  linalg.batch_matmul
 // CHECK-SAME:    lowering.config = #[[CONFIG]]
+
+// -----
+
+hal.executable @preset_config_matmul_tensors attributes {sym_visibility = "private"} {
+  hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
+    hal.executable.entry_point @preset_config attributes {interface = @io, ordinal = 0 : index}
+    builtin.module  {
+      builtin.func @preset_config() {
+        %c0 = constant 0 : index
+        %c512 = constant 512 : index
+        %c128 = constant 128 : index
+        %cst = constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:128x256xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x512xf32>
+        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:128x512xf32>
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+        scf.for %arg0 = %3 to %c128 step %4 {
+          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+          scf.for %arg1 = %5 to %c512 step %6 {
+            %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 128)>(%arg0)[%workgroup_size_y]
+            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x256xf32> -> tensor<?x256xf32>
+            %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 512)>(%arg1)[%workgroup_size_x]
+            %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [256, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:256x512xf32> -> tensor<256x?xf32>
+            %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 128)>(%arg0)[%workgroup_size_y]
+            %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 512)>(%arg1)[%workgroup_size_x]
+            %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 128, s0)>(%arg0)[%workgroup_size_y]
+            %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 512, s0)>(%arg1)[%workgroup_size_x]
+            %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
+            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32> 
+            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {passPipeline = 1 : i32, tileSizes = [[32, 32, 32]]}} ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:128x512xf32>
+          }
+        }
+        return
+      }
+      hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [], tileSizes = {{\[}}[32, 32, 32]{{\]}}}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//      CHECK: hal.executable.entry_point
+// CHECK-SAME:     translation.info = {passPipeline = 1 : i32, workloadPerWorkgroup = [32, 32]}
+// CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index
+//  CHECK-DAG:     %[[C1:.+]] = constant 1 : index
+//  CHECK-DAG:     %[[NWG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
+//  CHECK-DAG:     %[[NWG_Y:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
+//      CHECK:     return %[[NWG_X]], %[[NWG_Y]], %[[C1]]
+//      CHECK: builtin.module
+//      CHECK:   builtin.func @preset_config
+//  CHECK-DAG:     %[[WGID_X:.+]] = hal.interface.workgroup.id[0]
+//  CHECK-DAG:     %[[WGCOUNT_X:.+]] = hal.interface.workgroup.count[0]
+//  CHECK-DAG:     %[[WGID_Y:.+]] = hal.interface.workgroup.id[1]
+//  CHECK-DAG:     %[[WGCOUNT_Y:.+]] = hal.interface.workgroup.count[1]
+//      CHECK:     %[[LB_Y:.+]] = affine.apply #[[MAP1]]()[%[[WGID_Y]]]
+//      CHECK:     %[[STEP_Y:.+]] = affine.apply #[[MAP1]]()[%[[WGCOUNT_Y]]]
+//      CHECK:     scf.for %[[IV0:.+]] = %[[LB_Y]] to %{{.+}} step %[[STEP_Y]]
+//      CHECK:       %[[LB_X:.+]] = affine.apply #[[MAP1]]()[%[[WGID_X]]]
+//      CHECK:       %[[STEP_X:.+]] = affine.apply #[[MAP1]]()[%[[WGCOUNT_X]]]
+//      CHECK:       scf.for %[[IV1:.+]] = %[[LB_X]] to %{{.+}} step %[[STEP_X]]
+//      CHECK:         linalg.matmul
+// CHECK-SAME:             lowering.config = #[[CONFIG]]
+// CHECK-SAME:             ins(%{{.+}}, %{{.+}} : tensor<32x256xf32>, tensor<256x32xf32>)
+// CHECK-SAME:             outs(%{{.+}} : tensor<32x32xf32>)

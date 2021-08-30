@@ -41,6 +41,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "lowering_config.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
