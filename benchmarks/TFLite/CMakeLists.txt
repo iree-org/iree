@@ -19,35 +19,27 @@
 set(MOBILESSD_FP32_MODULE
   "MobileSSD"                     # MODULE_NAME
   "fp32"                          # MODULE_TAGS
-  "https://storage.googleapis.com/iree-model-artifacts/MobileSSD-3554868.tar.gz" # MLIR_SOURCE
+  "https://storage.googleapis.com/iree-model-artifacts/MobileSSD-2bcafb1.tar.gz" # MLIR_SOURCE
   "main"                          # ENTRY_FUNCTION
   "1x320x320x3xf32"               # FUNCTION_INPUTS
 )
 
-set(MOBILENETV1_FP32_MODULE
-  "MobileNetV1"                   # MODULE_NAME
+set(POSENET_FP32_MODULE
+  "PoseNet"                       # MODULE_NAME
   "fp32"                          # MODULE_TAGS
-  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV1.tar.gz" # MLIR_SOURCE
+  "https://storage.googleapis.com/iree-model-artifacts/PoseNet-2bcafb1.tar.gz" # MLIR_SOURCE
   "main"                          # ENTRY_FUNCTION
-  "1x224x224x3xf32"               # FUNCTION_INPUTS
+  "1x353x257x3xf32"               # FUNCTION_INPUTS
 )
 
-#set(POSENET_FP32_MODULE
-#  "PoseNet"                       # MODULE_NAME
-#  "fp32"                          # MODULE_TAGS
-#  "https://storage.googleapis.com/iree-model-artifacts/PoseNet.tar.gz" # MLIR_SOURCE
-#  "main"                          # ENTRY_FUNCTION
-#  "1x353x257x3xf32"               # FUNCTION_INPUTS
-#)
-#
-#set(DEEPLABV3_FP32_MODULE
-#  "DeepLabV3"                     # MODULE_NAME
-#  "fp32"                          # MODULE_TAGS
-#  "https://storage.googleapis.com/iree-model-artifacts/DeepLabV3.tar.gz" # MLIR_SOURCE
-#  "main"                          # ENTRY_FUNCTION
-#  "1x257x257x3xf32"               # FUNCTION_INPUTS
-#)
-#
+set(DEEPLABV3_FP32_MODULE
+  "DeepLabV3"                     # MODULE_NAME
+  "fp32"                          # MODULE_TAGS
+  "https://storage.googleapis.com/iree-model-artifacts/DeepLabV3-2bcafb1.tar.gz" # MLIR_SOURCE
+  "main"                          # ENTRY_FUNCTION
+  "1x257x257x3xf32"               # FUNCTION_INPUTS
+)
+
 ################################################################################
 #                                                                              #
 # Common benchmark configurations                                              #
@@ -62,9 +54,8 @@ set(MOBILENETV1_FP32_MODULE
 iree_mlir_benchmark_suite(
   MODULES
     ${MOBILENETSSD_FP32_MODULE}
-    ${MOBILENETV1_FP32_MODULE}
-#    ${POSENET_FP32_MODULE}
-#    ${DEEPLABV3_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+    ${DEEPLABV3_FP32_MODULE}
 
   BENCHMARK_MODES
     "big-core,full-inference"
@@ -86,10 +77,9 @@ iree_mlir_benchmark_suite(
 # CPU, Dylib, 1-thread, big/little-core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
-    ${MOBILENETSSD_FP32_MODULE}
-    ${MOBILENETV1_FP32_MODULE}
-#    ${POSENET_FP32_MODULE}
-#    ${DEEPLABV3_FP32_MODULE}
+   ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+    ${DEEPLABV3_FP32_MODULE}
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference"
@@ -110,81 +100,77 @@ iree_mlir_benchmark_suite(
     "--task_topology_group_count=1"
 )
 
-## GPU, Vulkan, Mali, full-inference
-#iree_mlir_benchmark_suite(
-#  MODULES
-#    ${MOBILENETSSD_FP32_MODULE}
-##    ${MOBILENETV1_FP32_MODULE}
-##    ${POSENET_FP32_MODULE}
-#    ${DEEPLABV3_FP32_MODULE}
-#
-#  BENCHMARK_MODES
-#    "1-thread,big-core,full-inference"
-#    "1-thread,little-core,full-inference"
-#  TARGET_BACKEND
-#    "dylib-llvm-aot"
-#  TARGET_ARCHITECTURE
-#    "CPU-ARM64-v8A"
-#  TRANSLATION_FLAGS
-#    "--iree-input-type=tosa"
-#    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-#    "--iree-flow-inline-constants-max-byte-length=2048"
-#    # TODO(GH-5857): Enable this after fixing segfault.
-#    #"--iree-flow-dispatch-formation-enable-operand-fusion"
-#    "--iree-llvm-loop-unrolling=true"
-#  DRIVER
-#    "dylib"
-#  RUNTIME_FLAGS
-#    "--task_topology_group_count=1"
-#)
+# GPU, Vulkan, Mali, full-inference
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+    ${DEEPLABV3_FP32_MODULE}
 
-## GPU, Vulkan, Mali, full-inference
-#iree_mlir_benchmark_suite(
-#  MODULES
-#    ${MOBILENETSSD_FP32_MODULE}
-#   ${MOBILENETV1_FP32_MODULE}
-#    ${POSENET_FP32_MODULE}
-#    ${DEEPLABV3_FP32_MODULE}
-#
-#  BENCHMARK_MODES
-#    "full-inference"
-#  TARGET_BACKEND
-#    "vulkan-spirv"
-#  TARGET_ARCHITECTURE
-#    "GPU-Mali-Valhall"
-#  TRANSLATION_FLAGS
-#    "--iree-input-type=tosa"
-#    "--iree-vulkan-target-triple=valhall-unknown-android11"
-#    "--iree-flow-inline-constants-max-byte-length=16"
-#    "--iree-flow-dispatch-formation-enable-operand-fusion"
-#    "--iree-enable-fusion-with-reduction-ops"
-#  DRIVER
-#    "vulkan"
-#)
-#
-## GPU, Vulkan, Mali, kernel-execution
-#iree_mlir_benchmark_suite(
-#  MODULES
-#    ${MOBILENETSSD_FP32_MODULE}
-##    ${MOBILENETV1_FP32_MODULE}
-##    ${POSENET_FP32_MODULE}
-##    ${DEEPLABV3_FP32_MODULE}
-#
-#  BENCHMARK_MODES
-#    "kernel-execution"
-#  TARGET_BACKEND
-#    "vulkan-spirv"
-#  TARGET_ARCHITECTURE
-#    "GPU-Mali-Valhall"
-#  TRANSLATION_FLAGS
-#    "--iree-input-type=tosa"
-#    "--iree-vulkan-target-triple=valhall-unknown-android11"
-#    "--iree-flow-inline-constants-max-byte-length=16"
-#    "--iree-flow-dispatch-formation-enable-operand-fusion"
-#    "--iree-enable-fusion-with-reduction-ops"
-#    "--iree-hal-benchmark-dispatch-repeat-count=32"
-#  DRIVER
-#    "vulkan"
-#  RUNTIME_FLAGS
-#    "--batch_size=32"
-#)
+  BENCHMARK_MODES
+    "1-thread,big-core,full-inference"
+    "1-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-llvm-loop-unrolling=true"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=1"
+)
+
+# GPU, Vulkan, Mali, full-inference
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+    ${DEEPLABV3_FP32_MODULE}
+
+  BENCHMARK_MODES
+    "full-inference"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+)
+
+# GPU, Vulkan, Mali, kernel-execution
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+    ${DEEPLABV3_FP32_MODULE}
+
+  BENCHMARK_MODES
+    "kernel-execution"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+  DRIVER
+    "vulkan"
+  RUNTIME_FLAGS
+    "--batch_size=32"
+)
