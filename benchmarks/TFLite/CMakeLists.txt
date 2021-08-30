@@ -77,32 +77,6 @@ iree_mlir_benchmark_suite(
 # CPU, Dylib, 1-thread, big/little-core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
-   ${MOBILESSD_FP32_MODULE}
-    ${POSENET_FP32_MODULE}
-    ${DEEPLABV3_FP32_MODULE}
-
-  BENCHMARK_MODES
-    "1-thread,big-core,full-inference"
-    "1-thread,little-core,full-inference"
-  TARGET_BACKEND
-    "dylib-llvm-aot"
-  TARGET_ARCHITECTURE
-    "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-inline-constants-max-byte-length=2048"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
-    "--iree-llvm-loop-unrolling=true"
-  DRIVER
-    "dylib"
-  RUNTIME_FLAGS
-    "--task_topology_group_count=1"
-)
-
-# GPU, Vulkan, Mali, full-inference
-iree_mlir_benchmark_suite(
-  MODULES
     ${MOBILESSD_FP32_MODULE}
     ${POSENET_FP32_MODULE}
     ${DEEPLABV3_FP32_MODULE}
