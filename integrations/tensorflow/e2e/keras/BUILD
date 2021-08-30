@@ -82,25 +82,15 @@ iree_e2e_cartesian_product_test_suite(
     failing_configurations = [
         {
             "model": [
-                # Timing out on SwiftShader
+                # unrolling True: "Unrolling requires a fixed number of timesteps."
+                # unrolling False: "error: 'tf.BatchMatMulV2' op : unlegalized TensorFlow op still exists"
                 "att_mh_rnn",
                 "att_rnn",
-                "gru",
-                # Compilation fails
-                "crnn",
-                "lstm",
             ],
-            "target_backends": "iree_vulkan",
-        },
-        {
-            "model": [
-                "att_mh_rnn",
-                "att_rnn",
-                "crnn",
-                "gru",
-                "lstm",
+            "target_backends": [
+                "iree_vulkan",
+                "iree_llvmaot",
             ],
-            "target_backends": "iree_llvmaot",
         },
     ],
     matrix = {

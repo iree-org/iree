@@ -30,15 +30,9 @@ iree_e2e_cartesian_product_test_suite(
     "tf;tflite;iree_llvmaot;iree_vulkan"
   FAILING_CONFIGURATIONS
     ",,,att_mh_rnn,iree_vulkan"
-    ",,,att_rnn,iree_vulkan"
-    ",,,gru,iree_vulkan"
-    ",,,crnn,iree_vulkan"
-    ",,,lstm,iree_vulkan"
     ",,,att_mh_rnn,iree_llvmaot"
+    ",,,att_rnn,iree_vulkan"
     ",,,att_rnn,iree_llvmaot"
-    ",,,crnn,iree_llvmaot"
-    ",,,gru,iree_llvmaot"
-    ",,,lstm,iree_llvmaot"
 )
 
 iree_e2e_cartesian_product_test_suite(
