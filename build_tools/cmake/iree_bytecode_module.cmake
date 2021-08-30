@@ -52,11 +52,7 @@ function(iree_bytecode_module)
   iree_get_executable_path(_EMBEDDED_LINKER_TOOL_EXECUTABLE "lld")
 
   set(_ARGS "${_RULE_FLAGS}")
-  # Check source file path to support absolute path.
-  set(_SRC_PATH "${_RULE_SRC}")
-  if (NOT IS_ABSOLUTE ${_SRC_PATH})
-    set(_SRC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
-  endif()
+  get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
   list(APPEND _ARGS "${_SRC_PATH}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_NAME}.vmfb")
