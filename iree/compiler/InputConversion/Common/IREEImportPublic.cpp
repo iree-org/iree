@@ -212,6 +212,7 @@ class GenericTypeConvert : public ConversionPattern {
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     llvm::SmallVector<NamedAttribute, 4> newAttr;
+    llvm::append_range(newAttr, op->getAttrs());
     llvm::SmallVector<Type, 4> newResults;
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
     OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
