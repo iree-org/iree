@@ -289,7 +289,7 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
   RewritePatternSet canonicalizePatterns =
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   populateAffineMinCanonicalizationPattern(canonicalizePatterns);
-  scf::populateSCFLoopBodyCanonicalizationPatterns(canonicalizePatterns);
+  scf::populateSCFForLoopCanonicalizationPatterns(canonicalizePatterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizePatterns));
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
