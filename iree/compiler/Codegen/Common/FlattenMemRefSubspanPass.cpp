@@ -214,15 +214,6 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   assert(sourceType.hasRank() && sourceType.getRank() != 0);
   int64_t rank = sourceType.getRank();
 
-  AffineExpr sym0, sym1, sym2;
-  bindSymbols(builder.getContext(), sym0, sym1, sym2);
-  MLIRContext *context = builder.getContext();
-  auto mulAddMap = AffineMap::get(0, 3, {sym0 * sym1 + sym2}, context);
-
-  int64_t offset;
-  SmallVector<int64_t, 4> strides;
-  strides.reserve(rank);
-
   // First try to get the strides from the MemRef type itself. This applies to
   // cases where we have static shapes and only the leading dimension is
   // dynamic.
@@ -247,6 +238,11 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   for (int i = 0; i < rank; ++i) {
     dims.push_back(builder.create<Shape::RankedDimOp>(loc, shapeOp, i));
   }
+
+  AffineExpr sym0, sym1, sym2;
+  bindSymbols(builder.getContext(), sym0, sym1, sym2);
+  MLIRContext *context = builder.getContext();
+  auto mulAddMap = AffineMap::get(0, 3, {sym0 * sym1 + sym2}, context);
 
   Value linearIndex = indices.front();
   for (int i = 1; i < indices.size(); ++i) {
