@@ -101,22 +101,25 @@ LogicalResult PyCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   if (fnType.getNumInputs() != getNumOperands())
     return emitOpError("incorrect number of operands for callee");
 
-  for (unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i)
-    if (getOperand(i).getType() != fnType.getInput(i))
+  for (unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i) {
+    if (getOperand(i).getType() != fnType.getInput(i)) {
       return emitOpError("operand type mismatch: expected operand type ")
              << fnType.getInput(i) << ", but provided "
              << getOperand(i).getType() << " for operand number " << i;
+    }
+  }
 
   if (fnType.getNumResults() != getNumResults())
     return emitOpError("incorrect number of results for callee");
 
-  for (unsigned i = 0, e = fnType.getNumResults(); i != e; ++i)
+  for (unsigned i = 0, e = fnType.getNumResults(); i != e; ++i) {
     if (getResult(i).getType() != fnType.getResult(i)) {
       auto diag = emitOpError("result type mismatch at index ") << i;
       diag.attachNote() << "      op result types: " << getResultTypes();
       diag.attachNote() << "function result types: " << fnType.getResults();
       return diag;
     }
+  }
 
   return success();
 }

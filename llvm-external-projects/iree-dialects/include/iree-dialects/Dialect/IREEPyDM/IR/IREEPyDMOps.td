@@ -17,6 +17,8 @@ include "mlir/IR/SymbolInterfaces.td"
 // Functions
 //===----------------------------------------------------------------------===//
 
+// TODO: Move arg attributes to arguments, and generally rework the free_vars,
+// cell_vars attributes (with better modeling, they may not be needed at all).
 def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
     IsolatedFromAbove,
     FunctionLike,
@@ -205,7 +207,7 @@ def IREEPyDM_PatternMatchCallOp : IREEPyDM_Op<"pattern_match_call", [
 
 def IREEPyDM_DynamicCallOp : IREEPyDM_PureOp<"dynamic_call", [
     DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-  let summary = "Dynamic dispatch to a `func` or `multi_func`.";
+  let summary = "Dynamic dispatch to a `func`.";
   let description = [{
     Performs full dynamic dispatch to a function. Most imports start in this
     form and are progressively refined to something more specific as more
@@ -266,7 +268,7 @@ def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox"> {
   );
 
   let assemblyFormat = [{
-    $object `:` type($object)  `->` type($primitive) attr-dict
+    $object `:` type($object) `->` type($primitive) attr-dict
   }];
 }
 
@@ -285,6 +287,8 @@ def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox"> {
 // level, it is by ordinal).
 //===----------------------------------------------------------------------===//
 
+// TODO: Consider adding a dedicated free_var op to bind free variables and
+// move the string attribute there.
 def IREEPyDM_LoadFreeVarOp : IREEPyDM_PureOp<"load_free_var"> {
   let summary = "Loads a boxed free variable";
   let description = [{
@@ -465,11 +469,11 @@ def IREEPyDM_DynamicBinaryPromoteOp : IREEPyDM_PureOp<"dynamic_binary_promote"> 
   }];
 
   let arguments = (ins
-      IREEPyDM_AnyValueType:$left,
-      IREEPyDM_AnyValueType:$right);
+    IREEPyDM_AnyValueType:$left,
+    IREEPyDM_AnyValueType:$right);
   let results = (outs
-      IREEPyDM_GenericObjectType:$left_prime,
-      IREEPyDM_GenericObjectType:$right_prime);
+    IREEPyDM_GenericObjectType:$left_prime,
+    IREEPyDM_GenericObjectType:$right_prime);
   let assemblyFormat = [{
     $left `,` $right `:` type($left) `,` type($right) attr-dict
   }];
