@@ -52,6 +52,7 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
+    // TODO(antigainst): enable dynamic shape support once they are needed.
     auto reshapeSrcType = reshapeOp.src().getType().template cast<ShapedType>();
     auto reshapeDstType = reshapeOp.getType().template cast<ShapedType>();
     if (!reshapeSrcType.hasStaticShape() || !reshapeDstType.hasStaticShape()) {

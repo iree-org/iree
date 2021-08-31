@@ -42,7 +42,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -226,16 +226,12 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   // First try to get the strides from the MemRef type itself. This applies to
   // cases where we have static shapes and only the leading dimension is
   // dynamic.
-  if (succeeded(getStridesAndOffset(sourceType, strides, offset)) &&
-      !llvm::is_contained(strides, MemRefType::getDynamicStrideOrOffset()) &&
-      offset != MemRefType::getDynamicStrideOrOffset()) {
-    Value linearIndex = builder.create<ConstantIndexOp>(loc, offset);
-    for (auto pair : llvm::zip(indices, strides)) {
-      Value stride = builder.create<ConstantIndexOp>(loc, std::get<1>(pair));
-      linearIndex = builder.create<AffineApplyOp>(
-          loc, mulAddMap, ValueRange{std::get<0>(pair), stride, linearIndex});
+  if (AffineMap linearLayoutMap = getStridedLinearLayoutMap(sourceType)) {
+    // Dynamic strides/offset will create symbols. There should be none for the
+    // static case.
+    if (linearLayoutMap.getNumSymbols() == 0) {
+      return makeComposedAffineApply(builder, loc, linearLayoutMap, indices);
     }
-    return linearIndex;
   }
 
   // Then try to see if the source op carries the dynamic dimensions itself.
