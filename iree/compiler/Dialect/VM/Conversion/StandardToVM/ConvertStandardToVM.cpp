@@ -730,33 +730,19 @@ class AssertOpConversion : public OpConversionPattern<AssertOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      AssertOp srcOp, ArrayRef<Value> operands,
+      AssertOp srcOp, ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    AssertOpAdaptor adaptor(operands);
-    Location loc = srcOp.getLoc();
-
-    // Start by splitting the block containing the assert into two. The part
-    // before will contain the condition, and the part after will contain
-    // the continuation point.
-    Block *condBlock = rewriter.getInsertionBlock();
-    Block::iterator opPosition = rewriter.getInsertionPoint();
-    Block *continuationBlock = rewriter.splitBlock(condBlock, opPosition);
-
-    // Create a new block for the target of the failure.
-    Block *failureBlock;
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
-      Region *parentRegion = condBlock->getParent();
-      failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
-      auto status = rewriter.create<IREE::VM::ConstI32Op>(
-          loc, rewriter.getIntegerAttr(rewriter.getIntegerType(32),
-                                       IREE_STATUS_FAILED_PRECONDITION));
-      rewriter.create<IREE::VM::FailOp>(loc, status, srcOp.msgAttr());
-    }
-
-    rewriter.setInsertionPointToEnd(condBlock);
-    rewriter.replaceOpWithNewOp<CondBranchOp>(srcOp, adaptor.arg(),
-                                              continuationBlock, failureBlock);
+    AssertOpAdaptor operands(newOperands, srcOp->getAttrDictionary());
+    auto status = rewriter.create<IREE::VM::ConstI32Op>(
+        srcOp.getLoc(),
+        rewriter.getIntegerAttr(rewriter.getIntegerType(32),
+                                IREE_STATUS_FAILED_PRECONDITION));
+    // TODO(benvanik): invert cond_fail instead.
+    auto invertedCondition = rewriter.createOrFold<IREE::VM::XorI32Op>(
+        srcOp.getLoc(), operands.arg().getType(), operands.arg(),
+        rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+    rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(
+        srcOp, invertedCondition, status, operands.msg().getValue());
     return success();
   }
 };

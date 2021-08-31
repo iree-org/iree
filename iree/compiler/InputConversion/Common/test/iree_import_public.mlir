@@ -15,6 +15,14 @@ builtin.func @list_func(%arg0 : !iree.list<!iree.variant>) -> !iree.list<!iree.v
 }
 
 // -----
+// CHECK-LABEL: func @list_func_call
+// CHECK: call @list_func_call(%arg0) : (!util.list<?>) -> !util.list<?>
+builtin.func @list_func_call(%arg0 : !iree.list<!iree.variant>) -> !iree.list<!iree.variant> {
+  call @list_func_call(%arg0) : (!iree.list<!iree.variant>) -> !iree.list<!iree.variant>
+  return %arg0 : !iree.list<!iree.variant>
+}
+
+// -----
 // CHECK-LABEL: func @ptr_func
 // CHECK-SAME: (%arg0: !util.ptr<!hal.buffer_view>) -> !util.ptr<!hal.buffer_view>
 builtin.func @ptr_func(%arg0 : !iree.ptr<!iree.buffer_view>) -> !iree.ptr<!iree.buffer_view> {

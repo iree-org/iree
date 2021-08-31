@@ -113,18 +113,13 @@ module @t006_assert {
 
 module {
   // CHECK: vm.func private @my_fn
-  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0 : i32) -> (i32) {
+  func @my_fn(%arg0: i32) -> i32 {
     %zero = constant 0 : i32
-    // CHECK: %[[COND:.*]] = vm.cmp.ne.i32
-    // CHECK-NEXT: vm.cond_br %[[COND]], ^[[BBTRUE:.*]], ^[[BBFALSE:.*]]
+    // CHECK: %[[COND:.+]] = vm.cmp.ne.i32
     %cond = cmpi ne, %arg0, %zero : i32
-    // CHECK: ^[[BBTRUE]]:
-    // CHECK: %[[SUM:.*]] = vm.add.i32
-    // CHECK: return %[[SUM]]
-    // CHECK: ^[[BBFALSE]]:
-    // CHECK: %[[STATUS:.*]] = vm.const.i32
-    // CHECK: vm.fail %[[STATUS]]
+    // CHECK: %[[STATUS:.+]] = vm.const.i32 9
+    // CHECK: %[[INVCOND:.+]] = vm.xor.i32 %[[COND]], %c1
+    // CHECK: vm.cond_fail %[[INVCOND]], %[[STATUS]], "Assertion failed"
     assert %cond, "Assertion failed"
     %sum = addi %arg0, %arg0 : i32
     return %sum : i32

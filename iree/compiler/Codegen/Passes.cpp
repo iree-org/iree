@@ -18,14 +18,12 @@ void registerCodegenPasses() {
   // Generated.
   registerPasses();
 
-  static PassPipelineRegistration<LLVMCPUCodegenPassPipelineOptions>
-      linalgLLVMVPipeline(
-          "iree-codegen-linalg-to-llvm-pipeline",
-          "Runs the progressive lowering pipeline from Linalg to LLVM",
-          [](OpPassManager &passManager,
-             const LLVMCPUCodegenPassPipelineOptions &options) {
-            buildLLVMCPUCodegenPassPipeline(passManager, options);
-          });
+  static PassPipelineRegistration<> LinalgLLVMVPipeline(
+      "iree-codegen-linalg-to-llvm-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to LLVM",
+      [](OpPassManager &passManager) {
+        buildLLVMCPUCodegenPassPipeline(passManager);
+      });
 
   static PassPipelineRegistration<> LinalgNVVMPipeline(
       "iree-codegen-linalg-to-nvvm-pipeline",

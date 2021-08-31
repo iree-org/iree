@@ -37,7 +37,7 @@ steps:
       - "android-version=11"
       - "queue=benchmark-android"
     artifact_paths: "benchmark-results-pixel-4.json"
-    timeout_in_minutes: "30"
+    timeout_in_minutes: "40"
 
   - label: "Benchmark on Galaxy S20 (exynos-990, mali-g77)"
     commands:
@@ -53,7 +53,7 @@ steps:
       - "android-version=11"
       - "queue=benchmark-android"
     artifact_paths: "benchmark-results-galaxy-s20.json"
-    timeout_in_minutes: "30"
+    timeout_in_minutes: "40"
 
   - wait
 

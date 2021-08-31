@@ -33,16 +33,31 @@ IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/google/iree/commit'
 IREE_PROJECT_ID = 'IREE'
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 
+COMMON_DESCRIIPTION = """
+<br>
+For the graph, the x axis is the Git commit index, and the y axis is the
+measured latency in milliseconds.
+"""
+
 # A non-exhaustive list of models and their source URLs.
 # For models listed here we can provide a nicer description for them on
 # webpage.
 IREE_TF_MODEL_SOURCE_URL = {
+    'MobileBertSquad':
+        'https://github.com/google-research/google-research/tree/master/mobilebert',
     'MobileNetV2':
         'https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV2',
     'MobileNetV3Small':
         'https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV3Small',
-    'MobileBertSquad':
-        'https://github.com/google-research/google-research/tree/master/mobilebert',
+}
+
+IREE_TFLITE_MODEL_SOURCE_URL = {
+    'DeepLabV3':
+        'https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/default/1',
+    'MobileSSD':
+        'https://www.tensorflow.org/lite/performance/gpu#demo_app_tutorials',
+    'PoseNet':
+        'https://tfhub.dev/tensorflow/lite-model/posenet/mobilenet/float/075/1/default/1',
 }
 
 
@@ -52,6 +67,8 @@ def get_model_description(benchmark_info: BenchmarkInfo) -> Optional[str]:
   name = benchmark_info.model_name
   if benchmark_info.model_source == "TensorFlow":
     url = IREE_TF_MODEL_SOURCE_URL.get(name)
+  elif benchmark_info.model_source == "TFLite":
+    url = IREE_TFLITE_MODEL_SOURCE_URL.get(name)
   if url is not None:
     description = f'{name} from <a href="{url}">{url}</a>.'
     return description
@@ -292,11 +309,14 @@ def main(args):
 
   # Upload benchmark results to the dashboard.
   for series_id, (sample_value, benchmark_info) in aggregate_results.items():
-    model_description = get_model_description(benchmark_info)
+    description = get_model_description(benchmark_info)
+    if description is None:
+      description = ""
+    description += COMMON_DESCRIIPTION
 
     # Override by default to allow updates to the series.
     add_new_iree_series(series_id,
-                        model_description,
+                        description,
                         override=True,
                         dry_run=args.dry_run,
                         verbose=args.verbose)

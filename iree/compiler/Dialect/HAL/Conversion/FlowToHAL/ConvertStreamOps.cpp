@@ -574,7 +574,7 @@ static LogicalResult allocateTransientBuffers(
     auto tensorValue = subspanOp.result();
     auto bufferValue = schedulingState.loadGlobal(
         IREE::HAL::BufferType::get(rewriter.getContext()),
-        subspanOp.runtime_buffer().getLeafReference(), rewriter);
+        subspanOp.runtime_buffer().getLeafReference().getValue(), rewriter);
     auto runtimeRange = subspanOp.runtime_range();
     auto offsetValue =
         schedulingState.lookupOrCreateIndex(runtimeRange.getOffset(), rewriter);
@@ -913,7 +913,8 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
         variantOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
     auto entryPointIt =
         llvm::find_if(entryPointOps, [&](IREE::HAL::ExecutableEntryPointOp op) {
-          return op.getName() == dispatchOp.entry_point().getLeafReference();
+          return op.getNameAttr() ==
+                 dispatchOp.entry_point().getLeafReference();
         });
     if (entryPointIt == entryPointOps.end()) {
       return variantOp.emitError()

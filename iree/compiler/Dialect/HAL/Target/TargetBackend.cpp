@@ -42,7 +42,7 @@ static void renameWithDisambiguatedName(
     Operation *op, Operation *moduleOp,
     DenseMap<StringRef, Operation *> &targetSymbolMap,
     SymbolTable *optionalSymbolTable) {
-  StringRef originalName = SymbolTable::getSymbolName(op);
+  StringRef originalName = SymbolTable::getSymbolName(op).getValue();
 
   // Iteratively try suffixes until we find one that isn't used.
   std::string disambiguatedName;
@@ -56,7 +56,9 @@ static void renameWithDisambiguatedName(
 
   SymbolTableCollection symbolTable;
   SymbolUserMap symbolUsers(symbolTable, moduleOp);
-  symbolUsers.replaceAllUsesWith(op, disambiguatedName);
+  mlir::StringAttr nameAttr =
+      mlir::StringAttr::get(op->getContext(), disambiguatedName);
+  symbolUsers.replaceAllUsesWith(op, nameAttr);
   SymbolTable::setSymbolName(op, disambiguatedName);
 }
 
@@ -120,7 +122,7 @@ static LogicalResult mergeModuleInto(
           }
         }
       }
-      targetSymbolMap[SymbolTable::getSymbolName(op)] = op;
+      targetSymbolMap[SymbolTable::getSymbolName(op).getValue()] = op;
     }
     if (!targetBlock.empty() &&
         targetBlock.back().hasTrait<OpTrait::IsTerminator>()) {
@@ -195,8 +197,10 @@ LogicalResult TargetBackend::linkExecutablesInto(
         if (!linkedInterfaceOp) {
           linkedInterfaceOp = dyn_cast<IREE::HAL::InterfaceOp>(
               linkedExecutableBuilder.clone(*sourceInterfaceOp));
-          linkedInterfaceOp.setName(
+          mlir::StringAttr nameAttr = mlir::StringAttr::get(
+              linkedInterfaceOp.getContext(),
               llvm::formatv("io_{0}", linkedInterfaceOps.size()).str());
+          linkedInterfaceOp.setName(nameAttr);
           linkedInterfaceOps.push_back(linkedInterfaceOp);
         }
 

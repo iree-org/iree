@@ -71,9 +71,7 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createLLVMCPUPlanConvLoopOrderPass());
 }
 
-static void addLowerToLLVMPasses(
-    OpPassManager &passManager,
-    const LLVMCPUCodegenPassPipelineOptions &options) {
+static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // LinalgExt -> SCF
   passManager.addNestedPass<FuncOp>(linalg_ext::createLinalgExtToLoopsPass());
 
@@ -92,8 +90,7 @@ static void addLowerToLLVMPasses(
   passManager.addPass(createFoldTensorExtractOpPass());
 
   // (HAL, IREE, Linalg, STD) -> LLVM
-  passManager.addPass(createConvertToLLVMPass(
-      options.targetTriple, options.targetDataLayout, options.unfuseFMAOps));
+  passManager.addPass(createConvertToLLVMPass());
 
   // We rely on MLIR symbol visibility being correct after this point and need
   // to mirror the LLVM linkage that was assigned during conversion.
@@ -103,11 +100,10 @@ static void addLowerToLLVMPasses(
   passManager.addPass(createCSEPass());
 }
 
-void buildLLVMCPUCodegenPassPipeline(
-    OpPassManager &passManager,
-    const LLVMCPUCodegenPassPipelineOptions &options) {
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  addLowerToLLVMPasses(nestedModulePM, options);
+  addLowerToLLVMPasses(nestedModulePM);
 }
 
 }  // namespace iree_compiler

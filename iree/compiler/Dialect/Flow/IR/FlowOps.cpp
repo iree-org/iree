@@ -647,7 +647,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
                      }));
 }
 
-StringRef DispatchOp::executable() { return entry_point().getRootReference(); }
+StringAttr DispatchOp::executable() { return entry_point().getRootReference(); }
 
 FunctionType DispatchOp::getEntryPointType() {
   SmallVector<Type, 8> argTypes(operand_type_range{operands()});

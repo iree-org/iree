@@ -25,7 +25,7 @@ class ConstantSubspanConversion
       ConversionPatternRewriter &rewriter) const override {
     auto bufferValue = rewriter.createOrFold<IREE::Util::GlobalLoadOp>(
         op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),
-        op.runtime_buffer().getLeafReference());
+        op.runtime_buffer().getLeafReference().getValue());
     auto offsetValue = rewriter.createOrFold<mlir::ConstantIndexOp>(
         op.getLoc(), op.runtime_range().getOffset());
     auto lengthValue = rewriter.createOrFold<mlir::ConstantIndexOp>(

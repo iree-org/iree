@@ -60,16 +60,7 @@ static LogicalResult declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
             sourceOp.getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
     targetSymbolTable.insert(targetContainerOp);
     OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-    auto moduleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
-
-    // TODO(benvanik): something more structured here; for now we just copy over
-    // any dialect attrs from the configuration to the inner module.
-    auto configAttr = targetAttr.getConfiguration();
-    if (configAttr) {
-      for (auto item : configAttr) {
-        moduleOp->setAttr(item.first, item.second);
-      }
-    }
+    containerBuilder.create<ModuleOp>(sourceOp.getLoc());
   }
 
   // Ensure that at least one target op got created. If it didn't that means
@@ -669,8 +660,7 @@ void InterfaceBuilder::applyUsageMappings() {
         case DispatchBinding::Type::CONSTANT_STORAGE:
           attrs.push_back(IREE::HAL::ExConstantStorageAttr::get(
               builder.getStringAttr(usage.bindingOp.getName()),
-              builder.getStringAttr(
-                  usage.constant.constantBuffer.getLeafReference()),
+              usage.constant.constantBuffer.getLeafReference(),
               builder.getIndexAttr(usage.constant.minimumOffset),
               builder.getIndexAttr(usage.constant.maximumOffset -
                                    usage.constant.minimumOffset + 1)));

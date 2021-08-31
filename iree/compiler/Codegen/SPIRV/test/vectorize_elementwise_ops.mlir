@@ -11,15 +11,15 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env =
+        #spv.target_env<#spv.vce<v1.5, [Shader], []>,
+        NVIDIA:DiscreteGPU, {subgroup_size = 32 : i32}>}> {
     hal.executable.entry_point @elementwise_static_shape attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.5, [Shader], []>,
-        NVIDIA:DiscreteGPU, {subgroup_size = 32 : i32}>} {
+    module {
       func @elementwise_static_shape() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128xf32>
@@ -63,15 +63,15 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+      spv.target_env =
+        #spv.target_env<#spv.vce<v1.5, [Shader], []>,
+        NVIDIA:DiscreteGPU, {subgroup_size = 32 : i32}>}> {
     hal.executable.entry_point @elementwise_transpose attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.5, [Shader], []>,
-        NVIDIA:DiscreteGPU, {subgroup_size = 32 : i32}>} {
+    module {
       func @elementwise_transpose() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128x8xf32>
@@ -100,3 +100,4 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
     }
   }
 }
+

@@ -99,7 +99,7 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
         canonicalizationPatterns);
     memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                context);
-    scf::populateSCFLoopBodyCanonicalizationPatterns(canonicalizationPatterns);
+    scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
       return signalPassFailure();
@@ -132,7 +132,7 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
         canonicalizationPatterns);
     memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                context);
-    scf::populateSCFLoopBodyCanonicalizationPatterns(canonicalizationPatterns);
+    scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
       return signalPassFailure();
