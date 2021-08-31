@@ -4,15 +4,15 @@ hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
   hal.interface @io {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @static_1d_sort attributes {interface = @io, ordinal = 0 : index}
-    builtin.module attributes {
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
-    } {
+    }> {
+    hal.executable.entry_point @static_1d_sort attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       builtin.func @static_1d_sort() {
         %c0 = constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:1000xi32>
@@ -52,15 +52,15 @@ hal.executable @static_3d_sort attributes {sym_visibility = "private"} {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @static_3d_sort attributes {interface = @io, ordinal = 0 : index}
-    builtin.module attributes {
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
-    } {
+    }> {
+    hal.executable.entry_point @static_3d_sort attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       builtin.func @static_3d_sort() {
         %c64 = constant 64 : index
         %c128 = constant 128 : index
@@ -117,15 +117,15 @@ hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirvfb"> {
-    hal.executable.entry_point @static_1d_fft attributes {interface = @io, ordinal = 0 : index}
-    builtin.module attributes {
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirvfb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
-    } {
+    }> {
+    hal.executable.entry_point @static_1d_fft attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       builtin.func @static_1d_fft() {
         %c0 = constant 0 : index
         %c2 = constant 2 : index
@@ -168,15 +168,15 @@ hal.executable @static_3d_fft attributes {sym_visibility = "private"} {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirvfb"> {
-    hal.executable.entry_point @static_3d_fft attributes {interface = @io, ordinal = 0 : index}
-    builtin.module attributes {
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirvfb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
-    } {
+    }> {
+    hal.executable.entry_point @static_3d_fft attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       builtin.func @static_3d_fft() {
         %c0 = constant 0 : index
         %c2 = constant 2 : index

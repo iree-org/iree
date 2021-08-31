@@ -6,7 +6,11 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+       native_vector_size = 16 : index,
+       target_triple = "x86_64-unknown-linux-gnu"
+    }> {
     hal.executable.entry_point @matmul_tensors attributes {
       interface = @io,
       ordinal = 0 : index
@@ -79,7 +83,11 @@ hal.executable @add_no_config attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+       native_vector_size = 16 : index,
+       target_triple = "x86_64-unknown-linux-gnu"
+    }> {
     hal.executable.entry_point @add_no_config attributes {
       interface = @io,
       ordinal = 0 : index
@@ -119,7 +127,11 @@ hal.executable @add attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+       native_vector_size = 16 : index,
+       target_triple = "x86_64-unknown-linux-gnu"
+    }> {
     hal.executable.entry_point @add attributes {
       interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?xf32>,
@@ -194,7 +206,11 @@ hal.executable @add4D attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+       native_vector_size = 16 : index,
+       target_triple = "x86_64-unknown-linux-gnu"
+    }> {
     hal.executable.entry_point @add4D attributes {
       interface = @io, ordinal = 0 : index,
       signature = (!flow.dispatch.tensor<readonly:?x?x?x?xf32>, !flow.dispatch.tensor<readonly:?xf32>,
@@ -290,7 +306,11 @@ hal.executable @batch_matmul_tensors attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+       native_vector_size = 16 : index,
+       target_triple = "x86_64-unknown-linux-gnu"
+    }> {
     hal.executable.entry_point @batch_matmul_tensors attributes {
       interface = @io,
       ordinal = 0 : index

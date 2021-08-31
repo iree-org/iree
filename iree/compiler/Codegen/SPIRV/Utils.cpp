@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/MemorySpace.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -27,6 +28,16 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
+  auto variant = op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  if (!variant) return nullptr;
+  IREE::HAL::ExecutableTargetAttr targetAttr = variant.target();
+  if (!targetAttr) return nullptr;
+  auto config = targetAttr.getConfiguration();
+  if (!config) return nullptr;
+  return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
+}
 
 LogicalResult updateWorkGroupSize(FuncOp funcOp,
                                   ArrayRef<int64_t> workGroupSize) {

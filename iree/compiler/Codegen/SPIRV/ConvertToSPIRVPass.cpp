@@ -17,6 +17,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -321,7 +322,8 @@ void ConvertToSPIRVPass::runOnOperation() {
                     spirv::getEntryPointABIAttr(workgroupSize32, context));
   }
 
-  auto targetAttr = spirv::lookupTargetEnv(moduleOp);
+  spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);
+  moduleOp->setAttr(spirv::getTargetEnvAttrName(), targetAttr);
   SPIRVTypeConverter typeConverter(targetAttr);
   OwningRewritePatternList patterns(&getContext());
   ScfToSPIRVContext scfToSPIRVContext;

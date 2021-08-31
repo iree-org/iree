@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -57,13 +58,13 @@ static Optional<SmallVector<int64_t, 4>> getCooperativeMatmulSubgroupSize(
 /// Returns true if the target environment attached to `op`'s ancestor op
 /// supports cooperative matrix.
 bool useCooperativeMatrix(Operation *op) {
-  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+  auto targetEnv = spirv::TargetEnv(getSPIRVTargetEnvAttr(op));
   return targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
          targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix);
 }
 
 Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
-  auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+  auto targetEnv = spirv::TargetEnv(getSPIRVTargetEnvAttr(op));
   bool useCoopMatrix = useCooperativeMatrix(op);
 
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {

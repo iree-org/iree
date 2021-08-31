@@ -15,6 +15,7 @@
 
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -28,6 +29,12 @@ namespace mlir {
 namespace iree_compiler {
 
 static constexpr int kNumGPUDims = 3;
+
+//===----------------------------------------------------------------------===//
+// Attribute utils
+//===----------------------------------------------------------------------===//
+/// Given an operation, return the `spv.target_env` attribute.
+spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 
 //===----------------------------------------------------------------------===//
 // Workgroup memory utils
