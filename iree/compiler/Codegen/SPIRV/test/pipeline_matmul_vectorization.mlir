@@ -8,13 +8,14 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
     hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    module {
       func @fuse_and_vectorize_fill_matmul() {
         %c0 = constant 0 : index
         %cst = constant 0.000000e+00 : f32
@@ -77,13 +78,14 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
     hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    module {
       func @fuse_and_vectorize_matmul_add() {
         %c0 = constant 0 : index
         %cst = constant 0.000000e+00 : f32

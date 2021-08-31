@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -276,6 +277,14 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
 LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps =
       getAllEntryPoints(module);
+  spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(module);
+  if (!targetEnvAttr) {
+    return module.emitOpError(
+        "expected parent hal.executable.variant to have spv.target_env "
+        "attribute");
+  }
+  spirv::TargetEnv targetEnv(targetEnvAttr);
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
   for (auto funcOp : module.getOps<FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
@@ -288,9 +297,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
-    spirv::TargetEnv targetEnv(spirv::lookupTargetEnv(funcOp));
-    spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-    int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
+    int64_t subgroupSize =
+        targetEnv.getResourceLimits().subgroup_size().getValue().getSExtValue();
 
     // If the dispatch region does not contain tiled and distributed Linalg ops,
     // invoke the pipeline to distribute to global invocations.
