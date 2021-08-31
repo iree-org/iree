@@ -181,7 +181,9 @@ class MaterializeShapeSupportPass
       IREE::Util::GlobalOp dirtyGlobalOp, OpBuilder &moduleBuilder) {
     // Clone the entire entry function with all its IR.
     auto calcFuncOp = cast<FuncOp>(moduleBuilder.clone(*funcOp.getOperation()));
-    calcFuncOp.setName(namePrefix.str() + "_calculate_shapes");
+    mlir::StringAttr nameAttr = mlir::StringAttr::get(
+        loc.getContext(), namePrefix.str() + "_calculate_shapes");
+    calcFuncOp.setName(nameAttr);
     calcFuncOp.setPrivate();
     // TODO(benvanik): find a better way to strip these attributes.
     calcFuncOp->removeAttr("iree.abi.stub");

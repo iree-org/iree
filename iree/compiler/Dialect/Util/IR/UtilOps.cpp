@@ -672,7 +672,7 @@ static LogicalResult verifyGlobalOp(GlobalOp op) {
 
 IREE::Util::GlobalOp GlobalAddressOp::getGlobalOp() {
   return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), global());
+      getOperation()->getParentOp(), globalAttr());
 }
 
 void GlobalAddressOp::getAsmResultNames(
@@ -697,7 +697,7 @@ void GlobalLoadOp::build(OpBuilder &builder, OperationState &state,
 
 IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp() {
   return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), global());
+      getOperation()->getParentOp(), globalAttr());
 }
 
 bool GlobalLoadOp::isGlobalImmutable() { return !getGlobalOp().is_mutable(); }
@@ -712,7 +712,7 @@ void GlobalLoadOp::getEffects(
   // HACK: works around the lack of symbol side effects in mlir by only saying
   // we have a side-effect if the variable we are loading is mutable.
   auto globalOp =
-      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, global());
+      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, globalAttr());
   assert(globalOp);
   if (globalOp.is_mutable()) {
     effects.emplace_back(MemoryEffects::Read::get());
@@ -746,7 +746,7 @@ static LogicalResult verifyGlobalLoadIndirectOp(GlobalLoadIndirectOp &op) {
 
 IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp() {
   return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), global());
+      getOperation()->getParentOp(), globalAttr());
 }
 
 static LogicalResult verifyGlobalStoreOp(GlobalStoreOp op) {

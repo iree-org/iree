@@ -104,7 +104,7 @@ class OrdinalAllocationPass
     // ordinals we just assigned.
     SmallVector<Operation *, 32> deadOps;
     getOperation().walk([&](IREE::VM::GlobalAddressOp op) {
-      auto *globalOp = symbolTable.lookupNearestSymbolFrom(op, op.global());
+      auto *globalOp = symbolTable.lookupNearestSymbolFrom(op, op.globalAttr());
       assert(globalOp);
       auto ordinal = globalOp->getAttrOfType<IntegerAttr>("ordinal").getInt();
 

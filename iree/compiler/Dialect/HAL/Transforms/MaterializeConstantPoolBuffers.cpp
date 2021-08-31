@@ -97,7 +97,8 @@ class MaterializeConstantPoolBuffersPass
     // uploading 1:1 today all the offsets are the same as their storage ones.
     auto variableSymRef = SymbolRefAttr::get(context, globalOp.getName());
     for (auto spanOp : poolOp.getOps<ConstantPoolSpanOp>()) {
-      if (spanOp.storage_buffer().getLeafReference() != storageOp.getName()) {
+      if (spanOp.storage_buffer().getLeafReference() !=
+          storageOp.getNameAttr()) {
         continue;
       }
       spanOp.runtime_bufferAttr(variableSymRef);

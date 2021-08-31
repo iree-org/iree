@@ -358,7 +358,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
                                                  getVectorizeMarker(), context);
     populateTilingConvFilterPatterns(context, convFilterTilingPatterns, marker);
     populateFoldGPUProcessorIDUsesPatterns(context, convFilterTilingPatterns);
-    scf::populateSCFLoopBodyCanonicalizationPatterns(convFilterTilingPatterns);
+    scf::populateSCFForLoopCanonicalizationPatterns(convFilterTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(convFilterTilingPatterns));
 

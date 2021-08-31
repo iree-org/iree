@@ -236,7 +236,8 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   vmAnalysisCache.insert(
       std::make_pair(newFuncOp.getOperation(), std::move(ptr->second)));
 
-  if (failed(funcOp.replaceAllSymbolUses(name, moduleOp)))
+  if (failed(
+          funcOp.replaceAllSymbolUses(builder.getStringAttr(name), moduleOp)))
     return funcOp.emitError() << "unable to update symbol name in module";
 
   return success();
