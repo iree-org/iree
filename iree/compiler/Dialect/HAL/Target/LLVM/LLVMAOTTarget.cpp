@@ -391,8 +391,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       std::vector<uint8_t> libraryNameVector(libraryName.begin(),
                                              libraryName.end());
       executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.sym_name(),
-          variantOp.target().getFormat().getValue(), libraryNameVector);
+          variantOp.getLoc(), variantOp.sym_name(), "static",
+          libraryNameVector);
     } else {
       FlatbufferBuilder builder;
       iree_DyLibExecutableDef_start_as_root(builder);
