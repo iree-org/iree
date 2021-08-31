@@ -78,3 +78,15 @@ DEPS
   iree::task::api
   simple_mul
 )
+
+iree_lit_test(
+  NAME
+    static_library_demo_test
+  TEST_FILE
+    "static_library_demo_test.txt"
+  DATA
+    ::static_library_demo
+    iree::tools::IreeFileCheck
+  LABELS
+    "hostonly"
+)
