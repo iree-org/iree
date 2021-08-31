@@ -38,10 +38,12 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -52,6 +54,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-flatten-memref-subspan"
 
 namespace mlir {
 namespace iree_compiler {
@@ -175,26 +179,21 @@ struct FlattenBindingSubspan final
                                                     oldType.getNumElements());
     } else {
       ArrayRef<int64_t> oldShape = oldType.getShape();
+      MLIRContext *context = rewriter.getContext();
       Location loc = subspanOp.getLoc();
 
-      AffineExpr sym0, sym1;
-      bindSymbols(rewriter.getContext(), sym0, sym1);
-      MLIRContext *context = rewriter.getContext();
-      auto mulMap = AffineMap::get(0, 2, {sym0 * sym1}, context);
-
-      Value totalSize = rewriter.create<ConstantIndexOp>(loc, 1);
       int dynamicDimIndex = 0;
+      SmallVector<Value, 4> dims;
+      AffineExpr sizeExpr = getAffineConstantExpr(1, context);
       for (int i = 0; i < oldType.getRank(); ++i) {
-        Value thisDim;
+        sizeExpr = sizeExpr * getAffineSymbolExpr(i, context);
         if (ShapedType::isDynamic(oldShape[i])) {
-          thisDim = subspanOp.dynamic_dims()[dynamicDimIndex++];
+          dims.push_back(subspanOp.dynamic_dims()[dynamicDimIndex++]);
         } else {
-          thisDim = rewriter.create<ConstantIndexOp>(loc, oldShape[i]);
+          dims.push_back(rewriter.create<ConstantIndexOp>(loc, oldShape[i]));
         }
-        totalSize = rewriter.create<AffineApplyOp>(
-            loc, mulMap, ValueRange{totalSize, thisDim});
       }
-      dynamicDim = totalSize;
+      dynamicDim = makeComposedAffineApply(rewriter, loc, sizeExpr, dims);
     }
 
     Type newType = getTypeConverter()->convertType(oldType);

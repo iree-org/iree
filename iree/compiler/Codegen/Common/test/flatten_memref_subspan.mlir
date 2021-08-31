@@ -113,7 +113,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
 }
 
-//      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (((s2 * s3) * s1) * s0)>
+//      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (((s0 * s1) * s2) * s3)>
 //      CHECK: #[[OFFSET_MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5, s6, s7] -> (((s4 * s5 + s6) * s2 + s3) * s0 + s1 + s7 floordiv 4)>
 //      CHECK: func @store_subspan_with_all_dynamic_dim
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
@@ -122,7 +122,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //      CHECK:   %[[DIM1:.+]] = hal.interface.load.constant offset = 1 : index
 //      CHECK:   %[[DIM2:.+]] = hal.interface.load.constant offset = 2 : index
 //      CHECK:   %[[DIM3:.+]] = hal.interface.load.constant offset = 3 : index
-//      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM3]], %[[DIM2]], %[[DIM0]], %[[DIM1]]]
+//      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]]]
 //      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[DIM3]], %[[I3]], %[[DIM2]], %[[I2]], %[[I0]], %[[DIM1]], %[[I1]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[DST]][%[[INDEX]]]
@@ -141,14 +141,14 @@ hal.interface @io attributes {sym_visibility = "private"} {
   hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
 }
 
-//      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1] -> ((s1 * s0) * 32)>
+//      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1] -> ((s0 * s1) * 32)>
 //      CHECK: #[[OFFSET_MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((s3 * 4 + s4) * s1 + s2) * 8 + s0 + s5 floordiv 4)>
 //      CHECK: func @store_subspan_with_mixed_dynamic_dim
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 //      CHECK:   %[[C0:.+]] = constant 0 : index
 //      CHECK:   %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
 //      CHECK:   %[[DIM2:.+]] = hal.interface.load.constant offset = 1 : index
-//      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM2]], %[[DIM0]]]
+//      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM0]], %[[DIM2]]]
 //      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[I3]], %[[DIM2]], %[[I2]], %[[I0]], %[[I1]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[DST]][%[[INDEX]]]
