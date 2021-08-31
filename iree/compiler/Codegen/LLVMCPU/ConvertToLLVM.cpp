@@ -232,8 +232,7 @@ class HALDispatchABI {
   // |baseOffset| can optionally adjust the base byte offset of the buffer.
   MemRefDescriptor loadBinding(Location loc, int64_t ordinal,
                                Value baseOffsetValue, MemRefType memRefType,
-                               ValueRange  dynamicDims,
-                               OpBuilder &builder) {
+                               ValueRange dynamicDims, OpBuilder &builder) {
     // Load the base buffer pointer in the appropriate type (f32*, etc).
     Value basePtrValue = loadBindingPtr(loc, ordinal, builder);
 
@@ -547,7 +546,8 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
     MemRefType memRefType = op->getResult(0).getType().cast<MemRefType>();
     auto memRefDesc = abi.loadBinding(
         op->getLoc(), interfaceBindingOp.binding().getZExtValue(),
-        newOperands.byte_offset(), memRefType, newOperands.dynamic_dims(), rewriter);
+        newOperands.byte_offset(), memRefType, newOperands.dynamic_dims(),
+        rewriter);
     rewriter.replaceOp(op, {memRefDesc});
     return success();
   }
