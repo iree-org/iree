@@ -43,12 +43,21 @@ measured latency in milliseconds.
 # For models listed here we can provide a nicer description for them on
 # webpage.
 IREE_TF_MODEL_SOURCE_URL = {
+    'MobileBertSquad':
+        'https://github.com/google-research/google-research/tree/master/mobilebert',
     'MobileNetV2':
         'https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV2',
     'MobileNetV3Small':
         'https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV3Small',
-    'MobileBertSquad':
-        'https://github.com/google-research/google-research/tree/master/mobilebert',
+}
+
+IREE_TFLITE_MODEL_SOURCE_URL = {
+    'DeepLabV3':
+        'https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/default/1',
+    'MobileSSD':
+        'https://www.tensorflow.org/lite/performance/gpu#demo_app_tutorials',
+    'PoseNet':
+        'https://tfhub.dev/tensorflow/lite-model/posenet/mobilenet/float/075/1/default/1',
 }
 
 
@@ -58,6 +67,8 @@ def get_model_description(benchmark_info: BenchmarkInfo) -> Optional[str]:
   name = benchmark_info.model_name
   if benchmark_info.model_source == "TensorFlow":
     url = IREE_TF_MODEL_SOURCE_URL.get(name)
+  elif benchmark_info.model_source == "TFLite":
+    url = IREE_TFLITE_MODEL_SOURCE_URL.get(name)
   if url is not None:
     description = f'{name} from <a href="{url}">{url}</a>.'
     return description
