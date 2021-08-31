@@ -72,19 +72,19 @@ jobs:
           # Macos packages.
           - os: macos-latest
             build_package: main-dist
-            experimental: false
+            experimental: true
           - os: macos-latest
             build_package: py-runtime-pkg
-            experimental: false
+            experimental: true
           - os: macos-latest
             build_package: py-xla-compiler-tools-pkg
-            experimental: false
+            experimental: true
           - os: macos-latest
             build_package: py-tflite-compiler-tools-pkg
-            experimental: false
+            experimental: true
           - os: macos-latest
             build_package: py-tf-compiler-tools-pkg
-            experimental: false
+            experimental: true
     env:
       CIBW_BUILD_VERBOSITY: 1
       # Note that on Linux, we run under docker with an altered path.
