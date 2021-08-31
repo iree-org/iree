@@ -77,6 +77,7 @@ static iree_status_t iree_hal_subspan_buffer_map_range(
 static void iree_hal_subspan_buffer_unmap_range(
     iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, void* data_ptr) {
+  if (!buffer->allocated_buffer) return;
   _VTABLE_DISPATCH(buffer->allocated_buffer, unmap_range)
   (buffer->allocated_buffer, local_byte_offset, local_byte_length, data_ptr);
 }
@@ -660,6 +661,7 @@ IREE_API_EXPORT void iree_hal_buffer_unmap_range(
   iree_hal_buffer_mapping_impl_t* buffer_mapping =
       (iree_hal_buffer_mapping_impl_t*)base_buffer_mapping;
   iree_hal_buffer_t* buffer = buffer_mapping->backing_buffer;
+  if (!buffer) return;
   IREE_TRACE_ZONE_BEGIN(z0);
   _VTABLE_DISPATCH(buffer, unmap_range)
   (buffer, buffer_mapping->byte_offset, buffer_mapping->contents.data_length,

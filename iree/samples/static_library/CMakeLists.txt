@@ -10,19 +10,20 @@ if(NOT ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}
   return()
 endif()
 
-# Set iree-translate binary
+# Set iree-translate binary.
 set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-translate>)
 
-# Setup args for iree-transalte
+# Setup args for iree-translate.
 set(_TRANSLATE_ARGS)
 list(APPEND _TRANSLATE_ARGS "-iree-mlir-to-vm-bytecode-module")
 list(APPEND _TRANSLATE_ARGS "-iree-hal-target-backends=dylib-llvm-aot")
+list(APPEND _TRANSLATE_ARGS "-iree-llvm-link-static")
 list(APPEND _TRANSLATE_ARGS "-iree-llvm-static-library-output-path=simple_mul.o")
 list(APPEND _TRANSLATE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
 list(APPEND _TRANSLATE_ARGS "-o")
 list(APPEND _TRANSLATE_ARGS "simple_mul.vmfb")
 
-# Custom command for iree-translate to generate static library and bytecode
+# Custom command for iree-translate to generate static library and bytecode.
 add_custom_command(
   OUTPUT
     ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.h
@@ -32,7 +33,7 @@ add_custom_command(
   DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} "simple_mul.mlir"
 )
 
-# Tell cmake about the simple_mul library so it will link it
+# Tell cmake about the simple_mul library so it will link it.
 add_library(simple_mul
   STATIC
   ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.o)
@@ -77,4 +78,16 @@ DEPS
   iree::hal::local::task_driver
   iree::task::api
   simple_mul
+)
+
+iree_lit_test(
+  NAME
+    static_library_demo_test
+  TEST_FILE
+    "static_library_demo_test.txt"
+  DATA
+    ::static_library_demo
+    iree::tools::IreeFileCheck
+  LABELS
+    "hostonly"
 )
