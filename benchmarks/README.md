@@ -41,8 +41,8 @@ posting results compared against their base commit as comments.
    * https://colab.research.google.com/gist/ScottTodd/10838c0ccc87fa6d1b1c72e0fabea064/iree-keyword_spotting_streaming-benchmarks.ipynb
 
 3. Package the imported .mlir model file(s) for storage (see
-   [iree_mlir_benchmark_suite.cmake](build_tools/cmake/iree_mlir_benchmark_suite.cmake)
-   and [download_file.py](scripts/download_file.py)), then upload them to the
+   [iree_mlir_benchmark_suite.cmake](../build_tools/cmake/iree_mlir_benchmark_suite.cmake)
+   and [download_file.py](../scripts/download_file.py)), then upload them to the
    `iree-model-artifacts` Google Cloud Storage bucket with the help of a team
    member. Files currently hosted in that bucket can be viewed at
    https://storage.googleapis.com/iree-model-artifacts/index.html.
