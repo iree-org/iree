@@ -34,7 +34,8 @@ posting results compared against their base commit as comments.
    be regenerated in the future.
 
    We may further automate this over time, such as by importing from Python
-   sources as part of the benchmarks pipeline directly. For now, here are some
+   sources as part of the benchmarks pipeline directly (see
+   https://github.com/google/iree/issues/6942). For now, here are some
    references:
 
    * https://gist.github.com/antiagainst/35b0989bd0188dd9df4630bb0cf778f2
