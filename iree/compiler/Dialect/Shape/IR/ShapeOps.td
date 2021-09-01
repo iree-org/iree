@@ -113,7 +113,7 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 }
 
 def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
-    [ConstantLike, DeclareOpInterfaceMethods<OpAsmOpInterface>]> {
+    [ConstantLike, DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>]> {
   let summary = "A constant ranked_shape.";
   let description = [{
     Holds a RankedShape value. Note that it is only legal to store a constant

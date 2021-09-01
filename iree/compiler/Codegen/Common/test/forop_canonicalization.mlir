@@ -35,19 +35,19 @@ func @loop_carried_unrealized_conversion_cast(%arg0: vector<4xf32>, %arg1: vecto
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c10 = constant 10 : index
-  %0 = unrealized_conversion_cast %arg0 : vector<4xf32> to vector<1x4xf32>
-  %1 = unrealized_conversion_cast %arg1 : vector<4xf32> to vector<1x4xf32>
+  %0 = builtin.unrealized_conversion_cast %arg0 : vector<4xf32> to vector<1x4xf32>
+  %1 = builtin.unrealized_conversion_cast %arg1 : vector<4xf32> to vector<1x4xf32>
   %20:2 = scf.for %arg3 = %c0 to %c10 step %c1 iter_args(%arg4 = %0, %arg5 = %1) -> (vector<1x4xf32>, vector<1x4xf32>) {
-    %a = unrealized_conversion_cast %arg4 : vector<1x4xf32> to vector<4xf32>
-    %b = unrealized_conversion_cast %arg5 : vector<1x4xf32> to vector<4xf32>
+    %a = builtin.unrealized_conversion_cast %arg4 : vector<1x4xf32> to vector<4xf32>
+    %b = builtin.unrealized_conversion_cast %arg5 : vector<1x4xf32> to vector<4xf32>
     %c = addf %a, %b : vector<4xf32>
     %d = mulf %a, %b : vector<4xf32>
-    %cc = unrealized_conversion_cast %c : vector<4xf32> to vector<1x4xf32>
-    %dc = unrealized_conversion_cast %d : vector<4xf32> to vector<1x4xf32>
+    %cc = builtin.unrealized_conversion_cast %c : vector<4xf32> to vector<1x4xf32>
+    %dc = builtin.unrealized_conversion_cast %d : vector<4xf32> to vector<1x4xf32>
     scf.yield %cc, %dc : vector<1x4xf32>, vector<1x4xf32>
   }
-  %21 = unrealized_conversion_cast %20#0 : vector<1x4xf32> to vector<4xf32>
-  %22 = unrealized_conversion_cast %20#1 : vector<1x4xf32> to vector<4xf32>
+  %21 = builtin.unrealized_conversion_cast %20#0 : vector<1x4xf32> to vector<4xf32>
+  %22 = builtin.unrealized_conversion_cast %20#1 : vector<1x4xf32> to vector<4xf32>
   return %21, %22 : vector<4xf32>, vector<4xf32>
 }
 

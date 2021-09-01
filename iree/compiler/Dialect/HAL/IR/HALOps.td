@@ -29,7 +29,7 @@ class HAL_MakeTupleOp<string mnemonic, list<OpTrait> traits = []> :
 // TODO(benvanik): remove these as the sequencer/other HAL ops are added.
 
 def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let results = (outs
     HAL_Device:$result
@@ -113,7 +113,7 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
 //===----------------------------------------------------------------------===//
 
 def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer allocation size computation operation}];
   let description = [{
@@ -160,7 +160,7 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
 }
 
 def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     SameVariadicOperandSize,
   ]> {
   let summary = [{buffer view indices to byte offset computation operation}];
@@ -211,7 +211,7 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
 }
 
 def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     SameVariadicOperandSize,
   ]> {
   let summary = [{buffer view byte range computation operation}];
@@ -267,7 +267,7 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
 }
 
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{empty buffer allocation operation}];
@@ -298,7 +298,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
 }
 
 def HAL_AllocatorConstantOp : HAL_Op<"allocator.constant", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{constant buffer allocation operation}];
   let description = [{
@@ -331,7 +331,7 @@ def HAL_AllocatorConstantOp : HAL_Op<"allocator.constant", [
 }
 
 def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{allocator-supported host buffer wrapping operation}];
@@ -366,7 +366,7 @@ def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
 }
 
 def HAL_AllocatorPackOp : HAL_PureOp<"allocator.pack", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     AttrSizedOperandSegments,
   ]> {
   let summary = [{packs variable-sized slices into a single slab}];
@@ -474,7 +474,7 @@ def HAL_AllocatorPackOp : HAL_PureOp<"allocator.pack", [
 //===----------------------------------------------------------------------===//
 
 def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer allocator accessor operation}];
   let description = [{
@@ -498,7 +498,7 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
 }
 
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{buffer subspan operation}];
@@ -524,7 +524,7 @@ def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
 }
 
 def HAL_BufferLengthOp : HAL_PureOp<"buffer.length", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer byte length accessor}];
   let description = [{
@@ -594,7 +594,7 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
 //===----------------------------------------------------------------------===//
 
 def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer view reference initializer}];
   let description = [{
@@ -641,7 +641,7 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
 }
 
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer view buffer accessor}];
   let description = [{
@@ -665,7 +665,7 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
 }
 
 def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer view buffer byte length accessor}];
   let description = [{
@@ -822,7 +822,7 @@ def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
 //===----------------------------------------------------------------------===//
 
 def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{command buffer allocation operation}];
   let description = [{
@@ -1346,7 +1346,7 @@ def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
 }
 
 def HAL_ConstantPoolLoadOp : HAL_PureOp<"constant_pool.load", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{constant pool tensor load pseudo-op}];
   let description = [{
@@ -1399,7 +1399,7 @@ def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
 
 def HAL_ConstantStorageLookupOp :
     HAL_PureOp<"constant_storage.lookup", [
-      DeclareOpInterfaceMethods<OpAsmOpInterface>,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     ]> {
   let summary = [{constant storage byte buffer accessor}];
   let description = [{
@@ -1419,7 +1419,7 @@ def HAL_ConstantStorageLookupOp :
 }
 
 def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{runtime constant buffer lookup pseudo-op}];
   let description = [{
@@ -1446,7 +1446,7 @@ def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
 //===----------------------------------------------------------------------===//
 
 def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     SameVariadicOperandSize,
   ]> {
   let summary = [{allocates a descriptor set from the device pool}];
@@ -1494,7 +1494,7 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
 
 def HAL_DescriptorSetLayoutCreateOp :
   HAL_PureOp<"descriptor_set_layout.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{creates a descriptor set layout}];
   let description = [{
@@ -1523,7 +1523,7 @@ def HAL_DescriptorSetLayoutCreateOp :
 }
 
 def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{descriptor set layout cache lookup pseudo-op}];
   let description = [{
@@ -1554,7 +1554,7 @@ def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup",
 //===----------------------------------------------------------------------===//
 
 def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{device allocator accessor operation}];
   let description = [{
@@ -1924,7 +1924,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
 }
 
 def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{creates an executable}];
   let description = [{
@@ -1957,7 +1957,7 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
 }
 
 def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{executable cache lookup pseudo-op}];
   let description = [{
@@ -2101,7 +2101,7 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
 }
 
 def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{returns the index of the current workgroup in the grid}];
   let description = [{
@@ -2127,7 +2127,7 @@ def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
 }
 
 def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{returns the total workgroup count of the grid}];
   let description = [{
@@ -2154,7 +2154,7 @@ def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
 }
 
 def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{returns the size of each workgroup in invocations}];
   let description = [{
@@ -2233,7 +2233,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
 //===----------------------------------------------------------------------===//
 
 def HAL_ExecutableLayoutCreateOp : HAL_PureOp<"executable_layout.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{creates an executable layout}];
   let description = [{
@@ -2266,7 +2266,7 @@ def HAL_ExecutableLayoutCreateOp : HAL_PureOp<"executable_layout.create", [
 }
 
 def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{executable layout cache lookup pseudo-op}];
   let description = [{
@@ -2299,7 +2299,7 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 //===----------------------------------------------------------------------===//
 
 def HAL_SemaphoreCreateOp : HAL_Op<"semaphore.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{semaphore allocation operation}];
   let description = [{

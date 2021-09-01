@@ -37,7 +37,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module {
+    builtin.module {
       func @matmul_static_shape() {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index
@@ -299,7 +299,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module {
+    builtin.module {
       func @matmul_static_shape() {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index

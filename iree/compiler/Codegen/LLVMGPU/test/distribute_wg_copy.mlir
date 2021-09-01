@@ -17,7 +17,7 @@ hal.executable @shared_mem_cpy attributes {sym_visibility = "private"} {
       memref.global "private" @__shared_memory___1 : memref<3x512xf32, 3>
       memref.global "private" @__shared_memory___0 : memref<256x4xf32, 3>
       memref.global "private" @__shared_memory__ : memref<64x16xf32, 3>
-    // CHECK-LABEL: builtin.func @shared_mem_cpy(
+    // CHECK-LABEL: @shared_mem_cpy(
       builtin.func @shared_mem_cpy(
         %m0 : memref<64x16xf32>, %m1 : memref<256x4xf32>, %m2 : memref<3x512xf32>) {
         %sm0 = memref.get_global @__shared_memory__ : memref<64x16xf32, 3>

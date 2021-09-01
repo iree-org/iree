@@ -144,7 +144,7 @@ static ParseResult parseExportOp(OpAsmParser &parser, OperationState *result) {
 }
 
 static void printExportOp(OpAsmPrinter &p, ExportOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.function_ref());
   if (op.export_name() != op.function_ref()) {
     p << " as(\"" << op.export_name() << "\")";
@@ -226,7 +226,7 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
 }
 
 static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.getName());
   p << "(";
   for (int i = 0; i < op.getNumFuncArguments(); ++i) {
@@ -304,7 +304,6 @@ static ParseResult parseInitializerOp(OpAsmParser &parser,
 }
 
 static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
-  p << "vm.initializer";
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
   p.printRegion(op.body());
 }
@@ -479,7 +478,7 @@ static ParseResult parseConstOp(OpAsmParser &parser, OperationState *result) {
 
 template <typename T>
 static void printConstOp(OpAsmPrinter &p, T &op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printAttribute(op.value());
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
 }
@@ -814,7 +813,7 @@ static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState *result) {
 
 template <typename T>
 static void printSwitchOp(OpAsmPrinter &p, T &op) {
-  p << op.getOperationName() << " ";
+  p << " ";
   p.printOperand(op.index());
   p << "[";
   p.printOperands(op.values());
@@ -1022,7 +1021,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
 }
 
 static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
-  p << op.getOperationName() << ' ' << op->getAttr("callee") << '(';
+  p << ' ' << op->getAttr("callee") << '(';
   int operand = 0;
   llvm::interleaveComma(
       llvm::zip(op.segment_sizes(), op.segment_types()), p,
@@ -1135,7 +1134,7 @@ static ParseResult parseCondFailOp(OpAsmParser &parser,
 }
 
 static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   if (op.condition() != op.status()) {
     p << op.condition() << ", ";
   }

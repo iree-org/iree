@@ -10,7 +10,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   }
   hal.executable.variant @rocm, target = #hal.executable.target<"rocm", "rocm-hsaco-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<writeonly:16xf32>) -> ()}
-  module  {
+  builtin.module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
       %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
@@ -53,7 +53,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @rocm, target = #hal.executable.target<"rocm", "rocm-hsaco-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<writeonly:1024x1024xf32>) -> ()}
-    module  {
+    builtin.module  {
       func @dot_dispatch_0() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index

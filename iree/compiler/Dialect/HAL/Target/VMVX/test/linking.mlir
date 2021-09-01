@@ -10,7 +10,7 @@ hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       vm.module @module {
         vm.func @dispatch_0() {
           vm.return
@@ -28,7 +28,7 @@ hal.executable @dispatch_1 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       vm.module @module {
         vm.func @dispatch_1() {
           vm.return
@@ -47,7 +47,7 @@ hal.executable @dispatch_2 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       vm.module @module {
         vm.func @dispatch_2() {
           vm.return
@@ -127,7 +127,7 @@ hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       vm.module @module {
         vm.func @dispatch_0() {
           vm.return
@@ -137,7 +137,7 @@ hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
     }
   }
   hal.executable.variant @cuda, target = #cuda_target {
-    module {
+    builtin.module {
     }
   }
 }
@@ -148,7 +148,7 @@ hal.executable @dispatch_1 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       vm.module @module {
         vm.func @dispatch_1() {
           vm.return
@@ -158,7 +158,7 @@ hal.executable @dispatch_1 attributes {sym_visibility = "private"} {
     }
   }
   hal.executable.variant @cuda, target = #cuda_target {
-    module {
+    builtin.module {
     }
   }
 }
@@ -249,7 +249,7 @@ module {
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
       hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-      module {
+      builtin.module {
         vm.module @module {}
       }
     }
@@ -262,7 +262,7 @@ module {
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
       hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
-      module {
+      builtin.module {
         vm.module @module {}
       }
     }
@@ -275,7 +275,7 @@ module {
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
       hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
-      module {
+      builtin.module {
         vm.module @module {}
       }
     }
@@ -306,7 +306,7 @@ hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
   hal.interface @io {}
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       vm.module @module {
         vm.rodata public @rodata_a dense<[0]> : tensor<1xi32>
         vm.rodata public @rodata_b dense<[0]> : tensor<1xi32>
@@ -329,7 +329,7 @@ hal.executable @dispatch_1 attributes {sym_visibility = "private"} {
   hal.interface @io {}
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       vm.module @module {
         // Conflict with a public symbol, this should be renamed when linked.
         vm.rodata private @rodata_b dense<[1]> : tensor<1xi32>
