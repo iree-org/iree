@@ -156,7 +156,7 @@ static void printExportOp(OpAsmPrinter &p, ExportOp op) {
 void ExportOp::build(OpBuilder &builder, OperationState &result,
                      FuncOp functionRef, StringRef exportName,
                      ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, builder.getSymbolRefAttr(functionRef),
+  build(builder, result, SymbolRefAttr::get(functionRef),
         exportName.empty() ? functionRef.getName() : exportName, attrs);
 }
 
@@ -716,7 +716,8 @@ static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
 void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
                              StringRef rodataName,
                              ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute("rodata", builder.getSymbolRefAttr(rodataName));
+  result.addAttribute("rodata",
+                      SymbolRefAttr::get(builder.getContext(), rodataName));
   auto type =
       IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
   result.addTypes({type});

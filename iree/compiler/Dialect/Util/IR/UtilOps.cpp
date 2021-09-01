@@ -691,7 +691,7 @@ static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
 void GlobalLoadOp::build(OpBuilder &builder, OperationState &state,
                          GlobalOp globalOp, ArrayRef<NamedAttribute> attrs) {
   state.addTypes({globalOp.type()});
-  state.addAttribute("global", builder.getSymbolRefAttr(globalOp));
+  state.addAttribute("global", SymbolRefAttr::get(globalOp));
   state.attributes.append(attrs.begin(), attrs.end());
 }
 

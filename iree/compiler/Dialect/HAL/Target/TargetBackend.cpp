@@ -208,19 +208,19 @@ LogicalResult TargetBackend::linkExecutablesInto(
             linkedTargetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
-                builder.getSymbolRefAttr(linkedInterfaceOp.getName()),
+                SymbolRefAttr::get(builder.getContext(),
+                                   linkedInterfaceOp.getName()),
                 ArrayAttr{}, IntegerAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.
-        auto oldSymbolRefAttr =
-            builder.getSymbolRefAttr(sourceExecutableOp.getName(),
-                                     {builder.getSymbolRefAttr(variantOp),
-                                      builder.getSymbolRefAttr(entryPointOp)});
-        auto newSymbolRefAttr = builder.getSymbolRefAttr(
-            linkedExecutableOp.getName(),
-            {builder.getSymbolRefAttr(linkedTargetOp),
-             builder.getSymbolRefAttr(newEntryPointOp)});
+        auto oldSymbolRefAttr = SymbolRefAttr::get(
+            builder.getContext(), sourceExecutableOp.getName(),
+            {SymbolRefAttr::get(variantOp), SymbolRefAttr::get(entryPointOp)});
+        auto newSymbolRefAttr = SymbolRefAttr::get(
+            builder.getContext(), linkedExecutableOp.getName(),
+            {SymbolRefAttr::get(linkedTargetOp),
+             SymbolRefAttr::get(newEntryPointOp)});
         entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
       }
 

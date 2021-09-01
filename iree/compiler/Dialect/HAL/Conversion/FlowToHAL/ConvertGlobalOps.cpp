@@ -108,7 +108,7 @@ class GlobalLoadOpConversion
     // TODO(benvanik): multiple converted type results to multiple globals.
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalLoadOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
-        rewriter.getSymbolRefAttr(loadOp.global()));
+        SymbolRefAttr::get(rewriter.getContext(), loadOp.global()));
     return success();
   }
 
@@ -184,7 +184,8 @@ class GlobalStoreOpConversion
     }
     // TODO(benvanik): multiple converted type results to multiple globals.
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalStoreOp>(
-        storeOp, storeValue, rewriter.getSymbolRefAttr(storeOp.global()));
+        storeOp, storeValue,
+        SymbolRefAttr::get(rewriter.getContext(), storeOp.global()));
     return success();
   }
 

@@ -52,8 +52,8 @@ class CommandBufferPushDescriptorSetOpConversion
     }
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
-        op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
-        segmentSizes, importType.getInputs(), callOperands);
+        op, SymbolRefAttr::get(importOp), importType.getResults(), segmentSizes,
+        importType.getInputs(), callOperands);
     copyImportAttrs(importOp, callOp);
     return success();
   }

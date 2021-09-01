@@ -215,7 +215,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   OpBuilder builder(executableOp.body());
   auto entryPointOp = builder.create<DispatchEntryOp>(
       regionOp.getLoc(), builder.getStringAttr(workgroupFuncOp.getName()),
-      builder.getSymbolRefAttr(workgroupFuncOp),
+      SymbolRefAttr::get(workgroupFuncOp),
       builder.getIndexAttr(regionOp.getWorkgroupRank()));
 
   // Finally convert the dispatch region into a dispatch to the outlined func.

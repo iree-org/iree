@@ -1985,7 +1985,7 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
     OpBuilder<(ins "Value":$device, "StringRef":$executable),
     [{
       $_state.addOperands({device});
-      $_state.addAttribute("executable", $_builder.getSymbolRefAttr(executable));
+      $_state.addAttribute("executable", mlir::SymbolRefAttr::get($_builder.getContext(), executable));
       $_state.addTypes({ExecutableType::get($_builder.getContext())});
     }]>,
   ];

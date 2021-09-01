@@ -941,10 +941,10 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                             executableLayout, bindingsAttr, schedulingState,
                             rewriter, caseBuilder);
 
-    auto entryPointSymRef = caseBuilder.getSymbolRefAttr(
-        executableOp.getName(),
-        {caseBuilder.getSymbolRefAttr(entryPointOp->getParentOp()),
-         caseBuilder.getSymbolRefAttr(entryPointOp)});
+    auto entryPointSymRef =
+        SymbolRefAttr::get(caseBuilder.getContext(), executableOp.getName(),
+                           {SymbolRefAttr::get(entryPointOp->getParentOp()),
+                            SymbolRefAttr::get(entryPointOp)});
     auto caseWorkgroupCount = calculateDispatchWorkgroupCount(
         loc, executableOp, entryPointOp, workgroupCount, caseBuilder);
     caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(

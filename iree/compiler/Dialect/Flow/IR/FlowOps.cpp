@@ -625,8 +625,8 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
           .getValue();
   state.addAttribute(
       "entry_point",
-      builder.getSymbolRefAttr(executableOpSymName,
-                               {builder.getSymbolRefAttr(entryPoint)}));
+      SymbolRefAttr::get(builder.getContext(), executableOpSymName,
+                         {SymbolRefAttr::get(entryPoint)}));
 
   state.addOperands(workgroupCount);
   state.addTypes(resultTypes);
