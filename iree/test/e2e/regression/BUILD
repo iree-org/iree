@@ -67,8 +67,17 @@ iree_check_single_backend_test_suite(
     name = "check_regression_dylib-llvm-aot",
     srcs = [
         "linalg_ext_ops.mlir",
-        "lowering_config.mlir",
+        "tensor_insert_slice.mlir",
     ] + BACKEND_TESTS,
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_lowering_config_dylib-llvm-aot",
+    srcs = [
+        "lowering_config.mlir",
+    ],
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
@@ -77,7 +86,6 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_vmvx",
     srcs = BACKEND_TESTS,
-    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vmvx",
     target_backend = "vmvx",
 )
@@ -85,7 +93,6 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
     srcs = BACKEND_TESTS,
-    compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

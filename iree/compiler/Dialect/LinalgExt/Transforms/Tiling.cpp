@@ -18,6 +18,7 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -58,20 +59,6 @@ static LogicalResult verifySupportedTilingOptions(
   return success();
 }
 
-/// Converts a `Value` to an `OpFoldRedult` by extracting the constant value if
-/// the value is defined by a constant op.
-static OpFoldResult getOpFoldResult(Value value) {
-  IntegerAttr::ValueType attr;
-  if (matchPattern(value, m_ConstantInt(&attr))) {
-    return IntegerAttr::get(value.getType(), attr);
-  }
-  return value;
-}
-static SmallVector<OpFoldResult, 4> getOpFoldResult(ArrayRef<Value> values) {
-  return llvm::to_vector<4>(llvm::map_range(
-      values, [](Value value) { return getOpFoldResult(value); }));
-}
-
 /// Converts an `OpFoldResult` to a `Value` by building a constant op if
 /// if the `OpFoldResult` is an `IntegerAttr`.
 static Value getValue(OpBuilder &builder, Location loc,
@@ -83,26 +70,13 @@ static Value getValue(OpBuilder &builder, Location loc,
   return valueOrAttr.get<Value>();
 }
 
-/// Returns the constant value in `valueOrAttr` if it is not a dynamic `Value`.
-static Optional<int64_t> getConstantValue(OpFoldResult valueOrAttr) {
-  if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-    return attr.cast<IntegerAttr>().getInt();
-  }
-  return {};
-}
-
-/// Checks if `valueOrAttr` represents a constant value `val`.
-static bool isValue(OpFoldResult valueOrAttr, int64_t val) {
-  auto attr = valueOrAttr.dyn_cast<Attribute>();
-  return attr && attr.cast<IntegerAttr>().getValue() == val;
-}
-
 /// Returns true if loop is untiled. Only checks if the value is statically
 /// zero. It is assumed that a `Value` defined by a constant op is already
 /// converted to an `IntegerAttr` of that value. So here just return true if
 /// this is an attribute with a zero value.
 static bool isUntiledLoop(OpFoldResult valueOrAttr) {
-  return isValue(valueOrAttr, 0);
+  Optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
+  return intVal && *intVal == 0;
 }
 
 /// Generates the tiled loops and the body by invoking the interface methods of
@@ -148,7 +122,7 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
     offsets.push_back(zeroAttr);
     assert(matchPattern(loopBounds[loopDepth].offset, m_Zero()) &&
            "expected loop bounds to have lower bound of zero");
-    tileSizes[loopDepth] = getOpFoldResult(loopBounds[loopDepth].size);
+    tileSizes[loopDepth] = getAsOpFoldResult(loopBounds[loopDepth].size);
     return tileInterfaceOpImpl(builder, tilableOp, outputs, tileSizes,
                                iteratorTypes, loopBounds, loopDepth + 1,
                                offsets, distributionInfo);
@@ -187,7 +161,7 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
         Value inBoundsTileSize = b.create<AffineMinOp>(
             loc, affineMaps,
             ValueRange{iv, getValue(builder, loc, tileSizes[loopDepth]), ub});
-        tileSizes[loopDepth] = getOpFoldResult(inBoundsTileSize);
+        tileSizes[loopDepth] = getAsOpFoldResult(inBoundsTileSize);
         // Recursively proceed to generate the tiled loop for the next level.
         innerReturnValue =
             tileInterfaceOpImpl(b, tilableOp, (isBufferTiling ? outputs : args),
@@ -221,7 +195,7 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
   // The actual tile sizes used converts `Value` defined as constant 0, to a
   // zero integer attributes. Currently if the iterator type is not "parallel",
   // the tile size is forced to zero as well.
-  auto tileSizes = getOpFoldResult(tileSizesVals);
+  auto tileSizes = getAsOpFoldResult(tileSizesVals);
   tileSizes.resize(iteratorTypes.size(), zeroAttr);
   for (auto en : llvm::enumerate(iteratorTypes)) {
     if (en.value() == getParallelIteratorTypeName()) continue;
@@ -304,7 +278,8 @@ struct InsertSliceTiledOpInterface
     // Compute a subtensor of the source based on the offsets.
     auto opStrides = insertOp.getMixedStrides();
     if (!llvm::all_of(opStrides, [&](OpFoldResult valueOrAttr) {
-          return isValue(valueOrAttr, 1);
+          Optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
+          return intVal && *intVal == 1;
         })) {
       op->emitOpError("unable to tile operation with non-unit stride");
       return nullptr;
@@ -331,7 +306,8 @@ struct InsertSliceTiledOpInterface
       // 2) The current rank of the source is not 1.
       // Then the opOffset is for the rank-reduced dimension. Skip.
       unsigned opOffsetIndex = opOffset.index();
-      if (isValue(opSizes[opOffsetIndex], 1) && sourceShape[offsetIndex] != 1) {
+      Optional<int64_t> opSizeVal = getConstantIntValue(opSizes[opOffsetIndex]);
+      if (opSizeVal && *opSizeVal == 1 && sourceShape[offsetIndex] != 1) {
         resultOffsets[opOffsetIndex] = zeroAttr;
         resultSizes[opOffsetIndex] = oneAttr;
         continue;
@@ -340,7 +316,7 @@ struct InsertSliceTiledOpInterface
       OpFoldResult offset = offsets[offsetIndex];
       if (opOffsetVal.is<Attribute>() && offset.is<Attribute>()) {
         resultOffsets[opOffsetIndex] = b.getI64IntegerAttr(
-            *getConstantValue(opOffsetVal) + *getConstantValue(offset));
+            *getConstantIntValue(opOffsetVal) + *getConstantIntValue(offset));
       } else {
         AffineMap map = AffineMap::get(
             1, 1, {b.getAffineDimExpr(0) + b.getAffineSymbolExpr(0)});
@@ -362,10 +338,6 @@ struct InsertSliceTiledOpInterface
   }
 };
 }  // namespace
-
-//===----------------------------------------------------------------------===//
-// Patterns for tiling LinalgExtOps.
-//===----------------------------------------------------------------------===//
 
 LogicalResult TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
     TiledOpInterface tilableOp, PatternRewriter &rewriter,
@@ -397,7 +369,6 @@ struct TiledOpInterfaceTilingPass
                 linalg_ext::LinalgExtDialect, memref::MemRefDialect,
                 StandardOpsDialect, tensor::TensorDialect, scf::SCFDialect>();
   }
-
   LogicalResult initialize(MLIRContext *context) override;
   void runOnOperation() override;
 };
@@ -409,6 +380,8 @@ static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 }
 
 LogicalResult TiledOpInterfaceTilingPass::initialize(MLIRContext *context) {
+  // TODO(ravishankarm): When the interface is added during registration, remove
+  // this initialization.
   tensor::InsertSliceOp::attachInterface<InsertSliceTiledOpInterface>(*context);
   return success();
 }
@@ -418,24 +391,23 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
   MLIRContext *context = funcOp.getContext();
 
   RewritePatternSet patterns(context);
-  patterns.add<TiledOpInterfaceTilingPattern<ScatterOp>,
-               TiledOpInterfaceTilingPattern<tensor::InsertSliceOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({10, 20}),
       linalg::LinalgTransformationFilter(
           Identifier::get("tiling_input", context),
           Identifier::get("tiling_output", context)));
-  patterns.add<TiledOpInterfaceTilingPattern<ScatterOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{0}),
       linalg::LinalgTransformationFilter(
           Identifier::get("no_tiling_input", context),
           Identifier::get("no_tiling_output", context)));
 
-  patterns.add<TiledOpInterfaceTilingPattern<SortOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({0, 20}),
       linalg::LinalgTransformationFilter(
           Identifier::get("outer_reduce_input", context),
           Identifier::get("outer_reduce_output", context)));
-  patterns.add<TiledOpInterfaceTilingPattern<SortOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({10, 0, 0}),
       linalg::LinalgTransformationFilter(
           Identifier::get("inner_reduce_input", context),
@@ -460,8 +432,7 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
       DenseMap<StringRef,
                std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 
-  patterns.add<TiledOpInterfaceTilingPattern<ScatterOp>,
-               TiledOpInterfaceTilingPattern<SortOp>>(
+  patterns.add<TiledOpInterfaceTilingPattern>(
       context,
       linalg::LinalgTilingOptions()
           .setTileSizes(ArrayRef<int64_t>{10, 0, 30})

@@ -42,6 +42,17 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_vector.mlir"
     "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "tensor_insert_slice.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_lowering_config_dylib-llvm-aot
+  SRCS
     "lowering_config.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -68,8 +79,6 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "vmvx"
-  COMPILER_FLAGS
-    "-iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -89,8 +98,6 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-  COMPILER_FLAGS
-    "-iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(

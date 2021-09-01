@@ -55,6 +55,7 @@ cc_library(
         ":LinalgExtOpsGen",
         ":TiledOpInterface",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",

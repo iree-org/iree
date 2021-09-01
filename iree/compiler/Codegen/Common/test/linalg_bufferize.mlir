@@ -2442,3 +2442,103 @@ func @linalg_ext_sort_1d() {
 //       CHECK:   linalg_ext.sort
 //  CHECK-SAME:     dimension(0)
 //  CHECK-SAME:     outs(%[[INOUT]] : memref<128xi32>)
+
+// -----
+
+builtin.func @tensor_insert_slice() {
+  %c0 = constant 0 : index
+  %1 = hal.interface.load.constant offset = 0 : index
+  %2 = hal.interface.load.constant offset = 1 : index
+  %d0 = hal.interface.load.constant offset = 2 : index
+  %d1 = hal.interface.load.constant offset = 3 : index
+  %d2 = hal.interface.load.constant offset = 4 : index
+  %d3 = hal.interface.load.constant offset = 5 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1}
+  %3 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>{%d2, %d3}
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_size_y = hal.interface.workgroup.size[1] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %4 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_y, %workgroup_id_y]
+  %5 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_y, %workgroup_count_y]
+  scf.for %arg0 = %4 to %d0 step %5 {
+    %6 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %d0]
+    %7 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_x, %workgroup_id_x]
+    %8 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_x, %workgroup_count_x]
+    scf.for %arg1 = %7 to %d1 step %8 {
+      %9 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %d1]
+      %10 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1], sizes = [%6, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+      %11 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%arg0)[%1]
+      %12 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%arg1)[%2]
+      flow.dispatch.tensor.store %10, %3, offsets = [%11, %12], sizes = [%6, %9], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
+    }
+  }
+  return
+}
+hal.interface @io attributes {push_constants = 2 : index, sym_visibility = "private"} {
+  hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+//       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+//       CHECK: func @tensor_insert_slice()
+//   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%{{.+}}] : memref<?x?xi32>
+//   CHECK-DAG:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b1_xw_external[%{{.+}}] : memref<?x?xi32>
+//   CHECK-DAG:   %[[OFFSET_Y:.+]] = hal.interface.load.constant offset = 0
+//   CHECK-DAG:   %[[OFFSET_X:.+]] = hal.interface.load.constant offset = 1
+//       CHECK:   scf.for %[[IV0:.+]] =
+//       CHECK:     scf.for %[[IV1:.+]] =
+//   CHECK-DAG:       %[[SRC_VIEW:.+]] = memref.subview %[[SRC]][%[[IV0]], %[[IV1]]]
+//   CHECK-DAG:       %[[DST_IDX_Y:.+]] = affine.apply #[[MAP]](%[[IV0]])[%[[OFFSET_Y]]]
+//   CHECK-DAG:       %[[DST_IDX_X:.+]] = affine.apply #[[MAP]](%[[IV1]])[%[[OFFSET_X]]]
+//       CHECK:       %[[DST_VIEW:.+]] = memref.subview %[[DST]][%[[DST_IDX_Y]], %[[DST_IDX_X]]]
+//       CHECK:       linalg.copy(%[[SRC_VIEW]], %[[DST_VIEW]])
+
+
+// -----
+
+builtin.func @dynamic_update_slice() {
+  %c0 = constant 0 : index
+  %c3 = constant 3 : index
+  %c0_i32 = constant 0 : i32
+  %d0 = hal.interface.load.constant offset = 0 : index
+  %d1 = hal.interface.load.constant offset = 1 : index
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:?xi32>{%d0}
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:i32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>{%d1, %d0}
+  %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
+  %4 = tensor.extract %3[] : tensor<i32>
+  %5 = cmpi slt, %4, %c0_i32 : i32
+  %6 = select %5, %4, %c0_i32 : i32
+  %7 = cmpi sgt, %6, %c0_i32 : i32
+  %8 = select %7, %6, %c0_i32 : i32
+  %9 = index_cast %8 : i32 to index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+  %11 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+  scf.for %arg0 = %10 to %d0 step %11 {
+    %12 = affine.min affine_map<(d0)[s0] -> (64, -d0 + s0)>(%arg0)[%d0]
+    %13 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [%12], strides = [1] : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
+    %14 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%arg0)[%9]
+    flow.dispatch.tensor.store %13, %2, offsets = [0, %14], sizes = [1, %12], strides = [1, 1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
+  }
+  return
+}
+hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+  hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+}
+// CHECK-LABEL: func @dynamic_update_slice()
+//   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%{{.+}}] : memref<?xi32>
+//   CHECK-DAG:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%{{.+}}] : memref<?x?xi32>
+//   CHECK-DAG:   %[[OFFSET_Y:.+]] = hal.interface.load.constant offset = 0
+//   CHECK-DAG:   %[[OFFSET_X:.+]] = hal.interface.load.constant offset = 1
+//       CHECK:   scf.for %[[IV0:.+]] =
+//       CHECK:     %[[SRC_VIEW:.+]] = memref.subview %[[SRC]][%[[IV0]]]
+//  CHECK-SAME:         : memref<?xi32> to memref<?xi32, #{{.+}}>
+//       CHECK:     %[[DST_VIEW:.+]] = memref.subview %[[DST]][0, %{{.+}}] [1, %{{.+}}]
+//  CHECK-SAME:         : memref<?x?xi32> to memref<?xi32, #{{.+}}>
+//       CHECK:     linalg.copy(%[[SRC_VIEW]], %[[DST_VIEW]])

@@ -332,10 +332,19 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
 
     // If the function entry point already doesnt have a lowering info attribute
     // on it, just add the default.
+    SmallVector<int64_t> workloadPerWorkgroup;
+    if (!tiledLoops.empty()) {
+      // If the tiled loops are not empty then this could be a corner case of
+      // tensor.insert_slice being tiled and distributed, that just shows up as
+      // a `flow.dispatch.tensor.load` and a `flow.dispatch.tensor.store`. For
+      // now just treat the tiled loops not being empty as an indicator of
+      // that. Need a better way of information flow from flow dialect to hal.
+      workloadPerWorkgroup.resize(tiledLoops.size(), defaultWorkgroupTileSize);
+    }
     if (!getTranslationInfo(entryPointOp)) {
       setTranslationInfo(funcOp,
                          IREE::HAL::DispatchLoweringPassPipeline::CPUDefault,
-                         /*workgroupSize =*/{}, /*workloadPerWorkgroup =*/{});
+                         /*workgroupSize =*/{}, workloadPerWorkgroup);
     }
   }
   return success();
