@@ -9,15 +9,12 @@ compiler:
 
 === "Linux and MacOS"
 
-    <!-- TODO(scotttodd): annotation about gcc vs clang -->
+    1. Install a compiler/linker (typically "clang" and "lld" package).
 
-    1. Install compiler/linker (typically "clang" and "lld" package).
+    2. Install [CMake](https://cmake.org/download/) (typically "cmake" package).
 
-    2. Install [CMake](https://cmake.org/download/) 
-       (typically "cmake" package).
-
-    3. Install [Ninja](https://ninja-build.org/) 
-       (typically "ninja-build" package).
+    3. Install [Ninja](https://ninja-build.org/) (typically "ninja-build"
+       package).
 
 On a relatively recent Debian/Ubuntu:
 
@@ -57,22 +54,32 @@ Configure then build all targets using CMake:
 
 Configure CMake:
 
-``` shell
-# Recommended for simple development using clang and lld:
-cmake -GNinja -B ../iree-build/ -S . \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DIREE_ENABLE_ASSERTIONS=ON \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DIREE_ENABLE_LLD=ON
+=== "Linux and MacOS"
 
-# Alternately, with system compiler and your choice of CMake generator:
-# cmake -B ../iree-build/ -S .
+    ``` shell
+    # Recommended for simple development using clang and lld:
+    cmake -GNinja -B ../iree-build/ -S . \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DIREE_ENABLE_ASSERTIONS=ON \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DIREE_ENABLE_LLD=ON
 
-# Additional quality of life CMake flags:
-# Enable ccache:
-#   -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-```
+    # Alternately, with system compiler and your choice of CMake generator:
+    # cmake -B ../iree-build/ -S .
+
+    # Additional quality of life CMake flags:
+    # Enable ccache:
+    #   -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+    ```
+
+=== "Windows"
+
+    ``` shell
+    cmake -GNinja -B ../iree-build/ -S . \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DIREE_ENABLE_ASSERTIONS=ON
+    ```
 
 Build:
 
