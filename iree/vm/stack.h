@@ -12,6 +12,8 @@
 
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
+#include "iree/base/attributes.h"
+#include "iree/base/string_builder.h"
 #include "iree/base/tracing.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
@@ -202,6 +204,24 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
 // Leaves the current stack frame.
 IREE_API_EXPORT iree_status_t
 iree_vm_stack_function_leave(iree_vm_stack_t* stack);
+
+// Formats a backtrace of the current stack to the given string |builder|.
+IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
+    iree_vm_stack_t* stack, iree_string_builder_t* builder);
+
+// Annotates |status| with the backtrace of |stack| and returns |base_status|.
+IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
+iree_vm_stack_annotate_backtrace(iree_vm_stack_t* stack,
+                                 iree_status_t base_status);
+
+#if IREE_VM_BACKTRACE_ENABLE && \
+    (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS)
+#define IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, base_status) \
+  iree_vm_stack_annotate_backtrace(stack, base_status)
+#else
+#define IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, base_status) \
+  (base_status)
+#endif  // IREE_VM_BACKTRACE_ENABLE && IREE_STATUS_FEATURE_ANNOTATIONS
 
 #ifdef __cplusplus
 }  // extern "C"

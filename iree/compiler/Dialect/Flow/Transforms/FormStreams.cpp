@@ -186,7 +186,7 @@ class FormStreamsPass : public FormStreamsBase<FormStreamsPass> {
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createFormStreamsPass() {
   return std::make_unique<FormStreamsPass>();
 }
 

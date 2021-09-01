@@ -106,24 +106,22 @@ static void populateTilingToInvocationPatterns(
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  patterns.insert<
-      linalg::LinalgTilingPattern<linalg::MatmulOp>,
-      linalg::LinalgTilingPattern<linalg::FillOp>,
-      linalg::LinalgTilingPattern<linalg::CopyOp>,
-      linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-      linalg::LinalgTilingPattern<linalg::GenericOp>,
-      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
-      linalg::LinalgTilingPattern<linalg::ConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCFOp>,
-      linalg::LinalgTilingPattern<linalg::DepthwiseConvInputNHWCFilterHWCOp>,
-      linalg_ext::TiledOpInterfaceTilingPattern<linalg_ext::ScatterOp>>(
-      context, tilingOptions,
-      linalg::LinalgTransformationFilter(
-          {Identifier::get(getWorkgroupMarker(), context),
-           Identifier::get(getWorkgroupKTiledMarker(), context),
-           Identifier::get(getWorkgroupMemoryMarker(), context)},
-          Identifier::get(getVectorizeMarker(), context)));
+  patterns
+      .insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+              linalg::LinalgTilingPattern<linalg::FillOp>,
+              linalg::LinalgTilingPattern<linalg::CopyOp>,
+              linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+              linalg::LinalgTilingPattern<linalg::GenericOp>,
+              linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
+              linalg_ext::TiledOpInterfaceTilingPattern<linalg_ext::ScatterOp>>(
+          context, tilingOptions,
+          linalg::LinalgTransformationFilter(
+              {Identifier::get(getWorkgroupMarker(), context),
+               Identifier::get(getWorkgroupKTiledMarker(), context),
+               Identifier::get(getWorkgroupMemoryMarker(), context)},
+              Identifier::get(getVectorizeMarker(), context)));
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
@@ -181,7 +179,8 @@ static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 
 static void populatePromotionPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
-  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>>(
+  patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
+                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
       context,
       linalg::LinalgPromotionOptions()
           .setAllocationDeallocationFns(allocateWorkgroupMemory,
@@ -228,7 +227,13 @@ struct LLVMGPUTileAndDistributePass
       funcOp.dump();
     });
 
-    {
+    auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
+        getEntryPoint(funcOp).workgroup_size().getValue(),
+        [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+    int64_t flatWorkgroupSize =
+        workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+    // Only promote to workgroup size if there are multiple warps.
+    if (flatWorkgroupSize > 32) {
       OwningRewritePatternList promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
@@ -264,9 +269,6 @@ struct LLVMGPUTileAndDistributePass
     });
 
     {
-      auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-          getEntryPoint(funcOp).workgroup_size().getValue(),
-          [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
       // Apply last level of tiling and distribute to threads.
       OwningRewritePatternList threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(context, threadLevelTilingPatterns,

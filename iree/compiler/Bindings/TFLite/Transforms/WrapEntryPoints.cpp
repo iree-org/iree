@@ -44,7 +44,9 @@ class WrapEntryPointsPass
 
     SmallVector<FuncOp, 4> entryFuncOps;
     for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-      if (funcOp.isPublic()) entryFuncOps.push_back(funcOp);
+      if (funcOp.isPublic() && !funcOp->hasAttr("iree.abi.stub")) {
+        entryFuncOps.push_back(funcOp);
+      }
     }
     if (entryFuncOps.size() == 0) {
       moduleOp.emitError()

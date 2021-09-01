@@ -18,14 +18,12 @@ void registerCodegenPasses() {
   // Generated.
   registerPasses();
 
-  static PassPipelineRegistration<LLVMCPUCodegenPassPipelineOptions>
-      linalgLLVMVPipeline(
-          "iree-codegen-linalg-to-llvm-pipeline",
-          "Runs the progressive lowering pipeline from Linalg to LLVM",
-          [](OpPassManager &passManager,
-             const LLVMCPUCodegenPassPipelineOptions &options) {
-            buildLLVMCPUCodegenPassPipeline(passManager, options);
-          });
+  static PassPipelineRegistration<> LinalgLLVMVPipeline(
+      "iree-codegen-linalg-to-llvm-pipeline",
+      "Runs the progressive lowering pipeline from Linalg to LLVM",
+      [](OpPassManager &passManager) {
+        buildLLVMCPUCodegenPassPipeline(passManager);
+      });
 
   static PassPipelineRegistration<> LinalgNVVMPipeline(
       "iree-codegen-linalg-to-nvvm-pipeline",
@@ -41,21 +39,12 @@ void registerCodegenPasses() {
         buildLLVMGPUTransformPassPipeline(passManager, true);
       });
 
-  static PassPipelineRegistration<> linalgToSPIRVPipeline(
+  static PassPipelineRegistration<> LinalgSPIRVPipeline(
       "iree-codegen-linalg-to-spirv-pipeline",
-      "Runs the progressive lowering pipeline from Linalg to SPIR-V",
-      [](OpPassManager &passManager) {
-        buildLinalgToSPIRVPassPipeline(passManager,
-                                       SPIRVCodegenOptions::getFromCLOptions());
-      });
-
-  static PassPipelineRegistration<> hloToLinalgSPIRVPipeline(
-      "iree-codegen-hlo-to-spirv-pipeline",
       "Runs the progressive lowering pipeline from XLA HLO to Linalg to "
       "SPIR-V",
       [](OpPassManager &passManager) {
-        buildSPIRVCodegenPassPipeline(passManager,
-                                      SPIRVCodegenOptions::getFromCLOptions());
+        buildSPIRVCodegenPassPipeline(passManager);
       });
 }
 

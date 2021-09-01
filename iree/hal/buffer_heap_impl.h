@@ -8,6 +8,7 @@
 #define IREE_HAL_BUFFER_HEAP_IMPL_H_
 
 #include "iree/base/api.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/hal/buffer.h"
 
 #ifdef __cplusplus
@@ -18,11 +19,19 @@ extern "C" {
 // Private utilities for working with heap buffers
 //===----------------------------------------------------------------------===//
 
+// Shared heap allocator statistics; owned by a heap allocator.
+// Access to the base statistics must be guarded by |mutex|.
+typedef struct iree_hal_heap_allocator_statistics_t {
+  iree_slim_mutex_t mutex;
+  iree_hal_allocator_statistics_t base;
+} iree_hal_heap_allocator_statistics_t;
+
 // Allocates a new heap buffer from the specified |host_allocator|.
 // |out_buffer| must be released by the caller.
 iree_status_t iree_hal_heap_buffer_create(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
+    iree_hal_allocator_t* allocator,
+    iree_hal_heap_allocator_statistics_t* statistics,
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 

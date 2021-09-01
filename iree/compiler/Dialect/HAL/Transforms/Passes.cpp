@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -83,9 +84,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.nest<IREE::HAL::ExecutableOp>()
       .addNestedPass<IREE::HAL::ExecutableVariantOp>(
           createPropagateConstantWorkgroupInfoPass());
-  passManager.nest<IREE::HAL::ExecutableOp>()
-      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
-          createTranslateExecutableVariantsPass());
+  passManager.addNestedPass<IREE::HAL::ExecutableOp>(
+      createTranslateExecutablesPass());
   passManager.addPass(createVerifyTargetEnvironmentPass());
 
   // Convert supported input dialects (std, flow, etc) into the HAL dialect.
@@ -112,7 +112,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // ordinals, we allow the backends to link executables together. For example,
   // the LLVM AOT backend may combine all executable targets for the same
   // architecture into a single executable and link it as a shared library.
-  // TODO(scotttodd): Move after createTranslateExecutableVariantsPass
+  // TODO(scotttodd): Move after createTranslateExecutablesPass
   //   * ConvertStreamOps under ConvertFlowToHALPass assumes one entry point.
   //     Adjust it to handle multiple entry points then this can move up.
   if (transformOptions.linkExecutables) {
@@ -133,6 +133,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Inline hal.device.switch ops and memoize their queries such that we can
   // better CSE/fold dispatch logic.
   passManager.addNestedPass<FuncOp>(createInlineDeviceSwitchesPass());
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      createInlineDeviceSwitchesPass());
   if (benchmarkDispatchRepeatCount != 1) {
     passManager.addNestedPass<FuncOp>(
         createBenchmarkBatchDispatchesPass(benchmarkDispatchRepeatCount));
@@ -142,10 +144,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      createCanonicalizerPass());
+  passManager.addNestedPass<IREE::Util::InitializerOp>(createCSEPass());
+
   // Run our own CSE on variable loads before moving on.
   // When specifying side effects can help MLIR's core CSE pass eliminate
   // redundant loads we can remove this.
-  passManager.addNestedPass<FuncOp>(createCSEVariableLoadsPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::Util::createSimplifyGlobalAccessesPass());
 
   if (transformOptions.serializeExecutables) {
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(

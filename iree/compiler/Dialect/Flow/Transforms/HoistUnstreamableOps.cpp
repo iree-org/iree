@@ -31,11 +31,20 @@ static bool isStreamableOp(Operation *op) {
   return false;
 }
 
+static bool isReturned(Operation *op) {
+  for (auto result : op->getResults()) {
+    for (auto *user : result.getUsers()) {
+      if (user->hasTrait<OpTrait::IsTerminator>()) return true;
+    }
+  }
+  return false;
+}
+
 static llvm::SmallVector<Operation *, 16> getOpsToHoist(Block &block) {
   llvm::SmallVector<Operation *, 16> opsToHoist;
   for (Operation &op : block) {
     if (!isStreamableOp(&op) && !op.hasTrait<OpTrait::IsTerminator>() &&
-        MemoryEffectOpInterface::hasNoEffect(&op)) {
+        MemoryEffectOpInterface::hasNoEffect(&op) && !isReturned(&op)) {
       opsToHoist.push_back(&op);
     }
   }
@@ -88,7 +97,7 @@ class HoistUnstreamableOpsPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createHoistUnstreamableOpsPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createHoistUnstreamableOpsPass() {
   return std::make_unique<HoistUnstreamableOpsPass>();
 }
 

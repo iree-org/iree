@@ -329,7 +329,18 @@ PYTHON_TO_VM_CONVERTERS = {
 
 def _vm_to_ndarray(inv: Invocation, vm_list: VmVariantList, vm_index: int,
                    desc):
-  return vm_list.get_as_ndarray(vm_index)
+  # The descriptor for an ndarray is like:
+  #   ["ndarray", "<dtype>", <rank>, <dim>...]
+  #   ex: ['ndarray', 'i32', 1, 25948]
+  x = vm_list.get_as_ndarray(vm_index)
+  dtype_str = desc[1]
+  try:
+    dtype = ABI_TYPE_TO_DTYPE[dtype_str]
+  except KeyError:
+    _raise_return_error(inv, f"unrecognized dtype '{dtype_str}'")
+  if dtype != x.dtype:
+    x = x.astype(dtype)
+  return x
 
 
 def _vm_to_sdict(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
@@ -394,6 +405,7 @@ ABI_TYPE_TO_DTYPE = {
     "i64": np.int64,
     "f64": np.float64,
     "i16": np.int16,
+    "i8": np.int8,
     "i1": np.bool_,
 }
 

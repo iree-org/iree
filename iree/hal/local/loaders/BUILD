@@ -34,26 +34,6 @@ cc_library(
 )
 
 cc_library(
-    name = "legacy_library_loader",
-    srcs = ["legacy_library_loader.c"],
-    hdrs = ["legacy_library_loader.h"],
-    defines = [
-        "IREE_HAL_HAVE_LEGACY_LIBRARY_LOADER=1",
-    ],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/base/internal:dynamic_library",
-        "//iree/base/internal:flatcc",
-        "//iree/hal",
-        "//iree/hal/local",
-        "//iree/hal/local:executable_library",
-        "//iree/schemas:dylib_executable_def_c_fbs",
-    ],
-)
-
-cc_library(
     name = "static_library_loader",
     srcs = ["static_library_loader.c"],
     hdrs = ["static_library_loader.h"],
@@ -66,6 +46,26 @@ cc_library(
         "//iree/hal",
         "//iree/hal/local",
         "//iree/hal/local:executable_library",
+    ],
+)
+
+cc_library(
+    name = "system_library_loader",
+    srcs = ["system_library_loader.c"],
+    hdrs = ["system_library_loader.h"],
+    defines = [
+        "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1",
+    ],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+        "//iree/base/internal:dynamic_library",
+        "//iree/base/internal:flatcc",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/hal/local:executable_library",
+        "//iree/schemas:dylib_executable_def_c_fbs",
     ],
 )
 

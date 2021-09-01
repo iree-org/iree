@@ -4,16 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- Utils.h - Utility functions used in Linalg to SPIR-V lowering ------===//
+//===- Utils.h - Utility functions for lowering Linalg to SPIR-V ----------===//
 //
-// Utility functions used while lowering from Linalg to SPIRV.
+// Utility functions used while lowering from Linalg to SPIR-V.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
 #define IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
 
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -27,6 +29,12 @@ namespace mlir {
 namespace iree_compiler {
 
 static constexpr int kNumGPUDims = 3;
+
+//===----------------------------------------------------------------------===//
+// Attribute utils
+//===----------------------------------------------------------------------===//
+/// Given an operation, return the `spv.target_env` attribute.
+spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 
 //===----------------------------------------------------------------------===//
 // Workgroup memory utils

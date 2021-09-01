@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -84,16 +85,7 @@ int dimensionToIndex(StringRef dimension) {
 
 IREE::HAL::ReturnOp getEntryPointReturnOp(Operation *op) {
   auto funcOp = op->getParentOfType<FuncOp>();
-  auto variantOp =
-      funcOp.getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-
-  IREE::HAL::ExecutableEntryPointOp entryPointOp;
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-    if (op.sym_name() == funcOp.getName()) {
-      entryPointOp = op;
-      break;
-    }
-  }
+  IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp || !entryPointOp.getBody()) return {};
 
   Operation *terminator = entryPointOp.getBlock()->getTerminator();
@@ -136,13 +128,17 @@ Optional<int64_t> getProcessorIDUpperBound(
 /// point ABI.
 Optional<int64_t> getProcessorIDUpperBound(gpu::ThreadIdOp threadIDOp) {
   FuncOp funcOp = threadIDOp->getParentOfType<FuncOp>();
-  auto abiAttr = funcOp->getAttrOfType<spirv::EntryPointABIAttr>(
-      spirv::getEntryPointABIAttrName());
-  if (!abiAttr) return llvm::None;
+  IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
+  if (!entryPointOp) return {};
+
+  Optional<ArrayAttr> sizes = entryPointOp.workgroup_size();
+  if (!sizes) return {};
 
   int index = dimensionToIndex(threadIDOp.dimension());
-  auto valueIt = abiAttr.local_size().getIntValues().begin() + index;
-  return (*valueIt).getZExtValue();
+  if (index < sizes->size()) {
+    return sizes->getValue()[index].cast<IntegerAttr>().getInt();
+  }
+  return llvm::None;
 }
 
 /// Folds `affine.min` ops which has only one symbol operand, which is a
@@ -268,8 +264,7 @@ struct SPIRVFoldProcessorIDUsesPass
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(&getContext());
     populateFoldGPUProcessorIDUsesPatterns(context, patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation().getInnerModule(),
-                                       std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 
@@ -281,8 +276,7 @@ void populateFoldGPUProcessorIDUsesPatterns(
   AffineMinOp::getCanonicalizationPatterns(patterns, context);
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVFoldProcessorIDUsesPass() {
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass() {
   return std::make_unique<SPIRVFoldProcessorIDUsesPass>();
 }
 

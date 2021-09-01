@@ -102,11 +102,16 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 //     CHECK-LABEL: hal.executable @dot_dispatch_0
 //           CHECK:   hal.executable.variant @cuda
 //       CHECK-NOT:   llvm.store
-//           CHECK:   llvm.br
 //   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.br
+//   CHECK-COUNT-3:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 //  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 // CHECK-COUNT-128:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
+//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //           CHECK:   llvm.br
+//   CHECK-COUNT-3:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+// CHECK-COUNT-128:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //  CHECK-COUNT-16:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // -----
@@ -245,7 +250,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
             %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 1, s0)>(%arg2)[%workgroup_size_x]
             %20 = linalg.init_tensor [1, %17, %18, %19] : tensor<1x?x?x?xf32>
             %21 = linalg.fill(%cst, %20) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
-            %22 = linalg.conv_2d_input_nhwc_filter_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%11, %13 : tensor<1x?x?x2xf32>, tensor<3x2x2x?xf32>) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+            %22 = linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%11, %13 : tensor<1x?x?x2xf32>, tensor<3x2x2x?xf32>) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
             flow.dispatch.tensor.store %22, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %14, %15, %16], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x2x3x1xf32>
           }
         }
@@ -359,28 +364,28 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
   builtin.module  {
     builtin.func @vector_add_dispatch() {
       %c0 = constant 0 : index
-      %c128 = constant 128 : index
-      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:128xf32>
-      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:128xf32>
-      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:128xf32>
+      %c16384 = constant 16384 : index
+      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
+      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
+      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:16384xf32>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_count_x = hal.interface.workgroup.count[0] : index
       %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
       %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
-      scf.for %arg0 = %3 to %c128 step %4 {
-        %5 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 128)>(%arg0)[%workgroup_size_x]
-        %6 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:128xf32> -> tensor<?xf32>
-        %7 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 128)>(%arg0)[%workgroup_size_x]
-        %8 = flow.dispatch.tensor.load %1, offsets = [%arg0], sizes = [%7], strides = [1] : !flow.dispatch.tensor<readonly:128xf32> -> tensor<?xf32>
-        %9 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 128)>(%arg0)[%workgroup_size_x]
+      scf.for %arg0 = %3 to %c16384 step %4 {
+        %5 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 16384)>(%arg0)[%workgroup_size_x]
+        %6 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<?xf32>
+        %7 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 16384)>(%arg0)[%workgroup_size_x]
+        %8 = flow.dispatch.tensor.load %1, offsets = [%arg0], sizes = [%7], strides = [1] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<?xf32>
+        %9 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 16384)>(%arg0)[%workgroup_size_x]
         %10 = linalg.init_tensor [%9] : tensor<?xf32>
         %11 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %8 : tensor<?xf32>, tensor<?xf32>) outs(%10 : tensor<?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
         ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
           %12 = addf %arg1, %arg2 : f32
           linalg.yield %12 : f32
         } -> tensor<?xf32>
-        flow.dispatch.tensor.store %11, %2, offsets = [%arg0], sizes = [%9], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:128xf32>
+        flow.dispatch.tensor.store %11, %2, offsets = [%arg0], sizes = [%9], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
       }
       return
     }
@@ -401,8 +406,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 // -----
 
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 768)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 768, s0)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 16384)>
+#map2 = affine_map<(d0)[s0] -> (-d0 + 16384, s0)>
 #map3 = affine_map<(d0, d1) -> (d1, d0)>
 #map4 = affine_map<(d0, d1) -> (d0)>
 
@@ -412,18 +417,18 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
   builtin.module  {
     builtin.func @vector_reduction_dispatch() {
           %c0 = constant 0 : index
-          %c768 = constant 768 : index
+          %c16384 = constant 16384 : index
           %cst = constant 1.000000e+00 : f32
-          %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x768xf32>
-          %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:768xf32>
+          %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x16384xf32>
+          %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:16384xf32>
           %workgroup_size_x = hal.interface.workgroup.size[0] : index
           %workgroup_id_x = hal.interface.workgroup.id[0] : index
           %workgroup_count_x = hal.interface.workgroup.count[0] : index
           %2 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
           %3 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg0 = %2 to %c768 step %3 {
+          scf.for %arg0 = %2 to %c16384 step %3 {
             %4 = affine.min #map1(%arg0)[%workgroup_size_x]
-            %5 = flow.dispatch.tensor.load %0, offsets = [0, %arg0], sizes = [512, %4], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x768xf32> -> tensor<512x?xf32>
+            %5 = flow.dispatch.tensor.load %0, offsets = [0, %arg0], sizes = [512, %4], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x16384xf32> -> tensor<512x?xf32>
             %6 = affine.min #map1(%arg0)[%workgroup_size_x]
             %7 = affine.min #map2(%arg0)[%workgroup_size_x]
             %8 = linalg.init_tensor [%7] : tensor<?xf32>
@@ -433,7 +438,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
               %11 = addf %arg1, %arg2 : f32
               linalg.yield %11 : f32
             } -> tensor<?xf32>
-            flow.dispatch.tensor.store %10, %1, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:768xf32>
+            flow.dispatch.tensor.store %10, %1, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
           }
           return
         }

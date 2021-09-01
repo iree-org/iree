@@ -296,6 +296,14 @@ IREE_VM_ABI_VLA_STRUCT(riCiD, a2_count, a2, {
   iree_vm_abi_i_t a2[0];
 });
 
+IREE_VM_ABI_VLA_STRUCT(riiCiD, a3_count, a3, {
+  iree_vm_ref_t r0;
+  int32_t i1;
+  int32_t i2;
+  iree_vm_size_t a3_count;
+  iree_vm_abi_i_t a3[0];
+});
+
 IREE_VM_ABI_VLA_STRUCT(riCrD, a2_count, a2, {
   iree_vm_ref_t r0;
   int32_t i1;
@@ -388,6 +396,7 @@ IREE_VM_ABI_DECLARE_SHIM(ri, f);
 IREE_VM_ABI_DECLARE_SHIM(ri, r);
 IREE_VM_ABI_DECLARE_SHIM(ri, v);
 IREE_VM_ABI_DECLARE_SHIM(riCiD, r);
+IREE_VM_ABI_DECLARE_SHIM(riiCiD, r);
 IREE_VM_ABI_DECLARE_SHIM(riCiiiD, r);
 IREE_VM_ABI_DECLARE_SHIM(riCrD, r);
 IREE_VM_ABI_DECLARE_SHIM(rii, i);

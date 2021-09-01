@@ -23,7 +23,7 @@ namespace Flow {
 // Clones each exported functions (including those just created) with
 // placeholder constant inputs instead of arguments and removes the exported
 // attribute from the old functions.
-// The input are provided using flow.variables.
+// The input are provided using util.globals.
 class ExportBenchmarkFuncsPass
     : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
  public:
@@ -32,13 +32,13 @@ class ExportBenchmarkFuncsPass
   }
 
   void runOnOperation() override {
-    ModuleOp moduleOp = getOperation();
+    auto moduleOp = getOperation();
 
     // Gather the functions we want to wrap for benchmarking and wrap them.
     // Since we are inserting new functions as part of this pass we must perform
     // the wrapping for only the inputs.
-    SmallVector<FuncOp, 4> entryFuncOps;
-    for (auto entryFuncOp : moduleOp.getOps<FuncOp>()) {
+    SmallVector<mlir::FuncOp, 4> entryFuncOps;
+    for (auto entryFuncOp : moduleOp.getOps<mlir::FuncOp>()) {
       if (entryFuncOp.isPublic()) {
         entryFuncOps.push_back(entryFuncOp);
       }
@@ -52,9 +52,8 @@ class ExportBenchmarkFuncsPass
   }
 
  private:
-  IREE::Flow::VariableOp createDummyInputVariableOp(Location loc,
-                                                    Type inputType,
-                                                    OpBuilder& moduleBuilder) {
+  IREE::Util::GlobalOp createDummyInputVariableOp(Location loc, Type inputType,
+                                                  OpBuilder& moduleBuilder) {
     std::string baseName = "_benchmark_input_";
     std::string name = baseName + std::to_string(uniqueId++);
     auto initialValue = moduleBuilder.getZeroAttr(inputType);
@@ -63,22 +62,22 @@ class ExportBenchmarkFuncsPass
                            << inputType;
       return {};
     }
-    auto variableOp = moduleBuilder.create<VariableOp>(loc, name,
-                                                       /*isMutable=*/false,
-                                                       inputType, initialValue);
-    variableOp.setPrivate();
-    variableOp->setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
-    return variableOp;
+    auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
+        loc, name,
+        /*isMutable=*/false, inputType, initialValue);
+    globalOp.setPrivate();
+    globalOp->setAttr("noinline", UnitAttr::get(moduleBuilder.getContext()));
+    return globalOp;
   }
 
-  LogicalResult createEntryPointBenchmarkFunc(ModuleOp moduleOp,
-                                              FuncOp entryFuncOp) {
+  LogicalResult createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
+                                              mlir::FuncOp entryFuncOp) {
     OpBuilder moduleBuilder(&getContext());
     moduleBuilder.setInsertionPointAfter(entryFuncOp);
 
     // Create one dummy input variable per input.
     Location loc = entryFuncOp.getLoc();
-    SmallVector<IREE::Flow::VariableOp, 4> dummyInputVariableOps;
+    SmallVector<IREE::Util::GlobalOp, 4> dummyInputVariableOps;
     for (auto inputType : entryFuncOp.getType().getInputs()) {
       auto dummyVar = createDummyInputVariableOp(loc, inputType, moduleBuilder);
       if (!dummyVar) return failure();
@@ -87,7 +86,7 @@ class ExportBenchmarkFuncsPass
 
     // Create a `() -> ()` entry point op the benchmark tool can run.
     std::string funcName = std::string(entryFuncOp.getName()) + "_benchmark";
-    auto funcOp = moduleBuilder.create<FuncOp>(
+    auto funcOp = moduleBuilder.create<mlir::FuncOp>(
         loc, funcName, moduleBuilder.getFunctionType({}, {}));
     funcOp.setPublic();
     funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
@@ -103,7 +102,7 @@ class ExportBenchmarkFuncsPass
     auto blockBuilder = OpBuilder::atBlockBegin(block);
     SmallVector<Value, 4> args;
     for (int i = 0, e = entryFuncOp.getNumArguments(); i < e; ++i) {
-      args.push_back(blockBuilder.createOrFold<IREE::Flow::VariableLoadOp>(
+      args.push_back(blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
           loc, dummyInputVariableOps[i]));
     }
     auto callOp = blockBuilder.create<mlir::CallOp>(loc, entryFuncOp, args);
@@ -126,7 +125,8 @@ class ExportBenchmarkFuncsPass
   int uniqueId = 0;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createExportBenchmarkFuncsPass() {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createExportBenchmarkFuncsPass() {
   return std::make_unique<ExportBenchmarkFuncsPass>();
 }
 

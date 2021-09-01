@@ -14,7 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "convert_flow_to_hal.mlir"
+    "hint_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

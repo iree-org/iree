@@ -19,7 +19,6 @@ iree_lit_test_suite(
         [
             "assign_target_devices.mlir",
             "benchmark_batch_dispatches.mlir",
-            "cse_variable_loads.mlir",
             "identify_constant_pools.mlir",
             "inline_device_switches.mlir",
             "materialize_constant_pool_buffers.mlir",

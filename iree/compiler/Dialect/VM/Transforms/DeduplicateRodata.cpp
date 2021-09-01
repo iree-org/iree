@@ -82,7 +82,7 @@ class DeduplicateRodataPass
       // Point all duplicates at the base op.
       for (auto duplicateOp : bucketOps) {
         if (failed(symbolTable.replaceAllSymbolUses(
-                duplicateOp, baseOp.getName(), moduleOp))) {
+                duplicateOp, baseOp.getNameAttr(), moduleOp))) {
           duplicateOp.emitError()
               << "failed to replace duplicate rodata op with base op "
               << baseOp.getName();

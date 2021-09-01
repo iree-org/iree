@@ -32,7 +32,7 @@ namespace {
 // Creates a flow.executable out of a set of functions, pulling in all other
 // functions reachable by the provided functions.
 static ExecutableOp createExecutable(Location loc, StringRef executableName,
-                                     ArrayRef<FuncOp> funcOps,
+                                     ArrayRef<mlir::FuncOp> funcOps,
                                      ModuleOp parentModuleOp) {
   assert(!funcOps.empty() && "must have at least one entry function");
 
@@ -47,7 +47,7 @@ static ExecutableOp createExecutable(Location loc, StringRef executableName,
   // containing module to provide symbol resolution.
   OpBuilder executableBuilder(executableOp);
   executableBuilder.setInsertionPointToStart(&executableOp.getBlock());
-  auto innerModule = executableBuilder.create<ModuleOp>(loc);
+  auto innerModule = executableBuilder.create<mlir::ModuleOp>(loc);
   for (auto funcOp : funcOps) {
     innerModule.push_back(funcOp);
   }
@@ -118,8 +118,8 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
 // The contents of the function will be updated to propagate shape information
 // across the function call boundary and ensure we have all the metadata we need
 // on the inside in order to manipulate dynamic shapes.
-static FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
-                                  Region &region) {
+static mlir::FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
+                                        Region &region) {
   // Build function type matching the region signature + the dynamic dims.
   //
   // At this stage we'll insert all dynamic dimension values even if some are
@@ -144,7 +144,7 @@ static FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
       FunctionType::get(region.getContext(), operandTypes, /*results=*/{});
 
   // Clone region into the function body.
-  auto funcOp = FuncOp::create(loc, functionName, functionType);
+  auto funcOp = mlir::FuncOp::create(loc, functionName, functionType);
   BlockAndValueMapping mapping;
   region.cloneInto(&funcOp.getBody(), mapping);
   auto *entryBlock = &funcOp.getBody().front();
@@ -204,10 +204,10 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   }
 
   // Create the executable with the region cloned into it.
-  auto parentFuncOp = regionOp->getParentOfType<FuncOp>();
+  auto parentFuncOp = regionOp->getParentOfType<mlir::FuncOp>();
   auto executableOp =
       createExecutable(regionOp.getLoc(), namePrefix, {workgroupFuncOp},
-                       parentFuncOp->getParentOfType<ModuleOp>());
+                       parentFuncOp->getParentOfType<mlir::ModuleOp>());
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
 
@@ -231,7 +231,7 @@ class OutlineDispatchRegionsPass
 
   void runOnOperation() override {
     // Convert each dispatch region into a flow.executable + dispatch op.
-    for (auto funcOp : getOperation().getOps<FuncOp>()) {
+    for (auto funcOp : getOperation().getOps<mlir::FuncOp>()) {
       // Outline all of the dispatch regions ops in this function.
       auto dispatchWorkgroupsOps =
           llvm::to_vector<8>(funcOp.getOps<DispatchWorkgroupsOp>());
@@ -247,7 +247,8 @@ class OutlineDispatchRegionsPass
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass() {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOutlineDispatchRegionsPass() {
   return std::make_unique<OutlineDispatchRegionsPass>();
 }
 

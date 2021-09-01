@@ -73,7 +73,7 @@ static LogicalResult parseMemoryType(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<MemoryTypeBitfield>(fullString);
     if (!symbolized.hasValue()) {
@@ -158,7 +158,7 @@ static LogicalResult parseMemoryAccess(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<MemoryAccessBitfield>(fullString);
     if (!symbolized.hasValue()) {
@@ -227,7 +227,7 @@ static LogicalResult parseBufferUsage(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<BufferUsageBitfield>(fullString);
     if (!symbolized.hasValue()) {
@@ -360,13 +360,27 @@ Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
       c8);
 }
 
+llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
+  // TODO(#6762): encoding attribute handling/mapping to enums.
+  assert(!attr && "encoding types other than default not yet supported");
+  // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
+  return 1;
+}
+
+IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context) {
+  auto encodingType = getEncodingTypeValue(attr);
+  if (!encodingType) return {};
+  return IntegerAttr::get(IntegerType::get(context, 32),
+                          encodingType.getValue());
+}
+
 //===----------------------------------------------------------------------===//
 // Size-aware type utils
 //===----------------------------------------------------------------------===//
 
 // Returns the SSA value containing the size of the given |value|.
 static Value lookupValueSize(Value value) {
-  assert(value.getType().isa<SizeAwareTypeInterface>());
+  assert(value.getType().isa<IREE::Util::SizeAwareTypeInterface>());
 
   auto definingOp = value.getDefiningOp();
   if (!definingOp) {
@@ -388,7 +402,7 @@ static Value lookupValueSize(Value value) {
     }
   }
   assert(resultIndex != -1 && "result not in results");
-  auto sizeAwareOp = dyn_cast<SizeAwareOpInterface>(definingOp);
+  auto sizeAwareOp = dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp);
   if (!sizeAwareOp) return {};
   return sizeAwareOp.getResultSize(resultIndex);
 }
@@ -512,75 +526,6 @@ void BufferConstraintsAttr::print(DialectAsmPrinter &p) const {
      << ", ";
   os << "max_buffer_range = " << max_buffer_range() << ", ";
   os << "min_buffer_range_alignment = " << min_buffer_range_alignment();
-  os << ">";
-}
-
-// static
-Attribute ByteRangeAttr::parse(DialectAsmParser &p) {
-  auto b = p.getBuilder();
-  if (failed(p.parseLess())) return {};
-
-  // TODO(benvanik): support the range syntax; the dialect asm parser fights
-  // with it though by checking for proper []/() nesting.
-
-  // Try first the range style: byte_range<[start..end)>
-  bool startInclusive;
-  if (succeeded(p.parseOptionalLSquare())) {  // [...
-    startInclusive = true;
-  } else if (succeeded(p.parseOptionalLParen())) {  // (...
-    startInclusive = false;
-  } else {
-    // byte_range<offset, length>
-    IntegerAttr offsetAttr;
-    IntegerAttr lengthAttr;
-    if (failed(p.parseAttribute(offsetAttr, b.getIndexType())) ||
-        failed(p.parseComma()) ||
-        failed(p.parseAttribute(lengthAttr, b.getIndexType())) ||
-        failed(p.parseGreater())) {
-      return {};
-    }
-    return get(offsetAttr, lengthAttr);
-  }
-
-  IntegerAttr startAttr;
-  IntegerAttr endAttr;
-  if (failed(p.parseAttribute(startAttr, b.getIndexType())) ||
-      failed(p.parseKeyword("to")) ||
-      failed(p.parseAttribute(endAttr, b.getIndexType()))) {
-    return {};
-  }
-
-  bool endInclusive;
-  if (succeeded(p.parseOptionalRSquare())) {  // ...]
-    endInclusive = true;
-  } else if (succeeded(p.parseOptionalRParen())) {  // ...)
-    endInclusive = false;
-  } else {
-    p.emitError(p.getCurrentLocation()) << "expected ] or ) to end range";
-    return {};
-  }
-
-  if (failed(p.parseGreater())) return {};
-
-  startAttr = startInclusive
-                  ? startAttr
-                  : b.getIndexAttr((startAttr.getValue() + 1).getSExtValue());
-  endAttr = endInclusive
-                ? endAttr
-                : b.getIndexAttr((endAttr.getValue() - 1).getSExtValue());
-
-  IntegerAttr offsetAttr = startAttr;
-  IntegerAttr lengthAttr = b.getIndexAttr(
-      (endAttr.getValue() - startAttr.getValue()).getSExtValue());
-  return get(offsetAttr, lengthAttr);
-}
-
-void ByteRangeAttr::print(DialectAsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << getKindName() << "<";
-  os << offset();
-  os << ", ";
-  os << length();
   os << ">";
 }
 
@@ -1134,8 +1079,7 @@ void ExResultBufferAttr::print(DialectAsmPrinter &p) const {
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
-  addAttributes<BufferConstraintsAttr, ByteRangeAttr,
-                DescriptorSetLayoutBindingAttr,
+  addAttributes<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
                 // Experimental:
                 ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
                 ExResultBufferAttr>();
@@ -1166,8 +1110,6 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   if (parseResult.hasValue()) return genAttr;
   if (mnemonic == BufferConstraintsAttr::getKindName()) {
     return BufferConstraintsAttr::parse(parser);
-  } else if (mnemonic == ByteRangeAttr::getKindName()) {
-    return ByteRangeAttr::parse(parser);
   } else if (mnemonic == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
   } else if (mnemonic == ExConstantStorageAttr::getKindName()) {
@@ -1186,8 +1128,7 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<BufferConstraintsAttr, ByteRangeAttr,
-            DescriptorSetLayoutBindingAttr,
+      .Case<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
             // Experimental:
             ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
             ExResultBufferAttr>([&](auto typedAttr) { typedAttr.print(p); })

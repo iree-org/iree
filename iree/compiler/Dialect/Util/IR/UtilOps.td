@@ -8,6 +8,10 @@
 #define IREE_DIALECT_UTIL_IR_UTIL_OPS
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "mlir/IR/OpAsmInterface.td"
+include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -149,6 +153,260 @@ def Util_UnreachableOp : Util_Op<"unreachable", [NoSideEffect, Terminator]> {
 }
 
 //===----------------------------------------------------------------------===//
+// Structural ops
+//===----------------------------------------------------------------------===//
+
+def Util_InitializerOp : Util_Op<"initializer", [
+    IsolatedFromAbove,
+    FunctionLike,
+    CallableOpInterface,
+  ]> {
+  let summary = [{global initialization function}];
+  let description = [{
+    A function that is called in definition order upon module initialization.
+    Must not load any globals that are defined or initialized after it in the
+    module.
+  }];
+
+  let arguments = (ins
+    TypeAttr:$type
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Add an entry block to an empty function and set up the block arguments
+    /// to match the signature of the function.
+    Block *addEntryBlock();
+    Block *addBlock();
+
+    unsigned getNumFuncArguments() { return 0; }
+    unsigned getNumFuncResults() { return 0; }
+
+    LogicalResult verifyType() { return success(); }
+
+    Region *getCallableRegion() { return &body(); }
+    ArrayRef<Type> getCallableResults() { return {}; }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_InitializerReturnOp : Util_Op<"initializer.return", [
+  HasParent<"IREE::Util::InitializerOp">,
+  NoSideEffect,
+  ReturnLike,
+  Terminator,
+]> {
+  let summary = [{return from a util.initializer}];
+  let description = [{
+    Returns control from an initializer function.
+  }];
+
+  let arguments = (ins);
+
+  let assemblyFormat = "attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// Globals
+//===----------------------------------------------------------------------===//
+
+def Util_GlobalOp : Util_Op<"global", [
+  Symbol,
+]> {
+  let summary = [{stateful global variable declaration}];
+  let description = [{
+    Declares a global variable that maintains its value across invocations.
+    The value is tied to the execution context of the module and different
+    contexts will have different variable storage.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
+    TypeAttr:$type,
+    UnitAttr:$is_mutable,
+    OptionalAttr<AnyAttr>:$initial_value
+  );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    (`mutable` $is_mutable^)?
+    $sym_name
+    attr-dict
+    custom<TypeOrAttr>($type, $initial_value)
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "Type":$type,
+      "Optional<Attribute>":$initialValue,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "Type":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    StringRef getSymbolName() { return sym_name(); }
+
+    bool isMutable() { return is_mutable(); }
+    void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
+
+    Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
+    void clearInitialValue() { (*this)->removeAttr("initial_value"); }
+  }];
+
+  let verifier = [{ return verifyGlobalOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_GlobalAddressOp : Util_PureOp<"global.address", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+]> {
+  let summary = [{returns an address reference to a global}];
+  let description = [{
+    Returns the address of a global as a typed reference. Can be used with the
+    global load and store indirect ops.
+  }];
+
+  let arguments = (ins
+    Util_GlobalRefAttr:$global
+  );
+  let results = (outs
+    Util_AnyGlobalPtr:$result
+  );
+
+  let assemblyFormat = [{
+    $global attr-dict `:` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    IREE::Util::GlobalOp getGlobalOp();
+  }];
+}
+
+def Util_GlobalLoadOp : Util_Op<"global.load", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  // HACK: works around the lack of symbol side effects in C++.
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+]> {
+  let summary = [{loads a value from a global variable}];
+  let description = [{
+    Returns a global variable value.
+  }];
+
+  let arguments = (ins
+    Arg<Util_GlobalRefAttr, "", []>:$global
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $global attr-dict `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "IREE::Util::GlobalOp":$globalOp,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    IREE::Util::GlobalOp getGlobalOp();
+    bool isGlobalImmutable();
+  }];
+
+  let verifier = [{ return verifyGlobalLoadOp(*this); }];
+
+  let hasFolder = 1;
+}
+
+def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
+  let summary = [{loads a value from a global variable}];
+  let description = [{
+    Returns a copy of the global variable value.
+  }];
+
+  let arguments = (ins
+    Arg<Util_AnyGlobalPtr, "", []>:$global
+  );
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    $global attr-dict `:` type($global) `->` type($result)
+  }];
+
+  let verifier = [{ return verifyGlobalLoadIndirectOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_GlobalStoreOp : Util_Op<"global.store"> {
+  let summary = [{stores a value into a global variable}];
+  let description = [{
+    Stores a copy of the value into a global variable.
+  }];
+
+  let arguments = (ins
+    AnyType:$value,
+    Arg<Util_GlobalRefAttr, "", []>:$global
+  );
+
+  let assemblyFormat = [{
+    $value `,` $global attr-dict `:` type($value)
+  }];
+
+  let extraClassDeclaration = [{
+    IREE::Util::GlobalOp getGlobalOp();
+  }];
+
+  let verifier = [{ return verifyGlobalStoreOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect"> {
+  let summary = [{stores a value into a global variable}];
+  let description = [{
+    Stores a copy of the value into a global variable.
+  }];
+
+  let arguments = (ins
+    AnyType:$value,
+    Arg<Util_AnyGlobalPtr, "", []>:$global
+  );
+
+  let assemblyFormat = [{
+    $value `,` $global attr-dict `:` type($value) `->` type($global)
+  }];
+
+  let verifier = [{ return verifyGlobalStoreIndirectOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Lists
 //===----------------------------------------------------------------------===//
 // NOTE: this type is mostly just a placeholder. Ideally we'd make this
@@ -167,7 +425,7 @@ def Util_ListCreateOp : Util_PureOp<
     Optional<Index>:$initial_capacity
   );
   let results = (outs
-    AnyList:$result
+    Util_AnyList:$result
   );
 
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` type($result)";
@@ -180,7 +438,7 @@ def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   }];
 
   let arguments = (ins
-    AnyList:$list
+    Util_AnyList:$list
   );
   let results = (outs
     Index:$result
@@ -198,7 +456,7 @@ def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   }];
 
   let arguments = (ins
-    AnyList:$list,
+    Util_AnyList:$list,
     Index:$new_size
   );
 
@@ -213,7 +471,7 @@ def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   }];
 
   let arguments = (ins
-    AnyList:$list,
+    Util_AnyList:$list,
     Index:$index
   );
   let results = (outs
@@ -232,7 +490,7 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   }];
 
   let arguments = (ins
-    AnyList:$list,
+    Util_AnyList:$list,
     Index:$index,
     AnyType:$value
   );
@@ -240,6 +498,44 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let assemblyFormat = "$list `[` $index `]` `,` $value attr-dict `:` custom<ListTypeSet>(type($list), type($value))";
 
   let verifier = [{ return verify$cppClass(*this); }];
+}
+
+//===----------------------------------------------------------------------===//
+// Status
+//===----------------------------------------------------------------------===//
+
+def Util_StatusCheckOkOp : Util_Op<"status.check_ok"> {
+  let summary = [{raises a global failure if a status is not 'ok'}];
+  let description = [{
+    When the status is not 'ok' this signals a runtime failure that causes the
+    entire active invocation - and possibly *all* in-flight and pending
+    invocations - to fail with the given status. The status will be propagated
+    back via the available runtime error handling mechanisms such as semaphores
+    or synchronous invocation results.
+
+    As the IREE execution model is deeply pipelined it's possible that failures
+    have a latency between when they are emitted and when the application can
+    observe the failure. It's also possible that other work that is in-flight
+    or pending when the failure occurs will complete.
+  }];
+
+  let arguments = (ins
+    Util_Status:$status,
+    OptionalAttr<StrAttr>:$message
+  );
+
+  let assemblyFormat = [{
+    $status (`,` $message^)? attr-dict
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$status, CArg<"StringRef", [{""}]>:$message),
+    [{
+      build(
+        $_builder, $_state, status,
+        message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
+    }]>,
+  ];
 }
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_OPS

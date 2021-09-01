@@ -96,7 +96,7 @@ cc_library(
         "//iree/hal/vulkan/util:intrusive_list",
         "//iree/hal/vulkan/util:ref_ptr",
         "//iree/schemas:spirv_executable_def_c_fbs",
-        "@iree_vulkan_headers//:vulkan_headers",
+        "@vulkan_headers",
         "@vulkan_memory_allocator//:impl_header_only",
     ],
 )
@@ -120,7 +120,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal:dynamic_library",
         "//iree/hal/vulkan/util:ref_ptr",
-        "@iree_vulkan_headers//:vulkan_headers",
+        "@vulkan_headers",
     ],
 )
 

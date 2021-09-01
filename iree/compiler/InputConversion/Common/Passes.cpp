@@ -6,6 +6,11 @@
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
 
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassOptions.h"
+#include "mlir/Pass/PassRegistry.h"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -14,9 +19,20 @@ namespace {
 #include "iree/compiler/InputConversion/Common/Passes.h.inc"  // IWYU pragma: export
 }  // namespace
 
+void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createIREEImportPublicPass());
+}
+
 void registerCommonInputConversionPasses() {
   // Generated passes.
   registerPasses();
+
+  PassPipelineRegistration<> mhlo(
+      "iree-common-input-transformation-pipeline",
+      "Runs the common input transformation pipeline",
+      [](OpPassManager &passManager) {
+        buildCommonInputConversionPassPipeline(passManager);
+      });
 }
 
 }  // namespace iree_compiler

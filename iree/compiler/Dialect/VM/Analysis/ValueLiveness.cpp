@@ -15,6 +15,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Value.h"
@@ -46,8 +47,14 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
   // Block names are their order in the function.
   DenseMap<Block *, int> blockOrdinals;
   for (auto &block : funcOp.getBlocks()) {
-    blockOrdinals[&block] = blockOrdinals.size();
+    int ordinal = blockOrdinals.size();
+    blockOrdinals[std::addressof(block)] = ordinal;
   }
+
+  // Keep asm state to make getting the SSA value names fast.
+  OpPrintingFlags printingFlags;
+  printingFlags.elideLargeElementsAttrs(1);
+  AsmState asmState(funcOp, printingFlags);
 
   // Gather attributes for each op before we actually add them. We do this so
   // that it's easier to slice out the results for printing without also
@@ -69,7 +76,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
         }
       } else {
         llvm::raw_string_ostream os(str);
-        value.print(os);
+        value.print(os, asmState);
         str = os.str();
       }
 
@@ -258,6 +265,7 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
       Operation *lastUse = &block.front();
       for (auto &use : value.getUses()) {
         if (use.getOwner()->getBlock() != &block) continue;
+        if (lastUse == use.getOwner()) continue;
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }

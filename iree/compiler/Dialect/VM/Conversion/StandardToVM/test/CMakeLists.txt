@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "comparison_ops.mlir"
     "const_ops.mlir"
     "control_flow_ops.mlir"
+    "conversion_ops.mlir"
     "func_attrs.mlir"
     "structural_ops.mlir"
   DATA

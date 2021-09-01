@@ -24,7 +24,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-python-swiftshader@sha256:9c3e5b8ba0c8ab0a9ef55c7141c71365cb3fab6f63c197fd4c7195d054ca6906 \
+  gcr.io/iree-oss/cmake-python-swiftshader@sha256:f13737fbcf79a2d9a6549e66ec75ecb05a6a35edeb32709a1b4c5f13f0ab955e \
   build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-swiftshader/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

@@ -5,9 +5,9 @@ vm.module @global_ops {
   // CHECK-LABEL: struct global_ops_state_t {
   // CHECK-NEXT: iree_allocator_t allocator;
   // CHECK-NEXT: uint8_t rwdata[8];
-  // CHECK-NEXT: iree_vm_ref_t refs[0];
-  // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[0];
-  // CHECK-NEXT: iree_vm_function_t imports[0];
+  // CHECK-NEXT: iree_vm_ref_t refs[1];
+  // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[1];
+  // CHECK-NEXT: iree_vm_function_t imports[1];
   // CHECK-NEXT: };
 
   vm.global.i32 mutable @c42 = 42 : i32

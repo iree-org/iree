@@ -34,7 +34,8 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 /// set.
 void setTranslationInfo(FuncOp entryPointFn,
                         IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-                        ArrayRef<int64_t> workgroupSize = {});
+                        ArrayRef<int64_t> workgroupSize,
+                        ArrayRef<int64_t> workloadPerWorkgroup);
 
 /// Returns the loops that are partitioned during dispatch region formations, in
 /// order, i.e. starting from the outer-most to innermost.
@@ -42,20 +43,22 @@ void setTranslationInfo(FuncOp entryPointFn,
 /// formation to tile and distribute the ops.
 SmallVector<unsigned> getPartitionedLoops(Operation *op);
 
-// /// Usually the tile sizes for the first level of tiling decides the
-// workgroup
-// /// size for the dispatch on the CPU backend. This is a general helper that
-// /// converts tile sizes of the first level into workgroup sizes.
-// SmallVector<int64_t, 3> getWorkloadPerWorkgroup(
-//     ArrayRef<int64_t> firstLevelTileSizes, ArrayRef<int64_t>
-//     partitionedLoops);
-
 /// Sets translation for the entry-point function based on op configuration.
 LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
-    ArrayRef<int64_t> nativeVectorSizes,
+    FuncOp entryPointFn, Operation *op, IREE::HAL::LoweringConfig config,
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {});
+inline LogicalResult setOpConfigAndEntryPointFnTranslation(
+    FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
+    ArrayRef<int64_t> nativeVectorSize,
+    IREE::HAL::DispatchLoweringPassPipeline passPipeline,
+    ArrayRef<int64_t> workgroupSize = {}) {
+  IREE::HAL::LoweringConfig config =
+      buildConfigAttr(tileSizes, nativeVectorSize, op->getContext());
+  setLoweringConfig(op, config);
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, config,
+                                               passPipeline, workgroupSize);
+}
 
 /// Returns the number of outer parallel loops of a linalgOp.
 /// Note: To be used only if needed. Use the `getPartitionedLoops` method if
@@ -71,6 +74,12 @@ Type getUntiledType(Value tiledView);
 /// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
 /// `subtensor` op chain (for tensors).
 ArrayRef<int64_t> getUntiledShape(Value tiledView);
+
+/// Returns the shape of the result of the untiled operation for
+/// `LinalgOp`s. First looks at definitions of the corresponding `outs`
+/// operands. If that fails, then looks at uses of the `result`.
+ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
+                                        unsigned resultNum);
 
 /// Assuming that `funcOp` contains a single nested scf.for that represented the
 /// tiled+fused+distributed loops with the distribution being across workgroups,

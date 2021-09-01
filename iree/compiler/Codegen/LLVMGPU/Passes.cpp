@@ -74,6 +74,9 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
   pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+
+  // Pipeline memory operations.
+  pm.addNestedPass<FuncOp>(createLLVMGPUPipeliningPass());
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {

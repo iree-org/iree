@@ -1,18 +1,20 @@
 // RUN: iree-opt -split-input-file -canonicalize -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
-// CHECK-LABEL: @allocatorComputeSizeFoldsAway
+// CHECK-LABEL: vm.func private @allocatorComputeSizeFoldsAway
 func @allocatorComputeSizeFoldsAway(%arg0 : !hal.allocator) -> index {
   // CHECK: %c4194304 = vm.const.i32 4194304 : i32
   // CHECK-NOT: hal.allocator.compute_size
   %c1024 = constant 1024 : index
+  %c1_i32 = constant 1 : i32
   %c32_i32 = constant 32 : i32
-  %0 = hal.allocator.compute_size<%arg0 : !hal.allocator> shape([%c1024, %c1024]) type(%c32_i32) : index
+  %0 = hal.allocator.compute_size<%arg0 : !hal.allocator>
+      shape([%c1024, %c1024]) type(%c32_i32) encoding(%c1_i32) : index
   return %0 : index
 }
 
 // -----
 
-// CHECK-LABEL: @allocatorAllocate
+// CHECK-LABEL: vm.func private @allocatorAllocate
 func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
   %c1024 = constant 1024 : index
   // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c6, %c14, %c1024) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
@@ -22,7 +24,7 @@ func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
 
 // -----
 
-// CHECK-LABEL: func @allocatorMapByteBuffer
+// CHECK-LABEL: vm.func private @allocatorMapByteBuffer
 func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !util.byte_buffer) -> !hal.buffer {
   %offset = constant 128 : index
   %length = constant 256 : index

@@ -255,15 +255,20 @@ function(iree_symlink_tool)
   iree_package_name(_PACKAGE_NAME)
   set(_TARGET "${_PACKAGE_NAME}_${ARG_TARGET}")
   set(_FROM_TOOL_TARGET ${ARG_FROM_TOOL_TARGET})
+  set(_TO_TOOL_PATH "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
+  get_filename_component(_TO_TOOL_DIR "${_TO_TOOL_PATH}" DIRECTORY)
+
 
   add_custom_command(
     TARGET "${_TARGET}"
     BYPRODUCTS
       "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
     COMMAND
+      ${CMAKE_COMMAND} -E make_directory "${_TO_TOOL_DIR}"
+    COMMAND
       ${CMAKE_COMMAND} -E create_symlink
         "$<TARGET_FILE:${_FROM_TOOL_TARGET}>"
-        "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TO_EXE_NAME}${CMAKE_EXECUTABLE_SUFFIX}"
+        "${_TO_TOOL_PATH}"
   )
 endfunction()
 

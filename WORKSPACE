@@ -31,34 +31,18 @@ bazel_skylib_workspace()
 ###############################################################################
 # llvm-project
 
-maybe(
-    local_repository,
-    name = "llvm_bazel",
-    path = "third_party/llvm-project/utils/bazel",
+new_local_repository(
+    name = "llvm-raw",
+    build_file_content = "# empty",
+    path = "third_party/llvm-project",
 )
 
-load("@llvm_bazel//:zlib.bzl", "llvm_zlib_disable")
+load("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure", "llvm_disable_optional_support_deps")
 
-maybe(
-    llvm_zlib_disable,
-    name = "llvm_zlib",
-)
+llvm_configure(name = "llvm-project")
 
-load("@llvm_bazel//:terminfo.bzl", "llvm_terminfo_disable")
+llvm_disable_optional_support_deps()
 
-maybe(
-    llvm_terminfo_disable,
-    name = "llvm_terminfo",
-)
-
-load("@llvm_bazel//:configure.bzl", "llvm_configure")
-
-maybe(
-    llvm_configure,
-    name = "llvm-project",
-    src_path = "third_party/llvm-project",
-    src_workspace = "@iree_core//:WORKSPACE",
-)
 ###############################################################################
 
 ###############################################################################
@@ -93,7 +77,7 @@ load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
 rbe_autoconfig(
     name = "rbe_default",
     base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
-    digest = "sha256:d7da526bb716a04048dd072762a1ba4145bbdfc95b51fbaca0ccb13adba210cc",
+    digest = "sha256:62b161e79413f0f59ae3845c377b10e60a4a639f3d32569a82b620f017837a68",
     registry = "gcr.io",
     repository = "iree-oss/rbe-toolchain",
     use_checked_in_confs = "Force",

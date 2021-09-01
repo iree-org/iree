@@ -77,8 +77,9 @@ class PackConstantPoolStoragePass
       OpBuilder builder(poolOp.getContext());
       builder.setInsertionPointAfter(splatValueOp);
       auto splatOp = builder.create<ConstantPoolSplatOp>(
-          splatValueOp.getLoc(), splatValueOp.getName(), splatValueOp.value(),
-          SymbolRefAttr{}, ByteRangeAttr{});
+          splatValueOp.getLoc(), splatValueOp.getName(),
+          splatValueOp.value().cast<SplatElementsAttr>(), SymbolRefAttr{},
+          IREE::Util::ByteRangeAttr{});
       splatOp.setNested();
       splatValueOp.erase();
     }
@@ -114,10 +115,9 @@ class PackConstantPoolStoragePass
         auto spanOp = poolBuilder.create<ConstantPoolSpanOp>(
             valueOp.getLoc(), valueOp.getName(), valueOp.value().getType(),
             poolBuilder.getSymbolRefAttr(storageBufferOp),
-            ByteRangeAttr::get(APInt(64, constantSpan.offset),
-                               APInt(64, constantSpan.length),
-                               poolOp.getContext()),
-            SymbolRefAttr{}, ByteRangeAttr{});
+            IREE::Util::ByteRangeAttr::get(
+                poolOp.getContext(), constantSpan.offset, constantSpan.length),
+            SymbolRefAttr{}, IREE::Util::ByteRangeAttr{});
         spanOp.setNested();
         valueOp.erase();
       }
@@ -147,7 +147,7 @@ class PackConstantPoolStoragePass
     SmallVector<ConstantSpan, 8> spans;
     // Packed byte data that must be embedded in the final module.
     // It must be written with an alignment as required by the constraints.
-    ElementsAttr data;
+    IREE::Util::CompositeAttr data;
   };
 
   // Returns zero or more storage buffers and the spans values map into.
@@ -251,27 +251,52 @@ class PackConstantPoolStoragePass
                                      return span.valueOp.getLoc();
                                    })));
 
-    // TODO(#3354): replace this with an #iree.composite_buffer attribute or
-    // something so we can reuse the uniqued storage for each constant and just
-    // reference them with the (offset, length) byte range. Otherwise we are
-    // re-uniquing the new constant (and the old ones will likely be around in
-    // various forms at least transiently) meaning that we are potentially
-    // doubling the size of all constants in memory.
-
-    // Construct the buffer in memory.
-    std::vector<char> buffer(storageBuffer.totalSize);
+    // Construct a composite attribute that contains references to the original
+    // uniqued storage values. This avoids needing to reallocate/unique/copy
+    // the entire constant storage. Since we may have inserted padding between
+    // values to meet the target buffer constraints we may need to insert some
+    // padding bytes between the elements to keep the composite dense.
+    auto i8Type = IntegerType::get(context, 8);
+    auto zeroAttr = IntegerAttr::get(i8Type, 0);
+    SmallVector<Attribute> values;
+    int64_t offset = 0;
     for (auto &constantSpan : storageBuffer.spans) {
-      // NOTE: we know the data is dense because we've already filtered out
-      // any splats; we really would not want to be writing splats to a file.
-      auto sourceData = constantSpan.valueOp.value().cast<DenseElementsAttr>();
-      auto rawData = sourceData.getRawData();
-      llvm::copy(rawData, buffer.begin() + constantSpan.offset);
+      if (constantSpan.length == 0) continue;
+
+      int64_t start = constantSpan.offset;
+      int64_t end = start + constantSpan.length;
+
+      // TODO(benvanik): when we start overlapping data we'll want to have a way
+      // to build subranges here by slicing out parts of the attributes we have
+      // coming in. This could be done with a #util.slice<> attr or something
+      // that when serialized performs the offsetting.
+      assert(start >= offset && "expect ordered spans");
+
+      int64_t spanPadding = start - offset;
+      if (spanPadding > 0) {
+        // 0-pad until the start of this span.
+        values.push_back(DenseElementsAttr::get(
+            VectorType::get({spanPadding}, i8Type), zeroAttr));
+        offset += spanPadding;
+      }
+
+      values.push_back(constantSpan.valueOp.value());
+      offset = end;
     }
-    storageBuffer.data = DenseElementsAttr::getFromRawBuffer(
-        VectorType::get({static_cast<int64_t>(storageBuffer.totalSize)},
-                        IntegerType::get(context, 8)),
-        buffer,
-        /*isSplatBuffer=*/false);
+
+    // Add tail padding. Unfortunate but some implementations will require the
+    // bytes and it's possible (and in some cases intentional) that the storage
+    // buffers fall at the end of mapped memory and need the valid bytes for
+    // page-granularity access.
+    int64_t tailPadding = storageBuffer.totalSize - offset;
+    if (tailPadding > 0) {
+      // 0-pad until the start of this span.
+      values.push_back(DenseElementsAttr::get(
+          VectorType::get({tailPadding}, i8Type), zeroAttr));
+      offset += tailPadding;
+    }
+
+    storageBuffer.data = IREE::Util::CompositeAttr::get(context, values);
   }
 };
 

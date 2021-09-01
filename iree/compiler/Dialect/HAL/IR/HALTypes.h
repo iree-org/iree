@@ -57,6 +57,13 @@ Value getElementBitCount(Location loc, Value elementType, OpBuilder &builder);
 size_t getElementByteCount(IntegerAttr elementType);
 Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder);
 
+// Returns a stable identifier for the MLIR encoding type or 0 (opaque) if the
+// type is unsupported in the ABI.
+llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr);
+
+// Returns an attribute with the MLIR encoding type or 0 (opaque).
+IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context);
+
 template <typename T>
 inline bool allEnumBitsSet(T value, T required) {
   return (static_cast<uint32_t>(value) & static_cast<uint32_t>(required)) ==
@@ -72,16 +79,18 @@ class AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
   using Base::Base;
 };
 
-class BufferType : public Type::TypeBase<BufferType, Type, TypeStorage,
-                                         InferTypeSizeInterface::Trait> {
+class BufferType
+    : public Type::TypeBase<BufferType, Type, TypeStorage,
+                            IREE::Util::InferTypeSizeInterface::Trait> {
  public:
   using Base::Base;
 
   Value inferSizeFromValue(Location loc, Value value, OpBuilder &builder) const;
 };
 
-class BufferViewType : public Type::TypeBase<BufferViewType, Type, TypeStorage,
-                                             InferTypeSizeInterface::Trait> {
+class BufferViewType
+    : public Type::TypeBase<BufferViewType, Type, TypeStorage,
+                            IREE::Util::InferTypeSizeInterface::Trait> {
  public:
   using Base::Base;
 

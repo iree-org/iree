@@ -729,27 +729,33 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
   return true;
 }
 
-IREE_API_EXPORT bool iree_status_to_string(
-    iree_status_t status, char** out_buffer,
-    iree_host_size_t* out_buffer_length) {
+// Converts the status to an allocated string value using the given allocator.
+// The caller must free the buffer with |allocator|.
+static bool iree_status_to_string(iree_status_t status,
+                                  iree_allocator_t allocator, char** out_buffer,
+                                  iree_host_size_t* out_buffer_length) {
   *out_buffer_length = 0;
   iree_host_size_t buffer_length = 0;
   if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
                                         /*buffer=*/NULL, &buffer_length))) {
     return false;
   }
-  // Buffer capacity needs to be +1 to account for the terminating null of
-  // snprintf.
-  buffer_length++;
-  char* buffer = (char*)malloc(buffer_length);
-  if (IREE_UNLIKELY(!buffer)) return false;
+
+  // Buffer capacity needs to be +1 for the NUL terminator (see snprintf).
+  char* buffer = NULL;
+  iree_status_t malloc_status =
+      iree_allocator_malloc(allocator, buffer_length + 1, (void**)&buffer);
+  if (!iree_status_is_ok(malloc_status)) {
+    iree_status_ignore(malloc_status);
+    return false;
+  }
   bool ret =
-      iree_status_format(status, buffer_length, buffer, out_buffer_length);
+      iree_status_format(status, buffer_length + 1, buffer, out_buffer_length);
   if (ret) {
     *out_buffer = buffer;
     return true;
   } else {
-    free(buffer);
+    iree_allocator_free(allocator, buffer);
     return false;
   }
 }
@@ -757,10 +763,15 @@ IREE_API_EXPORT bool iree_status_to_string(
 IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status) {
   // TODO(benvanik): better support for colors/etc - possibly move to logging.
   // TODO(benvanik): do this without allocation by streaming the status.
+  iree_allocator_t allocator = iree_allocator_system();
   char* status_buffer = NULL;
   iree_host_size_t status_buffer_length = 0;
-  iree_status_to_string(status, &status_buffer, &status_buffer_length);
-  fprintf(file, "%.*s\n", (int)status_buffer_length, status_buffer);
-  free(status_buffer);
+  if (iree_status_to_string(status, allocator, &status_buffer,
+                            &status_buffer_length)) {
+    fprintf(file, "%.*s\n", (int)status_buffer_length, status_buffer);
+    iree_allocator_free(allocator, status_buffer);
+  } else {
+    fprintf(file, "(failed to format status)\n");
+  }
   fflush(file);
 }

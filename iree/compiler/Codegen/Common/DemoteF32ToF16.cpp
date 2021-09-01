@@ -9,7 +9,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
@@ -138,8 +138,8 @@ struct DemoteF32ToF16Pass : public DemoteF32ToF16Base<DemoteF32ToF16Pass> {
     ConversionTarget target(*context);
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([](Operation *op) {
-      if (auto varOp = dyn_cast<IREE::Flow::VariableOp>(op)) {
-        return !isIllegalType(varOp.type());
+      if (auto globalOp = dyn_cast<IREE::Util::GlobalOp>(op)) {
+        return !isIllegalType(globalOp.type());
       }
       if (auto funcOp = dyn_cast<FuncOp>(op)) {
         for (Type type : funcOp.getType().getInputs()) {

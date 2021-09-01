@@ -120,6 +120,7 @@ cc_library(
         "//iree/compiler/InputConversion/MHLO",
         "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:IREEVM",
+        "//llvm-external-projects/iree-dialects:IREEDialect",
         "@llvm-project//mlir:IR",
     ],
 )
@@ -354,6 +355,7 @@ cc_library(
         ":init_compiler_modules",
         ":init_iree_passes_and_dialects",
         ":init_mlir_passes_and_dialects",
+        ":init_passes_and_dialects",
         ":init_targets",
         ":init_translations",
         ":init_xla_dialects",

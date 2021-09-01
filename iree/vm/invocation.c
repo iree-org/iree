@@ -210,6 +210,9 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
       stack, iree_vm_context_state_resolver(context), allocator);
   iree_status_t status =
       iree_vm_invoke_within(context, stack, function, policy, inputs, outputs);
+  if (!iree_status_is_ok(status)) {
+    status = IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, status);
+  }
   iree_vm_stack_deinitialize(stack);
 
   IREE_TRACE_ZONE_END(z0);

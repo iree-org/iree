@@ -116,11 +116,68 @@ struct FunctionDescriptor {
   // Offset and length within the larger bytecode data block.
   bytecode_offset:int32;
   bytecode_length:int32;
+
   // TODO(benvanik): remove counts and embed directly in bytecode.
   // Total number of i32 registers used by the function.
   i32_register_count:int16;
   // Total number of ref registers used by the function.
   ref_register_count:int16;
+}
+
+// mlir/IR/BuiltinLocationAttributes.td : CallSiteLoc
+table CallSiteLocDef {
+  callee:int32;
+  caller:int32;
+}
+
+// mlir/IR/BuiltinLocationAttributes.td : FileLineColLoc
+table FileLineColLocDef {
+  filename:string;
+  line:int32;
+  column:int32;
+}
+
+// mlir/IR/BuiltinLocationAttributes.td : FusedLoc
+table FusedLocDef {
+  metadata:string;
+  locations:[int32];
+}
+
+// mlir/IR/BuiltinLocationAttributes.td : FusedLoc
+table NameLocDef {
+  name:string;
+  child_location:int32;
+}
+
+// A location - possibly nested.
+union LocationTypeDef {
+  CallSiteLocDef,
+  FileLineColLocDef,
+  FusedLocDef,
+  NameLocDef,
+}
+
+// Maps a relative bytecode offset within a function to a source location.
+struct BytecodeLocationDef {
+  // Bytecode offset of the start of the operation.
+  bytecode_offset:int32;
+  // Index into the debug database location_table.
+  location:int32;
+}
+
+// Debug data for a single function mapping back into source IR.
+table FunctionSourceMapDef {
+  // Operation locations for all ops within the function.
+  locations:[BytecodeLocationDef];
+}
+
+// VM debug information database.
+table DebugDatabaseDef {
+  // Location table. Source maps reference this table.
+  location_table:[LocationTypeDef];
+
+  // Internal function source maps; 1:1 with the module function_descriptors.
+  functions:[FunctionSourceMapDef];
 }
 
 // Defines a bytecode module containing the information required to serve the
@@ -176,6 +233,9 @@ table BytecodeModuleDef {
 
   // Bytecode contents. One large buffer containing all of the function op data.
   bytecode_data:[uint8];
+
+  // Optional module debug database.
+  debug_database:DebugDatabaseDef;
 }
 
 root_type BytecodeModuleDef;

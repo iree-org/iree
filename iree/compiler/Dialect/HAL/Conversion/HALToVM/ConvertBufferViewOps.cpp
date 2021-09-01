@@ -24,6 +24,8 @@ void populateHALBufferViewToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.buffer_view.byte_length");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewElementTypeOp>>(
       context, importSymbols, typeConverter, "hal.buffer_view.element_type");
+  patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewEncodingTypeOp>>(
+      context, importSymbols, typeConverter, "hal.buffer_view.encoding_type");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewRankOp>>(
       context, importSymbols, typeConverter, "hal.buffer_view.rank");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewDimOp>>(

@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -59,6 +60,11 @@ static llvm::cl::opt<int> clLinalgOpsPaddingSize(
                    "flow-padding-size"),
     llvm::cl::init(4));
 
+static llvm::cl::opt<bool> clEnableMatmulToMMT4d(
+    "iree-flow-enable-matmul-to-mmt4d",
+    llvm::cl::desc("Enable converting linalg.matmul into linalg.mmt4d"),
+    llvm::cl::init(false));
+
 // TODO(#1159): enable by default or remove this option once it works on
 //              a broader set of programs
 static llvm::cl::opt<bool> clEnableLinalgDetensorize(
@@ -72,20 +78,22 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
-  // Simplify flow.variable accesses early on; this can help with dispatch
+  passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
+
+  // Simplify util.global accesses early on; this can help with dispatch
   // region formation as redundant store-loads are removed.
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createSimplifyVariableAccessesPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Util::createSimplifyGlobalAccessesPass());
 
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Replaces variables with !shapex.ranked_shape types with individual
   // variables for each dimension. This allows for constant dimensions to be
   // DCE'd in following passes.
-  passManager.addPass(IREE::Flow::createExpandVariableDynamicDimsPass());
+  passManager.addPass(createExpandGlobalDynamicDimsPass());
 
   // Materialize dynamic shapes in the IR, also expanding function signatures
   // such that:
@@ -96,80 +104,81 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // The generated ABI wrappers assume such an expansion and will generate code
   // to produce it from the original reflection metadata captured in the
   // previous pass.
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
       Shape::createExpandFunctionDynamicDimsPass());
 
   // Special case peephole optimizations.
-  if (clEnable1x1ConvToMatmul) {
-    passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
-  }
-  if (clEnableConvToImg2Col) {
-    passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
-  }
-  // Pad linalg op
-  if (clEnablePaddingLinalgOps) {
-    passManager.addNestedPass<FuncOp>(
-        createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
+  {
+    if (clEnable1x1ConvToMatmul) {
+      passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
+    }
+    if (clEnableConvToImg2Col) {
+      passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
+    }
+    // Pad linalg op
+    if (clEnablePaddingLinalgOps) {
+      passManager.addNestedPass<FuncOp>(
+          createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
+    }
+    // Convert linalg.matmul -> linalg.mmt4d
+    if (clEnableMatmulToMMT4d) {
+      passManager.addNestedPass<FuncOp>(
+          createConvertLinalgMatmulOpToLinalgMMT4dPass(clLinalgOpsPaddingSize,
+                                                       clLinalgOpsPaddingSize,
+                                                       clLinalgOpsPaddingSize));
+    }
   }
   passManager.addPass(createPadTensorToSubTensorInsertPass());
 
   // Elementwise, fusion, tiling and distribution.
-  passManager.addNestedPass<FuncOp>(
+  passManager.addNestedPass<mlir::FuncOp>(
       mlir::createConvertElementwiseToLinalgPass());
-  passManager.addNestedPass<FuncOp>(mlir::createLinalgFoldUnitExtentDimsPass());
-  passManager.addNestedPass<FuncOp>(createInterchangeGenericOpsPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createFusionOfTensorOpsPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      mlir::createLinalgFoldUnitExtentDimsPass());
+  passManager.addNestedPass<mlir::FuncOp>(createInterchangeGenericOpsPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(createFusionOfTensorOpsPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
   if (clEnableLinalgDetensorize) {
-    passManager.addNestedPass<FuncOp>(mlir::createLinalgDetensorizePass());
+    passManager.addNestedPass<mlir::FuncOp>(
+        mlir::createLinalgDetensorizePass());
   }
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createConvertTensorOpsPass());
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createConvertLinalgTensorOpsPass(
-          /*runBeforeDispatchRegionFormation=*/true));
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createDispatchLinalgOnTensorsPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      createConvertToFlowBeforeDispatchFormation());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(createDispatchLinalgOnTensorsPass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createConvertLinalgTensorOpsPass(
-          /*runBeforeDispatchRegionFormation=*/false));
+  passManager.addNestedPass<mlir::FuncOp>(
+      createConvertToFlowAfterDispatchFormation());
   // NOTE: required because the current dispatch-linalg-on-tensors pass
   // creates a lot of dead IR that needs to be cleaned up.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
 
   // Outline the dispatch regions into their own functions wrapped in
   // executables.
-  passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
+  passManager.addPass(createOutlineDispatchRegionsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
 
   // Deduplicate executables created from dispatch regions.
   // Note: this only deduplicates equivalent executables. We could in addition
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
-  passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
-
-  // TODO: Prune and rename this pass. This runs after sending everything
-  // possible to the device and then legalizes any remaining h<->d loads,
-  // typically coming from top level flow control.
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createPromoteTensorLoadsPass());
+  passManager.addPass(createDeduplicateExecutablesPass());
 
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as
   // exporting all original model entry points.
   if (clExportBenchmarkFuncs) {
-    passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
+    passManager.addPass(createExportBenchmarkFuncsPass());
   }
 
   // Inject tracing that logs both input and output tensors from all dispatches.
   // We do this after deduping so that the executable names match later stages.
   if (clTraceDispatchTensors) {
-    passManager.addNestedPass<FuncOp>(
-        IREE::Flow::createInjectDispatchTracingPass());
+    passManager.addNestedPass<mlir::FuncOp>(createInjectDispatchTracingPass());
   }
 
   //----------------------------------------------------------------------------
@@ -180,33 +189,31 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Form streams.
   // Cleanup the IR before we try to form streams.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Reorder blocks to increase the grouping of streamable ops.
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createHoistUnstreamableOpsPass());
+  passManager.addNestedPass<mlir::FuncOp>(createHoistUnstreamableOpsPass());
 
   // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
   // arbitrary ordering.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Clone constants that escape basic blocks until we have better analysis.
-  passManager.addNestedPass<FuncOp>(
-      IREE::Flow::createInsertConstantClonesPass());
+  passManager.addNestedPass<mlir::FuncOp>(createInsertConstantClonesPass());
 
   // Group streamable ops into streams.
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createFormStreamsPass());
+  passManager.addNestedPass<mlir::FuncOp>(createFormStreamsPass());
 
   // Prior to leaving the pipeline we need to clean things up for following
   // layers. These transforms may be undone by subsequent CSE/folding passes.
-  passManager.addPass(IREE::Flow::createOutlineLargeConstantsPass());
+  passManager.addPass(createOutlineLargeConstantsPass());
 
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.

@@ -45,6 +45,6 @@ vm.module @control_flow_module {
   // CHECK-NEXT: goto [[BB4:[^ ]*]];
   // CHECK-NEXT: [[BB4]]:
   // CHECK-NEXT: [[V0]] = vm_add_i32([[D]], [[E]]);
-  // CHECK-NEXT: EMITC_DEREF_ASSIGN([[RESULT]], [[V0]]);
+  // CHECK-NEXT: EMITC_DEREF_ASSIGN_VALUE([[RESULT]], [[V0]]);
   // CHECK-NEXT: [[STATUS]] = iree_ok_status();
   // CHECK-NEXT: return [[STATUS]];

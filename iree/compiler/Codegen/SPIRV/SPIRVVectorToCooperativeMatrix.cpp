@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -74,7 +75,8 @@ bool supportsCooperativeMatrix(Operation *op) {
 class CooperativeMatrixAnalysis {
  public:
   explicit CooperativeMatrixAnalysis(mlir::Operation *op) {
-    auto targetEnv = spirv::TargetEnv(spirv::lookupTargetEnv(op));
+    spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(op);
+    spirv::TargetEnv targetEnv(targetEnvAttr);
     if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
         !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix))
       return;
@@ -255,7 +257,7 @@ struct SPIRVVectorToCooperativeMatrixPass final
           SPIRVVectorToCooperativeMatrixPass> {
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
-    auto targetAttr = spirv::lookupTargetEnv(funcOp);
+    spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(funcOp);
     SPIRVTypeConverter typeConverter(targetAttr);
 
     typeConverter.addConversion(

@@ -25,6 +25,8 @@ cc_library(
         "assert.h",
         "status.c",
         "status.h",
+        "string_builder.c",
+        "string_builder.h",
         "string_view.c",
         "string_view.h",
         "time.c",
@@ -60,6 +62,16 @@ cc_test(
     deps = [
         ":base",
         ":cc",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "string_builder_test",
+    srcs = ["string_builder_test.cc"],
+    deps = [
+        ":base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

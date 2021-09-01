@@ -44,6 +44,19 @@ IREE::HAL::TranslationInfo getTranslationInfo(
       kTranslationInfoAttrName);
 }
 
+SmallVector<int64_t> getWorkgroupSize(
+    IREE::HAL::ExecutableEntryPointOp entryPointOp) {
+  SmallVector<int64_t> workgroupSize;
+  if (Optional<ArrayAttr> workgroupSizeAttrList =
+          entryPointOp.workgroup_size()) {
+    workgroupSize.resize(workgroupSizeAttrList->size());
+    for (auto attr : llvm::enumerate(workgroupSizeAttrList.getValue())) {
+      workgroupSize[attr.index()] = attr.value().cast<IntegerAttr>().getInt();
+    }
+  }
+  return workgroupSize;
+}
+
 void setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
                         IREE::HAL::TranslationInfo translationInfo,
                         ArrayRef<int64_t> workgroupSize) {
@@ -96,7 +109,8 @@ IREE::HAL::LoweringConfig buildConfigAttr(TileSizesListTypeRef tileSizes,
     nativeVectorSizeAttr = builder.getI64ArrayAttr(nativeVectorSize);
   }
   return IREE::HAL::LoweringConfig::get(tileSizesAttr, nativeVectorSizeAttr,
-                                        context);
+                                        /*passPipeline = */ nullptr,
+                                        /*workgroupSize = */ nullptr, context);
 }
 
 TileSizesListType getTileSizes(IREE::HAL::LoweringConfig config) {

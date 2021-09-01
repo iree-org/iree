@@ -17,9 +17,12 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "DropCompilerHints.cpp"
+    "SimplifyGlobalAccesses.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRPass
+    MLIRSupport
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

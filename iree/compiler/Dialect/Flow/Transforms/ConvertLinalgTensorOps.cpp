@@ -105,7 +105,7 @@ struct ConvertLinalgTensorOpsPass
                     linalg::LinalgDialect, mlir::StandardOpsDialect>();
   }
   void runOnOperation() override {
-    FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
@@ -125,7 +125,7 @@ struct ConvertLinalgTensorOpsPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgTensorOpsPass(
+std::unique_ptr<OperationPass<mlir::FuncOp>> createConvertLinalgTensorOpsPass(
     bool runBeforeDispatchRegionFormation) {
   return std::make_unique<ConvertLinalgTensorOpsPass>(
       runBeforeDispatchRegionFormation);

@@ -20,17 +20,17 @@ class AllocatorMapOpConversion
   AllocatorMapOpConversion(TypeConverter &typeConverter, MLIRContext *context,
                            SymbolTable &importSymbols)
       : OpConversionPattern(typeConverter, context) {
-    wrapByteBufferImportOp = importSymbols.lookup<IREE::VM::ImportOp>(
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(
         "hal.allocator.wrap.byte_buffer");
-    assert(wrapByteBufferImportOp);
+    assert(importOp);
   }
 
   LogicalResult matchAndRewrite(
       IREE::HAL::AllocatorMapOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::AllocatorMapOp::Adaptor opAdaptor(operands);
-    rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
-        op, wrapByteBufferImportOp.getName(),
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, importOp.getName(),
         ArrayRef<Type>{getTypeConverter()->convertType(op.getType())},
         ArrayRef<Value>{opAdaptor.allocator(),
                         rewriter.createOrFold<IREE::VM::ConstI32Op>(
@@ -39,11 +39,12 @@ class AllocatorMapOpConversion
                             op.getLoc(), op.buffer_usageAttr()),
                         opAdaptor.source(), opAdaptor.offset(),
                         opAdaptor.length()});
+    copyImportAttrs(importOp, callOp);
     return success();
   }
 
  private:
-  mutable IREE::VM::ImportOp wrapByteBufferImportOp;
+  mutable IREE::VM::ImportOp importOp;
 };
 
 }  // namespace

@@ -334,7 +334,7 @@ func @dont_fuse_tensor_update_with_fill(
   %4 = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>(%2)[%arg3, %arg5]
   %5 = linalg.init_tensor [%3, %4] : tensor<?x?xf32>
   %6 = linalg.fill(%0, %5) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-  %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32>{%1, %2} -> tensor<?x?xf32>{%3, %4}
+  %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32>{%1, %2} -> %6 as tensor<?x?xf32>{%3, %4}
   return %7 : tensor<?x?xf32>
 }
 
@@ -431,7 +431,7 @@ func @conv2d(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>) -
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %cst = constant 0.000000e+00 : f32
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
-  %2 = linalg.conv_2d_input_nhwc_filter_hwcf
+  %2 = linalg.conv_2d_nhwc_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>)
@@ -442,7 +442,7 @@ func @conv2d(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>) -
 // CHECK-LABEL: func @conv2d
 // CHECK: scf.for
 // CHECK: scf.for
-// CHECK: linalg.conv_2d_input_nhwc_filter_hwcf
+// CHECK: linalg.conv_2d_nhwc_hwcf
 
 // -----
 
@@ -450,14 +450,14 @@ func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96x
   %cst = constant 0.000000e+00 : f32
   %1 = linalg.init_tensor [1, 56, 56, 96] : tensor<1x56x56x96xf32>
   %2 = linalg.fill(%cst, %1) : f32, tensor<1x56x56x96xf32> -> tensor<1x56x56x96xf32>
-  %4 = linalg.depthwise_conv_2d_input_nhwc_filter_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%input, %filter : tensor<1x113x113x96xf32>, tensor<3x3x96xf32>) outs(%2 : tensor<1x56x56x96xf32>) -> tensor<1x56x56x96xf32>
+  %4 = linalg.depthwise_conv2D_nhw {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%input, %filter : tensor<1x113x113x96xf32>, tensor<3x3x96xf32>) outs(%2 : tensor<1x56x56x96xf32>) -> tensor<1x56x56x96xf32>
   return %4 : tensor<1x56x56x96xf32>
 }
 
 // CHECK-LABEL: func @depthwise_conv2d
 // CHECK: scf.for
 // CHECK: scf.for
-// CHECK: linalg.depthwise_conv_2d_input_nhwc_filter_hwc
+// CHECK: linalg.depthwise_conv2D_nhw
 
 // -----
 
@@ -639,7 +639,7 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
   %c5_i32 = constant 5 : i32
   %c0_i32 = constant 0 : i32
   %c9_i32 = constant 9 : i32
-  %245 = flow.tensor.update %240, %244[%c9] : tensor<9xi32> -> tensor<18xi32>
+  %245 = flow.tensor.update %240, %244[%c9] : tensor<9xi32> -> %244 as tensor<18xi32>
   %248 = tensor.extract %247[] : tensor<i32>
   %249 = cmpi slt, %248, %c9_i32 : i32
   %250 = select %249, %248, %c9_i32 : i32

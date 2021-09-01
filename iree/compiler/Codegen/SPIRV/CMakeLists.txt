@@ -14,22 +14,23 @@ iree_cc_library(
   NAME
     SPIRV
   HDRS
-    "KernelDispatchUtils.h"
-    "LaunchConfig.h"
+    "KernelConfig.h"
     "MemorySpace.h"
     "Utils.h"
   SRCS
-    "CodeGenOptionUtils.cpp"
     "ConvertToSPIRVPass.cpp"
-    "KernelDispatchUtils.cpp"
-    "LaunchConfig.cpp"
+    "KernelConfig.cpp"
+    "MaliConfig.cpp"
+    "NVIDIAConfig.cpp"
     "Passes.cpp"
-    "SPIRVConcretizeWorkgroupTiles.cpp"
-    "SPIRVConvertToGPU.cpp"
     "SPIRVCopyToWorkgroupMemory.cpp"
+    "SPIRVDistributeToGlobalID.cpp"
     "SPIRVFoldGPUProcessorIDUses.cpp"
-    "SPIRVTileAndVectorize.cpp"
+    "SPIRVLowerExecutableTargetPass.cpp"
+    "SPIRVRemoveOneTripTiledLoops.cpp"
+    "SPIRVTileAndDistribute.cpp"
     "SPIRVVectorToCooperativeMatrix.cpp"
+    "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
   DEPS
@@ -62,6 +63,7 @@ iree_cc_library(
     MLIRTosaToStandard
     MLIRTransforms
     MLIRVector
+    MLIRVectorInterfaces
     MLIRVectorToSPIRV
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::PassHeaders
@@ -70,6 +72,8 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Util::IR

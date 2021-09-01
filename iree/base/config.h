@@ -31,6 +31,7 @@
 #ifndef IREE_BASE_CONFIG_H_
 #define IREE_BASE_CONFIG_H_
 
+#include <inttypes.h>
 #include <stddef.h>
 
 #include "iree/base/target_platform.h"
@@ -77,6 +78,7 @@ typedef IREE_HOST_SIZE_T iree_host_size_t;
 
 #if !defined(IREE_DEVICE_SIZE_T)
 #define IREE_DEVICE_SIZE_T uint64_t
+#define PRIdsz PRIu64
 #endif  // !IREE_DEVICE_SIZE_T
 
 // Size, in bytes, of a buffer on remote devices.
@@ -135,6 +137,18 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #endif  // !IREE_FILE_IO_ENABLE
 
 //===----------------------------------------------------------------------===//
+// Statistics/reporting
+//===----------------------------------------------------------------------===//
+// Conditionally enables programmatic access to aggregate statistics. When
+// enabled statistics requires additional per-operation logic and per-resource
+// state that can bloat otherwise minimal structures. Shared resources may also
+// require synchronization where there otherwise would not be any.
+
+#if !defined(IREE_STATISTICS_ENABLE)
+#define IREE_STATISTICS_ENABLE 1
+#endif  // !IREE_STATISTICS_ENABLE
+
+//===----------------------------------------------------------------------===//
 // IREE HAL configuration
 //===----------------------------------------------------------------------===//
 // Enables optional HAL features. Each of these may add several KB to the final
@@ -157,23 +171,28 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // available extensions in order to ensure that the compiled modules only use
 // features available on the target they are to run on.
 //
-// See the `-iree-vm-target-extension=` compiler option for more information.
+// See the `-iree-vm-target-extension-*` compiler options for more information.
+
+#if !defined(IREE_VM_BACKTRACE_ENABLE)
+// Enables backtraces in VM failures when debugging information is available.
+#define IREE_VM_BACKTRACE_ENABLE 1
+#endif  // !IREE_VM_BACKTRACE_ENABLE
 
 #if !defined(IREE_VM_EXT_I64_ENABLE)
 // Enables the 64-bit integer instruction extension.
-// Targeted from the compiler with `-iree-vm-target-extension=i64`.
+// Targeted from the compiler with `-iree-vm-target-extension-i64`.
 #define IREE_VM_EXT_I64_ENABLE 1
 #endif  // !IREE_VM_EXT_I64_ENABLE
 
 #if !defined(IREE_VM_EXT_F32_ENABLE)
 // Enables the 32-bit floating-point instruction extension.
-// Targeted from the compiler with `-iree-vm-target-extension=f32`.
+// Targeted from the compiler with `-iree-vm-target-extension-f32`.
 #define IREE_VM_EXT_F32_ENABLE 1
 #endif  // !IREE_VM_EXT_F32_ENABLE
 
 #if !defined(IREE_VM_EXT_F64_ENABLE)
 // Enables the 64-bit floating-point instruction extension.
-// Targeted from the compiler with `-iree-vm-target-extension=f64`.
+// Targeted from the compiler with `-iree-vm-target-extension-f64`.
 #define IREE_VM_EXT_F64_ENABLE 0
 #endif  // !IREE_VM_EXT_F64_ENABLE
 

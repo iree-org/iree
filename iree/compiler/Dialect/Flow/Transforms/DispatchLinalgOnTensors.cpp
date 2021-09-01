@@ -140,9 +140,8 @@ static void removeFusionGroupsAttribute(Operation *op) {
 static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
   return op.iterator_types()
       .getValue()
-      .take_while([](Attribute attr) -> bool {
-        return linalg::isParallelIteratorType(attr);
-      })
+      .take_while(
+          [](Attribute attr) -> bool { return isParallelIterator(attr); })
       .size();
 }
 
@@ -1057,7 +1056,8 @@ struct MakeDispatchWorkgroupsOp : public RewritePattern {
 // TODO(#5045): After the regression issue on CPU side is addressed, this can be
 // folded into the main logic of fusion.
 template <typename GenericOpTy>
-static unsigned makeElementwiseOpsRootOps(FuncOp funcOp, unsigned numRoots) {
+static unsigned makeElementwiseOpsRootOps(mlir::FuncOp funcOp,
+                                          unsigned numRoots) {
   MLIRContext *context = funcOp.getContext();
   OpBuilder builder(context);
   for (Block &block : funcOp) {
@@ -1091,7 +1091,7 @@ static unsigned makeElementwiseOpsRootOps(FuncOp funcOp, unsigned numRoots) {
 /// groups. All analysis of what to fuse happens here. For now this is just
 /// hard-wiring from basic heuristic but this could be adapted to have 1) better
 /// heuristics and 2) use a search approach to decide what all should be fused.
-static unsigned decideFusableLinalgOps(FuncOp funcOp) {
+static unsigned decideFusableLinalgOps(mlir::FuncOp funcOp) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp.getContext();
   OpBuilder builder(context);
@@ -1179,7 +1179,7 @@ struct DispatchLinalgOnTensorsPass
 }  // namespace
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
-  FuncOp funcOp = getOperation();
+  auto funcOp = getOperation();
 
   MLIRContext *context = funcOp->getContext();
   context->allowUnregisteredDialects(true);
@@ -1370,7 +1370,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   });
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createDispatchLinalgOnTensorsPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
 }
 

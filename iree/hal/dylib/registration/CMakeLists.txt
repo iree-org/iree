@@ -32,7 +32,7 @@ iree_cc_library(
     iree::hal
     iree::hal::local
     iree::hal::local::loaders::embedded_library_loader
-    iree::hal::local::loaders::legacy_library_loader
+    iree::hal::local::loaders::system_library_loader
     iree::hal::local::task_driver
     iree::task::api
   DEFINES
@@ -51,7 +51,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::hal::local
-    iree::hal::local::loaders::legacy_library_loader
+    iree::hal::local::loaders::system_library_loader
     iree::hal::local::sync_driver
   DEFINES
     "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1"

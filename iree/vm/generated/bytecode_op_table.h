@@ -576,8 +576,8 @@ typedef enum {
   IREE_VM_OP_EXT_F32_CastUI32F32 = 0x31,
   IREE_VM_OP_EXT_F32_CastF32SI32 = 0x32,
   IREE_VM_OP_EXT_F32_CastF32UI32 = 0x33,
-  IREE_VM_OP_EXT_F32_RSV_0x34,
-  IREE_VM_OP_EXT_F32_RSV_0x35,
+  IREE_VM_OP_EXT_F32_BitcastI32F32 = 0x34,
+  IREE_VM_OP_EXT_F32_BitcastF32I32 = 0x35,
   IREE_VM_OP_EXT_F32_RSV_0x36,
   IREE_VM_OP_EXT_F32_RSV_0x37,
   IREE_VM_OP_EXT_F32_RSV_0x38,
@@ -835,8 +835,8 @@ typedef enum {
     OPC(0x31, CastUI32F32) \
     OPC(0x32, CastF32SI32) \
     OPC(0x33, CastF32UI32) \
-    RSV(0x34) \
-    RSV(0x35) \
+    OPC(0x34, BitcastI32F32) \
+    OPC(0x35, BitcastF32I32) \
     RSV(0x36) \
     RSV(0x37) \
     RSV(0x38) \
@@ -1097,8 +1097,8 @@ typedef enum {
   IREE_VM_OP_EXT_F64_CastUI64F64 = 0x35,
   IREE_VM_OP_EXT_F64_CastF64SI64 = 0x36,
   IREE_VM_OP_EXT_F64_CastF64UI64 = 0x37,
-  IREE_VM_OP_EXT_F64_RSV_0x38,
-  IREE_VM_OP_EXT_F64_RSV_0x39,
+  IREE_VM_OP_EXT_F64_BitcastI64F64 = 0x38,
+  IREE_VM_OP_EXT_F64_BitcastF64I64 = 0x39,
   IREE_VM_OP_EXT_F64_RSV_0x3A,
   IREE_VM_OP_EXT_F64_RSV_0x3B,
   IREE_VM_OP_EXT_F64_RSV_0x3C,
@@ -1356,8 +1356,8 @@ typedef enum {
     OPC(0x35, CastUI64F64) \
     OPC(0x36, CastF64SI64) \
     OPC(0x37, CastF64UI64) \
-    RSV(0x38) \
-    RSV(0x39) \
+    OPC(0x38, BitcastI64F64) \
+    OPC(0x39, BitcastF64I64) \
     RSV(0x3A) \
     RSV(0x3B) \
     RSV(0x3C) \

@@ -20,11 +20,11 @@ namespace {
 
 // Converts linalg.conv_2d_input_nhwc_filter_nhwc op to linalg.matmul
 class Convert1x1ConvolutionMatmulOp
-    : public OpRewritePattern<linalg::ConvInputNHWCFilterHWCFOp> {
+    : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
  public:
-  using OpRewritePattern<linalg::ConvInputNHWCFilterHWCFOp>::OpRewritePattern;
+  using OpRewritePattern<linalg::Conv2DNhwcHwcfOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::ConvInputNHWCFilterHWCFOp convOp,
+  LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
     ShapedType inputShapeType =
         convOp.getInputOperand(0)->get().getType().cast<ShapedType>();
@@ -107,7 +107,8 @@ struct ConvertConv2D1x1ConvToMatmulPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertConv2D1x1ToMatmulPass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createConvertConv2D1x1ToMatmulPass() {
   return std::make_unique<ConvertConv2D1x1ConvToMatmulPass>();
 }
 

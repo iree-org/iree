@@ -44,6 +44,7 @@ cc_library(
 cc_library(
     name = "Common",
     srcs = [
+        "IREEImportPublic.cpp",
         "Passes.cpp",
         "TopLevelSCFToCFG.cpp",
     ],
@@ -53,6 +54,11 @@ cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
+        "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/Util/IR",
+        "//llvm-external-projects/iree-dialects:IREEDialect",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

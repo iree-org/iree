@@ -54,6 +54,31 @@ enum iree_hal_buffer_compatibility_bits_t {
 typedef uint32_t iree_hal_buffer_compatibility_t;
 
 //===----------------------------------------------------------------------===//
+// Statistics/reporting
+//===----------------------------------------------------------------------===//
+
+// Aggregate allocation statistics.
+typedef struct iree_hal_allocator_statistics_t {
+#if IREE_STATISTICS_ENABLE
+  iree_device_size_t host_bytes_peak;
+  iree_device_size_t host_bytes_allocated;
+  iree_device_size_t host_bytes_freed;
+  iree_device_size_t device_bytes_peak;
+  iree_device_size_t device_bytes_allocated;
+  iree_device_size_t device_bytes_freed;
+  // TODO(benvanik): mapping information (discarded, mapping ranges,
+  //                 flushed/invalidated, etc).
+#else
+  int reserved;
+#endif  // IREE_STATISTICS_ENABLE
+} iree_hal_allocator_statistics_t;
+
+// Formats allocator statistics as a pretty-printed multi-line string.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_format(
+    const iree_hal_allocator_statistics_t* statistics,
+    iree_string_builder_t* builder);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
@@ -69,6 +94,15 @@ IREE_API_EXPORT void iree_hal_allocator_release(
 // Returns the host allocator used for allocating host objects.
 IREE_API_EXPORT iree_allocator_t
 iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator);
+
+// Queries the aggregate statistics from the allocator since creation.
+// Thread-safe; statistics are captured at the time the call is made.
+//
+// NOTE: statistics may be compiled out in some configurations and this call
+// will become a memset(0).
+IREE_API_EXPORT void iree_hal_allocator_query_statistics(
+    iree_hal_allocator_t* allocator,
+    iree_hal_allocator_statistics_t* out_statistics);
 
 // Returns a bitmask indicating what operations with buffers of the given type
 // are available on the allocator.
@@ -126,6 +160,11 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
 
+// Prints the current allocation statistics of |allocator| to |file|.
+// No-op if statistics are not enabled (IREE_STATISTICS_ENABLE).
+IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
+    FILE* file, iree_hal_allocator_t* allocator);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_heap_allocator_t
 //===----------------------------------------------------------------------===//
@@ -152,6 +191,10 @@ typedef struct iree_hal_allocator_vtable_t {
   iree_allocator_t(IREE_API_PTR* host_allocator)(
       const iree_hal_allocator_t* allocator);
 
+  void(IREE_API_PTR* query_statistics)(
+      iree_hal_allocator_t* allocator,
+      iree_hal_allocator_statistics_t* out_statistics);
+
   iree_hal_buffer_compatibility_t(IREE_API_PTR* query_buffer_compatibility)(
       iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
       iree_hal_buffer_usage_t allowed_usage,
@@ -172,6 +215,41 @@ typedef struct iree_hal_allocator_vtable_t {
 
 IREE_API_EXPORT void iree_hal_allocator_destroy(
     iree_hal_allocator_t* allocator);
+
+#if IREE_STATISTICS_ENABLE
+
+// Records a buffer allocation to |statistics|.
+static inline void iree_hal_allocator_statistics_record_alloc(
+    iree_hal_allocator_statistics_t* statistics,
+    iree_hal_memory_type_t memory_type, iree_device_size_t allocation_size) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL)) {
+    statistics->host_bytes_allocated += allocation_size;
+    statistics->host_bytes_peak =
+        iree_max(statistics->host_bytes_peak, statistics->host_bytes_allocated -
+                                                  statistics->host_bytes_freed);
+  } else {
+    statistics->device_bytes_allocated += allocation_size;
+    statistics->device_bytes_peak = iree_max(
+        statistics->device_bytes_peak,
+        statistics->device_bytes_allocated - statistics->device_bytes_freed);
+  }
+}
+
+// Records a buffer deallocation to |statistics|.
+static inline void iree_hal_allocator_statistics_record_free(
+    iree_hal_allocator_statistics_t* statistics,
+    iree_hal_memory_type_t memory_type, iree_device_size_t allocation_size) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL)) {
+    statistics->host_bytes_freed += allocation_size;
+  } else {
+    statistics->device_bytes_freed += allocation_size;
+  }
+}
+
+#else
+#define iree_hal_allocator_statistics_record_alloc(...)
+#define iree_hal_allocator_statistics_record_free(...)
+#endif  // IREE_STATISTICS_ENABLE
 
 #ifdef __cplusplus
 }  // extern "C"

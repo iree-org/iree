@@ -8,11 +8,16 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/BitVector.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/Interfaces/CastInterfaces.h"
+#include "mlir/Parser.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -108,7 +113,7 @@ PtrType PtrType::getChecked(function_ref<InFlightDiagnostic()> emitError,
   return Base::getChecked(emitError, targetType.getContext(), targetType);
 }
 
-Type PtrType::getTargetType() { return getImpl()->targetType; }
+Type PtrType::getTargetType() const { return getImpl()->targetType; }
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
@@ -181,6 +186,24 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
   return baseValue;
 }
 
+bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
+  auto storageAttr =
+      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
+  if (!storageAttr) return false;
+  auto valueAttrs = storageAttr.getValue();
+  if (valueAttrs.empty()) return false;
+  auto tiedOp = cast<TiedOpInterface>(op);
+  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
+  for (unsigned i = 0; i < valueAttrs.size(); ++i) {
+    int64_t index = valueAttrs[i].cast<IntegerAttr>().getInt();
+    index = index != TiedOpInterface::kUntiedIndex
+                ? tiedOperandsOffset + index
+                : TiedOpInterface::kUntiedIndex;
+    if (index == operandIndex) return true;
+  }
+  return false;
+}
+
 LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
   auto storageAttr =
       tiedOp->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
@@ -242,17 +265,91 @@ void excludeTiedOperandAndResultIndices(
   }
 }
 
-// At the end so it can use functions above:
-#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
-
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
 //===----------------------------------------------------------------------===//
+
+// At the end so it can use functions above:
+#include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
+#include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.cpp.inc"
 
 void UtilDialect::registerTypes() {
   addTypes<IREE::Util::ByteBufferType, IREE::Util::ListType,
            IREE::Util::MutableByteBufferType, IREE::Util::PtrType,
            IREE::Util::VariantType>();
+}
+
+//===----------------------------------------------------------------------===//
+// Type printing and parsing
+//===----------------------------------------------------------------------===//
+
+Type UtilDialect::parseType(DialectAsmParser &parser) const {
+  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
+  llvm::StringRef spec = parser.getFullSymbolSpec();
+  if (spec == "variant") {
+    return IREE::Util::VariantType::get(getContext());
+  } else if (spec.consume_front("ptr")) {
+    if (!spec.consume_front("<") || !spec.consume_back(">")) {
+      parser.emitError(parser.getCurrentLocation())
+          << "malformed ptr type '" << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    auto variableType = mlir::parseType(spec, getContext());
+    if (!variableType) {
+      parser.emitError(parser.getCurrentLocation())
+          << "invalid ptr object type specification: '"
+          << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    return IREE::Util::PtrType::getChecked(variableType, loc);
+  } else if (spec == "byte_buffer") {
+    return IREE::Util::ByteBufferType::get(getContext());
+  } else if (spec == "mutable_byte_buffer") {
+    return IREE::Util::MutableByteBufferType::get(getContext());
+  } else if (spec.consume_front("list")) {
+    if (!spec.consume_front("<") || !spec.consume_back(">")) {
+      parser.emitError(parser.getCurrentLocation())
+          << "malformed list type '" << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    Type elementType;
+    if (spec == "?") {
+      elementType = IREE::Util::VariantType::get(getContext());
+    } else {
+      elementType = mlir::parseType(spec, getContext());
+    }
+    if (!elementType) {
+      parser.emitError(parser.getCurrentLocation())
+          << "invalid list element type specification: '"
+          << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    return IREE::Util::ListType::getChecked(elementType, loc);
+  }
+  emitError(loc, "unknown IREE type: ") << spec;
+  return Type();
+}
+
+void UtilDialect::printType(Type type, DialectAsmPrinter &os) const {
+  if (type.isa<IREE::Util::VariantType>()) {
+    os << "variant";
+  } else if (auto ptrType = type.dyn_cast<IREE::Util::PtrType>()) {
+    os << "ptr<" << ptrType.getTargetType() << ">";
+  } else if (type.isa<IREE::Util::ByteBufferType>()) {
+    os << "byte_buffer";
+  } else if (type.isa<IREE::Util::MutableByteBufferType>()) {
+    os << "mutable_byte_buffer";
+  } else if (auto listType = type.dyn_cast<IREE::Util::ListType>()) {
+    os << "list<";
+    if (listType.getElementType().isa<IREE::Util::VariantType>()) {
+      os << "?";
+    } else {
+      os << listType.getElementType();
+    }
+    os << ">";
+  } else {
+    llvm_unreachable("unhandled IREE type");
+  }
 }
 
 }  // namespace Util

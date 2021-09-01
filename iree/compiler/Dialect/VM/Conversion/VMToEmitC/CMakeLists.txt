@@ -23,7 +23,7 @@ if(${IREE_ENABLE_EMITC})
       MLIRPass
       MLIRStandard
       MLIRTransforms
-      iree::compiler::Dialect::Util::Conversion::PreserveCompilerHints
+      iree::compiler::Dialect::Util::Conversion
       iree::compiler::Dialect::Util::IR
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR

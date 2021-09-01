@@ -37,7 +37,6 @@ endif()
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
-option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
@@ -95,11 +94,7 @@ option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disa
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-if(IREE_ENABLE_EMITC)
-  if(NOT IREE_BUILD_COMPILER)
-    message(FATAL_ERROR "Enabling EmitC requires setting IREE_BUILD_COMPILER to ON.")
-  endif()
-endif()
+option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILER})
 
 #-------------------------------------------------------------------------------
 # Target and backend configuration
@@ -347,6 +342,10 @@ else()
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
+  # Add default external projects.
+  iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir-hlo)
+
   add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
@@ -366,28 +365,20 @@ else()
     ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
   )
 
-  # Avoid globally modifying paths by instead adding the include paths to the
-  # rules that really should have them in the first place.
-  target_include_directories(LLVMSupport PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
-  )
-  target_include_directories(MLIRSupport PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
-  )
-endif()
-
-# Add bundled mlir-hlo project unless if already provided.
-if(IREE_BUILD_COMPILER)
-  if(TARGET MLIRMhloUtils)
-    message(STATUS "Not adding IREE bundled mlir-hlo project because it is already present")
-  else()
-    message(STATUS "Adding IREE bundled mlir-hlo project")
-    # TODO: Have better sub project detection upstream.
-    set(MHLO_BUILD_EMBEDDED ON)
-    add_subdirectory(third_party/mlir-hlo EXCLUDE_FROM_ALL)
-  endif()
+  function(_hack_llvm_include_paths)
+    set(_common_include_dirs
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir-hlo/include>
+    )
+    # Avoid globally modifying paths by instead adding the include paths to the
+    # rules that really should have them in the first place.
+    target_include_directories(LLVMSupport PUBLIC ${_common_include_dirs})
+    target_include_directories(MLIRSupport PUBLIC ${_common_include_dirs})
+  endfunction()
+  _hack_llvm_include_paths()
 endif()
 
 #-------------------------------------------------------------------------------

@@ -4,23 +4,25 @@
 
 // CHECK-LABEL: @global_i32_folds
 vm.module @global_i32_folds {
-  // CHECK: vm.global.i32 mutable @g0 = 123 : i32
-  vm.global.i32 mutable @g0 initializer(@g0init) : i32
-  vm.func @g0init() -> i32 {
+  // CHECK: vm.global.i32 public mutable @g0 = 123 : i32
+  vm.global.i32 mutable @g0 : i32
+  vm.initializer {
     %c123 = vm.const.i32 123 : i32
-    vm.return %c123 : i32
+    vm.global.store.i32 %c123, @g0 : i32
+    vm.return
   }
 
-  // CHECK: vm.global.i32 mutable @g1 : i32
+  // CHECK: vm.global.i32 public mutable @g1 : i32
   vm.global.i32 mutable @g1 = 0 : i32
-  // CHECK: vm.global.i32 @g2 : i32
+  // CHECK: vm.global.i32 public @g2 : i32
   vm.global.i32 @g2 = 0 : i32
 
-  // CHECK: vm.global.i32 mutable @g3 : i32
-  vm.global.i32 mutable @g3 initializer(@g3init) : i32
-  vm.func @g3init() -> i32 {
+  // CHECK: vm.global.i32 public mutable @g3 : i32
+  vm.global.i32 mutable @g3 : i32
+  vm.initializer {
     %c0 = vm.const.i32 0 : i32
-    vm.return %c0 : i32
+    vm.global.store.i32 %c0, @g3 : i32
+    vm.return
   }
 }
 
@@ -28,11 +30,12 @@ vm.module @global_i32_folds {
 
 // CHECK-LABEL: @global_ref_folds_null
 vm.module @global_ref_folds_null {
-  // CHECK: vm.global.ref mutable @g0 : !vm.ref<?>
-  vm.global.ref mutable @g0 initializer(@g0init) : !vm.ref<?>
-  vm.func @g0init() -> !vm.ref<?> {
+  // CHECK: vm.global.ref public mutable @g0 : !vm.ref<?>
+  vm.global.ref mutable @g0 : !vm.ref<?>
+  vm.initializer {
     %null = vm.const.ref.zero : !vm.ref<?>
-    vm.return %null : !vm.ref<?>
+    vm.global.store.ref %null, @g0 : !vm.ref<?>
+    vm.return
   }
 }
 

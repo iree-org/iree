@@ -19,10 +19,8 @@ iree_lit_test_suite(
     "buffer_view_ops.mlir"
     "command_buffer_ops.mlir"
     "constant_ops.mlir"
-    "control_flow_ops.mlir"
     "device_ops.mlir"
     "executable_ops.mlir"
-    "variable_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

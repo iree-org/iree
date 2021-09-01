@@ -82,7 +82,6 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(""));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.codegenOptions = SPIRVCodegenOptions::getFromCLOptions();
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
 
@@ -152,9 +151,12 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    buildSPIRVCodegenPassPipeline(passManager, options_.codegenOptions);
+    buildSPIRVCodegenPassPipeline(passManager);
   }
 
+  // TODO(antiagainst): Re-enable SPIR-V linking once the tensorflow integration
+  // crash is fixed.
+#if 0
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
     // Note: Vulkan flavored SPIR-V does not have linking in the conventional
     // sense. For example, there is no cross-module symbol reference and symbol
@@ -266,6 +268,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     return success();
   }
+#endif
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
@@ -345,7 +348,7 @@ void registerVulkanSPIRVTargetBackends(
     std::function<VulkanSPIRVTargetOptions()> queryOptions) {
   getVulkanSPIRVTargetOptionsFromFlags();
   auto backendFactory = [=]() {
-    return std::make_unique<VulkanSPIRVTargetBackend>(queryOptions());
+    return std::make_shared<VulkanSPIRVTargetBackend>(queryOptions());
   };
   // #hal.device.target<"vulkan", ...
   static TargetBackendRegistration registration0("vulkan", backendFactory);

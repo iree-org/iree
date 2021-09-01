@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/base/alignment.h"
 #include "iree/base/attributes.h"
 #include "iree/base/config.h"
 #include "iree/base/status.h"
@@ -40,6 +41,22 @@ extern "C" {
 #define iree_any_bit_set(lhs, rhs) (((lhs) & (rhs)) != 0)
 // Returns true iff all bits from |rhs| are set in |lhs|.
 #define iree_all_bits_set(lhs, rhs) (((lhs) & (rhs)) == (rhs))
+
+#if IREE_STATISTICS_ENABLE
+// Evalutes the expression code only if statistics are enabled.
+//
+// Example:
+//  struct {
+//    IREE_STATISTICS(uint32_t stats_only_value);
+//  } my_object;
+//  IREE_STATISTICS(my_object.stats_only_value = 5);
+//  IREE_STATISTICS({
+//    my_object.stats_only_value = 5;
+//  });
+#define IREE_STATISTICS(expr) expr
+#else
+#define IREE_STATISTICS(expr)
+#endif  // IREE_STATISTICS_ENABLE
 
 //===----------------------------------------------------------------------===//
 // Byte buffers and memory utilities
@@ -244,6 +261,11 @@ static inline iree_allocator_t iree_allocator_system(void) {
 static inline iree_allocator_t iree_allocator_null(void) {
   iree_allocator_t v = {NULL, NULL};
   return v;
+}
+
+// Returns true if the allocator is `iree_allocator_null()`.
+static inline bool iree_allocator_is_null(iree_allocator_t allocator) {
+  return allocator.ctl == NULL;
 }
 
 #ifdef __cplusplus
