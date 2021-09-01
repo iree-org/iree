@@ -57,6 +57,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:GPUDialect",
