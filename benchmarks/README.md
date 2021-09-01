@@ -33,6 +33,13 @@ posting results compared against their base commit as comments.
    the model came from and how it was imported in case the MLIR file needs to
    be regenerated in the future.
 
+   We may further automate this over time, such as by importing from Python
+   sources as part of the benchmarks pipeline directly. For now, here are some
+   references:
+
+   * https://gist.github.com/antiagainst/35b0989bd0188dd9df4630bb0cf778f2
+   * https://colab.research.google.com/gist/ScottTodd/10838c0ccc87fa6d1b1c72e0fabea064/iree-keyword_spotting_streaming-benchmarks.ipynb
+
 3. Package the imported .mlir model file(s) for storage (see
    [iree_mlir_benchmark_suite.cmake](build_tools/cmake/iree_mlir_benchmark_suite.cmake)
    and [download_file.py](scripts/download_file.py)), then upload them to the
