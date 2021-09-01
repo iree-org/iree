@@ -383,3 +383,38 @@ func @usage(%func_arg: tensor<8x4xf32>) -> (tensor<4x8xf32>, tensor<4x8xf32>) {
 }
 
 }
+
+// -----
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
+  executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
+}>]} {
+
+// CHECK-LABEL: hal.executable @unsued_arg
+//  CHECK-NEXT: hal.interface @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: }
+flow.executable @unsued_arg {
+  flow.dispatch.entry @entry attributes {workgroup_rank = 2 : index}
+  module  {
+    func @entry(%unused_arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
+      %val = constant dense<4.2> : tensor<4x8xf32>
+      // CHECK-NOT: hal.interface.binding.subspan @[[IO]]::@[[S0B0]]
+      //     CHECK: hal.interface.binding.subspan @[[IO]]::@[[S0B1]]
+      flow.dispatch.tensor.store %val, %ret, offsets=[], sizes=[], strides=[] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:4x8xf32>
+      return
+    }
+  }
+}
+func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
+  %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
+      (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
+    %c1 = constant 1 : index
+    %1 = flow.dispatch @unsued_arg::@entry[%c1, %c1, %c1](%stream_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32>
+    flow.return %1 : tensor<4x8xf32>
+  }
+  return %0 : tensor<4x8xf32>
+}
+
+}

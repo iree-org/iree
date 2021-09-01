@@ -15,6 +15,7 @@ cc_library(
     srcs = [
         "CleanupPlaceholdersPass.cpp",
         "FunctionSignatureExpansionPass.cpp",
+        "FoldDimOverShapeCarryingOpPass.cpp",
     ],
     hdrs = [
         "Passes.h",

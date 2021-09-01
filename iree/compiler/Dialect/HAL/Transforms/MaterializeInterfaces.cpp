@@ -572,6 +572,8 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
 
   for (auto regionOperand : llvm::enumerate(regionOperands)) {
     auto blockArg = entryBlock->getArgument(regionOperand.index());
+    if (blockArg.use_empty()) continue;
+
     auto &value = regionOperand.value();
     switch (value.type) {
       case RegionOperand::Type::PUSH_CONSTANT: {

@@ -79,6 +79,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Each executable needs a hal.interface to specify how the host and device
   // comminucate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass());
+  passManager.addPass(createCanonicalizerPass());
 
   // Translate each executable variant to its target IR form.
   passManager.nest<IREE::HAL::ExecutableOp>()

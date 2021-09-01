@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "dynamic_abs.mlir"
     "dynamic_add.mlir"
     "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
     "dynamic_torch_index_select_high_rank.mlir"
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
