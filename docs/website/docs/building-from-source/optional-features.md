@@ -87,6 +87,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
 
         ``` shell
         cmake \
+          -GNinja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DIREE_BUILD_PYTHON_BINDINGS=ON \
           -DPython3_EXECUTABLE="$(which python)" \
@@ -102,7 +103,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
     === "Windows"
 
         ``` powershell
-        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_PYTHON_BINDINGS=ON .
+        cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_PYTHON_BINDINGS=ON .
         cmake --build .
 
         # Add bindings\python to PYTHONPATH and use the API.

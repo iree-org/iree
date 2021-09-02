@@ -444,7 +444,7 @@ void DispatchShapeOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.shape
+// flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -462,11 +462,28 @@ struct FoldConstantDispatchTieShape
   }
 };
 
+/// Elides the tie_shape if its operand already carries shapes.
+struct ElideShapeCarryingOperandTieShape
+    : public OpRewritePattern<DispatchTieShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchTieShapeOp op,
+                                PatternRewriter &rewriter) const override {
+    auto definingOp = op.operand().getDefiningOp();
+    if (!definingOp) return failure();
+    if (!isa<ShapeCarryingInterface>(definingOp)) return failure();
+    rewriter.replaceOp(op, op.operand());
+    return success();
+  }
+};
+
 }  // namespace
 
 void DispatchTieShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<FoldConstantDispatchTieShape>(context);
+  results
+      .insert<ElideShapeCarryingOperandTieShape, FoldConstantDispatchTieShape>(
+          context);
 }
 
 //===----------------------------------------------------------------------===//

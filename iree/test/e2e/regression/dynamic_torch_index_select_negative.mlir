@@ -1,4 +1,6 @@
 // RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot -function-input="2x2x2xi32=[[100, 101] [110, 111]] [[200, 201] [210, 211]]" -function-input="2x2x2xi32=[[0, 1] [1, 0]] [[0, 0] [1, 1]]" | IreeFileCheck %s)
+// RUN: [[ $IREE_VMVX_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=vmvx -function-input="2x2x2xi32=[[100, 101] [110, 111]] [[200, 201] [210, 211]]" -function-input="2x2x2xi32=[[0, 1] [1, 0]] [[0, 0] [1, 1]]" | IreeFileCheck %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=vulkan-spirv -function-input="2x2x2xi32=[[100, 101] [110, 111]] [[200, 201] [210, 211]]" -function-input="2x2x2xi32=[[0, 1] [1, 0]] [[0, 0] [1, 1]]" | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @torch_index_select1
 func @torch_index_select1(%arg0: tensor<?x?x?xi32>, %arg1: tensor<?x?x?xi32>) -> tensor<?x?x?xi32> {

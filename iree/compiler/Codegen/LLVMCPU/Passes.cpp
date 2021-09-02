@@ -77,6 +77,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // Linalg -> SCF
   passManager.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
+  passManager.addNestedPass<FuncOp>(
+      Shape::createFoldDimOverShapeCarryingOpPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 

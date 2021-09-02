@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -571,6 +572,8 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
 
   for (auto regionOperand : llvm::enumerate(regionOperands)) {
     auto blockArg = entryBlock->getArgument(regionOperand.index());
+    if (blockArg.use_empty()) continue;
+
     auto &value = regionOperand.value();
     switch (value.type) {
       case RegionOperand::Type::PUSH_CONSTANT: {
@@ -587,15 +590,43 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
           offset = entryBuilder.createOrFold<mlir::ConstantIndexOp>(
               clonedFuncOp.getLoc(), value.bindingOffset.staticOffset);
         }
+
         auto bindingSymRefAttr = SymbolRefAttr::get(
             entryBuilder.getContext(), interfaceOp.sym_name(),
             {SymbolRefAttr::get(value.bindingOp)});
+
+        SmallVector<Value, 4> dynamicDims;
+        auto blockArgType = blockArg.getType().cast<Flow::DispatchTensorType>();
+        OpBuilder::InsertionGuard guard(entryBuilder);
+
+        if (!blockArgType.hasStaticShape()) {
+          // We can expect its first user to be a tie_shape op to associate
+          // concrete dimension values. Originally we have such information
+          // maintained in the flow ops handling dynamic tensors. But during
+          // flow executable outlining, such information is transfered to
+          // tie_shape ops.
+          auto tieShapeOp =
+              cast<Flow::DispatchTieShapeOp>(*blockArg.user_begin());
+
+          entryBuilder.setInsertionPointAfter(
+              tieShapeOp.shape().getDefiningOp());
+
+          // Get the SSA values for all dynamic dimensions.
+          dynamicDims.reserve(blockArgType.getNumDynamicDims());
+          for (int i = 0; i < blockArgType.getRank(); ++i) {
+            if (!blockArgType.isDynamicDim(i)) continue;
+            dynamicDims.push_back(entryBuilder.create<Shape::RankedDimOp>(
+                tieShapeOp.getLoc(), tieShapeOp.shape(), i));
+          }
+          assert(dynamicDims.size() == blockArgType.getNumDynamicDims());
+        }
+
         auto subspanOp =
             entryBuilder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-                clonedFuncOp.getLoc(), blockArg.getType(), bindingSymRefAttr,
-                /*byte_offset=*/offset,
-                /*byte_length=*/Value{});
+                clonedFuncOp.getLoc(), blockArgType, bindingSymRefAttr,
+                /*byte_offset=*/offset, /*byte_length=*/Value{}, dynamicDims);
         blockArg.replaceAllUsesWith(subspanOp);
+
         break;
       }
       default:

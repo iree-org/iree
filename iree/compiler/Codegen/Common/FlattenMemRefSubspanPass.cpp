@@ -36,11 +36,15 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -51,10 +55,13 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-flatten-memref-subspan"
+
 namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
 //===----------------------------------------------------------------------===//
 // Type Conversion
 //===----------------------------------------------------------------------===//
@@ -77,11 +84,6 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
     addConversion([](MemRefType type) -> Optional<Type> {
       // 1-D MemRef types are okay.
       if (isRankZeroOrOneMemRef(type)) return type;
-
-      // We can only handle static strides and offsets for now; fail the rest.
-      int64_t offset;
-      SmallVector<int64_t, 4> strides;
-      if (failed(getStridesAndOffset(type, strides, offset))) return Type();
 
       // Convert to a MemRef with unknown dimension. This is actually more akin
       // to how IREE uses memref types: they are for representing a view from a
@@ -168,27 +170,72 @@ struct FlattenBindingSubspan final
     // layout maps.
     if (!oldType || !oldType.getAffineMaps().empty()) return failure();
 
+    Value dynamicDim;
+    if (oldType.hasStaticShape()) {
+      // Because we always convert to 1-D dynamic memref, we still need to
+      // provide a "dynamic" dimension SSA value even if the old type is
+      // fully static.
+      dynamicDim = rewriter.create<ConstantIndexOp>(subspanOp.getLoc(),
+                                                    oldType.getNumElements());
+    } else {
+      ArrayRef<int64_t> oldShape = oldType.getShape();
+      MLIRContext *context = rewriter.getContext();
+      Location loc = subspanOp.getLoc();
+
+      int dynamicDimIndex = 0;
+      SmallVector<Value, 4> dims;
+      AffineExpr sizeExpr = getAffineConstantExpr(1, context);
+      for (int i = 0; i < oldType.getRank(); ++i) {
+        sizeExpr = sizeExpr * getAffineSymbolExpr(i, context);
+        if (ShapedType::isDynamic(oldShape[i])) {
+          dims.push_back(subspanOp.dynamic_dims()[dynamicDimIndex++]);
+        } else {
+          dims.push_back(rewriter.create<ConstantIndexOp>(loc, oldShape[i]));
+        }
+      }
+      dynamicDim = makeComposedAffineApply(rewriter, loc, sizeExpr, dims);
+    }
+
     Type newType = getTypeConverter()->convertType(oldType);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp, newType, subspanOp.binding(), subspanOp.byte_offset(),
-        subspanOp.byte_length());
+        subspanOp.byte_length(), dynamicDim);
     return success();
   }
 };
 
 /// Generates IR to perform index linearization with the given `indices`
-/// indexing into the given memref `sourceType`.
-static Value linearizeIndices(MemRefType sourceType, ValueRange indices,
+/// indexing into the given memref `sourceValue`.
+static Value linearizeIndices(Value sourceValue, ValueRange indices,
                               Location loc, OpBuilder &builder) {
+  MemRefType sourceType = sourceValue.getType().cast<MemRefType>();
   assert(sourceType.hasRank() && sourceType.getRank() != 0);
+  int64_t rank = sourceType.getRank();
 
-  int64_t offset;
-  SmallVector<int64_t, 4> strides;
-  if (failed(getStridesAndOffset(sourceType, strides, offset)) ||
-      llvm::is_contained(strides, MemRefType::getDynamicStrideOrOffset()) ||
-      offset == MemRefType::getDynamicStrideOrOffset()) {
-    return nullptr;
+  // First try to get the strides from the MemRef type itself. This applies to
+  // cases where we have static shapes and only the leading dimension is
+  // dynamic.
+  if (AffineMap linearLayoutMap = getStridedLinearLayoutMap(sourceType)) {
+    // Dynamic strides/offset will create symbols. There should be none for the
+    // static case.
+    if (linearLayoutMap.getNumSymbols() == 0) {
+      return makeComposedAffineApply(builder, loc, linearLayoutMap, indices);
+    }
+  }
+
+  // Then try to see if the source op carries the dynamic dimensions itself.
+  // If so we can still get the strides for dimensions to linearize.
+  Operation *sourceOp = sourceValue.getDefiningOp();
+  auto shapeCarryOp = dyn_cast<ShapeCarryingInterface>(sourceOp);
+  if (!shapeCarryOp) return nullptr;
+
+  Value shapeOp =
+      shapeCarryOp.buildResultValueRankedShape(sourceValue, builder);
+  SmallVector<Value, 4> dims;
+  dims.reserve(rank);
+  for (int i = 0; i < rank; ++i) {
+    dims.push_back(builder.create<Shape::RankedDimOp>(loc, shapeOp, i));
   }
 
   AffineExpr sym0, sym1, sym2;
@@ -196,11 +243,10 @@ static Value linearizeIndices(MemRefType sourceType, ValueRange indices,
   MLIRContext *context = builder.getContext();
   auto mulAddMap = AffineMap::get(0, 3, {sym0 * sym1 + sym2}, context);
 
-  Value linearIndex = builder.create<ConstantIndexOp>(loc, offset);
-  for (auto pair : llvm::zip(indices, strides)) {
-    Value stride = builder.create<ConstantIndexOp>(loc, std::get<1>(pair));
+  Value linearIndex = indices.front();
+  for (int i = 1; i < indices.size(); ++i) {
     linearIndex = builder.create<AffineApplyOp>(
-        loc, mulAddMap, ValueRange{std::get<0>(pair), stride, linearIndex});
+        loc, mulAddMap, ValueRange{linearIndex, dims[i], indices[i]});
   }
   return linearIndex;
 }
@@ -218,8 +264,8 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
           loadOp, "expected converted memref of rank <= 1");
     }
 
-    Value linearIndex = linearizeIndices(
-        loadOp.getMemRefType(), loadOp.getIndices(), loadOp.getLoc(), rewriter);
+    Value linearIndex = linearizeIndices(loadOp.memref(), loadOp.getIndices(),
+                                         loadOp.getLoc(), rewriter);
     if (!linearIndex) {
       return loadOp.emitOpError() << "failed to linearize index";
     }
@@ -244,9 +290,8 @@ struct LinearizeStoreIndices final
           storeOp, "expected converted memref of rank <= 1");
     }
 
-    Value linearIndex =
-        linearizeIndices(storeOp.getMemRefType(), storeOp.getIndices(),
-                         storeOp.getLoc(), rewriter);
+    Value linearIndex = linearizeIndices(storeOp.memref(), storeOp.getIndices(),
+                                         storeOp.getLoc(), rewriter);
     if (!linearIndex) {
       return storeOp.emitOpError() << "failed to linearize index";
     }
@@ -275,9 +320,9 @@ struct LinearizeTransferReadIndices final
       return rewriter.notifyMatchFailure(
           transferReadOp, "expected converted memref of rank <= 1");
     }
-    Value linearIndex = linearizeIndices(
-        transferReadOp.getShapedType().cast<MemRefType>(),
-        transferReadOp.indices(), transferReadOp.getLoc(), rewriter);
+    Value linearIndex =
+        linearizeIndices(transferReadOp.source(), transferReadOp.indices(),
+                         transferReadOp.getLoc(), rewriter);
     if (!linearIndex) {
       return transferReadOp.emitOpError() << "failed to linearize index";
     }
@@ -308,9 +353,9 @@ struct LinearizeTransferWriteIndices final
       return rewriter.notifyMatchFailure(
           transferWriteOp, "expected converted memref of rank <= 1");
     }
-    Value linearIndex = linearizeIndices(
-        transferWriteOp.getShapedType().cast<MemRefType>(),
-        transferWriteOp.indices(), transferWriteOp.getLoc(), rewriter);
+    Value linearIndex =
+        linearizeIndices(transferWriteOp.source(), transferWriteOp.indices(),
+                         transferWriteOp.getLoc(), rewriter);
     if (!linearIndex) {
       return transferWriteOp.emitOpError() << "failed to linearize index";
     }
@@ -397,7 +442,7 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     Value zero = rewriter.create<ConstantIndexOp>(op.memref().getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         op.memref().getLoc(), subspanOp.getType(), subspanOp.binding(), zero,
-        subspanOp.byte_length());
+        subspanOp.byte_length(), subspanOp.dynamic_dims());
 
     MLIRContext *context = rewriter.getContext();
     AffineExpr sym0, sym1;
@@ -438,7 +483,7 @@ struct FlattenMemRefSubspanPass
   FlattenMemRefSubspanPass(const FlattenMemRefSubspanPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, memref::MemRefDialect>();
+    registry.insert<AffineDialect, memref::MemRefDialect, ShapeDialect>();
   }
 
   void runOnOperation() override {

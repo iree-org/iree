@@ -61,6 +61,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
 
   // Flatten and cleanup memrefs.
   nestedModulePM.addNestedPass<FuncOp>(memref::createFoldSubViewOpsPass());
+  nestedModulePM.addNestedPass<FuncOp>(
+      Shape::createFoldDimOverShapeCarryingOpPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());
