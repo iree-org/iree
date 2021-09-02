@@ -6,7 +6,7 @@ used in a wide variety of devices from PCs and consoles to mobile phones and
 embedded platforms.
 
 This page lists steps and tips for setting up and trouble shooting a Vulkan
-development envirnoment. The information here is meant to be generic.
+development environment. The information here is meant to be generic.
 
 ## Vulkan architecture
 
@@ -70,7 +70,7 @@ packages:
 
 ### Linux
 
-For other Linux distros, please consult the corresponding package managment
+For other Linux distros, please consult the corresponding package management
 tools for the packages needed. (And please feel free to update this doc
 regarding them.)
 
@@ -124,7 +124,7 @@ behavior and print verbose information, notably:
     dump of all Vulkan API calls made by the application. You can force enable
     `VK_LAYER_LUNARG_core_validation` to validate the API calls made by the
     application.
-*   `VK_LAYER_PATH`: override the loader's standard layer libary search folders.
+*   `VK_LAYER_PATH`: override the loader's standard layer library search folders.
 
 Please see the [Vulkan loader's documentation][VulkanLoaderEnvVars] for detailed
 explanation for these variables.

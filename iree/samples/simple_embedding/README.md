@@ -9,8 +9,8 @@ supports.
 
 The main bytecode testing tool
 [iree-run-module](https://github.com/google/iree/tree/main/iree/tools/iree-run-module-main.cc)
-requires a proper operating system support to set up the runtime enviroment to
-execute an IREE bytecode module. For embeded systems, the support such as file
+requires a proper operating system support to set up the runtime environment to
+execute an IREE bytecode module. For embedded systems, the support such as file
 system or multi-thread asynchronous control may not be available. This sample
 demonstrates how to setup the simplest framework to load and run the IREE
 bytecode with various target backends.
