@@ -587,9 +587,9 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
           offset = entryBuilder.createOrFold<mlir::ConstantIndexOp>(
               clonedFuncOp.getLoc(), value.bindingOffset.staticOffset);
         }
-        auto bindingSymRefAttr = entryBuilder.getSymbolRefAttr(
-            interfaceOp.sym_name(),
-            {entryBuilder.getSymbolRefAttr(value.bindingOp)});
+        auto bindingSymRefAttr = SymbolRefAttr::get(
+            entryBuilder.getContext(), interfaceOp.sym_name(),
+            {SymbolRefAttr::get(value.bindingOp)});
         auto subspanOp =
             entryBuilder.create<IREE::HAL::InterfaceBindingSubspanOp>(
                 clonedFuncOp.getLoc(), blockArg.getType(), bindingSymRefAttr,
@@ -1063,9 +1063,8 @@ static LogicalResult declareEntryPointOps(
       targetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
           dispatchEntryOp.getLoc(),
           targetBuilder.getStringAttr(dispatchEntryOp.function_ref()),
-          targetBuilder.getIndexAttr(ordinal),
-          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{},
-          IntegerAttr{});
+          targetBuilder.getIndexAttr(ordinal), SymbolRefAttr::get(interfaceOp),
+          ArrayAttr{}, IntegerAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();

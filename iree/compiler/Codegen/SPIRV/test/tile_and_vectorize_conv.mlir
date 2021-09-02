@@ -22,7 +22,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
       %z = constant 28: index
       hal.return %x, %y, %z: index, index, index
     }
-    module {
+    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c32 = constant 32 : index
@@ -122,7 +122,7 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
       %z = constant 14: index
       hal.return %x, %y, %z: index, index, index
     }
-    module {
+    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @depthwise_conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c96 = constant 96 : index

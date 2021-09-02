@@ -29,7 +29,7 @@ hal.executable @matmul_cooperative_matrix attributes {sym_visibility = "private"
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @matmul_cooperative_matrix() {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index

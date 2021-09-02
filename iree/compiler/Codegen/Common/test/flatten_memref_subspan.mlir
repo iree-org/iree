@@ -105,7 +105,7 @@ func @ignore_load_store_alloc(%value : f32, %i0: index, %i1 : index, %i2: index)
 
 func @use_subspan_with_unrealized_conversion_cast(%offset : index, %i: index) -> f32 {
   %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<6x7x8xf32>
-  %use = unrealized_conversion_cast %subspan : memref<6x7x8xf32> to memref<?xf32>
+  %use = builtin.unrealized_conversion_cast %subspan : memref<6x7x8xf32> to memref<?xf32>
   %val = memref.load %use[%i] : memref<?xf32>
   return %val: f32
 }

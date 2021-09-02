@@ -11,7 +11,7 @@ hal.executable @exe {
       ordinal = 0 : index,
       workgroup_size = [32 : index, 4 : index, 8 : index]
     }
-    module {
+    builtin.module {
       // CHECK: func @entry()
       func @entry() {
         // CHECK-DAG: constant 32 : index

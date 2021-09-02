@@ -100,7 +100,7 @@ class ExecutableCreateOpConversion
 
     auto importType = importOp.getType();
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
-        createOp, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
+        createOp, SymbolRefAttr::get(importOp), importType.getResults(),
         segmentSizes, importType.getInputs(), callOperands);
     copyImportAttrs(importOp, callOp);
 

@@ -12,7 +12,7 @@ hal.executable @call_dispatch_0 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
     hal.executable.entry_point @call_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_0() "None" {
           spv.Return
@@ -35,7 +35,7 @@ hal.executable @call_dispatch_1 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
     hal.executable.entry_point @call_dispatch_1 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_1() "None" {
           spv.Return
@@ -58,7 +58,7 @@ hal.executable @call_dispatch_2 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
     hal.executable.entry_point @call_dispatch_2 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_2() "None" {
           spv.Return
@@ -87,7 +87,7 @@ hal.executable @call_dispatch_3 attributes {sym_visibility = "private"} {
       %c56_0 = constant 56 : index
       hal.return %c1, %c56, %c56_0 : index, index, index
     }
-    module {
+    builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_3() "None" {
           spv.Return
@@ -111,7 +111,7 @@ hal.executable @call_dispatch_4 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
     hal.executable.entry_point @call_dispatch_4 attributes {interface = @io, ordinal = 0 : index}
-    module {
+    builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_4() "None" {
           spv.Return

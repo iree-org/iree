@@ -219,9 +219,9 @@ class IdentifyConstantPoolsPass
     auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
     auto constValue = funcBuilder.createOrFold<IREE::HAL::ConstantPoolLoadOp>(
         globalOp.getLoc(), globalOp.type(),
-        funcBuilder.getSymbolRefAttr(
-            valueOp->getParentOfType<ConstantPoolOp>().getName(),
-            {funcBuilder.getSymbolRefAttr(valueOp)}));
+        SymbolRefAttr::get(funcBuilder.getContext(),
+                           valueOp->getParentOfType<ConstantPoolOp>().getName(),
+                           {SymbolRefAttr::get(valueOp)}));
     funcBuilder.create<IREE::Util::GlobalStoreOp>(globalOp.getLoc(), constValue,
                                                   globalOp.getName());
     funcBuilder.create<IREE::Util::InitializerReturnOp>(globalOp.getLoc());
@@ -254,9 +254,9 @@ class IdentifyConstantPoolsPass
     OpBuilder builder(globalLoadOp);
     auto poolLoadOp = builder.create<ConstantPoolLoadOp>(
         globalLoadOp.getLoc(), globalLoadOp.getType(),
-        builder.getSymbolRefAttr(
-            valueOp->getParentOfType<ConstantPoolOp>().getName(),
-            {builder.getSymbolRefAttr(valueOp)}));
+        SymbolRefAttr::get(builder.getContext(),
+                           valueOp->getParentOfType<ConstantPoolOp>().getName(),
+                           {SymbolRefAttr::get(valueOp)}));
     globalLoadOp.replaceAllUsesWith(poolLoadOp.result());
     globalLoadOp.erase();
   }

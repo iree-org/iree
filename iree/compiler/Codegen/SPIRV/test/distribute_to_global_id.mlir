@@ -12,7 +12,7 @@ hal.executable @parallel_4D attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module attributes {
+    builtin.module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
         [Shader], [SPV_KHR_storage_buffer_storage_class]>,
@@ -88,7 +88,7 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module attributes {
+    builtin.module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
         [Shader], [SPV_KHR_storage_buffer_storage_class]>,
@@ -160,7 +160,7 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module attributes {
+    builtin.module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3,
         [Shader], [SPV_KHR_storage_buffer_storage_class]>,
@@ -209,7 +209,7 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @reduce_sum() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<40x50x75xf32>

@@ -278,7 +278,7 @@ def Util_GlobalOp : Util_Op<"global", [
 }
 
 def Util_GlobalAddressOp : Util_PureOp<"global.address", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{returns an address reference to a global}];
   let description = [{
@@ -303,7 +303,7 @@ def Util_GlobalAddressOp : Util_PureOp<"global.address", [
 }
 
 def Util_GlobalLoadOp : Util_Op<"global.load", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   // HACK: works around the lack of symbol side effects in C++.
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
 ]> {

@@ -72,7 +72,7 @@ class AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
   let storageType = [{ FlatSymbolRefAttr }];
   let returnType = [{ StringRef }];
   let valueType = NoneType;
-  let constBuilderCall = "$_builder.getSymbolRefAttr($0)";
+  let constBuilderCall = "mlir::SymbolRefAttr::get($_builder.getContext(), $0)";
 }
 
 //===----------------------------------------------------------------------===//

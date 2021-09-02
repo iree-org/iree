@@ -270,12 +270,14 @@ class DeduplicateExecutablesPass
         for (auto entryOpPair : llvm::zip(
                  duplicateExecutableOp.getBlock().getOps<DispatchEntryOp>(),
                  referenceExecutableOp.getBlock().getOps<DispatchEntryOp>())) {
-          auto oldSymbolRefAttr = builder.getSymbolRefAttr(
-              duplicateExecutableOp.getName(),
-              {builder.getSymbolRefAttr(std::get<0>(entryOpPair).sym_name())});
-          auto newSymbolRefAttr = builder.getSymbolRefAttr(
-              referenceExecutableOp.getName(),
-              {builder.getSymbolRefAttr(std::get<1>(entryOpPair).sym_name())});
+          auto oldSymbolRefAttr = SymbolRefAttr::get(
+              builder.getContext(), duplicateExecutableOp.getName(),
+              {SymbolRefAttr::get(builder.getContext(),
+                                  std::get<0>(entryOpPair).sym_name())});
+          auto newSymbolRefAttr = SymbolRefAttr::get(
+              builder.getContext(), referenceExecutableOp.getName(),
+              {SymbolRefAttr::get(builder.getContext(),
+                                  std::get<1>(entryOpPair).sym_name())});
           entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
         }
 

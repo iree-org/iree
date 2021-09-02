@@ -3436,7 +3436,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
       CArg<"ValueRange", "{}">:$operands),
     [{
       $_state.addOperands(operands);
-      $_state.addAttribute("callee", $_builder.getSymbolRefAttr(callee));
+      $_state.addAttribute("callee", mlir::SymbolRefAttr::get(callee));
       $_state.addTypes(callee.getType().getResults());
     }]>,
     OpBuilder<(ins "FlatSymbolRefAttr":$callee,
@@ -3449,7 +3449,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
     OpBuilder<(ins "StringRef":$callee, "ArrayRef<Type>":$resultTypes,
       CArg<"ValueRange", "{}">:$operands),
     [{
-      build($_builder, $_state, $_builder.getSymbolRefAttr(callee),
+      build($_builder, $_state, mlir::SymbolRefAttr::get($_builder.getContext(), callee),
             resultTypes, operands);
     }]>,
   ];

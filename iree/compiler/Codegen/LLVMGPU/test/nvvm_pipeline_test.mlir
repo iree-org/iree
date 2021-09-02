@@ -10,7 +10,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  module  {
+  builtin.module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
       %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
@@ -53,7 +53,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    module  {
+    builtin.module  {
       func @dot_dispatch_0() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index
@@ -141,7 +141,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    module  {
+    builtin.module  {
       func @dot_dispatch_0() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index
@@ -209,7 +209,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.entry_point @conv2d_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  module  {
+  builtin.module  {
     func @conv2d_dispatch_0() {
       %c0 = constant 0 : index
       %cst = constant 0.000000e+00 : f32
@@ -282,7 +282,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  module  {
+  builtin.module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
       %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
@@ -316,7 +316,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 hal.executable @reduction_dispatch {
 hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @reduction attributes {interface = @io, ordinal = 0 : index}
-  module  {
+  builtin.module  {
     func @reduction() {
       %c0 = constant 0 : index
       %cst = constant 0.000000e+00 : f32

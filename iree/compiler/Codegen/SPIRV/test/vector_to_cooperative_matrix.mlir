@@ -12,7 +12,7 @@ hal.executable @kernel_matmul attributes {sym_visibility = "private"} {
         [Shader, CooperativeMatrixNV, Int8, StorageBuffer8BitAccess],
         [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>,
         {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
-    module {
+    builtin.module {
       // CHECK-LABEL: func @kernel_matmul
       func @kernel_matmul(%arg0: memref<8x32xi8>, %arg1: memref<32x8xi8>, %arg2: memref<8x8xi32>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
         %c0 = constant 0 : index
@@ -48,7 +48,7 @@ hal.executable @kernel_matmul attributes {sym_visibility = "private"} {
           [Shader, CooperativeMatrixNV, Int8, Float16, StorageUniform16, StorageBuffer8BitAccess, Float16Buffer],
           [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>,
       {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
-    module {
+    builtin.module {
       // CHECK-LABEL: func @kernel_matmul_licm
       func @kernel_matmul_licm(%arg0: memref<4096x4096xi8>, %arg1: memref<4096x4096xi8>, %arg2: memref<4096x4096xi32>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
         %c32 = constant 32 : index
@@ -95,7 +95,7 @@ hal.executable @kernel_matmul attributes {sym_visibility = "private"} {
       [Shader, CooperativeMatrixNV, Int8, Float16, StorageUniform16, StorageBuffer8BitAccess, Float16Buffer],
       [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>,
       {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
-    module {
+    builtin.module {
       // CHECK-LABEL: func @kernel_matmul_vector_memref
       func @kernel_matmul_vector_memref(%arg0: memref<4096x256xvector<4xi32>>, %arg1: memref<4096x256xvector<4xi32>>, %arg2: memref<4096x1024xvector<4xi32>>) attributes {spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}} {
         %c32 = constant 32 : index
