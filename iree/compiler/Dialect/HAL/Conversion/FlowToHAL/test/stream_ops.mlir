@@ -12,7 +12,7 @@ hal.executable @ex0 {
       interface = @interface,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -172,7 +172,7 @@ hal.executable @ex0 {
       interface = @interface,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -308,7 +308,7 @@ hal.executable @ex0 {
       interface = @interface,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -371,7 +371,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -419,7 +419,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -479,7 +479,7 @@ hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
       interface = @interface_io,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -493,7 +493,7 @@ hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
       interface = @interface_io,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 

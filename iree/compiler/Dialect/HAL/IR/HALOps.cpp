@@ -536,7 +536,7 @@ static ParseResult parseCommandBufferExecutionBarrierOp(
 
 static void printCommandBufferExecutionBarrierOp(
     OpAsmPrinter &p, CommandBufferExecutionBarrierOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printOperand(op.command_buffer());
   p << ", \"";
   p << stringifyExecutionStageBitfield(op.source_stage_mask());
@@ -622,7 +622,7 @@ static ParseResult parseConstantPoolOp(OpAsmParser &parser,
 }
 
 static void printConstantPoolOp(OpAsmPrinter &p, ConstantPoolOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
@@ -783,7 +783,7 @@ static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
 }
 
 static void printDeviceSwitchOp(OpAsmPrinter &p, DeviceSwitchOp op) {
-  p << op.getOperationName() << "<";
+  p << "<";
   p.printOperand(op.device());
   p << " : ";
   p.printType(op.device().getType());
@@ -864,7 +864,7 @@ static ParseResult parseExecutableOp(OpAsmParser &parser,
 }
 
 static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
@@ -906,7 +906,7 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
 
 static void printExecutableEntryPointOp(OpAsmPrinter &p,
                                         ExecutableEntryPointOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{"sym_name"});
@@ -984,7 +984,7 @@ static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
 }
 
 static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p << ", target = " << op.target();
   p.printOptionalAttrDictWithKeyword(
@@ -1035,7 +1035,7 @@ static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
 }
 
 static void printExecutableBinaryOp(OpAsmPrinter &p, ExecutableBinaryOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
@@ -1096,7 +1096,7 @@ static ParseResult parseInterfaceOp(OpAsmParser &parser,
 }
 
 static void printInterfaceOp(OpAsmPrinter &p, InterfaceOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
@@ -1183,7 +1183,7 @@ static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
 }
 
 static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p << ", set=" << op.set();
   p << ", binding=" << op.binding();

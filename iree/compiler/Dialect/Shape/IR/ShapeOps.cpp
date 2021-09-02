@@ -163,7 +163,7 @@ ParseResult parseRankedDimOp(OpAsmParser &parser, OperationState &state) {
 }
 
 static void printRankedDimOp(OpAsmPrinter &p, RankedDimOp op) {
-  p << op.getOperationName() << " ";
+  p << " ";
   p.printOperand(op.shape());
   p << "[" << op.getIndex() << "]";
   p << " : ";

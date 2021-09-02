@@ -15,7 +15,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8, 1]}
     }
-    module {
+    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @batch_matmul_static_shape() {
         %c0 = constant 0 : index
         %c4 = constant 4 : index
@@ -384,7 +384,7 @@ hal.executable @fused_fill_batch_matmul attributes {sym_visibility = "private"} 
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8, 1]}
     }
-    module {
+    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @fused_fill_batch_matmul() {
         %zero = constant 0.0 : f32
         %c0 = constant 0 : index

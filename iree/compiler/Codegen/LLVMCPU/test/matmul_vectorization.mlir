@@ -13,7 +13,7 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @matmul_128x128x128() {
         %c0 = constant 0 : index
         %c128 = constant 128 : index
@@ -126,7 +126,7 @@ hal.executable @matmul_i8_i8_i32 attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @matmul_i8_i8_i32_128x128x128() {
         %c0 = constant 0 : index
         %c128 = constant 128 : index

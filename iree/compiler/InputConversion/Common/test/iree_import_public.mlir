@@ -192,7 +192,7 @@ builtin.module @globals {
   // CHECK-NEXT:   util.global.store %[[VALUE]], @global5 : tensor<4xi32>
   // CHECK-NEXT:   util.initializer.return
   // CHECK-NEXT: }
-  // CHECK: builtin.func private @initializer() -> tensor<4xi32>
+  // CHECK: func private @initializer() -> tensor<4xi32>
   builtin.func private @initializer() -> tensor<4xi32>
 }
 

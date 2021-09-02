@@ -129,7 +129,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 }
 
 def FLOW_DispatchWorkgroupRankOp : FLOW_PureOp<"dispatch.workgroup.rank", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{returns the rank of the workgroup dimensions}];
   let description = [{
@@ -150,7 +150,7 @@ def FLOW_DispatchWorkgroupRankOp : FLOW_PureOp<"dispatch.workgroup.rank", [
 }
 
 def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{returns the index of the current workgroup in the grid}];
   let description = [{
@@ -182,7 +182,7 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
 }
 
 def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{returns the total workgroup count of the grid}];
   let description = [{
@@ -213,7 +213,7 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
 }
 
 def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{returns the size of each workgroup in invocations}];
   let description = [{
@@ -252,7 +252,7 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
 }
 
 def FLOW_DispatchShapeOp : FLOW_PureOp<"dispatch.shape", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<InferTypeOpInterface>
 ]> {
   let summary = [{returns the shape of a dispatch region input/output tensor}];

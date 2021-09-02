@@ -553,7 +553,7 @@ static ParseResult parseExecutableOp(OpAsmParser &parser,
 }
 
 static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
@@ -600,7 +600,7 @@ static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
 }
 
 static void printDispatchEntryOp(OpAsmPrinter &p, DispatchEntryOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.function_ref());
   if (op.sym_name() != op.function_ref()) {
     p << " as(\"" << op.sym_name() << "\")";
@@ -625,8 +625,8 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
           .getValue();
   state.addAttribute(
       "entry_point",
-      builder.getSymbolRefAttr(executableOpSymName,
-                               {builder.getSymbolRefAttr(entryPoint)}));
+      SymbolRefAttr::get(builder.getContext(), executableOpSymName,
+                         {SymbolRefAttr::get(entryPoint)}));
 
   state.addOperands(workgroupCount);
   state.addTypes(resultTypes);

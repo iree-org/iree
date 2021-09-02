@@ -34,4 +34,4 @@ jobs:
         uses: ad-m/github-push-action@v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          branch: latest-snapshot
+          branch: refs/heads/latest-snapshot

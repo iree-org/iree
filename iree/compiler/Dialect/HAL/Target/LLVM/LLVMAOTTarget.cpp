@@ -142,7 +142,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         variantOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
     // Validate flags for output mode.
-    if (options_.linkEmbedded && !options_.staticLibraryOutput.empty()) {
+    if (options_.linkEmbedded && options_.linkStatic) {
       return variantOp.emitError()
              << "cannot embed ELF and produce static library simultaneously";
     }
@@ -221,7 +221,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
 
     auto queryFunctionName = std::string(kQueryFunctionName);
-    if (!options_.staticLibraryOutput.empty()) {
+    if (options_.linkStatic) {
       // Static library query functions must be unique to support multiple
       // libraries in the same namespace.
       queryFunctionName = libraryName + "_library_query";
@@ -351,7 +351,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
     }
 
-    if (options_.linkEmbedded) {
+    if (options_.linkStatic) {
+      // Embed the library name in the executable binary op. This informs the
+      // loader which static library to load for the target binary.
+      std::vector<uint8_t> libraryNameVector(libraryName.begin(),
+                                             libraryName.end());
+      executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+          variantOp.getLoc(), variantOp.sym_name(), "static",
+          libraryNameVector);
+    } else if (options_.linkEmbedded) {
       // Load the linked ELF file and pack into an attr.
       auto elfFile = linkArtifacts.libraryFile.read();
       if (!elfFile.hasValue()) {
@@ -370,14 +378,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           variantOp.target().getFormat(), bufferAttr);
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
-    } else if (!options_.staticLibraryOutput.empty()) {
-      // Embed the library name in the executable binary op. This informs the
-      // loader which static library to load for the target binary.
-      std::vector<uint8_t> libraryNameVector(libraryName.begin(),
-                                             libraryName.end());
-      executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.sym_name(),
-          variantOp.target().getFormat().getValue(), libraryNameVector);
     } else {
       FlatbufferBuilder builder;
       iree_DyLibExecutableDef_start_as_root(builder);

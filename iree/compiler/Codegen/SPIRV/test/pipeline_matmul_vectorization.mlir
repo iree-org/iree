@@ -15,7 +15,7 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
     }
-    module {
+    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @fuse_and_vectorize_fill_matmul() {
         %c0 = constant 0 : index
         %cst = constant 0.000000e+00 : f32
@@ -85,7 +85,7 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
     }
-    module {
+    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @fuse_and_vectorize_matmul_add() {
         %c0 = constant 0 : index
         %cst = constant 0.000000e+00 : f32

@@ -19,7 +19,7 @@ flow.executable @static_tiled_dispatch {
     workgroup_rank = 2 : index
   }
   // CHECK-NEXT: module  {
-  module  {
+  builtin.module  {
     // CHECK-NEXT: func @entry() {
     func @entry(%arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
       // CHECK-NEXT: %c0 = constant 0 : index
@@ -79,7 +79,7 @@ flow.executable @multi_target_ex {
     workgroup_rank = 2 : index
   }
   // CHECK-NEXT: module  {
-  module  {
+  builtin.module  {
     // CHECK-NEXT: func @entry() {
     func @entry(%arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
       // CHECK-NEXT: %c0 = constant 0 : index
@@ -138,7 +138,7 @@ flow.executable @dynamic_tiled_dispatch {
     workgroup_rank = 2 : index
   }
   // CHECK-NEXT: module  {
-  module  {
+  builtin.module  {
     // CHECK-NEXT: func @entry() {
     func @entry(
         // CHECK-NEXT: %c0 = constant 0 : index
@@ -214,7 +214,7 @@ flow.executable @workgroup_infos {
     workgroup_rank = 2 : index
   }
   // CHECK-NEXT: module  {
-  module  {
+  builtin.module  {
     // CHECK-NEXT: func @entry() {
     func @entry(%arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
       // CHECK-DAG: %[[WORKGROUP_ID_X:.+]] = hal.interface.workgroup.id[0] : index
@@ -255,7 +255,7 @@ flow.executable @static_tied_result {
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 2 : index
   }
-  module  {
+  builtin.module  {
     // CHECK: func @entry() {
     func @entry(%arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<readwrite:4x8xf32>) {
       // CHECK-NEXT: %c0 = constant 0 : index
@@ -309,7 +309,7 @@ flow.executable @constant_dispatch {
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 2 : index
   }
-  module  {
+  builtin.module  {
     // CHECK: func @entry() {
     func @entry(
         %arg: !flow.dispatch.tensor<readonly:8x4xf32>,
@@ -397,7 +397,7 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
 //  CHECK-NEXT: }
 flow.executable @unsued_arg {
   flow.dispatch.entry @entry attributes {workgroup_rank = 2 : index}
-  module  {
+  builtin.module  {
     func @entry(%unused_arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
       %val = constant dense<4.2> : tensor<4x8xf32>
       // CHECK-NOT: hal.interface.binding.subspan @[[IO]]::@[[S0B0]]

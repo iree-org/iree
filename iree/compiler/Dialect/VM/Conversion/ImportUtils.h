@@ -57,7 +57,7 @@ Optional<SmallVector<Value>> rewriteToCall(
       op.getLoc(), isOpVariadic ? IREE::VM::CallVariadicOp::getOperationName()
                                 : IREE::VM::CallOp::getOperationName()};
   state.addAttributes(llvm::to_vector<4>(operation->getDialectAttrs()));
-  state.addAttribute("callee", rewriter.getSymbolRefAttr(importOp));
+  state.addAttribute("callee", SymbolRefAttr::get(importOp));
 
   auto importType = importOp.getType();
   for (auto resultType : operation->getResultTypes()) {

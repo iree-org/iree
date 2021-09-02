@@ -132,9 +132,10 @@ class MaterializeConstantPoolBuffersPass
     // TODO(benvanik): allocate based on usage tracking.
     auto sourceValue = builder.createOrFold<IREE::HAL::ConstantStorageLookupOp>(
         loc, IREE::Util::ByteBufferType::get(context),
-        builder.getSymbolRefAttr(
+        SymbolRefAttr::get(
+            builder.getContext(),
             storageOp->getParentOfType<ConstantPoolOp>().getName(),
-            {builder.getSymbolRefAttr(storageOp)}));
+            {SymbolRefAttr::get(storageOp)}));
     auto offsetValue = builder.createOrFold<mlir::ConstantIndexOp>(loc, 0);
     auto storageValueAttr =
         storageOp.value().cast<IREE::Util::SerializableAttrInterface>();

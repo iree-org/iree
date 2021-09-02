@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 flow.executable @ex0 {
-  module {
+  builtin.module {
     func @dispatch_fn(%cst : index, %arg0 : tensor<4xf32>) -> tensor<4xf32> {
       return %arg0 : tensor<4xf32>
     }

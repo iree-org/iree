@@ -7,7 +7,7 @@ hal.executable @add_dispatch_0 {
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  module  {
+  builtin.module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
       %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
@@ -52,7 +52,7 @@ hal.executable @add_dispatch_0 {
 hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
-    module  {
+    builtin.module  {
       func @dot_dispatch_1() {
         %c0 = constant 0 : index
         %c4 = constant 4 : index
@@ -117,7 +117,7 @@ hal.executable @reduction_dispatch {
     hal.executable.entry_point @predict_dispatch_153 attributes {
       interface = @io,
       ordinal = 0 : index}
-    module  {
+    builtin.module  {
       func @predict_dispatch_153() {
         %c0 = constant 0 : index
         %cst = constant 0x7FC00000 : f32

@@ -591,9 +591,9 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
               clonedFuncOp.getLoc(), value.bindingOffset.staticOffset);
         }
 
-        auto bindingSymRefAttr = entryBuilder.getSymbolRefAttr(
-            interfaceOp.sym_name(),
-            {entryBuilder.getSymbolRefAttr(value.bindingOp)});
+        auto bindingSymRefAttr = SymbolRefAttr::get(
+            entryBuilder.getContext(), interfaceOp.sym_name(),
+            {SymbolRefAttr::get(value.bindingOp)});
 
         SmallVector<Value, 4> dynamicDims;
         auto blockArgType = blockArg.getType().cast<Flow::DispatchTensorType>();
@@ -1094,9 +1094,8 @@ static LogicalResult declareEntryPointOps(
       targetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
           dispatchEntryOp.getLoc(),
           targetBuilder.getStringAttr(dispatchEntryOp.function_ref()),
-          targetBuilder.getIndexAttr(ordinal),
-          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{},
-          IntegerAttr{});
+          targetBuilder.getIndexAttr(ordinal), SymbolRefAttr::get(interfaceOp),
+          ArrayAttr{}, IntegerAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
