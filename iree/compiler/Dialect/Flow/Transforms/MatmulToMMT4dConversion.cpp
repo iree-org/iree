@@ -128,7 +128,7 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
     auto dst4D = expandTo4D(loc, rewriter, dst, {m1, M0Size, n1, N0Size});
 
     auto lhs4DT = transposeOperand(loc, rewriter, lhs4D, {0, 2, 1, 3});
-    auto rhs4DT = transposeOperand(loc, rewriter, rhs4D, {2, 0, 1, 3});
+    auto rhs4DT = transposeOperand(loc, rewriter, rhs4D, {2, 0, 3, 1});
     auto dst4DT = transposeOperand(loc, rewriter, dst4D, {0, 2, 1, 3});
 
     auto mmt4DResult = rewriter.create<linalg::Mmt4DOp>(
