@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -51,6 +52,13 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
+    // TODO(antigainst): enable dynamic shape support once they are needed.
+    auto reshapeSrcType = reshapeOp.src().getType().template cast<ShapedType>();
+    auto reshapeDstType = reshapeOp.getType().template cast<ShapedType>();
+    if (!reshapeSrcType.hasStaticShape() || !reshapeDstType.hasStaticShape()) {
+      return failure();
+    }
+
     auto loadOp =
         reshapeOp.src()
             .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
@@ -66,16 +74,18 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         loadOp.source()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!subspanOp) return failure();
+    assert(subspanOp.dynamic_dims().empty());
 
+    auto tensorAccess = subspanOp.getType()
+                            .template cast<IREE::Flow::DispatchTensorType>()
+                            .getAccess();
     auto newSubspanType = IREE::Flow::DispatchTensorType::get(
-        subspanOp.getType()
-            .template cast<IREE::Flow::DispatchTensorType>()
-            .getAccess(),
-        reshapeOp.getResultType());
+        tensorAccess, reshapeOp.getResultType());
 
     Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp.getLoc(), newSubspanType, subspanOp.binding(),
-        subspanOp.byte_offset(), subspanOp.byte_length());
+        subspanOp.byte_offset(), subspanOp.byte_length(),
+        subspanOp.dynamic_dims());
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         reshapeOp, reshapeOp.getResultType(), newSubspanOp);

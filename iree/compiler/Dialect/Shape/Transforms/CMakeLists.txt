@@ -17,6 +17,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "CleanupPlaceholdersPass.cpp"
+    "FoldDimOverShapeCarryingOpPass.cpp"
     "FunctionSignatureExpansionPass.cpp"
   DEPS
     LLVMSupport

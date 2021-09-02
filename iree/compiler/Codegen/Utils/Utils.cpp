@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -163,9 +164,13 @@ ArrayRef<int64_t> getUntiledShape(Value tiledView) {
 ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
                                         unsigned resultNum) {
   // Check the shape of the `outs` operand.
-  ArrayRef<int64_t> outputShape =
-      getUntiledShape(linalgOp.outputs()[resultNum]);
-  if (!llvm::any_of(outputShape, ShapedType::isDynamic)) return outputShape;
+  auto outputShape = getUntiledShape(linalgOp.outputs()[resultNum]);
+  if (llvm::none_of(outputShape, ShapedType::isDynamic)) return outputShape;
+
+  // For Linalg ops with buffer semantics, there won't exist op results and
+  // hence IR users. Also directly return.
+  if (linalgOp.hasBufferSemantics()) return outputShape;
+
   // Try to use the result value and check if the untiled shape can be obtained
   // based on the uses.
   Value result = linalgOp->getResult(resultNum);

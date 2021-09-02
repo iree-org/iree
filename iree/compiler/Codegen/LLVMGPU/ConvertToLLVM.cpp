@@ -226,7 +226,8 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
         getKernelArgMapping(llvmFuncOp);
     Location loc = op->getLoc();
     auto ireeBindingOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
-    IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(operands);
+    IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(
+        operands, op->getAttrDictionary());
     MemRefType memrefType =
         ireeBindingOp.getResult().getType().dyn_cast<MemRefType>();
     IREE::HAL::InterfaceBindingOp binding = ireeBindingOp.queryBindingOp();

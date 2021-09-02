@@ -117,6 +117,7 @@ static void addLowerToSPIRVPasses(OpPassManager &pm) {
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
   pm.addPass(memref::createFoldSubViewOpsPass());
+  pm.addNestedPass<FuncOp>(Shape::createFoldDimOverShapeCarryingOpPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -136,9 +137,9 @@ static void addLowerToSPIRVPasses(OpPassManager &pm) {
   // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
   // because we don't use upstream memref descriptors.
   pm.addPass(createFlattenMemRefSubspanPass());
-  pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(createLowerAffinePass());
 
   // Finally convert everything to SPIR-V.
   pm.addPass(createConvertToSPIRVPass());

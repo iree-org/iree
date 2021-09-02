@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-materialize-interfaces -canonicalize %s | IreeFileCheck %s
 
 module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
   executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
@@ -142,9 +142,7 @@ flow.executable @dynamic_tiled_dispatch {
     // CHECK-NEXT: func @entry() {
     func @entry(
         // CHECK-NEXT: %c0 = constant 0 : index
-        // CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B0]][%c0] : !flow.dispatch.tensor<readonly:7x?x24x?xf32>
         %arg: !flow.dispatch.tensor<readonly:7x?x24x?xf32>,
-        // CHECK-DAG: %[[RET:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B1]][%c0] : !flow.dispatch.tensor<writeonly:?x?x1024xf32>
         %ret: !flow.dispatch.tensor<writeonly:?x?x1024xf32>,
         // CHECK-DAG: %[[ARG_DIM1:.+]] = hal.interface.load.constant offset = 0 : index
         %arg_dim1: index,
@@ -155,19 +153,18 @@ flow.executable @dynamic_tiled_dispatch {
         // CHECK-DAG: %[[RET_DIM1:.+]] = hal.interface.load.constant offset = 3 : index
         %ret_dim1: index
       ) {
-      // CHECK-NEXT: %[[ARG_SHAPE:.+]] = shapex.make_ranked_shape %[[ARG_DIM1]], %[[ARG_DIM3]]
+      // CHECK-NEXT: %[[ARG:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B0]][%c0] : !flow.dispatch.tensor<readonly:7x?x24x?xf32>{%[[ARG_DIM1]], %[[ARG_DIM3]]}
+      // CHECK-NEXT: %[[RET:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B1]][%c0] : !flow.dispatch.tensor<writeonly:?x?x1024xf32>{%[[RET_DIM0]], %[[RET_DIM1]]}
+
       %arg_shape = shapex.make_ranked_shape %arg_dim1, %arg_dim3 : (index, index) -> !shapex.ranked_shape<[7,?,24,?]>
-      // CHECK-NEXT: %[[ARG_SHAPED:.+]] = flow.dispatch.tie_shape %[[ARG]], %[[ARG_SHAPE]]
       %arg_shaped = flow.dispatch.tie_shape %arg, %arg_shape : (!flow.dispatch.tensor<readonly:7x?x24x?xf32>, !shapex.ranked_shape<[7,?,24,?]>) -> !flow.dispatch.tensor<readonly:7x?x24x?xf32>
-      // CHECK-NEXT: %[[RET_SHAPE:.+]] = shapex.make_ranked_shape %[[RET_DIM0]], %[[RET_DIM1]]
       %ret_shape = shapex.make_ranked_shape %ret_dim0, %ret_dim1 : (index, index) -> !shapex.ranked_shape<[?,?,1024]>
-      // CHECK-NEXT: %[[RET_SHAPED:.+]] = flow.dispatch.tie_shape %[[RET]], %[[RET_SHAPE]]
       %ret_shaped = flow.dispatch.tie_shape %ret, %ret_shape : (!flow.dispatch.tensor<writeonly:?x?x1024xf32>, !shapex.ranked_shape<[?,?,1024]>) -> !flow.dispatch.tensor<writeonly:?x?x1024xf32>
-      // CHECK-NEXT: %[[ARG_TILE:.+]] = flow.dispatch.tensor.load %[[ARG_SHAPED]]
+      // CHECK-NEXT: %[[ARG_TILE:.+]] = flow.dispatch.tensor.load %[[ARG]]
       %arg_tile = flow.dispatch.tensor.load %arg_shaped, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:7x?x24x?xf32> -> tensor<7x?x24x?xf32>
       // CHECK-NEXT: %[[RET_TILE:.+]] = "test.tile_math"(%[[ARG_TILE]])
       %ret_tile = "test.tile_math"(%arg_tile) : (tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32>
-      // CHECK-NEXT: flow.dispatch.tensor.store %[[RET_TILE]], %[[RET_SHAPED]]
+      // CHECK-NEXT: flow.dispatch.tensor.store %[[RET_TILE]], %[[RET]]
       flow.dispatch.tensor.store %ret_tile, %ret_shaped, offsets=[], sizes=[], strides=[] : tensor<?x?x1024xf32> -> !flow.dispatch.tensor<writeonly:?x?x1024xf32>
       return
     }
@@ -351,9 +348,9 @@ flow.executable @constant_dispatch {
 }
 util.global @storage0 : !hal.buffer
 util.global @storage1 : !hal.buffer
-func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
-  %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
-      (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
+func @usage(%func_arg: tensor<8x4xf32>) -> (tensor<4x8xf32>, tensor<4x8xf32>) {
+  %0:2 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> (tensor<4x8xf32>, tensor<4x8xf32>) =
+      (%stream_arg: tensor<8x4xf32>) -> (tensor<4x8xf32>, tensor<4x8xf32>) {
     %const_span_0a = hal.constant.subspan @storage0[#util.byte_range<0, 128>] : tensor<8x4xf32>
     %const_span_0b = hal.constant.subspan @storage0[#util.byte_range<128, 128>] : tensor<8x4xf32>
     %const_span_0c = hal.constant.subspan @storage0[#util.byte_range<256, 128>] : tensor<8x4xf32>
@@ -380,7 +377,42 @@ func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
     %2 = flow.dispatch @constant_dispatch::@entry[%c1, %c1, %c1]
         (%stream_arg, %const_span_0a, %const_span_0b, %const_span_1a, %const_span_0c) :
         (tensor<8x4xf32>, tensor<8x4xf32>, tensor<8x4xf32>, tensor<8x4xf32>, tensor<8x4xf32>) -> tensor<4x8xf32>
-    flow.return %2 : tensor<4x8xf32>
+    flow.return %1, %2 : tensor<4x8xf32>, tensor<4x8xf32>
+  }
+  return %0#0, %0#1 : tensor<4x8xf32>, tensor<4x8xf32>
+}
+
+}
+
+// -----
+
+module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
+  executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
+}>]} {
+
+// CHECK-LABEL: hal.executable @unsued_arg
+//  CHECK-NEXT: hal.interface @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: }
+flow.executable @unsued_arg {
+  flow.dispatch.entry @entry attributes {workgroup_rank = 2 : index}
+  builtin.module  {
+    func @entry(%unused_arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
+      %val = constant dense<4.2> : tensor<4x8xf32>
+      // CHECK-NOT: hal.interface.binding.subspan @[[IO]]::@[[S0B0]]
+      //     CHECK: hal.interface.binding.subspan @[[IO]]::@[[S0B1]]
+      flow.dispatch.tensor.store %val, %ret, offsets=[], sizes=[], strides=[] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:4x8xf32>
+      return
+    }
+  }
+}
+func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
+  %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
+      (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
+    %c1 = constant 1 : index
+    %1 = flow.dispatch @unsued_arg::@entry[%c1, %c1, %c1](%stream_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32>
+    flow.return %1 : tensor<4x8xf32>
   }
   return %0 : tensor<4x8xf32>
 }
