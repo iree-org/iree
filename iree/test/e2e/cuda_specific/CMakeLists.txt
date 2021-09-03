@@ -38,6 +38,7 @@ iree_lit_test_suite(
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
   LABELS
+    "driver=cuda"
     "noasan"
     "nomsan"
     "notsan"

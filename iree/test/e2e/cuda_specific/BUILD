@@ -44,6 +44,7 @@ iree_lit_test_suite(
         "//iree/tools:iree-run-mlir",
     ],
     tags = [
+        "driver=cuda",
         # CUDA cuInit fails with sanitizer on.
         "noasan",
         "nomsan",
