@@ -4,9 +4,9 @@
 
 // CHECK-LABEL: @ex
 hal.executable @ex {
-  // CHECK: hal.executable.variant @backend, target = #executable_target_format
+  // CHECK: hal.executable.variant public @backend, target = #executable_target_format
   hal.executable.variant @backend, target = #executable_target_format {
-    // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
+    // CHECK-DAG: hal.executable.entry_point public @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : index
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
@@ -38,9 +38,9 @@ hal.executable @ex {
 
 // CHECK-LABEL: @ex_with_workgroup_count_region
 hal.executable @ex_with_workgroup_count_region {
-  // CHECK: hal.executable.variant @backend, target = #executable_target_format
+  // CHECK: hal.executable.variant public @backend, target = #executable_target_format
   hal.executable.variant @backend, target = #executable_target_format {
-    // CHECK-DAG: hal.executable.entry_point @entry0 attributes {
+    // CHECK-DAG: hal.executable.entry_point public @entry0 attributes {
     // CHECK-SAME:     interface = @interface
     // CHECK-SAME:     ordinal = 0 : index
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]

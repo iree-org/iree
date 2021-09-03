@@ -1767,11 +1767,20 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name
     // TODO(benvanik): entry point types for verification.
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1816,7 +1825,8 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
     FlatSymbolRefAttr:$interface,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
@@ -1833,7 +1843,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
-      build($_builder, $_state, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
             workgroup_size, workgroup_local_memory, 0);
     }]>,
     OpBuilder<(ins
@@ -1843,7 +1853,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
-      build($_builder, $_state, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
             workgroup_size, workgroup_local_memory, 0);
     }]>
   ];
@@ -1877,11 +1887,21 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_ExecutableTargetAttr:$target
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    `,` `target` `=` $target
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1918,12 +1938,19 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     StrAttr:$format,
     HAL_ExecutableDataAttr:$data,
     OptionalAttr<StrAttr>:$mime_type
     // TODO(benvanik): add compatibility and versioning attributes.
   );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [

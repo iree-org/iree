@@ -35,7 +35,7 @@ hal.executable @add_dispatch_0 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[128], [], [4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
-//      CHECK: hal.executable.entry_point @add_dispatch_0
+//      CHECK: hal.executable.entry_point public @add_dispatch_0
 // CHECK-SAME:     passPipeline = 3 : i32
 // CHECK-SAME:     workloadPerWorkgroup = [128]
 // CHECK-SAME:     workgroup_size = [32 : index, 1 : index, 1 : index]
@@ -95,7 +95,7 @@ hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[4, 2, 4], [], [1, 1]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
-//      CHECK: hal.executable.entry_point @dot_dispatch_1
+//      CHECK: hal.executable.entry_point public @dot_dispatch_1
 // CHECK-SAME:     passPipeline = 4 : i32
 // CHECK-SAME:     workloadPerWorkgroup = [2, 4]
 // CHECK-SAME:     workgroup_size = [2 : index, 4 : index, 1 : index]
@@ -145,7 +145,7 @@ hal.executable @reduction_dispatch {
 
 //  CHECK-DAG: #[[CONFIG0:.+]] = {passPipeline = 2 : i32}
 //  CHECK-DAG: #[[CONFIG1:.+]] = {tileSizes = {{\[}}[]{{\]}}}
-//      CHECK: hal.executable.entry_point @predict_dispatch_153
+//      CHECK: hal.executable.entry_point public @predict_dispatch_153
 // CHECK-SAME:     translation.info = #[[CONFIG0]]
 // CHECK-SAME:     workgroup_size = [1 : index, 1 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index,

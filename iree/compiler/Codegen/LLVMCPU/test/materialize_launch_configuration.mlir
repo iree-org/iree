@@ -61,7 +61,7 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}[64, 64], [32, 32, 32], [4, 4, 4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//      CHECK: hal.executable.entry_point @matmul_tensors
+//      CHECK: hal.executable.entry_point public @matmul_tensors
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -76,7 +76,7 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 
 //      CHECK: #[[CONFIG:.+]] = {passPipeline = 0 : i32}
 //  CHECK-NOT: #config
-//      CHECK: hal.executable.entry_point @add_no_config
+//      CHECK: hal.executable.entry_point public @add_no_config
 // CHECK-SAME:     translation.info = #[[CONFIG]]
 //  CHECK-NOT:     #config
 
@@ -194,7 +194,7 @@ hal.executable @add attributes {sym_visibility = "private"} {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[64, 64]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//      CHECK: hal.executable.entry_point @add
+//      CHECK: hal.executable.entry_point public @add
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -298,7 +298,7 @@ hal.executable @add4D attributes {sym_visibility = "private"} {
   }
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[0, 64, 64, 64]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//      CHECK: hal.executable.entry_point @add4D
+//      CHECK: hal.executable.entry_point public @add4D
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -382,7 +382,7 @@ hal.executable @batch_matmul_tensors attributes {sym_visibility = "private"} {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [1, 4, 4, 4], tileSizes = {{\[}}[1, 32, 32], [1, 16, 16, 16], [1, 4, 4, 4]{{\]}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//      CHECK: hal.executable.entry_point @batch_matmul_tensors
+//      CHECK: hal.executable.entry_point public @batch_matmul_tensors
 // CHECK-NEXT: (%[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: index)

@@ -810,37 +810,6 @@ void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                      builder.getStringAttr(name));
 }
 
-static ParseResult parseExecutableOp(OpAsmParser &parser,
-                                     OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  // Parse the module body.
-  auto *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ExecutableOp::ensureTerminator(*body, parser.getBuilder(), result->location);
-  return success();
-}
-
-static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/false);
-}
-
 static LogicalResult verifyExecutableOp(ExecutableOp op) {
   // TODO(benvanik): check export name conflicts.
   return success();
@@ -852,6 +821,11 @@ static LogicalResult verifyExecutableOp(ExecutableOp op) {
 
 static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
                                                OperationState *result) {
+  StringAttr visibilityAttr;
+  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
+    return failure();
+  }
+
   StringAttr nameAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
@@ -874,6 +848,8 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
 
 static void printExecutableEntryPointOp(OpAsmPrinter &p,
                                         ExecutableEntryPointOp op) {
+  p << ' ';
+  printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(op->getAttrs(),
@@ -925,45 +901,6 @@ void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
   state.addAttribute("target", target);
 }
 
-static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
-                                            OperationState *result) {
-  auto *body = result->addRegion();
-  StringAttr nameAttr;
-  IREE::HAL::ExecutableTargetAttr targetAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("target")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(targetAttr, "target", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
-  if (parseResult.hasValue() && failed(*parseResult)) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ExecutableVariantOp::ensureTerminator(*body, parser.getBuilder(),
-                                        result->location);
-  return success();
-}
-
-static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p << ", target = " << op.target();
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(), "target"});
-  if (!op.body().empty()) {
-    p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                  /*printBlockTerminators=*/false);
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // hal.executable.binary
 //===----------------------------------------------------------------------===//
@@ -988,26 +925,6 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
                      builder.getStringAttr(symName));
   state.addAttribute("format", format);
   state.addAttribute("data", data);
-}
-
-static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
-                                           OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printExecutableBinaryOp(OpAsmPrinter &p, ExecutableBinaryOp op) {
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
 }
 
 //===----------------------------------------------------------------------===//

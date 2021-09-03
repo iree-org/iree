@@ -35,6 +35,6 @@ flow.executable @add_dispatch_0 {
 
 }
 
-//      CHECK:   hal.executable.binary @rocm_hsaco_fb attributes {
+//      CHECK:   hal.executable.binary public @rocm_hsaco_fb attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = "rocm-hsaco-fb"

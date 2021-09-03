@@ -59,8 +59,8 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
 }
 }
 
-//   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.variant @cuda
+//   CHECK-LABEL: hal.executable private @dot_dispatch_0
+//         CHECK:   hal.executable.variant public @cuda
 //         CHECK:  memref.global "private" @{{.*}} : memref<4x256xf32, 3>
 //         CHECK:  memref.global "private" @{{.*}} : memref<2x4xf32, 3>
 //     CHECK-DAG:  %[[C0:.+]] = constant 0 : index
@@ -120,7 +120,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
   }
 }
 //      CHECK: #[[CONFIG:.+]] = {tileSizes = {{\[}}[]{{\]}}}
-//      CHECK: hal.executable @reduction_dispatch
+//      CHECK: hal.executable public @reduction_dispatch
 //      CHECK: linalg.fill
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
 //      CHECK: linalg.generic

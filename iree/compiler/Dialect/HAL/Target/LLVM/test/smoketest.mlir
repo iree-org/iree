@@ -34,6 +34,6 @@ flow.executable @add_dispatch_0 {
 
 }
 
-// CHECK:       hal.executable.binary @embedded_elf_x86_64
+// CHECK:       hal.executable.binary public @embedded_elf_x86_64
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = "embedded-elf-x86_64"
