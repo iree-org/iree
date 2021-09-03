@@ -297,7 +297,7 @@ static iree_status_t iree_hal_validating_command_buffer_fill_buffer(
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "fill offset and/or length do not match the natural alignment of the "
-        "fill value (target_offset=%" PRIu64 ", length=%" PRIu64
+        "fill value (target_offset=%" PRIdsz ", length=%" PRIdsz
         ", pattern_length=%zu)",
         target_offset, length, pattern_length);
   }
