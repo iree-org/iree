@@ -1237,7 +1237,7 @@ def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
   ]> {
   let summary = [{pool of constants with similar lifetimes}];
   let description = [{
-    A pool of constants that share a similiar lifetime and that should be stored
+    A pool of constants that share a similar lifetime and that should be stored
     together both in the source files and at runtime. By logically grouping
     constants by their frequency and locality of access we can reduce the number
     of bindings required on hal.interface by sourcing constants from the same
@@ -1246,11 +1246,20 @@ def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_BufferConstraintsAttr:$buffer_constraints
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1284,11 +1293,13 @@ def HAL_ConstantPoolValueOp : HAL_Op<"constant_pool.value", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     Util_AnySerializableAttr:$value
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value attr-dict-with-keyword
   }];
 }
@@ -1305,6 +1316,7 @@ def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     TypeAttr:$tensor_type,
     SymbolRefAttr:$storage_buffer,
@@ -1314,6 +1326,7 @@ def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `:` $tensor_type
     `=` $storage_buffer `[` $storage_range `]`
     (`->` $runtime_buffer^ `[` $runtime_range `]`)?
@@ -1332,6 +1345,7 @@ def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     ElementsAttr:$value,
     OptionalAttr<SymbolRefAttr>:$runtime_buffer,
@@ -1339,6 +1353,7 @@ def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value
     (`->` $runtime_buffer^ `[` $runtime_range `]`)?
     attr-dict-with-keyword
@@ -1388,11 +1403,13 @@ def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     Util_AnySerializableAttr:$value
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value attr-dict-with-keyword
   }];
 }

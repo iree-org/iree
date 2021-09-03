@@ -599,38 +599,6 @@ void ConstantPoolOp::build(OpBuilder &builder, OperationState &state,
   state.addAttribute("buffer_constraints", bufferConstraints);
 }
 
-static ParseResult parseConstantPoolOp(OpAsmParser &parser,
-                                       OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  // Parse the module body.
-  auto *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ConstantPoolOp::ensureTerminator(*body, parser.getBuilder(),
-                                   result->location);
-  return success();
-}
-
-static void printConstantPoolOp(OpAsmPrinter &p, ConstantPoolOp op) {
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/false);
-}
-
 //===----------------------------------------------------------------------===//
 // hal.constant_pool.load
 //===----------------------------------------------------------------------===//
