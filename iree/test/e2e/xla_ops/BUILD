@@ -342,6 +342,7 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
+            "scatter_dynamic.mlir",
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
@@ -357,7 +358,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "round.mlir",
-            "scatter_dynamic.mlir",  # TODO(GH-6388): Enable the test.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
