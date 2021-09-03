@@ -4,5 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from ._iree_ops_gen import *
-from .._mlir_libs._ireeDialects.iree import *
+from .util import ImportContext, ImportHooks, ImportStage
+from .importer import Importer
+from .intrinsic_def import def_ir_macro_intrinsic, def_pattern_call_intrinsic, def_pyfunc_intrinsic
