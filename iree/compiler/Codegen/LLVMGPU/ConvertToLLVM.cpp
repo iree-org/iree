@@ -176,6 +176,15 @@ class ConvertFunc : public ConvertToLLVMPattern {
       IREE::HAL::InterfaceBindingOp binding = input.queryBindingOp();
       llvmInputTypes[argMapping[binding]] = llvmType;
     });
+    // As a convention with HAL, push constants are appended as kernel arguments
+    // after all the binding inputs.
+    uint64_t numConstants = 0;
+    funcOp.walk([&](IREE::HAL::InterfaceLoadConstantOp constant) {
+      numConstants =
+          std::max(constant.offset().getZExtValue() + 1, numConstants);
+    });
+    llvmInputTypes.resize(argMapping.size() + numConstants,
+                          rewriter.getI32Type());
     signatureConverter.addInputs(llvmInputTypes);
 
     // Construct newFunc with all attributes except return type & symbol name.
@@ -256,10 +265,68 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);
       rewriter.replaceOp(op, {desc});
     } else {
-      // TODO: pull those paramters from HAL constants.
-      assert(0 && "TODO: implement dynamic shape");
+      ValueRange dynamicDims = adaptor.dynamic_dims();
+      assert(memrefType.getNumDynamicDims() == dynamicDims.size());
+      int64_t rank = memrefType.getRank();
+
+      // Build MemRef descriptor for this interface binding.
+      auto desc = MemRefDescriptor::undef(
+          rewriter, loc, typeConverter->convertType(memrefType));
+      desc.setAllocatedPtr(rewriter, loc, llvmBufferBasePtr);
+      desc.setAlignedPtr(rewriter, loc, llvmBufferBasePtr);
+      desc.setConstantOffset(rewriter, loc, 0);
+
+      // Update memref descriptor shape. Dynamic dimensions can be mixed with
+      // static dimensions, like [128, ?, 128].
+      int dynamicDimIndex = 0;
+      for (int i = 0; i < rank; ++i) {
+        if (memrefType.isDynamicDim(i)) {
+          desc.setSize(rewriter, loc, i, dynamicDims[dynamicDimIndex++]);
+        } else {
+          desc.setConstantSize(rewriter, loc, i, memrefType.getDimSize(i));
+        }
+      }
+
+      // Compute and update strides. Assume that MemRefs are row-major, that is,
+      // following index linearization:
+      //   x[i, j, k] = i * x.dim[1] * x.dim[2] + j * x.dim[2] + k
+      desc.setConstantStride(rewriter, loc, rank - 1, 1);
+      for (int i = rank - 2; i >= 0; --i) {
+        auto stride = desc.stride(rewriter, loc, i + 1);
+        auto dim = desc.size(rewriter, loc, i + 1);
+        Value strideVal = rewriter.create<LLVM::MulOp>(loc, stride, dim);
+        desc.setStride(rewriter, loc, i, strideVal);
+      }
+      rewriter.replaceOp(op, {desc});
     }
 
+    return success();
+  }
+};
+
+class ConvertIREEConstantOp : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertIREEConstantOp(MLIRContext *context,
+                                 LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            IREE::HAL::InterfaceLoadConstantOp::getOperationName(), context,
+            converter) {}
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // Bail until nested under an LLVMFuncOp.
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
+    assert(llvmFuncOp.getNumArguments() > 0);
+
+    llvm::SmallDenseMap<Operation *, size_t> argMapping =
+        getKernelArgMapping(llvmFuncOp);
+    auto ireeConstantOp = cast<IREE::HAL::InterfaceLoadConstantOp>(op);
+    mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
+        argMapping.size() + ireeConstantOp.offset().getZExtValue());
+    assert(llvmBufferArg.getType().isInteger(32));
+    Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
+    rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(op, dstType, llvmBufferArg);
     return success();
   }
 };
@@ -305,7 +372,8 @@ void populateLLVMConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns,
                                     LLVMTypeConverter &converter,
                                     bool useROCM) {
-  patterns.insert<ConvertFunc, ConvertIREEBindingOp>(context, converter);
+  patterns.insert<ConvertFunc, ConvertIREEBindingOp, ConvertIREEConstantOp>(
+      context, converter);
   if (useROCM) {
     patterns.insert<HALInterfaceWorkgroupOpsConverter<
                         IREE::HAL::InterfaceWorkgroupIDOp, ROCDL::BlockIdXOp,

@@ -330,8 +330,16 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need cuda implementation");
+  iree_hal_cuda_graph_command_buffer_t* command_buffer =
+      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+  iree_host_size_t constant_base_index =
+      iree_hal_cuda_push_constant_index(executable_layout) +
+      offset / sizeof(int32_t);
+  for (iree_host_size_t i = 0; i < values_length / sizeof(int32_t); i++) {
+    *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
+        ((uint32_t*)values)[i];
+  }
+  return iree_ok_status();
 }
 
 // Tie together the binding index and its index in |bindings| array.
