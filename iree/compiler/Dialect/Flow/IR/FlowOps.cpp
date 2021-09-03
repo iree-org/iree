@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -529,37 +530,6 @@ void ExecutableOp::build(OpBuilder &builder, OperationState &state,
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(name));
-}
-
-static ParseResult parseExecutableOp(OpAsmParser &parser,
-                                     OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  // Parse the module body.
-  auto *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ExecutableOp::ensureTerminator(*body, parser.getBuilder(), result->location);
-  return success();
-}
-
-static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/false);
 }
 
 static LogicalResult verifyExecutableOp(ExecutableOp op) {

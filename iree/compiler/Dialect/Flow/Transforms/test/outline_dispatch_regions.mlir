@@ -1,6 +1,6 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-outline-dispatch-regions2 %s | IreeFileCheck %s
 
-//      CHECK: flow.executable @staticShapeDispatch_dispatch_0
+//      CHECK: flow.executable private @staticShapeDispatch_dispatch_0
 // CHECK-NEXT:   flow.dispatch.entry @staticShapeDispatch_dispatch_0 attributes {
 // CHECK-SAME:       workgroup_rank = 2 : index}
 //      CHECK: func @staticShapeDispatch_dispatch_0(
@@ -40,12 +40,12 @@ func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 
 // -----
 
-//      CHECK: flow.executable @dispatchFnMuli_dispatch_0
+//      CHECK: flow.executable private @dispatchFnMuli_dispatch_0
 // CHECK-NEXT:   flow.dispatch.entry @dispatchFnMuli_dispatch_0 attributes {
 // CHECK-SAME:       workgroup_rank = 2 : index}
 //      CHECK: func @dispatchFnMuli_dispatch_0(
 
-//      CHECK: flow.executable @dispatchFnMuli_dispatch_1
+//      CHECK: flow.executable private @dispatchFnMuli_dispatch_1
 // CHECK-NEXT:   flow.dispatch.entry @dispatchFnMuli_dispatch_1 attributes {
 // CHECK-SAME:       workgroup_rank = 2 : index}
 //      CHECK: func @dispatchFnMuli_dispatch_1(
@@ -89,7 +89,7 @@ func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
 
 // -----
 
-// CHECK: flow.executable @dispatchFn1_dispatch_0
+// CHECK: flow.executable private @dispatchFn1_dispatch_0
 
 // CHECK-LABEL: func @dispatchFn1
 func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
@@ -104,7 +104,7 @@ func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   return %0 : tensor<4x8xf32>
 }
 
-// CHECK: flow.executable @dispatchFn2_dispatch_0
+// CHECK: flow.executable private @dispatchFn2_dispatch_0
 
 // CHECK-LABEL: func @dispatchFn2
 func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
@@ -121,7 +121,7 @@ func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 
 // -----
 
-//      CHECK: flow.executable @dynamicShapeDispatch_dispatch_0
+//      CHECK: flow.executable private @dynamicShapeDispatch_dispatch_0
 // CHECK-NEXT:   flow.dispatch.entry @dynamicShapeDispatch_dispatch_0 attributes {
 // CHECK-SAME:       workgroup_rank = 2 : index}
 //      CHECK: func @dynamicShapeDispatch_dispatch_0(

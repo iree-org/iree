@@ -460,11 +460,20 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name
     // TODO(benvanik): add compatibility and versioning attributes.
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
