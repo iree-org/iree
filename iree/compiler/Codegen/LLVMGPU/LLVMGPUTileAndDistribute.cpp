@@ -134,7 +134,7 @@ static Optional<Value> allocateWorkgroupMemory(
     OpBuilder &b, memref::SubViewOp subview,
     ArrayRef<Value> boundingSubViewSize, DataLayout &layout) {
   // In CUDA workgroup memory is represented by a global variable. Create a
-  // global variable and a memref.GetGlobalOp at the beginning of the funtion to
+  // global variable and a memref.GetGlobalOp at the beginning of the function to
   // get the memref.
   OpBuilder::InsertionGuard guard(b);
   FuncOp funcOp = subview->getParentOfType<FuncOp>();
