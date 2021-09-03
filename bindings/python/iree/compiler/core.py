@@ -172,9 +172,6 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
   cl = [
       iree_translate,
       input_file,
-      # People are only looking at stderr here if the tool fails and there's
-      # already lots of output, so adding this doesn't cost much.
-      "--print-main-address",
       f"--iree-input-type={options.input_type.value}",
       f"--iree-vm-bytecode-module-output-format={options.output_format.value}",
   ]
