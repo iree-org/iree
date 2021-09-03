@@ -510,7 +510,8 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     FlatSymbolRefAttr:$function_ref,
     OptionalAttr<IndexAttr>:$workgroup_rank
   );

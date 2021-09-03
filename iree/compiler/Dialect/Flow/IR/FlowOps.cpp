@@ -543,6 +543,11 @@ static LogicalResult verifyExecutableOp(ExecutableOp op) {
 
 static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
                                         OperationState *result) {
+  StringAttr visibilityAttr;
+  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
+    return failure();
+  }
+
   FlatSymbolRefAttr functionRefAttr;
   if (failed(parser.parseAttribute(functionRefAttr, "function_ref",
                                    result->attributes))) {
@@ -570,6 +575,8 @@ static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
 }
 
 static void printDispatchEntryOp(OpAsmPrinter &p, DispatchEntryOp op) {
+  p << ' ';
+  printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
   p.printSymbolName(op.function_ref());
   if (op.sym_name() != op.function_ref()) {
