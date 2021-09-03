@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -43,9 +43,9 @@ class ConstantStorageLookupOpConversion
       ConversionPatternRewriter &rewriter) const override {
     // I don't like this, but I can't figure out what to do.
     // Matches the logic above.
-    auto rodataName =
-        (op.constant().getRootReference() + op.constant().getLeafReference())
-            .str();
+    auto rodataName = (op.constant().getRootReference().getValue() +
+                       op.constant().getLeafReference().getValue())
+                          .str();
     rewriter.replaceOpWithNewOp<IREE::VM::ConstRefRodataOp>(op, rodataName);
     return success();
   }

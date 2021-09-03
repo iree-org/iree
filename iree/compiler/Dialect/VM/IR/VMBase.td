@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_VM_BASE
 #define IREE_DIALECT_VM_BASE
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE VM (Virtual Machine) dialect
@@ -218,14 +218,13 @@ def VM_GlobalOpInterface : OpInterface<"VMGlobalOp"> {
     }]>,
     InterfaceMethod<[{}], "StringRef", "getSymbolName", (ins)>,
     InterfaceMethod<[{}], "bool", "isMutable", (ins)>,
-    InterfaceMethod<[{}], "Optional<StringRef>", "getInitializerAttr", (ins)>,
     InterfaceMethod<[{}], "Optional<Attribute>", "getInitialValueAttr", (ins)>,
+    InterfaceMethod<[{}], "void", "setInitialValue", (ins "Attribute":$value)>,
     InterfaceMethod<[{}], "Optional<IntegerAttr>", "getOrdinalAttr", (ins)>,
     InterfaceMethod<[{}], "int", "getOrdinal", (ins), [{
       return $_self.getOrdinalAttr().getValue().template cast<IntegerAttr>().getInt();
     }]>,
     InterfaceMethod<[{}], "void", "makeMutable", (ins)>,
-    InterfaceMethod<[{}], "void", "clearInitializer", (ins)>,
     InterfaceMethod<[{}], "void", "clearInitialValue", (ins)>,
   ];
 }
@@ -258,7 +257,7 @@ def VM_ExtF64 : NativeOpTrait<"IREE::VM::ExtF64">;
 //===----------------------------------------------------------------------===//
 
 def VM_AnyRefObject : DialectType<
-    IREE_Dialect,
+    Util_Dialect,
     CPred<"IREE::VM::RefType::isCompatible($_self)">,
     "ref_object"> {
   let description = [{
@@ -267,7 +266,7 @@ def VM_AnyRefObject : DialectType<
 }
 
 def VM_AnyRef : DialectType<
-    IREE_Dialect,
+    Util_Dialect,
     CPred<"$_self.isa<IREE::VM::RefType>()">,
     "ref"> {
   let description = [{
@@ -291,7 +290,7 @@ class VM_RefOf<Type type> :
 //===----------------------------------------------------------------------===//
 
 def VM_BufferType : DialectType<
-    IREE_Dialect,
+    Util_Dialect,
     CPred<"$_self.isa<IREE::VM::BufferType>()">,
     "buffer"> {
   let description = [{
@@ -305,7 +304,7 @@ def VM_BufferType : DialectType<
 //===----------------------------------------------------------------------===//
 
 def VM_AnyList : DialectType<
-    IREE_Dialect,
+    Util_Dialect,
     And<[
       CPred<"$_self.isa<IREE::VM::RefType>()">,
       CPred<"$_self.cast<IREE::VM::RefType>().getObjectType().isa<IREE::VM::ListType>()">,
@@ -395,16 +394,16 @@ class VM_ConstantFloatValueAttr<F type> :
 //===----------------------------------------------------------------------===//
 
 def VM_OrdinalCountsAttr :
-  IREE_StructAttr<"ordinal_counts",
+  Util_StructAttr<"ordinal_counts",
                   "OrdinalCountsAttr",
                   VM_Dialect, [
-    IREE_StructFieldAttr<"import_funcs", I32Attr>,
-    IREE_StructFieldAttr<"export_funcs", I32Attr>,
-    IREE_StructFieldAttr<"internal_funcs", I32Attr>,
-    IREE_StructFieldAttr<"global_bytes", I32Attr>,
-    IREE_StructFieldAttr<"global_refs", I32Attr>,
-    IREE_StructFieldAttr<"rodatas", I32Attr>,
-    IREE_StructFieldAttr<"rwdatas", I32Attr>,
+    Util_StructFieldAttr<"import_funcs", I32Attr>,
+    Util_StructFieldAttr<"export_funcs", I32Attr>,
+    Util_StructFieldAttr<"internal_funcs", I32Attr>,
+    Util_StructFieldAttr<"global_bytes", I32Attr>,
+    Util_StructFieldAttr<"global_refs", I32Attr>,
+    Util_StructFieldAttr<"rodatas", I32Attr>,
+    Util_StructFieldAttr<"rwdatas", I32Attr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::VM";
 }

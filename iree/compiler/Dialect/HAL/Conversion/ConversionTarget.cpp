@@ -9,8 +9,8 @@
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -21,12 +21,7 @@ namespace iree_compiler {
 
 HALConversionTarget::HALConversionTarget(MLIRContext *context,
                                          TypeConverter &typeConverter)
-    : ConversionTarget(*context), typeConverter(typeConverter) {
-  // Setup the fallback handler such that all ops without explicitly
-  // registered patterns will be checked to ensure that they don't use any
-  // illegal types.
-  markUnknownOpDynamicallyLegal();
-
+    : ConversionTarget(*context) {
   // The HAL dialect allows hal ops as input as we may be running on partially
   // processed files or may have already lowered some constructs (like constant
   // pools).
@@ -47,15 +42,18 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
   addDynamicallyLegalOp<Shape::TieShapeOp>([&](Shape::TieShapeOp op) {
     return typeConverter.isLegal(op.result().getType());
   });
-}
 
-bool HALConversionTarget::isDynamicallyLegal(Operation *op) const {
-  // Short-circuit test that bails on the first illegal type.
-  const auto isTypeIllegal = [&](Type type) {
-    return !typeConverter.isLegal(type);
-  };
-  return !(llvm::any_of(op->getOperandTypes(), isTypeIllegal) ||
-           llvm::any_of(op->getResultTypes(), isTypeIllegal));
+  // Setup the fallback handler such that all ops without explicitly
+  // registered patterns will be checked to ensure that they don't use any
+  // illegal types.
+  markUnknownOpDynamicallyLegal([&](Operation *op) {
+    // Short-circuit test that bails on the first illegal type.
+    const auto isTypeIllegal = [&](Type type) {
+      return !typeConverter.isLegal(type);
+    };
+    return !(llvm::any_of(op->getOperandTypes(), isTypeIllegal) ||
+             llvm::any_of(op->getResultTypes(), isTypeIllegal));
+  });
 }
 
 // static

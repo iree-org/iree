@@ -10,8 +10,6 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
-#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "llvm/ADT/MapVector.h"
@@ -32,8 +30,7 @@ class PackAllocationsPass
  public:
   using Slice = IREE::HAL::AllocatorPackOp::Slice;
 
-  explicit PackAllocationsPass(TargetOptions targetOptions)
-      : targetOptions_(targetOptions) {}
+  PackAllocationsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::StandardOpsDialect>();
@@ -50,18 +47,10 @@ class PackAllocationsPass
   void runOnOperation() override {
     auto funcOp = getOperation();
 
-    // Derive buffer constraints based on target backends.
-    // TODO(benvanik): move to a module-level attribute so that we can query
-    // this without having to plumb through the target options and share code
-    // with IdentifyConstantPools.
-    auto bufferConstraints = computeConservativeBufferConstraints(
-        targetOptions_, funcOp.getContext());
-    if (!bufferConstraints) {
-      funcOp.emitWarning() << "no target backends provided buffer "
-                              "constraints; falling back to host default";
-      bufferConstraints =
-          TargetBackend::makeDefaultBufferConstraints(funcOp.getContext());
-    }
+    // Derive buffer constraints based on target devices.
+    auto bufferConstraints =
+        IREE::HAL::DeviceTargetAttr::lookupConservativeBufferConstraints(
+            funcOp);
 
     // NOTE: we could try several algorithms and compute which packs best. For
     // now we just pack greedily as it's fast and what most existing ML
@@ -116,25 +105,6 @@ class PackAllocationsPass
   }
 
  private:
-  // Tries to find the min/max constraints on buffers across all target
-  // backends. This should really be done per pool based on the usage of the
-  // constants (if pool 0 is used by device A and pool 1 is used by device B
-  // then they should not need to have matching constraints).
-  BufferConstraintsAttr computeConservativeBufferConstraints(
-      const TargetOptions &targetOptions, MLIRContext *context) {
-    auto targetBackends = getTargetBackends(targetOptions.targets);
-    BufferConstraintsAttr attr = {};
-    for (auto &targetBackend : targetBackends) {
-      if (attr) {
-        attr = intersectBufferConstraints(
-            attr, targetBackend->queryBufferConstraints(context));
-      } else {
-        attr = targetBackend->queryBufferConstraints(context);
-      }
-    }
-    return attr;
-  }
-
   // Packs slices back-to-back with no aliasing. Useful when debugging to remove
   // the aliasing that makes data breakpoints useless.
   //
@@ -344,18 +314,14 @@ class PackAllocationsPass
 
     return align(loc, offset, rangeAlignment, builder);
   }
-
-  TargetOptions targetOptions_;
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass(
-    TargetOptions targetOptions) {
-  return std::make_unique<PackAllocationsPass>(targetOptions);
+std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass() {
+  return std::make_unique<PackAllocationsPass>();
 }
 
 static PassRegistration<PackAllocationsPass> pass([] {
-  auto options = getTargetOptionsFromFlags();
-  return std::make_unique<PackAllocationsPass>(options);
+  return std::make_unique<PackAllocationsPass>();
 });
 
 }  // namespace HAL

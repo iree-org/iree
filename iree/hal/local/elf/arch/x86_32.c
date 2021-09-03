@@ -120,10 +120,10 @@ iree_status_t iree_elf_arch_apply_relocations(
 // Cross-ABI function calls
 //==============================================================================
 
-// System V 386 ABI (used in IREE):
+// System V i386 ABI (used in IREE):
 // https://uclibc.org/docs/psABI-i386.pdf
 // Arguments:
-//
+//   (reverse order on the stack; last arg furthest from stack pointer)
 //
 // Results:
 //   EAX
@@ -136,7 +136,7 @@ iree_status_t iree_elf_arch_apply_relocations(
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
-#error "TODO"
+#error "TODO(#6554): need cdecl -> sysv ABI shims in x86_32_msvc.asm"
 
 #else
 

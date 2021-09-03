@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -76,6 +77,9 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
 
+/// Creates a pass to vectorize a very specific form of linalg.conv ops.
+std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeMMT4dPass();
+
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
 
@@ -95,14 +99,16 @@ createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 void populateLinalgToVectorVectorizeConvPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
+/// Populates `patterns` to convert linalg.mmt4d to vector.contract.
+void populateLinalgToVectorVectorizeMMT4dPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns);
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
 
 /// Performs the final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
-    std::string targetTriple = "", std::string targetDataLayout = "",
-    bool unfuseFMAOps = false);
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 
 /// Pass to lower the module an hal.executable.variant operation to external
 /// dialect. Currently this pass lowers to LLVM dialect, but could be
@@ -166,39 +172,26 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
 //----------------------------------------------------------------------------//
 
-/// Options for LLVM pipeline.
-struct LLVMCPUCodegenPassPipelineOptions
-    : public PassPipelineOptions<LLVMCPUCodegenPassPipelineOptions> {
-  Option<std::string> targetDataLayout{
-      *this, "target-data-layout",
-      llvm::cl::desc("Code generation target data layout."),
-      llvm::cl::init("")};
-  Option<std::string> targetTriple{
-      *this, "target-triple", llvm::cl::desc("Code generation target triple."),
-      llvm::cl::init("")};
-  Option<bool> unfuseFMAOps{
-      *this, "unfuse-fma-ops",
-      llvm::cl::desc("Enable rewriting llvm.fma to its unfused version."),
-      llvm::cl::init(false)};
-};
-
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.
-void buildLLVMCPUCodegenPassPipeline(
-    OpPassManager &passManager,
-    const LLVMCPUCodegenPassPipelineOptions &options);
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
 
 //------------------------------------------------------------------------------
 // LLVMGPU
 //------------------------------------------------------------------------------
 
+/// Lowering calling vectorization patterns. Expects pass manager to be a
+/// module-level pass manager.
+void addGPUVectorizationPassPipeline(OpPassManager &pm);
+
 /// Lowering calling vectorization patterns.
-void addGPUVectorizationPassPipeline(OpPassManager &passManager);
+void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
-/// will result in scalar operations.
-void addGPUSimpleDistributePassPipeline(OpPassManager &passManager);
+/// will result in scalar operations. Expects pass manager to be a module-level
+/// pass manager.
+void addGPUSimpleDistributePassPipeline(OpPassManager &pm);
 
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
@@ -212,7 +205,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUTileAndDistributeToThreads();
 
 std::unique_ptr<OperationPass<FuncOp>>
@@ -225,54 +218,72 @@ createLLVMGPULowerExecutableTargetPass();
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass();
 
+/// Lower vector ops before convertion to LLVM.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();
+
+/// Convert shared memory copies to distributed transfer_read/transfer_write.
+std::unique_ptr<OperationPass<FuncOp>>
+createLLVMGPUDistributeSharedMemoryCopy();
+
+/// Apply software pipelining.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
+
 //------------------------------------------------------------------------------
-// SPIRV Passes
+// SPIR-V Passes
 //------------------------------------------------------------------------------
 
-// Options that can be used to configure SPIR-V code generation.
-struct SPIRVCodegenOptions {
-  llvm::SmallVector<unsigned, 3> workgroupSize = {};
-  llvm::SmallVector<unsigned, 3> workgroupTileSizes = {};
-  llvm::SmallVector<unsigned, 3> invocationTileSizes = {};
+/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
+/// distributed Linalg ops to SPIR-V scalar code. Additionally performs
+/// distribution to threads without vectorization.
+void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm);
 
-  bool useWorkgroupMemory = false;
+/// Pass pipeline to lower IREE HAL executables that contain Linalg ops that are
+/// not tiled/distributed. Performs distribution to global invocations.
+void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm);
 
-  static SPIRVCodegenOptions getFromCLOptions();
-};
+/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
+/// distributed Linalg ops to SPIR-V scalar and vector code. Additionally
+/// performs distribution to threads with vectorization.
+void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
 
 /// Pass to perform the final conversion to SPIR-V dialect.
+///
 /// This pass converts remaining interface ops into SPIR-V global variables,
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
-/// Creates a pass to concretize hal.interface.workgroup.* ops with concrete
-/// tiling and distribution scheme.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVConcretizeWorkgroupTilesPass(const SPIRVCodegenOptions &options);
-
-/// Pass to add the synchronizations and attributes needed to lower from PLoops
-/// to GPU dialect.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVConvertToGPUPass();
+/// Pass to distribute Linalg ops with buffer semantics to global invocations.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVDistributeToGlobalIDPass();
 
 /// Creates a pass to fold processor ID uses where possible.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVFoldProcessorIDUsesPass();
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
 
-/// Pass to tile and vectorize Linalg operations on buffers in a single
-/// workgroup.
+/// Main pass to lower executables to scalar + vector code on SPIR-V path.
+/// Invokes one of the pass pipelines that translate the executable to
+/// scalar + vector code.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVTileAndVectorizePass(const SPIRVCodegenOptions &options);
+createSPIRVLowerExecutableTargetPass();
+
+/// Pass to remove loop generated at flow for tiled and distributed Linalg ops
+/// when the loop is known to have a single trip count.
+/// WARNING: DO NOT USE. This is a legacy pass that is to be deprecated.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVRemoveOneTripTiledLoopPass();
+
+/// Pass to tile and distribute Linalg ops with buffer semantics to subgroups
+/// and invocations.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
 
 /// Pass to convert vector read/write/arithmetic operations to the corresponding
 /// cooperative matrix ops when possible.
 std::unique_ptr<OperationPass<FuncOp>>
 createSPIRVVectorToCooperativeMatrixPass();
 
-/// Pass to convert vector operations to GPU level operations. Instructions of
-/// vector size equal to subgroup size are distributed across the subgroup.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToGPUPass();
+/// Pass to lower linalg.copy for copying data to workgroup memory.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVCopyToWorkgroupMemoryPass();
+
+/// Pass to vectorize Linalg ops with buffer semantics.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorizePass();
 
 /// Converts memref of scalar to memref of vector of efficent size. This will
 /// allow to convert memory accesses to vector load/store in SPIR-V without
@@ -283,10 +294,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
 
-/// Populates passes need to lower from Linalf to SPIR-V.
-void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
-                                    const SPIRVCodegenOptions &options);
-
 /// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
 /// structured ops path. The pass manager `pm` in here operate on the module
 /// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to
@@ -294,16 +301,11 @@ void buildLinalgToSPIRVPassPipeline(OpPassManager &pm,
 /// testing purposes only. The pass pipeline will set an appropriate workgroup
 /// size.
 /// TODO: Are both of these needed and does this one still work on HLO?
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm,
-                                   const SPIRVCodegenOptions &options);
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
 
 //----------------------------------------------------------------------------//
 // SPIRV Codegen specific patterns.
 //----------------------------------------------------------------------------//
-
-/// Populates patterns to tile and distribute linalg.copy operations.
-void populateTileAndDistributeLinalgCopyPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
 
 /// Populates patterns to fold processor ID uses by using processor counts
 /// information where possible.

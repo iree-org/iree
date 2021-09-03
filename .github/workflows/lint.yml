@@ -134,3 +134,4 @@ jobs:
         uses: ibiqlik/action-yamllint@v1
         with:
           strict: true
+          file_or_dir: .github/**/*.yml build_tools/buildkite/**/*.yml

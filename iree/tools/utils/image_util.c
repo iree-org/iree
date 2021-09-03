@@ -136,6 +136,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
     // SINT_8 and UINT_8 perform direct buffer wrap.
     result = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
         allocator, shape, shape_rank, element_type,
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
         iree_make_byte_span((void*)pixel_data, element_byte * buffer_length),
@@ -186,8 +187,11 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
     iree_hal_buffer_unmap_range(&mapped_memory);
   }
   if (iree_status_is_ok(result)) {
-    result = iree_hal_buffer_view_create(buffer, shape, shape_rank,
-                                         element_type, out_buffer_view);
+    iree_hal_encoding_type_t encoding_type =
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
+    result =
+        iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
+                                    encoding_type, out_buffer_view);
   }
   iree_hal_buffer_release(buffer);
   stbi_image_free(pixel_data);

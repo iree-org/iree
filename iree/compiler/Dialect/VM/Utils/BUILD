@@ -21,13 +21,3 @@ cc_library(
         "@llvm-project//mlir:Support",
     ],
 )
-
-cc_library(
-    name = "ConstantEncoding",
-    srcs = ["ConstantEncoding.cpp"],
-    hdrs = ["ConstantEncoding.h"],
-    deps = [
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Support",
-    ],
-)

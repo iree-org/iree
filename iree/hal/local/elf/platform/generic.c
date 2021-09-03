@@ -41,30 +41,20 @@ void iree_memory_jit_context_end(void) {}
 
 iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
                                        iree_host_size_t total_length,
+                                       iree_allocator_t allocator,
                                        void** out_base_address) {
   *out_base_address = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_status_t status = iree_ok_status();
-
-  void* base_address =
-      iree_aligned_alloc(IREE_MEMORY_PAGE_SIZE_NORMAL, total_length);
-  if (base_address == NULL) {
-    status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "malloc failed on reservation");
-  }
-
-  *out_base_address = base_address;
+  iree_status_t status =
+      iree_allocator_malloc(allocator, total_length, out_base_address);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-void iree_memory_view_release(void* base_address,
-                              iree_host_size_t total_length) {
+void iree_memory_view_release(void* base_address, iree_host_size_t total_length,
+                              iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_aligned_free(base_address);
-
+  iree_allocator_free(allocator, base_address);
   IREE_TRACE_ZONE_END(z0);
 }
 

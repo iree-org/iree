@@ -27,8 +27,8 @@ IREE_API_EXPORT iree_status_t iree_vm_instance_create(
 
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(allocator, sizeof(iree_vm_instance_t),
-                                (void**)&instance));
+      z0,
+      iree_allocator_malloc(allocator, sizeof(*instance), (void**)&instance));
   instance->allocator = allocator;
   iree_atomic_ref_count_init(&instance->ref_count);
 

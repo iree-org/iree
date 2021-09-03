@@ -27,3 +27,31 @@ module {
 }
 
 }
+
+// -----
+// CHECK-LABEL: @t002_const.f32.nonzero
+module @t002_const.f32.nonzero {
+
+module {
+  func @non_zero() -> (f32) {
+    // CHECK: vm.const.f32 1.000000e+00 : f32
+    %1 = constant 1. : f32
+    return %1 : f32
+  }
+}
+
+}
+
+// -----
+// CHECK-LABEL: @t003_const.f32.zero
+module @t003_const.f32.zero {
+
+module {
+  func @zero() -> (f32) {
+    // CHECK: vm.const.f32.zero : f32
+    %1 = constant 0. : f32
+    return %1 : f32
+  }
+}
+
+}

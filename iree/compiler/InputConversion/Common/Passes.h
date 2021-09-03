@@ -17,25 +17,16 @@ namespace iree_compiler {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-// Performs input legalization for specific combination of input dialects.
+// Performs common input legalization after specific input dialect conversions
+// have taken place.
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
-
-void registerCommonConversionPassPipelines();
 
 //===----------------------------------------------------------------------===//
 // Passes
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<FuncOp>> createTopLevelSCFToCFGPass();
-std::unique_ptr<OperationPass<FuncOp>> createConvertUpstreamToIREE();
-
-//===----------------------------------------------------------------------===//
-// Patterns
-//===----------------------------------------------------------------------===//
-
-void populateConvertUpstreamToIREEPatterns(MLIRContext *context,
-                                           TypeConverter &typeConverter,
-                                           OwningRewritePatternList &patterns);
+std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

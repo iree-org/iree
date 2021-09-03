@@ -33,9 +33,11 @@ cc_library(
     name = "CUDA",
     srcs = [
         "CUDATarget.cpp",
+        "NoLoopUnrollPass.cpp",
     ],
     hdrs = [
         "CUDATarget.h",
+        "LLVMPasses.h",
     ],
     deps = [
         ":cuda_libdevice",
@@ -45,6 +47,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
         "//iree/schemas:cuda_executable_def_c_fbs",
+        "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:BitReader",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:IPO",

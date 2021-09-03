@@ -159,6 +159,7 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
 //   hal.device.id :: some-pattern-*
 //   hal.device.feature :: some-pattern-*
 //   hal.device.architecture :: some-pattern-*
+//   hal.executable.format :: some-pattern-*
 //
 // Returned values must remain the same for the lifetime of the device as
 // callers may cache them to avoid redundant calls.

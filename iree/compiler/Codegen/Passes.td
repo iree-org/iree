@@ -74,9 +74,15 @@ def LinalgToVectorVectorizeConv :
     Pass<"iree-codegen-vectorize-linalg-conv", "FuncOp"> {
   let summary = "Vectorize a very specific form of linalg.conv";
   let constructor =
-      "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass();";
+      "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass()";
 }
 
+def LinalgToVectorVectorizeMMT4d :
+    Pass<"iree-codegen-vectorize-linalg-mmt4d", "FuncOp"> {
+  let summary = "Vectorize a very specific form of linalg.mmt4d";
+  let constructor =
+      "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
+}
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -176,7 +182,7 @@ def LLVMGPURemoveSingleIterationLoop :
 }
 
 def LLVMGPUTileAndDistribute :
-    Pass<"iree-llvmgpu-tile-and-distribute", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-llvmgpu-tile-and-distribute", "FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistributeToThreads()";
 }
@@ -187,50 +193,77 @@ def LLVMGPUVectorization :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
 }
 
+def LLVMGPUVectorLowering :
+    Pass<"iree-llvmgpu-vector-lowering", "FuncOp"> {
+  let summary = "Pass to lower Vector ops before conversion to LLVM.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
+}
+
+def LLVMGPUDistributeSharedMemoryCopy :
+    Pass<"iree-llvmgpu-distribute-shared-memory-copy", "FuncOp"> {
+  let summary = "Pass to distribute shared memory copies to threads.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUDistributeSharedMemoryCopy()";
+}
+
+def LLVMGPUPipelining :
+    Pass<"iree-llvmgpu-pipelining", "FuncOp"> {
+  let summary = "Pass to do software pipelining.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPipeliningPass()";
+}
+
 //------------------------------------------------------------------------------
-// SPIRV
+// SPIR-V
 //------------------------------------------------------------------------------
 
 // TODO: Rename argument to be fully qualified.
-def ConvertToSPIRV :
-    Pass<"iree-convert-to-spirv", "ModuleOp"> {
-  let summary = "Perform final conversion to SPIR-V dialect";
+def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
+  let summary = "Perform the final conversion to SPIR-V dialect";
   let constructor = "mlir::iree_compiler::createConvertToSPIRVPass()";
 }
 
-def SPIRVConcretizeWorkgroupTiles :
-    Pass<"iree-spirv-concretize-workgroup-tiles",
-    "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Replace hal.interface.workgroup.* ops with constant values";
+// TODO: Rename argument to be fully qualified.
+def SPIRVDistributeToGlobalID :
+    Pass<"iree-spirv-distribute-to-global-id", "FuncOp"> {
+  let summary = "Distribute Linalg ops with buffer semantics to global "
+                "invocations";
   let constructor =
-     "mlir::iree_compiler::createSPIRVConcretizeWorkgroupTilesPass(mlir::iree_compiler::SPIRVCodegenOptions::getFromCLOptions())";
+      "mlir::iree_compiler::createSPIRVDistributeToGlobalIDPass()";
 }
 
 // TODO: Rename argument to be fully qualified.
-def SPIRVConvertToGPU :
-    Pass<"iree-spirv-convert-to-gpu",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Map tiled linalg and loop ops to GPU";
-  let constructor = "mlir::iree_compiler::createSPIRVConvertToGPUPass()";
-}
-
-// TODO: Rename argument to be fully qualified.
-// TODO: Does not appear used?
 def SPIRVFoldProcessorIDUses :
-    Pass<"iree-spirv-fold-gpu-procid-uses",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-spirv-fold-gpu-procid-uses", "FuncOp"> {
   let summary = "Fold GPU processor ID uses where possible";
   let constructor = "mlir::iree_compiler::createSPIRVFoldProcessorIDUsesPass()";
 }
 
-// TODO: Rename argument to be fully qualified.
-def SPIRVTileAndVectorize :
-    Pass<"iree-spirv-tile-and-vectorize",
+def SPIRVLowerExecutableTarget :
+    Pass<"iree-spirv-lower-executable-target-pass",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary =
-      "Tile and vectorize Linalg operations on buffers in one workgroup";
+  let summary = "Lower the executable target to SPIR-V using one of the "
+                "IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
-      "mlir::iree_compiler::createSPIRVTileAndVectorizePass(mlir::iree_compiler::SPIRVCodegenOptions::getFromCLOptions())";
+      "mlir::iree_compiler::createSPIRVLowerExecutableTargetPass()";
+}
+
+def SPIRVRemoveOneTripTiledLoop :
+    Pass<"iree-spirv-remove-one-trip-tiled-loop", "FuncOp"> {
+  let summary = "Remove one-trip tiled loop for convolution "
+                "(LEGACY PASS; DO NOT USE!)";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVRemoveOneTripTiledLoopPass()";
+}
+
+// TODO: Rename argument to be fully qualified.
+def SPIRVTileAndDistribute : Pass<"iree-spirv-tile-and-distribute", "FuncOp"> {
+  let summary = "Tile and distribute Linalg ops with buffer semantics to "
+                "subgroups and invocations";
+  let constructor = "mlir::iree_compiler::createSPIRVTileAndDistributePass()";
+}
+
+def SPIRVVectorize : Pass<"iree-spirv-vectorize", "FuncOp"> {
+  let summary = "Vectorize Linalg ops with buffer semantics";
+  let constructor = "mlir::iree_compiler::createSPIRVVectorizePass()";
 }
 
 // TODO: Rename argument to be fully qualified.
@@ -243,16 +276,18 @@ def SPIRVVectorizeLoadStore :
 // TODO: Rename argument to be fully qualified.
 def SPIRVVectorToCooperativeMatrix :
     Pass<"iree-spirv-vector-to-cooperative-matrix", "FuncOp"> {
-  let summary = "Generate cooperative matrix ops when possible";
+  let summary = "Convert vector ops to SPIR-V cooperative matrix ops "
+                "when possible";
   let constructor =
       "mlir::iree_compiler::createSPIRVVectorToCooperativeMatrixPass()";
 }
 
 // TODO: Rename argument to be fully qualified.
-def SPIRVVectorToGPU :
-    Pass<"iree-spirv-vector-to-gpu", "FuncOp"> {
-  let summary = "Convert vector dialect to gpu subgroup level GPU instructions";
-  let constructor = "mlir::iree_compiler::createSPIRVVectorToGPUPass()";
+def SPIRVCopyToWorkgroupMemory :
+    Pass<"iree-spirv-copy-to-workgroup-memory", "FuncOp"> {
+  let summary = "Lower linalg.copy for copying data to workgroup memory";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVCopyToWorkgroupMemoryPass()";
 }
 
 //------------------------------------------------------------------------------

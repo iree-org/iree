@@ -70,12 +70,12 @@ IREE_API_EXPORT iree_host_size_t iree_string_view_find_char(
     iree_string_view_t value, char c, iree_host_size_t pos);
 
 // Returns the index of the first occurrence of one of the characters in |s| or
-// -1 if none of the characters were found.
+// IREE_STRING_VIEW_NPOS if none of the characters were found.
 IREE_API_EXPORT iree_host_size_t iree_string_view_find_first_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos);
 
 // Returns the index of the last occurrence of one of the characters in |s| or
-// -1 if none of the characters were found.
+// IREE_STRING_VIEW_NPOS if none of the characters were found.
 IREE_API_EXPORT iree_host_size_t iree_string_view_find_last_of(
     iree_string_view_t value, iree_string_view_t s, iree_host_size_t pos);
 

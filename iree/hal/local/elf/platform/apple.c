@@ -80,6 +80,7 @@ static int iree_memory_access_to_prot(iree_memory_access_t access) {
 
 iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
                                        iree_host_size_t total_length,
+                                       iree_allocator_t allocator,
                                        void** out_base_address) {
   *out_base_address = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -105,8 +106,8 @@ iree_status_t iree_memory_view_reserve(iree_memory_view_flags_t flags,
   return status;
 }
 
-void iree_memory_view_release(void* base_address,
-                              iree_host_size_t total_length) {
+void iree_memory_view_release(void* base_address, iree_host_size_t total_length,
+                              iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // NOTE: return value ignored as this is a shutdown path.
@@ -125,9 +126,11 @@ iree_status_t iree_memory_view_commit_ranges(
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < range_count; ++i) {
-    void* range_start = (void*)iree_page_align_start(
-        (uintptr_t)base_address + ranges[i].offset, getpagesize());
-    void* result = mmap(range_start, ranges[i].length, mmap_prot, mmap_flags,
+    void* range_start = NULL;
+    iree_host_size_t aligned_length = 0;
+    iree_page_align_range(base_address, ranges[i], getpagesize(), &range_start,
+                          &aligned_length);
+    void* result = mmap(range_start, aligned_length, mmap_prot, mmap_flags,
                         IREE_MEMORY_MMAP_FD, 0);
     if (result == MAP_FAILED) {
       status = iree_make_status(iree_status_code_from_errno(errno),
@@ -150,9 +153,11 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < range_count; ++i) {
-    void* range_start = (void*)iree_page_align_start(
-        (uintptr_t)base_address + ranges[i].offset, getpagesize());
-    int ret = mprotect(range_start, ranges[i].length, mmap_prot);
+    void* range_start = NULL;
+    iree_host_size_t aligned_length = 0;
+    iree_page_align_range(base_address, ranges[i], getpagesize(), &range_start,
+                          &aligned_length);
+    int ret = mprotect(range_start, aligned_length, mmap_prot);
     if (ret != 0) {
       status = iree_make_status(iree_status_code_from_errno(errno),
                                 "mprotect failed");

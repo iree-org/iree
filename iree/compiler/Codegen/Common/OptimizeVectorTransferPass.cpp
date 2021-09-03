@@ -6,12 +6,14 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/LoopUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -73,6 +75,16 @@ class TransposeUnitDimToShapeCast
   }
 };
 
+static void loopInvariantCodeMotion(FuncOp funcOp) {
+  // Walk through all loops in a function in innermost-loop-first order. This
+  // way, we first LICM from the inner loop, and place the ops in
+  // the outer loop, which in turn can be further LICM'ed.
+  funcOp.walk([&](LoopLikeOpInterface loopLike) {
+    if (failed(moveLoopInvariantCode(loopLike)))
+      llvm_unreachable("Unexpected failure to move invariant code out of loop");
+  });
+}
+
 struct OptimizeVectorTransferPass
     : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
   void runOnOperation() override {
@@ -84,7 +96,11 @@ struct OptimizeVectorTransferPass
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     patterns.add<TransposeUnitDimToShapeCast>(&getContext());
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
-
+    // Workaround, run loop invariant code motion before hoist redudant vector
+    // transfer to workaround a bug upstream.
+    // TODO(thomasraoux): Remove it once the fix is merged.
+    loopInvariantCodeMotion(funcOp);
+    linalg::hoistRedundantVectorTransfers(funcOp);
     vector::transferOpflowOpt(funcOp);
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.

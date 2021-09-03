@@ -188,8 +188,8 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_registry_enumerate(
 
   // Allocate the required memory for both the driver infos and the string
   // storage in a single block.
-  iree_host_size_t total_driver_infos_size = iree_host_align(
-      total_driver_info_count * sizeof(iree_hal_driver_info_t), 8);
+  iree_host_size_t total_driver_infos_size =
+      total_driver_info_count * sizeof(iree_hal_driver_info_t);
   if (iree_status_is_ok(status)) {
     status = iree_allocator_malloc(allocator,
                                    total_driver_infos_size + total_storage_size,

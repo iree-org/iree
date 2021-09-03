@@ -32,8 +32,15 @@ iree_cc_library(
     MLIRTransforms
     iree::base::internal::flatcc
     iree::base::tracing
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(${IREE_ENABLE_COMPILER_TRACING})
+  target_compile_definitions(iree_compiler_Utils_Utils
+  PUBLIC
+    "IREE_ENABLE_COMPILER_TRACING=1"
+  )
+endif()

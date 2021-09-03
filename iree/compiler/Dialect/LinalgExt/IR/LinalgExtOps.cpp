@@ -12,6 +12,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -95,68 +96,8 @@ OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
 }
 
 //===----------------------------------------------------------------------===//
-// Common methods from Linalg dialect.
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseLinalgExtOperandList(
-    OpAsmParser &parser, StringRef keyword,
-    SmallVectorImpl<OpAsmParser::OperandType> &values,
-    SmallVectorImpl<Type> &types) {
-  StringRef parsedKeyword;
-  if (succeeded(parser.parseOptionalKeyword(&parsedKeyword, {keyword}))) {
-    if (parser.parseLParen() || parser.parseOperandList(values) ||
-        parser.parseColonTypeList(types) || parser.parseRParen()) {
-      return failure();
-    }
-  }
-  return success();
-}
-
-static ParseResult parseLinalgExtInsList(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &values,
-    SmallVectorImpl<Type> &types) {
-  return parseLinalgExtOperandList(parser, "ins", values, types);
-}
-
-static ParseResult parseLinalgExtOutsList(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &values,
-    SmallVectorImpl<Type> &types) {
-  return parseLinalgExtOperandList(parser, "outs", values, types);
-}
-
-static void printLinalgExtOperandList(OpAsmPrinter &printer, Operation *op,
-                                      StringRef keyword, OperandRange values,
-                                      TypeRange types) {
-  if (!values.empty()) {
-    printer << keyword << "(";
-    printer.printOperands(values);
-    printer << " : " << types << ")";
-  }
-}
-
-static void printLinalgExtInsList(OpAsmPrinter &printer, Operation *op,
-                                  OperandRange values, TypeRange types) {
-  return printLinalgExtOperandList(printer, op, "ins", values, types);
-}
-
-static void printLinalgExtOutsList(OpAsmPrinter &printer, Operation *op,
-                                   OperandRange values, TypeRange types) {
-  return printLinalgExtOperandList(printer, op, "outs", values, types);
-}
-
-//===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
-
-void ScatterOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  SmallVector<Value> inputBuffers = getInputBufferOperands();
-  SmallVector<Value> outputBuffers = getOutputBufferOperands();
-  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
-                 outputBuffers);
-}
-
 static LogicalResult verifyScatterOp(ScatterOp op) {
   if (op.inputs().size() != 2) {
     return op.emitOpError("expected two input operands");
@@ -242,45 +183,44 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
 }
 
 SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
-  return {getParallelIteratorTypeName()};
+  SmallVector<StringRef> iteratorTypes(getUpdateType().getRank(),
+                                       getParallelIteratorTypeName());
+  return iteratorTypes;
 }
 
 SmallVector<Range> ScatterOp::getLoopBounds(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<ConstantIndexOp>(loc, 0);
   Value one = builder.create<ConstantIndexOp>(loc, 1);
-  Value ub = getDimValue(builder, loc, updates(), 0);
-  return {Range{zero, ub, one}};
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
+    Value ub = getDimValue(builder, loc, updates(), dim);
+    ranges.emplace_back(Range{zero, ub, one});
+  }
+  return ranges;
 }
 
-Operation *ScatterOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes,
-    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets,
-    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultSizes) {
-  assert(outputs.size() == 1 && offsets.size() == 1 && sizes.size() == 1);
+Operation *ScatterOp::getTiledImplementation(OpBuilder &builder,
+                                             ValueRange outputs,
+                                             ArrayRef<OpFoldResult> offsets,
+                                             ArrayRef<OpFoldResult> sizes,
+                                             SmallVectorImpl<Value> &results) {
+  assert(outputs.size() >= 1 && offsets.size() >= 1 && sizes.size() >= 1);
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
   auto oneAttr = builder.getI64IntegerAttr(1);
 
   // Slice of the updates.
   auto updateRank = getUpdateType().getRank();
-  SmallVector<OpFoldResult> updateOffsets(updateRank, zeroAttr);
-  SmallVector<OpFoldResult> updateSizes(updateRank, zeroAttr);
-  updateOffsets[0] = offsets[0];
-  updateSizes[0] = sizes[0];
-  for (auto dim : llvm::seq<int64_t>(1, updateRank)) {
-    updateSizes[dim] = getDim(builder, loc, updates(), dim);
-  }
   SmallVector<OpFoldResult> updateStrides(updateRank, oneAttr);
-  Value tiledUpdate = getSlice(builder, loc, updates(), updateOffsets,
-                               updateSizes, updateStrides);
+  Value tiledUpdate =
+      getSlice(builder, loc, updates(), offsets, sizes, updateStrides);
   assert(tiledUpdate && "failed to get slice of update");
 
   // Slice of indices.
   auto indicesRank = getIndicesType().getRank();
   SmallVector<OpFoldResult> indicesOffsets(indicesRank, zeroAttr);
-  SmallVector<OpFoldResult> indicesSizes(indicesRank, zeroAttr);
+  SmallVector<OpFoldResult> indicesSizes(indicesRank);
   indicesOffsets[0] = offsets[0];
   indicesSizes[0] = sizes[0];
   for (auto dim : llvm::seq<int64_t>(1, indicesRank)) {
@@ -291,34 +231,55 @@ Operation *ScatterOp::getTiledImplementation(
                                 indicesSizes, indicesStrides);
   assert(tiledIndices && "failed to get slice of indices");
 
-  resultOffsets.resize(1);
-  resultOffsets[0].resize(updateRank, zeroAttr);
-  resultSizes.resize(1);
-  resultSizes[0].resize(updateRank);
-  for (auto dim : llvm::seq<int64_t>(0, updateRank)) {
-    resultSizes[0][dim] = getDim(builder, loc, original(), dim);
+  // Slice of the original.
+  auto originalRank = getOriginalType().getRank();
+  SmallVector<OpFoldResult> originalOffsets(originalRank, zeroAttr);
+  SmallVector<OpFoldResult> originalSizes(originalRank);
+  for (auto dim : llvm::seq<int64_t>(0, originalRank - updateRank + 1)) {
+    originalSizes[dim] = getDim(builder, loc, original(), dim);
   }
+  for (auto dim :
+       llvm::seq<int64_t>(originalRank - updateRank + 1, originalRank)) {
+    originalOffsets[dim] = offsets[dim - (originalRank - updateRank)];
+    originalSizes[dim] = sizes[dim - (originalRank - updateRank)];
+  }
+  SmallVector<OpFoldResult> originalStrides(originalRank, oneAttr);
+  Value tiledOriginal = getSlice(builder, loc, outputs[0], originalOffsets,
+                                 originalSizes, originalStrides);
+  assert(tiledOriginal && "failed to get slice of original tensor");
+
   SmallVector<Type> resultTypes;
   if (getNumResults()) {
-    resultTypes.push_back(getResultTypes()[0]);
+    resultTypes.push_back(tiledOriginal.getType());
   }
-  return cast<LinalgExtOp>(getOperation())
-      .clone(builder, loc, resultTypes,
-             ValueRange{tiledUpdate, tiledIndices, outputs[0]});
+  Operation *tiledScatterOp =
+      cast<LinalgExtOp>(getOperation())
+          .clone(builder, loc, resultTypes,
+                 ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
+  for (auto result : llvm::enumerate(tiledScatterOp->getResults())) {
+    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+        loc, result.value(), outputs[0], originalOffsets, originalSizes,
+        originalStrides);
+    results.push_back(insertSliceOp.getResult());
+  }
+  return tiledScatterOp;
 }
 
-void ScatterOp::generateScalarUpdateLoopBody(OpBuilder &b, Location loc,
-                                             ValueRange ivs) {
+LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
+                                                      Location loc,
+                                                      ValueRange ivs) {
   auto indexDepth = getIndexDepth();
   Value update = b.create<memref::LoadOp>(loc, updates(), ivs);
   SmallVector<Value> starts;
-  SmallVector<Value> loadIndices(ivs.begin(), ivs.end());
+  SmallVector<Value> loadIndices;
+  loadIndices.push_back(ivs.front());
   loadIndices.push_back(Value());
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
     loadIndices.back() = b.create<ConstantIndexOp>(loc, i);
     Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
     starts.push_back(b.create<IndexCastOp>(loc, b.getIndexType(), idx));
   }
+  starts.append(std::next(ivs.begin()), ivs.end());
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
 
   BlockAndValueMapping bvm;
@@ -333,88 +294,12 @@ void ScatterOp::generateScalarUpdateLoopBody(OpBuilder &b, Location loc,
   b.create<memref::StoreOp>(
       loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
       original(), starts);
-}
-
-void ScatterOp::generateSliceUpdateLoopBody(OpBuilder &b, Location loc,
-                                            ValueRange ivs) {
-  auto indexDepth = getIndexDepth();
-  Value one = b.create<ConstantIndexOp>(loc, 1);
-  Value update = b.create<memref::SubViewOp>(loc, updates(), ivs, one, one);
-  SmallVector<Value> starts;
-  SmallVector<Value> loadIndices(ivs.begin(), ivs.end());
-  loadIndices.push_back(Value());
-  for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
-    loadIndices.back() = b.create<ConstantIndexOp>(loc, i);
-    Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
-    starts.push_back(b.create<IndexCastOp>(loc, b.getIndexType(), idx));
-  }
-  SmallVector<Value> ones(indexDepth, one);
-  Value subview =
-      b.create<memref::SubViewOp>(loc, original(), starts, ones, ones);
-
-  auto nloops = getUpdateSliceRank();
-  SmallVector<AffineMap> maps;
-  {
-    SmallVector<AffineExpr> exprs(1, b.getAffineConstantExpr(0));
-    for (int i = 0; i < nloops; ++i) {
-      exprs.push_back(b.getAffineDimExpr(i));
-    }
-    maps.push_back(AffineMap::get(nloops, 0, exprs, b.getContext()));
-  }
-  {
-    SmallVector<AffineExpr> exprs(indexDepth, b.getAffineConstantExpr(0));
-    for (int i = 0; i < nloops; ++i) {
-      exprs.push_back(b.getAffineDimExpr(i));
-    }
-    maps.push_back(AffineMap::get(nloops, 0, exprs, b.getContext()));
-  }
-
-  SmallVector<StringRef> iterTypes(nloops, getParallelIteratorTypeName());
-  auto genericOp =
-      b.create<linalg::GenericOp>(loc, TypeRange{}, ValueRange{update},
-                                  ValueRange{subview}, maps, iterTypes);
-  {
-    OpBuilder::InsertionGuard guard(b);
-    auto *block = b.createBlock(&genericOp.region(), genericOp.region().end());
-    b.setInsertionPointToEnd(block);
-    BlockAndValueMapping bvm;
-    auto &srcBlock = region().front();
-    for (auto blockArg : srcBlock.getArguments()) {
-      bvm.map(blockArg, block->addArgument(blockArg.getType()));
-    }
-    for (auto &blockOp : srcBlock.without_terminator()) {
-      b.clone(blockOp, bvm);
-    }
-    b.create<linalg::YieldOp>(
-        loc, bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0)));
-  }
-}
-
-LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
-                                                      Location loc,
-                                                      ValueRange ivs) {
-  assert(ivs.size() == 1);
-
-  if (isScalarUpdate()) {
-    generateScalarUpdateLoopBody(b, loc, ivs);
-  } else {
-    generateSliceUpdateLoopBody(b, loc, ivs);
-  }
   return success();
 }
 
 //===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
-
-void SortOp::getEffects(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects) {
-  SmallVector<Value> inputBuffers = getInputBufferOperands();
-  SmallVector<Value> outputBuffers = getOutputBufferOperands();
-  getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,
-                 outputBuffers);
-}
 
 static LogicalResult verifySortOp(SortOp op) {
   if (op.getNumInputs()) {
@@ -501,11 +386,26 @@ SmallVector<Range> SortOp::getLoopBounds(OpBuilder &builder) {
   return loopBounds;
 }
 
-Operation *SortOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes,
-    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultOffsets,
-    SmallVectorImpl<SmallVector<OpFoldResult, 4>> &resultSizes) {
+SmallVector<unsigned> SortOp::getPartitionableLoops(
+    unsigned maxNumParallelDims) {
+  auto range = llvm::seq<unsigned>(0, getOperandRank());
+  SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+  partitionableLoops.erase(
+      std::next(partitionableLoops.begin(), getSortedDimension()));
+  if (partitionableLoops.size() > maxNumParallelDims) {
+    partitionableLoops.erase(
+        partitionableLoops.begin(),
+        std::next(partitionableLoops.begin(),
+                  partitionableLoops.size() - maxNumParallelDims));
+  }
+  return partitionableLoops;
+}
+
+Operation *SortOp::getTiledImplementation(OpBuilder &builder,
+                                          ValueRange outputs,
+                                          ArrayRef<OpFoldResult> offsets,
+                                          ArrayRef<OpFoldResult> sizes,
+                                          SmallVectorImpl<Value> &results) {
   assert(outputs.size() == this->outputs().size());
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
@@ -514,22 +414,24 @@ Operation *SortOp::getTiledImplementation(
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   Location loc = getLoc();
   SmallVector<Value> tiledOperands(outputs.size());
-  resultOffsets.resize(outputs.size());
-  resultSizes.resize(outputs.size());
   for (auto en : llvm::enumerate(outputs)) {
     tiledOperands[en.index()] =
         getSlice(builder, getLoc(), en.value(), offsets, sizes, strides);
     assert(tiledOperands[en.index()] && "failed to get slice of operand");
-    resultOffsets[en.index()].assign(offsets.begin(), offsets.end());
-    resultSizes[en.index()].assign(sizes.begin(), sizes.end());
   }
   SmallVector<Type, 4> resultTypes;
   if (getNumResults()) {
     resultTypes = llvm::to_vector<4>(
         llvm::map_range(tiledOperands, [&](Value v) { return v.getType(); }));
   }
-  return cast<LinalgExtOp>(getOperation())
-      .clone(builder, loc, resultTypes, tiledOperands);
+  Operation *tiledSortOp = cast<LinalgExtOp>(getOperation())
+                               .clone(builder, loc, resultTypes, tiledOperands);
+  for (auto result : llvm::enumerate(tiledSortOp->getResults())) {
+    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+        loc, result.value(), outputs[result.index()], offsets, sizes, strides);
+    results.push_back(insertSliceOp.getResult());
+  }
+  return tiledSortOp;
 }
 
 LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
@@ -578,6 +480,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   }
   Value cond = bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0));
 
+  OpBuilder::InsertionGuard g(b);
   b.setInsertionPointToEnd(&region.front());
   b.create<scf::IfOp>(
       loc, TypeRange{}, cond,
@@ -601,8 +504,230 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
         }
         b.create<scf::YieldOp>(loc);
       });
+  b.create<scf::YieldOp>(loc);
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// FftOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyFftOp(FftOp op) {
+  auto length = op.getFftLength();
+  if (length == ShapedType::kDynamicSize) return failure();
+  if (length & (length - 1)) {
+    return op.emitOpError("only powers of 2 are handled currently");
+  }
+  if (!op.getNumInputs() || !op.isScalar(op.getInputOperand(0))) {
+    return op.emitOpError("expected to carry `stage` input");
+  }
+  if (op.getNumInputs() != 1) {
+    if (op.getNumInputs() != 3 || op.isScalar(op.getInputOperand(1)) ||
+        op.isScalar(op.getInputOperand(2))) {
+      return op.emitOpError("expected to carry real and imag coeff inputs");
+    }
+  }
+  if (op.getNumOutputs() != 2) {
+    return op.emitOpError("expected outputs to be real and imag tensor/memref");
+  }
+  return success();
+}
+
+SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
+  // There are `rank-1` outer loops. The fft itselfs has one loop for each
+  // stage, which handles the merge step -- taking two half size tensors and
+  // merge them into one tensor.
+  SmallVector<StringRef> iteratorTypes(getOperandRank(),
+                                       getParallelIteratorTypeName());
+  // TODO(hanchung): Mark the loop type as "parallel" after tiling is
+  // implemented.
+  iteratorTypes[0] = getReductionIteratorTypeName();
+  return iteratorTypes;
+}
+
+SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
+  SmallVector<Range> res;
+  Location loc = getLoc();
+  Value zero = builder.create<ConstantIndexOp>(loc, 0);
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  for (auto en : llvm::enumerate(getOperandShape().drop_back())) {
+    Value size;
+    if (en.value() == ShapedType::kDynamicSize) {
+      size = getDimValue(builder, loc, getReal(), en.index());
+    } else {
+      size = builder.create<ConstantIndexOp>(loc, en.value());
+    }
+    res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/one});
+  }
+
+  Value size = builder.create<ConstantIndexOp>(loc, getFftLength());
+  Value stride = builder.create<ShiftLeftOp>(loc, one, getStage());
+  res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
+  return res;
+}
+
+void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
+                                              ArrayRef<Value> operands,
+                                              Value wholeSize) {
+  auto rank = getOperandRank();
+  SmallVector<AffineMap> maps(operands.size(), b.getMultiDimIdentityMap(rank));
+  // TODO(hanchung): Use getLoopIteratorTypes(), once tiling method is
+  // implemented.
+  SmallVector<StringRef> iterTypes(rank, getParallelIteratorTypeName());
+
+  auto f32Type = b.getF32Type();
+  auto indexToF32 = [](OpBuilder &builder, Location loc, Value v) -> Value {
+    v = builder.create<IndexCastOp>(loc, builder.getI32Type(), v);
+    return builder.create<SIToFPOp>(loc, builder.getF32Type(), v);
+  };
+
+  // We will need exp(-2 * PI * j / m * I), compute "-2 * PI / m" for imag part
+  // first.
+  Value coeff = b.create<ConstantFloatOp>(
+      loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
+  coeff = b.create<DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
+
+  b.create<linalg::GenericOp>(
+      loc, TypeRange{}, ValueRange{}, operands, maps, iterTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value lhsReal = args[0];
+        Value lhsImag = args[1];
+        Value rhsReal = args[2];
+        Value rhsImag = args[3];
+
+        // Compute "-2 * PI / m * j"
+        Value w = b.create<MulFOp>(
+            loc, coeff,
+            indexToF32(b, loc, b.create<linalg::IndexOp>(loc, rank - 1)));
+        Value wReal = b.create<math::CosOp>(loc, w);
+        Value wImag = b.create<math::SinOp>(loc, w);
+
+        // t = w * a[k + j + mh];
+        // ->  (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
+        Value xu = b.create<MulFOp>(loc, wReal, rhsReal);
+        Value yv = b.create<MulFOp>(loc, wImag, rhsImag);
+        Value xv = b.create<MulFOp>(loc, wReal, rhsImag);
+        Value yu = b.create<MulFOp>(loc, wImag, rhsReal);
+        Value tReal = b.create<SubFOp>(loc, xu, yv);
+        Value tImag = b.create<AddFOp>(loc, xv, yu);
+
+        // cplx u = a[k + j];
+        // a[k + j] = u + t;
+        // a[k + j + mh] = u - t;
+        Value r1 = b.create<AddFOp>(loc, lhsReal, tReal);
+        Value r2 = b.create<AddFOp>(loc, lhsImag, tImag);
+        Value r3 = b.create<SubFOp>(loc, lhsReal, tReal);
+        Value r4 = b.create<SubFOp>(loc, lhsImag, tImag);
+        b.create<linalg::YieldOp>(loc, ValueRange{r1, r2, r3, r4});
+      });
+}
+
+void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
+                                           ArrayRef<Value> operands) {
+  auto rank = getOperandRank();
+  SmallVector<AffineMap> maps;
+  // The size of coefficent buffer is epxected to match `2^(stage-1)`, which
+  // equals to the last dim of operands.
+  maps.append(
+      2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
+  maps.append(operands.size(), b.getMultiDimIdentityMap(rank));
+  // TODO(hanchung): Use getLoopIteratorTypes(), once tiling method is
+  // implemented.
+  SmallVector<StringRef> iterTypes(rank, getParallelIteratorTypeName());
+
+  b.create<linalg::GenericOp>(
+      loc, TypeRange{}, ValueRange{getRealCoeff(), getImagCoeff()}, operands,
+      maps, iterTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value wReal = args[0];
+        Value wImag = args[1];
+        Value lhsReal = args[2];
+        Value lhsImag = args[3];
+        Value rhsReal = args[4];
+        Value rhsImag = args[5];
+
+        // t = w * a[k + j + mh];
+        // ->  (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
+        Value xu = b.create<MulFOp>(loc, wReal, rhsReal);
+        Value yv = b.create<MulFOp>(loc, wImag, rhsImag);
+        Value xv = b.create<MulFOp>(loc, wReal, rhsImag);
+        Value yu = b.create<MulFOp>(loc, wImag, rhsReal);
+        Value tReal = b.create<SubFOp>(loc, xu, yv);
+        Value tImag = b.create<AddFOp>(loc, xv, yu);
+
+        // cplx u = a[k + j];
+        // a[k + j] = u + t;
+        // a[k + j + mh] = u - t;
+        Value r1 = b.create<AddFOp>(loc, lhsReal, tReal);
+        Value r2 = b.create<AddFOp>(loc, lhsImag, tImag);
+        Value r3 = b.create<SubFOp>(loc, lhsReal, tReal);
+        Value r4 = b.create<SubFOp>(loc, lhsImag, tImag);
+        b.create<linalg::YieldOp>(loc, ValueRange{r1, r2, r3, r4});
+      });
+}
+
+// Generates FFT stage scalar implementation. This follows Cooley–Tukey FFT
+// algorithm. The pseudo reference code is:
+//   let s <- stage of linalg_ext.fft
+//   int m = 1 << s;
+//   int mh = m >> 1;
+//   for (int k = 0; k < n; k += m) {
+//     for (int j = 0; j < mh; ++j) {
+//       cplx w = exp(-2 * PI * j / m * I);
+//       cplx t = w * a[k + j + mh];
+//       cplx u = a[k + j];
+//       a[k + j] = u + t;
+//       a[k + j + mh] = u - t;
+//     }
+//   }
+LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                  ValueRange ivs) {
+  Value real = getReal();
+  Value imag = getImag();
+  Value stage = getStage();
+  Value one = b.create<ConstantIndexOp>(loc, 1);
+  Value wholeSize = b.create<ShiftLeftOp>(loc, one, stage);
+  Value halfSize = b.create<SignedShiftRightOp>(loc, wholeSize, one);
+
+  auto rank = getOperandRank();
+  SmallVector<Value> operands;
+  SmallVector<OpFoldResult> lhsIvs(ivs.begin(), ivs.end());
+  SmallVector<OpFoldResult> ones(rank, b.getIndexAttr(1));
+  SmallVector<OpFoldResult> sizes(rank, b.getIndexAttr(1));
+  sizes.back() = halfSize;
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, real, lhsIvs, sizes, ones));
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, imag, lhsIvs, sizes, ones));
+
+  SmallVector<OpFoldResult> rhsIvs(ivs.begin(), ivs.end());
+  rhsIvs.back() = b.create<AddIOp>(loc, ivs.back(), halfSize).getResult();
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, real, rhsIvs, sizes, ones));
+  operands.push_back(
+      b.create<memref::SubViewOp>(loc, imag, rhsIvs, sizes, ones));
+
+  if (hasCoeff()) {
+    generateScalarImplWithCoeffBuf(b, loc, operands);
+  } else {
+    generateScalarImplWithoutCoeffBuf(b, loc, operands, wholeSize);
+  }
+
+  return success();
+}
+
+#define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
+  void OP_NAME::getEffects(                                               \
+      SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> \
+          &effects) {                                                     \
+    SmallVector<Value> inputBuffers = getInputBufferOperands();           \
+    SmallVector<Value> outputBuffers = getOutputBufferOperands();         \
+    getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,   \
+                   outputBuffers);                                        \
+  }
+
+DEFINE_OP_GET_EFFECTS(ScatterOp)
+DEFINE_OP_GET_EFFECTS(SortOp)
+DEFINE_OP_GET_EFFECTS(FftOp)
 
 }  // namespace linalg_ext
 }  // namespace iree_compiler

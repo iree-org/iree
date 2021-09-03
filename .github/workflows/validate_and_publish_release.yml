@@ -1,0 +1,40 @@
+# Publishes a draft snapshot, after performing validation to make sure all
+# packages are stable (coming soon).
+name: Validate and Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: 'Release id to publish'
+        required: true
+        default: ''
+
+# TODO(jennik): Add more validation. https://github.com/google/iree/issues/6316
+
+jobs:
+  publish_release:
+    name: "Publish release"
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Publish Release
+        id: publish_release
+        uses: eregon/publish-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        with:
+          release_id: ${{ github.event.inputs.release_id }}
+
+      - name: Checking out repository
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          # Get all history. Otherwise the latest-snapshot branch can't be
+          # fast-forwarded.
+          fetch-depth: 0
+
+      - name: Updating latest-snapshot branch
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          branch: latest-snapshot

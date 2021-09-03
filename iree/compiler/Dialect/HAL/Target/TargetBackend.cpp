@@ -22,7 +22,7 @@ TargetOptions getTargetOptionsFromFlags() {
       "IREE HAL executable target options");
 
   // This function is called as part of registering the pass
-  // TranslateExecutableVariantsPass. Pass registery is also staticly
+  // TranslateExecutablesPass. Pass registery is also staticly
   // initialized, so targetBackendsFlags needs to be here to be initialized
   // first.
   static llvm::cl::list<std::string> *targetBackendsFlag =
@@ -36,33 +36,13 @@ TargetOptions getTargetOptionsFromFlags() {
   return targetOptions;
 }
 
-// static
-BufferConstraintsAttr TargetBackend::makeDefaultBufferConstraints(
-    MLIRContext *context) {
-  // Picked to represent what we kind of want on CPU today.
-  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
-  uint64_t minBufferOffsetAlignment = 16ull;
-  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
-  uint64_t minBufferRangeAlignment = 16ull;
-  Builder b(context);
-  return BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
-                                    b.getIndexAttr(minBufferOffsetAlignment),
-                                    b.getIndexAttr(maxBufferRange),
-                                    b.getIndexAttr(minBufferRangeAlignment));
-}
-
-BufferConstraintsAttr TargetBackend::queryBufferConstraints(
-    MLIRContext *context) {
-  return makeDefaultBufferConstraints(context);
-}
-
 // Renames |op| within |moduleOp| with a new name that is unique within both
 // |moduleOp| and |optionalSymbolTable| (if one is provided).
 static void renameWithDisambiguatedName(
     Operation *op, Operation *moduleOp,
     DenseMap<StringRef, Operation *> &targetSymbolMap,
     SymbolTable *optionalSymbolTable) {
-  StringRef originalName = SymbolTable::getSymbolName(op);
+  StringRef originalName = SymbolTable::getSymbolName(op).getValue();
 
   // Iteratively try suffixes until we find one that isn't used.
   std::string disambiguatedName;
@@ -76,17 +56,10 @@ static void renameWithDisambiguatedName(
 
   SymbolTableCollection symbolTable;
   SymbolUserMap symbolUsers(symbolTable, moduleOp);
-  symbolUsers.replaceAllUsesWith(op, disambiguatedName);
+  mlir::StringAttr nameAttr =
+      mlir::StringAttr::get(op->getContext(), disambiguatedName);
+  symbolUsers.replaceAllUsesWith(op, nameAttr);
   SymbolTable::setSymbolName(op, disambiguatedName);
-}
-
-void TargetBackend::declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
-                                      IREE::HAL::ExecutableOp executableOp) {
-  OpBuilder targetBuilder(&executableOp.getBlock().back());
-  auto targetContainerOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
-      sourceOp.getLoc(), name(), name());
-  OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-  containerBuilder.create<ModuleOp>(sourceOp.getLoc());
 }
 
 // Destructively merges |sourceModuleOp| into |targetModuleOp|.
@@ -115,7 +88,10 @@ static LogicalResult mergeModuleInto(
       if (auto targetOp = targetSymbolMap[symbolName]) {
         if (symbolOp.getVisibility() == SymbolTable::Visibility::Private) {
           // Private symbols can be safely folded into duplicates or renamed.
-          if (OperationEquivalence::isEquivalentTo(targetOp, op)) {
+          if (OperationEquivalence::isEquivalentTo(
+                  targetOp, op, OperationEquivalence::exactValueMatch,
+                  OperationEquivalence::exactValueMatch,
+                  OperationEquivalence::Flags::IgnoreLocations)) {
             // Optimization: skip over duplicate private symbols.
             // We could let CSE do this later, but we may as well check here.
             continue;
@@ -146,7 +122,7 @@ static LogicalResult mergeModuleInto(
           }
         }
       }
-      targetSymbolMap[SymbolTable::getSymbolName(op)] = op;
+      targetSymbolMap[SymbolTable::getSymbolName(op).getValue()] = op;
     }
     if (!targetBlock.empty() &&
         targetBlock.back().hasTrait<OpTrait::IsTerminator>()) {
@@ -200,7 +176,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
         sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       // Only process targets matching our pattern.
-      if (variantOp.target() != name()) continue;
+      if (variantOp.target().getBackend().getValue() != name()) continue;
 
       // Clone entry point ops and queue remapping ordinals and updating
       // symbol refs.
@@ -221,8 +197,10 @@ LogicalResult TargetBackend::linkExecutablesInto(
         if (!linkedInterfaceOp) {
           linkedInterfaceOp = dyn_cast<IREE::HAL::InterfaceOp>(
               linkedExecutableBuilder.clone(*sourceInterfaceOp));
-          linkedInterfaceOp.setName(
+          mlir::StringAttr nameAttr = mlir::StringAttr::get(
+              linkedInterfaceOp.getContext(),
               llvm::formatv("io_{0}", linkedInterfaceOps.size()).str());
+          linkedInterfaceOp.setName(nameAttr);
           linkedInterfaceOps.push_back(linkedInterfaceOp);
         }
 
@@ -230,19 +208,19 @@ LogicalResult TargetBackend::linkExecutablesInto(
             linkedTargetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
-                builder.getSymbolRefAttr(linkedInterfaceOp.getName()),
+                SymbolRefAttr::get(builder.getContext(),
+                                   linkedInterfaceOp.getName()),
                 ArrayAttr{}, IntegerAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.
-        auto oldSymbolRefAttr =
-            builder.getSymbolRefAttr(sourceExecutableOp.getName(),
-                                     {builder.getSymbolRefAttr(variantOp),
-                                      builder.getSymbolRefAttr(entryPointOp)});
-        auto newSymbolRefAttr = builder.getSymbolRefAttr(
-            linkedExecutableOp.getName(),
-            {builder.getSymbolRefAttr(linkedTargetOp),
-             builder.getSymbolRefAttr(newEntryPointOp)});
+        auto oldSymbolRefAttr = SymbolRefAttr::get(
+            builder.getContext(), sourceExecutableOp.getName(),
+            {SymbolRefAttr::get(variantOp), SymbolRefAttr::get(entryPointOp)});
+        auto newSymbolRefAttr = SymbolRefAttr::get(
+            builder.getContext(), linkedExecutableOp.getName(),
+            {SymbolRefAttr::get(linkedTargetOp),
+             SymbolRefAttr::get(newEntryPointOp)});
         entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
       }
 

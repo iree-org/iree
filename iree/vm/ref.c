@@ -98,8 +98,8 @@ IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*
 iree_vm_ref_lookup_registered_type(iree_string_view_t full_name) {
   for (int i = 1; i <= IREE_VM_MAX_TYPE_ID; ++i) {
     if (!iree_vm_ref_type_descriptors[i]) break;
-    if (iree_string_view_compare(iree_vm_ref_type_descriptors[i]->type_name,
-                                 full_name) == 0) {
+    if (iree_string_view_equal(iree_vm_ref_type_descriptors[i]->type_name,
+                               full_name)) {
       return iree_vm_ref_type_descriptors[i];
     }
   }

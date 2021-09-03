@@ -19,7 +19,7 @@ namespace TF {
 
 // Create a single pipeline that will run all the needed IREE-specific TF import
 // passes in the right order.
-void buildTFImportPassPipeline(OpPassManager &pm);
+void buildTFImportPassPipeline(OpPassManager &pm, bool useTosa);
 void registerTFImportPassPipeline();
 
 //===----------------------------------------------------------------------===//
@@ -30,7 +30,7 @@ void registerTFImportPassPipeline();
 std::unique_ptr<FunctionPass> createConvertToMHLOPass();
 
 // In a module tagged with `tf_saved_model.semantics`, lowers
-// `tf_saved_model.global_variable`'s to `flow.variable`'s.
+// `tf_saved_model.global_variable`'s to `util.global`'s.
 //
 // This pass should be run before adopting the exports, which transitions to
 // a module that does not have `tf_saved_model.semantics`.

@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -37,12 +38,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-CUDATargetOptions getCUDATargetOptionsFromFlags() {
-  CUDATargetOptions targetOptions;
-  // TODO: flags
-  return targetOptions;
-}
-
 static std::string translateModuleToISA(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
   std::string targetISA;
@@ -50,6 +45,12 @@ static std::string translateModuleToISA(llvm::Module &module,
     llvm::raw_string_ostream stream(targetISA);
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
+    // Workaround for CUDA driver bug
+    // (https://bugs.llvm.org/show_bug.cgi?id=48771), we mark all the loops with
+    // the no unroll metadata. This bug is fixed in cuda 11.4 but since we still
+    // run on older driver we need to keep it.
+    // TODO(thomasraoux): Remove it once we stop supporting older drivers.
+    codegenPasses.add(llvm::createSetNoUnrollPass());
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
                                       llvm::CGFT_AssemblyFile);
     codegenPasses.run(module);
@@ -135,13 +136,26 @@ static std::string sanitizeNameForCuda(llvm::StringRef name) {
 
 class CUDATargetBackend final : public TargetBackend {
  public:
-  CUDATargetBackend(CUDATargetOptions options) : options_(std::move(options)) {}
+  CUDATargetBackend() = default;
 
   std::string name() const override { return "cuda"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);
+  }
+
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    configItems.emplace_back(b.getIdentifier("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
@@ -181,6 +195,12 @@ class CUDATargetBackend final : public TargetBackend {
       return variantOp.emitError() << "failed to translate the MLIR LLVM "
                                       "dialect to the native llvm::Module";
     }
+
+    // Collect all the entry point names.
+    llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
+    for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+      entryPointOps[op.sym_name()] = op;
+    }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     std::vector<std::string> entryPointNames;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
@@ -190,10 +210,14 @@ class CUDATargetBackend final : public TargetBackend {
       llvmFunc->setName(sanitizeNameForCuda(func.getName()));
       entryPointNames.emplace_back(llvmFunc->getName());
       std::array<int32_t, 3> workgroup_size;
-      for (auto it : llvm::enumerate(func->getAttr("llvmgpu_workgroup_size")
-                                         .cast<DenseIntElementsAttr>()
-                                         .getIntValues())) {
-        workgroup_size[it.index()] = it.value().getZExtValue();
+      auto entryPointOp = entryPointOps[func.getName()];
+      if (Optional<ArrayAttr> workgroupSizeAttr =
+              entryPointOp.workgroup_size()) {
+        for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
+          workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
+        }
+      } else {
+        workgroup_size = {1, 1, 1};
       }
       workgroupSizes.push_back(workgroup_size);
       llvm::Metadata *llvmMetadata[] = {
@@ -261,7 +285,7 @@ class CUDATargetBackend final : public TargetBackend {
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),
-        executableBuilder.getStringAttr("PTXE"),
+        variantOp.target().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.mime_typeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
@@ -270,18 +294,35 @@ class CUDATargetBackend final : public TargetBackend {
   }
 
  private:
-  CUDATargetOptions options_;
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    targetAttrs.push_back(getExecutableTarget(context));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::ExecutableTargetAttr::get(
+        context, b.getStringAttr("cuda"), b.getStringAttr("cuda-nvptx-fb"),
+        configAttr);
+  }
 };
 
-void registerCUDATargetBackends(
-    std::function<CUDATargetOptions()> queryOptions) {
-  getCUDATargetOptionsFromFlags();
+void registerCUDATargetBackends() {
+  // #hal.device.target<"cuda", ...
+  // #hal.executable.target<"cuda", ...
   static TargetBackendRegistration registration("cuda", [=]() {
     LLVMInitializeNVPTXTarget();
     LLVMInitializeNVPTXTargetMC();
     LLVMInitializeNVPTXTargetInfo();
     LLVMInitializeNVPTXAsmPrinter();
-    return std::make_unique<CUDATargetBackend>(queryOptions());
+    return std::make_shared<CUDATargetBackend>();
   });
 }
 

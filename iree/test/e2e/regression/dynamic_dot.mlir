@@ -1,14 +1,16 @@
 // RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot %s | IreeFileCheck %s)
+// RUN: [[ $IREE_VMVX_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=vmvx %s | IreeFileCheck %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @dynamic_dot
 func @dynamic_dot() -> tensor<?x?xf32> {
-  %lhs = iree.dynamic_shape_constant dense<[
+  %lhs = util.dynamic_shape_constant dense<[
     [15.0, 14.0, 13.0],
     [12.0, 11.0, 10.0],
     [09.0, 08.0, 07.0],
     [06.0, 05.0, 04.0],
     [03.0, 02.0, 01.0]]> : tensor<5x3xf32> -> tensor<?x?xf32>
-  %rhs = iree.dynamic_shape_constant dense<[
+  %rhs = util.dynamic_shape_constant dense<[
     [15.0, 14.0, 13.0, 12.0, 11.0],
     [10.0, 09.0, 08.0, 07.0, 06.0],
     [05.0, 04.0, 03.0, 02.0, 01.0]]> : tensor<3x5xf32> -> tensor<?x?xf32>

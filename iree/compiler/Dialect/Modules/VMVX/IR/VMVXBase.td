@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_MODULES_VMVX_BASE
 #define IREE_DIALECT_MODULES_VMVX_BASE
 
-include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE VMVX (Virtual Machine-based Linear Algebra) dialect
@@ -38,10 +38,10 @@ def VMVX_Dialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 def VMVX_DeviceSize : TypeAlias<Index>;
-def VMVX_DeviceSizeAttr : IREE_IndexAttrBase<"size_t">;
+def VMVX_DeviceSizeAttr : Util_IndexAttrBase<"size_t">;
 
 def VMVX_HostSize : TypeAlias<Index>;
-def VMVX_HostSizeAttr : IREE_IndexAttrBase<"size_t">;
+def VMVX_HostSizeAttr : Util_IndexAttrBase<"size_t">;
 
 def VMVX_Index : TypeAlias<Index>;
 

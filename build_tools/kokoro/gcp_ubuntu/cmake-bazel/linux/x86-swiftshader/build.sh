@@ -36,7 +36,9 @@ pushd integrations/tensorflow
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
 "${BAZEL_CMD[@]?}" query //iree_tf_compiler/... | \
-   xargs "${BAZEL_CMD[@]?}" test --config=generic_clang \
+   xargs "${BAZEL_CMD[@]?}" test \
+      --config=remote_cache_tf_integrations \
+      --config=generic_clang \
       --test_tag_filters="-nokokoro" \
       --build_tag_filters="-nokokoro"
 popd
@@ -64,6 +66,6 @@ ninja
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 echo "Testing with CTest"
-ctest --output-on-failure \
+ctest --timeout 900 --output-on-failure \
    --tests-regex "^integrations/tensorflow/|^bindings/python/" \
    --label-exclude "^nokokoro$|^vulkan_uses_vk_khr_shader_float16_int8$"

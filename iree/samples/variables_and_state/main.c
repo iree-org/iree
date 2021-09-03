@@ -56,6 +56,7 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
     status = iree_hal_buffer_view_clone_heap_buffer(
         iree_runtime_session_device_allocator(session), arg0_shape,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,
         iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);
@@ -88,6 +89,7 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
     status = iree_hal_buffer_view_clone_heap_buffer(
         iree_runtime_session_device_allocator(session), arg0_shape,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,
         iree_make_const_byte_span((void*)arg0_data, sizeof(arg0_data)), &arg0);

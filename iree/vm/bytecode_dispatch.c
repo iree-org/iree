@@ -1479,7 +1479,8 @@ iree_status_t iree_vm_bytecode_dispatch(
       VM_DecStrAttr("message", &message);
       if (status_code != 0) {
         // TODO(benvanik): capture source information.
-        return iree_status_allocate(status_code, "<vm>", 0, message);
+        return iree_status_allocate_f(status_code, "<vm>", 0, "%.*s",
+                                      (int)message.size, message.data);
       }
     });
 
@@ -1539,8 +1540,8 @@ iree_status_t iree_vm_bytecode_dispatch(
     // Extension trampolines
     //===------------------------------------------------------------------===//
 
-    BEGIN_DISPATCH_PREFIX(PrefixExtI64, EXT_I64) {
 #if IREE_VM_EXT_I64_ENABLE
+    BEGIN_DISPATCH_PREFIX(PrefixExtI64, EXT_I64) {
       //===----------------------------------------------------------------===//
       // ExtI64: Globals
       //===----------------------------------------------------------------===//
@@ -1801,15 +1802,14 @@ iree_status_t iree_vm_bytecode_dispatch(
         IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
             &value, buffer, offset, 1, sizeof(uint64_t)));
       });
-
-#else
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
-#endif  // IREE_VM_EXT_I64_ENABLE
     }
     END_DISPATCH_PREFIX();
+#else
+    UNHANDLED_DISPATCH_PREFIX(PrefixExtI64, EXT_I64);
+#endif  // IREE_VM_EXT_I64_ENABLE
 
-    BEGIN_DISPATCH_PREFIX(PrefixExtF32, EXT_F32) {
 #if IREE_VM_EXT_F32_ENABLE
+    BEGIN_DISPATCH_PREFIX(PrefixExtF32, EXT_F32) {
       //===----------------------------------------------------------------===//
       // ExtF32: Globals
       //===----------------------------------------------------------------===//
@@ -1827,7 +1827,6 @@ iree_status_t iree_vm_bytecode_dispatch(
         const float global_value =
             vm_global_load_f32(module_state->rwdata_storage.data, byte_offset);
         *value = global_value;
-        
       });
 
       DISPATCH_OP(EXT_F32, GlobalStoreF32, {
@@ -2001,6 +2000,16 @@ iree_status_t iree_vm_bytecode_dispatch(
         int32_t* result = VM_DecResultRegI32("result");
         *result = vm_cast_f32ui32(operand);
       });
+      DISPATCH_OP(EXT_F32, BitcastI32F32, {
+        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
+        float* result = VM_DecResultRegF32("result");
+        *result = vm_bitcast_i32f32(operand);
+      });
+      DISPATCH_OP(EXT_F32, BitcastF32I32, {
+        float operand = VM_DecOperandRegF32("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = vm_bitcast_f32i32(operand);
+      });
 
       //===----------------------------------------------------------------===//
       // ExtF32: Comparison ops
@@ -2077,12 +2086,11 @@ iree_status_t iree_vm_bytecode_dispatch(
         IREE_RETURN_IF_ERROR(iree_vm_buffer_write_elements(
             &value, buffer, offset, 1, sizeof(float)));
       });
-
-#else
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
-#endif  // IREE_VM_EXT_F32_ENABLE
     }
     END_DISPATCH_PREFIX();
+#else
+    UNHANDLED_DISPATCH_PREFIX(PrefixExtF32, EXT_F32);
+#endif  // IREE_VM_EXT_F32_ENABLE
 
     DISPATCH_OP(CORE, PrefixExtF64,
                 { return iree_make_status(IREE_STATUS_UNIMPLEMENTED); });

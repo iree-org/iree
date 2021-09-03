@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
 
+#include <mutex>
+
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -29,24 +31,26 @@ namespace IREE {
 namespace HAL {
 
 ROCMTargetOptions getROCMTargetOptionsFromFlags() {
-  ROCMTargetOptions targetOptions;
-  static llvm::cl::opt<std::string> clROCMTargetChip(
-      "iree-rocm-target-chip", llvm::cl::desc("ROCm target Chip"),
-      llvm::cl::init("gfx908"));
+  static ROCMTargetOptions targetOptions;
+  static std::once_flag onceFlag;
+  std::call_once(onceFlag, [&]() {
+    static llvm::cl::opt<std::string> clROCMTargetChip(
+        "iree-rocm-target-chip", llvm::cl::desc("ROCm target Chip"),
+        llvm::cl::init("gfx908"));
 
-  static llvm::cl::opt<bool> clROCMLinkBC(
-      "iree-rocm-link-bc",
-      llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
-      llvm::cl::init(false));
+    static llvm::cl::opt<bool> clROCMLinkBC(
+        "iree-rocm-link-bc",
+        llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
+        llvm::cl::init(false));
 
-  static llvm::cl::opt<std::string> clROCMBitcodeDir(
-      "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
-      llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
+    static llvm::cl::opt<std::string> clROCMBitcodeDir(
+        "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
+        llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
 
-  targetOptions.ROCMTargetChip = clROCMTargetChip;
-  targetOptions.ROCMLinkBC = clROCMLinkBC;
-  targetOptions.ROCMBitcodeDir = clROCMBitcodeDir;
-
+    targetOptions.ROCMTargetChip = clROCMTargetChip;
+    targetOptions.ROCMLinkBC = clROCMLinkBC;
+    targetOptions.ROCMBitcodeDir = clROCMBitcodeDir;
+  });
   return targetOptions;
 }
 
@@ -73,6 +77,19 @@ class ROCMTargetBackend final : public TargetBackend {
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerROCDLDialectTranslation(registry);
+  }
+
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+    ;
+    configItems.emplace_back(b.getIdentifier("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
@@ -116,15 +133,24 @@ class ROCMTargetBackend final : public TargetBackend {
                                       "dialect to the native llvm::Module";
     }
 
+    // Collect all the entry point names.
+    llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps;
+    for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+      entryPointOps[op.sym_name()] = op;
+    }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
       std::array<int32_t, 3> workgroup_size;
-      for (auto it : llvm::enumerate(func->getAttr("llvmgpu_workgroup_size")
-                                         .cast<DenseIntElementsAttr>()
-                                         .getIntValues())) {
-        workgroup_size[it.index()] = it.value().getZExtValue();
+      auto entryPointOp = entryPointOps[func.getName()];
+      if (Optional<ArrayAttr> workgroupSizeAttr =
+              entryPointOp.workgroup_size()) {
+        for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
+          workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
+        }
+      } else {
+        workgroup_size = {1, 1, 1};
       }
       workgroupSizes.push_back(workgroup_size);
       llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
@@ -189,26 +215,47 @@ class ROCMTargetBackend final : public TargetBackend {
     // Add the binary data to the target executable.
     executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.sym_name(),
-        executableBuilder.getStringAttr("HSACO"),
+        variantOp.target().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
 
     return success();
   }
 
  private:
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    targetAttrs.push_back(getExecutableTarget(context));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::ExecutableTargetAttr::get(
+        context, b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
+        configAttr);
+  }
+
   ROCMTargetOptions options_;
 };
 
 void registerROCMTargetBackends(
     std::function<ROCMTargetOptions()> queryOptions) {
   getROCMTargetOptionsFromFlags();
+  // #hal.device.target<"rocm", ...
+  // #hal.executable.target<"rocm", ...
   static iree_compiler::IREE::HAL::TargetBackendRegistration registration(
       "rocm", [=]() {
         LLVMInitializeAMDGPUTarget();
         LLVMInitializeAMDGPUTargetMC();
         LLVMInitializeAMDGPUTargetInfo();
         LLVMInitializeAMDGPUAsmPrinter();
-        return std::make_unique<ROCMTargetBackend>(queryOptions());
+        return std::make_shared<ROCMTargetBackend>(queryOptions());
       });
 }
 

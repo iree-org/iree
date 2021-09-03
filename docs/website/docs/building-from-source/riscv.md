@@ -55,7 +55,7 @@ For RISC-V vector extensions support, see
 Build and install on your host machine:
 
 ``` shell
-cmake -B ../iree-build/ \
+cmake -GNinja -B ../iree-build/ \
   -DCMAKE_INSTALL_PREFIX=../iree-build/install \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   .
@@ -72,12 +72,11 @@ as a reference of how to set up the cmake configuration.
 #### RISC-V 64-bit Linux target
 
 ```shell
-cmake -B ../iree-build-riscv/ \
+cmake -GNinja -B ../iree-build-riscv/ \
   -DCMAKE_TOOLCHAIN_FILE="./build_tools/cmake/riscv.toolchain.cmake" \
   -DIREE_HOST_BINARY_ROOT=$(realpath ../iree-build-host/install) \
   -DRISCV_CPU=rv64 \
   -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_ENABLE_MLIR=OFF \
   -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
   .
 ```

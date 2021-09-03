@@ -41,10 +41,10 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "BroadcastingToLinalgPatterns.cpp"
-    "ConvertAndDistributeMHLOToLinalgExt.cpp"
     "ConvertComplexToReal.cpp"
     "ConvertMHLOToFlow.cpp"
     "ConvertMHLOToFlow.h"
+    "ConvertMHLOToLinalgExt.cpp"
     "LegalizeInputTypes.cpp"
     "MHLOToLinalgOnTensors.cpp"
     "MHLOToMHLOPreprocessing.cpp"
@@ -72,9 +72,9 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::InputConversion::Common
     tensorflow::mlir_hlo
   PUBLIC

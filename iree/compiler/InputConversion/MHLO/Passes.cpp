@@ -6,10 +6,10 @@
 
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -41,11 +41,6 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createConvertShapeToStandardPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
-  // Now that control flow has been lowered, promote and extract_element
-  // to tensor loads. This will be done again later once everything that can
-  // be is lowered to device.
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createPromoteTensorLoadsPass());
-
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
@@ -66,7 +61,7 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
 
   // Convert to Linalg. After this point, MHLO will be eliminated.
   passManager.addNestedPass<FuncOp>(
-      mlir::iree_compiler::createConvertAndDistributeMHLOToLinalgExtPass());
+      mlir::iree_compiler::createConvertMHLOToLinalgExtPass());
   passManager.addNestedPass<FuncOp>(
       mlir::iree_compiler::createMHLOToLinalgOnTensorsPass());
 

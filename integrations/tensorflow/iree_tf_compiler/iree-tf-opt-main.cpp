@@ -12,7 +12,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
@@ -26,6 +26,9 @@
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
 #include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
+#include "tensorflow/compiler/mlir/tosa/tf_passes.h"
+#include "tensorflow/compiler/mlir/tosa/tfl_passes.h"
+#include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
@@ -34,7 +37,7 @@ int main(int argc, char **argv) {
   mlir::registerXLADialects(registry);
   registry.insert<mlir::iree_compiler::IREE::Flow::FlowDialect,
                   mlir::iree_compiler::IREE::HAL::HALDialect,
-                  mlir::iree_compiler::IREEDialect>();
+                  mlir::iree_compiler::IREE::Util::UtilDialect>();
 
   // Select IREE input passes.
   mlir::iree_compiler::registerCommonInputConversionPasses();
@@ -63,6 +66,11 @@ int main(int argc, char **argv) {
   mlir::TF::CreateDeviceIndexSelectorPass();
   mlir::TF::CreateGuaranteeAllFuncsOneUsePass();
   mlir::TF::CreateTFFunctionalControlFlowToCFG();
+
+  // Tosa related passes.
+  mlir::tosa::registerLegalizeTosaPasses();
+  mlir::tosa::registerTFtoTOSALegalizationPipeline();
+  mlir::tosa::registerTFLtoTOSALegalizationPipeline();
 
   if (failed(MlirOptMain(argc, argv, "IREE-TF modular optimizer driver\n",
                          registry,

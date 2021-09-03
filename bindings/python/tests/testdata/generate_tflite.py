@@ -20,7 +20,8 @@ model = Squared()
 concrete_func = model.__call__.get_concrete_function(
     tf.TensorSpec(shape=[4, 3], dtype=tf.float32))
 
-converter = tf.lite.TFLiteConverter.from_concrete_functions([concrete_func])
+converter = tf.lite.TFLiteConverter.from_concrete_functions([concrete_func],
+                                                            model)
 tflite_model = converter.convert()
 
 this_dir = os.path.dirname(__file__)

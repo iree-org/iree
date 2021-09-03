@@ -1,11 +1,22 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' %s | IreeFileCheck %s
 
 #map = affine_map<(d0) -> (d0)>
+
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"vmvx", {
+      executable_targets = [
+        #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+      ]
+    }>
+  ]
+} {
+
 flow.executable @add_dispatch_0 {
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 3 : index
   }
-  module  {
+  builtin.module  {
     func @entry(%arg0: !flow.dispatch.tensor<readonly:16xf32>, %arg1: !flow.dispatch.tensor<readonly:16xf32>, %arg2: !flow.dispatch.tensor<writeonly:16xf32>) {
       %0 = linalg.init_tensor [16] : tensor<16xf32>
       %1 = flow.dispatch.tensor.load %arg0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
@@ -21,20 +32,22 @@ flow.executable @add_dispatch_0 {
   }
 }
 
+}
+
 // CHECK-LABEL: hal.executable @add_dispatch_0
 //  CHECK-NEXT:   hal.interface @io {
 //  CHECK-NEXT:    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.variant @vmvx, target="vmvx" {
+//  CHECK-NEXT:   hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 //  CHECK-NEXT:     hal.executable.entry_point @entry attributes {
 //  CHECK-SAME:       interface = @io,
 //  CHECK-SAME:       ordinal = 0 : index
 //  CHECK-SAME:     }
 //       CHECK:     module {
-//  CHECK-NEXT:       vm.module @module {
-//  CHECK-NEXT:         vm.func @entry(
+//  CHECK-NEXT:       vm.module public @module {
+//  CHECK-NEXT:         vm.func private @entry(
 //  CHECK-SAME:             %[[SCRATCHPAD:.+]]: !vm.buffer, %[[CONSTANTS:.+]]: !vm.buffer,
 //  CHECK-SAME:             %[[BINDINGS:.+]]: !vm.list<!vm.buffer>
 //   CHECK-DAG:           %c16 = vm.const.i32 16 : i32

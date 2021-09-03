@@ -23,7 +23,6 @@ iree_check_single_backend_test_suite(
             "compare.mlir",
             "conv.mlir",
             "dot_general.mlir",
-            "fft.mlir",
             "log_plus_one.mlir",
             "pw_add_multiwg.mlir",
             "reduce.mlir",
@@ -35,20 +34,6 @@ iree_check_single_backend_test_suite(
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
-    driver = "vulkan",
-    target_backend = "vulkan-spirv",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_vulkan-spirv_vulkan_wgmem",
-    srcs = [
-        "conv.mlir",
-        "gemm.mlir",
-    ],
-    compiler_flags = [
-        "-iree-input-type=mhlo",
-        "-iree-spirv-use-workgroup-memory",
-    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

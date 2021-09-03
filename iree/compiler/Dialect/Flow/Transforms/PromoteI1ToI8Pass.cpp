@@ -105,7 +105,7 @@ class PromoteI1ToI8Pass : public PromoteI1ToI8Base<PromoteI1ToI8Pass> {
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createPromoteI1ToI8Pass() {
+std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass() {
   return std::make_unique<PromoteI1ToI8Pass>();
 }
 

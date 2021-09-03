@@ -36,8 +36,8 @@ cc_library(
         "@iree//iree/compiler/Dialect/Flow/Transforms",
         "@iree//iree/compiler/Dialect/HAL/IR",
         "@iree//iree/compiler/Dialect/HAL/IR:HALDialect",
-        "@iree//iree/compiler/Dialect/IREE/IR",
         "@iree//iree/compiler/Dialect/Shape/Transforms",
+        "@iree//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
@@ -58,6 +58,7 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:lower_tf_lib",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_saved_model_passes",
+        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
     ],
 )

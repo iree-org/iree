@@ -16,17 +16,22 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
+    "LLVMGPUUtils.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "KernelConfig.cpp"
+    "LLVMGPUDistributeSharedMemoryCopy.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
+    "LLVMGPUPipelining.cpp"
     "LLVMGPURemoveTrivialLoops.cpp"
     "LLVMGPUTileAndDistribute.cpp"
+    "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
   DEPS
+    LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
     MLIRGPUOps
@@ -44,6 +49,7 @@ iree_cc_library(
     MLIRNVVMIR
     MLIRPass
     MLIRROCDLIR
+    MLIRSCF
     MLIRSCFToStandard
     MLIRStandard
     MLIRStandardOpsTransforms
@@ -57,10 +63,12 @@ iree_cc_library(
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::Transforms
+    iree::compiler::Dialect::Util::IR
     tensorflow::mlir_hlo
   PUBLIC
 )

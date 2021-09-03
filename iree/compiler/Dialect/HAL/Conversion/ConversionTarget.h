@@ -28,11 +28,6 @@ class HALConversionTarget : public ConversionTarget {
   static LogicalResult applyDefaultBufferRewrite(
       Operation *srcOp, ArrayRef<Value> operands, StringRef dstOpName,
       TypeConverter &typeConverter, ConversionPatternRewriter &rewriter);
-
- private:
-  bool isDynamicallyLegal(Operation *op) const override;
-
-  TypeConverter &typeConverter;
 };
 
 // HAL tensor-to-buffer conversion utility.

@@ -1,4 +1,6 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-concretize-workgroup-tiles,iree-spirv-tile-and-vectorize))" -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(canonicalize,iree-spirv-remove-one-trip-tiled-loop,iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
+
+#config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
 hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -6,12 +8,21 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target="vulkan" {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
     hal.executable.entry_point @conv_static_shape_f32 attributes {
       interface = @io,
-      ordinal = 0 : index
+      ordinal = 0 : index,
+      workgroup_size = [4: index, 4: index, 1: index],
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]}
+    } {
+    ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
+      %x = constant 2: index
+      %y = constant 28: index
+      %z = constant 28: index
+      hal.return %x, %y, %z: index, index, index
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c32 = constant 32 : index
@@ -48,8 +59,8 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
               %16 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg0)[%workgroup_size_z]
               %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg1)[%workgroup_size_y]
               %18 = memref.subview %2[0, %arg0, %arg1, %arg2] [1, %16, %17, %14] [1, 1, 1, 1] : memref<1x112x112x32xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
-              linalg.fill(%cst, %18) {__internal_linalg_transform__ = "workgroup"} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
-              linalg.conv_2d_input_nhwc_filter_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : memref<1x?x?x16xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 810000 + s0 + d1 * 3600 + d2 * 16 + d3)>>, memref<3x3x16x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1536 + s0 + d1 * 512 + d2 * 32 + d3)>>) outs(%18 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>)
+              linalg.fill(%cst, %18) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
+              linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : memref<1x?x?x16xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 810000 + s0 + d1 * 3600 + d2 * 16 + d3)>>, memref<3x3x16x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1536 + s0 + d1 * 512 + d2 * 32 + d3)>>) outs(%18 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>)
             }
           }
         }
@@ -69,7 +80,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
 // For linalg.fill
 // CHECK-COUNT-4: vector.transfer_write
 
-// For linalg.conv_2d_input_nhwc_filter_hwcf
+// For linalg.conv_2d_nhwc_hwcf
 // CHECK-COUNT-4: vector.transfer_read
 
 // check tiling loop along filter height/width and input channel
@@ -84,10 +95,12 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
 
 // CHECK-COUNT-3: scf.yield
 
-// For linalg.conv_2d_input_nhwc_filter_hwcf
+// For linalg.conv_2d_nhwc_hwcf
 // CHECK-COUNT-4: vector.transfer_write
 
 // -----
+
+#config = {tileSizes = [[0, 2, 2, 32], [], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
 
 hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -95,12 +108,21 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target="vulkan" {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
       interface = @io,
-      ordinal = 0 : index
+      ordinal = 0 : index,
+      workgroup_size = [8: index, 2: index, 2: index],
+      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]}
+    } {
+    ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
+      %x = constant 6: index
+      %y = constant 14: index
+      %z = constant 14: index
+      hal.return %x, %y, %z: index, index, index
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
       func @depthwise_conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c96 = constant 96 : index
@@ -139,8 +161,8 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
               %18 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 56)>(%arg0)[%workgroup_size_z]
               %19 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 56)>(%arg1)[%workgroup_size_y]
               %20 = memref.subview %2[0, %arg0, %arg1, %arg2] [1, %18, %19, %15] [1, 1, 1, 1] : memref<1x56x56x96xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>
-              linalg.fill(%cst, %20) {__internal_linalg_transform__ = "workgroup"} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>
-              linalg.depthwise_conv_2d_input_nhwc_filter_hwc {__internal_linalg_transform__ = "workgroup", dilations = dense<2> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%16, %17 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1225824 + s0 + d1 * 10848 + d2 * 96 + d3)>>, memref<3x3x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 288 + s0 + d1 * 96 + d2)>>) outs(%20 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>)
+              linalg.fill(%cst, %20) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>
+              linalg.depthwise_conv2D_nhw {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<2> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%16, %17 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1225824 + s0 + d1 * 10848 + d2 * 96 + d3)>>, memref<3x3x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 288 + s0 + d1 * 96 + d2)>>) outs(%20 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>)
             }
           }
         }
@@ -160,7 +182,7 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
 // For linalg.fill
 // CHECK: vector.transfer_write
 
-// For linalg.depthwise_conv_2d_input_nhwc_filter_hwc
+// For linalg.depthwise_conv2D_nhw
 // CHECK: vector.transfer_read
 
 // check tiling loop along filter height/width and input channel
@@ -174,5 +196,5 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
 
 // CHECK-COUNT-2: scf.yield
 
-// For linalg.depthwise_conv_2d_input_nhwc_filter_hwc
+// For linalg.depthwise_conv2D_nhw
 // CHECK: vector.transfer_write

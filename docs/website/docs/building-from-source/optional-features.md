@@ -3,7 +3,7 @@
 This page details the optional features and build modes for the project.
 Most of these are controlled by various CMake options, sometimes requiring
 extra setup or preparation. Each section extends the basic build steps
-in the [getting started](../getting-started/) page.
+in the [getting started](./getting-started.md) page.
 
 ## Building Python Bindings
 
@@ -15,11 +15,11 @@ Python bindings for the following packages:
 | `import iree.compiler`     | IREE's generic compiler tools and helpers                                   |
 | `import iree.runtime`      | IREE's runtime, including CPU and GPU backends                              |
 
-Also see [instructions for installing pre-built binaries](../../bindings/python/).
+Also see [instructions for installing pre-built binaries](../bindings/python.md).
 
 **Pre-requisites:**
 
-* A relatively recent Python3 installation (we aim to support
+* A relatively recent Python3 installation >=3.7 (we aim to support
   [non-eol Python versions](https://endoflife.date/python)).
 * Installation of python dependencies as specified in
   [`bindings/python/build_requirements.txt`](https://github.com/google/iree/blob/main/bindings/python/build_requirements.txt).
@@ -87,6 +87,7 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
 
         ``` shell
         cmake \
+          -GNinja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DIREE_BUILD_PYTHON_BINDINGS=ON \
           -DPython3_EXECUTABLE="$(which python)" \
@@ -102,7 +103,7 @@ Also see [instructions for installing pre-built binaries](../../bindings/python/
     === "Windows"
 
         ``` powershell
-        cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_PYTHON_BINDINGS=ON .
+        cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_PYTHON_BINDINGS=ON .
         cmake --build .
 
         # Add bindings\python to PYTHONPATH and use the API.

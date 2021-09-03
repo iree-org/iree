@@ -14,9 +14,9 @@ cc_library(
     name = "FlowToHAL",
     srcs = [
         "ConvertFlowToHAL.cpp",
+        "ConvertGlobalOps.cpp",
         "ConvertStreamOps.cpp",
         "ConvertTensorOps.cpp",
-        "ConvertVariableOps.cpp",
     ],
     hdrs = [
         "ConvertFlowToHAL.h",
@@ -28,8 +28,8 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",

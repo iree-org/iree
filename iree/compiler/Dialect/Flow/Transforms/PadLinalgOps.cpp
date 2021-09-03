@@ -144,8 +144,8 @@ class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createPadLinalgOpsToIntegerMultiplePass(
-    int paddingSize) {
+std::unique_ptr<OperationPass<mlir::FuncOp>>
+createPadLinalgOpsToIntegerMultiplePass(int paddingSize) {
   return std::make_unique<PadLinalgOpsPass>(paddingSize);
 }
 

@@ -14,12 +14,13 @@ func @func(%arg0 : i32) -> i32 {
 // CHECK: "function_descriptors":
 // CHECK-NEXT: {
 // CHECK-NEXT:   "bytecode_offset": 0
-// CHECK-NEXT:   "bytecode_length": 5
+// CHECK-NEXT:   "bytecode_length": 8
 // CHECK-NEXT:   "i32_register_count": 1
 // CHECK-NEXT:   "ref_register_count": 0
 // CHECK-NEXT: }
 // CHECK: "bytecode_data": [
 // CHECK-NEXT:   84,
+// CHECK-NEXT:   0,
 // CHECK-NEXT:   1,
 // CHECK-NEXT:   0,
 // CHECK-NEXT:   0,
@@ -33,8 +34,8 @@ module @do_not_optimize_module {
 // CHECK: "local_name": "add"
 func @add() -> i32 {
   %c1 = constant 1 : i32
-  %unf_c1 = iree.do_not_optimize(%c1) : i32
-  %unf_c2 = iree.unfoldable_constant 2 : i32
+  %unf_c1 = util.do_not_optimize(%c1) : i32
+  %unf_c2 = util.unfoldable_constant 2 : i32
   %result = addi %unf_c1, %unf_c2 : i32
   return %result : i32
 }

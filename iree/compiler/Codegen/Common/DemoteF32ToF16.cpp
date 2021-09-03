@@ -9,8 +9,8 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,7 +31,7 @@ namespace {
 /// Any fp32 derived type is illegal.
 static bool isIllegalType(Type type) {
   if (type.isF32()) return true;
-  if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
+  if (auto ptrType = type.dyn_cast<IREE::Util::PtrType>()) {
     return isIllegalType(ptrType.getTargetType());
   }
   if (auto shapedType = type.dyn_cast<ShapedType>()) {
@@ -39,34 +39,6 @@ static bool isIllegalType(Type type) {
   }
   return false;
 }
-
-class F32ToF16ConversionTarget : public ConversionTarget {
- public:
-  using ConversionTarget::ConversionTarget;
-
- protected:
-  // Operations are legal if they don't contain any illegal type.
-  bool isDynamicallyLegal(Operation *op) const override {
-    if (auto varOp = dyn_cast<IREE::Flow::VariableOp>(op)) {
-      return !isIllegalType(varOp.type());
-    }
-    if (auto funcOp = dyn_cast<FuncOp>(op)) {
-      for (Type type : funcOp.getType().getInputs()) {
-        if (isIllegalType(type)) return false;
-      }
-      for (Type type : funcOp.getType().getResults()) {
-        if (isIllegalType(type)) return false;
-      }
-    }
-    for (Type type : op->getResultTypes()) {
-      if (isIllegalType(type)) return false;
-    }
-    for (Type type : op->getOperandTypes()) {
-      if (isIllegalType(type)) return false;
-    }
-    return true;
-  }
-};
 
 class FloatTypeConverter : public TypeConverter {
  public:
@@ -83,10 +55,10 @@ class FloatTypeConverter : public TypeConverter {
       return type;
     });
     addConversion(convertTensor);
-    addConversion([&](IREE::PtrType ptrType) {
+    addConversion([&](IREE::Util::PtrType ptrType) {
       if (auto tensorType =
               ptrType.getTargetType().dyn_cast<RankedTensorType>()) {
-        return IREE::PtrType::get(convertTensor(tensorType));
+        return IREE::Util::PtrType::get(convertTensor(tensorType));
       }
       return ptrType;
     });
@@ -163,8 +135,28 @@ struct DemoteF32ToF16Pass : public DemoteF32ToF16Base<DemoteF32ToF16Pass> {
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<GenericTypeConvert>(context, converter);
     populateFuncOpTypeConversionPattern(patterns, converter);
-    F32ToF16ConversionTarget target(*context);
-    target.markUnknownOpDynamicallyLegal();
+    ConversionTarget target(*context);
+    // Operations are legal if they don't contain any illegal type.
+    target.markUnknownOpDynamicallyLegal([](Operation *op) {
+      if (auto globalOp = dyn_cast<IREE::Util::GlobalOp>(op)) {
+        return !isIllegalType(globalOp.type());
+      }
+      if (auto funcOp = dyn_cast<FuncOp>(op)) {
+        for (Type type : funcOp.getType().getInputs()) {
+          if (isIllegalType(type)) return false;
+        }
+        for (Type type : funcOp.getType().getResults()) {
+          if (isIllegalType(type)) return false;
+        }
+      }
+      for (Type type : op->getResultTypes()) {
+        if (isIllegalType(type)) return false;
+      }
+      for (Type type : op->getOperandTypes()) {
+        if (isIllegalType(type)) return false;
+      }
+      return true;
+    });
     if (failed(applyFullConversion(moduleOp, target, std::move(patterns)))) {
       return signalPassFailure();
     }

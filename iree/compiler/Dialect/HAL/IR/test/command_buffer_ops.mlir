@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @command_buffer_create
 //  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
@@ -134,7 +134,7 @@ func @command_buffer_bind_descriptor_set(
 // -----
 
 hal.executable @ex {
-  hal.executable.variant @backend, target="backend" {
+  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index
@@ -163,7 +163,7 @@ func @command_buffer_dispatch(
 // -----
 
 hal.executable @ex {
-  hal.executable.variant @backend, target="backend" {
+  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface,
       ordinal = 0 : index

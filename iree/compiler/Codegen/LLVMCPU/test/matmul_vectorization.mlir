@@ -1,5 +1,5 @@
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='func(iree-llvmcpu-vectorization)'}))" -split-input-file %s | IreeFileCheck %s
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='func(iree-llvmcpu-vectorization{promote-workgroup-to-full-tiles}),cse'}))" -split-input-file %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization)'}))" -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization{promote-workgroup-to-full-tiles}),cse'}))" -split-input-file %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
 
 #config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
 hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
@@ -8,12 +8,12 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm, target="llvm" {
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
     hal.executable.entry_point @matmul_128x128x128 attributes {
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @matmul_128x128x128() {
         %c0 = constant 0 : index
         %c128 = constant 128 : index
@@ -121,12 +121,12 @@ hal.executable @matmul_i8_i8_i32 attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @llvm, target="llvm" {
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
     hal.executable.entry_point @matmul_i8_i8_i32_128x128x128 attributes {
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @matmul_i8_i8_i32_128x128x128() {
         %c0 = constant 0 : index
         %c128 = constant 128 : index

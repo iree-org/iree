@@ -36,11 +36,6 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
   passManager.addNestedPass<FuncOp>(createTopLevelSCFToCFGPass());
 
-  // Now that control flow has been lowered, promote and extract_element
-  // to tensor loads. This will be done again later once everything that can
-  // be is lowered to device.
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createPromoteTensorLoadsPass());
-
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());

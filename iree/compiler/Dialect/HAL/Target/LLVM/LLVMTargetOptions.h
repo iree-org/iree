@@ -29,7 +29,7 @@ struct LLVMTargetOptions {
   std::string targetCPUFeatures;
 
   llvm::PipelineTuningOptions pipelineTuningOptions;
-  llvm::PassBuilder::OptimizationLevel optLevel;
+  llvm::OptimizationLevel optLevel;
   llvm::TargetOptions options;
 
   // Include debug information in output files (PDB, DWARF, etc).

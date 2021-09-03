@@ -74,6 +74,7 @@ class ImportOptions(CompilerOptions):
                import_format: Union[ImportFormat,
                                     str] = ImportFormat.BINARY_PROTO,
                import_extra_args: Sequence[str] = (),
+               save_temp_mhlo_input: Optional[str] = None,
                save_temp_iree_input: Optional[str] = None,
                **kwargs):
     """Initialize options from keywords.
@@ -87,6 +88,7 @@ class ImportOptions(CompilerOptions):
     self.import_only = import_only
     self.import_format = ImportFormat.parse(import_format)
     self.import_extra_args = import_extra_args
+    self.save_temp_mhlo_input = save_temp_mhlo_input
     self.save_temp_iree_input = save_temp_iree_input
 
 
@@ -121,6 +123,10 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
     cl.append("--mlir-print-op-generic")
 
   # Save temps flags.
+  save_mhlo_input = tfs.alloc_optional("tf-mhlo.mlir",
+                                       export_as=options.save_temp_mhlo_input)
+  if save_mhlo_input:
+    cl.append(f"--save-temp-mhlo-input={save_mhlo_input}")
   iree_input = tfs.alloc_optional("xla-iree-input.mlir",
                                   export_as=options.save_temp_iree_input)
   if iree_input:

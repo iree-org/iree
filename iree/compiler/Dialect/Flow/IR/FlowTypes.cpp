@@ -6,8 +6,16 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "mlir/IR/DialectImplementation.h"
+
 // clang-format off: must be included after all LLVM/MLIR headers.
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/Flow/IR/FlowAttrs.cpp.inc"  // IWYU pragma: keep
 #include "iree/compiler/Dialect/Flow/IR/FlowEnums.cpp.inc"  // IWYU pragma: keep
+#define GET_TYPEDEF_CLASSES
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.cpp.inc"  // IWYU pragma: keep
 // clang-format on
 
 namespace mlir {
@@ -16,7 +24,7 @@ namespace IREE {
 namespace Flow {
 
 //===----------------------------------------------------------------------===//
-// Object types
+// !flow.dispatch.tensor
 //===----------------------------------------------------------------------===//
 
 // static
@@ -158,6 +166,74 @@ void printType(DispatchTensorType &type, DialectAsmPrinter &p) {
   p << "dispatch.tensor<";
   printShapedType(type, p);
   p << '>';
+}
+
+//===----------------------------------------------------------------------===//
+// Dialect registration
+//===----------------------------------------------------------------------===//
+
+#include "iree/compiler/Dialect/Flow/IR/FlowOpInterfaces.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Flow/IR/FlowTypeInterfaces.cpp.inc"  // IWYU pragma: keep
+
+void FlowDialect::registerAttributes() {
+  addAttributes<
+#define GET_ATTRDEF_LIST
+#include "iree/compiler/Dialect/Flow/IR/FlowAttrs.cpp.inc"  // IWYU pragma: keep
+      >();
+}
+
+void FlowDialect::registerTypes() {
+  addTypes<DispatchTensorType>();
+  addTypes<
+#define GET_TYPEDEF_LIST
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.cpp.inc"  // IWYU pragma: keep
+      >();
+}
+
+//===----------------------------------------------------------------------===//
+// Type printing and parsing
+//===----------------------------------------------------------------------===//
+
+Attribute FlowDialect::parseAttribute(DialectAsmParser &parser,
+                                      Type type) const {
+  StringRef mnemonic;
+  if (failed(parser.parseKeyword(&mnemonic))) return {};
+  Attribute attr;
+  auto parseResult =
+      generatedAttributeParser(getContext(), parser, mnemonic, type, attr);
+  if (parseResult.hasValue()) return attr;
+  parser.emitError(parser.getCurrentLocation())
+      << "unknown Flow attribute: " << mnemonic;
+  return {};
+}
+
+void FlowDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
+  if (failed(generatedAttributePrinter(attr, p))) {
+    llvm_unreachable("unknown Flow attribute");
+  }
+}
+
+Type FlowDialect::parseType(DialectAsmParser &parser) const {
+  StringRef mnemonic;
+  if (failed(parser.parseKeyword(&mnemonic))) return {};
+  Type type;
+  OptionalParseResult parseResult =
+      generatedTypeParser(getContext(), parser, mnemonic, type);
+  if (parseResult.hasValue()) return type;
+  if (mnemonic == "dispatch.tensor") {
+    return DispatchTensorType::parse(parser);
+  }
+  parser.emitError(parser.getCurrentLocation())
+      << "unknown Flow type: " << mnemonic;
+  return {};
+}
+
+void FlowDialect::printType(Type type, DialectAsmPrinter &p) const {
+  if (auto inputType = type.dyn_cast<DispatchTensorType>()) {
+    IREE::Flow::printType(inputType, p);
+  } else if (failed(generatedTypePrinter(type, p))) {
+    llvm_unreachable("unknown Flow type");
+  }
 }
 
 }  // namespace Flow

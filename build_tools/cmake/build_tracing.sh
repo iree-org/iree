@@ -28,9 +28,11 @@ else
 fi
 cd build-tracing
 
+# Note: https://github.com/google/iree/issues/6404 prevents us from building
+# tests with these other settings. Many tests invoke the compiler tools with
+# MLIR threading enabled, which crashes with compiler tracing enabled.
 "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
-  -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_SAMPLES=OFF
+  -DIREE_BUILD_COMPILER=OFF
 "${CMAKE_BIN?}" --build .

@@ -61,6 +61,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
 
   // Flatten and cleanup memrefs.
   nestedModulePM.addNestedPass<FuncOp>(memref::createFoldSubViewOpsPass());
+  nestedModulePM.addNestedPass<FuncOp>(
+      Shape::createFoldDimOverShapeCarryingOpPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());
@@ -90,7 +92,7 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Standard/Vector/HAL/etc -> VMVX conversion
   // ---------------------------------------------------------------------------
 
-  passManager.addPass(createConversionPass());
+  passManager.addNestedPass<mlir::ModuleOp>(createConversionPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 

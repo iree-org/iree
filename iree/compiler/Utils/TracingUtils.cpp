@@ -9,7 +9,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_ENABLE_COMPILER_TRACING && \
+    IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 namespace {
 thread_local llvm::SmallVector<iree_zone_id_t, 8> passTraceZonesStack;

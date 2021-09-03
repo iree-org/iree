@@ -67,4 +67,4 @@ fi
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 cd "$BUILD_DIR"
-ctest --output-on-failure --label-exclude "${label_exclude_regex?}"
+ctest --timeout 900 --output-on-failure --label-exclude "${label_exclude_regex?}"

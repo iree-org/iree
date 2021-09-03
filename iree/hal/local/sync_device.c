@@ -23,13 +23,13 @@ typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
 
-  iree_host_size_t loader_count;
-  iree_hal_executable_loader_t** loaders;
-
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
   iree_hal_sync_semaphore_state_t semaphore_state;
+
+  iree_host_size_t loader_count;
+  iree_hal_executable_loader_t* loaders[];
 } iree_hal_sync_device_t;
 
 static const iree_hal_device_vtable_t iree_hal_sync_device_vtable;
@@ -64,8 +64,9 @@ iree_status_t iree_hal_sync_device_create(
                                     iree_hal_sync_device_check_params(params));
 
   iree_hal_sync_device_t* device = NULL;
-  iree_host_size_t total_size = sizeof(*device) + identifier.size +
-                                loader_count * sizeof(*device->loaders);
+  iree_host_size_t struct_size =
+      sizeof(*device) + loader_count * sizeof(*device->loaders);
+  iree_host_size_t total_size = struct_size + identifier.size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&device);
   if (iree_status_is_ok(status)) {
@@ -73,13 +74,10 @@ iree_status_t iree_hal_sync_device_create(
     iree_hal_resource_initialize(&iree_hal_sync_device_vtable,
                                  &device->resource);
     iree_string_view_append_to_buffer(identifier, &device->identifier,
-                                      (char*)device + sizeof(*device));
+                                      (char*)device + struct_size);
     device->host_allocator = host_allocator;
 
     device->loader_count = loader_count;
-    device->loaders =
-        (iree_hal_executable_loader_t**)((uint8_t*)device->identifier.data +
-                                         identifier.size);
     for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
       device->loaders[i] = loaders[i];
       iree_hal_executable_loader_retain(device->loaders[i]);
@@ -139,8 +137,19 @@ static iree_hal_allocator_t* iree_hal_sync_device_allocator(
 static iree_status_t iree_hal_sync_device_query_i32(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value) {
-  // iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   *out_value = 0;
+
+  if (iree_string_view_equal(category,
+                             iree_make_cstring_view("hal.executable.format"))) {
+    *out_value =
+        iree_hal_query_any_executable_loader_support(
+            device->loader_count, device->loaders, /*caching_mode=*/0, key)
+            ? 1
+            : 0;
+    return iree_ok_status();
+  }
+
   return iree_make_status(
       IREE_STATUS_NOT_FOUND,
       "unknown device configuration key value '%.*s :: %.*s'",

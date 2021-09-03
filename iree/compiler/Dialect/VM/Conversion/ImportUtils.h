@@ -7,9 +7,9 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_IMPORTUTILS_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_IMPORTUTILS_H_
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -39,6 +39,11 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     ConversionPatternRewriter &rewriter);
 }  // namespace detail
 
+// Copies known attributes from the |importOp| to the |callOp|.
+// This allows for passes to quickly query the properties of the import such as
+// nosideeffects.
+void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp);
+
 // Rewrites the op T to a VM call to |importOp|.
 // Automatically handles type conversion and special logic for variadic operands
 // and special types (such as ranked shape).
@@ -52,7 +57,7 @@ Optional<SmallVector<Value>> rewriteToCall(
       op.getLoc(), isOpVariadic ? IREE::VM::CallVariadicOp::getOperationName()
                                 : IREE::VM::CallOp::getOperationName()};
   state.addAttributes(llvm::to_vector<4>(operation->getDialectAttrs()));
-  state.addAttribute("callee", rewriter.getSymbolRefAttr(importOp));
+  state.addAttribute("callee", SymbolRefAttr::get(importOp));
 
   auto importType = importOp.getType();
   for (auto resultType : operation->getResultTypes()) {
@@ -123,6 +128,7 @@ Optional<SmallVector<Value>> rewriteToCall(
   }
 
   auto *callOp = rewriter.createOperation(state);
+  copyImportAttrs(importOp, callOp);
   return SmallVector<Value>(callOp->getResults());
 }
 

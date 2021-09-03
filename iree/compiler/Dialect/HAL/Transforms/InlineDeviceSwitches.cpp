@@ -8,8 +8,8 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -121,7 +121,7 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
       // condition will add its IR to the block.
     } else {
       // Fallthrough of all expressions; die if we expected return values.
-      funcBuilder.create<IREE::UnreachableOp>(
+      funcBuilder.create<IREE::Util::UnreachableOp>(
           switchOp.getLoc(),
           "device not supported in the compiled configuration");
     }
@@ -133,10 +133,10 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
 }
 
 class InlineDeviceSwitchesPass
-    : public PassWrapper<InlineDeviceSwitchesPass, OperationPass<FuncOp>> {
+    : public PassWrapper<InlineDeviceSwitchesPass, OperationPass<void>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREEDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
   }
 
   StringRef getArgument() const override {
@@ -150,7 +150,7 @@ class InlineDeviceSwitchesPass
   void runOnOperation() override {
     auto funcOp = getOperation();
     SmallVector<IREE::HAL::DeviceSwitchOp, 4> switchOps;
-    funcOp.walk([&](IREE::HAL::DeviceSwitchOp switchOp) {
+    funcOp->walk([&](IREE::HAL::DeviceSwitchOp switchOp) {
       switchOps.push_back(switchOp);
     });
     for (auto switchOp : switchOps) {
@@ -161,7 +161,7 @@ class InlineDeviceSwitchesPass
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createInlineDeviceSwitchesPass() {
+std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass() {
   return std::make_unique<InlineDeviceSwitchesPass>();
 }
 

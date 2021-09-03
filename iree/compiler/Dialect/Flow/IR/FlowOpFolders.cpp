@@ -8,10 +8,10 @@
 #include <numeric>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
@@ -111,8 +111,8 @@ static bool updatesConstantInStream(Value operand, Operation *updateOp) {
 
   // For loaded variables, check whether it's mutable. Immutable variables will
   // be aggregated into one read-only buffer.
-  if (auto varLoadOp = operand.getDefiningOp<VariableLoadOp>()) {
-    return !varLoadOp.getLoadedVariable().is_mutable();
+  if (auto loadOp = operand.getDefiningOp<IREE::Util::GlobalLoadOp>()) {
+    return loadOp.isGlobalImmutable();
   }
 
   return false;
@@ -142,11 +142,11 @@ struct InsertImmutabilityPreservingStreamClones
 
   LogicalResult matchAndRewrite(ExStreamFragmentOp op,
                                 PatternRewriter &rewriter) const override {
-    bool didClone =
-        insertTiedClones(cast<TiedOpInterface>(op.getOperation()), rewriter);
+    bool didClone = insertTiedClones(
+        cast<IREE::Util::TiedOpInterface>(op.getOperation()), rewriter);
     for (auto &block : op.getClosureBodyRegion()) {
       for (auto &innerOp : block) {
-        if (auto tiedOp = dyn_cast<TiedOpInterface>(innerOp)) {
+        if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(innerOp)) {
           didClone |= insertTiedClones(tiedOp, rewriter);
         }
       }
@@ -154,7 +154,7 @@ struct InsertImmutabilityPreservingStreamClones
     return success(didClone);
   }
 
-  bool insertTiedClones(TiedOpInterface tiedOp,
+  bool insertTiedClones(IREE::Util::TiedOpInterface tiedOp,
                         PatternRewriter &rewriter) const {
     bool didClone = false;
     for (unsigned resultIndex = 0; resultIndex < tiedOp->getNumResults();
@@ -212,7 +212,7 @@ struct TieStreamResults : public OpRewritePattern<ExStreamFragmentOp> {
           continue;  // Already tied.
         }
         auto baseValue =
-            IREE::TiedOpInterface::findTiedBaseValue(result.value());
+            IREE::Util::TiedOpInterface::findTiedBaseValue(result.value());
         if (auto blockArg = baseValue.dyn_cast<BlockArgument>()) {
           unsigned operandIndex = blockArg.getArgNumber();
           op.setTiedResultOperandIndex(result.index(), operandIndex);
@@ -228,151 +228,11 @@ struct TieStreamResults : public OpRewritePattern<ExStreamFragmentOp> {
 
 void ExStreamFragmentOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ClosureOptimizationPattern<ExStreamFragmentOp>>(context);
+  results.insert<IREE::Util::ClosureOptimizationPattern<ExStreamFragmentOp>>(
+      context);
   results.insert<InsertImmutabilityPreservingStreamClones>(context);
-  // TODO(#6185): fix stream ties when types/shapes change.
+  // TODO(#6420): fix HAL lowering of this (or wait until streams are gone).
   // results.insert<TieStreamResults>(context);
-}
-
-//===----------------------------------------------------------------------===//
-// Variables
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Converts variable initializer functions that evaluate to a constant to a
-/// specified initial value.
-struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
-  using OpRewritePattern<VariableOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VariableOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return failure();
-    auto *symbolOp =
-        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
-    auto initializer = cast<FuncOp>(symbolOp);
-    if (initializer.getBlocks().size() == 1 &&
-        initializer.getBlocks().front().getOperations().size() == 2 &&
-        isa<mlir::ReturnOp>(
-            initializer.getBlocks().front().getOperations().back())) {
-      auto &primaryOp = initializer.getBlocks().front().getOperations().front();
-      Attribute constResult;
-      if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
-        rewriter.replaceOpWithNewOp<VariableOp>(
-            op, op.sym_name(), op.is_mutable(), op.type(), constResult);
-        return success();
-      }
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                             MLIRContext *context) {
-  results.insert<InlineConstVariableOpInitializer>(context);
-}
-
-OpFoldResult VariableLoadOp::fold(ArrayRef<Attribute> operands) {
-  auto variableOp = dyn_cast_or_null<VariableOp>(
-      SymbolTable::lookupNearestSymbolFrom(*this, variable()));
-  if (!variableOp) return {};
-  if (variableOp->getAttr("noinline")) {
-    // Inlining of the constant has been disabled.
-    return {};
-  } else if (variableOp.is_mutable()) {
-    // We can't inline mutable variables as they may be changed at any time.
-    // There may still be other folders/canonicalizers that can help (such as
-    // store-forwarding).
-    return {};
-  } else if (!variableOp.initial_value()) {
-    // Uninitialized variables (or those with initializers) can't be folded as
-    // we don't yet know the value. InlineConstVariableOpInitializer may help.
-    return {};
-  }
-  return variableOp.initial_value().getValue();
-}
-
-namespace {
-
-class PropagateVariableLoadAddress
-    : public OpRewritePattern<VariableLoadIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
- public:
-  LogicalResult matchAndRewrite(VariableLoadIndirectOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
-            op.variable().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<VariableLoadOp>(op, op.result().getType(),
-                                                  addressOp.variable());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableLoadIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<PropagateVariableLoadAddress>(context);
-}
-
-namespace {
-
-/// Erases flow.variable.store ops that are no-ops.
-/// This can happen if there was a variable load, some DCE'd usage, and a
-/// store back to the same variable: we want to be able to elide the entire load
-/// and store.
-struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
-  using OpRewritePattern<VariableStoreOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(VariableStoreOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto loadOp =
-            dyn_cast_or_null<VariableLoadOp>(op.value().getDefiningOp())) {
-      if (loadOp.variable() == op.variable()) {
-        rewriter.eraseOp(op);
-        return success();
-      }
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<EraseUnusedVariableStoreOp>(context);
-}
-
-namespace {
-
-class PropagateVariableStoreAddress
-    : public OpRewritePattern<VariableStoreIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
- public:
-  LogicalResult matchAndRewrite(VariableStoreIndirectOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
-            op.variable().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<VariableStoreOp>(op, op.value(),
-                                                   addressOp.variable());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void VariableStoreIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<PropagateVariableStoreAddress>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -381,7 +241,8 @@ void VariableStoreIndirectOp::getCanonicalizationPatterns(
 
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ClosureOptimizationPattern<DispatchWorkgroupsOp>>(context);
+  results.insert<IREE::Util::ClosureOptimizationPattern<DispatchWorkgroupsOp>>(
+      context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -583,7 +444,7 @@ void DispatchShapeOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.shape
+// flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -601,11 +462,28 @@ struct FoldConstantDispatchTieShape
   }
 };
 
+/// Elides the tie_shape if its operand already carries shapes.
+struct ElideShapeCarryingOperandTieShape
+    : public OpRewritePattern<DispatchTieShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchTieShapeOp op,
+                                PatternRewriter &rewriter) const override {
+    auto definingOp = op.operand().getDefiningOp();
+    if (!definingOp) return failure();
+    if (!isa<ShapeCarryingInterface>(definingOp)) return failure();
+    rewriter.replaceOp(op, op.operand());
+    return success();
+  }
+};
+
 }  // namespace
 
 void DispatchTieShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<FoldConstantDispatchTieShape>(context);
+  results
+      .insert<ElideShapeCarryingOperandTieShape, FoldConstantDispatchTieShape>(
+          context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -695,11 +573,53 @@ struct FlattenTensorReshapeChain : public OpRewritePattern<TensorReshapeOp> {
   }
 };
 
+// Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
+// primitive value for the splat op.
+struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
+  using OpRewritePattern<TensorLoadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceOp =
+        dyn_cast_or_null<TensorSplatOp>(loadOp.source().getDefiningOp());
+
+    if (!sourceOp) return failure();
+
+    rewriter.replaceOp(loadOp, sourceOp.value());
+    return success();
+  }
+};
+
+struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
+  using OpRewritePattern<TensorSplatOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorSplatOp splatOp,
+                                PatternRewriter &rewriter) const override {
+    if (!splatOp.result().hasOneUse()) return failure();
+
+    auto reshapeOp = dyn_cast_or_null<TensorReshapeOp>(
+        splatOp.result().use_begin()->getOwner());
+    if (!reshapeOp) return failure();
+
+    rewriter.replaceOpWithNewOp<TensorSplatOp>(
+        reshapeOp, reshapeOp.result().getType(), splatOp.value(),
+        reshapeOp.result_dims());
+    rewriter.eraseOp(splatOp);
+
+    return success();
+  }
+};
+
 }  // namespace
 
 void TensorReshapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<FlattenTensorReshapeChain>(context);
+}
+
+void TensorLoadOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<FoldSplatLoadIntoPrimitive>(context);
 }
 
 OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute> operands) {
@@ -737,6 +657,12 @@ OpFoldResult TensorStoreOp::fold(ArrayRef<Attribute> operands) {
     }
   }
   return {};
+}
+
+void TensorSplatOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  // TODO(benvanik): canonicalize splat+slice to smaller splat.
+  results.insert<FoldSplatReshapeIntoSplat>(context);
 }
 
 OpFoldResult TensorSplatOp::fold(ArrayRef<Attribute> operands) {

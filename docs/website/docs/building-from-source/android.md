@@ -42,7 +42,7 @@ devices from the command line. Install it following the
 Build and install on your host machine:
 
 ``` shell
-cmake -B ../iree-build/ \
+cmake -GNinja -B ../iree-build/ \
   -DCMAKE_INSTALL_PREFIX=../iree-build/install \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   .
@@ -56,7 +56,7 @@ Build the runtime using the Android NDK toolchain:
 === "Linux and MacOS"
 
     ``` shell
-    cmake -B ../iree-build-android/ \
+    cmake -GNinja -B ../iree-build-android/ \
       -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK?}/build/cmake/android.toolchain.cmake" \
       -DIREE_HOST_BINARY_ROOT="$PWD/../iree-build/install" \
       -DANDROID_ABI="arm64-v8a" \
@@ -69,7 +69,7 @@ Build the runtime using the Android NDK toolchain:
 === "Windows"
 
     ``` shell
-    cmake -B ../iree-build-android/ \
+    cmake -GNinja -B ../iree-build-android/ \
       -DCMAKE_TOOLCHAIN_FILE="%ANDROID_NDK%/build/cmake/android.toolchain.cmake" \
       -DIREE_HOST_BINARY_ROOT="%CD%/../iree-build/install" \
       -DANDROID_ABI="arm64-v8a" \

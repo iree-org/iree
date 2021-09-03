@@ -18,13 +18,16 @@ vm.module @simple_module {
   // CHECK: "function_descriptors":
   // CHECK-NEXT: {
   // CHECK-NEXT:   "bytecode_offset": 0
-  // CHECK-NEXT:   "bytecode_length": 5
+  // CHECK-NEXT:   "bytecode_length": 8
   // CHECK-NEXT:   "i32_register_count": 1
   // CHECK-NEXT:   "ref_register_count": 0
   // CHECK-NEXT: }
   //      CHECK: "bytecode_data": [
   // CHECK-NEXT:   84,
+  // CHECK-NEXT:   0,
   // CHECK-NEXT:   1,
+  // CHECK-NEXT:   0,
+  // CHECK-NEXT:   0,
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   0,
   // CHECK-NEXT:   0

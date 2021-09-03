@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -38,34 +39,28 @@ namespace HAL {
 // Creates zero or more hal.executable.variant ops for each target backend.
 // The source op will contain the flow.executable contents and any attributes
 // the backend wants to carry along during transformation.
-static LogicalResult declareVariantOps(TargetOptions targetOptions,
-                                       IREE::Flow::ExecutableOp sourceOp,
+static LogicalResult declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
                                        IREE::HAL::ExecutableOp executableOp) {
-  // The user has specified what targets they want as a set of patterns. This
-  // matches against those patterns so vulkan-* may match vulkan-v1.1 and
-  // vulkan-v1.2.
-  auto targetBackends = getTargetBackends(targetOptions.targets);
-  if (targetBackends.empty()) {
-    auto diagnostic = sourceOp.emitError();
-    diagnostic
-        << "no target backends available for executable translation; ensure "
-        << "they are linked in and the target options are properly "
-        << "specified. requested = [ ";
-    for (const auto &target : targetOptions.targets) {
-      diagnostic << "'" << target << "' ";
-    }
-    diagnostic << "], available = [ ";
-    for (const auto &target : getRegisteredTargetBackends()) {
-      diagnostic << "'" << target << "' ";
-    }
-    diagnostic << "]";
-    return diagnostic;
+  // Gather a list of all #hal.executable.targets that we should produce
+  // variants for.
+  auto executableTargetAttrs =
+      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
+  if (executableTargetAttrs.empty()) {
+    return sourceOp.emitError()
+           << "no executable targets specified for translation";
   }
 
   // Materialize all of the hal.executable.variant ops for all backends we are
   // targeting. Note that each backend may create zero or more target ops.
-  for (auto &targetBackend : targetBackends) {
-    targetBackend->declareVariantOps(sourceOp, executableOp);
+  SymbolTable targetSymbolTable(executableOp);
+  OpBuilder targetBuilder(&executableOp.getBlock().back());
+  for (auto &targetAttr : executableTargetAttrs) {
+    auto targetContainerOp =
+        targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
+            sourceOp.getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
+    targetSymbolTable.insert(targetContainerOp);
+    OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
+    containerBuilder.create<ModuleOp>(sourceOp.getLoc());
   }
 
   // Ensure that at least one target op got created. If it didn't that means
@@ -76,8 +71,8 @@ static LogicalResult declareVariantOps(TargetOptions targetOptions,
     auto diagnostic = sourceOp.emitError();
     diagnostic
         << "no target backend was able to handle this executable; tried = [ ";
-    for (const auto &target : targetOptions.targets) {
-      diagnostic << "'" << target << "' ";
+    for (const auto &targetAttr : executableTargetAttrs) {
+      diagnostic << targetAttr.getFormat() << " ";
     }
     diagnostic << "]";
     return diagnostic;
@@ -577,6 +572,8 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
 
   for (auto regionOperand : llvm::enumerate(regionOperands)) {
     auto blockArg = entryBlock->getArgument(regionOperand.index());
+    if (blockArg.use_empty()) continue;
+
     auto &value = regionOperand.value();
     switch (value.type) {
       case RegionOperand::Type::PUSH_CONSTANT: {
@@ -593,15 +590,43 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
           offset = entryBuilder.createOrFold<mlir::ConstantIndexOp>(
               clonedFuncOp.getLoc(), value.bindingOffset.staticOffset);
         }
-        auto bindingSymRefAttr = entryBuilder.getSymbolRefAttr(
-            interfaceOp.sym_name(),
-            {entryBuilder.getSymbolRefAttr(value.bindingOp)});
+
+        auto bindingSymRefAttr = SymbolRefAttr::get(
+            entryBuilder.getContext(), interfaceOp.sym_name(),
+            {SymbolRefAttr::get(value.bindingOp)});
+
+        SmallVector<Value, 4> dynamicDims;
+        auto blockArgType = blockArg.getType().cast<Flow::DispatchTensorType>();
+        OpBuilder::InsertionGuard guard(entryBuilder);
+
+        if (!blockArgType.hasStaticShape()) {
+          // We can expect its first user to be a tie_shape op to associate
+          // concrete dimension values. Originally we have such information
+          // maintained in the flow ops handling dynamic tensors. But during
+          // flow executable outlining, such information is transfered to
+          // tie_shape ops.
+          auto tieShapeOp =
+              cast<Flow::DispatchTieShapeOp>(*blockArg.user_begin());
+
+          entryBuilder.setInsertionPointAfter(
+              tieShapeOp.shape().getDefiningOp());
+
+          // Get the SSA values for all dynamic dimensions.
+          dynamicDims.reserve(blockArgType.getNumDynamicDims());
+          for (int i = 0; i < blockArgType.getRank(); ++i) {
+            if (!blockArgType.isDynamicDim(i)) continue;
+            dynamicDims.push_back(entryBuilder.create<Shape::RankedDimOp>(
+                tieShapeOp.getLoc(), tieShapeOp.shape(), i));
+          }
+          assert(dynamicDims.size() == blockArgType.getNumDynamicDims());
+        }
+
         auto subspanOp =
             entryBuilder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-                clonedFuncOp.getLoc(), blockArg.getType(), bindingSymRefAttr,
-                /*byte_offset=*/offset,
-                /*byte_length=*/Value{});
+                clonedFuncOp.getLoc(), blockArgType, bindingSymRefAttr,
+                /*byte_offset=*/offset, /*byte_length=*/Value{}, dynamicDims);
         blockArg.replaceAllUsesWith(subspanOp);
+
         break;
       }
       default:
@@ -637,8 +662,7 @@ void InterfaceBuilder::applyUsageMappings() {
         case DispatchBinding::Type::CONSTANT_STORAGE:
           attrs.push_back(IREE::HAL::ExConstantStorageAttr::get(
               builder.getStringAttr(usage.bindingOp.getName()),
-              builder.getStringAttr(
-                  usage.constant.constantBuffer.getLeafReference()),
+              usage.constant.constantBuffer.getLeafReference(),
               builder.getIndexAttr(usage.constant.minimumOffset),
               builder.getIndexAttr(usage.constant.maximumOffset -
                                    usage.constant.minimumOffset + 1)));
@@ -704,14 +728,13 @@ static void defineConstantBindings(FuncOp entryFuncOp,
     for (auto &operandInfo : constantInfo.getSecond()) {
       storageUsages.resize(operandInfo.constantRanges.size());
       for (auto attr : llvm::enumerate(operandInfo.constantRanges)) {
-        auto byteRangeAttr = attr.value().cast<ByteRangeAttr>();
+        auto byteRangeAttr = attr.value().cast<IREE::Util::ByteRangeAttr>();
         auto &usage = storageUsages[attr.index()];
         usage.constantBuffer = operandInfo.constantBuffer;
-        usage.minimumOffset = std::min(byteRangeAttr.offset().getSExtValue(),
-                                       usage.minimumOffset);
+        usage.minimumOffset =
+            std::min(byteRangeAttr.getOffset(), usage.minimumOffset);
         usage.maximumOffset = std::max(
-            (byteRangeAttr.offset() + byteRangeAttr.length()).getSExtValue() -
-                1,
+            (byteRangeAttr.getOffset() + byteRangeAttr.getLength()) - 1,
             usage.maximumOffset);
       }
     }
@@ -742,10 +765,9 @@ static void defineConstantBindings(FuncOp entryFuncOp,
     for (auto &operandInfo : constantInfo.getSecond()) {
       auto &operandOffset = storageOffsets[operandInfo.operandIndex];
       for (auto attr : llvm::enumerate(operandInfo.constantRanges)) {
-        auto byteRangeAttr = attr.value().cast<ByteRangeAttr>();
+        auto byteRangeAttr = attr.value().cast<IREE::Util::ByteRangeAttr>();
         auto &usage = storageUsages[attr.index()];
-        int64_t offset =
-            byteRangeAttr.offset().getSExtValue() - usage.minimumOffset;
+        int64_t offset = byteRangeAttr.getOffset() - usage.minimumOffset;
         switch (operandOffset) {
           case INT64_MIN:
             // First use; take offset directly as a starting point.
@@ -1072,9 +1094,8 @@ static LogicalResult declareEntryPointOps(
       targetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
           dispatchEntryOp.getLoc(),
           targetBuilder.getStringAttr(dispatchEntryOp.function_ref()),
-          targetBuilder.getIndexAttr(ordinal),
-          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{},
-          IntegerAttr{});
+          targetBuilder.getIndexAttr(ordinal), SymbolRefAttr::get(interfaceOp),
+          ArrayAttr{}, IntegerAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
@@ -1112,15 +1133,10 @@ class ConverterDispatchWorkgroupInfoPattern final
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
-  explicit MaterializeInterfacesPass(TargetOptions targetOptions)
-      : targetOptions_(targetOptions) {}
+  MaterializeInterfacesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackends = getTargetBackends(targetOptions_.targets);
-    for (auto &targetBackend : targetBackends) {
-      targetBackend->getDependentDialects(registry);
-    }
   }
 
   StringRef getArgument() const override {
@@ -1142,7 +1158,6 @@ class MaterializeInterfacesPass
         llvm::to_vector<32>(getOperation().getOps<IREE::Flow::ExecutableOp>());
     for (auto sourceOp : sourceOps) {
       // Only manipulate tiled executables.
-      // TODO(benvanik): remove this check once linalg-on-tensors is default.
       auto entryOps = sourceOp.getOps<IREE::Flow::DispatchEntryOp>();
       if (entryOps.empty()) continue;
       auto anyEntryOp = *entryOps.begin();
@@ -1158,7 +1173,7 @@ class MaterializeInterfacesPass
       executableOp.setVisibility(sourceOp.getVisibility());
 
       // Embed the hal.executable.variant ops for each source.
-      if (failed(declareVariantOps(targetOptions_, sourceOp, executableOp))) {
+      if (failed(declareVariantOps(sourceOp, executableOp))) {
         return signalPassFailure();
       }
 
@@ -1188,19 +1203,14 @@ class MaterializeInterfacesPass
       sourceOp.erase();
     }
   }
-
- private:
-  TargetOptions targetOptions_;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
-    TargetOptions executableOptions) {
-  return std::make_unique<MaterializeInterfacesPass>(executableOptions);
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass() {
+  return std::make_unique<MaterializeInterfacesPass>();
 }
 
 static PassRegistration<MaterializeInterfacesPass> pass([] {
-  auto options = getTargetOptionsFromFlags();
-  return std::make_unique<MaterializeInterfacesPass>(options);
+  return std::make_unique<MaterializeInterfacesPass>();
 });
 
 }  // namespace HAL

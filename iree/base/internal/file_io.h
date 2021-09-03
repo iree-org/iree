@@ -34,6 +34,17 @@ iree_status_t iree_file_read_contents(const char* path,
 iree_status_t iree_file_write_contents(const char* path,
                                        iree_const_byte_span_t content);
 
+// Reads the contents of stdin until EOF into memory.
+// The contents will specify up until EOF and the allocation will have a
+// trailing NUL to allow use as a C-string (assuming the contents themselves
+// don't contain NUL).
+//
+// Returns the contents of the file in |out_contents|.
+// |allocator| is used to allocate the memory and the caller must use the same
+// allocator when freeing it.
+iree_status_t iree_stdin_read_contents(iree_allocator_t allocator,
+                                       iree_byte_span_t* out_contents);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

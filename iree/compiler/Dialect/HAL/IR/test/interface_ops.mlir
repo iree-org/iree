@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -verify-diagnostics %s | IreeFileCheck %s
 
 // CHECK-LABEL: @interface_workgroup_info
 func @interface_workgroup_info() {
@@ -14,15 +14,27 @@ func @interface_workgroup_info() {
 // -----
 
 // CHECK-LABEL: @interface_io_subspan
-func @interface_io_subspan() {
+//  CHECK-SAME: (%[[DIM0:.+]]: index, %[[DIM2:.+]]: index)
+func @interface_io_subspan(%dim0: index, %dim2: index) {
   %c8 = constant 8 : index
   %c16 = constant 16 : index
 
-  // CHECK: = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?xi8>
-  %0 = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?xi8>
+  // CHECK: = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?x4x?x16xi8>{%[[DIM0]], %[[DIM2]]}
+  %0 = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?x4x?x16xi8>{%dim0, %dim2}
 
   // CHECK: = hal.interface.binding.subspan @interface::@s0b0[%c8, %c16] : memref<16xi8>
   %1 = hal.interface.binding.subspan @interface::@s0b0[%c8, %c16] : memref<16xi8>
+
+  return
+}
+
+// -----
+
+func @interface_io_subspan_wrong_dynamic_dim(%dim: index) {
+  %c8 = constant 8 : index
+
+  // expected-error @+1{{result type 'memref<?x4x?x16xi8>' has 2 dynamic dimensions but 1 associated dimension SSA values}}
+  %0 = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?x4x?x16xi8>{%dim}
 
   return
 }

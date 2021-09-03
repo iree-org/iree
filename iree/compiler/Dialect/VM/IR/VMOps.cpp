@@ -6,7 +6,8 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
@@ -29,36 +30,6 @@ namespace VM {
 //===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseModuleOp(OpAsmParser &parser, OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  // Parse the module body.
-  auto *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ModuleOp::ensureTerminator(*body, parser.getBuilder(), result->location);
-  return success();
-}
-
-static void printModuleOp(OpAsmPrinter &p, ModuleOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  p.printRegion(op.getBodyRegion(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/false);
-}
 
 void ModuleOp::build(OpBuilder &builder, OperationState &result,
                      StringRef name) {
@@ -173,7 +144,7 @@ static ParseResult parseExportOp(OpAsmParser &parser, OperationState *result) {
 }
 
 static void printExportOp(OpAsmPrinter &p, ExportOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.function_ref());
   if (op.export_name() != op.function_ref()) {
     p << " as(\"" << op.export_name() << "\")";
@@ -185,7 +156,7 @@ static void printExportOp(OpAsmPrinter &p, ExportOp op) {
 void ExportOp::build(OpBuilder &builder, OperationState &result,
                      FuncOp functionRef, StringRef exportName,
                      ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, builder.getSymbolRefAttr(functionRef),
+  build(builder, result, SymbolRefAttr::get(functionRef),
         exportName.empty() ? functionRef.getName() : exportName, attrs);
 }
 
@@ -255,7 +226,7 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
 }
 
 static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.getName());
   p << "(";
   for (int i = 0; i < op.getNumFuncArguments(); ++i) {
@@ -310,78 +281,49 @@ LogicalResult ImportOp::verifyType() {
   return success();
 }
 
+void InitializerOp::build(OpBuilder &builder, OperationState &result,
+                          ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute(
+      "type", TypeAttr::get(FunctionType::get(builder.getContext(), {}, {})));
+  result.addRegion();
+  result.attributes.append(attrs.begin(), attrs.end());
+}
+
+static ParseResult parseInitializerOp(OpAsmParser &parser,
+                                      OperationState *result) {
+  result->addAttribute(
+      "type", TypeAttr::get(FunctionType::get(result->getContext(), {}, {})));
+  if (parser.parseOptionalAttrDictWithKeyword(result->attributes)) {
+    return failure();
+  }
+  auto &body = *result->addRegion();
+  if (failed(parser.parseRegion(body))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p.printRegion(op.body());
+}
+
+Block *InitializerOp::addEntryBlock() {
+  assert(empty() && "function already has an entry block");
+  auto *entry = new Block();
+  push_back(entry);
+  return entry;
+}
+
+Block *InitializerOp::addBlock() {
+  assert(!empty() && "function should at least have an entry block");
+  push_back(new Block());
+  return &back();
+}
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseGlobalOp(OpAsmParser &parser, OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes))) {
-    return failure();
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("mutable"))) {
-    result->addAttribute("is_mutable", UnitAttr::get(result->getContext()));
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("init"))) {
-    FlatSymbolRefAttr initializerAttr;
-    if (failed(parser.parseLParen()) ||
-        failed(parser.parseAttribute(initializerAttr, "initializer",
-                                     result->attributes)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  }
-
-  if (failed(parser.parseOptionalColon())) {
-    Attribute initialValueAttr;
-    if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
-                                     result->attributes))) {
-      return failure();
-    }
-    result->addAttribute("type", TypeAttr::get(initialValueAttr.getType()));
-  } else {
-    Type type;
-    if (failed(parser.parseType(type))) {
-      return failure();
-    }
-    result->addAttribute("type", TypeAttr::get(type));
-  }
-
-  return parser.parseOptionalAttrDictWithKeyword(result->attributes);
-}
-
-static void printGlobalOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ';
-  p.printSymbolName(
-      op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
-          .getValue());
-  if (op->getAttrOfType<UnitAttr>("is_mutable")) {
-    p << " mutable";
-  }
-  if (auto initializer = op->getAttrOfType<FlatSymbolRefAttr>("initializer")) {
-    p << " init(";
-    p.printSymbolName(initializer.getValue());
-    p << ')';
-  }
-  if (auto initialValue = op->getAttrOfType<IntegerAttr>("initial_value")) {
-    p << ' ';
-    p.printAttribute(initialValue);
-  } else {
-    p << " : ";
-    p.printType(op->getAttrOfType<TypeAttr>("type").getValue());
-  }
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
-                                         "sym_name",
-                                         "is_mutable",
-                                         "initializer",
-                                         "initial_value",
-                                         "type",
-                                     });
-}
 
 static LogicalResult verifyGlobalOp(Operation *op) {
   auto globalName =
@@ -431,7 +373,7 @@ static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
 
 template <typename T>
 static void addMemoryEffectsForGlobal(
-    Operation *op, StringRef global,
+    Operation *op, mlir::FlatSymbolRefAttr global,
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   // HACK: works around the lack of symbol side effects in mlir by only saying
   // we have a side-effect if the variable we are loading is mutable.
@@ -445,27 +387,27 @@ static void addMemoryEffectsForGlobal(
 
 void GlobalLoadI32Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalI32Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalI32Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadI64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalI64Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalI64Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadF32Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalF32Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalF32Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadF64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalF64Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalF64Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadRefOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalRefOp>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalRefOp>(*this, globalAttr(), effects);
 }
 
 static LogicalResult verifyGlobalLoadOp(Operation *op) {
@@ -473,13 +415,13 @@ static LogicalResult verifyGlobalLoadOp(Operation *op) {
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
   if (!globalOp) {
-    return op->emitOpError() << "Undefined global: " << globalAttr;
+    return op->emitOpError() << "undefined global: " << globalAttr;
   }
   auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
   auto loadType = op->getResult(0).getType();
   if (globalType.getValue() != loadType) {
     return op->emitOpError()
-           << "Global type mismatch; global " << globalAttr << " is "
+           << "global type mismatch; global " << globalAttr << " is "
            << globalType << " but load is " << loadType;
   }
   return success();
@@ -490,18 +432,21 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
   if (!globalOp) {
-    return op->emitOpError() << "Undefined global: " << globalAttr;
+    return op->emitOpError() << "undefined global: " << globalAttr;
   }
   auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
   auto storeType = op->getOperand(0).getType();
   if (globalType.getValue() != storeType) {
     return op->emitOpError()
-           << "Global type mismatch; global " << globalAttr << " is "
+           << "global type mismatch; global " << globalAttr << " is "
            << globalType << " but store is " << storeType;
   }
   if (!globalOp->getAttrOfType<UnitAttr>("is_mutable")) {
-    return op->emitOpError() << "Global " << globalAttr
-                             << " is not mutable and cannot be stored to";
+    // Allow stores to immutable globals in initializers.
+    if (!op->getParentOfType<IREE::VM::InitializerOp>()) {
+      return op->emitOpError() << "global " << globalAttr
+                               << " is not mutable and cannot be stored to";
+    }
   }
   return success();
 }
@@ -533,7 +478,7 @@ static ParseResult parseConstOp(OpAsmParser &parser, OperationState *result) {
 
 template <typename T>
 static void printConstOp(OpAsmPrinter &p, T &op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printAttribute(op.value());
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
 }
@@ -751,54 +696,8 @@ void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
   result.addTypes(objectType);
 }
 
-static ParseResult parseRodataOp(OpAsmParser &parser, OperationState *result) {
-  // TODO(#4670): Share across ops or upstream a custom directive
-  StringRef visibility;
-  if (parser.parseOptionalKeyword(&visibility,
-                                  {"public", "private", "nested"})) {
-    parser.emitError(
-        parser.getCurrentLocation(),
-        "expected valid visibility specifier (public, private or nested)");
-    return failure();
-  }
-  StringAttr visibilityAttr = parser.getBuilder().getStringAttr(visibility);
-  result->attributes.push_back(parser.getBuilder().getNamedAttr(
-      SymbolTable::getVisibilityAttrName(), visibilityAttr));
-
-  StringAttr nameAttr;
-  Attribute valueAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
-    return failure();
-  }
-
-  return success();
-}
-
-static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
-  p << op.getOperationName() << ' ';
-
-  // TODO(#4670): Share across ops or upstream a custom directive
-  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
-  if (auto visibility = op->getAttrOfType<StringAttr>(visibilityAttrName)) {
-    p << visibility.getValue() << ' ';
-  }
-
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{
-                              visibilityAttrName,
-                              "sym_name",
-                              "value",
-                          });
-  p << ' ';
-  p.printAttribute(op.value());
-}
-
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     ElementsAttr value, ArrayRef<NamedAttribute> attrs) {
+                     Attribute value, ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("sym_name", builder.getStringAttr(name));
   result.addAttribute("value", value);
   result.addAttributes(attrs);
@@ -816,7 +715,8 @@ static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
 void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
                              StringRef rodataName,
                              ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute("rodata", builder.getSymbolRefAttr(rodataName));
+  result.addAttribute("rodata",
+                      SymbolRefAttr::get(builder.getContext(), rodataName));
   auto type =
       IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
   result.addTypes({type});
@@ -913,7 +813,7 @@ static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState *result) {
 
 template <typename T>
 static void printSwitchOp(OpAsmPrinter &p, T &op) {
-  p << op.getOperationName() << " ";
+  p << " ";
   p.printOperand(op.index());
   p << "[";
   p.printOperands(op.values());
@@ -952,6 +852,24 @@ Optional<MutableOperandRange> BranchOp::getMutableSuccessorOperands(
     unsigned index) {
   assert(index == 0 && "invalid successor index");
   return destOperandsMutable();
+}
+
+void CallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  if (!getOperation()->hasAttr("nosideeffects")) {
+    // TODO(benvanik): actually annotate this.
+    effects.emplace_back(MemoryEffects::Read::get());
+    effects.emplace_back(MemoryEffects::Write::get());
+  }
+}
+
+void CallVariadicOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  if (!getOperation()->hasAttr("nosideeffects")) {
+    // TODO(benvanik): actually annotate this.
+    effects.emplace_back(MemoryEffects::Read::get());
+    effects.emplace_back(MemoryEffects::Write::get());
+  }
 }
 
 static ParseResult parseCallVariadicOp(OpAsmParser &parser,
@@ -1103,7 +1021,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
 }
 
 static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
-  p << op.getOperationName() << ' ' << op->getAttr("callee") << '(';
+  p << ' ' << op->getAttr("callee") << '(';
   int operand = 0;
   llvm::interleaveComma(
       llvm::zip(op.segment_sizes(), op.segment_types()), p,
@@ -1216,7 +1134,7 @@ static ParseResult parseCondFailOp(OpAsmParser &parser,
 }
 
 static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   if (op.condition() != op.status()) {
     p << op.condition() << ", ";
   }

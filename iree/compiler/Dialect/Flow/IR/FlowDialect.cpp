@@ -23,8 +23,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-#include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.cpp.inc"  // IWYU pragma: keep
-
 namespace {
 
 // Used to control inlining behavior.
@@ -62,13 +60,15 @@ struct FlowFolderInterface : public DialectFoldInterface {
 
 FlowDialect::FlowDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<FlowDialect>()) {
-  addInterfaces<FlowInlinerInterface, FlowFolderInterface>();
-  addTypes<DispatchTensorType>();
+  registerAttributes();
+  registerTypes();
 
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.cpp.inc"
       >();
+  addInterfaces<FlowInlinerInterface, FlowFolderInterface>();
+
   context->getOrLoadDialect("shapex");
   context->getOrLoadDialect<tensor::TensorDialect>();
 }
@@ -78,28 +78,6 @@ Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
   if (ConstantOp::isBuildableWith(value, type))
     return builder.create<ConstantOp>(loc, type, value);
   return nullptr;
-}
-
-//===----------------------------------------------------------------------===//
-// Type printing and parsing
-//===----------------------------------------------------------------------===//
-
-Type FlowDialect::parseType(DialectAsmParser &parser) const {
-  llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (succeeded(parser.parseOptionalKeyword("dispatch.tensor"))) {
-    return DispatchTensorType::parse(parser);
-  }
-  parser.emitError(parser.getCurrentLocation())
-      << "unknown Flow type: " << spec;
-  return {};
-}
-
-void FlowDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (auto inputType = type.dyn_cast<DispatchTensorType>()) {
-    IREE::Flow::printType(inputType, p);
-  } else {
-    llvm_unreachable("unknown Flow type");
-  }
 }
 
 }  // namespace Flow

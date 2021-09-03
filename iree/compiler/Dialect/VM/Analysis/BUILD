@@ -18,7 +18,7 @@ cc_library(
         "ValueLiveness.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",

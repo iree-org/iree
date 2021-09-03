@@ -26,7 +26,9 @@ hal.interface @io attributes {sym_visibility = "private"} {
 }
 
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32>, %[[ARG1:.+]]: !llvm.ptr<f32>, %{{.*}}: !llvm.ptr<f32>)
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32},
+//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32})
 //       CHECK:   %[[C128:.+]] = llvm.mlir.constant(128 : index) : i64
 //       CHECK:   %[[PTRI8:.+]] = llvm.bitcast %[[ARG1]] : !llvm.ptr<f32> to !llvm.ptr<i8>
 //       CHECK:   %[[OFF:.+]] = llvm.getelementptr %[[PTRI8]][%[[C128]]] : (!llvm.ptr<i8>, i64) -> !llvm.ptr<i8>

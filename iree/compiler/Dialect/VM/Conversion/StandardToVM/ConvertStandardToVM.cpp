@@ -7,7 +7,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
 #include "iree/base/api.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -124,6 +124,9 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
       rewriter.create<IREE::VM::ExportOp>(srcOp.getLoc(), newFuncOp,
                                           exportName);
     }
+    // VM functions are private by default and exported via the dedicated
+    // vm.export ops.
+    newFuncOp.setPrivate();
 
     rewriter.replaceOp(srcOp, llvm::None);
     return success();
@@ -151,6 +154,10 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       ConstantOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto targetType = typeConverter.convertType(srcOp.getType());
+    if (!targetType) {
+      return srcOp.emitError() << "could not convert type: " << srcOp.getType()
+                               << " (check -iree-vm-target-* options)";
+    }
     if (targetType.isa<IntegerType>()) {
       auto integerAttr = srcOp.getValue().dyn_cast<IntegerAttr>();
       if (!integerAttr) {
@@ -653,6 +660,33 @@ class FPToUIOpConversion : public OpConversionPattern<FPToUIOp> {
   }
 };
 
+class BitcastOpConversion : public OpConversionPattern<BitcastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      BitcastOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto srcType = operands[0].getType();
+    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    if (srcType.isF32() && dstType.isInteger(32)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BitcastF32I32Op>(srcOp, dstType,
+                                                             operands[0]);
+    } else if (srcType.isInteger(32) && dstType.isF32()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BitcastI32F32Op>(srcOp, dstType,
+                                                             operands[0]);
+    } else if (srcType.isF64() && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BitcastF64I64Op>(srcOp, dstType,
+                                                             operands[0]);
+    } else if (srcType.isInteger(64) && dstType.isF64()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BitcastI64F64Op>(srcOp, dstType,
+                                                             operands[0]);
+    } else {
+      return rewriter.notifyMatchFailure(srcOp, "unsupported bitcast");
+    }
+    return success();
+  }
+};
+
 class SelectOpConversion : public OpConversionPattern<SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -696,33 +730,19 @@ class AssertOpConversion : public OpConversionPattern<AssertOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      AssertOp srcOp, ArrayRef<Value> operands,
+      AssertOp srcOp, ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    AssertOpAdaptor adaptor(operands);
-    Location loc = srcOp.getLoc();
-
-    // Start by splitting the block containing the assert into two. The part
-    // before will contain the condition, and the part after will contain
-    // the continuation point.
-    Block *condBlock = rewriter.getInsertionBlock();
-    Block::iterator opPosition = rewriter.getInsertionPoint();
-    Block *continuationBlock = rewriter.splitBlock(condBlock, opPosition);
-
-    // Create a new block for the target of the failure.
-    Block *failureBlock;
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
-      Region *parentRegion = condBlock->getParent();
-      failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
-      auto status = rewriter.create<IREE::VM::ConstI32Op>(
-          loc, rewriter.getIntegerAttr(rewriter.getIntegerType(32),
-                                       IREE_STATUS_FAILED_PRECONDITION));
-      rewriter.create<IREE::VM::FailOp>(loc, status, srcOp.msgAttr());
-    }
-
-    rewriter.setInsertionPointToEnd(condBlock);
-    rewriter.replaceOpWithNewOp<CondBranchOp>(srcOp, adaptor.arg(),
-                                              continuationBlock, failureBlock);
+    AssertOpAdaptor operands(newOperands, srcOp->getAttrDictionary());
+    auto status = rewriter.create<IREE::VM::ConstI32Op>(
+        srcOp.getLoc(),
+        rewriter.getIntegerAttr(rewriter.getIntegerType(32),
+                                IREE_STATUS_FAILED_PRECONDITION));
+    // TODO(benvanik): invert cond_fail instead.
+    auto invertedCondition = rewriter.createOrFold<IREE::VM::XorI32Op>(
+        srcOp.getLoc(), operands.arg().getType(), operands.arg(),
+        rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+    rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(
+        srcOp, invertedCondition, status, operands.msg().getValue());
     return success();
   }
 };
@@ -843,7 +863,8 @@ void populateStandardToVMPatterns(MLIRContext *context,
 
   // Floating-point conversion ops.
   patterns.insert<SIToFPOpConversion, UIToFPOpConversion, FPToSIOpConversion,
-                  FPToUIOpConversion>(typeConverter, context);
+                  FPToUIOpConversion, BitcastOpConversion>(typeConverter,
+                                                           context);
 
   // Shift ops.
   patterns.insert<

@@ -51,8 +51,17 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
 // Device management
 //===----------------------------------------------------------------------===//
 
+// Verifies that the target execution environment is valid.
+// #hal.device.target and #hal.executable.target attribute placement and
+// definition will be checked as well along with other structural requirements.
+std::unique_ptr<OperationPass<ModuleOp>> createVerifyTargetEnvironmentPass();
+
+// Assigns the HAL devices the module will target to the given list of targets.
+std::unique_ptr<OperationPass<ModuleOp>> createAssignTargetDevicesPass(
+    ArrayRef<std::string> targets);
+
 // Outlines hal.device.switch conditions into functions and inlines conditions.
-std::unique_ptr<OperationPass<FuncOp>> createInlineDeviceSwitchesPass();
+std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass();
 
 // Finds hal.device.query ops and creates variables initialized on startup.
 std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
@@ -64,16 +73,19 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // Defines hal.executables and hal.interfaces for flow.executable ops based on
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
-    TargetOptions targetOptions);
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass();
 
 // Propagates hal.interface.workload.* information when constant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createPropagateConstantWorkgroupInfoPass();
 
 // Translates hal.executable.variant ops via a nested translation pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createTranslateExecutablesPass();
+
+// Translates hal.executable.variant ops for the specified |target| backend.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createTranslateExecutableVariantsPass();
+createTranslateTargetExecutableVariantsPass(StringRef target);
 
 // Calls into each target backend to have it link multiple hal.executables
 // together (if that makes sense). For example, the LLVM AOT backend may combine
@@ -102,8 +114,7 @@ createSerializeTargetExecutablesPass(StringRef target);
 
 // Combines constant variables into one or more hal.constant_pools based on
 // usage semantics.
-std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass(
-    TargetOptions targetOptions);
+std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass();
 
 // Packs all constant data in a hal.constant_pool into their storage formats
 // and maps them with hal.constant_pool.span.
@@ -115,8 +126,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createMaterializeConstantPoolBuffersPass();
 
 // Performs packing and materializes runtime packing code when required.
-std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass(
-    TargetOptions targetOptions);
+std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass();
 
 // Finds all resource lookups (such as hal.executable.lookup), materializes
 // their cache storage and initialization, and rewrites the lookups to
@@ -140,21 +150,26 @@ std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
 inline void registerHALPasses() {
   registerHALTransformPassPipeline();
   auto targetOptions = getTargetOptionsFromFlags();
-  createConvertToHALPass();
+  createAssignTargetDevicesPass({});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
+  createConvertToHALPass();
+  createIdentifyConstantPoolsPass();
   createInlineDeviceSwitchesPass();
-  createMemoizeDeviceQueriesPass();
-  createTranslateExecutableVariantsPass();
   createLinkExecutablesPass();
   createLinkTargetExecutablesPass("");
+  createMaterializeConstantPoolBuffersPass();
+  createMaterializeInterfacesPass();
+  createMaterializeResourceCachesPass(targetOptions);
+  createMemoizeDeviceQueriesPass();
+  createPackAllocationsPass();
+  createPackConstantPoolStoragePass();
+  createPropagateConstantWorkgroupInfoPass();
   createResolveEntryPointOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");
-  createIdentifyConstantPoolsPass(targetOptions);
-  createPackConstantPoolStoragePass();
-  createMaterializeConstantPoolBuffersPass();
-  createPackAllocationsPass(targetOptions);
-  createMaterializeResourceCachesPass(targetOptions);
+  createTranslateExecutablesPass();
+  createTranslateTargetExecutableVariantsPass("");
+  createVerifyTargetEnvironmentPass();
 }
 
 }  // namespace HAL

@@ -21,13 +21,11 @@ iree_cc_library(
     "ConvertBufferViewOps.cpp"
     "ConvertCommandBufferOps.cpp"
     "ConvertConstantOps.cpp"
-    "ConvertControlFlowOps.cpp"
     "ConvertDeviceOps.cpp"
     "ConvertExecutableOps.cpp"
     "ConvertExperimentalOps.cpp"
     "ConvertHALToVM.cpp"
     "ConvertSemaphoreOps.cpp"
-    "ConvertVariableOps.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -37,10 +35,10 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::HAL::hal_imports
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::IREEToVM
     iree::compiler::Dialect::VM::Conversion::StandardToVM
+    iree::compiler::Dialect::VM::Conversion::UtilToVM
     iree::compiler::Dialect::VM::IR
   PUBLIC
 )

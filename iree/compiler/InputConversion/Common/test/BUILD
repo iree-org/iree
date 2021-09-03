@@ -19,7 +19,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "convert_upstream_to_iree.mlir",
+            "iree_import_public.mlir",
             "top_level_scf_to_cfg.mlir",
         ],
         include = ["*.mlir"],

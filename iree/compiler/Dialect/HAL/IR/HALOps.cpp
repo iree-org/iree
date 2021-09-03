@@ -7,13 +7,15 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -47,65 +49,6 @@ static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
       attrName, parser.getBuilder().getI32IntegerAttr(
                     static_cast<int32_t>(symbolized.getValue()))));
   return success();
-}
-
-//===----------------------------------------------------------------------===//
-// custom<SizeAwareType>
-//===----------------------------------------------------------------------===//
-// type{%size}
-
-static ParseResult parseSizeAwareType(OpAsmParser &parser, Type &type,
-                                      OpAsmParser::OperandType &size) {
-  if (failed(parser.parseType(type)) || failed(parser.parseLBrace()) ||
-      failed(parser.parseOperand(size)) || failed(parser.parseRBrace())) {
-    return failure();
-  }
-  return success();
-}
-
-static void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type,
-                               Value size) {
-  p.printType(type);
-  p << "{";
-  p.printOperand(size);
-  p << "}";
-}
-
-//===----------------------------------------------------------------------===//
-// custom<SizeAwareTypeList>
-//===----------------------------------------------------------------------===//
-// (type{%size0}, type, type{%size1})
-
-static ParseResult parseSizeAwareTypeList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
-  do {
-    Type type;
-    if (failed(parser.parseType(type))) return failure();
-    if (type.isa<SizeAwareTypeInterface>()) {
-      OpAsmParser::OperandType size;
-      if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
-          failed(parser.parseRBrace())) {
-        return failure();
-      }
-      sizes.push_back(size);
-    }
-    types.push_back(type);
-  } while (succeeded(parser.parseOptionalComma()));
-  return success();
-}
-
-static void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op,
-                                   TypeRange types, OperandRange sizes) {
-  int sizeIndex = 0;
-  llvm::interleaveComma(types, p, [&](Type type) {
-    p.printType(type);
-    if (type.isa<SizeAwareTypeInterface>()) {
-      p << "{";
-      p.printOperand(sizes[sizeIndex++]);
-      p << "}";
-    }
-  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -294,7 +237,7 @@ Value TensorCastOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
 }
 
 Value TensorCastOp::getTiedResult(unsigned resultIndex) {
-  return IREE::TiedOpInterface::findTiedBaseValue(source());
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
 }
 
 ::llvm::Optional<unsigned> TensorCastOp::getTiedResultOperandIndex(
@@ -307,277 +250,24 @@ SmallVector<int64_t, 4> TensorCastOp::getTiedResultOperandIndices() {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.variable
-//===----------------------------------------------------------------------===//
-
-// Returns true if the given |accessType| is compatible with the |variableType|.
-// For example, this will return true if the variable type is a tensor<?xf32>
-// and the access is tensor<4xf32>.
-static bool isVariableTypeCompatible(Type variableType, Type accessType) {
-  // If one is a shaped type, then they both must be and have compatible
-  // shapes.
-  if (variableType.isa<ShapedType>() || accessType.isa<ShapedType>()) {
-    return succeeded(mlir::verifyCompatibleShape(variableType, accessType));
-  }
-
-  // Otherwise, the types must be the same.
-  return variableType == accessType;
-}
-
-static ParseResult parseVariableOp(OpAsmParser &parser,
-                                   OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes))) {
-    return failure();
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("mutable"))) {
-    result->addAttribute("is_mutable", UnitAttr::get(result->getContext()));
-  }
-
-  if (succeeded(parser.parseOptionalKeyword("init"))) {
-    FlatSymbolRefAttr initializerAttr;
-    if (failed(parser.parseLParen()) ||
-        failed(parser.parseAttribute(initializerAttr, "initializer",
-                                     result->attributes)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  }
-
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  Type type;
-  if (succeeded(parser.parseOptionalEqual())) {
-    // @foo = 4 : i32
-    Attribute initialValueAttr;
-    if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
-                                     result->attributes))) {
-      return failure();
-    }
-    type = initialValueAttr.getType();
-  } else {
-    // @foo : index = 4 : i32
-    if (failed(parser.parseColonType(type)) ||
-        failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-      return failure();
-    }
-    if (succeeded(parser.parseOptionalEqual())) {
-      Attribute initialValueAttr;
-      if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
-                                       result->attributes))) {
-        return failure();
-      }
-    }
-  }
-  result->addAttribute("type", TypeAttr::get(type));
-
-  return success();
-}
-
-static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
-  p << op.getOperationName() << ' ';
-  p.printSymbolName(op.sym_name());
-  if (op.is_mutable()) {
-    p << " mutable";
-  }
-  if (op.initializer().hasValue()) {
-    p << " init(";
-    p.printSymbolName(op.initializer().getValue());
-    p << ')';
-  }
-  if (op.initial_value().hasValue() &&
-      op.type() == op.initial_value().getValue().getType()) {
-    // @foo = 4 : i32
-  } else {
-    // @foo : index = 4 : i32
-    p << " : ";
-    p.printType(op.type());
-  }
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
-                                         "sym_name",
-                                         "type",
-                                         "is_mutable",
-                                         "initializer",
-                                         "initial_value",
-                                     });
-  if (op.initial_value().hasValue()) {
-    p << " = ";
-    p.printAttribute(op.initial_value().getValue());
-  }
-}
-
-static LogicalResult verifyVariableOp(VariableOp op) {
-  if (op.initializer().hasValue() && op.initial_value().hasValue()) {
-    return op.emitOpError()
-           << "variables can have either an initializer or an initial value";
-  } else if (op.initializer().hasValue()) {
-    // Ensure initializer returns the same type as the variable.
-    auto *symbolOp =
-        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
-    if (!symbolOp) {
-      return op.emitOpError() << "initializer function "
-                              << op.initializer().getValue() << " not found";
-    }
-    auto initializerOp = dyn_cast<FuncOp>(symbolOp);
-    if (initializerOp.getNumArguments() != 0 ||
-        initializerOp.getNumResults() != 1 ||
-        initializerOp.getType().getResult(0) != op.type()) {
-      return op.emitOpError()
-             << "initializer type mismatch; variable " << op.sym_name()
-             << " is " << op.type() << " but initializer function "
-             << initializerOp.getName() << " is " << initializerOp.getType();
-    }
-  }
-  return success();
-}
-
-void VariableOp::build(OpBuilder &builder, OperationState &result,
-                       StringRef name, bool isMutable, Type type,
-                       Optional<StringRef> initializer,
-                       Optional<Attribute> initialValue,
-                       ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder.getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder.getUnitAttr());
-  }
-  if (initializer.hasValue()) {
-    result.addAttribute("initializer",
-                        builder.getSymbolRefAttr(initializer.getValue()));
-  } else if (initialValue.hasValue()) {
-    result.addAttribute("initial_value", initialValue.getValue());
-  }
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
-}
-
-void VariableOp::build(OpBuilder &builder, OperationState &result,
-                       StringRef name, bool isMutable, mlir::FuncOp initializer,
-                       ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, initializer.getType().getResult(0),
-        initializer.getName(), llvm::None, attrs);
-}
-
-void VariableOp::build(OpBuilder &builder, OperationState &result,
-                       StringRef name, bool isMutable, Type type,
-                       Attribute initialValue, ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, initialValue,
-        attrs);
-}
-
-void VariableOp::build(OpBuilder &builder, OperationState &result,
-                       StringRef name, bool isMutable, Type type,
-                       ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.variable.load
-//===----------------------------------------------------------------------===//
-
-void VariableLoadOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  // HACK: works around the lack of symbol side effects in mlir by only saying
-  // we have a side-effect if the variable we are loading is mutable.
-  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(*this, variable());
-  assert(symbolOp);
-  auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  if (variableOp.is_mutable()) {
-    effects.emplace_back(MemoryEffects::Read::get());
-  }
-}
-
-static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
-  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
-  if (!symbolOp) {
-    return op.emitOpError() << "undefined variable: " << op.variable();
-  }
-  auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  auto loadType = op.result().getType();
-  if (!isVariableTypeCompatible(variableOp.type(), loadType)) {
-    return op.emitOpError()
-           << "variable type mismatch; variable " << op.variable() << " is "
-           << variableOp.type() << " but load is " << loadType;
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// hal.variable.load.indirect
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyVariableLoadIndirectOp(VariableLoadIndirectOp &op) {
-  auto variableType =
-      op.variable().getType().cast<IREE::PtrType>().getTargetType();
-  auto loadType = op.result().getType();
-  if (!isVariableTypeCompatible(variableType, loadType)) {
-    return op.emitOpError() << "variable type mismatch; variable pointer is "
-                            << variableType << " but load is " << loadType;
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// hal.variable.store
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
-  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
-  if (!symbolOp) {
-    return op.emitOpError() << "undefined variable: " << op.variable();
-  }
-  auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  auto storeType = op.value().getType();
-  if (!isVariableTypeCompatible(variableOp.type(), storeType)) {
-    return op.emitOpError()
-           << "variable type mismatch; variable " << op.variable() << " is "
-           << variableOp.type() << " but store is " << storeType;
-  }
-  if (!variableOp.is_mutable()) {
-    return op.emitOpError() << "variable " << op.variable()
-                            << " is not mutable and cannot be stored to";
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// hal.variable.store.indirect
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyVariableStoreIndirectOp(
-    VariableStoreIndirectOp &op) {
-  auto variableType =
-      op.variable().getType().cast<IREE::PtrType>().getTargetType();
-  auto storeType = op.value().getType();
-  if (!isVariableTypeCompatible(variableType, storeType)) {
-    return op.emitOpError() << "variable type mismatch; variable pointer is "
-                            << variableType << " but store is " << storeType;
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // hal.allocator.compute_size
 //===----------------------------------------------------------------------===//
 
 void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
                                    Value allocator, ValueRange shape,
-                                   int32_t elementType) {
+                                   int32_t elementType, int32_t encodingType) {
   build(builder, state, allocator, shape,
-        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32));
+        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32));
 }
 
 void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
                                    Value allocator, ValueRange shape,
-                                   Value elementType) {
+                                   Value elementType, Value encodingType) {
   state.addOperands({allocator});
   state.addOperands(shape);
   state.addOperands(elementType);
+  state.addOperands(encodingType);
   state.addTypes({builder.getIndexType()});
 }
 
@@ -592,18 +282,22 @@ void AllocatorComputeSizeOp::getAsmResultNames(
 
 void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
                                      Value allocator, ValueRange shape,
-                                     int32_t elementType, ValueRange indices) {
+                                     int32_t elementType, int32_t encodingType,
+                                     ValueRange indices) {
   build(builder, state, allocator, shape,
         builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
         indices);
 }
 
 void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
                                      Value allocator, ValueRange shape,
-                                     Value elementType, ValueRange indices) {
+                                     Value elementType, Value encodingType,
+                                     ValueRange indices) {
   state.addOperands({allocator});
   state.addOperands(shape);
   state.addOperands(elementType);
+  state.addOperands(encodingType);
   state.addOperands(indices);
   state.addTypes({builder.getIndexType()});
 }
@@ -619,20 +313,22 @@ void AllocatorComputeOffsetOp::getAsmResultNames(
 
 void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
                                     Value allocator, ValueRange shape,
-                                    int32_t elementType, ValueRange indices,
-                                    ValueRange lengths) {
+                                    int32_t elementType, int32_t encodingType,
+                                    ValueRange indices, ValueRange lengths) {
   build(builder, state, allocator, shape,
         builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
         indices, lengths);
 }
 
 void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
                                     Value allocator, ValueRange shape,
-                                    Value elementType, ValueRange indices,
-                                    ValueRange lengths) {
+                                    Value elementType, Value encodingType,
+                                    ValueRange indices, ValueRange lengths) {
   state.addOperands({allocator});
   state.addOperands(shape);
   state.addOperands(elementType);
+  state.addOperands(encodingType);
   state.addOperands(indices);
   state.addOperands(lengths);
   state.addTypes({builder.getIndexType(), builder.getIndexType()});
@@ -757,30 +453,22 @@ void BufferLengthOp::getAsmResultNames(
 
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
                                Value buffer, int32_t elementType,
-                               ValueRange shape) {
+                               int32_t encodingType, ValueRange shape) {
   build(builder, state, buffer,
         builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
+        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
         shape);
 }
 
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
                                Value buffer, Value elementType,
-                               ValueRange shape) {
-  state.addOperands({buffer, elementType});
+                               Value encodingType, ValueRange shape) {
+  state.addOperands({buffer, elementType, encodingType});
   state.addOperands(shape);
   state.addTypes({BufferViewType::get(builder.getContext())});
 }
 
 void BufferViewCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "view");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer_view.subview
-//===----------------------------------------------------------------------===//
-
-void BufferViewSubviewOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "view");
 }
@@ -807,41 +495,6 @@ void BufferViewByteLengthOp::build(OpBuilder &builder, OperationState &state,
 void BufferViewByteLengthOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "len");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer_view.compute_offset
-//===----------------------------------------------------------------------===//
-
-void BufferViewComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
-                                      Value bufferView, ValueRange indices) {
-  state.addOperands({bufferView});
-  state.addOperands(indices);
-  state.addTypes({builder.getIndexType()});
-}
-
-void BufferViewComputeOffsetOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(offset(), "off");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer_view.compute_range
-//===----------------------------------------------------------------------===//
-
-void BufferViewComputeRangeOp::build(OpBuilder &builder, OperationState &state,
-                                     Value bufferView, ValueRange indices,
-                                     ValueRange lengths) {
-  state.addOperands({bufferView});
-  state.addOperands(indices);
-  state.addOperands(lengths);
-  state.addTypes({builder.getIndexType(), builder.getIndexType()});
-}
-
-void BufferViewComputeRangeOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(offset(), "off");
-  setNameFn(length(), "len");
 }
 
 //===----------------------------------------------------------------------===//
@@ -883,7 +536,7 @@ static ParseResult parseCommandBufferExecutionBarrierOp(
 
 static void printCommandBufferExecutionBarrierOp(
     OpAsmPrinter &p, CommandBufferExecutionBarrierOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printOperand(op.command_buffer());
   p << ", \"";
   p << stringifyExecutionStageBitfield(op.source_stage_mask());
@@ -969,7 +622,7 @@ static ParseResult parseConstantPoolOp(OpAsmParser &parser,
 }
 
 static void printConstantPoolOp(OpAsmPrinter &p, ConstantPoolOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
@@ -1130,7 +783,7 @@ static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
 }
 
 static void printDeviceSwitchOp(OpAsmPrinter &p, DeviceSwitchOp op) {
-  p << op.getOperationName() << "<";
+  p << "<";
   p.printOperand(op.device());
   p << " : ";
   p.printType(op.device().getType());
@@ -1211,7 +864,7 @@ static ParseResult parseExecutableOp(OpAsmParser &parser,
 }
 
 static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
@@ -1253,7 +906,7 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
 
 static void printExecutableEntryPointOp(OpAsmPrinter &p,
                                         ExecutableEntryPointOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{"sym_name"});
@@ -1296,18 +949,19 @@ static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
 //===----------------------------------------------------------------------===//
 
 void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
-                                StringRef symName, StringRef target) {
+                                StringRef symName,
+                                IREE::HAL::ExecutableTargetAttr target) {
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
-  state.addAttribute("target", builder.getStringAttr(target));
+  state.addAttribute("target", target);
 }
 
 static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
                                             OperationState *result) {
   auto *body = result->addRegion();
   StringAttr nameAttr;
-  StringAttr targetAttr;
+  IREE::HAL::ExecutableTargetAttr targetAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
@@ -1330,9 +984,9 @@ static ParseResult parseExecutableVariantOp(OpAsmParser &parser,
 }
 
 static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
-  p << ", target=\"" << op.target() << "\"";
+  p << ", target = " << op.target();
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName(), "target"});
@@ -1349,7 +1003,6 @@ static void printExecutableVariantOp(OpAsmPrinter &p, ExecutableVariantOp op) {
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
                                StringRef symName, StringRef format,
                                std::vector<uint8_t> data) {
-  ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
   state.addAttribute("format", builder.getStringAttr(format));
@@ -1363,7 +1016,6 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
                                StringRef symName, StringAttr format,
                                DenseIntElementsAttr data) {
-  ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
   state.addAttribute("format", format);
@@ -1372,7 +1024,6 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 
 static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
                                            OperationState *result) {
-  auto *body = result->addRegion();
   StringAttr nameAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
@@ -1380,38 +1031,15 @@ static ParseResult parseExecutableBinaryOp(OpAsmParser &parser,
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
-  OptionalParseResult parseResult = parser.parseOptionalRegion(*body);
-  if (parseResult.hasValue() && failed(*parseResult)) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ExecutableBinaryOp::ensureTerminator(*body, parser.getBuilder(),
-                                       result->location);
   return success();
 }
 
 static void printExecutableBinaryOp(OpAsmPrinter &p, ExecutableBinaryOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  if (!op.body().empty()) {
-    p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                  /*printBlockTerminators=*/false);
-  }
-}
-
-static LogicalResult verifyExecutableBinaryOp(ExecutableBinaryOp op) {
-  // Zero or one ModuleOps allowed.
-  if (std::distance(op.getBlock().getOps<ModuleOp>().begin(),
-                    op.getBlock().getOps<ModuleOp>().end()) > 1) {
-    return op.emitOpError() << "expects zero or one nested std.module ops";
-  }
-
-  // TODO(benvanik): check export name conflicts.
-  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1468,7 +1096,7 @@ static ParseResult parseInterfaceOp(OpAsmParser &parser,
 }
 
 static void printInterfaceOp(OpAsmPrinter &p, InterfaceOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(),
@@ -1502,9 +1130,21 @@ bool InterfaceOp::isEquivalentTo(InterfaceOp other) {
   return push_constantsAttr() == other.push_constantsAttr() &&
          bindings.size() == otherBindings.size() &&
          llvm::all_of(llvm::zip(bindings, otherBindings), [](auto bindings) {
-           return OperationEquivalence::isEquivalentTo(std::get<0>(bindings),
-                                                       std::get<1>(bindings));
+           return OperationEquivalence::isEquivalentTo(
+               std::get<0>(bindings), std::get<1>(bindings),
+               OperationEquivalence::exactValueMatch,
+               OperationEquivalence::exactValueMatch,
+               OperationEquivalence::Flags::IgnoreLocations);
          });
+}
+
+llvm::hash_code InterfaceOp::getInterfaceHash() {
+  auto range = llvm::map_range(getBlock().getOps<InterfaceBindingOp>(),
+                               [](InterfaceBindingOp bindingOp) {
+                                 return bindingOp.getDescriptorHash();
+                               });
+  return llvm::hash_combine(
+      push_constants(), llvm::hash_combine_range(range.begin(), range.end()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1543,7 +1183,7 @@ static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
 }
 
 static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.sym_name());
   p << ", set=" << op.set();
   p << ", binding=" << op.binding();
@@ -1559,13 +1199,45 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
                                      });
 }
 
+llvm::hash_code InterfaceBindingOp::getDescriptorHash() {
+  // Use the unwrapped attribute accessors so that we can have determinstic
+  // hashes. Hashing against the wrapped attributes are hashing against pointer
+  // values, which change per run.
+  return llvm::hash_combine(set(), binding(), type(), access());
+}
+
 //===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
+static LogicalResult verifyInterfaceBindingSubspanOp(
+    InterfaceBindingSubspanOp op) {
+  if (ShapedType shapedType = op.getType().dyn_cast<ShapedType>()) {
+    if (shapedType.getNumDynamicDims() != op.dynamic_dims().size()) {
+      return op.emitOpError("result type ")
+             << op.getType() << " has " << shapedType.getNumDynamicDims()
+             << " dynamic dimensions but " << op.dynamic_dims().size()
+             << " associated dimension SSA values";
+    }
+  }
+
+  return success();
+}
+
 InterfaceBindingOp InterfaceBindingSubspanOp::queryBindingOp() {
   return dyn_cast_or_null<InterfaceBindingOp>(
       SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
+}
+
+Value InterfaceBindingSubspanOp::buildOperandRankedShape(unsigned idx,
+                                                         OpBuilder &builder) {
+  return {};
+}
+
+Value InterfaceBindingSubspanOp::buildResultRankedShape(unsigned idx,
+                                                        OpBuilder &builder) {
+  return Shape::buildRankedShapeForValue(getLoc(), result(), dynamic_dims(),
+                                         builder);
 }
 
 //===----------------------------------------------------------------------===//

@@ -31,7 +31,6 @@ class DropExcludedExportsPass
     getOperation()->walk([&](IREE::VM::ExportOp exportOp) {
       Operation *op = exportOp.getOperation();
       if (op->hasAttr("emitc.exclude")) {
-        exportOp.emitRemark("Dropping excluded export");
         opsToRemove.push_back(op);
       }
     });

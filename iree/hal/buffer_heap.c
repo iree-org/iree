@@ -12,6 +12,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
+#include "iree/hal/buffer_heap_impl.h"
 #include "iree/hal/resource.h"
 
 typedef struct iree_hal_heap_buffer_t {
@@ -19,21 +20,27 @@ typedef struct iree_hal_heap_buffer_t {
 
   iree_byte_span_t data;
   iree_allocator_t data_allocator;
+
+  // Optional statistics shared with the allocator.
+  IREE_STATISTICS(iree_hal_heap_allocator_statistics_t* statistics;)
 } iree_hal_heap_buffer_t;
 
 static const iree_hal_buffer_vtable_t iree_hal_heap_buffer_vtable;
 
 iree_status_t iree_hal_heap_buffer_create(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
+    iree_hal_allocator_t* allocator,
+    iree_hal_heap_allocator_statistics_t* statistics,
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // NOTE: we want the buffer data to always be 16-byte aligned.
   iree_hal_heap_buffer_t* buffer = NULL;
-  iree_host_size_t header_size = iree_host_align(sizeof(*buffer), 16);
+  iree_host_size_t header_size =
+      iree_host_align(iree_sizeof_struct(*buffer), 16);
   iree_host_size_t total_size = header_size + allocation_size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&buffer);
@@ -51,11 +58,22 @@ iree_status_t iree_hal_heap_buffer_create(
     buffer->data =
         iree_make_byte_span((uint8_t*)buffer + header_size, allocation_size);
     buffer->data_allocator = iree_allocator_null();  // freed with the buffer
+
+    IREE_STATISTICS({
+      if (statistics != NULL) {
+        buffer->statistics = statistics;
+        iree_slim_mutex_lock(&statistics->mutex);
+        iree_hal_allocator_statistics_record_alloc(
+            &statistics->base, memory_type, allocation_size);
+        iree_slim_mutex_unlock(&statistics->mutex);
+      }
+    });
+
     *out_buffer = &buffer->base;
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
@@ -89,7 +107,7 @@ IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_heap_buffer_destroy(iree_hal_buffer_t* base_buffer) {
@@ -97,6 +115,16 @@ static void iree_hal_heap_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_STATISTICS({
+    if (buffer->statistics != NULL) {
+      iree_slim_mutex_lock(&buffer->statistics->mutex);
+      iree_hal_allocator_statistics_record_free(&buffer->statistics->base,
+                                                base_buffer->memory_type,
+                                                base_buffer->allocation_size);
+      iree_slim_mutex_unlock(&buffer->statistics->mutex);
+    }
+  });
 
   iree_allocator_free(buffer->data_allocator, buffer->data.data);
   iree_allocator_free(host_allocator, buffer);

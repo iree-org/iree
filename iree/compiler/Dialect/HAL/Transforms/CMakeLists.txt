@@ -16,8 +16,8 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "AssignTargetDevices.cpp"
     "BenchmarkBatchDispatches.cpp"
-    "CSEVariableLoads.cpp"
     "ConvertToHAL.cpp"
     "IdentifyConstantPools.cpp"
     "InlineDeviceSwitches.cpp"
@@ -32,7 +32,8 @@ iree_cc_library(
     "PropagateConstantWorkgroupInfo.cpp"
     "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
-    "TranslateExecutableVariants.cpp"
+    "TranslateExecutables.cpp"
+    "VerifyTargetEnvironment.cpp"
   DEPS
     LLVMSupport
     MLIRAffineToStandard
@@ -45,17 +46,17 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL
     iree::compiler::Dialect::HAL::Conversion::HALToHAL
-    iree::compiler::Dialect::HAL::Conversion::IREEToHAL
     iree::compiler::Dialect::HAL::Conversion::StandardToHAL
+    iree::compiler::Dialect::HAL::Conversion::UtilToHAL
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
+    iree::compiler::Dialect::Util::Conversion
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
   PUBLIC
 )
 

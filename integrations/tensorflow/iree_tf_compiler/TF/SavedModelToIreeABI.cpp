@@ -20,9 +20,9 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/JSON.h"
@@ -101,6 +101,7 @@ struct StructureLevel {
   // index for arguments, return index for returns).
   int valueIndex = 0;
   Type valueType;
+  StringRef valueName;
 
   // For child levels, the key in the parent container, either a string or int
   // value.
@@ -109,15 +110,7 @@ struct StructureLevel {
 
   // Children (must be heap allocated due to recursion).
   std::vector<StructureLevel> children;
-
-  // The root argument level is still just a list but has a special dict
-  // child in which to shove kwargs. Once everything is constructed, if the
-  // kwargs dict is not empty, it is added as the last child.
   bool isRootArgs = false;
-  std::unique_ptr<StructureLevel> kwargs;
-
-  // If this is the kwargs dict level, it will have this bit set.
-  bool isKwargs = false;
 
   static StructureLevel leafValue(int valueIndex) {
     return StructureLevel{LevelType::Value, valueIndex};
@@ -126,23 +119,20 @@ struct StructureLevel {
   static StructureLevel createRootArgsList() {
     StructureLevel ret = StructureLevel{LevelType::List};
     ret.isRootArgs = true;
-    ret.kwargs =
-        std::unique_ptr<StructureLevel>(new StructureLevel{LevelType::Dict});
-    ret.kwargs->isKwargs = true;
     return ret;
   }
 
   Type getIrType(Builder builder) {
-    auto variantType = IREE::VariantType::get(builder.getContext());
+    auto variantType = IREE::Util::VariantType::get(builder.getContext());
     if (type == LevelType::Value) {
       if (valueType.isa<TensorType>()) {
         return IREE::HAL::BufferViewType::get(builder.getContext());
       }
       return valueType;
     } else if (type == LevelType::List || type == LevelType::Tuple) {
-      return IREE::ListType::get(variantType);
+      return IREE::Util::ListType::get(variantType);
     } else if (type == LevelType::Dict) {
-      return IREE::ListType::get(variantType);
+      return IREE::Util::ListType::get(variantType);
     }
 
     llvm_unreachable("Unknown LevelType");
@@ -168,7 +158,17 @@ struct StructureLevel {
   json::Value createReflectionType() {
     switch (type) {
       case LevelType::Value:
-        return mapTypeToJsonTypeRecord(valueType);
+        if (valueName.empty()) {
+          // Unnamed.
+          return mapTypeToJsonTypeRecord(valueType);
+        } else {
+          // Named.
+          json::Array namedRecord;
+          namedRecord.push_back(json::Value("named"));
+          namedRecord.push_back(json::Value(valueName));
+          namedRecord.push_back(mapTypeToJsonTypeRecord(valueType));
+          return json::Value(std::move(namedRecord));
+        }
       case LevelType::List:
       case LevelType::Tuple: {
         json::Array typeRecord;
@@ -186,8 +186,7 @@ struct StructureLevel {
       }
       case LevelType::Dict: {
         json::Array typeRecord;
-        typeRecord.push_back(isKwargs ? json::Value("sdict_kwargs")
-                                      : json::Value("sdict"));
+        typeRecord.push_back(json::Value("sdict"));
         for (auto &child : children) {
           json::Array nvRecord;
           nvRecord.push_back(child.skey);
@@ -263,14 +262,15 @@ struct StructureLevel {
       Value listSizeValue =
           builder.create<ConstantOp>(loc, builder.getIndexType(),
                                      builder.getIndexAttr(getNeededListSize()));
-      Value listValue = builder.create<IREE::ListCreateOp>(
+      Value listValue = builder.create<IREE::Util::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
-      builder.create<IREE::ListResizeOp>(loc, listValue, listSizeValue);
+      builder.create<IREE::Util::ListResizeOp>(loc, listValue, listSizeValue);
       for (StructureLevel &child : children) {
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(child.ikey));
-        builder.create<IREE::ListSetOp>(loc, listValue, indexValue, childValue);
+        builder.create<IREE::Util::ListSetOp>(loc, listValue, indexValue,
+                                              childValue);
       }
       return listValue;
     }
@@ -280,15 +280,16 @@ struct StructureLevel {
       Value listSizeValue =
           builder.create<ConstantOp>(loc, builder.getIndexType(),
                                      builder.getIndexAttr(getNeededListSize()));
-      Value listValue = builder.create<IREE::ListCreateOp>(
+      Value listValue = builder.create<IREE::Util::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
-      builder.create<IREE::ListResizeOp>(loc, listValue, listSizeValue);
+      builder.create<IREE::Util::ListResizeOp>(loc, listValue, listSizeValue);
       for (auto it : llvm::enumerate(children)) {
         StructureLevel &child = it.value();
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
         Value indexValue = builder.create<ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(it.index()));
-        builder.create<IREE::ListSetOp>(loc, listValue, indexValue, childValue);
+        builder.create<IREE::Util::ListSetOp>(loc, listValue, indexValue,
+                                              childValue);
       }
       return listValue;
     }
@@ -301,8 +302,8 @@ struct StructureLevel {
                         int index) {
     Value indexValue = builder.create<ConstantOp>(loc, builder.getIndexType(),
                                                   builder.getIndexAttr(index));
-    Value itemValue = builder.create<IREE::ListGetOp>(loc, getIrType(builder),
-                                                      parentList, indexValue);
+    Value itemValue = builder.create<IREE::Util::ListGetOp>(
+        loc, getIrType(builder), parentList, indexValue);
     // TODO: Null check, etc. How does that work if returning a tensor? Need
     // to box somehow?
     if (itemValue.getType().isa<IREE::HAL::BufferViewType>()) {
@@ -313,12 +314,6 @@ struct StructureLevel {
   }
 
   void normalize() {
-    // Handle root kwargs.
-    if (isRootArgs && !kwargs->children.empty()) {
-      kwargs->ikey = children.size();
-      children.push_back(std::move(*kwargs));
-    }
-
     // Sort by key.
     if (type == LevelType::List || type == LevelType::Tuple) {
       std::sort(
@@ -369,9 +364,17 @@ struct StructureLevel {
   StructureLevel *allocateChild(Location loc, StringRef childKey) {
     if (type == LevelType::None) type = LevelType::Dict;
     if (type != LevelType::Dict) {
-      // Special case for root-args: shove it into the kwargs.
+      // Special case for root-args: create a named bindings.
       if (isRootArgs) {
-        return kwargs->allocateChild(loc, childKey);
+        int maxIKey = 0;
+        for (auto &child : children) {
+          if (child.ikey > maxIKey) maxIKey = child.ikey;
+        }
+
+        children.push_back({});
+        children.back().ikey = maxIKey + 1;
+        children.back().valueName = childKey;
+        return &children.back();
       } else {
         emitError(loc) << "structure path mismatch: dereference a non-dict "
                        << "with a dict key '" << childKey << "'";
@@ -463,7 +466,11 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // towards multi-return safe by converting to tuple.
   // TODO: Investigate upstream whether there are additional signals to be
   // plumbed.
-  bool isMultiResult = resultsRoot.type == LevelType::Tuple;
+  // Tuples, lists and dicts are just inlined as multi results instead of
+  // introducing a root nesting.
+  bool isMultiResult = resultsRoot.type == LevelType::Tuple ||
+                       resultsRoot.type == LevelType::List ||
+                       resultsRoot.type == LevelType::Dict;
 
   // Build the wrapper function type.
   SmallVector<Type> wrapperArgTypes;
@@ -525,8 +532,9 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
     for (int i = 0, e = resultsRoot.children.size(); i < e; ++i) {
       wrapperReturns[i] = resultsRoot.children[i].emitCreateReturns(
           loc, builder, internalResults);
-      refReturns.push_back(resultsRoot.children[i].createReflectionType());
     }
+    // Multi-result roots are implicitly inlined.
+    refReturns.push_back(resultsRoot.createReflectionType());
   } else {
     // Single return.
     assert(wrapperReturns.size() == 1 &&
@@ -563,9 +571,10 @@ class SavedModelToIREEABIPass
     : public PassWrapper<SavedModelToIREEABIPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, iree_compiler::IREEDialect,
-                    IREE::HAL::HALDialect,
-                    mlir::tf_saved_model::TensorFlowSavedModelDialect>();
+    registry
+        .insert<IREE::Flow::FlowDialect, iree_compiler::IREE::Util::UtilDialect,
+                IREE::HAL::HALDialect,
+                mlir::tf_saved_model::TensorFlowSavedModelDialect>();
   }
 
   StringRef getArgument() const override {

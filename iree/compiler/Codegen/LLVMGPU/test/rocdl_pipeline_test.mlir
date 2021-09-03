@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-codegen-linalg-to-rocdl-pipeline))" %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-rocdl-pipeline))' %s | IreeFileCheck %s
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -8,9 +8,9 @@ hal.executable @simpleMath_ex_dispatch_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @rocm, target="rocm" {
+  hal.executable.variant @rocm, target = #hal.executable.target<"rocm", "rocm-hsaco-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<writeonly:16xf32>) -> ()}
-  module  {
+  builtin.module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
       %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
@@ -37,7 +37,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 }
 
 // CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-//       CHECK:   hal.executable.variant @rocm, target="rocm" {
+//       CHECK:   hal.executable.variant @rocm
 //       CHECK:   llvm.fadd
 
 // -----
@@ -51,9 +51,9 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @rocm, target="rocm" {
+  hal.executable.variant @rocm, target = #hal.executable.target<"rocm", "rocm-hsaco-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<writeonly:1024x1024xf32>) -> ()}
-    module  {
+    builtin.module  {
       func @dot_dispatch_0() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index
@@ -100,10 +100,16 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 }
 
 //   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.variant @rocm, target="rocm" {
-// CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
-//         CHECK:   llvm.br
-// CHECK-COUNT-6:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-// CHECK-COUNT-8:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//         CHECK:   llvm.br
-// CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//         CHECK:   hal.executable.variant @rocm
+//       CHECK-NOT:   llvm.store
+//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.br
+//   CHECK-COUNT-3:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+// CHECK-COUNT-128:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
+//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.br
+//   CHECK-COUNT-3:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+// CHECK-COUNT-128:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
+//  CHECK-COUNT-16:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>

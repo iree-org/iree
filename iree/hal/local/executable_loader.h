@@ -99,6 +99,14 @@ bool iree_hal_executable_loader_query_support(
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format);
 
+// Returns true if any loader in the list can load executables of the given
+// |executable_format|. Note that loading may still fail if the executable uses
+// features not available on the current host or runtime.
+bool iree_hal_query_any_executable_loader_support(
+    iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_string_view_t executable_format);
+
 // Tries loading the |executable_data| provided in the given
 // |executable_format|. May fail even if the executable is valid if it requires
 // features not supported by the current host or runtime (such as available

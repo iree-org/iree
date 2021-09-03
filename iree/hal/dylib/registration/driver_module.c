@@ -13,7 +13,7 @@
 #include "iree/base/internal/flags.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/embedded_library_loader.h"
-#include "iree/hal/local/loaders/legacy_library_loader.h"
+#include "iree/hal/local/loaders/system_library_loader.h"
 #include "iree/hal/local/task_device.h"
 #include "iree/hal/local/task_driver.h"
 #include "iree/task/api.h"
@@ -66,7 +66,7 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
         &loaders[loader_count++]);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_legacy_library_loader_create(
+    status = iree_hal_system_library_loader_create(
         iree_hal_executable_import_provider_null(), allocator,
         &loaders[loader_count++]);
   }
@@ -78,8 +78,8 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
-        iree_make_cstring_view("dylib"), &default_params, executor,
-        loader_count, loaders, allocator, out_driver);
+        iree_make_cstring_view("cpu"), &default_params, executor, loader_count,
+        loaders, allocator, out_driver);
   }
 
   iree_task_executor_release(executor);

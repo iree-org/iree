@@ -1,5 +1,6 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))" %s | IreeFileCheck %s
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))" -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s -check-prefix=PROMOTE
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))' %s | IreeFileCheck %s
+// TODO(antiagainst): Fix promotion to workgroup and enable the test.
+// | IreeFileCheck %s -check-prefix=PROMOTE
 
 hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
   hal.interface @io attributes {sym_visibility = "private"} {
@@ -7,12 +8,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target="vulkan" {
-    hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    module attributes {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
           [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
@@ -36,7 +32,12 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
            max_compute_shared_memory_size = 49152 : i32,
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-           subgroup_size = 32 : i32}>} {
+           subgroup_size = 32 : i32}>}> {
+    hal.executable.entry_point @matmul_static_shape attributes {
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 1: index, 1: index]
+    }
+    builtin.module {
       func @matmul_static_shape() {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index
@@ -54,7 +55,9 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
           %9 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%4]
           %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%3]
           %11 = memref.subview %2[%9, %10] [64, 64] [1, 1] : memref<4096x4096xf16> to memref<64x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%6, %8 : memref<64x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<32x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>) outs(%11 : memref<64x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
+          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[64, 64, 32], [64, 64]]}}
+            ins(%6, %8 : memref<64x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<32x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
+            outs(%11 : memref<64x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
         }
         return
       }
@@ -267,12 +270,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target="vulkan" {
-    hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    module attributes {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
           [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
@@ -296,7 +294,12 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
            max_compute_shared_memory_size = 49152 : i32,
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-           subgroup_size = 32 : i32}>} {
+           subgroup_size = 32 : i32}>}> {
+    hal.executable.entry_point @matmul_static_shape attributes {
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 1: index, 1: index]
+    }
+    builtin.module {
       func @matmul_static_shape() {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index
@@ -314,7 +317,9 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
           %9 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%4]
           %10 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%3]
           %11 = memref.subview %2[%9, %10] [128, 128] [1, 1] : memref<4096x4096xf16> to memref<128x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup", is_root_op, launch_info_key = "__op_num_0__"} ins(%6, %8 : memref<128x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<32x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>) outs(%11 : memref<128x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
+          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[64, 64, 32], [64, 64]]}}
+            ins(%6, %8 : memref<128x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<32x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
+            outs(%11 : memref<128x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
         }
         return
       }

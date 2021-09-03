@@ -97,10 +97,10 @@ vm.module @list_variant_ops {
   vm.func @fail_uninitialized_access() {
     %c0 = vm.const.i32 0 : i32
     %c1 = vm.const.i32 1 : i32
-    
+
     %ref = vm.const.ref.rodata @byte_buffer : !vm.buffer
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
-    
+
     vm.list.set.ref %list, %c0, %ref : (!vm.list<?>, i32, !vm.buffer)
     vm.return
   }
@@ -111,9 +111,9 @@ vm.module @list_variant_ops {
 
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
     vm.list.resize %list, %c1 : (!vm.list<?>, i32)
-    
+
     %ref = vm.list.get.ref %list, %c1 : (!vm.list<?>, i32) -> !vm.buffer
-    %ref_dno = iree.do_not_optimize(%ref) : !vm.buffer
+    %ref_dno = util.do_not_optimize(%ref) : !vm.buffer
     vm.return
   }
 
@@ -121,7 +121,7 @@ vm.module @list_variant_ops {
   vm.func @fail_out_of_bounds_write() {
     %c0 = vm.const.i32 0 : i32
     %c1 = vm.const.i32 1 : i32
-    
+
     %ref = vm.const.ref.rodata @byte_buffer : !vm.buffer
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
     vm.list.resize %list, %c1 : (!vm.list<?>, i32)

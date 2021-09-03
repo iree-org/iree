@@ -27,6 +27,7 @@ iree_check_single_backend_test_suite(
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
             "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
@@ -62,6 +63,7 @@ iree_check_single_backend_test_suite(
             "reshape.mlir",
             "reverse.mlir",
             "rsqrt.mlir",
+            "scatter.mlir",
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
@@ -76,7 +78,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "round.mlir",
-            "scatter.mlir",
+            "scatter_dynamic.mlir",
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -92,6 +94,76 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
+# TODO(#6748): Enable after issue is fixed.
+# iree_check_single_backend_test_suite(
+#     name = "check_dylib_embedded-llvm-aot_dylib",
+#     srcs = enforce_glob(
+#         # keep sorted
+#         [
+#             "abs.mlir",
+#             "add.mlir",
+#             "batch_norm_inference.mlir",
+#             "broadcast.mlir",
+#             "broadcast_add.mlir",
+#             "broadcast_in_dim.mlir",
+#             "clamp.mlir",
+#             "compare.mlir",
+#             "concatenate.mlir",
+#             "constant.mlir",
+#             "convert.mlir",
+#             "convolution.mlir",
+#             "cosine.mlir",
+#             "divide.mlir",
+#             "dot.mlir",
+#             "dot_general.mlir",
+#             "dynamic_slice.mlir",
+#             "dynamic_update_slice.mlir",
+#             "exponential.mlir",
+#             "exponential_minus_one.mlir",
+#             "fft.mlir",
+#             "finite.mlir",
+#             "floor.mlir",
+#             "gather.mlir",
+#             "iota.mlir",
+#             "log.mlir",
+#             "log_plus_one.mlir",
+#             "maximum.mlir",
+#             "minimum.mlir",
+#             "multiply.mlir",
+#             "negate.mlir",
+#             "pad.mlir",
+#             "reduce.mlir",
+#             "reduce_window.mlir",
+#             "remainder.mlir",
+#             "reshape.mlir",
+#             "reverse.mlir",
+#             "rsqrt.mlir",
+#             "scatter.mlir",
+#             "scatter_dynamic.mlir",
+#             "select.mlir",
+#             "sine.mlir",
+#             "slice.mlir",
+#             "sort.mlir",
+#             "sqrt.mlir",
+#             "subtract.mlir",
+#             "tanh.mlir",
+#             "torch_index_select.mlir",
+#             "transpose.mlir",
+#             "while.mlir",
+#         ],
+#         include = ["*.mlir"],
+#         exclude = [
+#             "round.mlir",
+#         ],
+#     ),
+#     compiler_flags = [
+#         "-iree-input-type=mhlo",
+#         "-iree-llvm-link-embedded=true",
+#     ],
+#     driver = "dylib",
+#     target_backend = "dylib-llvm-aot",
+# )
+
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = enforce_glob(
@@ -100,6 +172,7 @@ iree_check_single_backend_test_suite(
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
             "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
@@ -136,6 +209,7 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
+            "scatter_dynamic.mlir",
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
@@ -165,6 +239,7 @@ iree_check_single_backend_test_suite(
             "abs.mlir",
             "add.mlir",
             "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
             "broadcast.mlir",
             "broadcast_add.mlir",
             "broadcast_in_dim.mlir",
@@ -182,7 +257,6 @@ iree_check_single_backend_test_suite(
             "dynamic_update_slice.mlir",
             "exponential.mlir",
             "exponential_minus_one.mlir",
-            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -212,8 +286,10 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "fft.mlir",  # TODO(GH-6601): Eanble the test.
             "round.mlir",
-            "scatter.mlir",  # TODO(GH-6000): Enable the test.
+            "scatter.mlir",  # TODO(GH-6601): Enable the test.
+            "scatter_dynamic.mlir",  # TODO(GH-6601): Enable the test.
             "sort.mlir",
         ],
     ),
@@ -247,6 +323,7 @@ iree_check_single_backend_test_suite(
             "dynamic_update_slice.mlir",
             "exponential.mlir",
             "exponential_minus_one.mlir",
+            "fft.mlir",
             "finite.mlir",
             "floor.mlir",
             "gather.mlir",
@@ -264,9 +341,11 @@ iree_check_single_backend_test_suite(
             "reshape.mlir",
             "reverse.mlir",
             "rsqrt.mlir",
+            "scatter.mlir",
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
+            "sort.mlir",
             "sqrt.mlir",
             "subtract.mlir",
             "tanh.mlir",
@@ -276,10 +355,9 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",  # TODO(GH-5444): Enable the test.
+            "bitcast_convert.mlir",
             "round.mlir",
-            "scatter.mlir",  # TODO(GH-6001): Enable the test.
-            "sort.mlir",
+            "scatter_dynamic.mlir",  # TODO(GH-6388): Enable the test.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],

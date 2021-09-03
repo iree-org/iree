@@ -32,12 +32,16 @@ iree_cc_library(
     "OptimizeVectorTransferPass.cpp"
     "SetNumWorkgroupsPass.cpp"
     "VectorizeConv.cpp"
+    "VectorizeMMT4d.cpp"
   DEPS
     LLVMSupport
     MLIRAffine
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRGPUOps
     MLIRIR
+    MLIRLLVMCommonConversion
+    MLIRLLVMIR
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRMemRef
@@ -57,9 +61,9 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

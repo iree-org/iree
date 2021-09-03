@@ -27,35 +27,6 @@ http_archive(
 load("@bazel_skylib//lib:paths.bzl", "paths")
 ################################################################################
 
-################################## TensorFlow ##################################
-maybe(
-    local_repository,
-    name = "org_tensorflow",
-    path = paths.join(IREE_PATH, "third_party/tensorflow"),
-)
-
-# Import all of the tensorflow dependencies. Note that we are deliberately
-# letting TensorFlow take control of all the dependencies it sets up, whereas
-# ours are initialized with `maybe`. Actually tracking this with Bazel is PITA
-# and for now this gets TF stuff building. This includes, for instance,
-# @llvm-project and @com_google_absl.
-load("@org_tensorflow//tensorflow:workspace3.bzl", "tf_workspace3")
-
-tf_workspace3()
-
-load("@org_tensorflow//tensorflow:workspace2.bzl", "tf_workspace2")
-
-tf_workspace2()
-
-load("@org_tensorflow//tensorflow:workspace1.bzl", "tf_workspace1")
-
-tf_workspace1()
-
-load("@org_tensorflow//tensorflow:workspace0.bzl", "tf_workspace0")
-
-tf_workspace0()
-################################################################################
-
 ##################################### IREE #####################################
 # We need a shim here to make this use the version of mlir-hlo present in
 # TensorFlow. This shim is just alias rules that forward to the TF rule. Note
@@ -79,4 +50,43 @@ configure_iree_submodule_deps(
     iree_path = IREE_PATH,
     iree_repo_alias = "@iree",
 )
+
+new_local_repository(
+    name = "llvm-raw",
+    build_file_content = "# empty",
+    path = paths.join(IREE_PATH, "third_party/llvm-project"),
+)
+
+load("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure", "llvm_disable_optional_support_deps")
+
+llvm_configure(name = "llvm-project")
+
+llvm_disable_optional_support_deps()
+
+################################################################################
+
+################################## TensorFlow ##################################
+maybe(
+    local_repository,
+    name = "org_tensorflow",
+    path = paths.join(IREE_PATH, "third_party/tensorflow"),
+)
+
+# Import all of the tensorflow dependencies. Note that any repository previously
+# defined (e.g. from IREE submodules) will be skipped.
+load("@org_tensorflow//tensorflow:workspace3.bzl", "tf_workspace3")
+
+tf_workspace3()
+
+load("@org_tensorflow//tensorflow:workspace2.bzl", "tf_workspace2")
+
+tf_workspace2()
+
+load("@org_tensorflow//tensorflow:workspace1.bzl", "tf_workspace1")
+
+tf_workspace1()
+
+load("@org_tensorflow//tensorflow:workspace0.bzl", "tf_workspace0")
+
+tf_workspace0()
 ################################################################################

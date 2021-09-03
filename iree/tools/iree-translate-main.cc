@@ -20,6 +20,7 @@
 #include "iree/tools/init_compiler_modules.h"
 #include "iree/tools/init_iree_dialects.h"
 #include "iree/tools/init_mlir_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
 #include "iree/tools/init_translations.h"
 #include "iree/tools/init_xla_dialects.h"
@@ -57,12 +58,19 @@ static llvm::cl::opt<bool> splitInputFile(
                    "process each chunk independently"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> printMainAddress(
+    "print-main-address",
+    llvm::cl::desc("Print the address of main to stderr to aid in symbolizing "
+                   "stack traces after the fact"),
+    llvm::cl::init(false));
+
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
   mlir::registerLLVMDialectTranslation(registry);
   mlir::registerXLADialects(registry);
+  mlir::iree_compiler::registerAllPasses();
   mlir::iree_compiler::registerIreeDialects(registry);
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
@@ -88,6 +96,11 @@ int main(int argc, char **argv) {
                            llvm::cl::Required);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "IREE translation driver\n");
+
+  if (printMainAddress) {
+    llvm::errs() << "iree-translate main is at "
+                 << reinterpret_cast<void *>(&main) << "\n";
+  }
 
   std::string errorMessage;
   auto input = mlir::openInputFile(inputFilename, &errorMessage);

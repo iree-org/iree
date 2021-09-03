@@ -4,9 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
@@ -19,7 +21,7 @@ namespace iree_compiler {
 /// If the value is a threadID return the range [0, workgroupSize-1].
 static Optional<std::pair<AffineExpr, AffineExpr>> threadIdMinMax(
     Value value, SmallVectorImpl<Value> &dims, SmallVectorImpl<Value> &symbols,
-    ArrayRef<int32_t> workgroupSize) {
+    ArrayRef<int64_t> workgroupSize) {
   if (auto idOp = value.getDefiningOp<gpu::ThreadIdOp>()) {
     unsigned index = StringSwitch<unsigned>(idOp.dimension())
                          .Case("x", 0)
@@ -40,12 +42,10 @@ class LLVMGPURemoveSingleIterationLoopPass
           LLVMGPURemoveSingleIterationLoopPass> {
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
-    std::array<int32_t, 3> workgroupSize;
-    for (auto it : llvm::enumerate(funcOp->getAttr("llvmgpu_workgroup_size")
-                                       .cast<DenseIntElementsAttr>()
-                                       .getIntValues())) {
-      workgroupSize[it.index()] = it.value().getZExtValue();
-    }
+    auto entryPointOp = getEntryPoint(funcOp);
+    if (!entryPointOp) return;
+    auto workgroupSize = getWorkgroupSize(entryPointOp);
+    workgroupSize.resize(3, 1);
     auto getThreadIdMinMax = [&workgroupSize](Value value,
                                               SmallVectorImpl<Value> &dims,
                                               SmallVectorImpl<Value> &symbols) {

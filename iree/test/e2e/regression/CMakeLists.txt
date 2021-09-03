@@ -17,12 +17,14 @@ iree_lit_test_suite(
     "dynamic_abs.mlir"
     "dynamic_add.mlir"
     "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
     "dynamic_torch_index_select_high_rank.mlir"
     "dynamic_torch_index_select_negative.mlir"
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
     "globals.mlir"
     "scalar.mlir"
+    "tensor_cast.mlir"
     "trace_dispatch_tensors.mlir"
     "unused_args.mlir"
   DATA
@@ -38,7 +40,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_linalg_ops_dylib-llvm-aot
   SRCS
+    "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "lowering_config.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER

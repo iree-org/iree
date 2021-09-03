@@ -22,46 +22,11 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-static constexpr unsigned kMaxNumParallelDims = 3;
-
 namespace mlir {
 namespace iree_compiler {
 
 namespace {
-static size_t kMaxHALDimensions = 3;
 
-/// Sets the hal.interace.workgroup.size operation to the constant value passed
-/// in as `workloadPerWorkgroup`. The number of entries in
-/// `workloadPerWorkgroup` is at least as much as the dimensionality of the
-/// workgroup. It is assumed that the inner-most loop is mapped to the fastest
-/// varying dimension in flow.dispatch.workgroup_size.
-class SetWorkgroupSizePattern
-    : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
- public:
-  SetWorkgroupSizePattern(MLIRContext *context,
-                          ArrayRef<int64_t> workloadPerWorkgroupRef,
-                          PatternBenefit benefit = 1)
-      : OpRewritePattern(context, benefit),
-        workloadPerWorkgroup(llvm::to_vector<4>(
-            workloadPerWorkgroupRef.size() > kMaxHALDimensions
-                ? workloadPerWorkgroupRef.take_front(kMaxHALDimensions)
-                : workloadPerWorkgroupRef)) {}
-
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupSizeOp workgroupSizeOp,
-      PatternRewriter &rewriter) const override {
-    int64_t dim = workgroupSizeOp.dimension().getSExtValue();
-    if (dim >= workloadPerWorkgroup.size()) {
-      return failure();
-    }
-    rewriter.replaceOpWithNewOp<ConstantIndexOp>(workgroupSizeOp,
-                                                 workloadPerWorkgroup[dim]);
-    return success();
-  }
-
- private:
-  SmallVector<int64_t, 4> workloadPerWorkgroup;
-};
 }  // namespace
 
 LogicalResult defineWorkgroupCountRegion(
@@ -76,10 +41,21 @@ LogicalResult defineWorkgroupCountRegion(
   OpBuilder::InsertionGuard guard(builder);
   // Create the cloned operation but with a single region.
   builder.setInsertionPoint(entryPointOp);
+
   auto clonedOp = builder.create<IREE::HAL::ExecutableEntryPointOp>(
       loc, entryPointOp.sym_nameAttr(), entryPointOp.ordinalAttr(),
       entryPointOp.interfaceAttr(), entryPointOp.workgroup_sizeAttr(),
       entryPointOp.workgroup_local_memoryAttr(), 1);
+  // Copy over all attributes
+  for (auto attr : entryPointOp->getAttrs()) {
+    if (attr.first != entryPointOp.sym_nameAttrName() &&
+        attr.first != entryPointOp.ordinalAttrName() &&
+        attr.first != entryPointOp.interfaceAttrName() &&
+        attr.first != entryPointOp.workgroup_sizeAttrName() &&
+        attr.first != entryPointOp.workgroup_local_memoryAttrName()) {
+      clonedOp->setAttr(attr.first, attr.second);
+    }
+  }
   Region *region = clonedOp.getBody();
   Block *entryBlock = builder.createBlock(region);
   // Add 3 index arguments for the workload.
@@ -91,34 +67,6 @@ LogicalResult defineWorkgroupCountRegion(
   builder.create<IREE::HAL::ReturnOp>(loc, workgroupCount);
   entryPointOp.erase();
   return success();
-}
-
-LogicalResult materializeStaticLaunchInformation(
-    FuncOp funcOp, ArrayRef<int64_t> workloadPerWorkgroup) {
-  OwningRewritePatternList patterns(funcOp.getContext());
-  patterns.insert<SetWorkgroupSizePattern>(funcOp.getContext(),
-                                           workloadPerWorkgroup);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-    return failure();
-  }
-  assert(workloadPerWorkgroup.size() <= kMaxNumParallelDims &&
-         "workloadPerWorkgroup size greater than max num parallel dims");
-  WorkgroupCountRegionBuilder regionBuilder =
-      [&workloadPerWorkgroup](
-          OpBuilder &b, Location loc,
-          std::array<Value, 3> workload) -> std::array<Value, 3> {
-    Value one = b.create<ConstantIndexOp>(loc, 1);
-    std::array<Value, 3> returnValues = {one, one, one};
-    for (auto ts : llvm::enumerate(workloadPerWorkgroup)) {
-      returnValues[ts.index()] = linalg::applyMapToValues(
-          b, loc,
-          AffineMap::get(0, 1, b.getAffineSymbolExpr(0).ceilDiv(ts.value())),
-          workload[ts.index()])[0];
-    }
-    return returnValues;
-  };
-  OpBuilder builder(funcOp.getContext());
-  return defineWorkgroupCountRegion(builder, funcOp, regionBuilder);
 }
 
 /// Return a fused vector::ContractionOp which represents a patterns such as:

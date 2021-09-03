@@ -13,9 +13,11 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/librt/librt.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/dylib_executable_def_builder.h"
+#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -25,16 +27,17 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
+#define DEBUG_TYPE "iree-llvmaot-target"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-namespace {
+static constexpr char kQueryFunctionName[] =
+    "iree_hal_executable_library_query";
 
-constexpr char kQueryFunctionName[] = "iree_hal_executable_library_query";
-
-llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
+static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
     for (auto &childLoc : loc.getLocations()) {
       auto childResult = findFirstFileLoc(childLoc);
@@ -46,7 +49,7 @@ llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   return llvm::None;
 }
 
-std::string guessModuleName(mlir::ModuleOp moduleOp) {
+static std::string guessModuleName(mlir::ModuleOp moduleOp) {
   std::string moduleName =
       moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
   if (!moduleName.empty()) return moduleName;
@@ -58,43 +61,36 @@ std::string guessModuleName(mlir::ModuleOp moduleOp) {
   }
 }
 
-}  // namespace
-
 class LLVMAOTTargetBackend final : public TargetBackend {
  public:
   explicit LLVMAOTTargetBackend(LLVMTargetOptions options)
-      : options_(std::move(options)) {}
+      : options_(std::move(options)) {
+    initConfiguration();
+  }
 
-  // NOTE: we could vary these based on the options, such as by arch/etc.
   std::string name() const override { return "llvm"; }
 
-  std::string deviceID() const override { return "dylib"; }
+  std::string deviceID() const override { return "cpu"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
   }
 
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    configItems.emplace_back(b.getIdentifier("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
+  }
+
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    auto targetMachine = createTargetMachine(options_);
-    if (!targetMachine) {
-      llvm::errs() << "failed to create target machine for target triple '"
-                   << options_.targetTriple << "'";
-      return;
-    }
-    passManager.addPass(createLLVMCPULowerExecutableTargetPass());
-    // Set target specific options.
-    LLVMCPUCodegenPassPipelineOptions codeGenOptions;
-    codeGenOptions.targetTriple = options_.targetTriple;
-    codeGenOptions.targetDataLayout =
-        targetMachine->createDataLayout().getStringRepresentation();
-
-    // TODO(ataei): This is temporary here, should move when target specific
-    // overrides options grows.
-    if (targetMachine->getTargetTriple().isWasm()) {
-      codeGenOptions.unfuseFMAOps = true;
-    }
-
-    buildLLVMCPUCodegenPassPipeline(passManager, codeGenOptions);
+    buildLLVMCPUCodegenPassPipeline(passManager);
   }
 
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
@@ -103,6 +99,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     auto sourceExecutableOps =
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     if (sourceExecutableOps.size() <= 1) return success();
+
+    // TODO(benvanik): rework linking to support multiple formats.
+    auto sharedTargetAttr = getExecutableTarget(builder.getContext());
 
     // Guess a module name, if needed, to make the output files readable.
     auto moduleName = guessModuleName(moduleOp);
@@ -118,7 +117,8 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Add our hal.executable.variant with an empty module.
     builder.setInsertionPointToStart(linkedExecutableOp.getBody());
     auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
-        moduleOp.getLoc(), name(), name());
+        moduleOp.getLoc(), sharedTargetAttr.getSymbolNameFragment(),
+        sharedTargetAttr);
     builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
     builder.create<ModuleOp>(moduleOp.getLoc());
 
@@ -142,7 +142,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         variantOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
     // Validate flags for output mode.
-    if (options_.linkEmbedded && !options_.staticLibraryOutput.empty()) {
+    if (options_.linkEmbedded && options_.linkStatic) {
       return variantOp.emitError()
              << "cannot embed ELF and produce static library simultaneously";
     }
@@ -221,7 +221,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
 
     auto queryFunctionName = std::string(kQueryFunctionName);
-    if (!options_.staticLibraryOutput.empty()) {
+    if (options_.linkStatic) {
       // Static library query functions must be unique to support multiple
       // libraries in the same namespace.
       queryFunctionName = libraryName + "_library_query";
@@ -268,8 +268,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
              << options_.targetTriple << "'";
     }
 
-    // Emit object files.
-    SmallVector<Artifact, 4> objectFiles;
+    SmallVector<Artifact> objectFiles;
+
+    // Emit the base object file containing the bulk of our code.
+    // This must come first such that we have the proper library linking order.
     {
       // NOTE: today we just use a single object file, however if we wanted to
       // scale code generation and linking we'd want to generate one per
@@ -288,6 +290,16 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       os.flush();
       os.close();
       objectFiles.push_back(std::move(objectFile));
+    }
+
+    // Optionally append additional object files that provide functionality that
+    // may otherwise have been runtime-dynamic (like libc/libm calls).
+    // For now we only do this for embedded uses.
+    if (options_.linkEmbedded) {
+      if (failed(buildLibraryObjects(variantOp.getLoc(), targetMachine.get(),
+                                     objectFiles, context))) {
+        return variantOp.emitError() << "failed generating library objects";
+      }
     }
 
     // If we are keeping artifacts then let's also add the bitcode for easier
@@ -313,7 +325,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       // Copy the static object file to the specified output along with
       // generated header file.
       const std::string &libraryPath = options_.staticLibraryOutput;
-      const auto library_name = objectFiles[0].path;
       if (!outputStaticLibrary(libraryName, queryFunctionName, libraryPath,
                                objectFiles[0].path)) {
         return variantOp.emitError() << "static library generation failed";
@@ -340,7 +351,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
     }
 
-    if (options_.linkEmbedded) {
+    if (options_.linkStatic) {
+      // Embed the library name in the executable binary op. This informs the
+      // loader which static library to load for the target binary.
+      std::vector<uint8_t> libraryNameVector(libraryName.begin(),
+                                             libraryName.end());
+      executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+          variantOp.getLoc(), variantOp.sym_name(), "static",
+          libraryNameVector);
+    } else if (options_.linkEmbedded) {
       // Load the linked ELF file and pack into an attr.
       auto elfFile = linkArtifacts.libraryFile.read();
       if (!elfFile.hasValue()) {
@@ -354,22 +373,11 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           std::move(elfFile.getValue()));
 
       // Add the binary to the parent hal.executable.
-      auto executableFormatAttr = executableBuilder.getStringAttr("EX_ELF");
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.sym_name(), executableFormatAttr,
-          bufferAttr);
+          variantOp.getLoc(), variantOp.sym_name(),
+          variantOp.target().getFormat(), bufferAttr);
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
-    } else if (!options_.staticLibraryOutput.empty()) {
-      // Embed the library name in the executable binary op. This informs the
-      // loader which static library to load for the target binary.
-      std::vector<uint8_t> libraryNameVector(libraryName.begin(),
-                                             libraryName.end());
-      auto executableFormatAttr = std::string("static");
-
-      auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.sym_name(), executableFormatAttr,
-          libraryNameVector);
     } else {
       FlatbufferBuilder builder;
       iree_DyLibExecutableDef_start_as_root(builder);
@@ -404,13 +412,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                                           debugDatabaseRef);
       iree_DyLibExecutableDef_end_as_root(builder);
 
-      auto executableFormatAttr = targetTriple.isWasm()
-                                      ? executableBuilder.getStringAttr("WASM")
-                                      : executableBuilder.getStringAttr("DLIB");
-
       // Add the binary data to the target executable.
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.sym_name(), executableFormatAttr,
+          variantOp.getLoc(), variantOp.sym_name(),
+          variantOp.target().getFormat(),
           builder.getBufferAttr(executableBuilder.getContext()));
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-flatbuffers"));
@@ -419,7 +424,212 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   }
 
  private:
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // This is where we would multiversion.
+    targetAttrs.push_back(getExecutableTarget(context));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    std::string format;
+    if (options_.linkStatic) {
+      // Static libraries are just string references when serialized so we don't
+      // need to specify the target architecture.
+      format += "static";
+    } else {
+      // Construct the [loader]-[format]-[arch] triple.
+      llvm::Triple targetTriple(options_.targetTriple);
+      if (options_.linkEmbedded) {
+        // Using the IREE embedded ELF format/loader.
+        format += "embedded-elf-";
+      } else {
+        // System-specific shared library format.
+        format += "system-";
+        switch (targetTriple.getObjectFormat()) {
+          case llvm::Triple::ObjectFormatType::COFF:
+            format += "dll-";
+            break;
+          case llvm::Triple::ObjectFormatType::ELF:
+            format += "elf-";
+            break;
+          case llvm::Triple::ObjectFormatType::MachO:
+            format += "dylib-";
+            break;
+          case llvm::Triple::ObjectFormatType::Wasm:
+            format += "wasm-";
+            break;
+          default:
+            format += "unknown-";
+            break;
+        }
+      }
+      switch (targetTriple.getArch()) {
+        case llvm::Triple::ArchType::arm:
+          format += "arm_32";
+          break;
+        case llvm::Triple::ArchType::aarch64:
+          format += "arm_64";
+          break;
+        case llvm::Triple::ArchType::riscv32:
+          format += "riscv_32";
+          break;
+        case llvm::Triple::ArchType::riscv64:
+          format += "riscv_64";
+          break;
+        case llvm::Triple::ArchType::wasm32:
+          format += "wasm_32";
+          break;
+        case llvm::Triple::ArchType::wasm64:
+          format += "wasm_64";
+          break;
+        case llvm::Triple::ArchType::x86:
+          format += "x86_32";
+          break;
+        case llvm::Triple::ArchType::x86_64:
+          format += "x86_64";
+          break;
+        default:
+          format += "unknown";
+          break;
+      }
+    }
+
+    // Add some configurations to the `hal.executable.target` attribute.
+    SmallVector<NamedAttribute> config;
+    auto addConfig = [&](StringRef name, Attribute value) {
+      config.emplace_back(
+          std::make_pair(Identifier::get(name, context), value));
+    };
+
+    // Set target triple.
+    addConfig("target_triple", StringAttr::get(context, options_.targetTriple));
+
+    // Set data layout
+    addConfig("data_layout", StringAttr::get(context, config_.dataLayoutStr));
+
+    // Set the native vector size. This creates a dummy llvm module just to
+    // build the TTI the right way.
+    addConfig("native_vector_size",
+              IntegerAttr::get(IndexType::get(context), config_.vectorSize));
+
+    return IREE::HAL::ExecutableTargetAttr::get(
+        context, StringAttr::get(context, "llvm"),
+        StringAttr::get(context, format), DictionaryAttr::get(context, config));
+  }
+
+  static void overridePlatformGlobal(llvm::Module &module, StringRef globalName,
+                                     uint32_t newValue) {
+    // NOTE: the global will not be defined if it is not used in the module.
+    auto *globalValue = module.getNamedGlobal(globalName);
+    if (!globalValue) return;
+    globalValue->setLinkage(llvm::GlobalValue::PrivateLinkage);
+    globalValue->setDSOLocal(true);
+    globalValue->setConstant(true);
+    globalValue->setInitializer(llvm::ConstantInt::get(
+        globalValue->getValueType(), APInt(32, newValue)));
+  }
+
+  // Builds an object file for the librt embedded runtime library.
+  // This is done per link operation so that we can match the precise target
+  // configuration. Since we (mostly) link once per user-level compilation
+  // this is fine today. If in the future we invoke the compiler for thousands
+  // of modules we'd want to (carefully) cache this.
+  LogicalResult buildLibraryObjects(Location loc,
+                                    llvm::TargetMachine *targetMachine,
+                                    SmallVector<Artifact> &objectFiles,
+                                    llvm::LLVMContext &context) {
+    assert(!objectFiles.empty() && "libraries must come after the base object");
+
+    // Load the generic bitcode file contents.
+    llvm::MemoryBufferRef bitcodeBufferRef(
+        llvm::StringRef(iree_compiler_librt_create()->data,
+                        iree_compiler_librt_create()->size),
+        "librt.bc");
+    auto bitcodeModuleValue = llvm::parseBitcodeFile(bitcodeBufferRef, context);
+    if (!bitcodeModuleValue) {
+      return mlir::emitError(loc)
+             << "failed to parse librt bitcode: "
+             << llvm::toString(bitcodeModuleValue.takeError());
+    }
+    auto bitcodeModule = std::move(bitcodeModuleValue.get());
+    bitcodeModule->setDataLayout(targetMachine->createDataLayout());
+    bitcodeModule->setTargetTriple(targetMachine->getTargetTriple().str());
+
+    // Inject target-specific flags.
+    // TODO(benvanik): move this entire function to another file that can do
+    // more complex logic cleanly. This is just an example.
+    overridePlatformGlobal(*bitcodeModule, "librt_platform_example_flag", 0u);
+
+    // Run the LLVM passes to optimize it for the current target.
+    if (failed(runLLVMIRPasses(options_, targetMachine, bitcodeModule.get()))) {
+      return mlir::emitError(loc)
+             << "failed to run librt LLVM-IR opt passes targeting '"
+             << options_.targetTriple << "'";
+    }
+
+    // Emit an object file we can pass to the linker.
+    std::string objectData;
+    if (failed(runEmitObjFilePasses(targetMachine, bitcodeModule.get(),
+                                    &objectData))) {
+      return mlir::emitError(loc)
+             << "failed to compile librt LLVM-IR module to an object file";
+    }
+
+    // Write the object file to disk with a similar name to the base file.
+    auto objectFile =
+        Artifact::createVariant(objectFiles.front().path, ".librt.o");
+    auto &os = objectFile.outputFile->os();
+    os << objectData;
+    os.flush();
+    os.close();
+    objectFiles.push_back(std::move(objectFile));
+
+    return success();
+  }
+
+  void initConfiguration() {
+    auto targetMachine = createTargetMachine(options_);
+
+    // Data layout
+    llvm::DataLayout DL = targetMachine->createDataLayout();
+    config_.dataLayoutStr = DL.getStringRepresentation();
+
+    // Set the native vector size. This creates a dummy llvm module just to
+    // build the TTI the right way.
+    llvm::LLVMContext llvmContext;
+    auto llvmModule =
+        std::make_unique<llvm::Module>("dummy_module", llvmContext);
+    llvm::Type *voidType = llvm::Type::getVoidTy(llvmContext);
+    llvmModule->setDataLayout(DL);
+    llvm::Function *dummyFunc = llvm::Function::Create(
+        llvm::FunctionType::get(voidType, false),
+        llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
+    llvm::TargetTransformInfo tti =
+        targetMachine->getTargetTransformInfo(*dummyFunc);
+    config_.vectorSize = tti.getRegisterBitWidth(
+                             llvm::TargetTransformInfo::RGK_FixedWidthVector) /
+                         8;
+    LLVM_DEBUG({
+      llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
+      llvm::dbgs() << "Target Triple : "
+                   << targetMachine->getTargetTriple().normalize() << "\n";
+      llvm::dbgs() << "Target Feature string : "
+                   << targetMachine->getTargetFeatureString() << "\n";
+      llvm::dbgs() << "Data Layout : " << config_.dataLayoutStr << "\n";
+      llvm::dbgs() << "Vector Width : " << config_.vectorSize << "\n";
+    });
+  }
+
   LLVMTargetOptions options_;
+
+  // Configuration to be set on each `hal.executable.variant` that only depend
+  // on the `options_`.
+  struct ConfigurationValues {
+    std::string dataLayoutStr;
+    int64_t vectorSize;
+  } config_;
 };
 
 void registerLLVMAOTTargetBackends(
@@ -439,10 +649,17 @@ void registerLLVMAOTTargetBackends(
     INIT_LLVM_TARGET(AArch64)
     INIT_LLVM_TARGET(RISCV)
     INIT_LLVM_TARGET(WebAssembly)
-    return std::make_unique<LLVMAOTTargetBackend>(queryOptions());
+    return std::make_shared<LLVMAOTTargetBackend>(queryOptions());
   };
-  static TargetBackendRegistration registration0("llvm", backendFactory);
-  static TargetBackendRegistration registration1("dylib-llvm-aot",
+
+  // #hal.device.target<"cpu", ...
+  static TargetBackendRegistration registration0("cpu", backendFactory);
+  // #hal.executable.target<"llvm", ...
+  static TargetBackendRegistration registration1("llvm", backendFactory);
+
+  // TODO(benvanik): remove legacy dylib name.
+  static TargetBackendRegistration registration2("dylib", backendFactory);
+  static TargetBackendRegistration registration3("dylib-llvm-aot",
                                                  backendFactory);
 
 #undef INIT_LLVM_TARGET

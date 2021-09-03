@@ -1,5 +1,5 @@
 func @conv() {
-  %0 = iree.unfoldable_constant dense<
+  %0 = util.unfoldable_constant dense<
       [[[[0.5       , 0.5212766 ],
          [0.54255319, 0.56382979],
          [0.58510638, 0.60638298],
@@ -27,7 +27,7 @@ func @conv() {
          [1.39361702, 1.41489362],
          [1.43617021, 1.45744681],
          [1.4787234 , 1.5       ]]]]> : tensor<1x4x6x2xf32>
-  %1 = iree.unfoldable_constant dense<
+  %1 = util.unfoldable_constant dense<
       [[[[0.5       , 0.52857143, 0.55714286],
          [0.58571429, 0.61428571, 0.64285714]],
 

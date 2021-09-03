@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOps.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/IR/Attributes.h"

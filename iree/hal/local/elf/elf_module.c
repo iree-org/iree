@@ -245,7 +245,7 @@ static iree_status_t iree_elf_module_load_segments(
       vaddr_range.length, load_state->memory_info.normal_page_size);
   IREE_RETURN_IF_ERROR(iree_memory_view_reserve(
       IREE_MEMORY_VIEW_FLAG_MAY_EXECUTE, module->vaddr_size,
-      (void**)&module->vaddr_base));
+      module->host_allocator, (void**)&module->vaddr_base));
   module->vaddr_bias = module->vaddr_base - vaddr_range.offset;
 
   // Commit and load all of the segments.
@@ -351,7 +351,8 @@ static iree_status_t iree_elf_module_protect_segments(
 static void iree_elf_module_unload_segments(iree_elf_module_t* module) {
   // Decommit/unreserve the entire memory space.
   if (module->vaddr_base != NULL) {
-    iree_memory_view_release(module->vaddr_base, module->vaddr_size);
+    iree_memory_view_release(module->vaddr_base, module->vaddr_size,
+                             module->host_allocator);
   }
   module->vaddr_base = NULL;
   module->vaddr_bias = NULL;
@@ -465,6 +466,25 @@ static iree_status_t iree_elf_module_parse_dynamic_tables(
   return iree_ok_status();
 }
 
+// Verifies that there are no dynamic imports in the module as we don't support
+// them yet.
+static iree_status_t iree_elf_module_verify_no_imports(
+    iree_elf_module_load_state_t* load_state, iree_elf_module_t* module) {
+  // NOTE: slot 0 is always the 0 placeholder.
+  for (iree_host_size_t i = 1; i < module->dynsym_count; ++i) {
+    const iree_elf_sym_t* sym = &module->dynsym[i];
+    if (sym->st_shndx == IREE_ELF_SHN_UNDEF) {
+      const char* symname = sym->st_name ? module->dynstr + sym->st_name : NULL;
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "ELF imports one or more symbols (trying "
+                              "'%s'); imports are not supported in the "
+                              "platform-agnostic loader",
+                              symname);
+    }
+  }
+  return iree_ok_status();
+}
+
 //==============================================================================
 // Relocation
 //==============================================================================
@@ -563,6 +583,7 @@ iree_status_t iree_elf_module_initialize_from_memory(
   iree_elf_module_load_state_t load_state;
   iree_status_t status =
       iree_elf_module_parse_headers(raw_data, &load_state, out_module);
+  out_module->host_allocator = host_allocator;
 
   // Allocate and load the ELF into memory.
   iree_memory_jit_context_begin();
@@ -576,7 +597,11 @@ iree_status_t iree_elf_module_initialize_from_memory(
     status = iree_elf_module_parse_dynamic_tables(&load_state, out_module);
   }
 
-  // TODO(benvanik): imports would happen here.
+  // TODO(benvanik): imports would happen here. For now we just ensure there are
+  // no imports as otherwise things will fail with obscure messages later on.
+  if (iree_status_is_ok(status)) {
+    status = iree_elf_module_verify_no_imports(&load_state, out_module);
+  }
 
   // Apply relocations to the loaded pages.
   if (iree_status_is_ok(status)) {

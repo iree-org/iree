@@ -22,7 +22,7 @@ flow.executable @outerOps_ex_dispatch_0 {
   flow.dispatch.entry @outerOps_rgn_dispatch_0 attributes {
     workload = 4 : index
   }
-  module {
+  builtin.module {
     func @outerOps_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
       %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
@@ -75,7 +75,7 @@ flow.executable @interleavedOuterOps_ex_dispatch_0 {
   flow.dispatch.entry @interleavedOuterOps_rgn_dispatch_0 attributes {
     workload = 4 : index
   }
-  module {
+  builtin.module {
     func @interleavedOuterOps_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
       %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
@@ -137,7 +137,7 @@ flow.executable @interleavedDot_ex_dispatch_0 {
   flow.dispatch.entry @interleavedDot_rgn_dispatch_0 attributes {
     workload = 16 : index
   }
-  module {
+  builtin.module {
     func @interleavedDot_rgn_dispatch_0(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
       %0 = mhlo.add %arg0, %arg0 : tensor<4x4xf32>
       return %0 : tensor<4x4xf32>
@@ -148,7 +148,7 @@ flow.executable @interleavedDot_ex_dispatch_1 {
   flow.dispatch.entry @interleavedDot_rgn_dispatch_1 attributes {
     workload = 16 : index
   }
-  module {
+  builtin.module {
     func @interleavedDot_rgn_dispatch_1(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
       %0 = "mhlo.dot"(%arg0, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
       return %0 : tensor<4x4xf32>
@@ -159,7 +159,7 @@ flow.executable @interleavedDot_ex_dispatch_2 {
   flow.dispatch.entry @interleavedDot_rgn_dispatch_2 attributes {
     workload = 16 : index
   }
-  module {
+  builtin.module {
     func @interleavedDot_rgn_dispatch_2(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
       %0 = mhlo.multiply %arg0, %arg1 : tensor<4x4xf32>
       return %0 : tensor<4x4xf32>
@@ -190,7 +190,7 @@ flow.executable @caller_ex_dispatch_0 {
   flow.dispatch.entry @caller_rgn_dispatch_0 attributes {
     workload = 4 : index
   }
-  module {
+  builtin.module {
     func @caller_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
       %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
@@ -201,7 +201,7 @@ flow.executable @caller_ex_dispatch_1 {
   flow.dispatch.entry @caller_rgn_dispatch_1 attributes {
     workload = 4 : index
   }
-  module {
+  builtin.module {
     func @caller_rgn_dispatch_1(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
       %0 = mhlo.multiply %arg0, %arg1 : tensor<4xf32>
       return %0 : tensor<4xf32>
@@ -232,7 +232,7 @@ func @caller(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 }
 flow.executable @callee_ex_dispatch_0 {
   flow.dispatch.entry @callee_rgn_dispatch_0
-  module {
+  builtin.module {
     func @callee_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
       %0 = mhlo.multiply %arg0, %arg0 : tensor<4xf32>
       return %0 : tensor<4xf32>
@@ -329,8 +329,8 @@ func @ordering(%w : index) -> (tensor<i32>, tensor<f32>, tensor<i32>) {
   //  CHECK-DAG:   %[[D1:.+]] = flow.dispatch @dispatch_1::@dispatch_1
   // CHECK-NEXT:   flow.return %[[D1]]
   %d1 = flow.dispatch @dispatch_1::@dispatch_1[%w](%c1) : (i32) -> tensor<i32>
-  // CHECK: %[[SE_USER:.+]] = iree.do_not_optimize(%[[S1]])
-  %side_effecting_user = iree.do_not_optimize(%d1) : tensor<i32>
+  // CHECK: %[[SE_USER:.+]] = util.do_not_optimize(%[[S1]])
+  %side_effecting_user = util.do_not_optimize(%d1) : tensor<i32>
   %c2 = constant 2 : i32
   //      CHECK: %[[S2:.+]] = flow.ex.stream.fragment
   //      CHECK:   %[[C2:.+]] = constant 2

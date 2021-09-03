@@ -30,8 +30,8 @@ iree_cc_library(
     MLIRParser
     MLIRStandard
     MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::IR
   PUBLIC
 )

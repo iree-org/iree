@@ -30,11 +30,11 @@ iree_cc_library(
   SRCS
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
-    "ConvertToFlowTensorOps.cpp"
+    "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchLinalgOnTensors.cpp"
-    "ExpandVariableDynamicDims.cpp"
+    "ExpandGlobalDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FormStreams.cpp"
     "FusionOfTensorOps.cpp"
@@ -42,6 +42,7 @@ iree_cc_library(
     "InjectDispatchTracing.cpp"
     "InsertConstantClones.cpp"
     "InterchangeGenericOps.cpp"
+    "MatmulToMMT4dConversion.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineLargeConstants.cpp"
     "PadLinalgOps.cpp"
@@ -49,9 +50,9 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.cpp"
     "PromoteI1ToI8Pass.cpp"
-    "PromoteTensorLoads.cpp"
     "StripAndSplatConstantVariables.cpp"
     "TypeConverter.cpp"
+    "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
@@ -66,14 +67,19 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTosa
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
   PUBLIC
 )

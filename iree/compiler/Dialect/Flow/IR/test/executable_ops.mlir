@@ -5,7 +5,7 @@
 // CHECK-LABEL: @dispatch_ex
 flow.executable @dispatch_ex {
   // CHECK: module {
-  module {
+  builtin.module {
     // CHECK: @dispatch0
     func @dispatch0() {
       return

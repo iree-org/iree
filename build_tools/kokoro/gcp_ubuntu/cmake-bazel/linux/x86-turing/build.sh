@@ -36,7 +36,16 @@ echo "Initializing submodules"
 pushd integrations/tensorflow
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
-"${BAZEL_CMD[@]?}" build --config=generic_clang //iree_tf_compiler:all
+# Technically, the cache key of the `remote_cache_tf_integrations` config
+# references the Docker image used by the non-GPU build that includes
+# swiftshader. In practice though, the part that matters for building these
+# binaries is common to both of them.
+# TODO(gcmn): Split this out into a multistage build so we only build these
+# once anyway.
+"${BAZEL_CMD[@]?}" build \
+   --config=generic_clang \
+   --config=remote_cache_tf_integrations \
+   //iree_tf_compiler:all
 popd
 
 
@@ -68,7 +77,7 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-1}
 # Only test drivers that use the GPU, since we run all tests on non-GPU machines
 # as well.
 echo "Testing with CTest"
-ctest --output-on-failure \
+ctest --timeout 900 --output-on-failure \
    --tests-regex "^integrations/tensorflow/|^bindings/python/" \
    --label-regex "^driver=vulkan$|^driver=cuda$" \
    --label-exclude "^nokokoro$"

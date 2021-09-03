@@ -30,8 +30,10 @@ IREE::HAL::TranslationInfo buildTranslationInfo(
   OpBuilder builder(context);
   auto pipelineAttr =
       IREE::HAL::DispatchLoweringPassPipelineAttr::get(context, passPipeline);
-  ArrayAttr workloadPerWorkgroupAttr =
-      builder.getI64ArrayAttr(workloadPerWorkgroup);
+  ArrayAttr workloadPerWorkgroupAttr = nullptr;
+  if (!workloadPerWorkgroup.empty()) {
+    workloadPerWorkgroupAttr = builder.getI64ArrayAttr(workloadPerWorkgroup);
+  }
   return IREE::HAL::TranslationInfo::get(pipelineAttr, workloadPerWorkgroupAttr,
                                          context);
 }
@@ -42,21 +44,33 @@ IREE::HAL::TranslationInfo getTranslationInfo(
       kTranslationInfoAttrName);
 }
 
-LogicalResult setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
-                                 IREE::HAL::TranslationInfo translationInfo) {
-  auto currTranslationAttr =
-      entryPointOp->getAttrOfType<IREE::HAL::TranslationInfo>(
-          kTranslationInfoAttrName);
-  if (currTranslationAttr) {
-    if (currTranslationAttr != translationInfo) {
-      return entryPointOp.emitError(
-          "illegal to override set translation information");
+SmallVector<int64_t> getWorkgroupSize(
+    IREE::HAL::ExecutableEntryPointOp entryPointOp) {
+  SmallVector<int64_t> workgroupSize;
+  if (Optional<ArrayAttr> workgroupSizeAttrList =
+          entryPointOp.workgroup_size()) {
+    workgroupSize.resize(workgroupSizeAttrList->size());
+    for (auto attr : llvm::enumerate(workgroupSizeAttrList.getValue())) {
+      workgroupSize[attr.index()] = attr.value().cast<IntegerAttr>().getInt();
     }
   }
-  if (!currTranslationAttr) {
-    entryPointOp->setAttr(kTranslationInfoAttrName, translationInfo);
+  return workgroupSize;
+}
+
+void setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
+                        IREE::HAL::TranslationInfo translationInfo,
+                        ArrayRef<int64_t> workgroupSize) {
+  entryPointOp->setAttr(kTranslationInfoAttrName, translationInfo);
+  // The workgroup size is set on the entry point op directly.
+  if (!workgroupSize.empty()) {
+    MLIRContext *context = entryPointOp->getContext();
+    auto indexType = IndexType::get(context);
+    auto attrs = llvm::to_vector<4>(
+        llvm::map_range(workgroupSize, [&](int64_t v) -> Attribute {
+          return IntegerAttr::get(indexType, v);
+        }));
+    entryPointOp.workgroup_sizeAttr(ArrayAttr::get(context, attrs));
   }
-  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -68,14 +82,8 @@ IREE::HAL::LoweringConfig getLoweringConfig(Operation *op) {
   return op->getAttrOfType<IREE::HAL::LoweringConfig>(kConfigAttrName);
 }
 
-bool hasLoweringConfig(Operation *op) {
-  return op->hasAttrOfType<IREE::HAL::LoweringConfig>(kConfigAttrName);
-}
-
-bool setLoweringConfig(Operation *op, IREE::HAL::LoweringConfig config) {
-  if (hasLoweringConfig(op)) return false;
+void setLoweringConfig(Operation *op, IREE::HAL::LoweringConfig config) {
   op->setAttr(kConfigAttrName, config);
-  return true;
 }
 
 void eraseLoweringConfig(Operation *op) { op->removeAttr(kConfigAttrName); }
@@ -101,7 +109,8 @@ IREE::HAL::LoweringConfig buildConfigAttr(TileSizesListTypeRef tileSizes,
     nativeVectorSizeAttr = builder.getI64ArrayAttr(nativeVectorSize);
   }
   return IREE::HAL::LoweringConfig::get(tileSizesAttr, nativeVectorSizeAttr,
-                                        context);
+                                        /*passPipeline = */ nullptr,
+                                        /*workgroupSize = */ nullptr, context);
 }
 
 TileSizesListType getTileSizes(IREE::HAL::LoweringConfig config) {

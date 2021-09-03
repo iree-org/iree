@@ -41,7 +41,7 @@ class WrapEntryPointsPass
   }
 
   StringRef getDescription() const override {
-    return " Wraps all entry points in a function that is compatible with the "
+    return "Wraps all entry points in a function that is compatible with the "
            "expected invocation semantics of bindings following the native "
            "IREE ABI.";
   }
@@ -51,7 +51,9 @@ class WrapEntryPointsPass
 
     SmallVector<FuncOp, 4> entryFuncOps;
     for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-      if (funcOp.isPublic()) entryFuncOps.push_back(funcOp);
+      if (funcOp.isPublic() && !funcOp->hasAttr("iree.abi.stub")) {
+        entryFuncOps.push_back(funcOp);
+      }
     }
 
     // Create a wrapper function for each entry point.
@@ -60,14 +62,17 @@ class WrapEntryPointsPass
       // name in its public definition.
       auto publicName = entryFuncOp.getName().str();
       auto privateName = "_" + publicName;
-      entryFuncOp.setName(privateName);
+      mlir::StringAttr privateNameAttr =
+          mlir::StringAttr::get(entryFuncOp.getContext(), privateName);
+      entryFuncOp.setName(privateNameAttr);
       entryFuncOp.setPrivate();
 
       // Create the wrapper function that conforms to the IREE native ABI and
       // marshals arguments/results to the original function.
       auto wrapperFuncOp = createWrapperFunc(entryFuncOp);
       wrapperFuncOp.setPublic();
-      wrapperFuncOp.setName(publicName);
+      wrapperFuncOp.setName(
+          mlir::StringAttr::get(entryFuncOp.getContext(), publicName));
       moduleOp.insert(Block::iterator(entryFuncOp), wrapperFuncOp);
 
       wrapperFuncOp.getOperation()->setAttr("iree.abi.stub",

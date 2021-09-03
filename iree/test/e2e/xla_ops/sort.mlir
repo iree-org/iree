@@ -1,5 +1,5 @@
 func @sort1D() {
-  %input = iree.unfoldable_constant dense<[3, 2, 1, 4]> : tensor<4xi32>
+  %input = util.unfoldable_constant dense<[3, 2, 1, 4]> : tensor<4xi32>
 
   %sort = "mhlo.sort"(%input) ( {
   ^bb0(%arg1: tensor<i32>, %arg2: tensor<i32>):  // no predecessors
@@ -12,7 +12,7 @@ func @sort1D() {
 }
 
 func @sort2D() {
-  %input = iree.unfoldable_constant dense<[[1, 2, 3, 4],
+  %input = util.unfoldable_constant dense<[[1, 2, 3, 4],
                                            [4, 3, 2, 1]]> : tensor<2x4xi32>
 
   %sort = "mhlo.sort"(%input) ( {
@@ -26,7 +26,7 @@ func @sort2D() {
 }
 
 func @sort3D() {
-  %input = iree.unfoldable_constant dense<[[[1, 2, 3, 4],
+  %input = util.unfoldable_constant dense<[[[1, 2, 3, 4],
                                             [4, 3, 2, 1]]]> : tensor<1x2x4xi32>
 
   %sort = "mhlo.sort"(%input) ( {
@@ -40,7 +40,7 @@ func @sort3D() {
 }
 
 func @sort_to_decreasing_seq() {
-  %input = iree.unfoldable_constant dense<[3, 2, 1, 4]> : tensor<4xi32>
+  %input = util.unfoldable_constant dense<[3, 2, 1, 4]> : tensor<4xi32>
 
   %sort = "mhlo.sort"(%input) ( {
   ^bb0(%arg1: tensor<i32>, %arg2: tensor<i32>):  // no predecessors

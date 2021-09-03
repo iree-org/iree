@@ -347,7 +347,7 @@ def HAL_BufferType : AnyTypeOf<[
   HAL_Buffer,
 ]>;
 
-def HAL_OrdinalAttr : IREE_IndexAttrBase<"size_t">;
+def HAL_OrdinalAttr : Util_IndexAttrBase<"size_t">;
 
 def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 
@@ -355,22 +355,26 @@ def HAL_ElementType : TypeAlias<I32>;
 def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
 
+def HAL_EncodingType : TypeAlias<I32>;
+def HAL_EncodingTypeAttr : SignlessIntegerAttrBase<
+  I32, "encoding type attribute">;
+
 def HAL_DeviceSize : TypeAlias<Index>;
-def HAL_DeviceSizeAttr : IREE_IndexAttrBase<"iree_device_size_t">;
+def HAL_DeviceSizeAttr : Util_IndexAttrBase<"iree_device_size_t">;
 def HAL_DeviceSizes : Variadic<HAL_DeviceSize>;
 
 def HAL_HostSize : TypeAlias<Index>;
-def HAL_HostSizeAttr : IREE_IndexAttrBase<"size_t">;
+def HAL_HostSizeAttr : Util_IndexAttrBase<"size_t">;
 
 def HAL_TimelineValue : TypeAlias<Index>;
 
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
-def HAL_VariableRefAttr : AliasedSymbolRefAttr;
-def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
-def HAL_VariablePtr : PtrOf<HAL_VariableType>;
+def HAL_GlobalRefAttr : AliasedSymbolRefAttr;
+def HAL_GlobalType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
+def HAL_GlobalPtr : Util_PtrOf<HAL_GlobalType>;
 
-def HAL_IndexAttr : IREE_IndexAttrBase<"index">;
+def HAL_IndexAttr : Util_IndexAttrBase<"index">;
 def HAL_IndexArrayAttr : TypedArrayAttrBase<HAL_IndexAttr,
                                       "index array attribute"> {
   let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
@@ -383,7 +387,7 @@ def HAL_ShapeDynamicDims : Variadic<HAL_Dim>;
 
 // TODO(benvanik): assert rank 3
 def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<
-    IREE_IndexAttrBase<"size_t">,
+    Util_IndexAttrBase<"size_t">,
     "index array attribute"> {
   let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
 }
@@ -412,40 +416,32 @@ def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
 //===----------------------------------------------------------------------===//
 
 def HAL_BufferConstraintsAttr :
-  IREE_StructAttr<"buffer_constraints", "BufferConstraintsAttr", HAL_Dialect, [
+  Util_StructAttr<"buffer_constraints", "BufferConstraintsAttr", HAL_Dialect, [
     // The maximum size of a memory allocation that can be created, even if
     // there is more space available in the heap.
-    IREE_StructFieldAttr<"max_allocation_size", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"max_allocation_size", HAL_DeviceSizeAttr>,
     // The minimum required alignment, in bytes, for offsets used in runtime
     // buffer bindings for target backends. Offset values (both dynamic and
     // static) must be an integer multiple of this limit.
-    IREE_StructFieldAttr<"min_buffer_offset_alignment", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"min_buffer_offset_alignment", HAL_DeviceSizeAttr>,
     // The maximum value that can be specified for size ranges of buffer
     // bindings. The underlying allocation may be larger than this but only
     // up to this amount will be visible to kernels.
-    IREE_StructFieldAttr<"max_buffer_range", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"max_buffer_range", HAL_DeviceSizeAttr>,
     // The minimum required alignment, in bytes, for size ranges of buffer
     // bindings.
-    IREE_StructFieldAttr<"min_buffer_range_alignment", HAL_DeviceSizeAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-
-def HAL_ByteRangeAttr :
-  IREE_StructAttr<"byte_range", "ByteRangeAttr", HAL_Dialect, [
-    IREE_StructFieldAttr<"offset", HAL_DeviceSizeAttr>,
-    IREE_StructFieldAttr<"length", HAL_DeviceSizeAttr>,
+    Util_StructFieldAttr<"min_buffer_range_alignment", HAL_DeviceSizeAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
 def HAL_DescriptorSetLayoutBindingAttr :
-  IREE_StructAttr<"descriptor_set_layout_binding",
+  Util_StructAttr<"descriptor_set_layout_binding",
                   "DescriptorSetLayoutBindingAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"binding", I32Attr>,
-    IREE_StructFieldAttr<"type", HAL_DescriptorTypeAttr>,
-    IREE_StructFieldAttr<"access", HAL_MemoryAccessBitfieldAttr>,
+    Util_StructFieldAttr<"binding", I32Attr>,
+    Util_StructFieldAttr<"type", HAL_DescriptorTypeAttr>,
+    Util_StructFieldAttr<"access", HAL_MemoryAccessBitfieldAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
@@ -454,58 +450,172 @@ def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
     HAL_DescriptorSetLayoutBindingAttr,
     "HAL descriptor set layout binding array attribute">;
 
-def HAL_ExecutableTargetAttr :
-    AttrDef<HAL_Dialect, "ExecutableTarget", []> {
-  let mnemonic = "executable.target";
-  let summary = [{Generic executable target specification.}];
+//===----------------------------------------------------------------------===//
+// Device and executable target specification
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceTargetAttr :
+    AttrDef<HAL_Dialect, "DeviceTarget", []> {
+  let mnemonic = "device.target";
+  let summary = [{generic device target specification}];
   let description = [{
-    Specifies how to compile an executable for a specific target backend.
+    Specifies the properties of a target runtime device.
+    Target devices are specified with a canonical identifier matching those used
+    by the runtime (such as `cpu`, `vulkan`, etc). Target devices may support
+    several target executable formats specified with `#hal.executable.target`.
+    An optional configuration dictionary allows for overriding backend defaults.
+
+    Example:
+    ```mlir
+    #hal.device.target<"cpu", {
+      executable_targets = [
+        #hal.executable.target<"llvm", "embedded-elf-arm_32">,
+        #hal.executable.target<"llvm", "embedded-elf-arm_64">,
+      ]
+    }>
+    ```
   }];
   let parameters = (ins
-    AttrParameter<"StringAttr", "">:$target,
+    AttrParameter<"StringAttr", "">:$deviceID,
     AttrParameter<"DictionaryAttr", "">:$configuration
   );
   let builders = [
-    AttrBuilder<(ins "StringRef":$target)>,
+    AttrBuilder<(ins "StringRef":$deviceID)>,
   ];
+
+  let extraClassDeclaration = [{
+    // Returns a symbol-compatible name that pseudo-uniquely identifies this
+    // target. Callers must perform deduplication when required.
+    std::string getSymbolNameFragment();
+
+    // Returns a hal.match.* expression tree that specifically matches this
+    // target device.
+    Attribute getMatchExpression();
+
+    // Returns the constraints defining buffer allocation and usage allowed on
+    // the device or the host defaults if none are defined.
+    BufferConstraintsAttr getBufferConstraints();
+
+    // Returns zero or more executable targets that this device supports.
+    SmallVector<ExecutableTargetAttr, 4> getExecutableTargets();
+
+    // Returns a list of target devices that may be active for the given
+    // operation. This will recursively walk parent operations until one with
+    // the `hal.device.targets` attribute is found.
+    static SmallVector<DeviceTargetAttr, 4> lookup(Operation *op);
+
+    // Returns a set of buffer constraints compatible with the host.
+    // These must only be used with device buffers when it is known that the
+    // device is local.
+    static BufferConstraintsAttr
+    getDefaultHostBufferConstraints(MLIRContext *context);
+
+    // Tries to find the min/max constraints on buffers across all target
+    // devices applicable to the given operation. If no target device specifies
+    // constraints then a generally acceptable default set with minimums will be
+    // returned.
+    //
+    // This can result in non-optimal constraints when multi-targeting wildly
+    // different device types and should only be used as a fallback.
+    static BufferConstraintsAttr
+    lookupConservativeBufferConstraints(Operation *op);
+
+    // Returns a list of all target executable configurations that may be
+    // required for the given operation.
+    static SmallVector<ExecutableTargetAttr, 4>
+    lookupExecutableTargets(Operation *op);
+  }];
 }
 
+def HAL_ExecutableTargetAttr :
+    AttrDef<HAL_Dialect, "ExecutableTarget", []> {
+  let mnemonic = "executable.target";
+  let summary = [{generic executable target specification}];
+  let description = [{
+    Specifies how to compile an executable for a specific target backend.
+    A backend is used to translate and serialize the executable into the final
+    form passed to the runtime. The format of the executable is a
+    target-specific value indicating the required runtime support to load the
+    deployed artifact. An optionally provided configuration dictionary overrides
+    backend-specific defaults.
+
+    Example:
+    ```mlir
+      // Produce a system-native ELF for x86-64 systems using the LLVM backend:
+      #hal.executable.target<"llvm", "system-elf-x86_64", {
+        triple = "x86_64-unknown-linux-elf",
+        cpu = "host",
+        cpu_features = "host",
+        abi = "lp32",
+        ...
+      }>
+    ```
+
+    The same compilation backend may be used to translate executables for
+    several different runtime devices. Likewise the same runtime device may use
+    one of many different executable targets. Assume an N:M mapping between the
+    two in all cases.
+  }];
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$backend,
+    AttrParameter<"StringAttr", "">:$format,
+    AttrParameter<"DictionaryAttr", "">:$configuration
+  );
+  let builders = [
+    AttrBuilder<(ins "StringRef":$backend, "StringRef":$format)>,
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a symbol-compatible name that pseudo-uniquely identifies this
+    // target. Callers must perform deduplication when required.
+    std::string getSymbolNameFragment();
+
+    // Returns a hal.match.* expression tree that specifically matches a
+    // device that can load an executable of this target.
+    Attribute getMatchExpression();
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Experimental binding metadata
+//===----------------------------------------------------------------------===//
 // TODO(benvanik): drop this when we have a HAL dispatch abstraction.
+
 def HAL_ExConstantStorageAttr :
-  IREE_StructAttr<"ex.constant_storage",
+  Util_StructAttr<"ex.constant_storage",
                   "ExConstantStorageAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"binding", StrAttr>,
-    IREE_StructFieldAttr<"storage", StrAttr>,
-    IREE_StructFieldAttr<"offset", IndexAttr>,
-    IREE_StructFieldAttr<"length", IndexAttr>,
+    Util_StructFieldAttr<"binding", StrAttr>,
+    Util_StructFieldAttr<"storage", StrAttr>,
+    Util_StructFieldAttr<"offset", IndexAttr>,
+    Util_StructFieldAttr<"length", IndexAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 def HAL_ExPushConstantAttr :
-  IREE_StructAttr<"ex.push_constant",
+  Util_StructAttr<"ex.push_constant",
                   "ExPushConstantAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"ordinal", IndexAttr>,
-    IREE_StructFieldAttr<"operand", IndexAttr>,
+    Util_StructFieldAttr<"ordinal", IndexAttr>,
+    Util_StructFieldAttr<"operand", IndexAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 def HAL_ExOperandBufferAttr :
-  IREE_StructAttr<"ex.operand_buffer",
+  Util_StructAttr<"ex.operand_buffer",
                   "ExOperandBufferAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"binding", StrAttr>,
-    IREE_StructFieldAttr<"operand", IndexAttr>,
+    Util_StructFieldAttr<"binding", StrAttr>,
+    Util_StructFieldAttr<"operand", IndexAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 def HAL_ExResultBufferAttr :
-  IREE_StructAttr<"ex.result_buffer",
+  Util_StructAttr<"ex.result_buffer",
                   "ExResultBufferAttr",
                   HAL_Dialect, [
-    IREE_StructFieldAttr<"binding", StrAttr>,
-    IREE_StructFieldAttr<"result", IndexAttr>,
+    Util_StructFieldAttr<"binding", StrAttr>,
+    Util_StructFieldAttr<"result", IndexAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
@@ -583,6 +693,9 @@ def HAL_DeviceMatchIDAttr :
     }]>,
     AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
       return $_get(pattern.getContext(), pattern);
+    }]>,
+    AttrBuilderWithInferredContext<(ins "IREE::HAL::DeviceTargetAttr":$target), [{
+      return $_get(target.getContext(), target.getDeviceID());
     }]>,
   ];
 }
@@ -662,6 +775,9 @@ def HAL_DeviceMatchExecutableFormatAttr :
     }]>,
     AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
       return $_get(pattern.getContext(), pattern);
+    }]>,
+    AttrBuilderWithInferredContext<(ins "IREE::HAL::ExecutableTargetAttr":$target), [{
+      return $_get(target.getContext(), target.getFormat());
     }]>,
   ];
 }

@@ -14,18 +14,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Options controlling SPIR-V compilation for Metal.
-struct MetalSPIRVTargetOptions {
-  // TODO(antiagainst): Metal GPU family
-};
-
-// Returns a MetalSPIRVTargetOptions struct initialized with Metal/SPIR-V
-// related command-line flags.
-MetalSPIRVTargetOptions getMetalSPIRVTargetOptionsFromFlags();
-
 // Registers the Metal/SPIR-V backends.
-void registerMetalSPIRVTargetBackends(
-    std::function<MetalSPIRVTargetOptions()> queryOptions);
+void registerMetalSPIRVTargetBackends();
 
 }  // namespace HAL
 }  // namespace IREE

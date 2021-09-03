@@ -1,4 +1,12 @@
-// RUN: iree-opt -split-input-file -iree-hal-target-backends=dylib-llvm-aot -iree-hal-pack-allocations -cse -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-pack-allocations -cse -canonicalize %s | IreeFileCheck %s
+
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"cpu", {
+      buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 16, max_buffer_range = 1073741824, min_buffer_range_alignment = 16>
+    }>
+  ]
+} {
 
 // CHECK-LABEL: @packStatic
 // CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
@@ -20,7 +28,17 @@ func @packStatic(%allocator: !hal.allocator) ->
   return %t#0, %t#1, %t#2, %t#3, %t#4, %t#5, %t#6 : index, index, index, index, index, index, index
 }
 
+}
+
 // -----
+
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"cpu", {
+      buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 16, max_buffer_range = 1073741824, min_buffer_range_alignment = 16>
+    }>
+  ]
+} {
 
 // CHECK-LABEL: @packDynamic
 // CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator,
@@ -57,7 +75,17 @@ func @packDynamic(%allocator: !hal.allocator, %size_a: index, %size_b: index) ->
   return %t#0, %t#1, %t#2, %t#3 : index, index, index, index
 }
 
+}
+
 // -----
+
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"cpu", {
+      buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 16, max_buffer_range = 1073741824, min_buffer_range_alignment = 16>
+    }>
+  ]
+} {
 
 // CHECK-LABEL: @packMixedStaticDynamic
 // CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator,
@@ -96,4 +124,6 @@ func @packMixedStaticDynamic(%allocator: !hal.allocator, %size_a: index, %size_b
 
   // CHECK-DAG: return %10, %c0, %c208, %3, %c0
   return %t#0, %t#1, %t#2, %t#3, %t#4 : index, index, index, index, index
+}
+
 }

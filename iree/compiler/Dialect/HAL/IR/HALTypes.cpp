@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -73,7 +73,7 @@ static LogicalResult parseMemoryType(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<MemoryTypeBitfield>(fullString);
     if (!symbolized.hasValue()) {
@@ -158,7 +158,7 @@ static LogicalResult parseMemoryAccess(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<MemoryAccessBitfield>(fullString);
     if (!symbolized.hasValue()) {
@@ -227,7 +227,7 @@ static LogicalResult parseBufferUsage(DialectAsmParser &parser,
     return success();
   }
 
-  StringRef fullString;
+  std::string fullString;
   if (succeeded(parser.parseOptionalString(&fullString))) {
     auto symbolized = symbolizeEnum<BufferUsageBitfield>(fullString);
     if (!symbolized.hasValue()) {
@@ -360,13 +360,27 @@ Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
       c8);
 }
 
+llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
+  // TODO(#6762): encoding attribute handling/mapping to enums.
+  assert(!attr && "encoding types other than default not yet supported");
+  // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
+  return 1;
+}
+
+IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context) {
+  auto encodingType = getEncodingTypeValue(attr);
+  if (!encodingType) return {};
+  return IntegerAttr::get(IntegerType::get(context, 32),
+                          encodingType.getValue());
+}
+
 //===----------------------------------------------------------------------===//
 // Size-aware type utils
 //===----------------------------------------------------------------------===//
 
 // Returns the SSA value containing the size of the given |value|.
 static Value lookupValueSize(Value value) {
-  assert(value.getType().isa<SizeAwareTypeInterface>());
+  assert(value.getType().isa<IREE::Util::SizeAwareTypeInterface>());
 
   auto definingOp = value.getDefiningOp();
   if (!definingOp) {
@@ -374,7 +388,7 @@ static Value lookupValueSize(Value value) {
   }
 
   // Skip do-not-optimize ops.
-  if (auto dnoOp = dyn_cast<IREE::DoNotOptimizeOp>(definingOp)) {
+  if (auto dnoOp = dyn_cast<IREE::Util::DoNotOptimizeOp>(definingOp)) {
     return lookupValueSize(dnoOp.getOperand(0));
   }
 
@@ -388,7 +402,7 @@ static Value lookupValueSize(Value value) {
     }
   }
   assert(resultIndex != -1 && "result not in results");
-  auto sizeAwareOp = dyn_cast<SizeAwareOpInterface>(definingOp);
+  auto sizeAwareOp = dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp);
   if (!sizeAwareOp) return {};
   return sizeAwareOp.getResultSize(resultIndex);
 }
@@ -413,6 +427,8 @@ Value BufferViewType::inferSizeFromValue(Location loc, Value value,
 
 BufferConstraintsAttr intersectBufferConstraints(BufferConstraintsAttr lhs,
                                                  BufferConstraintsAttr rhs) {
+  if (!lhs) return rhs;
+  if (!rhs) return lhs;
   Builder b(lhs.getContext());
   return BufferConstraintsAttr::get(
       b.getIndexAttr(std::min(lhs.max_allocation_size().getSExtValue(),
@@ -514,75 +530,6 @@ void BufferConstraintsAttr::print(DialectAsmPrinter &p) const {
 }
 
 // static
-Attribute ByteRangeAttr::parse(DialectAsmParser &p) {
-  auto b = p.getBuilder();
-  if (failed(p.parseLess())) return {};
-
-  // TODO(benvanik): support the range syntax; the dialect asm parser fights
-  // with it though by checking for proper []/() nesting.
-
-  // Try first the range style: byte_range<[start..end)>
-  bool startInclusive;
-  if (succeeded(p.parseOptionalLSquare())) {  // [...
-    startInclusive = true;
-  } else if (succeeded(p.parseOptionalLParen())) {  // (...
-    startInclusive = false;
-  } else {
-    // byte_range<offset, length>
-    IntegerAttr offsetAttr;
-    IntegerAttr lengthAttr;
-    if (failed(p.parseAttribute(offsetAttr, b.getIndexType())) ||
-        failed(p.parseComma()) ||
-        failed(p.parseAttribute(lengthAttr, b.getIndexType())) ||
-        failed(p.parseGreater())) {
-      return {};
-    }
-    return get(offsetAttr, lengthAttr);
-  }
-
-  IntegerAttr startAttr;
-  IntegerAttr endAttr;
-  if (failed(p.parseAttribute(startAttr, b.getIndexType())) ||
-      failed(p.parseKeyword("to")) ||
-      failed(p.parseAttribute(endAttr, b.getIndexType()))) {
-    return {};
-  }
-
-  bool endInclusive;
-  if (succeeded(p.parseOptionalRSquare())) {  // ...]
-    endInclusive = true;
-  } else if (succeeded(p.parseOptionalRParen())) {  // ...)
-    endInclusive = false;
-  } else {
-    p.emitError(p.getCurrentLocation()) << "expected ] or ) to end range";
-    return {};
-  }
-
-  if (failed(p.parseGreater())) return {};
-
-  startAttr = startInclusive
-                  ? startAttr
-                  : b.getIndexAttr((startAttr.getValue() + 1).getSExtValue());
-  endAttr = endInclusive
-                ? endAttr
-                : b.getIndexAttr((endAttr.getValue() - 1).getSExtValue());
-
-  IntegerAttr offsetAttr = startAttr;
-  IntegerAttr lengthAttr = b.getIndexAttr(
-      (endAttr.getValue() - startAttr.getValue()).getSExtValue());
-  return get(offsetAttr, lengthAttr);
-}
-
-void ByteRangeAttr::print(DialectAsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << getKindName() << "<";
-  os << offset();
-  os << ", ";
-  os << length();
-  os << ">";
-}
-
-// static
 Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
   auto b = p.getBuilder();
   IntegerAttr bindingAttr;
@@ -607,22 +554,172 @@ void DescriptorSetLayoutBindingAttr::print(DialectAsmPrinter &p) const {
   os << ">";
 }
 
+//===----------------------------------------------------------------------===//
+// #hal.device.target
+//===----------------------------------------------------------------------===//
+
+// static
+DeviceTargetAttr DeviceTargetAttr::get(MLIRContext *context,
+                                       StringRef deviceID) {
+  // TODO(benvanik): query default configuration from the target backend.
+  return get(context, StringAttr::get(context, deviceID),
+             DictionaryAttr::get(context));
+}
+
+// static
+Attribute DeviceTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
+                                  Type type) {
+  auto b = p.getBuilder();
+  StringAttr deviceIDAttr;
+  DictionaryAttr configAttr;
+  // `<"device-id"`
+  if (failed(p.parseLess()) || failed(p.parseAttribute(deviceIDAttr))) {
+    return {};
+  }
+  // `, {config}`
+  if (succeeded(p.parseOptionalComma()) &&
+      failed(p.parseAttribute(configAttr))) {
+    return {};
+  }
+  // `>`
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(b.getContext(), deviceIDAttr, configAttr);
+}
+
+void DeviceTargetAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getMnemonic() << "<";
+  p.printAttribute(getDeviceID());
+  auto configAttr = getConfiguration();
+  if (configAttr && !configAttr.empty()) {
+    os << ", ";
+    p.printAttribute(configAttr);
+  }
+  os << ">";
+}
+
+std::string DeviceTargetAttr::getSymbolNameFragment() {
+  auto deviceName = getDeviceID().getValue().lower();
+  std::replace(deviceName.begin(), deviceName.end(), '-', '_');
+  return deviceName;
+}
+
+Attribute DeviceTargetAttr::getMatchExpression() {
+  return DeviceMatchIDAttr::get(*this);
+}
+
+BufferConstraintsAttr DeviceTargetAttr::getBufferConstraints() {
+  BufferConstraintsAttr constraintsAttr;
+  auto configAttr = getConfiguration();
+  if (configAttr) {
+    constraintsAttr =
+        configAttr.getAs<BufferConstraintsAttr>("buffer_constraints");
+  }
+  return constraintsAttr ? constraintsAttr
+                         : getDefaultHostBufferConstraints(getContext());
+}
+
+SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
+  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
+  auto configAttr = getConfiguration();
+  if (configAttr) {
+    auto targetsAttr = configAttr.getAs<ArrayAttr>("executable_targets");
+    if (targetsAttr) {
+      for (auto attr : targetsAttr.getValue()) {
+        resultAttrs.push_back(attr.dyn_cast<ExecutableTargetAttr>());
+      }
+    }
+  }
+  return resultAttrs;
+}
+
+// static
+SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
+    Operation *op) {
+  auto attrId = mlir::Identifier::get("hal.device.targets", op->getContext());
+  while (op) {
+    auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
+    if (targetsAttr) {
+      SmallVector<IREE::HAL::DeviceTargetAttr, 4> result;
+      for (auto targetAttr : targetsAttr) {
+        result.push_back(targetAttr.cast<IREE::HAL::DeviceTargetAttr>());
+      }
+      return result;
+    }
+    op = op->getParentOp();
+  }
+  return {};  // No devices found; let caller decide what to do.
+}
+
+// static
+BufferConstraintsAttr DeviceTargetAttr::getDefaultHostBufferConstraints(
+    MLIRContext *context) {
+  // Picked to represent what we kind of want on CPU today.
+  uint64_t maxAllocationSize = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferOffsetAlignment = 16ull;
+  uint64_t maxBufferRange = 1 * 1024 * 1024 * 1024ull;
+  uint64_t minBufferRangeAlignment = 16ull;
+  Builder b(context);
+  return BufferConstraintsAttr::get(b.getIndexAttr(maxAllocationSize),
+                                    b.getIndexAttr(minBufferOffsetAlignment),
+                                    b.getIndexAttr(maxBufferRange),
+                                    b.getIndexAttr(minBufferRangeAlignment));
+}
+
+// static
+BufferConstraintsAttr DeviceTargetAttr::lookupConservativeBufferConstraints(
+    Operation *op) {
+  BufferConstraintsAttr resultAttr = {};
+  for (auto targetAttr : IREE::HAL::DeviceTargetAttr::lookup(op)) {
+    auto configAttr = targetAttr.getConfiguration();
+    if (!configAttr) continue;
+    auto targetConstraintsAttr =
+        configAttr.getAs<BufferConstraintsAttr>("buffer_constraints");
+    if (!targetConstraintsAttr) continue;
+    resultAttr = intersectBufferConstraints(resultAttr, targetConstraintsAttr);
+  }
+  return resultAttr ? resultAttr
+                    : getDefaultHostBufferConstraints(op->getContext());
+}
+
+// static
+SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::lookupExecutableTargets(
+    Operation *op) {
+  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
+  for (auto deviceTargetAttr : lookup(op)) {
+    for (auto executableTargetAttr : deviceTargetAttr.getExecutableTargets()) {
+      if (!llvm::is_contained(resultAttrs, executableTargetAttr)) {
+        resultAttrs.push_back(executableTargetAttr);
+      }
+    }
+  }
+  return resultAttrs;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.executable.target
+//===----------------------------------------------------------------------===//
+
 // static
 ExecutableTargetAttr ExecutableTargetAttr::get(MLIRContext *context,
-                                               StringRef target) {
-  // TODO(benvanik): query from target backend.
-  return get(context, StringAttr::get(context, target),
-             DictionaryAttr::get(context));
+                                               StringRef backend,
+                                               StringRef format) {
+  return get(context, StringAttr::get(context, backend),
+             StringAttr::get(context, format), DictionaryAttr::get(context));
 }
 
 // static
 Attribute ExecutableTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
                                       Type type) {
   auto b = p.getBuilder();
-  StringAttr targetAttr;
+  StringAttr backendAttr;
+  StringAttr formatAttr;
   DictionaryAttr configurationAttr;
-  // `<"target"`
-  if (failed(p.parseLess()) || failed(p.parseAttribute(targetAttr))) {
+  // `<"backend", "format"`
+  if (failed(p.parseLess()) || failed(p.parseAttribute(backendAttr)) ||
+      failed(p.parseComma()) || failed(p.parseAttribute(formatAttr))) {
     return {};
   }
   // `, {config}`
@@ -634,19 +731,31 @@ Attribute ExecutableTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(b.getContext(), targetAttr, configurationAttr);
+  return get(b.getContext(), backendAttr, formatAttr, configurationAttr);
 }
 
 void ExecutableTargetAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
   os << getMnemonic() << "<";
-  p.printAttribute(getTarget());
+  p.printAttribute(getBackend());
+  os << ", ";
+  p.printAttribute(getFormat());
   auto config = getConfiguration();
   if (config && !config.empty()) {
     os << ", ";
     p.printAttribute(config);
   }
   os << ">";
+}
+
+std::string ExecutableTargetAttr::getSymbolNameFragment() {
+  auto format = getFormat().getValue().lower();
+  std::replace(format.begin(), format.end(), '-', '_');
+  return format;
+}
+
+Attribute ExecutableTargetAttr::getMatchExpression() {
+  return DeviceMatchExecutableFormatAttr::get(getContext(), getFormat());
 }
 
 //===----------------------------------------------------------------------===//
@@ -970,8 +1079,7 @@ void ExResultBufferAttr::print(DialectAsmPrinter &p) const {
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
-  addAttributes<BufferConstraintsAttr, ByteRangeAttr,
-                DescriptorSetLayoutBindingAttr,
+  addAttributes<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
                 // Experimental:
                 ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
                 ExResultBufferAttr>();
@@ -1002,8 +1110,6 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   if (parseResult.hasValue()) return genAttr;
   if (mnemonic == BufferConstraintsAttr::getKindName()) {
     return BufferConstraintsAttr::parse(parser);
-  } else if (mnemonic == ByteRangeAttr::getKindName()) {
-    return ByteRangeAttr::parse(parser);
   } else if (mnemonic == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
   } else if (mnemonic == ExConstantStorageAttr::getKindName()) {
@@ -1022,8 +1128,7 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<BufferConstraintsAttr, ByteRangeAttr,
-            DescriptorSetLayoutBindingAttr,
+      .Case<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
             // Experimental:
             ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
             ExResultBufferAttr>([&](auto typedAttr) { typedAttr.print(p); })

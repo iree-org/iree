@@ -1,12 +1,12 @@
-// RUN: (iree-translate --iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-run-module --entry_function=many_tensor) | IreeFileCheck %s
-// RUN: iree-translate --iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-benchmark-module --driver=vmvx --entry_function=many_tensor | IreeFileCheck --check-prefix=BENCHMARK %s
+// RUN: (iree-translate -iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-run-module --entry_function=many_tensor) | IreeFileCheck %s
+// RUN: iree-translate -iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-benchmark-module --driver=vmvx --entry_function=many_tensor | IreeFileCheck --check-prefix=BENCHMARK %s
 // RUN: iree-run-mlir -iree-hal-target-backends=vmvx %s | IreeFileCheck %s
 
 // BENCHMARK-LABEL: BM_many_tensor
 // CHECK-LABEL: EXEC @many_tensor
 func @many_tensor() -> (tensor<2x2xf32>, tensor<2x2xf32>, tensor<2x2xf32>,
                         tensor<2x2xf32>, tensor<2x2xf32>, tensor<2x2xf32>) {
-  %res = iree.unfoldable_constant
+  %res = util.unfoldable_constant
       dense<[[1.0, 2.0], [3.0, 4.0]]> : tensor<2x2xf32>
   return %res, %res, %res, %res, %res, %res :
         tensor<2x2xf32>, tensor<2x2xf32>, tensor<2x2xf32>, tensor<2x2xf32>,

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='func(iree-flow-insert-constant-clones)' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-flow-insert-constant-clones)' %s | IreeFileCheck %s
 
 // CHECK-LABEL: @function_return
 func @function_return() -> (tensor<8xf32>, i32) {
@@ -52,10 +52,10 @@ func @branch_argument_reuse(%cond : i1) -> tensor<8xf32> {
 // -----
 
 // CHECK-LABEL: @constant_variable
-flow.variable @constant_variable dense<1.200000e+00> : tensor<8xf32>
+util.global private @constant_variable = dense<1.200000e+00> : tensor<8xf32>
 func @constant_load() -> (tensor<8xf32>) {
-  // CHECK: %[[VAR:.+]] = flow.variable.load @constant_variable
-  %0 = flow.variable.load @constant_variable : tensor<8xf32>
+  // CHECK: %[[VAR:.+]] = util.global.load @constant_variable
+  %0 = util.global.load @constant_variable : tensor<8xf32>
   // CHECK-NEXT: %[[CLONE:.+]] = flow.tensor.clone %[[VAR]] : tensor<8xf32>
   // CHECK-NEXT: return %[[CLONE]]
   return %0 : tensor<8xf32>

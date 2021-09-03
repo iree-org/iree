@@ -8,15 +8,15 @@
 
 #include <algorithm>
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
-#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
-#include "iree/compiler/Dialect/VM/Target/Bytecode/ConstantEncoder.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -24,6 +24,7 @@
 #include "iree/schemas/bytecode_module_def_builder.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/CRC.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/IR/Attributes.h"
@@ -34,6 +35,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Translation.h"
 
@@ -50,6 +52,61 @@ struct TypeDef {
   Type type;
   std::string full_name;
 };
+
+struct SerializedConstantRef {
+  flatbuffers_uint8_vec_ref_t ref = 0;
+  int64_t totalSize = 0;
+  uint32_t crc32 = 0;
+};
+
+// Serializes a constant attribute to the FlatBuffer as a binary blob.
+// Returns the size in bytes of the serialized value and the flatbuffers offset
+// to the uint8 vec containing the data. If |calculateCRC32| is provided then a
+// CRC32 of the data will be computed and returned as well.
+SerializedConstantRef serializeConstant(Location loc, Attribute valueAttr,
+                                        size_t alignment, bool calculateCRC32,
+                                        FlatbufferBuilder &fbb) {
+  flatcc_builder_start_vector(fbb, 1, alignment, FLATBUFFERS_COUNT_MAX(1));
+
+  auto value = valueAttr.dyn_cast<IREE::Util::SerializableAttrInterface>();
+  assert(value && "expected a serializable rodata value");
+
+  // TODO(benvanik): use fbb.streamUint8Vec + value.serializeToStream.
+  // Right now this will allocate a single slab of the entire storage size and
+  // write the contents into it. streamUint8Vec also does the same thing but
+  // we could extend it with custom fbb storage such that we could reserve the
+  // size in the file and then fix it up after we write it. The complication is
+  // that we need the CRC below and thus have to have the bytes in memory at
+  // some point. An interface member for computeCRC() could be useful as even
+  // though slow it would avoid the need to malloc everything. We could also
+  // switch implementations based on calculateCRC32 - models with GB of params
+  // are probably fine not to have nice hackability :)
+  uint64_t actualSize = value.getStorageSize();
+  if (actualSize > SIZE_MAX) {
+    mlir::emitError(loc) << "constant size " << actualSize
+                         << " exceeds native size_t; unable to serialize";
+    return {};
+  }
+  size_t size = static_cast<size_t>(value.getStorageSize());
+  uint8_t *bytePtr = flatbuffers_uint8_vec_extend(fbb, size);
+  if (failed(value.serializeToBuffer(llvm::support::endianness::little,
+                                     ArrayRef<char>((char *)bytePtr, size)))) {
+    return {};
+  }
+
+  uint8_t *dataPtr =
+      reinterpret_cast<uint8_t *>(flatcc_builder_vector_edit(fbb));
+  size_t totalSize = flatcc_builder_vector_count(fbb);
+  uint32_t crc32Value = 0;
+  if (calculateCRC32) {
+    crc32Value = llvm::crc32(0u, ArrayRef<uint8_t>(dataPtr, totalSize));
+  }
+  return SerializedConstantRef{
+      flatbuffers_uint8_vec_end(fbb),
+      static_cast<int64_t>(totalSize),
+      crc32Value,
+  };
+}
 
 LLVM_PACKED_START
 struct ZIPEndOfCentralDirectoryRecord {
@@ -318,7 +375,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   OwningRewritePatternList patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
-  target.addLegalOp<IREE::DoNotOptimizeOp>();
+  target.addLegalOp<IREE::Util::DoNotOptimizeOp>();
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
@@ -356,7 +413,7 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
     modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
-  modulePasses.addPass(createDropCompilerHintsPass());
+  modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
 
   // Mark up the module with ordinals for each top-level op (func, etc).
   // This will make it easier to correlate the MLIR textual output to the
@@ -490,6 +547,11 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   // file and is only used to prime the flatcc builder.
   iree_vm_BytecodeModuleDef_start_as_root(fbb);
 
+  // Debug database is always populated but conditionally written.
+  // This allows us to emit the database to a separate file if we want to strip
+  // the module but still allow debugging later.
+  DebugDatabaseBuilder debugDatabase;
+
   SymbolTable symbolTable(moduleOp);
   if (!moduleOp.ordinal_counts().hasValue()) {
     return moduleOp.emitError() << "ordinal_counts attribute not found. The "
@@ -582,7 +644,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   size_t totalBytecodeLength = 0;
   for (auto funcOp : llvm::enumerate(internalFuncOps)) {
     auto encodedFunction = BytecodeEncoder::encodeFunction(
-        funcOp.value(), typeOrdinalMap, symbolTable);
+        funcOp.value(), typeOrdinalMap, symbolTable, debugDatabase);
     if (!encodedFunction) {
       return funcOp.value().emitError() << "failed to encode function bytecode";
     }
@@ -697,6 +759,11 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
     moduleStateDef = iree_vm_ModuleStateDef_end(fbb);
   }
 
+  iree_vm_DebugDatabaseDef_ref_t debugDatabaseRef = 0;
+  if (!targetOptions.stripSourceMap) {
+    debugDatabaseRef = debugDatabase.build(fbb);
+  }
+
   auto moduleNameRef = fbb.createString(
       moduleOp.sym_name().empty() ? "module" : moduleOp.sym_name());
 
@@ -711,6 +778,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   iree_vm_BytecodeModuleDef_function_descriptors_add(fbb,
                                                      functionDescriptorsRef);
   iree_vm_BytecodeModuleDef_bytecode_data_add(fbb, bytecodeDataRef);
+  iree_vm_BytecodeModuleDef_debug_database_add(fbb, debugDatabaseRef);
   iree_vm_BytecodeModuleDef_end_as_root(fbb);
 
   return success();
@@ -719,11 +787,24 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
 LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                                         BytecodeTargetOptions targetOptions,
                                         llvm::raw_ostream &output) {
+  moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
+
   uint64_t startOffset = output.tell();
 
   if (failed(canonicalizeModule(targetOptions, moduleOp))) {
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";
+  }
+
+  // Dump VM assembly source listing to a file and annotate IR locations.
+  if (!targetOptions.sourceListing.empty()) {
+    OpPrintingFlags printFlags;
+    printFlags.elideLargeElementsAttrs(8192);
+    if (failed(mlir::generateLocationsFromIR(targetOptions.sourceListing, "vm",
+                                             moduleOp, printFlags))) {
+      return moduleOp.emitError() << "failed to write source listing to '"
+                                  << targetOptions.sourceListing << "'";
+    }
   }
 
   if (targetOptions.outputFormat == BytecodeOutputFormat::kAnnotatedMlirText) {

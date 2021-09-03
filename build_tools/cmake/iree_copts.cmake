@@ -317,6 +317,11 @@ endif()
   # TODO(#898): add a dedicated size-constrained configuration.
 if(${IREE_SIZE_OPTIMIZED})
   iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
+    CLANG_OR_GCC
+      "-DIREE_STATUS_MODE=0"
+      "-DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
+      "-DIREE_VM_EXT_I64_ENABLE=0"
+      "-DIREE_VM_EXT_F32_ENABLE=0"
     MSVC_OR_CLANG_CL
       "/GS-"
       "/GL"
@@ -367,60 +372,8 @@ endif()
 # TODO(benvanik): MSVC options.
 
 #-------------------------------------------------------------------------------
-# Third party: benchmark
+# Third party: llvm-project
 #-------------------------------------------------------------------------------
-
-set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
-
-#-------------------------------------------------------------------------------
-# Third party: cpuinfo
-#-------------------------------------------------------------------------------
-
-set(CPUINFO_BUILD_TOOLS ON CACHE BOOL "" FORCE)
-
-set(CPUINFO_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
-set(CPUINFO_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
-set(CPUINFO_BUILD_MOCK_TESTS OFF CACHE BOOL "" FORCE)
-
-#-------------------------------------------------------------------------------
-# Third party: flatcc
-#-------------------------------------------------------------------------------
-
-set(FLATCC_TEST OFF CACHE BOOL "" FORCE)
-set(FLATCC_CXX_TEST OFF CACHE BOOL "" FORCE)
-set(FLATCC_REFLECTION OFF CACHE BOOL "" FORCE)
-set(FLATCC_ALLOW_WERROR OFF CACHE BOOL "" FORCE)
-
-if(CMAKE_CROSSCOMPILING)
-  set(FLATCC_RTONLY ON CACHE BOOL "" FORCE)
-else()
-  set(FLATCC_RTONLY OFF CACHE BOOL "" FORCE)
-endif()
-
-#-------------------------------------------------------------------------------
-# Third party: gtest
-#-------------------------------------------------------------------------------
-
-set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-#-------------------------------------------------------------------------------
-# Third party: llvm/mlir
-#-------------------------------------------------------------------------------
-
-set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
-set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
-set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
-set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
-
-# TODO(ataei): Use optional build time targets selection for LLVMAOT.
-set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64;RISCV;NVPTX;AMDGPU"
-    CACHE STRING "" FORCE)
-
-set(LLVM_ENABLE_PROJECTS "mlir;lld" CACHE STRING "" FORCE)
-set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
 # iree-tblgen is not defined using the add_tablegen mechanism as other TableGen
@@ -433,24 +386,4 @@ iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
 
 if(IREE_ENABLE_EMITC)
   add_definitions(-DIREE_HAVE_EMITC_DIALECT)
-endif()
-
-#-------------------------------------------------------------------------------
-# Third party: SPIRV-Cross
-#-------------------------------------------------------------------------------
-
-if(${IREE_TARGET_BACKEND_METAL-SPIRV})
-  set(SPIRV_CROSS_ENABLE_MSL ON CACHE BOOL "" FORCE)
-  set(SPIRV_CROSS_ENABLE_GLSL ON CACHE BOOL "" FORCE) # Required to enable MSL
-
-  set(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS OFF CACHE BOOL "" FORCE)
-  set(SPIRV_CROSS_CLI OFF CACHE BOOL "" FORCE)
-  set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
-  set(SPIRV_CROSS_SKIP_INSTALL ON CACHE BOOL "" FORCE)
-
-  set(SPIRV_CROSS_ENABLE_HLSL OFF CACHE BOOL "" FORCE)
-  set(SPIRV_CROSS_ENABLE_CPP OFF CACHE BOOL "" FORCE)
-  set(SPIRV_CROSS_ENABLE_REFLECT OFF CACHE BOOL "" FORCE)
-  set(SPIRV_CROSS_ENABLE_C_API OFF CACHE BOOL "" FORCE)
-  set(SPIRV_CROSS_ENABLE_UTIL OFF CACHE BOOL "" FORCE)
 endif()

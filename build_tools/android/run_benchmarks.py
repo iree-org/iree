@@ -153,9 +153,11 @@ def compose_benchmark_info_object(device_info: AndroidDeviceInfo,
   root_immediate_dir = os.path.basename(benchmark_case_dir)
   iree_driver, target_arch, bench_mode = root_immediate_dir.split("__")
 
+  model_source = os.path.basename(benchmark_category_dir)
+
   return BenchmarkInfo(model_name=model_name,
                        model_tags=model_tags,
-                       model_source="TensorFlow",
+                       model_source=model_source,
                        bench_mode=bench_mode.split(","),
                        runner=iree_driver,
                        device_info=device_info)

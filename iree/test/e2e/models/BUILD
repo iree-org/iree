@@ -31,7 +31,7 @@ iree_lit_test_suite(
             "fragment_000.mlir",
             "fullyconnected.mlir",
             "mnist_fake_weights.mlir",
-            "resnet_fake_weights.mlir",
+            "resnet50_fake_weights.mlir",
             "unidirectional_lstm.mlir",
         ],
         include =
@@ -71,4 +71,21 @@ iree_check_single_backend_test_suite(
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_linalg_on_tensors_cuda_cuda",
+    timeout = "long",
+    srcs = CHECK_FRAMEWORK_TESTS,
+    compiler_flags = ["-iree-input-type=mhlo"],
+    driver = "cuda",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
 )

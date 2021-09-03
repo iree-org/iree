@@ -385,7 +385,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store,  //
              iree_hal_buffer_byte_length(target_buffer)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
-        "store out of bounds (target_offset=%d, length=%d into max %" PRIu64
+        "store out of bounds (target_offset=%d, length=%d into max %" PRIdsz
         ")",
         target_offset, length, iree_hal_buffer_byte_length(target_buffer));
   }
@@ -400,18 +400,20 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
                    iree_hal_module_state_t,             //
-                   riCiD, r) {
+                   riiCiD, r) {
   iree_hal_buffer_t* source_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &source_buffer));
   iree_hal_element_type_t element_type = (iree_hal_element_type_t)args->i1;
+  iree_hal_encoding_type_t encoding_type = (iree_hal_encoding_type_t)args->i2;
   iree_host_size_t shape_rank = 0;
   iree_hal_dim_t* shape_dims = NULL;
-  IREE_VM_ABI_VLA_STACK_CAST(args, a2_count, a2, iree_hal_dim_t, 128,
+  IREE_VM_ABI_VLA_STACK_CAST(args, a3_count, a3, iree_hal_dim_t, 128,
                              &shape_rank, &shape_dims);
 
   iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      source_buffer, shape_dims, shape_rank, element_type, &buffer_view));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_view_create(source_buffer, shape_dims, shape_rank,
+                                  element_type, encoding_type, &buffer_view));
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
 }
@@ -444,6 +446,16 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_element_type,  //
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
   rets->i0 = (uint32_t)iree_hal_buffer_view_element_type(buffer_view);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_encoding_type,  //
+                   iree_hal_module_state_t,                    //
+                   r, i) {
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
+  rets->i0 = (uint32_t)iree_hal_buffer_view_encoding_type(buffer_view);
   return iree_ok_status();
 }
 
@@ -859,9 +871,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32,  //
                    rrr, ii) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_vm_buffer_t* ns = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &ns));
-  iree_string_view_t category_str = iree_vm_buffer_as_string(ns);
+  iree_vm_buffer_t* category = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &category));
+  iree_string_view_t category_str = iree_vm_buffer_as_string(category);
   iree_vm_buffer_t* key = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r2, &key));
   iree_string_view_t key_str = iree_vm_buffer_as_string(key);

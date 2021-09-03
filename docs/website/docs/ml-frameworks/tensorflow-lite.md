@@ -24,6 +24,11 @@ python -m pip install \
   -f https://github.com/google/iree/releases
 ```
 
+!!! warning
+    The TensorFlow Lite package is currently only available on Linux and macOS.
+    It is not available on Windows yet (see
+    [this issue](https://github.com/google/iree/issues/6417)).
+
 ## Importing models
 
 Fist, import the TFLite model to TOSA MLIR:
@@ -42,6 +47,7 @@ tools or the [Python API](https://google.github.io/iree/bindings/python/):
 ``` shell
 iree-translate \
   --iree-mlir-to-vm-bytecode-module \
+  --iree-input-type=tosa \
   --iree-hal-target-backends=vmvx \
   sample.mlir \
   -o sample.vmfb

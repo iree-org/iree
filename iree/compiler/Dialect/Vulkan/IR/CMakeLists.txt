@@ -29,10 +29,11 @@ iree_cc_library(
     ::VulkanAttrsGen
     ::VulkanEnumsGen
     LLVMSupport
+    MLIRGPUOps
     MLIRIR
     MLIRSPIRV
     MLIRSupport
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

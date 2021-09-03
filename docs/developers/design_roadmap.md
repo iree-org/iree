@@ -608,7 +608,7 @@ some traditional instruction scheduling techniques to (only here our
 'instructions' are entire command buffer dispatches/transfers).
 
 Two degenerate cases of this approach are that of resource indirection
-(`iree.ptr<tensor<T>>`) and dynamic resource shapes. In these two cases it may
+(`util.ptr<tensor<T>>`) and dynamic resource shapes. In these two cases it may
 not be possible to continue recording commands even if we are able to ensure
 execution is appropriately synchronized. This is where indirect dispatch,
 [predication](#predication-of-flowdispatch),

@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "llvm/ADT/STLExtras.h"
@@ -148,7 +148,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodePrimitiveArrayAttr(DenseElementsAttr value) override {
-    if (value.getNumElements() > UINT16_MAX ||
+    if (value.getNumElements() > UINT16_MAX || failed(ensureAlignment(2)) ||
         failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";
     }
@@ -187,7 +187,9 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     // this list is small :)
     auto srcDstRegs = registerAllocation_->remapSuccessorRegisters(
         currentOp_, successorIndex);
-    (void)writeUint16(srcDstRegs.size());
+    if (failed(ensureAlignment(2)) || failed(writeUint16(srcDstRegs.size()))) {
+      return failure();
+    }
     for (auto srcDstReg : srcDstRegs) {
       if (failed(writeUint16(srcDstReg.first.encode())) ||
           failed(writeUint16(srcDstReg.second.encode()))) {
@@ -206,7 +208,10 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeOperands(Operation::operand_range values) override {
-    (void)writeUint16(std::distance(values.begin(), values.end()));
+    if (failed(ensureAlignment(2)) ||
+        failed(writeUint16(std::distance(values.begin(), values.end())))) {
+      return failure();
+    }
     for (auto it : llvm::enumerate(values)) {
       uint16_t reg = registerAllocation_
                          ->mapUseToRegister(it.value(), currentOp_, it.index())
@@ -224,7 +229,10 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeResults(Operation::result_range values) override {
-    (void)writeUint16(std::distance(values.begin(), values.end()));
+    if (failed(ensureAlignment(2)) ||
+        failed(writeUint16(std::distance(values.begin(), values.end())))) {
+      return failure();
+    }
     for (auto value : values) {
       uint16_t reg = registerAllocation_->mapToRegister(value).encode();
       if (failed(writeUint16(reg))) {
@@ -239,6 +247,17 @@ class V0BytecodeEncoder : public BytecodeEncoder {
       return llvm::None;
     }
     return std::move(bytecode_);
+  }
+
+  size_t getOffset() const { return bytecode_.size(); }
+
+  LogicalResult ensureAlignment(size_t alignment) {
+    size_t paddedSize = (bytecode_.size() + (alignment - 1)) & ~(alignment - 1);
+    size_t padding = paddedSize - bytecode_.size();
+    if (padding == 0) return success();
+    static const uint8_t kZeros[32] = {0};
+    if (padding > sizeof(kZeros)) return failure();
+    return writeBytes(kZeros, padding);
   }
 
  private:
@@ -310,7 +329,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 // static
 Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-    SymbolTable &symbolTable) {
+    SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase) {
   EncodedBytecodeFunction result;
 
   // Perform register allocation first so that we can quickly lookup values as
@@ -320,6 +339,8 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     funcOp.emitError() << "register allocation failed";
     return llvm::None;
   }
+
+  FunctionSourceMap sourceMap;
 
   V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
   for (auto &block : funcOp.getBlocks()) {
@@ -334,6 +355,8 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
         op.emitOpError() << "is not serializable";
         return llvm::None;
       }
+      sourceMap.locations.push_back(
+          {static_cast<int32_t>(encoder.getOffset()), op.getLoc()});
       if (failed(encoder.beginOp(&op)) ||
           failed(serializableOp.encode(symbolTable, encoder)) ||
           failed(encoder.endOp(&op))) {
@@ -348,6 +371,12 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     }
   }
 
+  debugDatabase.addFunctionSourceMap(funcOp, sourceMap);
+
+  if (failed(encoder.ensureAlignment(8))) {
+    funcOp.emitError() << "failed to pad function";
+    return llvm::None;
+  }
   auto bytecodeData = encoder.finish();
   if (!bytecodeData.hasValue()) {
     funcOp.emitError() << "failed to fixup and finish encoding";

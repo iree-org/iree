@@ -1,4 +1,5 @@
-// RUN: iree-opt -split-input-file -pass-pipeline="hal.executable(hal.executable.variant(iree-spirv-tile-and-vectorize,canonicalize,cse))" -iree-spirv-use-workgroup-memory %s | IreeFileCheck %s
+// TODO(antiagainst): Fix promotion to workgroup and enable the test.
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))' | IreeFileCheck %s
 
 hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "private"} {
   hal.interface @io {
@@ -6,12 +7,12 @@ hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "pr
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target="vulkan" {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul_promote_workgroup_memory attributes {
-      interface = @io,
-      ordinal = 0 : index
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [16: index, 8: index, 1: index]
     }
-    module attributes {
+    builtin.module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                         {max_compute_workgroup_invocations = 128 : i32,
@@ -39,7 +40,9 @@ hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "pr
           %15 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%3]
           %16 = affine.min affine_map<()[s0] -> (16, s0 * -16 + 75)>()[%3]
           %17 = memref.subview %2[%13, %15] [%14, %16] [1, 1] : memref<25x75xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 75 + s0 + d1)>>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %12 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 50 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 75 + s0 + d1)>>) outs(%17 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 75 + s0 + d1)>>)
+          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[8, 16, 32], [], [1, 1, 0]]}}
+            ins(%8, %12 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 50 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 75 + s0 + d1)>>)
+            outs(%17 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 75 + s0 + d1)>>)
         }
         return
       }
@@ -82,12 +85,12 @@ hal.executable @conv_promote_workgroup_memory attributes {sym_visibility = "priv
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target="vulkan" {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_promote_workgroup_memory attributes {
-      interface = @io,
-      ordinal = 0 : index
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 4: index, 1: index]
     }
-    module attributes {
+    builtin.module attributes {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
                         {max_compute_workgroup_invocations = 128 : i32,
@@ -110,7 +113,9 @@ hal.executable @conv_promote_workgroup_memory attributes {sym_visibility = "priv
         %13 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
         %14 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 11)>()[%3]
         %15 = memref.subview %2[%5, %11, %13, 0] [1, %12, %14, 14] [1, 1, 1, 1] : memref<2x13x11x14xf32> to memref<1x?x?x14xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 2002 + s0 + d1 * 154 + d2 * 14 + d3)>>
-        linalg.conv_2d_input_nhwc_filter_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%10, %0 : memref<1x?x?x6xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1260 + s0 + d1 * 84 + d2 * 6 + d3)>>, memref<3x4x6x14xf32>) outs(%15 : memref<1x?x?x14xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 2002 + s0 + d1 * 154 + d2 * 14 + d3)>>)
+        linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[0, 1, 4, 32], [], [0, 1, 1, 1]]}, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+          ins(%10, %0 : memref<1x?x?x6xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1260 + s0 + d1 * 84 + d2 * 6 + d3)>>, memref<3x4x6x14xf32>)
+          outs(%15 : memref<1x?x?x14xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 2002 + s0 + d1 * 154 + d2 * 14 + d3)>>)
         return
       }
       hal.interface @io attributes {sym_visibility = "private"} {

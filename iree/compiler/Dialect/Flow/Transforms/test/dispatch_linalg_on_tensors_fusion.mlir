@@ -4,7 +4,7 @@ func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
-  %2 = linalg.conv_2d_input_nhwc_filter_hwcf
+  %2 = linalg.conv_2d_nhwc_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>)
@@ -36,7 +36,7 @@ func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<
 //      CHECK:     scf.for
 //      CHECK:       %[[INIT:.+]] = linalg.init_tensor
 //      CHECK:       %[[FILL0:.+]] = linalg.fill(%{{.+}}, %[[INIT]])
-//      CHECK:       %[[CONV:.+]] = linalg.conv_2d_input_nhwc_filter_hwcf
+//      CHECK:       %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:         outs(%[[FILL0]] : tensor<1x?x?x?xf32>)
 //      CHECK:       %[[FILL1:.+]] = linalg.fill(%{{.+}}, %[[INIT]])
 //      CHECK:       linalg.generic
@@ -50,7 +50,7 @@ func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %fil
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
-  %2 = linalg.conv_2d_input_nhwc_filter_hwcf
+  %2 = linalg.conv_2d_nhwc_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>)
@@ -75,7 +75,7 @@ func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %fil
 // CHECK: flow.dispatch.workgroups
 // CHECK:   scf.for
 // CHECK:     scf.for
-// CHECK:       linalg.conv_2d_input_nhwc_filter_hwcf
+// CHECK:       linalg.conv_2d_nhwc_hwcf
 
 // CHECK: flow.dispatch.workgroups
 // CHECK:       linalg.generic
@@ -86,7 +86,7 @@ func @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x225x16xf32>, %
   %cst = constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
-  %2 = linalg.conv_2d_input_nhwc_filter_hwcf
+  %2 = linalg.conv_2d_nhwc_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>)
@@ -111,7 +111,7 @@ func @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x225x16xf32>, %
 // CHECK: flow.dispatch.workgroups
 // CHECK:   scf.for
 // CHECK:     scf.for
-// CHECK:       linalg.conv_2d_input_nhwc_filter_hwcf
+// CHECK:       linalg.conv_2d_nhwc_hwcf
 
 // CHECK: flow.dispatch.workgroups
 // CHECK:       linalg.generic

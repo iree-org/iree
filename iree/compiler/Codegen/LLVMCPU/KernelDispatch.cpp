@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -19,8 +20,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
-static const unsigned kNumMaxParallelDims = 3;
 
 namespace mlir {
 namespace iree_compiler {
@@ -57,45 +56,67 @@ static llvm::cl::opt<int> batchMatmulL1TileSize(
     llvm::cl::desc("linalg.batch_matmul tile size for L1 spliting of M, N, K "
                    "dimensions"),
     llvm::cl::init(16));
-static llvm::cl::opt<int> batchMatmulL2TileSize(
-    "iree-codegen-llvm-batch-matmul-vector-size",
-    llvm::cl::desc("linalg.batch_matmul vector tile size"), llvm::cl::init(4));
 
-static llvm::cl::opt<int> genericOpsWorkgroupTileSize(
+static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
+    "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
+    llvm::cl::desc("linalg.mmt4d workgroup tile size"), llvm::cl::ZeroOrMore,
+    llvm::cl::MiscFlags::CommaSeparated);
+
+static llvm::cl::list<int> mmt4dL1TileSizes(
+    "iree-codegen-llvm-mmt4d-l1-tile-size",
+    llvm::cl::desc("linalg.mmt4d L1 tile size"), llvm::cl::ZeroOrMore,
+    llvm::cl::MiscFlags::CommaSeparated);
+
+static llvm::cl::list<int> mmt4dVectorSizes(
+    "iree-codegen-llvm-mmt4d-vector-size",
+    llvm::cl::desc("linalg.mmt4d vector tile size"), llvm::cl::ZeroOrMore,
+    llvm::cl::MiscFlags::CommaSeparated);
+
+static llvm::cl::opt<int> defaultWorkgroupTileSize(
     "iree-codegen-llvm-generic-ops-workgroup-size",
     llvm::cl::desc(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
-    llvm::cl::init(128));
+    llvm::cl::init(64));
 
-/// Usually the tile sizes for the first level of tiling decides the workgroup
-/// size for the dispatch on the CPU backend. This is a general helper that
-/// converts tile sizes of the first level into workgroup sizes.
-static SmallVector<int64_t, 3> getWorkloadPerWorkgroup(
-    ArrayRef<int64_t> distributedTileSizes) {
-  if (distributedTileSizes.size() > kNumMaxParallelDims) {
-    distributedTileSizes = distributedTileSizes.take_back(kNumMaxParallelDims);
+static Optional<int64_t> getNativeVectorSize(FuncOp entryPointFn,
+                                             Type elementType) {
+  Optional<int64_t> nativeVectorSizeInBytes = llvm::None;
+  if (auto variantOp =
+          entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    if (IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target()) {
+      if (auto config = targetAttr.getConfiguration()) {
+        if (auto nativeVectorSizeAttr =
+                config.getAs<IntegerAttr>("native_vector_size")) {
+          if (int64_t nativeVectorSizeVal = nativeVectorSizeAttr.getInt()) {
+            nativeVectorSizeInBytes = nativeVectorSizeVal;
+          }
+        }
+      }
+    }
   }
-  return llvm::to_vector<3>(llvm::reverse(distributedTileSizes));
-}
-
-/// Sets the translation info on the `hal.executable.entry_point` op
-/// corresponding to the `entryPointFn`. Returns failure if a translation info
-/// is already set on the entry point op and is incompatible with what is being
-/// set.
-static LogicalResult setTranslationInfo(
-    FuncOp entryPointFn, IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workloadPerWorkgroup) {
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  auto translationInfo = buildTranslationInfo(
-      passPipeline, workloadPerWorkgroup, entryPointFn.getContext());
-  return setTranslationInfo(entryPointOp, translationInfo);
+  // TODO(ravishankarm): For now still picking the value from the
+  // `iree-codegen-llvm-matmul-vector-size` option to avoid some issues on
+  // RISCV-32 side.
+  if (nativeVectorSizeInBytes) {
+    if (elementType.isIntOrFloat()) {
+      unsigned bitWidth = elementType.getIntOrFloatBitWidth() / 8;
+      return (*nativeVectorSizeInBytes) / bitWidth;
+    }
+  }
+  return matmulVectorSize.getValue();
 }
 
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp) {
-  if (hasLoweringConfig(entryPointFn)) return success();
+  if (getLoweringConfig(contractionOp)) return success();
+  Type elementType =
+      contractionOp.lhs().getType().cast<ShapedType>().getElementType();
+  auto vectorSize = getNativeVectorSize(entryPointFn, elementType);
+  if (!vectorSize) return success();
+  int64_t vectorSizeVal = *vectorSize;
+
   if (contractionOp.isRowMajorMatmul()) {
     int mWorkgroupSize = matmulWorkgroupTileSize;
     int nWorkgroupSize = matmulWorkgroupTileSize;
@@ -104,13 +125,14 @@ static LogicalResult setRootConfig(
     int kL1TileSize = matmulL1TileSize;
     auto lhsShape = getUntiledShape(contractionOp.lhs());
     auto rhsShape = getUntiledShape(contractionOp.rhs());
+    if (!vectorSize) return success();
     if (!lhsShape.empty() && !rhsShape.empty()) {
       // Find largest tile size that is a multiple of the vector size.
-      auto getTileSize = [](int dim, int maxSize) {
+      auto getTileSize = [vectorSizeVal](int dim, int maxSize) -> int {
         if (dim == ShapedType::kDynamicSize) return maxSize;
-        if (dim < matmulVectorSize) return matmulVectorSize.getValue();
+        if (dim < vectorSizeVal) return vectorSizeVal;
         for (int i = std::min(maxSize, dim); i > 0; --i) {
-          if (dim % i == 0 && i % matmulVectorSize == 0) {
+          if (dim % i == 0 && i % vectorSizeVal == 0) {
             return i;
           }
         }
@@ -125,15 +147,12 @@ static LogicalResult setRootConfig(
     TileSizesListType tileSizes = {
         {mWorkgroupSize, nWorkgroupSize},
         {mL1TileSize, nL1TileSize, kL1TileSize},
-        {matmulVectorSize, matmulVectorSize, matmulVectorSize}};
-    SmallVector<int64_t, 4> nativeVectorSize = {
-        matmulVectorSize, matmulVectorSize, matmulVectorSize};
-    IREE::HAL::LoweringConfig config = buildConfigAttr(
-        tileSizes, nativeVectorSize, contractionOp->getContext());
-    setLoweringConfig(contractionOp, config);
-    return setTranslationInfo(
-        entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization,
-        getWorkloadPerWorkgroup(tileSizes[0]));
+        {vectorSizeVal, vectorSizeVal, vectorSizeVal}};
+    SmallVector<int64_t, 4> nativeVectorSize = {vectorSizeVal, vectorSizeVal,
+                                                vectorSizeVal};
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPointFn, contractionOp, tileSizes, nativeVectorSize,
+        IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
   }
   if (contractionOp.isRowMajorBatchMatmul()) {
     // TODO(ataei, ravishankarm): This should just use the configuration for
@@ -142,95 +161,152 @@ static LogicalResult setRootConfig(
         {1, batchMatmulWorkgroupTileSize, batchMatmulWorkgroupTileSize},
         {1, batchMatmulL1TileSize, batchMatmulL1TileSize,
          batchMatmulL1TileSize},
-        {1, batchMatmulL2TileSize, batchMatmulL2TileSize,
-         batchMatmulL2TileSize}};
-    SmallVector<int64_t, 4> nativeVectorSize = {
-        1, batchMatmulL2TileSize, batchMatmulL2TileSize, batchMatmulL2TileSize};
-    IREE::HAL::LoweringConfig config = buildConfigAttr(
-        tileSizes, nativeVectorSize, contractionOp->getContext());
-    setLoweringConfig(contractionOp, config);
-    return setTranslationInfo(
-        entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization,
-        getWorkloadPerWorkgroup(tileSizes[0]));
+        {1, vectorSizeVal, vectorSizeVal, vectorSizeVal}};
+    SmallVector<int64_t, 4> nativeVectorSize = {1, vectorSizeVal, vectorSizeVal,
+                                                vectorSizeVal};
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPointFn, contractionOp, tileSizes, nativeVectorSize,
+        IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
   }
   return success();
 }
 
-/// Legalized the tile sizes for the first-level of tiling
-/// (i.e. workgroup-level) to stay consistent with the distribution done at the
-/// Flow dialect level, where the last `kNumMaxParallelDims` of the outer
-/// parallel loops are distributed.
-static SmallVector<int64_t, 4> getTileSizesForWorkgroupDistribution(
-    int64_t numOuterParallelLoops, ArrayRef<int64_t> workgroupTileSizes) {
-  SmallVector<int64_t, 4> distributedTileSizes =
-      llvm::to_vector<4>(workgroupTileSizes);
-  for (int64_t i = 0; i < numOuterParallelLoops - kNumMaxParallelDims; i++) {
-    distributedTileSizes[i] = 0;
-  }
-  return distributedTileSizes;
+/// Sets the lowering configuration for dispatch region for linalg.mmt4d root op
+static LogicalResult setRootConfig(FuncOp entryPointFn,
+                                   linalg::Mmt4DOp mmt4dOp) {
+  // TODO(ataei): These are hand tuned for some performance benchmarks for now,
+  // we want to adapt the same strategy as matmul that dynamically sets tile
+  // size.
+  auto getWorkgroupTileSizes = [&]() -> SmallVector<int64_t> {
+    if (!mmt4dWorkgroupTileSizes.empty()) {
+      return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
+                                  mmt4dWorkgroupTileSizes.end());
+    }
+    return {64, 32};
+  };
+
+  auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
+    if (!mmt4dL1TileSizes.empty()) {
+      return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
+                                  mmt4dL1TileSizes.end());
+    }
+    return {1, 1, 4, 4, 1, 4};
+  };
+
+  auto getVectorSizes = [&]() -> SmallVector<int64_t> {
+    if (!mmt4dVectorSizes.empty()) {
+      return SmallVector<int64_t>(mmt4dVectorSizes.begin(),
+                                  mmt4dVectorSizes.end());
+    }
+    return {1, 1, 4, 4, 1, 4};
+  };
+
+  SmallVector<int64_t, 4> nativeVectorSize = getVectorSizes();
+
+  TileSizesListType tileSizes = {getWorkgroupTileSizes(), getL1TileSizes(),
+                                 nativeVectorSize};
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
+      IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
 }
 
 /// Sets the lowering configuration for dispatch region with root op being a
 /// generic op.
-static LogicalResult setRootConfig(FuncOp entryPointFn,
-                                   linalg::GenericOp genericOp) {
-  if (hasLoweringConfig(genericOp)) return success();
-  int64_t numOuterParallelLoops = getNumOuterParallelLoops(genericOp);
-  SmallVector<int64_t, 4> workgroupTileSizes(numOuterParallelLoops,
-                                             genericOpsWorkgroupTileSize);
-  workgroupTileSizes = getTileSizesForWorkgroupDistribution(
-      numOuterParallelLoops, workgroupTileSizes);
+static LogicalResult setDefaultRootConfig(FuncOp entryPointFn, Operation *op) {
+  auto partitionedLoops = getPartitionedLoops(op);
+  if (partitionedLoops.empty()) {
+    // Return success without doing anything. Eventually default will be used.
+    return success();
+  }
+  unsigned maxDepth = partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSizes(maxDepth,
+                                             defaultWorkgroupTileSize);
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
+    if (!partitionedLoopsSet.count(dim)) {
+      workgroupTileSizes[dim] = 0;
+    }
+  }
   TileSizesListType tileSizes = {workgroupTileSizes};
-  IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, ArrayRef<int64_t>{}, genericOp->getContext());
-  setLoweringConfig(genericOp, config);
-  return setTranslationInfo(
-      entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization,
-      getWorkloadPerWorkgroup(tileSizes[0]));
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+      IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
 }
 
 /// Finds the root operation in the given list of linalg operations and sets its
 /// configuration. Returns the root operation.
 static LogicalResult setRootConfig(FuncOp entryPointFn,
-                                   ArrayRef<linalg::LinalgOp> linalgOps) {
-  linalg::LinalgOp rootOp = nullptr;
-  for (auto linalgOp : linalgOps) {
-    if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
-    auto status =
-        TypeSwitch<Operation *, LogicalResult>(linalgOp.getOperation())
-            .Case<linalg::ContractionOpInterface>(
+                                   ArrayRef<Operation *> computeOps) {
+  Operation *rootOp = nullptr;
+  for (auto computeOp : computeOps) {
+    if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
+
+    /// If the op already has a lowering config, then check for whether it
+    /// specifies a pass-pipeline and workgroup size as well. If so use those.
+    if (auto config = getLoweringConfig(computeOp)) {
+      IREE::HAL::DispatchLoweringPassPipeline passPipeline =
+          IREE::HAL::DispatchLoweringPassPipeline::CPUDefault;
+      if (auto passPipelineAttr = config.passPipeline()) {
+        passPipeline = passPipelineAttr.getValue();
+      }
+      SmallVector<int64_t, 4> workgroupSize;
+      if (auto workgroupSizeAttr = config.workgroupSize()) {
+        workgroupSize = llvm::to_vector<4>(
+            llvm::map_range(workgroupSizeAttr, [](Attribute intAttr) {
+              return intAttr.cast<IntegerAttr>().getInt();
+            }));
+      }
+      if (failed(setOpConfigAndEntryPointFnTranslation(
+              entryPointFn, computeOp, config, passPipeline, workgroupSize))) {
+        return failure();
+      }
+      // Reset the op configuration to drop the pass-pipeline and workgroup size
+      // info. The op does not carry that information anymore.
+      auto resetConfig = IREE::HAL::LoweringConfig::get(
+          config.tileSizes(), config.nativeVectorSize(),
+          /*passPipeline =*/nullptr,
+          /*workgroupSize =*/nullptr, computeOp->getContext());
+      setLoweringConfig(computeOp, resetConfig);
+    } else {
+      auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
+        return TypeSwitch<Operation *, LogicalResult>(op)
+            .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface>(
                 [&](auto op) { return setRootConfig(entryPointFn, op); })
-            .Default([](Operation *) { return success(); });
-    if (failed(status)) {
-      return status;
+            .Default([&](Operation *op) { return success(); });
+      };
+      if (failed(setRootConfigFn(computeOp))) {
+        return failure();
+      }
     }
-    if (hasLoweringConfig(linalgOp)) {
+
+    if (getLoweringConfig(computeOp)) {
       if (rootOp) {
-        return linalgOp.emitError(
+        return computeOp->emitError(
             "unhandled multiple roots in dispatch region");
       }
-      rootOp = linalgOp;
-      continue;
+      rootOp = computeOp;
     }
   }
 
   // If no root operation found, check if the dispatch region contains a single
   // generic op and chose pipeline based on that.
   if (!rootOp) {
-    for (auto linalgOp : linalgOps) {
-      if (!hasMarker(linalgOp, getWorkgroupMarker())) continue;
-      auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
-      if (!genericOp) continue;
-      if (failed(setRootConfig(entryPointFn, genericOp))) {
+    for (auto computeOp : computeOps) {
+      if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
+      // Ignore fill ops. They never end up in their own dispatch, so are never
+      // root ops.
+      if (isa<linalg::FillOp>(computeOp)) continue;
+      if (failed(setDefaultRootConfig(entryPointFn, computeOp))) {
         return failure();
       }
-      if (hasLoweringConfig(genericOp)) {
+      if (getLoweringConfig(computeOp)) {
         if (rootOp) {
-          return genericOp.emitError(
+          return computeOp->emitError(
               "unhandled multiple roots in dispatch region");
         }
-        rootOp = genericOp;
-        continue;
+        rootOp = computeOp;
       }
     }
   }
@@ -243,12 +319,13 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
-    SmallVector<linalg::LinalgOp, 4> linalgOps;
+    if (getTranslationInfo(entryPointOp)) continue;
+    SmallVector<Operation *, 4> computeOps;
     SmallVector<Operation *, 4> tiledLoops;
     // If there are no linalg ops, not using Linalg based lowering.
-    if (succeeded(getLinalgOps(funcOp, linalgOps, tiledLoops)) &&
-        !linalgOps.empty()) {
-      if (failed(setRootConfig(funcOp, linalgOps))) {
+    if (succeeded(getComputeOps(funcOp, computeOps, tiledLoops)) &&
+        !computeOps.empty()) {
+      if (failed(setRootConfig(funcOp, computeOps))) {
         return failure();
       }
     }
@@ -256,11 +333,9 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     // If the function entry point already doesnt have a lowering info attribute
     // on it, just add the default.
     if (!getTranslationInfo(entryPointOp)) {
-      if (failed(setTranslationInfo(
-              funcOp, IREE::HAL::DispatchLoweringPassPipeline::CPUDefault,
-              {}))) {
-        return failure();
-      }
+      setTranslationInfo(funcOp,
+                         IREE::HAL::DispatchLoweringPassPipeline::CPUDefault,
+                         /*workgroupSize =*/{}, /*workloadPerWorkgroup =*/{});
     }
   }
   return success();

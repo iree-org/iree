@@ -63,6 +63,7 @@ foreach ($test_line in $test_lines) {
   }
   $test_line = $test_line.Substring("// RUN: ".Length)
   $test_line = $test_line -replace "%s", $test_file
+  $test_line = $test_line -replace "`"", "\`""
   Write-Host -ForegroundColor Blue "Running test command:"
   Write-Host -ForegroundColor Yellow "$test_line"
   & $bashExe -c $test_line | Out-Default
