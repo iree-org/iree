@@ -11,7 +11,9 @@
 set -eu -o errtrace
 
 project_dir="$(cd $(dirname $0)/.. && pwd)"
-build_dir="$project_dir/build"
+# NOTE: Python setuptools always uses the 'build' directory. So do a regular
+# cmake build elsewhere.
+build_dir="$project_dir/build_intree"
 
 cmake -GNinja -B"$build_dir" "$project_dir" \
   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache \

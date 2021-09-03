@@ -35,6 +35,7 @@ set(IREE_COMPILER_API_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 set(IREE_COMPILER_API_INTREE ON)
 if(IREE_COMPILER_API_INTREE)
+  set(IREE_BUILD_TESTS OFF)
   set(LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../iree-dialects")
   set(IREE_MAIN_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../..")
   set(LLVM_MAIN_SRC_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/llvm-project/llvm")
@@ -43,6 +44,8 @@ if(IREE_COMPILER_API_INTREE)
 else()
   message(FATAL_ERROR "Non intree (source package) not yet supported")
 endif()
+
+enable_testing()
 
 # Configuration includes.
 include(${IREE_MAIN_SOURCE_DIR}/build_tools/cmake/iree_third_party_cmake_options.cmake)
@@ -136,3 +139,4 @@ add_subdirectory("${IREE_MAIN_SOURCE_DIR}" "${IREE_MAIN_BINARY_DIR}" EXCLUDE_FRO
 include(HandleLLVMOptions)
 add_subdirectory(lib)
 add_subdirectory(python)
+add_subdirectory(unittests)

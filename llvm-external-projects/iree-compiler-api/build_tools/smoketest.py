@@ -11,6 +11,7 @@ from iree.compiler import passmanager
 from iree.compiler.dialects import chlo
 from iree.compiler.dialects import mhlo
 from iree.compiler.dialects import iree as iree_dialect
+from iree.compiler.dialects import iree_pydm as iree_pydm_dialect
 from iree.compiler.dialects import builtin
 from iree.compiler.dialects import std
 from iree.compiler.dialects import linalg
@@ -27,7 +28,8 @@ from iree.compiler.api import driver
 with ir.Context() as ctx:
   chlo.register_chlo_dialect(ctx)
   mhlo.register_mhlo_dialect(ctx)
-  iree_dialect.register_iree_dialect(ctx)
+  iree_dialect.register_dialect(ctx)
+  iree_pydm_dialect.register_dialect(ctx)
 
   input_module = ir.Module.parse(r"""
     builtin.module  {

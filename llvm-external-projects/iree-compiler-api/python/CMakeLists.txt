@@ -11,8 +11,9 @@ add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
 declare_mlir_python_sources(IREECompilerAPIPythonSources
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   SOURCES
-    api/driver.py
     version.py
+  SOURCES_GLOB
+    api/*.py
 )
 declare_mlir_python_sources(IREECompilerAPIPythonExtensions)
 
