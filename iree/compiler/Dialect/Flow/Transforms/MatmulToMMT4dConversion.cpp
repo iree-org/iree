@@ -192,13 +192,33 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-class ConvertLinalgMatmulOpToLinalgMMT4dPass
+class ConvertLinalgMatmulOpToLinalgMMT4dPass final
     : public ConvertMatmulToMMT4dBase<ConvertLinalgMatmulOpToLinalgMMT4dPass> {
  public:
-  ConvertLinalgMatmulOpToLinalgMMT4dPass(int M0, int N0, int K0)
-      : M0Size(M0), N0Size(K0), K0Size(N0) {}
+  ConvertLinalgMatmulOpToLinalgMMT4dPass() {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
+  }
+
+  LogicalResult initializeOptions(StringRef options) override {
+    if (failed(Pass::initializeOptions(options))) return failure();
+    auto failureWithMessage = [=](const char *msg) {
+      llvm::errs() << "illegal options `" << options << "` for pass `"
+                   << getArgument() << "`: " << msg << "\n";
+      return failure();
+    };
+    if (M0 == mlir::ShapedType::kDynamicSize ||
+        N0 == mlir::ShapedType::kDynamicSize ||
+        K0 == mlir::ShapedType::kDynamicSize) {
+      return failureWithMessage(
+          "currently all three values M0,K0,N0 must be "
+          "specified as a fixed size value, not 'dynamic', as the heuristic to "
+          "choose these values is not yet implemented.");
+    }
+    if (M0 == 0 || N0 == 0 || K0 == 0) {
+      return failureWithMessage("all three values M0,K0,N0 must be nonzero.");
+    }
+    return success();
   }
 
   void runOnOperation() override {
@@ -206,8 +226,8 @@ class ConvertLinalgMatmulOpToLinalgMMT4dPass
     // Main pattern.
     {
       OwningRewritePatternList patterns(&getContext());
-      patterns.insert<LinalgMatmulOpToLinalgMMT4dOpPattern>(context, M0Size,
-                                                            N0Size, K0Size);
+      patterns.insert<LinalgMatmulOpToLinalgMMT4dOpPattern>(context, M0, N0,
+                                                            K0);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
     // Canonicalization.
@@ -219,17 +239,12 @@ class ConvertLinalgMatmulOpToLinalgMMT4dPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
   }
-
- private:
-  int M0Size;
-  int N0Size;
-  int K0Size;
 };
 }  // namespace
 
 std::unique_ptr<OperationPass<FuncOp>>
-createConvertLinalgMatmulOpToLinalgMMT4dPass(int M0, int N0, int K0) {
-  return std::make_unique<ConvertLinalgMatmulOpToLinalgMMT4dPass>(M0, N0, K0);
+createConvertLinalgMatmulOpToLinalgMMT4dPass() {
+  return std::make_unique<ConvertLinalgMatmulOpToLinalgMMT4dPass>();
 }
 
 }  // namespace Flow

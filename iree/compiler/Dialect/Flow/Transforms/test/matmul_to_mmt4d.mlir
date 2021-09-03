@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file --iree-flow-convert-matmul-to-mmt4d %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file --iree-flow-convert-matmul-to-mmt4d='M0=4 K0=4 N0=4' %s | IreeFileCheck %s
 
 func @check_mmt4d(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>, %arg2: tensor<24x32xf32>) -> tensor<24x32xf32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<24x8xf32>, tensor<8x32xf32>) outs(%arg2 : tensor<24x32xf32>) -> tensor<24x32xf32>
