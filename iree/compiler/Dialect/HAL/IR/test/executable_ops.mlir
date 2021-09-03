@@ -16,11 +16,11 @@ hal.executable @ex {
       workgroup_size = [4 : index, 1 : index, 1 : index]
     }
   }
-  // CHECK-DAG: hal.interface @interface
+  // CHECK-DAG: hal.interface public @interface
   hal.interface @interface {
-    // CHECK-NEXT: hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
+    // CHECK-NEXT: hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    // CHECK-NEXT: hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    // CHECK-NEXT: hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
   // CHECK: hal.executable.binary
@@ -53,11 +53,11 @@ hal.executable @ex_with_workgroup_count_region {
       hal.return %arg0, %arg1, %arg2 : index, index, index
     }
   }
-  // CHECK-DAG: hal.interface @interface
+  // CHECK-DAG: hal.interface public @interface
   hal.interface @interface {
-    // CHECK-NEXT: hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
+    // CHECK-NEXT: hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    // CHECK-NEXT: hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    // CHECK-NEXT: hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
   }
   // CHECK: hal.executable.binary

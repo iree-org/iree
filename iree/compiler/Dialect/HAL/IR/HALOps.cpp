@@ -959,37 +959,6 @@ void InterfaceOp::build(OpBuilder &builder, OperationState &state,
   }
 }
 
-static ParseResult parseInterfaceOp(OpAsmParser &parser,
-                                    OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  // Parse the module body.
-  auto *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  InterfaceOp::ensureTerminator(*body, parser.getBuilder(), result->location);
-  return success();
-}
-
-static void printInterfaceOp(OpAsmPrinter &p, InterfaceOp op) {
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/false);
-}
-
 ArrayAttr InterfaceOp::getExecutableSetLayoutsAttr() {
   Builder builder(getContext());
   SmallVector<SmallVector<Attribute, 4>, 4> setAttrs;
@@ -1038,6 +1007,11 @@ llvm::hash_code InterfaceOp::getInterfaceHash() {
 
 static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
                                            OperationState *result) {
+  StringAttr visibilityAttr;
+  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
+    return failure();
+  }
+
   StringAttr nameAttr;
   IntegerAttr setAttr;
   IntegerAttr bindingAttr;
@@ -1068,6 +1042,8 @@ static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
 }
 
 static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
+  p << ' ';
+  printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
   p.printSymbolName(op.sym_name());
   p << ", set=" << op.set();

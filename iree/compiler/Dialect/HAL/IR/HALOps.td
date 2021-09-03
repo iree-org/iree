@@ -2069,11 +2069,20 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     OptionalAttr<IndexAttr>:$push_constants
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -2130,12 +2139,25 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     IndexAttr:$set,
     IndexAttr:$binding,
     HAL_DescriptorTypeAttr:$type,
     HAL_MemoryAccessBitfieldAttr:$access
   );
+
+  // TODO(scotttodd): enable assemblyFormat after figuring out how to keep
+  //   quotes around "type" and "access". The custom printer uses stringify*
+  // let assemblyFormat = [{
+  //   custom<SymbolVisibility>($sym_visibility)
+  //   $sym_name
+  //   `,` `set` `` `=` `` $set
+  //   `,` `binding` `` `=` `` $binding
+  //   `,` `type` `` `=` `` $type
+  //   `,` `access` `` `=` `` $access
+  //   attr-dict-with-keyword
+  // }];
 
   let extraClassDeclaration = [{
     /// Returns a hash for the descriptor, considering the set, binding,

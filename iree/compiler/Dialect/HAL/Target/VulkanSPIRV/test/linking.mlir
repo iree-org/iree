@@ -131,10 +131,10 @@ hal.executable @call_dispatch_4 attributes {sym_visibility = "private"} {
 // Two groups should be created, according to their interfaces.
 
 //      CHECK: hal.executable private @linking_linked_vulkan_0 {
-// CHECK-NEXT:   hal.interface @io_0 {
-// CHECK-NEXT:     hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:   hal.interface public @io_0 {
+// CHECK-NEXT:     hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:     hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:   }
 // CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
 // CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_1 attributes {interface = @io_0, ordinal = 0 : index}
@@ -163,9 +163,9 @@ hal.executable @call_dispatch_4 attributes {sym_visibility = "private"} {
 // CHECK-NEXT: }
 
 //      CHECK: hal.executable private @linking_linked_vulkan {
-// CHECK-NEXT:   hal.interface @io_0 {
-// CHECK-NEXT:     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+// CHECK-NEXT:   hal.interface public @io_0 {
+// CHECK-NEXT:     hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:     hal.interface.binding public @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
 // CHECK-NEXT:   }
 // CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
 // CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}

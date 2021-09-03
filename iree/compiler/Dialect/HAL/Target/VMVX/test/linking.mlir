@@ -73,16 +73,16 @@ func @basic_linking() -> () {
 // CHECK-NOT: hal.executable private @dispatch_1
 // CHECK-NOT: hal.executable private @dispatch_2
 // CHECK:       hal.executable private @vmvx_linked {
-// CHECK-NEXT:    hal.interface @io_0 {
-// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    hal.interface public @io_0 {
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
-// CHECK-NEXT:    hal.interface @io_1 {
-// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    hal.interface public @io_1 {
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @arg2, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
@@ -184,14 +184,14 @@ func @other_targets() -> () {
 // VMVX target should be pulled out from both executables leaving the originals
 // untouched.
 // CHECK:       hal.executable private @vmvx_linked {
-// CHECK-NEXT:    hal.interface @io_0 {
-// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    hal.interface public @io_0 {
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
-// CHECK-NEXT:    hal.interface @io_1 {
-// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    hal.interface public @io_1 {
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
@@ -213,10 +213,10 @@ func @other_targets() -> () {
 //
 // @dispatch_0/1 should remain, with just @cuda
 // CHECK:  hal.executable private @dispatch_0 {
-// CHECK:    hal.interface @io
+// CHECK:    hal.interface public @io
 // CHECK:    hal.executable.variant public @cuda, target = #executable_target_cuda
 // CHECK:  hal.executable private @dispatch_1 {
-// CHECK:    hal.interface @io
+// CHECK:    hal.interface public @io
 // CHECK:    hal.executable.variant public @cuda, target = #executable_target_cuda
 //
 // CHECK:       func @other_targets() {
@@ -287,15 +287,15 @@ module {
 // CHECK-NOT: hal.executable private @dispatch_1
 // CHECK-NOT: hal.executable private @dispatch_2
 // CHECK:       hal.executable private @vmvx_linked {
-// CHECK-NEXT:    hal.interface @io_0 {
-// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    hal.interface public @io_0 {
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
-// CHECK-NEXT:    hal.interface @io_1 attributes {push_constants = 2 : index} {
-// CHECK-NEXT:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:    hal.interface public @io_1 attributes {push_constants = 2 : index} {
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 // CHECK-NEXT:    }
 
 // -----

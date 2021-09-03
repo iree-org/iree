@@ -5,9 +5,9 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
 }>]} {
 
 // CHECK-LABEL: hal.executable public @static_tiled_dispatch
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @static_tiled_dispatch {
   // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
@@ -65,9 +65,9 @@ module attributes {
 } {
 
 // CHECK-LABEL: hal.executable public @multi_target_ex
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @multi_target_ex {
   // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
@@ -124,9 +124,9 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
 }>]} {
 
 // CHECK-LABEL: hal.executable public @dynamic_tiled_dispatch
-//  CHECK-NEXT: hal.interface @[[IO:.+]] attributes {push_constants = 4 : index} {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] attributes {push_constants = 4 : index} {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @dynamic_tiled_dispatch {
   // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
@@ -200,9 +200,9 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
 }>]} {
 
 // CHECK-LABEL: hal.executable public @workgroup_infos
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @workgroup_infos {
   // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
@@ -245,9 +245,9 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
 }>]} {
 
 // CHECK-LABEL: hal.executable public @static_tied_result
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read|Write"
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read|Write"
 //  CHECK-NEXT: }
 flow.executable @static_tied_result {
   // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
@@ -296,12 +296,12 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
 }>]} {
 
 // CHECK-LABEL: hal.executable public @constant_dispatch
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B2:.+]], set=0, binding=2, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B3:.+]], set=0, binding=3, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B4:.+]], set=0, binding=4, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B2:.+]], set=0, binding=2, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B3:.+]], set=0, binding=3, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B4:.+]], set=0, binding=4, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @constant_dispatch {
   // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {

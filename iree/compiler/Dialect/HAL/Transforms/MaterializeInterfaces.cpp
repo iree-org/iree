@@ -450,7 +450,8 @@ class InterfaceBuilder {
     }
 
     auto bindingOp = builder.create<IREE::HAL::InterfaceBindingOp>(
-        interfaceOp.getLoc(), bindingName, /*set=*/APInt(64, setOrdinal),
+        interfaceOp.getLoc(), /*sym_visibility=*/nullptr, bindingName,
+        /*set=*/APInt(64, setOrdinal),
         /*binding=*/APInt(64, nextBindingOrdinal++), descriptorType,
         memoryAccess);
     return bindingOp;
