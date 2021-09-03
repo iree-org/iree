@@ -229,8 +229,16 @@ function(iree_check_single_backend_test_suite)
   if(NOT DEFINED IREE_TARGET_BACKEND_${_UPPERCASE_TARGET_BACKEND})
     message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_ALL_TARGET_BACKENDS.")
   endif()
-  if(NOT IREE_TARGET_BACKEND_${_UPPERCASE_TARGET_BACKEND})
-    return()
+  if(DEFINED IREE_HOST_BINARY_ROOT)
+    # If we're not building the host tools from source under this configuration,
+    # such as when cross compiling, then we can't easily check for which
+    # compiler target backends are enabled. Just assume all are enabled and only
+    # rely on the runtime HAL driver check above for filtering.
+  else()
+    # We are building the host tools, so check enabled compiler target backends.
+    if(NOT IREE_TARGET_BACKEND_${_UPPERCASE_TARGET_BACKEND})
+      return()
+    endif()
   endif()
 
   foreach(_SRC IN LISTS _RULE_SRCS)

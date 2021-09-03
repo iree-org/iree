@@ -29,9 +29,12 @@ jobs:
         uses: actions/checkout@v2
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          # Get all history. Otherwise the latest-snapshot branch can't be
+          # fast-forwarded.
+          fetch-depth: 0
 
       - name: Updating latest-snapshot branch
         uses: ad-m/github-push-action@v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          branch: refs/heads/latest-snapshot
+          branch: latest-snapshot

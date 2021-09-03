@@ -385,7 +385,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store,  //
              iree_hal_buffer_byte_length(target_buffer)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
-        "store out of bounds (target_offset=%d, length=%d into max %" PRIu64
+        "store out of bounds (target_offset=%d, length=%d into max %" PRIdsz
         ")",
         target_offset, length, iree_hal_buffer_byte_length(target_buffer));
   }

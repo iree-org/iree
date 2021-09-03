@@ -100,6 +100,29 @@ iree_mlir_benchmark_suite(
     "--task_topology_group_count=1"
 )
 
+# GPU, Vulkan, Adreno, full-inference
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILENETSSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+    ${DEEPLABV3_FP32_MODULE}
+
+  BENCHMARK_MODES
+    "full-inference"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Adreno"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=adreno-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    #"--iree-flow-dispatch-formation-enable-operand-fusion"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+)
+
 # GPU, Vulkan, Mali, full-inference
 iree_mlir_benchmark_suite(
   MODULES

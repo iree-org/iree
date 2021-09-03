@@ -11,6 +11,7 @@ configure_lit_site_cfg(
 
 set(IREE_DIALECTS_TEST_DEPENDS
         FileCheck count not
+        iree-dialects-opt
         )
 
 if(MLIR_ENABLE_BINDINGS_PYTHON)
