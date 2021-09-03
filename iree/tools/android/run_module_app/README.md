@@ -45,7 +45,7 @@ In general, we need to
    1. Copy the VM FlatBuffer as `assets/module.vmfb`, write the entry function
       input buffers, and HAL driver into `assets/entry_function.txt`,
       `assets/inputs.txt`, and `assets/driver.txt`, respectively.
-   1. Copy the shared libary under `lib/<android-abi>/`.
+   1. Copy the shared library under `lib/<android-abi>/`.
    1. Compile resources under [`res/`](./res) directory into an Android DEX
       file.
    1. Package all of the above into an APK file.
