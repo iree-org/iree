@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv)))' %s | IreeFileCheck %s
 
-hal.executable @push_constant attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.executable private @push_constant  {
+  hal.interface private @io attributes {push_constants = 5 : index} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
@@ -25,7 +25,7 @@ hal.executable @push_constant attributes {sym_visibility = "private"} {
         return
       }
 
-      hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+      hal.interface private @io attributes {push_constants = 5 : index} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
       }
@@ -35,8 +35,8 @@ hal.executable @push_constant attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @resource_bindings_in_same_func attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.executable private @resource_bindings_in_same_func  {
+  hal.interface private @io attributes {push_constants = 5 : index} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
@@ -83,7 +83,7 @@ hal.executable @resource_bindings_in_same_func attributes {sym_visibility = "pri
         return
       }
 
-      hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+      hal.interface private @io attributes {push_constants = 5 : index} {
         hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
@@ -94,8 +94,8 @@ hal.executable @resource_bindings_in_same_func attributes {sym_visibility = "pri
 
 // -----
 
-hal.executable @resource_bindings_in_multi_entry_func attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.executable private @resource_bindings_in_multi_entry_func  {
+  hal.interface private @io attributes {push_constants = 5 : index} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }
@@ -144,7 +144,7 @@ hal.executable @resource_bindings_in_multi_entry_func attributes {sym_visibility
         return
       }
 
-      hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+      hal.interface private @io attributes {push_constants = 5 : index} {
         hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
       }
@@ -154,8 +154,8 @@ hal.executable @resource_bindings_in_multi_entry_func attributes {sym_visibility
 
 // -----
 
-hal.executable @interface_binding attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @interface_binding  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -179,7 +179,7 @@ hal.executable @interface_binding attributes {sym_visibility = "private"} {
 
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -201,8 +201,8 @@ hal.executable @interface_binding attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @interface_wg_id attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @interface_wg_id  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -219,7 +219,7 @@ hal.executable @interface_wg_id attributes {sym_visibility = "private"} {
         %1 = hal.interface.workgroup.id[1] : index
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -240,8 +240,8 @@ hal.executable @interface_wg_id attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @interface_wg_count attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @interface_wg_count  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -258,7 +258,7 @@ hal.executable @interface_wg_count attributes {sym_visibility = "private"} {
         %1 = hal.interface.workgroup.count[1] : index
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

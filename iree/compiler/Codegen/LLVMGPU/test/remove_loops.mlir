@@ -1,7 +1,7 @@
 // RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-remove-single-iteration-loop))))' %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @dispatch_0()
-hal.executable @dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable private @dispatch_0  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dispatch_0 attributes {
       interface = @io,

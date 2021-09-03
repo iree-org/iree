@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -mlir-print-local-scope -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
 
-hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
+hal.executable private @static_1d_sort  {
   hal.interface @io {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
   }
@@ -25,7 +25,7 @@ hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
         flow.dispatch.tensor.store %2, %0, offsets = [], sizes = [], strides = [] : tensor<1000xi32> -> !flow.dispatch.tensor<readwrite:1000xi32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
       }
     }
@@ -47,7 +47,7 @@ hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @static_3d_sort attributes {sym_visibility = "private"} {
+hal.executable private @static_3d_sort  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -112,7 +112,7 @@ hal.executable @static_3d_sort attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
+hal.executable private @static_1d_fft  {
   hal.interface @io {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
@@ -140,7 +140,7 @@ hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
         flow.dispatch.tensor.store %4#1, %1, offsets = [], sizes = [], strides = [] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:32xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
         hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
       }
@@ -163,7 +163,7 @@ hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @static_3d_fft attributes {sym_visibility = "private"} {
+hal.executable private @static_3d_fft  {
   hal.interface @io {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
@@ -191,7 +191,7 @@ hal.executable @static_3d_fft attributes {sym_visibility = "private"} {
         flow.dispatch.tensor.store %4#1, %1, offsets = [], sizes = [], strides = [] : tensor<64x128x32xf32> -> !flow.dispatch.tensor<readwrite:64x128x32xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
         hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
       }

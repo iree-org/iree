@@ -24,7 +24,7 @@ hal.executable @add_dispatch_0 {
         flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16384xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -49,7 +49,7 @@ hal.executable @add_dispatch_0 {
 
 // -----
 
-hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
+hal.executable private @dot_dispatch_1  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
     builtin.module  {
@@ -84,7 +84,7 @@ hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface private @legacy_io  {
         hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -135,7 +135,7 @@ hal.executable @reduction_dispatch {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
       }

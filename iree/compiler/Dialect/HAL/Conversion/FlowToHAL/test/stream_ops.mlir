@@ -361,7 +361,7 @@ func @dispatchWithShapeTies(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x1
 
 module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 
-hal.executable @ex attributes {sym_visibility = "private"} {
+hal.executable private @ex  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -409,7 +409,7 @@ func @staticTiledDispatch(%input: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
 
 module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 
-hal.executable @ex attributes {sym_visibility = "private"} {
+hal.executable private @ex  {
   hal.interface @io attributes {push_constants = 4 : index} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -469,7 +469,7 @@ func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: ind
 
 module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 
-hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable private @pad_dispatch_0  {
   hal.interface @interface_io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @wo1, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -483,7 +483,7 @@ hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
   }
 }
 
-hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
+hal.executable private @pad_dispatch_1  {
   hal.interface @interface_io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @rw1, set=0, binding=1, type="StorageBuffer", access="Read|Write"

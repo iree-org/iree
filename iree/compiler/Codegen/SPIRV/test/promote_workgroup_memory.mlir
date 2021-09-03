@@ -1,7 +1,7 @@
 // TODO(antiagainst): Fix promotion to workgroup and enable the test.
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))' | IreeFileCheck %s
 
-hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "private"} {
+hal.executable private @matmul_promote_workgroup_memory  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -46,7 +46,7 @@ hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "pr
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -79,7 +79,7 @@ hal.executable @matmul_promote_workgroup_memory attributes {sym_visibility = "pr
 
 // -----
 
-hal.executable @conv_promote_workgroup_memory attributes {sym_visibility = "private"} {
+hal.executable private @conv_promote_workgroup_memory  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -118,7 +118,7 @@ hal.executable @conv_promote_workgroup_memory attributes {sym_visibility = "priv
           outs(%15 : memref<1x?x?x14xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 2002 + s0 + d1 * 154 + d2 * 14 + d3)>>)
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

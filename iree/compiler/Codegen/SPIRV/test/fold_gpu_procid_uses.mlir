@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-fold-gpu-procid-uses))))' %s | IreeFileCheck %s
 
-hal.executable @fold_block_id attributes {sym_visibility = "private"} {
+hal.executable private @fold_block_id  {
   hal.interface @io {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
@@ -35,7 +35,7 @@ hal.executable @fold_block_id attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "private"} {
+hal.executable private @fold_interface_workgroup_id  {
   hal.interface @io {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
@@ -70,7 +70,7 @@ hal.executable @fold_interface_workgroup_id attributes {sym_visibility = "privat
 
 // -----
 
-hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
+hal.executable private @fold_thread_id  {
   hal.interface @io {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
@@ -100,7 +100,7 @@ hal.executable @fold_thread_id attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
+hal.executable private @does_not_fold_mod  {
   hal.interface @io {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
@@ -123,7 +123,7 @@ hal.executable @does_not_fold_mod attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
+hal.executable private @does_not_fold_div  {
   hal.interface @io {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
@@ -146,7 +146,7 @@ hal.executable @does_not_fold_div attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @does_not_fold_symbol_mul_symbol attributes {sym_visibility = "private"} {
+hal.executable private @does_not_fold_symbol_mul_symbol  {
   hal.interface @io {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
