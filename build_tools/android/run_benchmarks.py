@@ -56,8 +56,6 @@ MODEL_FLAGFILE_NAME = "flagfile"
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMP_DIR = "/data/local/tmp/iree-benchmarks"
 
-BENCHMARK_REPETITIONS = 10
-
 # A map from Android CPU ABI to IREE's benchmark target architecture.
 CPU_ABI_TO_TARGET_ARCH_MAP = {
     "arm64-v8a": "cpu-arm64-v8a",
@@ -71,6 +69,15 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "mali-g77": "gpu-mali-valhall",
     "mali-g78": "gpu-mali-valhall",
 }
+
+
+def get_benchmark_repetition_count(runner: str) -> int:
+  """Returns the benchmark repetition count for the given runner."""
+  if iree_driver == "iree-vmvx":
+    # VMVX is very unoptimized for now and can take a long time to run.
+    # Decrease the repetition for it until it's reasonably fast.
+    return 3
+  return 10
 
 
 def get_git_commit_hash(commit: str) -> str:
@@ -244,18 +251,20 @@ def run_benchmarks_for_category(
                                                    benchmark_category_dir,
                                                    benchmark_case_dir)
     print(f"--> benchmark: {benchmark_info} <--")
+
     android_relative_dir = os.path.relpath(benchmark_case_dir,
                                            root_benchmark_dir)
     adb_push_to_tmp_dir(os.path.join(benchmark_case_dir, MODEL_FLAGFILE_NAME),
                         android_relative_dir,
                         verbose=verbose)
 
+    repetitions = get_benchmark_repetition_count(benchmark_info.runner)
     cmd = [
         "taskset",
         benchmark_info.deduce_taskset(),
         android_tool_path,
         f"--flagfile={MODEL_FLAGFILE_NAME}",
-        f"--benchmark_repetitions={BENCHMARK_REPETITIONS}",
+        f"--benchmark_repetitions={repetitions}",
         "--benchmark_format=json",
     ]
     resultjson = adb_execute_in_dir(cmd, android_relative_dir, verbose=verbose)
