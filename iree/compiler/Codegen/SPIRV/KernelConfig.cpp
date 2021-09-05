@@ -252,6 +252,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
     case spirv::Vendor::NVIDIA:
       result = detail::setNVIDIACodeGenConfig(targetEnv, rootOp);
       break;
+    case spirv::Vendor::Qualcomm:
+      result = detail::setAdrenoCodeGenConfig(targetEnv, rootOp);
+      break;
     default:
       break;
   }
