@@ -7,11 +7,31 @@
 #ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_DIALECT_H
 #define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_DIALECT_H
 
+#include "iree-dialects/Dialect/IREEPyDM/IR/Interfaces.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Types.h"
 
 namespace mlir {
 namespace iree_pydm {
+
+// Each built-in (to the compiler) type has a unique code, enumerated here.
+// Generally, the closed part of the type system will have type codes <
+// FirstCustom.
+enum class BuiltinTypeCode : int {
+  Bool = 1,
+  Bytes,
+  ExceptionResult,
+  Integer,
+  List,
+  None,
+  Object,
+  Real,
+  Str,
+  Tuple,
+  Type,
+
+  FirstCustom = 100,
+};
 
 /// Base class for all unboxed primitive types.
 class PrimitiveType : public mlir::Type {
@@ -25,10 +45,10 @@ class PrimitiveType : public mlir::Type {
 
 // Include generated dialect code (this comment blocks clang-format from
 // clobbering order).
-#include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMOpsDialect.h.inc"
+#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMOpsTypes.h.inc"
+#include "iree-dialects/Dialect/IREEPyDM/IR/Types.h.inc"
 
 namespace mlir {
 namespace iree_pydm {

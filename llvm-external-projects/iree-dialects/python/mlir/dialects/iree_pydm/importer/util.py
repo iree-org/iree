@@ -137,7 +137,7 @@ class ImportContext:
       elif isinstance(value, int):
         return d.ConstantOp(
             d.IntegerType.get(),
-            ir.IntegerAttr.get(ir.IntegerType.get_signed(64), value)).result
+            ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)).result
       elif isinstance(value, float):
         return d.ConstantOp(d.RealType.get(),
                             ir.FloatAttr.get(ir.F64Type.get(), value)).result
@@ -148,13 +148,14 @@ class ImportContext:
     self.abort(
         f"unsupported Python constant value '{value}' (an {value.__class__}))")
 
-  # TODO: Map the SCF dialect properly upstream.
-  def scf_IfOp(self, results, condition: ir.Value, with_else_region: bool):
-    """Creates an SCF if op.
+  def create_functional_if_op(self, results, condition: ir.Value,
+                              with_else_region: bool):
+    """Sugar to create a `functional_if`.
     Returns:
       (if_op, then_ip, else_ip) if with_else_region, otherwise (if_op, then_ip)
     """
-    op = ir.Operation.create("scf.if",
+    # TODO: ODS for these style of ops with variable regions needs work.
+    op = ir.Operation.create("iree_pydm.functional_if",
                              results=results,
                              operands=[condition],
                              regions=2 if with_else_region else 1,
@@ -168,12 +169,6 @@ class ImportContext:
       return op, ir.InsertionPoint(then_block), ir.InsertionPoint(else_block)
     else:
       return op, ir.InsertionPoint(then_block)
-
-  def scf_YieldOp(self, operands):
-    return ir.Operation.create("scf.yield",
-                               operands=operands,
-                               loc=self.loc,
-                               ip=self.ip)
 
 
 class ImportStage:

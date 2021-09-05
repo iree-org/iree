@@ -13,7 +13,7 @@
 #define IREE_TOOLS_INIT_IREE_DIALECTS_H_
 
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMDialect.h"
+#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"

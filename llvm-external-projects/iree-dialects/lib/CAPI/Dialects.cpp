@@ -7,7 +7,7 @@
 #include "iree-dialects-c/Dialects.h"
 
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMDialect.h"
+#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
 #include "mlir/CAPI/Registration.h"
 
 //===----------------------------------------------------------------------===//
@@ -39,6 +39,7 @@ IREEPYDM_DEFINE_NULLARY_TYPE(Bool)
 IREEPYDM_DEFINE_NULLARY_TYPE(Bytes)
 IREEPYDM_DEFINE_NULLARY_TYPE(Integer)
 IREEPYDM_DEFINE_NULLARY_TYPE(ExceptionResult)
+IREEPYDM_DEFINE_NULLARY_TYPE(FreeVarRef)
 IREEPYDM_DEFINE_NULLARY_TYPE(List)
 IREEPYDM_DEFINE_NULLARY_TYPE(None)
 IREEPYDM_DEFINE_NULLARY_TYPE(Real)
@@ -51,6 +52,10 @@ bool mlirTypeIsAIREEPyDMObject(MlirType type) {
 }
 
 MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
+  if (!primitive.ptr) {
+    return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), nullptr));
+  }
+
   auto cppType = unwrap(primitive).cast<mlir::iree_pydm::PrimitiveType>();
   return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), cppType));
 }

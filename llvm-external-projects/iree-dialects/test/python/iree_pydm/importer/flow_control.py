@@ -5,15 +5,15 @@ from mlir.dialects.iree_pydm.importer.test_util import *
 
 
 # CHECK-LABEL: @simple_if
-# CHECK: %[[COND:.*]] = iree_pydm.load_free_var "cond"
-# CHECK: %[[COND_BOOL:.*]] = iree_pydm.as_bool %[[COND]]
-# CHECK: %[[COND_PRED:.*]] = iree_pydm.bool_to_pred %[[COND_BOOL]]
+# CHECK: %[[COND:.*]] = load_var %cond
+# CHECK: %[[COND_BOOL:.*]] = as_bool %[[COND]]
+# CHECK: %[[COND_PRED:.*]] = bool_to_pred %[[COND_BOOL]]
 # CHECK: cond_br %2, ^bb1, ^bb2
 # CHECK: ^bb1:
-# CHECK: %[[A:.*]] = iree_pydm.load_free_var "a"
+# CHECK: %[[A:.*]] = load_var %a
 # CHECK: return %[[A]]
 # CHECK: ^bb2:
-# CHECK: %[[B:.*]] = iree_pydm.load_free_var "b"
+# CHECK: %[[B:.*]] = load_var %b
 # CHECK: return %[[B]]
 @test_import_global
 def simple_if(cond, a, b):
@@ -30,7 +30,7 @@ def simple_if(cond, a, b):
 # CHECK: ^bb2:
 # CHECK: br ^bb3
 # CHECK: ^bb3:
-# CHECK: iree_pydm.return
+# CHECK: return
 @test_import_global
 def if_fallthrough(cond, a, b):
   if cond:
@@ -45,7 +45,7 @@ def if_fallthrough(cond, a, b):
 # CHECK: ^bb1:
 # CHECK: br ^bb2
 # CHECK: ^bb2:
-# CHECK: iree_pydm.return
+# CHECK: return
 @test_import_global
 def if_noelse(cond, a, b):
   c = 1
@@ -67,7 +67,7 @@ def if_noelse(cond, a, b):
 # CHECK: ^bb5:
 # CHECK: br ^bb6
 # CHECK: ^bb6:
-# CHECK: iree_pydm.return
+# CHECK: return
 @test_import_global
 def if_elif(cond, a, b):
   if cond:
