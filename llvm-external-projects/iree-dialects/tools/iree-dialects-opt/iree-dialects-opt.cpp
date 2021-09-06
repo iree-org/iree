@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMDialect.h"
+#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"

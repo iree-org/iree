@@ -7,11 +7,60 @@
 #ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_OPS_TD
 #define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_OPS_TD
 
-include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMDialect.td"
+include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+
+//===----------------------------------------------------------------------===//
+// Variable access
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_AllocFreeVarOp : IREEPyDM_PureOp<"alloc_free_var", [
+    MemoryEffects<[MemAlloc]>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>]> {
+  let summary = "Declares a 'free variable' by name and instance number";
+  let description = [{
+    Free variables represent allocated storage for a single value. By default
+    it is a variant which can store anything.
+  }];
+
+  let arguments = (ins
+    StrAttr:$name,
+    OptionalAttr<IndexAttr>:$index);
+  let results = (outs IREEPyDM_FreeVarRef:$free_var);
+  let assemblyFormat = [{
+    $name (`[` $index^ `]`)? `->` type($free_var) attr-dict
+  }];
+}
+
+def IREEPyDM_LoadVarOp : IREEPyDM_PureOp<"load_var", [MemoryEffects<[MemRead]>]> {
+  let summary = "Loads a value from a variable";
+  let description = [{
+    Loads a value from a variables. The value is implicitly cast to the given
+    result type, which must be legal.
+  }];
+
+  let arguments = (ins IREEPyDM_AnyVarRef:$var);
+  let results = (outs IREEPyDM_AnyValueType);
+
+  let assemblyFormat = [{
+    $var `:` type($var) `->` type(results) attr-dict
+  }];
+}
+
+def IREEPyDM_StoreVarOp : IREEPyDM_Op<"store_var", [MemoryEffects<[MemWrite]>]> {
+  let summary = "Stores a value to a variable";
+
+  let arguments = (ins
+    IREEPyDM_AnyVarRef:$var,
+    IREEPyDM_AnyValueType:$value);
+  let assemblyFormat = [{
+    $var `=` $value `:` type(operands) attr-dict
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // Functions
@@ -23,7 +72,8 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
     IsolatedFromAbove,
     FunctionLike,
     CallableOpInterface,
-    Symbol]> {
+    Symbol,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
   let summary = "Python func";
   let description = [{
     Python functions map arguments to results and have the following additional
@@ -45,9 +95,9 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
 
   let arguments = (ins SymbolNameAttr:$sym_name,
                        TypeAttr:$type,
-                       StrArrayAttr:$arg_names,
-                       StrArrayAttr:$free_vars,
-                       StrArrayAttr:$cell_vars,
+                       OptionalAttr<StrArrayAttr>:$arg_names,
+                       OptionalAttr<StrArrayAttr>:$free_vars,
+                       OptionalAttr<StrArrayAttr>:$cell_vars,
                        OptionalAttr<StrAttr>:$sym_visibility);
   let regions = (region AnyRegion:$body);
 
@@ -126,6 +176,8 @@ def IREEPyDM_RaiseOnFailureOp : IREEPyDM_Op<"raise_on_failure", [
   let assemblyFormat = [{
     $exc_result `:` type($exc_result) attr-dict
   }];
+
+  let hasFolder = 1;
 }
 
 def IREEPyDM_CallOp : IREEPyDM_Op<"call", [
@@ -238,10 +290,13 @@ def IREEPyDM_BoxOp : IREEPyDM_PureOp<"box"> {
     reference primitives, the providence must be tracked and the original boxed
     value used (vs boxing a new one). Failure to do so will result in aliased
     objects.
+
+    Note that this operation allows to box object->object but canonicalizes
+    away in such a case (this is a convenience for IR construction).
   }];
 
   let arguments = (ins
-    IREEPyDM_AnyPrimitiveType:$primitive
+    IREEPyDM_AnyValueType:$primitive
   );
   let results = (outs
     IREEPyDM_ObjectType:$object
@@ -250,6 +305,8 @@ def IREEPyDM_BoxOp : IREEPyDM_PureOp<"box"> {
   let assemblyFormat = [{
     $primitive `:` type($primitive)  `->` type($object) attr-dict
   }];
+
+  let hasCanonicalizeMethod = 1;
 }
 
 def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox"> {
@@ -270,87 +327,8 @@ def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox"> {
   let assemblyFormat = [{
     $object `:` type($object) `->` type($primitive) attr-dict
   }];
-}
 
-//===----------------------------------------------------------------------===//
-// Name access
-// While the CPython nomenclature is a bit inconsistent, we follow it where
-// it makes sense. Names are split into a few categories:
-//   - Free Variables: Local variables that are not visible outside of the
-//     containing (actual, not lexical) function. CPython bytecode refers
-//     to operations on these as "FAST" (i.e. LOAD_FAST, STORE_FAST, DEL_FAST).
-//   - Cell Variables: Variables that exist as part of the function closure
-//     and are resolved through a level of indirection (cell).
-//   - Global Variables: Variables that are resolved via the function's
-//     globals().
-// At this level, all operations are done by name (at the CPython instruction
-// level, it is by ordinal).
-//===----------------------------------------------------------------------===//
-
-// TODO: Consider adding a dedicated free_var op to bind free variables and
-// move the string attribute there.
-def IREEPyDM_LoadFreeVarOp : IREEPyDM_PureOp<"load_free_var"> {
-  let summary = "Loads a boxed free variable";
-  let description = [{
-    Loads the boxed object for a free variable. This is not failable at
-    runtime, and if the slot is not initialized, it will contain a special
-    NotInitialized primitive which cannot convert to anything else.
-
-    When importing Python programs, they must use boxed accessors to free
-    variable storage. Further analysis and transformation can promote these
-    to unboxed access.
-  }];
-
-  let arguments = (ins StrAttr:$name);
-  let results = (outs IREEPyDM_ObjectType:$value);
-
-  let assemblyFormat = [{
-    $name `->` type($value) attr-dict
-  }];
-}
-
-def IREEPyDM_StoreFreeVarOp : IREEPyDM_Op<"store_free_var"> {
-  let summary = "Stores a boxed free variable";
-  let description = [{
-    Stores a boxed value to a free variable slot.
-  }];
-
-  let arguments = (ins StrAttr:$name, IREEPyDM_ObjectType:$value);
-
-  let assemblyFormat = [{
-    $name `,` $value `:` type($value) attr-dict
-  }];
-}
-
-def IREEPyDM_LoadFreeVarUnboxedOp : IREEPyDM_PureOp<"load_free_var_unboxed"> {
-  let summary = "Loads an unboxed free variable";
-  let description = [{
-    Loads an unboxed value from a free variable slot. This will not be
-    emitted in regular programs but can be used in intrinsics and by
-    optimizations to remove boxing when types are guaranteed. It is a
-    program error to load a mismatched type and will produce undefined
-    behavior.
-  }];
-
-  let arguments = (ins StrAttr:$name);
-  let results = (outs IREEPyDM_PrimitiveType:$value);
-
-  let assemblyFormat = [{
-    $name `->` type($value) attr-dict
-  }];
-}
-
-def IREEPyDM_StoreFreeVarUnboxedOp : IREEPyDM_Op<"store_free_var_unboxed"> {
-  let summary = "Stores an unboxed free variable";
-  let description = [{
-    Stores an unboxed value to a free variable slot.
-  }];
-
-  let arguments = (ins StrAttr:$name, IREEPyDM_PrimitiveType:$value);
-
-  let assemblyFormat = [{
-    $name `,` $value `:` type($value) attr-dict
-  }];
+  let hasCanonicalizeMethod = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -363,9 +341,9 @@ def IREEPyDM_ConstantOp : IREEPyDM_PureOp<"constant", [ConstantLike]> {
     This op supports immutable value types that have direct coding as MLIR
     attributes:
       IntType -> IntegerAttr<i64>
-      FloatType -> FloatAttr<double>
+      RealType -> FloatAttr<double>
       StrType -> StringAttr
-      BytesType -> BytesAttr
+      BytesType -> StringAttr
       BoolType -> IntegerAttr<i1>
   }];
 
@@ -379,14 +357,37 @@ def IREEPyDM_ConstantOp : IREEPyDM_PureOp<"constant", [ConstantLike]> {
   let extraClassDeclaration = [{
     Attribute getValue() { return (*this)->getAttr("value"); }
   }];
+  let hasFolder = 1;
 }
 
-def IREEPyDM_NoneOp : IREEPyDM_PureOp<"none"> {
+def IREEPyDM_NoneOp : IREEPyDM_PureOp<"none", [ConstantLike]> {
   let summary = "Gets the singleton NoneType primitive value";
   let results = (outs IREEPyDM_NoneType:$value);
   let assemblyFormat = [{
-    `->` type($value) attr-dict
+    attr-dict
   }];
+  let hasFolder = 1;
+}
+
+// TODO: Make ConstantLike
+def IREEPyDM_FailureOp : IREEPyDM_PureOp<"failure", []> {
+  let summary = "Generates a constant failure ExceptionResult";
+  let results = (outs IREEPyDM_ExceptionResultType);
+  let assemblyFormat = [{
+    `->` type(results) attr-dict
+  }];
+}
+
+def IREEPyDM_SuccessOp : IREEPyDM_PureOp<"success", [ConstantLike]> {
+  let summary = "Generates a constant success ExceptionResult";
+  let description = [{
+    A successful ExceptionResultType folds to a UnitAttr.
+  }];
+  let results = (outs IREEPyDM_ExceptionResultType);
+  let assemblyFormat = [{
+    `->` type(results) attr-dict
+  }];
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -400,6 +401,8 @@ def IREEPyDM_AsBoolOp : IREEPyDM_PureOp<"as_bool"> {
   let assemblyFormat = [{
     $value `:` type($value) `->` type(results) attr-dict
   }];
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
 }
 
 def IREEPyDM_BoolToPredOp : IREEPyDM_PureOp<"bool_to_pred"> {
@@ -411,7 +414,20 @@ def IREEPyDM_BoolToPredOp : IREEPyDM_PureOp<"bool_to_pred"> {
   let arguments = (ins IREEPyDM_BoolType:$value);
   let results = (outs I1);
   let assemblyFormat = [{
-    $value `:` type($value) `->` type(results) attr-dict
+    $value attr-dict
+  }];
+  let hasFolder = 1;
+}
+
+def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
+  let summary = "Makes a tuple from a static list of values";
+  let description = [{
+    Used for static construction of a tuple when the exact nature is known.
+  }];
+  let arguments = (ins Variadic<IREEPyDM_AnyValueType>:$slots);
+  let results = (outs IREEPyDM_TupleType:$tuple);
+  let assemblyFormat = [{
+    $slots `:` type($slots) `->` type(results) attr-dict
   }];
 }
 
@@ -431,6 +447,7 @@ def IREEPyDM_SelectOp : IREEPyDM_PureOp<"select", [
   let assemblyFormat = [{
     $condition `,` $true_value `,` $false_value `:` type($result) attr-dict
   }];
+  let hasFolder = 1;
 }
 
 def IREEPyDM_ExprStatementDiscardOp : IREEPyDM_Op<"expr_statement_discard"> {
@@ -443,6 +460,34 @@ def IREEPyDM_ExprStatementDiscardOp : IREEPyDM_Op<"expr_statement_discard"> {
   let assemblyFormat = [{
     $value `:` type($value) attr-dict
   }];
+}
+
+def FunctionalIfOp : IREEPyDM_Op<"functional_if", [
+    DeclareOpInterfaceMethods<RegionBranchOpInterface>,
+    SingleBlockImplicitTerminator<"iree_pydm::YieldOp">, RecursiveSideEffects,
+    NoRegionArguments,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
+  let summary = "A functional if construct";
+  let description = [{
+    This is similar to `scf.if` but adapted for this dialect. It has a required
+    then region and an optional else region. Types yielded from both must
+    match the result types of the `functional_if` op.
+  }];
+  let arguments = (ins IREEPyDM_BoolType:$condition);
+  let results = (outs Variadic<AnyType>:$results);
+  let regions = (region SizedRegion<1>:$thenRegion, AnyRegion:$elseRegion);
+
+  let printer = [{ return ::print(p, *this); }];
+  let verifier = [{ return ::verify(*this); }];
+  let parser = [{ return ::parse$cppClass(parser, result); }];
+}
+
+def YieldOp : IREEPyDM_Op<"yield", [NoSideEffect, ReturnLike, Terminator,
+                                    ParentOneOf<["FunctionalIfOp"]>]> {
+  let summary = "Yields a value from a functional control flow region";
+  let arguments = (ins Variadic<AnyType>:$results);
+  let assemblyFormat =
+      [{  attr-dict ($results^ `:` type($results))? }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -477,6 +522,22 @@ def IREEPyDM_DynamicBinaryPromoteOp : IREEPyDM_PureOp<"dynamic_binary_promote"> 
   let assemblyFormat = [{
     $left `,` $right `:` type($left) `,` type($right) attr-dict
   }];
+  let hasCanonicalizeMethod = 1;
+}
+
+def IREEPyDM_PromoteNumericOp : IREEPyDM_PureOp<"promote_numeric"> {
+  let summary = "Promotes one numeric type to another higher on the hierarchy";
+  let description = [{
+    Given a numeric value of lower promotion order, promotes it to a higher
+    order.
+  }];
+  let arguments = (ins IREEPyDM_AnyNumericType:$input);
+  let results = (outs IREEPyDM_AnyNumericType);
+  let assemblyFormat = [{
+    $input `:` type(operands) `->` type(results) attr-dict
+  }];
+  let hasFolder = 1;
+  let hasCanonicalizeMethod = 1;
 }
 
 def IREEPyDM_ApplyBinaryOp : IREEPyDM_PureOp<"apply_binary"> {

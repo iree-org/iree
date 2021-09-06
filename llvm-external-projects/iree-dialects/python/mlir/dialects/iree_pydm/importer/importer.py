@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from typing import Optional, Sequence, Tuple, List, Union
+from typing import Dict, Optional, Sequence, Set, Tuple, List, Union
 
 import ast
 import inspect
@@ -99,6 +99,7 @@ class Importer:
                            host_closure_vars=inspect.getclosurevars(f))
     body_importer = FunctionDefBodyImporter(fctx)
     with ic.scoped_ip(ir.InsertionPoint(entry_block)):
+      body_importer.declare_variables()
       body_importer.import_body(fd_node)
     return f_op
 
@@ -118,6 +119,7 @@ class FunctionContext(ImportStage):
       "free_vars",
       "cell_vars",
       "host_closure_vars",
+      "variable_value_map",
   ]
 
   def __init__(self,
@@ -134,12 +136,31 @@ class FunctionContext(ImportStage):
 
     # Keep sets of free and cell var names so that we know what kinds of
     # loads to issue.
-    self.arg_names = set(
+    self.arg_names: Set[str] = set(
         [ir.StringAttr(attr).value for attr in self.f_op.arg_names])
-    self.free_vars = set(
+    self.free_vars: Set[str] = set(
         [ir.StringAttr(attr).value for attr in self.f_op.free_vars])
-    self.cell_vars = set(
+    self.cell_vars: Set[str] = set(
         [ir.StringAttr(attr).value for attr in self.f_op.cell_vars])
+
+    self.variable_value_map: Dict[str, ir.Value] = {}
+
+  def declare_free_var(self, name: str):
+    """Declares a free-variable SSA value for the given name."""
+    ic = self.ic
+    if name in self.variable_value_map:
+      ic.abort(f"attempt to duplicate declare variable {name}")
+    with ic.ip, ic.loc:
+      t = d.FreeVarRefType.get()
+      self.variable_value_map[name] = (d.AllocFreeVarOp(t,
+                                                        ir.StringAttr.get(name),
+                                                        index=None).result)
+
+  def find_variable(self, name: str) -> ir.Value:
+    try:
+      return self.variable_value_map[name]
+    except KeyError:
+      self.ic.abort(f"attempt to reference variable not declared: {name}")
 
   def update_loc(self, ast_node):
     self.ic.set_file_line_col(self.filename, ast_node.lineno,
@@ -204,6 +225,11 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     self.successor_block = successor_block
     self._last_was_return = False
 
+  def declare_variables(self):
+    fctx = self.fctx
+    for name in fctx.free_vars:
+      fctx.declare_free_var(name)
+
   def import_body(self, ast_fd: ast.FunctionDef):
     ic = self.fctx.ic
     # Function prologue: Initialize arguments.
@@ -237,7 +263,7 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     arg_value = entry_block.arguments[index]
     arg_value = ic.box(arg_value)
     with ic.loc, ic.ip:
-      d.StoreFreeVarOp(ir.StringAttr.get(name), arg_value)
+      d.StoreVarOp(fctx.find_variable(name), arg_value)
 
   def visit_Pass(self, ast_node):
     pass
@@ -268,7 +294,7 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
       boxed = ic.box(expr.get_immediate())
       with ic.loc, ic.ip:
         target_id = target.id  # pytype: disable=attribute-error
-        d.StoreFreeVarOp(ir.StringAttr.get(target_id), boxed)
+        d.StoreVarOp(fctx.find_variable(target_id), boxed)
 
   def visit_Expr(self, node: ast.Expr):
     fctx = self.fctx
@@ -397,9 +423,9 @@ class ExpressionImporter(BaseNodeVisitor):
     with ic.loc:
       if node.id in self.fctx.free_vars:
         self._set_result(
-            d.LoadFreeVarOp(d.ObjectType.get(),
-                            ir.StringAttr.get(node.id),
-                            ip=ic.ip).result)
+            d.LoadVarOp(d.ObjectType.get(),
+                        fctx.find_variable(node.id),
+                        ip=ic.ip).result)
         return
 
     # Fall-back to global resolution.
@@ -463,24 +489,23 @@ class ExpressionImporter(BaseNodeVisitor):
       if not next_nodes:
         return next_value
 
-      bool_value = d.AsBoolOp(d.BoolType.get(), next_value, ip=ic.ip).result
-      condition_value = d.BoolToPredOp(ir.IntegerType.get_signless(1),
-                                       bool_value,
-                                       ip=ic.ip).result
+      condition_value = d.AsBoolOp(d.BoolType.get(), next_value,
+                                   ip=ic.ip).result
       # TODO: See if we can re-organize this to not force boxing through the
       # if.
-      if_op, then_ip, else_ip = ic.scf_IfOp([d.ObjectType.get()],
-                                            condition_value, True)
+      if_op, then_ip, else_ip = ic.create_functional_if_op([d.ObjectType.get()],
+                                                           condition_value,
+                                                           True)
       # Short-circuit return case.
       with ic.scoped_ip(then_ip if return_first_true else else_ip):
         next_value_casted = ic.box(next_value)
-        ic.scf_YieldOp([next_value_casted])
+        d.YieldOp([next_value_casted], loc=ic.loc, ip=ic.ip)
 
       # Nested evaluate next case.
       with ic.scoped_ip(else_ip if return_first_true else then_ip):
         nested_value = emit_next(next_nodes)
         nested_value_casted = next_value_casted = ic.box(nested_value)
-        ic.scf_YieldOp([nested_value_casted])
+        d.YieldOp([nested_value_casted], loc=ic.loc, ip=ic.ip)
 
       return if_op.result
 
@@ -531,18 +556,17 @@ class ExpressionImporter(BaseNodeVisitor):
       # Emit if for short circuit eval.
       # Since this is an 'and', all else clauses yield a false value.
       with ic.ip, ic.loc:
-        compare_result_i1 = d.BoolToPredOp(ir.IntegerType.get_signless(1),
-                                           compare_result).result
-        if_op, then_ip, else_ip = ic.scf_IfOp([d.BoolType.get()],
-                                              compare_result_i1, True)
+        if_op, then_ip, else_ip = ic.create_functional_if_op([d.BoolType.get()],
+                                                             compare_result,
+                                                             True)
       # Build the else clause.
       with ic.scoped_ip(else_ip):
-        ic.scf_YieldOp([false_value])
+        d.YieldOp([false_value], loc=ic.loc, ip=ic.ip)
 
       # Build the then clause.
       with ic.scoped_ip(then_ip):
         nested_result = emit_next(right_value, comparisons)
-        ic.scf_YieldOp([nested_result])
+        d.YieldOp([nested_result], loc=ic.loc, ip=ic.ip)
 
       return if_op.result
 
@@ -606,30 +630,26 @@ class ExpressionImporter(BaseNodeVisitor):
     # Interpret as bool.
     test_bool = d.AsBoolOp(d.BoolType.get(), test_value, ip=ic.ip,
                            loc=ic.loc).result
-    test_pred = d.BoolToPredOp(ir.IntegerType.get_signless(1),
-                               test_bool,
-                               ip=ic.ip,
-                               loc=ic.loc).result
 
     # TODO: There is a hazard here if then and else refine to different
     # boxed types. Needs a derefine cast. Also we are boxing to type erased
     # types to satisfy scf.if verifier. Do something better.
-    if_op, then_ip, else_ip = ic.scf_IfOp([d.ObjectType.get(ic.context)],
-                                          test_pred, True)
+    if_op, then_ip, else_ip = ic.create_functional_if_op(
+        [d.ObjectType.get(ic.context)], test_bool, True)
     # Build the then clause
     with ic.scoped_ip(then_ip):
       # Evaluate the true clause within the if body.
       sub_expression = ExpressionImporter(fctx)
       sub_expression.visit(node.body)
       then_result = sub_expression.get_immediate()
-      ic.scf_YieldOp([ic.box(then_result, to_typed=False)])
+      d.YieldOp([ic.box(then_result, to_typed=False)], loc=ic.loc, ip=ic.ip)
 
     # Build the then clause.
     with ic.scoped_ip(else_ip):
       sub_expression = ExpressionImporter(fctx)
       sub_expression.visit(node.orelse)
       orelse_result = sub_expression.get_immediate()
-      ic.scf_YieldOp([ic.box(orelse_result, to_typed=False)])
+      d.YieldOp([ic.box(orelse_result, to_typed=False)], loc=ic.loc, ip=ic.ip)
 
     self._set_result(if_op.result)
 
