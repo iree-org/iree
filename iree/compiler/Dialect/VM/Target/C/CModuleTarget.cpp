@@ -381,8 +381,8 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     Operation *op = funcOp.getOperation();
     if (op->hasAttr("emitc.static")) output << "static ";
 
-    if (failed(emitter.emitTypes(*funcOp.getOperation(),
-                                 funcOp.getType().getResults())))
+    if (failed(
+            emitter.emitTypes(funcOp.getLoc(), funcOp.getType().getResults())))
       return failure();
     output << " " << funcOp.getName();
 
@@ -391,7 +391,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     bool error = false;
     llvm::interleaveComma(
         funcOp.getArguments(), output, [&](BlockArgument arg) {
-          if (failed(emitter.emitType(*funcOp.getOperation(), arg.getType())))
+          if (failed(emitter.emitType(funcOp.getLoc(), arg.getType())))
             error = true;
         });
     if (error) return failure();
