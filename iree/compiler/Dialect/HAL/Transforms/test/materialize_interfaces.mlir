@@ -390,10 +390,10 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
   executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
 }>]} {
 
-// CHECK-LABEL: hal.executable @unsued_arg
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+// CHECK-LABEL: hal.executable public @unsued_arg
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @unsued_arg {
   flow.dispatch.entry @entry attributes {workgroup_rank = 2 : index}
