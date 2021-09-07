@@ -104,8 +104,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // The generated ABI wrappers assume such an expansion and will generate code
   // to produce it from the original reflection metadata captured in the
   // previous pass.
-  passManager.addNestedPass<mlir::FuncOp>(
-      Shape::createExpandFunctionDynamicDimsPass());
+  passManager.addPass(Shape::createExpandFunctionDynamicDimsPass());
 
   // Special case peephole optimizations.
   {
