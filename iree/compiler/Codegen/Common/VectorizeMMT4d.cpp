@@ -27,7 +27,7 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     auto dst = mmt4DOp.outputs()[0];
 
     auto lhsType = lhs.getType().dyn_cast<ShapedType>();
-    auto rhsType = lhs.getType().dyn_cast<ShapedType>();
+    auto rhsType = rhs.getType().dyn_cast<ShapedType>();
 
     if (!lhsType || !rhsType || !lhsType.hasStaticShape() ||
         !rhsType.hasStaticShape())
@@ -46,7 +46,9 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     auto loc = mmt4DOp.getLoc();
     auto c0 = rewriter.create<ConstantIndexOp>(loc, 0);
 
-    auto vecType = VectorType::get({1, 1, M0, N0}, rewriter.getF32Type());
+    auto lhsVecType = VectorType::get({1, 1, M0, K0}, rewriter.getF32Type());
+    auto rhsVecType = VectorType::get({1, 1, N0, K0}, rewriter.getF32Type());
+    auto dstVecType = VectorType::get({1, 1, M0, N0}, rewriter.getF32Type());
 
     auto lhsVecType2D = VectorType::get({M0, K0}, rewriter.getF32Type());
     auto rhsVecType2D = VectorType::get({N0, K0}, rewriter.getF32Type());
@@ -55,13 +57,13 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     auto identityMap = rewriter.getMultiDimIdentityMap(4);
 
     auto lhsVec = rewriter.create<vector::TransferReadOp>(
-        loc, vecType, lhs, ValueRange{c0, c0, c0, c0}, identityMap);
+        loc, lhsVecType, lhs, ValueRange{c0, c0, c0, c0}, identityMap);
 
     auto rhsVec = rewriter.create<vector::TransferReadOp>(
-        loc, vecType, rhs, ValueRange{c0, c0, c0, c0}, identityMap);
+        loc, rhsVecType, rhs, ValueRange{c0, c0, c0, c0}, identityMap);
 
     auto dstVec = rewriter.create<vector::TransferReadOp>(
-        loc, vecType, dst, ValueRange{c0, c0, c0, c0}, identityMap);
+        loc, dstVecType, dst, ValueRange{c0, c0, c0, c0}, identityMap);
 
     Value lhsVec2D =
         rewriter.create<vector::ShapeCastOp>(loc, lhsVecType2D, lhsVec);
@@ -90,7 +92,7 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
         loc, lhsVec2D, rhsVec2D, dstVec2D, indexingMaps, iterators);
 
     Value contractResult4D =
-        rewriter.create<vector::ShapeCastOp>(loc, vecType, contractResult);
+        rewriter.create<vector::ShapeCastOp>(loc, dstVecType, contractResult);
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
         mmt4DOp, contractResult4D, dst, ValueRange{c0, c0, c0, c0},
