@@ -48,8 +48,6 @@ jobs:
           cd bin
           ./iree-benchmark-module --help
           ./iree-benchmark-trace --help
-          # ./iree-check-module --help
-          # ./iree-dump-module --help
           ./iree-flatcc-cli --help
           ./iree-opt --help
           ./iree-run-mlir --help

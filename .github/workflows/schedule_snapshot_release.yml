@@ -11,7 +11,7 @@ jobs:
     name: "Tag snapshot release"
     runs-on: ubuntu-18.04
     # Don't run this in everyone's forks.
-    # if: github.repository == 'google/iree'
+    if: github.repository == 'google/iree'
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
@@ -34,7 +34,7 @@ jobs:
         uses: ad-m/github-push-action@v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          branch: validate-release
+          branch: main
           tags: true
 
       - name: Create Release
