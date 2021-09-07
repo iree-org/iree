@@ -541,6 +541,13 @@ static LogicalResult verifyExecutableOp(ExecutableOp op) {
 // flow.dispatch.entry
 //===----------------------------------------------------------------------===//
 
+void DispatchEntryOp::build(OpBuilder &builder, OperationState &state,
+                            StringRef sym_name, FlatSymbolRefAttr function_ref,
+                            IntegerAttr workgroup_rank) {
+  build(builder, state, /*sym_visibility=*/nullptr,
+        builder.getStringAttr(sym_name), function_ref, workgroup_rank);
+}
+
 static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
                                         OperationState *result) {
   StringAttr visibilityAttr;

@@ -515,6 +515,13 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
     FlatSymbolRefAttr:$function_ref,
     OptionalAttr<IndexAttr>:$workgroup_rank
   );
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "FlatSymbolRefAttr":$function_ref,
+      "IntegerAttr":$workgroup_rank)>,
+  ];
 }
 
 //===----------------------------------------------------------------------===//
