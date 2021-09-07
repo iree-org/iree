@@ -54,7 +54,7 @@ func @resource_copy() {
   return
 }
 
-hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.interface private @io attributes {push_constants = 5 : index} {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
@@ -80,7 +80,7 @@ func @resource_copy_f16() {
   return
 }
 
-hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.interface private @io attributes {push_constants = 5 : index} {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
@@ -106,7 +106,7 @@ func @resource_copy_8xf16() {
   return
 }
 
-hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.interface private @io attributes {push_constants = 5 : index} {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
@@ -182,7 +182,7 @@ func @do_not_vectorize_odd_vector_size() {
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
 }
@@ -203,7 +203,7 @@ func @vectorize_binding_subspan() {
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }

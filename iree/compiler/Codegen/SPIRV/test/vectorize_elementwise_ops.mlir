@@ -5,7 +5,7 @@
 //       CHECK:   vector.transfer_read %{{.+}}[%c0], {{.+}} memref<4xf32, #{{.+}}>, vector<4xf32>
 //       CHECK:   addf %{{.*}}, %{{.*}} : vector<4xf32>
 //       CHECK:   vector.transfer_write {{.*}} : vector<4xf32>, memref<4xf32
-hal.executable @elementwise_static_shape attributes {sym_visibility = "private"} {
+hal.executable private @elementwise_static_shape  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -43,7 +43,7 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -60,7 +60,7 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
 //   CHECK-NOT:   vector.transfer_read
 //       CHECK:   scf.for
 //       CHECK:     scf.for
-hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
+hal.executable private @elementwise_transpose  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -98,7 +98,7 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -106,4 +106,3 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
     }
   }
 }
-

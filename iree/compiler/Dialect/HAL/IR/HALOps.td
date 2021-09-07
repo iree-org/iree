@@ -1237,7 +1237,7 @@ def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
   ]> {
   let summary = [{pool of constants with similar lifetimes}];
   let description = [{
-    A pool of constants that share a similiar lifetime and that should be stored
+    A pool of constants that share a similar lifetime and that should be stored
     together both in the source files and at runtime. By logically grouping
     constants by their frequency and locality of access we can reduce the number
     of bindings required on hal.interface by sourcing constants from the same
@@ -1246,11 +1246,20 @@ def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_BufferConstraintsAttr:$buffer_constraints
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1284,13 +1293,24 @@ def HAL_ConstantPoolValueOp : HAL_Op<"constant_pool.value", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     Util_AnySerializableAttr:$value
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Attribute":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value);
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
@@ -1305,6 +1325,7 @@ def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     TypeAttr:$tensor_type,
     SymbolRefAttr:$storage_buffer,
@@ -1314,11 +1335,26 @@ def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `:` $tensor_type
     `=` $storage_buffer `[` $storage_range `]`
     (`->` $runtime_buffer^ `[` $runtime_range `]`)?
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Type":$tensor_type,
+      "::mlir::FlatSymbolRefAttr":$storage_buffer,
+      "::mlir::Attribute":$storage_range,
+      "::mlir::SymbolRefAttr":$runtime_buffer,
+      "::mlir::Attribute":$runtime_range
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, tensor_type, storage_buffer,
+            storage_range, runtime_buffer, runtime_range);
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
@@ -1332,6 +1368,7 @@ def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     ElementsAttr:$value,
     OptionalAttr<SymbolRefAttr>:$runtime_buffer,
@@ -1339,10 +1376,21 @@ def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value
     (`->` $runtime_buffer^ `[` $runtime_range `]`)?
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::ElementsAttr":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value, SymbolRefAttr{},
+            IREE::Util::ByteRangeAttr{});
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolLoadOp : HAL_PureOp<"constant_pool.load", [
@@ -1388,13 +1436,24 @@ def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     Util_AnySerializableAttr:$value
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Attribute":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value);
+    }]>
+  ];
 }
 
 def HAL_ConstantStorageLookupOp :
@@ -1750,11 +1809,20 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name
     // TODO(benvanik): entry point types for verification.
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1799,7 +1867,8 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
     FlatSymbolRefAttr:$interface,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
@@ -1816,7 +1885,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
-      build($_builder, $_state, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
             workgroup_size, workgroup_local_memory, 0);
     }]>,
     OpBuilder<(ins
@@ -1826,8 +1895,19 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
-      build($_builder, $_state, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
             workgroup_size, workgroup_local_memory, 0);
+    }]>,
+    OpBuilder<(ins
+      "::mlir::StringAttr":$sym_name,
+      "::mlir::IntegerAttr":$ordinal,
+      "::mlir::FlatSymbolRefAttr":$interface,
+      "::mlir::ArrayAttr":$workgroup_size,
+      "::mlir::IntegerAttr":$workgroup_local_memory,
+      "int":$workgroup_count_regionCount
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
+            workgroup_size, workgroup_local_memory, workgroup_count_regionCount);
     }]>
   ];
 
@@ -1860,11 +1940,21 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_ExecutableTargetAttr:$target
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    `,` `target` `=` $target
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1901,12 +1991,19 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     StrAttr:$format,
     HAL_ExecutableDataAttr:$data,
     OptionalAttr<StrAttr>:$mime_type
     // TODO(benvanik): add compatibility and versioning attributes.
   );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -2025,11 +2122,20 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     OptionalAttr<IndexAttr>:$push_constants
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -2086,12 +2192,37 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     IndexAttr:$set,
     IndexAttr:$binding,
     HAL_DescriptorTypeAttr:$type,
     HAL_MemoryAccessBitfieldAttr:$access
   );
+
+  // TODO(scotttodd): enable assemblyFormat after figuring out how to keep
+  //   quotes around "type" and "access". The custom printer uses stringify*
+  // let assemblyFormat = [{
+  //   custom<SymbolVisibility>($sym_visibility)
+  //   $sym_name
+  //   `,` `set` `` `=` `` $set
+  //   `,` `binding` `` `=` `` $binding
+  //   `,` `type` `` `=` `` $type
+  //   `,` `access` `` `=` `` $access
+  //   attr-dict-with-keyword
+  // }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::llvm::APInt":$set,
+      "::llvm::APInt":$binding,
+      "IREE::HAL::DescriptorType":$type,
+      "IREE::HAL::MemoryAccessBitfield":$access
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, set, binding, type, access);
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     /// Returns a hash for the descriptor, considering the set, binding,

@@ -6,7 +6,7 @@ func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2: ind
   return %val: f32
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
 }
 
@@ -28,7 +28,7 @@ func @store_subspan_with_offset(%value: f32, %offset : index, %i0: index, %i1: i
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
 }
 
@@ -49,7 +49,7 @@ func @load_subspan_with_vector_element(%offset : index, %i0: index, %i1: index, 
   return %val: vector<4xf32>
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
 }
 
@@ -65,7 +65,7 @@ func @load_subspan_with_16bit_element(%offset : index, %i0: index, %i1: index, %
   return %val: f16
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
 }
 
@@ -82,7 +82,7 @@ func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, %i0: 
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
 }
 
@@ -176,7 +176,7 @@ func @use_subspan_with_unrealized_conversion_cast(%offset : index, %i: index) ->
   return %val: f32
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
 }
 
@@ -215,7 +215,7 @@ func @transfer_read_subspan_with_offset(
   %val = vector.transfer_read %subspan[%arg1, %arg2, %arg3], %cst {in_bounds = [true]} : memref<6x7x8xf32>, vector<4xf32>
   return %val: vector<4xf32>
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @ro, set=0, binding=0, type="StorageBuffer", access="Read"
 }
 //      CHECK: #[[MAP:.+]] =  affine_map<()[s0, s1, s2] -> (s0 * 56 + s1 * 8 + s2)>
@@ -237,7 +237,7 @@ func @transfer_write_subspan_with_offset(
   vector.transfer_write %arg4, %subspan[%arg1, %arg2, %arg3] {in_bounds = [true]} :  vector<4xf32>, memref<6x7x8xf32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @ro, set=0, binding=0, type="StorageBuffer", access="Read|Write"
 }
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 56 + s1 * 8 + s2)>

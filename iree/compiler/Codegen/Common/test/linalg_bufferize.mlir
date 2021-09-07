@@ -27,7 +27,7 @@ func @tile_from_tensor_load() {
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -77,7 +77,7 @@ func @tile_from_tensor_load_inplace() {
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read|Write"
@@ -125,7 +125,7 @@ func @tile_from_tensor_load_inplace_and_copy() {
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read|Write"
@@ -182,7 +182,7 @@ func @tile_from_pointwise_lhs() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -243,7 +243,7 @@ func @tile_from_pointwise_lhs_inplace() {
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read|Write"
@@ -300,7 +300,7 @@ func @tile_from_pointwise_outs() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -358,7 +358,7 @@ func @tile_from_pointwise_outs_inplace() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read|Write"
@@ -409,7 +409,7 @@ func @tile_from_matmul_outs() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -461,7 +461,7 @@ func @tile_from_matmul_outs_inplace() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @TENSOR_LHS, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_RHS, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @TENSOR_INIT, set=0, binding=2, type="StorageBuffer", access="Read|Write"
@@ -523,7 +523,7 @@ func @bufferize_dynamic() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -600,7 +600,7 @@ func @bufferize_dynamic_inplace() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read|Write"
@@ -647,7 +647,7 @@ func @reshape_simple() {
   flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -681,7 +681,7 @@ func @reshape_fused_source() {
   flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -720,7 +720,7 @@ func @reshape_fused_source_and_copyout() {
   flow.dispatch.tensor.store %4, %2, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -760,7 +760,7 @@ func @reshape_fused_target() {
   flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<12xi32> -> !flow.dispatch.tensor<writeonly:12xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -810,7 +810,7 @@ func @dot_general_lowering() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -845,7 +845,7 @@ func @slice() {
   flow.dispatch.tensor.store %7, %1, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -871,7 +871,7 @@ func @slice_rank_reducing() {
   flow.dispatch.tensor.store %7, %1, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -902,7 +902,7 @@ func @slice_multiple_copy() {
   flow.dispatch.tensor.store %11, %2, offsets = [%3, %5], sizes = [%6, %8], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
   hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -931,7 +931,7 @@ func @slice_in_place() {
   flow.dispatch.tensor.store %6, %0, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read|Write"
 }
 // CHECK-LABEL: func @slice_in_place()
@@ -953,7 +953,7 @@ func @slice_whole_stride_dispatch_0() {
   flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<1x4xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -985,7 +985,7 @@ func @subtensor_insert() {
   flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -1015,7 +1015,7 @@ func @tensor_extract() {
   flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<3x9xi32> -> !flow.dispatch.tensor<writeonly:3x9xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -1036,7 +1036,7 @@ func @load_to_store() {
   return
 }
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -1097,7 +1097,7 @@ func @rhs_non_splat_constant() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -1145,7 +1145,7 @@ func @gather() {
   flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -1181,7 +1181,7 @@ func @pooling_nhwc_sum() {
   flow.dispatch.tensor.store %9, %2, offsets = [], sizes = [], strides = [] : tensor<1x2x2x1xf32> -> !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -1256,7 +1256,7 @@ func @read_only_subtensor() {
     }
   }
   return
-}hal.interface @io attributes {sym_visibility = "private"} {
+}hal.interface private @io  {
   hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -1345,7 +1345,7 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
   return
 }
 
-hal.interface @interface_io attributes {sym_visibility = "private"} {
+hal.interface private @interface_io  {
   hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @ro2, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -1442,7 +1442,7 @@ func @bufferize_cst_output_tensor() {
   return
 }
 
-hal.interface @interface_io attributes {sym_visibility = "private"} {
+hal.interface private @interface_io  {
   hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @wo1, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -1530,7 +1530,7 @@ func @rank_reduced_subtensor_insert() {
   flow.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = [] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<readwrite:?x?x?xf32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Read|Write"
 }
@@ -1580,7 +1580,7 @@ func @bufferize_transfer_op() {
   flow.dispatch.tensor.store %25, %3, offsets = [%c0, %c0], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<2x1xf32> -> !flow.dispatch.tensor<writeonly:2x4xf32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -1641,7 +1641,7 @@ func @bufferize_transfer_op_inplace() {
   flow.dispatch.tensor.store %25, %3, offsets = [%c0, %c0], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<2x1xf32> -> !flow.dispatch.tensor<readwrite:2x4xf32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
@@ -1716,7 +1716,7 @@ func @multi_result() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -1845,7 +1845,7 @@ func @dot_general_padded() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -1931,7 +1931,7 @@ func @im2col() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -2003,7 +2003,7 @@ func @multi_result_reduce() {
   }
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
   hal.interface.binding @wo0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -2091,7 +2091,7 @@ module  {
     }
     return
   }
-  hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface private @io  {
     hal.interface.binding @ro1, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ro2, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ro3, set=0, binding=2, type="StorageBuffer", access="Read"
@@ -2196,7 +2196,7 @@ module  {
     }
     return
   }
-  hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface private @io  {
     hal.interface.binding @ro1, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ro2, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @wo, set=0, binding=2, type="StorageBuffer", access="Read|Write"
@@ -2297,7 +2297,7 @@ module  {
     }
     return
   }
-  hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface private @io  {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -2362,7 +2362,7 @@ func @sort1D() {
   flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<4xi32> -> !flow.dispatch.tensor<writeonly:4xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @ro, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @wo, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
@@ -2409,7 +2409,7 @@ func @sort1D_inplace() {
   flow.dispatch.tensor.store %3, %0, offsets = [], sizes = [], strides = [] : tensor<4xi32> -> !flow.dispatch.tensor<readwrite:4xi32>
   return
 }
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @rw, set=0, binding=0, type="StorageBuffer", access="Read|Write"
 }
 // CHECK-LABEL: func @sort1D_inplace()

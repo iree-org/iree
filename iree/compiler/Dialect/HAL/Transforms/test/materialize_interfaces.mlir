@@ -4,14 +4,14 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
   executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
 }>]} {
 
-// CHECK-LABEL: hal.executable @static_tiled_dispatch
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+// CHECK-LABEL: hal.executable public @static_tiled_dispatch
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @static_tiled_dispatch {
-  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-  // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
+  // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+  // CHECK-NEXT:   hal.executable.entry_point public @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index
   // CHECK-SAME:   }
@@ -64,14 +64,14 @@ module attributes {
   hal.device.targets = [#device_target_vmvx, #device_target_cuda]
 } {
 
-// CHECK-LABEL: hal.executable @multi_target_ex
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+// CHECK-LABEL: hal.executable public @multi_target_ex
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @multi_target_ex {
-  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-  // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
+  // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+  // CHECK-NEXT:   hal.executable.entry_point public @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index
   // CHECK-SAME:   }
@@ -95,8 +95,8 @@ flow.executable @multi_target_ex {
       return
     }
   }
-  //      CHECK: hal.executable.variant @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
-  // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
+  //      CHECK: hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+  // CHECK-NEXT:   hal.executable.entry_point public @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index
   // CHECK-SAME:   }
@@ -123,14 +123,14 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
   executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
 }>]} {
 
-// CHECK-LABEL: hal.executable @dynamic_tiled_dispatch
-//  CHECK-NEXT: hal.interface @[[IO:.+]] attributes {push_constants = 4 : index} {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+// CHECK-LABEL: hal.executable public @dynamic_tiled_dispatch
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] attributes {push_constants = 4 : index} {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @dynamic_tiled_dispatch {
-  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-  // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
+  // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+  // CHECK-NEXT:   hal.executable.entry_point public @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index
   // CHECK-SAME:   }
@@ -199,14 +199,14 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
   executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
 }>]} {
 
-// CHECK-LABEL: hal.executable @workgroup_infos
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+// CHECK-LABEL: hal.executable public @workgroup_infos
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @workgroup_infos {
-  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-  // CHECK-NEXT:   hal.executable.entry_point @entry attributes {
+  // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+  // CHECK-NEXT:   hal.executable.entry_point public @entry attributes {
   // CHECK-SAME:     interface = @[[IO]],
   // CHECK-SAME:     ordinal = 0 : index
   // CHECK-SAME:   }
@@ -244,14 +244,14 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
   executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
 }>]} {
 
-// CHECK-LABEL: hal.executable @static_tied_result
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read|Write"
+// CHECK-LABEL: hal.executable public @static_tied_result
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read|Write"
 //  CHECK-NEXT: }
 flow.executable @static_tied_result {
-  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-  // CHECK-NEXT:   hal.executable.entry_point @entry
+  // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+  // CHECK-NEXT:   hal.executable.entry_point public @entry
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 2 : index
   }
@@ -295,17 +295,17 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
   executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
 }>]} {
 
-// CHECK-LABEL: hal.executable @constant_dispatch
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B2:.+]], set=0, binding=2, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B3:.+]], set=0, binding=3, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B4:.+]], set=0, binding=4, type="StorageBuffer", access="Write|Discard"
+// CHECK-LABEL: hal.executable public @constant_dispatch
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B2:.+]], set=0, binding=2, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B3:.+]], set=0, binding=3, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B4:.+]], set=0, binding=4, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @constant_dispatch {
-  // CHECK-NEXT: hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-  // CHECK-NEXT:   hal.executable.entry_point @entry
+  // CHECK-NEXT: hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+  // CHECK-NEXT:   hal.executable.entry_point public @entry
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 2 : index
   }
@@ -390,10 +390,10 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx", {
   executable_targets = [#hal.executable.target<"vmvx", "vmvx-bytecode-fb">]
 }>]} {
 
-// CHECK-LABEL: hal.executable @unsued_arg
-//  CHECK-NEXT: hal.interface @[[IO:.+]] {
-//  CHECK-NEXT:   hal.interface.binding @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:   hal.interface.binding @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+// CHECK-LABEL: hal.executable public @unsued_arg
+//  CHECK-NEXT: hal.interface public @[[IO:.+]] {
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B0:.+]], set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:   hal.interface.binding public @[[S0B1:.+]], set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT: }
 flow.executable @unsued_arg {
   flow.dispatch.entry @entry attributes {workgroup_rank = 2 : index}
