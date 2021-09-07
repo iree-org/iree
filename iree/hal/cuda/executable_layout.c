@@ -12,9 +12,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/descriptor_set_layout.h"
 
-// Max size of arguments supported by CUDA.
-#define IREE_HAL_CUDA_MAX_ARG_SIZE 256
-
 typedef struct iree_hal_cuda_executable_layout_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
@@ -80,16 +77,6 @@ iree_status_t iree_hal_cuda_executable_layout_create(
     }
     executable_layout->push_constant_base_index = binding_number;
     *out_executable_layout = (iree_hal_executable_layout_t*)executable_layout;
-    iree_host_size_t arg_size = binding_number * sizeof(CUdeviceptr) +
-                                push_constant_count * sizeof(uint32_t);
-    if (arg_size > IREE_HAL_CUDA_MAX_ARG_SIZE) {
-      iree_hal_cuda_executable_layout_destroy(*out_executable_layout);
-      out_executable_layout = NULL;
-      return iree_make_status(
-          IREE_STATUS_INTERNAL,
-          "Size of arguments (size = %zu) over the limit of %zu bytes",
-          set_layout_count, (iree_host_size_t)IREE_HAL_CUDA_MAX_ARG_SIZE);
-    }
   }
   IREE_TRACE_ZONE_END(z0);
   return status;

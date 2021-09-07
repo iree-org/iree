@@ -37,6 +37,8 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
 } iree_hal_cuda_graph_command_buffer_t;
 
 #define IREE_HAL_CUDA_MAX_BINDING_COUNT 64
+// Kernel arguments contains binding and push constants.
+#define IREE_HAL_CUDA_MAX_KERNEL_ARG 128
 
 extern const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable;
@@ -62,8 +64,8 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
                        "cuGraphCreate");
   iree_hal_cuda_graph_command_buffer_t* command_buffer = NULL;
   size_t total_size = sizeof(*command_buffer) +
-                      IREE_HAL_CUDA_MAX_BINDING_COUNT * sizeof(void*) +
-                      IREE_HAL_CUDA_MAX_BINDING_COUNT * sizeof(CUdeviceptr);
+                      IREE_HAL_CUDA_MAX_KERNEL_ARG * sizeof(void*) +
+                      IREE_HAL_CUDA_MAX_KERNEL_ARG * sizeof(CUdeviceptr);
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, total_size, (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
@@ -79,8 +81,8 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
 
     CUdeviceptr* device_ptrs =
         (CUdeviceptr*)(command_buffer->current_descriptor +
-                       IREE_HAL_CUDA_MAX_BINDING_COUNT);
-    for (size_t i = 0; i < IREE_HAL_CUDA_MAX_BINDING_COUNT; i++) {
+                       IREE_HAL_CUDA_MAX_KERNEL_ARG);
+    for (size_t i = 0; i < IREE_HAL_CUDA_MAX_KERNEL_ARG; i++) {
       command_buffer->current_descriptor[i] = &device_ptrs[i];
     }
 
