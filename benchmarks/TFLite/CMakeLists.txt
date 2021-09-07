@@ -16,6 +16,14 @@
 #                                                                              #
 ################################################################################
 
+set(DEEPLABV3_FP32_MODULE
+  "DeepLabV3"                     # MODULE_NAME
+  "fp32"                          # MODULE_TAGS
+  "https://storage.googleapis.com/iree-model-artifacts/DeepLabV3-2bcafb1.tar.gz" # MLIR_SOURCE
+  "main"                          # ENTRY_FUNCTION
+  "1x257x257x3xf32"               # FUNCTION_INPUTS
+)
+
 set(MOBILESSD_FP32_MODULE
   "MobileSSD"                     # MODULE_NAME
   "fp32"                          # MODULE_TAGS
@@ -32,14 +40,6 @@ set(POSENET_FP32_MODULE
   "1x353x257x3xf32"               # FUNCTION_INPUTS
 )
 
-set(DEEPLABV3_FP32_MODULE
-  "DeepLabV3"                     # MODULE_NAME
-  "fp32"                          # MODULE_TAGS
-  "https://storage.googleapis.com/iree-model-artifacts/DeepLabV3-2bcafb1.tar.gz" # MLIR_SOURCE
-  "main"                          # ENTRY_FUNCTION
-  "1x257x257x3xf32"               # FUNCTION_INPUTS
-)
-
 ################################################################################
 #                                                                              #
 # Common benchmark configurations                                              #
@@ -53,9 +53,9 @@ set(DEEPLABV3_FP32_MODULE
 # CPU, Dylib-Sync, big/little-core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
-    ${MOBILENETSSD_FP32_MODULE}
-    ${POSENET_FP32_MODULE}
     ${DEEPLABV3_FP32_MODULE}
+    ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
 
   BENCHMARK_MODES
     "big-core,full-inference"
@@ -77,9 +77,9 @@ iree_mlir_benchmark_suite(
 # CPU, Dylib, 1-thread, big/little-core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
+    ${DEEPLABV3_FP32_MODULE}
     ${MOBILESSD_FP32_MODULE}
     ${POSENET_FP32_MODULE}
-    ${DEEPLABV3_FP32_MODULE}
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference"
@@ -103,9 +103,9 @@ iree_mlir_benchmark_suite(
 # GPU, Vulkan, Adreno, full-inference
 iree_mlir_benchmark_suite(
   MODULES
-    ${MOBILENETSSD_FP32_MODULE}
-    ${POSENET_FP32_MODULE}
     ${DEEPLABV3_FP32_MODULE}
+    ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
 
   BENCHMARK_MODES
     "full-inference"
@@ -126,9 +126,9 @@ iree_mlir_benchmark_suite(
 # GPU, Vulkan, Mali, full-inference
 iree_mlir_benchmark_suite(
   MODULES
+    ${DEEPLABV3_FP32_MODULE}
     ${MOBILESSD_FP32_MODULE}
     ${POSENET_FP32_MODULE}
-    ${DEEPLABV3_FP32_MODULE}
 
   BENCHMARK_MODES
     "full-inference"
@@ -149,9 +149,9 @@ iree_mlir_benchmark_suite(
 # GPU, Vulkan, Mali, kernel-execution
 iree_mlir_benchmark_suite(
   MODULES
+    ${DEEPLABV3_FP32_MODULE}
     ${MOBILESSD_FP32_MODULE}
     ${POSENET_FP32_MODULE}
-    ${DEEPLABV3_FP32_MODULE}
 
   BENCHMARK_MODES
     "kernel-execution"
