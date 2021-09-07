@@ -172,7 +172,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_range(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "attempted to access an address off the end of the valid buffer range "
-        "(offset=%" PRIu64 ", length=%" PRIu64 ", buffer byte_length=%" PRIu64
+        "(offset=%" PRIdsz ", length=%" PRIdsz ", buffer byte_length=%" PRIdsz
         ")",
         byte_offset, byte_length, iree_hal_buffer_byte_length(buffer));
   }
@@ -188,8 +188,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_range(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "attempted to access an address outside of the valid buffer range "
-        "(offset=%" PRIu64 ", length=%" PRIu64 ", end(inc)=%" PRIu64
-        ", buffer byte_length=%" PRIu64 ")",
+        "(offset=%" PRIdsz ", length=%" PRIdsz ", end(inc)=%" PRIdsz
+        ", buffer byte_length=%" PRIdsz ")",
         byte_offset, byte_length, end - 1, iree_hal_buffer_byte_length(buffer));
   }
 
@@ -208,8 +208,8 @@ static iree_status_t iree_hal_buffer_calculate_range(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "attempted to access an address off the end of the valid buffer "
-        "range (offset=%" PRIu64 ", length=%" PRIu64
-        ", buffer byte_length=%" PRIu64 ")",
+        "range (offset=%" PRIdsz ", length=%" PRIdsz
+        ", buffer byte_length=%" PRIdsz ")",
         offset, length, max_length);
   }
 
@@ -241,8 +241,8 @@ static iree_status_t iree_hal_buffer_calculate_range(
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "attempted to access an address outside of the valid buffer "
-        "range (offset=%" PRIu64 ", adjusted_length=%" PRIu64 ", end=%" PRIu64
-        ", buffer byte_length=%" PRIu64 ")",
+        "range (offset=%" PRIdsz ", adjusted_length=%" PRIdsz ", end=%" PRIdsz
+        ", buffer byte_length=%" PRIdsz ")",
         offset, adjusted_length, end, max_length);
   }
 
@@ -411,8 +411,8 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "attempting to fill a range with %zu byte values "
-                            "that is not aligned (offset=%" PRIu64
-                            ", length=%" PRIu64 ")",
+                            "that is not aligned (offset=%" PRIdsz
+                            ", length=%" PRIdsz ")",
                             pattern_length, byte_offset, byte_length);
   }
 

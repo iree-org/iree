@@ -1527,7 +1527,7 @@ void LinalgBufferizePass::runOnOperation() {
     auto memRefType = getMemrefTypeForTensor(tensorType);
     auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
         op->getLoc(), memRefType, op.binding(), op.byte_offset(),
-        op.byte_length());
+        op.byte_length(), op.dynamic_dims());
     bvm.map(op, baseBuffer);
   });
 

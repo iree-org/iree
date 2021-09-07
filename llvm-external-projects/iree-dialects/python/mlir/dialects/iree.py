@@ -5,4 +5,4 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from ._iree_ops_gen import *
-from .._mlir_libs._ireeDialects import register_iree_dialect
+from .._mlir_libs._ireeDialects.iree import *

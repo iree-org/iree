@@ -40,7 +40,6 @@ cc_library(
         "LinalgBufferizePass.cpp",
         "OptimizeVectorTransferPass.cpp",
         "SetNumWorkgroupsPass.cpp",
-        "ShapeToLLVMConversion.cpp",
         "VectorizeConv.cpp",
         "VectorizeMMT4d.cpp",
     ],

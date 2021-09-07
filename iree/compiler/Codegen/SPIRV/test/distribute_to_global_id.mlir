@@ -20,9 +20,13 @@ hal.executable @parallel_4D attributes {sym_visibility = "private"} {
          max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
       func @parallel_4D() {
         %c0 = constant 0 : index
-        %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?x?x?xf32>
-        %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?x?x?xf32>
-        %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?x?x?xf32>
+        %dim0 = hal.interface.load.constant offset = 0 : index
+        %dim1 = hal.interface.load.constant offset = 1 : index
+        %dim2 = hal.interface.load.constant offset = 2 : index
+        %dim3 = hal.interface.load.constant offset = 3 : index
+        %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
+        %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
+        %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
         linalg.generic {
            indexing_maps = [#map0, #map0, #map0],
            iterator_types = ["parallel", "parallel", "parallel", "parallel"]}

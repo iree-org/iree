@@ -103,11 +103,6 @@ void populateLinalgToVectorVectorizeConvPatterns(
 void populateLinalgToVectorVectorizeMMT4dPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
-/// Populates `patterns` with conversions of Shape dialect to LLVM Dialect.
-void populateShapeToLLVMConversionPatterns(MLIRContext *context,
-                                           TypeConverter *converter,
-                                           OwningRewritePatternList &patterns);
-
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------

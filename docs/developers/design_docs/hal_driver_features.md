@@ -27,7 +27,7 @@ Vulkan has many mechanisms for supporting different hardware implementations:
 versions, extensions, features, limits. Vulkan uses SPIR-V to express the GPU
 program but Vulkan is just one client SPIR-V supports. So SPIR-V has its own
 mechanisms for supporting different clients: versions, capabilities, extensions.
-The mechanims in these two domains bear lots of similarity, but they are not
+The mechanism in these two domains bear lots of similarity, but they are not
 exactly the same. We need to bridge these two worlds inside IREE.
 
 IREE has its own [Vulkan dialect][iree-vulkan-dialect], which defines the Vulkan

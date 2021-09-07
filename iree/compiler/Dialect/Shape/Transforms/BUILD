@@ -14,6 +14,7 @@ cc_library(
     name = "Transforms",
     srcs = [
         "CleanupPlaceholdersPass.cpp",
+        "FoldDimOverShapeCarryingOpPass.cpp",
         "FunctionSignatureExpansionPass.cpp",
     ],
     hdrs = [

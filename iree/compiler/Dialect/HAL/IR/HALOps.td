@@ -2201,7 +2201,9 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
 }
 
 def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
-    MemoryEffects<[MemAlloc]>]> {
+    AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>
+  ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
     // TODO(benvanik): add description
@@ -2210,7 +2212,8 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   let arguments = (ins
     SymbolRefAttr:$binding,
     HAL_DeviceSize:$byte_offset,
-    Optional<HAL_DeviceSize>:$byte_length
+    Optional<HAL_DeviceSize>:$byte_length,
+    HAL_ShapeDynamicDims:$dynamic_dims
   );
   let results = (outs
     Res<AnyType, "", [MemAlloc]>:$result
@@ -2218,8 +2221,10 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
 
   let assemblyFormat = [{
     $binding `[` $byte_offset ( `,` $byte_length^ )? `]`
-    attr-dict `:` type($result)
+    attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
+
+  let verifier = [{ return verifyInterfaceBindingSubspanOp(*this); }];
 
   let extraClassDeclaration = [{
     /// Returns the hal.interface.binding op associated with this op.

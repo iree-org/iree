@@ -10,6 +10,8 @@ jobs:
   tag_release:
     name: "Tag snapshot release"
     runs-on: ubuntu-18.04
+    # Don't run this in everyone's forks.
+    if: github.repository == 'google/iree'
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2

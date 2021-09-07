@@ -233,7 +233,7 @@ class HALDispatchABI {
   // |baseOffset| can optionally adjust the base byte offset of the buffer.
   MemRefDescriptor loadBinding(Location loc, int64_t ordinal,
                                Value baseOffsetValue, MemRefType memRefType,
-                               OpBuilder &builder) {
+                               ValueRange dynamicDims, OpBuilder &builder) {
     // Load the base buffer pointer in the appropriate type (f32*, etc).
     Value basePtrValue = loadBindingPtr(loc, ordinal, builder);
 
@@ -261,11 +261,38 @@ class HALDispatchABI {
       return MemRefDescriptor::fromStaticShape(builder, loc, *typeConverter,
                                                memRefType, typedPtrValue);
     } else {
+      assert(memRefType.getNumDynamicDims() == dynamicDims.size());
+      int64_t rank = memRefType.getRank();
+
+      // Build MemRef descriptor for this interface binding.
       auto desc = MemRefDescriptor::undef(
           builder, loc, typeConverter->convertType(memRefType));
       desc.setAllocatedPtr(builder, loc, typedPtrValue);
       desc.setAlignedPtr(builder, loc, typedPtrValue);
       desc.setConstantOffset(builder, loc, 0);
+
+      // Update memref descriptor shape. Dynamic dimensions can be mixed with
+      // static dimensions, like [128, ?, 128].
+      int dynamicDimIndex = 0;
+      for (int i = 0; i < rank; ++i) {
+        if (memRefType.isDynamicDim(i)) {
+          desc.setSize(builder, loc, i, dynamicDims[dynamicDimIndex++]);
+        } else {
+          desc.setConstantSize(builder, loc, i, memRefType.getDimSize(i));
+        }
+      }
+
+      // Compute and update strides. Assume that MemRefs are row-major, that is,
+      // following index linearization:
+      //   x[i, j, k] = i * x.dim[1] * x.dim[2] + j * x.dim[2] + k
+      desc.setConstantStride(builder, loc, rank - 1, 1);
+      for (int i = rank - 2; i >= 0; --i) {
+        auto stride = desc.stride(builder, loc, i + 1);
+        auto dim = desc.size(builder, loc, i + 1);
+        Value strideVal = builder.create<LLVM::MulOp>(loc, stride, dim);
+        desc.setStride(builder, loc, i, strideVal);
+      }
+
       return desc;
     }
   }
@@ -515,11 +542,13 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
     auto interfaceBindingOp =
         cast<IREE::HAL::InterfaceBindingSubspanOp>(op).queryBindingOp();
-    IREE::HAL::InterfaceBindingSubspanOpAdaptor newOperands(operands);
+    IREE::HAL::InterfaceBindingSubspanOpAdaptor newOperands(
+        operands, op->getAttrDictionary());
     MemRefType memRefType = op->getResult(0).getType().cast<MemRefType>();
     auto memRefDesc = abi.loadBinding(
         op->getLoc(), interfaceBindingOp.binding().getZExtValue(),
-        newOperands.byte_offset(), memRefType, rewriter);
+        newOperands.byte_offset(), memRefType, newOperands.dynamic_dims(),
+        rewriter);
     rewriter.replaceOp(op, {memRefDesc});
     return success();
   }
@@ -645,7 +674,6 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
   populateLinalgToLLVMConversionPatterns(converter, patterns);
-  populateShapeToLLVMConversionPatterns(&getContext(), &converter, patterns);
 
   // clang-format off
   patterns.insert<
