@@ -43,9 +43,8 @@ LogicalResult defineWorkgroupCountRegion(
   builder.setInsertionPoint(entryPointOp);
 
   auto clonedOp = builder.create<IREE::HAL::ExecutableEntryPointOp>(
-      loc, /*sym_visibility=*/nullptr, entryPointOp.sym_nameAttr(),
-      entryPointOp.ordinalAttr(), entryPointOp.interfaceAttr(),
-      entryPointOp.workgroup_sizeAttr(),
+      loc, entryPointOp.sym_nameAttr(), entryPointOp.ordinalAttr(),
+      entryPointOp.interfaceAttr(), entryPointOp.workgroup_sizeAttr(),
       entryPointOp.workgroup_local_memoryAttr(), 1);
   // Copy over all attributes
   for (auto attr : entryPointOp->getAttrs()) {

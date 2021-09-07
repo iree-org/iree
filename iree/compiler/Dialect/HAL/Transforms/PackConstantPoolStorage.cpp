@@ -77,10 +77,8 @@ class PackConstantPoolStoragePass
       OpBuilder builder(poolOp.getContext());
       builder.setInsertionPointAfter(splatValueOp);
       auto splatOp = builder.create<ConstantPoolSplatOp>(
-          splatValueOp.getLoc(), /*sym_visibility=*/nullptr,
-          splatValueOp.getName(),
-          splatValueOp.value().cast<SplatElementsAttr>(), SymbolRefAttr{},
-          IREE::Util::ByteRangeAttr{});
+          splatValueOp.getLoc(), splatValueOp.getName(),
+          splatValueOp.value().cast<SplatElementsAttr>());
       splatOp.setNested();
       splatValueOp.erase();
     }
@@ -99,8 +97,7 @@ class PackConstantPoolStoragePass
                                   : UnknownLoc::get(poolOp.getContext());
       auto storageBufferOp =
           OpBuilder(poolOp.getContext())
-              .create<ConstantStorageOp>(storageBufferLoc,
-                                         /*sym_visibility=*/nullptr, "_storage",
+              .create<ConstantStorageOp>(storageBufferLoc, "_storage",
                                          storageBuffer.data);
       poolSymbolTable.insert(storageBufferOp);
       storageBufferOp.setNested();
@@ -115,8 +112,8 @@ class PackConstantPoolStoragePass
         OpBuilder poolBuilder(poolOp.getContext());
         poolBuilder.setInsertionPointAfter(valueOp);
         auto spanOp = poolBuilder.create<ConstantPoolSpanOp>(
-            valueOp.getLoc(), /*sym_visibility=*/nullptr, valueOp.getName(),
-            valueOp.value().getType(), SymbolRefAttr::get(storageBufferOp),
+            valueOp.getLoc(), valueOp.getName(), valueOp.value().getType(),
+            SymbolRefAttr::get(storageBufferOp),
             IREE::Util::ByteRangeAttr::get(
                 poolOp.getContext(), constantSpan.offset, constantSpan.length),
             SymbolRefAttr{}, IREE::Util::ByteRangeAttr{});

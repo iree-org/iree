@@ -158,8 +158,7 @@ class IdentifyConstantPoolsPass
 
       // Create the constant in the pool.
       auto valueOp = poolBuilder.create<ConstantPoolValueOp>(
-          globalOp.getLoc(), /*sym_visibility=*/nullptr, globalOp.getName(),
-          value);
+          globalOp.getLoc(), globalOp.getName(), value);
       valueOp.setNested();
 
       // If the global is an immutable constant and used in compatible

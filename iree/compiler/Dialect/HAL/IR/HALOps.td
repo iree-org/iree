@@ -1302,6 +1302,15 @@ def HAL_ConstantPoolValueOp : HAL_Op<"constant_pool.value", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Attribute":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value);
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
@@ -1332,6 +1341,20 @@ def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
     (`->` $runtime_buffer^ `[` $runtime_range `]`)?
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Type":$tensor_type,
+      "::mlir::FlatSymbolRefAttr":$storage_buffer,
+      "::mlir::Attribute":$storage_range,
+      "::mlir::SymbolRefAttr":$runtime_buffer,
+      "::mlir::Attribute":$runtime_range
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, tensor_type, storage_buffer,
+            storage_range, runtime_buffer, runtime_range);
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
@@ -1358,6 +1381,16 @@ def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
     (`->` $runtime_buffer^ `[` $runtime_range `]`)?
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::ElementsAttr":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value, SymbolRefAttr{},
+            IREE::Util::ByteRangeAttr{});
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolLoadOp : HAL_PureOp<"constant_pool.load", [
@@ -1412,6 +1445,15 @@ def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Attribute":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value);
+    }]>
+  ];
 }
 
 def HAL_ConstantStorageLookupOp :
@@ -1855,6 +1897,17 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     ), [{
       build($_builder, $_state, nullptr, sym_name, ordinal, interface,
             workgroup_size, workgroup_local_memory, 0);
+    }]>,
+    OpBuilder<(ins
+      "::mlir::StringAttr":$sym_name,
+      "::mlir::IntegerAttr":$ordinal,
+      "::mlir::FlatSymbolRefAttr":$interface,
+      "::mlir::ArrayAttr":$workgroup_size,
+      "::mlir::IntegerAttr":$workgroup_local_memory,
+      "int":$workgroup_count_regionCount
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
+            workgroup_size, workgroup_local_memory, workgroup_count_regionCount);
     }]>
   ];
 
@@ -2158,6 +2211,18 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
   //   `,` `access` `` `=` `` $access
   //   attr-dict-with-keyword
   // }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::llvm::APInt":$set,
+      "::llvm::APInt":$binding,
+      "IREE::HAL::DescriptorType":$type,
+      "IREE::HAL::MemoryAccessBitfield":$access
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, set, binding, type, access);
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     /// Returns a hash for the descriptor, considering the set, binding,
