@@ -36,7 +36,7 @@ hal.executable.variant "vulkan*" {
         offset = %c0 : tensor<32x16xf32>
       return
     }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface private @legacy_io  {
       hal.interface.binding @arg0, set=0, binding=0,
         type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1,
@@ -71,7 +71,7 @@ hal.executable.variant "vulkan*" {
         offset = %c0 : tensor<10x15xf32>
       return
     }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface private @legacy_io  {
       hal.interface.binding @arg0, set=0, binding=0,
         type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1,

@@ -460,11 +460,20 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name
     // TODO(benvanik): add compatibility and versioning attributes.
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -501,10 +510,18 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     FlatSymbolRefAttr:$function_ref,
     OptionalAttr<IndexAttr>:$workgroup_rank
   );
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "FlatSymbolRefAttr":$function_ref,
+      "IntegerAttr":$workgroup_rank)>,
+  ];
 }
 
 //===----------------------------------------------------------------------===//

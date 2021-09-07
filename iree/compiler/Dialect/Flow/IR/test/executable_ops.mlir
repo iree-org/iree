@@ -11,8 +11,8 @@ flow.executable @dispatch_ex {
       return
     }
   }
-  // CHECK: flow.dispatch.entry @dispatch0
+  // CHECK: flow.dispatch.entry public @dispatch0
   flow.dispatch.entry @dispatch0
-  // CHECK: flow.dispatch.entry @dispatch0 as("dispatch0_alias")
+  // CHECK: flow.dispatch.entry public @dispatch0 as("dispatch0_alias")
   flow.dispatch.entry @dispatch0 as("dispatch0_alias")
 }

@@ -7,7 +7,26 @@
 #ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_DIALECT_TD
 #define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_DIALECT_TD
 
-include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMBase.td"
+include "iree-dialects/Dialect/IREEPyDM/IR/Base.td"
+include "iree-dialects/Dialect/IREEPyDM/IR/Interfaces.td"
+
+//===----------------------------------------------------------------------===//
+// Variable Types
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_FreeVarRef : IREEPyDM_TypeDef<"FreeVarRef"> {
+  let mnemonic = "free_var_ref";
+  let summary = "A direct access 'free' variable slot within a func";
+  let description = [{
+    A 'free variable' is a non-shared, direct access variable in a function.
+    Other languages would call these 'locals'. In Python, they are distinguished
+    from 'cell variables'.
+  }];
+}
+
+def IREEPyDM_AnyVarRef : AnyTypeOf<[
+  IREEPyDM_FreeVarRef,
+], "Python variable reference">;
 
 //===----------------------------------------------------------------------===//
 // Unboxed Primitive Types
@@ -16,8 +35,11 @@ include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMBase.td"
 // Declare a new primitive type.
 // When adding a new one, update the PrimitiveType::classof method in
 // IREEPyDMDialect.h.
-class IREEPyDM_PrimitiveTypeDef<string name> :
-    TypeDef<IREEPyDM_Dialect, name, /*traits=*/[],
+class IREEPyDM_PrimitiveTypeDef<
+  string name, list<string> overridenMethods = []> :
+    TypeDef<IREEPyDM_Dialect, name, /*traits=*/[
+      DeclareTypeInterfaceMethods<PythonTypeInterface, overridenMethods>
+    ],
     /*baseCppClass=*/"::mlir::iree_pydm::PrimitiveType"> {
 }
 
@@ -26,7 +48,7 @@ def IREEPyDM_AnyPrimitiveType : Type<
     "unboxed primitive type",
     "::mlir::iree_pydm::PrimitiveType">;
 
-def IREEPyDM_BoolType : IREEPyDM_PrimitiveTypeDef<"Bool"> {
+def IREEPyDM_BoolType : IREEPyDM_PrimitiveTypeDef<"Bool", ["getNumericPromotionOrder"]> {
   let mnemonic = "bool";
 
   let summary = "Type of bool values";
@@ -62,7 +84,7 @@ def IREEPyDM_ExceptionResultType : IREEPyDM_PrimitiveTypeDef<"ExceptionResult"> 
   }];
 }
 
-def IREEPyDM_IntegerType : IREEPyDM_PrimitiveTypeDef<"Integer"> {
+def IREEPyDM_IntegerType : IREEPyDM_PrimitiveTypeDef<"Integer", ["getNumericPromotionOrder"]> {
   let mnemonic = "integer";
 
   let summary = "Type of integer values";
@@ -95,7 +117,7 @@ def IREEPyDM_NoneType : IREEPyDM_PrimitiveTypeDef<"None"> {
   }];
 }
 
-def IREEPyDM_RealType : IREEPyDM_PrimitiveTypeDef<"Real"> {
+def IREEPyDM_RealType : IREEPyDM_PrimitiveTypeDef<"Real", ["getNumericPromotionOrder"]> {
   let mnemonic = "real";
 
   let summary = "Type of floating point values";
@@ -143,7 +165,8 @@ def IREEPyDM_TypeType : IREEPyDM_PrimitiveTypeDef<"Type"> {
 // Boxed objects
 //===----------------------------------------------------------------------===//
 
-def IREEPyDM_ObjectType : IREEPyDM_TypeDef<"Object"> {
+def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
+    "Object", [DeclareTypeInterfaceMethods<PythonTypeInterface>]> {
   let mnemonic = "object";
 
   let summary = "Core data type having an identity, type and value";
@@ -198,6 +221,52 @@ def IREEPyDM_ObjectType : IREEPyDM_TypeDef<"Object"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Union type
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_UnionType : IREEPyDM_TypeDef<"Union"> {
+  let mnemonic = "union";
+
+  let summary = "Represents a union of types";
+
+  let description = [{
+    Unions show up naturally in Python data-flows and this type represents
+    them. Note that it is not a "real" type in that it has not runtime
+    realization. However, most ops can be parameterized in terms of unions, and
+    it is generally the job of the compiler to do something sensible with them
+    before lowering.
+  }];
+
+  let parameters = (ins
+    ArrayRefParameter<"::mlir::Type">:$alternatives
+  );
+
+  let genVerifyDecl = 1;
+  let printer = [{
+    $_printer << getMnemonic();
+    llvm::interleaveComma(getAlternatives(), $_printer);
+  }];
+
+  let parser = [{
+    if (parser.parseOptionalLess())
+      return get($_ctxt, {});
+
+    SmallVector<::mlir::Type> alternatives;
+
+    do {
+      Type type;
+      if ($_parser.parseType(type))
+        return Type();
+      alternatives.push_back(type);
+    } while (succeeded($_parser.parseOptionalComma()));
+
+    return getChecked([&]() {
+      return $_parser.emitError($_parser.getNameLoc());
+    }, $_ctxt, alternatives);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Predicates and aggregate definitions
 //===----------------------------------------------------------------------===//
 
@@ -209,6 +278,12 @@ def IREEPyDM_AnyValueType : AnyTypeOf<[
   IREEPyDM_ObjectType,
   IREEPyDM_PrimitiveType,
 ], "Python boxed or unboxed value">;
+
+def IREEPyDM_AnyNumericType : AnyTypeOf<[
+  IREEPyDM_BoolType,
+  IREEPyDM_IntegerType,
+  IREEPyDM_RealType,
+], "Python numeric type">;
 
 def IREEPyDM_GenericObjectType : Type<
     CPred<"::mlir::iree_pydm::ObjectType::isGenericObjectType($_self)">,

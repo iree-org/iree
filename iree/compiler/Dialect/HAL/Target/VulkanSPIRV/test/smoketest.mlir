@@ -36,6 +36,6 @@ flow.executable @add_dispatch_0 {
 
 }
 
-//      CHECK:   hal.executable.binary @vulkan_spirv_fb attributes
+//      CHECK:   hal.executable.binary public @vulkan_spirv_fb attributes
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = "vulkan-spirv-fb"

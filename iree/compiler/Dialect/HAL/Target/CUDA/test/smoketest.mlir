@@ -40,6 +40,6 @@ flow.executable @add_dispatch_0 {
 // PTX:   add.rn.f32
 // PTX:   sqrt
 
-//      CHECK:   hal.executable.binary @cuda_nvptx_fb attributes {
+//      CHECK:   hal.executable.binary public @cuda_nvptx_fb attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = "cuda-nvptx-fb"

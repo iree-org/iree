@@ -151,6 +151,7 @@ VULKAN_SRCS = enforce_glob(
         "equal.mlir",
         "exp.mlir",
         "floor.mlir",
+        "fully_connected.mlir",
         "gather.mlir",
         "greater.mlir",
         "greater_equal.mlir",
@@ -158,12 +159,14 @@ VULKAN_SRCS = enforce_glob(
         "log.mlir",
         "logical_left_shift.mlir",
         "logical_right_shift.mlir",
+        "max_pool.mlir",
         "maximum.mlir",
         "minimum.mlir",
         "mul.mlir",
         "negate.mlir",
         "pad.mlir",
         "reciprocal.mlir",
+        "reduce.mlir",
         "reluN.mlir",
         "reshape.mlir",
         "rsqrt.mlir",
@@ -177,10 +180,7 @@ VULKAN_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "fully_connected.mlir",  # Currently failing on vulkan.
         "matmul.mlir",  # TOSA matmul is being refactored to be batched
-        "reduce.mlir",  # Currently failing on vulkan.
-        "max_pool.mlir",  # Currently failing on vulkan.
     ],
 )
 

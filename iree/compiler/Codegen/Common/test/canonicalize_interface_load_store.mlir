@@ -17,7 +17,7 @@ func @fold_reshape() {
   return
 }
 
-hal.interface @interface_io attributes {sym_visibility = "private"} {
+hal.interface private @interface_io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
 }
@@ -42,7 +42,7 @@ func @dont_fold_reshape_with_not_full_load() {
   return
 }
 
-hal.interface @interface_io attributes {sym_visibility = "private"} {
+hal.interface private @interface_io  {
   hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
 }

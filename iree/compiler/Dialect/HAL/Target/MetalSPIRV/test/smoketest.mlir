@@ -36,6 +36,6 @@ flow.executable @add_dispatch_0 {
 
 }
 
-// CHECK:        hal.executable.binary @metal_msl_fb attributes {
+// CHECK:        hal.executable.binary public @metal_msl_fb attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = "metal-msl-fb"

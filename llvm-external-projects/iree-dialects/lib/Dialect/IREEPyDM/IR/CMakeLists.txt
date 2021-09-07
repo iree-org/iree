@@ -1,6 +1,6 @@
 add_mlir_library(IREEDialectsIREEPyDMDialect
-  IREEPyDMDialect.cpp
-  IREEPyDMOps.cpp
+  Dialect.cpp
+  Ops.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${IREE_DIALECTS_SOURCE_DIR}/include

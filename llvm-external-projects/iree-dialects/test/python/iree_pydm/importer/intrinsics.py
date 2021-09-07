@@ -23,8 +23,8 @@ def intrinsic_return_first_true(a: int, b: int) -> int:
 
 
 # CHECK-LABEL: @test_intrinsic_function_no_args
-# CHECK: iree_pydm.dynamic_call @__return_one() : () -> (!iree_pydm.exception_result, !iree_pydm.object)
-# CHECK: iree_pydm.func private @__return_one()
+# CHECK: dynamic_call @__return_one() : () -> (!iree_pydm.exception_result, !iree_pydm.object)
+# CHECK: func private @__return_one()
 @test_import_global
 def test_intrinsic_function_no_args():
   value = intrinsic_return_one()
@@ -41,10 +41,10 @@ def test_intrinsic_function_double_call():
 
 
 # CHECK-LABEL: @test_intrinsic_function_args
-# CHECK: %[[ZERO:.*]] = iree_pydm.constant 0 : si64 -> !iree_pydm.integer
-# CHECK: %[[ONE:.*]] = iree_pydm.constant 1 : si64 -> !iree_pydm.integer
-# CHECK: iree_pydm.dynamic_call @__return_first_true(%[[ZERO]], %[[ONE]]) : (!iree_pydm.integer, !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.object)
-# CHECK: iree_pydm.func private @__return_first_true
+# CHECK: %[[ZERO:.*]] = constant 0 : i64 -> !iree_pydm.integer
+# CHECK: %[[ONE:.*]] = constant 1 : i64 -> !iree_pydm.integer
+# CHECK: dynamic_call @__return_first_true(%[[ZERO]], %[[ONE]]) : (!iree_pydm.integer, !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.object)
+# CHECK: func private @__return_first_true
 @test_import_global
 def test_intrinsic_function_args():
   value = intrinsic_return_first_true(0, 1)
@@ -68,8 +68,8 @@ def macro_box_arg(stage: ImportStage, arg: ir.Value) -> ir.Value:
 
 
 # CHECK-LABEL: @test_intrinsic_macro_no_args
-# CHECK: %[[ONE:.*]] = iree_pydm.constant 1
-# CHECK: iree_pydm.box %[[ONE]] : !iree_pydm.integer -> !iree_pydm.object<!iree_pydm.integer>
+# CHECK: %[[ONE:.*]] = constant 1
+# CHECK: box %[[ONE]] : !iree_pydm.integer -> !iree_pydm.object<!iree_pydm.integer>
 @test_import_global
 def test_intrinsic_macro_no_args() -> int:
   return macro_box_arg(1)
@@ -95,11 +95,11 @@ logical_not = def_pattern_call_intrinsic(match_generic=[logical_not_generic],
 
 
 # CHECK-LABEL: @test_pattern_call
-# CHECK: %[[TRUE:.*]] = iree_pydm.constant true
-# CHECK: iree_pydm.pattern_match_call(%[[TRUE]]) : (!iree_pydm.bool) -> (!iree_pydm.exception_result, !iree_pydm.object)
+# CHECK: %[[TRUE:.*]] = constant true
+# CHECK: pattern_match_call(%[[TRUE]]) : (!iree_pydm.bool) -> (!iree_pydm.exception_result, !iree_pydm.object)
 # CHECK-SAME:   matching generic [@__logical_not_generic] specific [@__logical_not_bool]
-# CHECK-DAG: iree_pydm.func private @__logical_not_generic
-# CHECK-DAG: iree_pydm.func private @__logical_not_bool
+# CHECK-DAG: func private @__logical_not_generic
+# CHECK-DAG: func private @__logical_not_bool
 @test_import_global
 def test_pattern_call():
   return logical_not(True)

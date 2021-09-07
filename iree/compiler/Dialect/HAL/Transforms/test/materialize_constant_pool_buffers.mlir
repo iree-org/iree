@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-hal-materialize-constant-pool-buffers %s | IreeFileCheck %s
 
-// CHECK-LABEL: hal.constant_pool @dense_variable_init
+// CHECK-LABEL: hal.constant_pool public @dense_variable_init
 hal.constant_pool @dense_variable_init attributes {buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 32, max_buffer_range = 134217728, min_buffer_range_alignment = 4>} {
   // CHECK-NEXT: @cst0 {{.+}} -> @dense_variable_init_storage_buffer[#util.byte_range<0, 512>]
   hal.constant_pool.span @cst0 : tensor<128xf32> = @_storage[#util.byte_range<0, 512>]
@@ -18,7 +18,7 @@ hal.constant_pool @dense_variable_init attributes {buffer_constraints = #hal.buf
 
 // -----
 
-// CHECK-LABEL: hal.constant_pool @splat_variable_init
+// CHECK-LABEL: hal.constant_pool public @splat_variable_init
 hal.constant_pool @splat_variable_init attributes {buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 32, max_buffer_range = 134217728, min_buffer_range_alignment = 4>} {
   // CHECK-NEXT: @cst0 {{.+}} -> @splat_variable_init_splats[#util.byte_range<0, 4>]
   hal.constant_pool.splat @cst0 = dense<1.000000e+00> : tensor<1xf32>
@@ -40,7 +40,7 @@ hal.constant_pool @splat_variable_init attributes {buffer_constraints = #hal.buf
 
 // -----
 
-// CHECK-LABEL: hal.constant_pool @pool
+// CHECK-LABEL: hal.constant_pool public @pool
 hal.constant_pool @pool attributes {buffer_constraints = #hal.buffer_constraints<max_allocation_size = 1073741824, min_buffer_offset_alignment = 32, max_buffer_range = 134217728, min_buffer_range_alignment = 4>} {
   // CHECK-NEXT: @cst0 {{.+}} -> @pool_storage0_buffer[#util.byte_range<0, 16>]
   hal.constant_pool.span @cst0 : tensor<4xf32> = @_storage0[#util.byte_range<0, 16>]

@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-vmvx-conversion -canonicalize %s | IreeFileCheck %s
 
-hal.interface @io attributes {sym_visibility = "private"} {
+hal.interface private @io  {
   hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
   hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }

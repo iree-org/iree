@@ -214,7 +214,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   // Add executable entry point pointing at the function.
   OpBuilder builder(executableOp.body());
   auto entryPointOp = builder.create<DispatchEntryOp>(
-      regionOp.getLoc(), builder.getStringAttr(workgroupFuncOp.getName()),
+      regionOp.getLoc(), workgroupFuncOp.getName(),
       SymbolRefAttr::get(workgroupFuncOp),
       builder.getIndexAttr(regionOp.getWorkgroupRank()));
 

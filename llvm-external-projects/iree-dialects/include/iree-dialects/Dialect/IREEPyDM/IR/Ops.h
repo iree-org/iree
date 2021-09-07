@@ -7,17 +7,18 @@
 #ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_IREEPYDM_IR_OPS_H
 #define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_IREEPYDM_IR_OPS_H
 
-#include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMDialect.h"
+#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "iree-dialects/Dialect/IREEPyDM/IR/IREEPyDMOps.h.inc"
+#include "iree-dialects/Dialect/IREEPyDM/IR/Ops.h.inc"
 
 #endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_IREEPYDM_IR_OPS_H
