@@ -18,6 +18,7 @@ iree_cc_library(
     "MemorySpace.h"
     "Utils.h"
   SRCS
+    "AdrenoConfig.cpp"
     "ConvertToSPIRVPass.cpp"
     "KernelConfig.cpp"
     "MaliConfig.cpp"
