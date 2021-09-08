@@ -95,14 +95,14 @@ branch.
 To run
 [`schedule_snapshot_release.yml`](https://github.com/google/iree/blob/main/.github/workflows/schedule_snapshot_release.yml),
 comment out
-[this line](https://github.com/google/iree/blob/main/.github/workflows/schedule_snapshot_release.yml#L14):
+[this line](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/schedule_snapshot_release.yml#L14):
 ```yaml
 # Don't run this in everyone's forks.
 if: github.repository == 'google/iree'
 ```
 
 And change the branch from 'main' to the branch you are developing on
-[here](https://github.com/google/iree/blob/main/.github/workflows/schedule_snapshot_release.yml#L37):
+[here](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/schedule_snapshot_release.yml#L37):
 ```yaml
 - name: Pushing changes
   uses: ad-m/github-push-action@v0.6.0
@@ -115,11 +115,11 @@ And change the branch from 'main' to the branch you are developing on
 To speed up
 [`build_package.yml`](https://github.com/google/iree/blob/main/.github/workflows/build_package.yml),
 you may want to comment out some of the builds
-[here](https://github.com/google/iree/blob/main/.github/workflows/build_package.yml#L34-L87).
+[here](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/build_package.yml#L34-L87).
 The
-[`py-pure-pkgs`](https://github.com/google/iree/blob/main/.github/workflows/build_package.yml#L52)
+[`py-pure-pkgs`](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/build_package.yml#L52)
 build takes only ~2 minutes and the
-[`py-runtime-pkg`](https://github.com/google/iree/blob/main/.github/workflows/build_package.yml#L39)
+[`py-runtime-pkg`](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/build_package.yml#L39)
 build takes ~5, while the others can take several hours.
 
 From your development branch, you can manually run the
