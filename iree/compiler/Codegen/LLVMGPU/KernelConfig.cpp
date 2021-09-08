@@ -43,8 +43,8 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape = getUntiledShape(op.getInputOperand(0)->get());
   auto rhsShape = getUntiledShape(op.getInputOperand(1)->get());
-  int64_t sizeM = -1;
-  int64_t sizeN = -1;
+  int64_t sizeM = ShapedType::kDynamicSize;
+  int64_t sizeN = ShapedType::kDynamicSize;
   auto outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
   for (unsigned i = 0; i < lhsShape.size(); i++) {
     if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
@@ -65,25 +65,29 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   int64_t tileY = 256;
   int64_t tileK = 4;
   SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
-  // Special case for very small matrices.
-  if (sizeM * sizeN <= cudaWarpSize) {
-    tileX = sizeN;
-    tileY = sizeM;
-    workgroupSize = {sizeM, sizeN, 1};
-  }
-  SmallVector<TileWorkgroupSizePair> tileSizeConfig;
-  // Query the best configuration.
-  getMatmulConfig(tileSizeConfig);
-  // Pick the best configuration where the original shape is aligned on the tile
-  // size.
-  for (TileWorkgroupSizePair &config : tileSizeConfig) {
-    if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
-      tileX = config.tileSize[0];
-      tileY = config.tileSize[1];
-      tileK = config.tileSize[2];
-      workgroupSize.assign(config.workgroupSize.begin(),
-                           config.workgroupSize.end());
-      break;
+  bool isStaticSize =
+      sizeM != ShapedType::kDynamicSize && sizeN != ShapedType::kDynamicSize;
+  if (isStaticSize) {
+    // Special case for very small matrices.
+    if (sizeM * sizeN <= cudaWarpSize) {
+      tileX = sizeN;
+      tileY = sizeM;
+      workgroupSize = {sizeM, sizeN, 1};
+    }
+    SmallVector<TileWorkgroupSizePair> tileSizeConfig;
+    // Query the best configuration.
+    getMatmulConfig(tileSizeConfig);
+    // Pick the best configuration where the original shape is aligned on the
+    // tile size.
+    for (TileWorkgroupSizePair &config : tileSizeConfig) {
+      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
+        tileX = config.tileSize[0];
+        tileY = config.tileSize[1];
+        tileK = config.tileSize[2];
+        workgroupSize.assign(config.workgroupSize.begin(),
+                             config.workgroupSize.end());
+        break;
+      }
     }
   }
   // Currently just a basic tile size to enable tiling and vectorization.
