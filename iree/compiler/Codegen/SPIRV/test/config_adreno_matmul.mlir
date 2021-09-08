@@ -62,7 +62,7 @@ hal.executable @matmul_1024x2048x512 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point @matmul_1024x2048x512
+//          CHECK-LABEL: hal.executable.entry_point public @matmul_1024x2048x512
 //           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [128, 16]}
 //           CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
@@ -139,7 +139,7 @@ hal.executable @matmul_3136x24x96 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point @matmul_3136x24x96
+//          CHECK-LABEL: hal.executable.entry_point public @matmul_3136x24x96
 //           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [8, 224]}
 //           CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
@@ -216,7 +216,7 @@ hal.executable @matmul_196x64x192 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point @matmul_196x64x192
+//          CHECK-LABEL: hal.executable.entry_point public @matmul_196x64x192
 //           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 28]}
 //           CHECK-SAME:   workgroup_size = [16 : index, 4 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
@@ -288,7 +288,7 @@ hal.executable @matmul_12544x96x16 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point @matmul_12544x96x16
+//          CHECK-LABEL: hal.executable.entry_point public @matmul_12544x96x16
 //           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 64]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
@@ -365,7 +365,7 @@ hal.executable @matmul_49x160x576 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point @matmul_49x160x576
+//          CHECK-LABEL: hal.executable.entry_point public @matmul_49x160x576
 //           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 7]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
