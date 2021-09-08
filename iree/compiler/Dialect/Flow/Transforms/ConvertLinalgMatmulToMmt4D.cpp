@@ -86,10 +86,10 @@ static Value collapseTo2D(mlir::Location loc, PatternRewriter &rewriter,
 // Converts linalg.matmul to an equivalent subgraph using linalg.mmt4d.
 // Currently, M0, N0, K0 are compile time constants.
 // TODO(ataei): Move this pattern to linalg transforms upstream.
-class LinalgMatmulOpToLinalgMMT4dOpPattern
+class LinalgMatmulOpToLinalgMmt4DOpPattern
     : public OpRewritePattern<linalg::MatmulOp> {
  public:
-  LinalgMatmulOpToLinalgMMT4dOpPattern(MLIRContext *context, int M0, int K0,
+  LinalgMatmulOpToLinalgMmt4DOpPattern(MLIRContext *context, int M0, int K0,
                                        int N0, PatternBenefit benefit = 1)
       : OpRewritePattern<linalg::MatmulOp>(context, benefit),
         M0(M0),
@@ -135,11 +135,11 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
     auto rhs4DT = transpose(loc, rewriter, rhs4D, {2, 0, 3, 1});
     auto dst4DT = transpose(loc, rewriter, dst4D, {0, 2, 1, 3});
 
-    auto mmt4DResult = rewriter.create<linalg::Mmt4DOp>(
+    auto mmt4dResult = rewriter.create<linalg::Mmt4DOp>(
         loc, dst4DT.getType(), ValueRange{lhs4DT, rhs4DT}, ValueRange{dst4DT});
 
     auto mmt4dResultTransposed =
-        transpose(loc, rewriter, mmt4DResult.getResult(0), {0, 2, 1, 3});
+        transpose(loc, rewriter, mmt4dResult.getResult(0), {0, 2, 1, 3});
 
     Value result = collapseTo2D(loc, rewriter, mmt4dResultTransposed, {m, n});
 
@@ -196,10 +196,10 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-class ConvertLinalgMatmulOpToLinalgMMT4dPass final
-    : public ConvertMatmulToMMT4dBase<ConvertLinalgMatmulOpToLinalgMMT4dPass> {
+class ConvertLinalgMatmulToMmt4DPass final
+    : public ConvertLinalgMatmulToMmt4DBase<ConvertLinalgMatmulToMmt4DPass> {
  public:
-  ConvertLinalgMatmulOpToLinalgMMT4dPass() {}
+  ConvertLinalgMatmulToMmt4DPass() {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
@@ -230,7 +230,7 @@ class ConvertLinalgMatmulOpToLinalgMMT4dPass final
     // Main pattern.
     {
       OwningRewritePatternList patterns(&getContext());
-      patterns.insert<LinalgMatmulOpToLinalgMMT4dOpPattern>(context, M0, K0,
+      patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(context, M0, K0,
                                                             N0);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
@@ -246,9 +246,8 @@ class ConvertLinalgMatmulOpToLinalgMMT4dPass final
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
-createConvertLinalgMatmulOpToLinalgMMT4dPass() {
-  return std::make_unique<ConvertLinalgMatmulOpToLinalgMMT4dPass>();
+std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass() {
+  return std::make_unique<ConvertLinalgMatmulToMmt4DPass>();
 }
 
 }  // namespace Flow

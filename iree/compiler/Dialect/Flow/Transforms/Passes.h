@@ -57,8 +57,7 @@ std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass();
 
 /// Pass to convert a linalg.matmul into linalg.mmt4d given M0, N0 and K0 are
 /// compile time constants.
-std::unique_ptr<OperationPass<FuncOp>>
-createConvertLinalgMatmulOpToLinalgMMT4dPass();
+std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass();
 
 /// Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();
