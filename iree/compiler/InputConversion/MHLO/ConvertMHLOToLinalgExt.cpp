@@ -30,9 +30,9 @@ namespace iree_compiler {
 
 namespace {
 
-static Type convertInteger(IntegerType int_type) {
-  return IntegerType::get(int_type.getContext(),
-                          int_type.getIntOrFloatBitWidth());
+static Type convertInteger(IntegerType intType) {
+  return IntegerType::get(intType.getContext(),
+                          intType.getIntOrFloatBitWidth());
 }
 
 static Optional<Type> convertTensor(TensorType tensorType) {
