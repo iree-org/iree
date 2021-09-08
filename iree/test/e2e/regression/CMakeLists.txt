@@ -93,4 +93,31 @@ iree_check_single_backend_test_suite(
     "-iree-input-type=mhlo"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_cuda
+  SRCS
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
+    "linalg_ops.mlir"
+  TARGET_BACKEND
+    "cuda"
+  DRIVER
+    "cuda"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
