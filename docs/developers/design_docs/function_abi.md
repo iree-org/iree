@@ -183,3 +183,5 @@ type specific fields:
 -   `["sdict", ["key", {slot_type}]...]`: An anonymous structure with named
     slots. Note that when passing these types, the keys are not passed to the
     function (only the slot values).
+-   `["py_homogeneous_list", {element_type}]`: A Python list of unknown size
+    with elements sharing a common type bound given by `element_type`.
