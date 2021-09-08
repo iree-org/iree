@@ -1,15 +1,11 @@
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot -function-input="2x2x2xi32=[[100, 101] [110, 111]] [[200, 201] [210, 211]]" -function-input="2x2x2xi32=[[0, 1] [1, 0]] [[0, 0] [1, 1]]" | IreeFileCheck %s)
-// RUN: [[ $IREE_VMVX_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=vmvx -function-input="2x2x2xi32=[[100, 101] [110, 111]] [[200, 201] [210, 211]]" -function-input="2x2x2xi32=[[0, 1] [1, 0]] [[0, 0] [1, 1]]" | IreeFileCheck %s)
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=vulkan-spirv -function-input="2x2x2xi32=[[100, 101] [110, 111]] [[200, 201] [210, 211]]" -function-input="2x2x2xi32=[[0, 1] [1, 0]] [[0, 0] [1, 1]]" | IreeFileCheck %s)
-
-// CHECK-LABEL: EXEC @torch_index_select1
-func @torch_index_select1(%arg0: tensor<?x?x?xi32>, %arg1: tensor<?x?x?xi32>) -> tensor<?x?x?xi32> {
-  %0 = "mhlo.torch_index_select"(%arg0, %arg1) {batch_dims = -1 : i64, dim = -1 : i64} : (tensor<?x?x?xi32>, tensor<?x?x?xi32>) -> tensor<?x?x?xi32>
-  return %0 : tensor<?x?x?xi32>
+func @torch_index_select1() {
+  %lhs = util.dynamic_shape_constant  dense<[[[100, 101],[110, 111]],[[200, 201],[210, 211]]]> : tensor<2x2x2xi32> -> tensor<?x?x?xi32>
+  %rhs = util.dynamic_shape_constant  dense<[[[0, 1],[1, 0]],[[0, 0],[1, 1]]]> : tensor<2x2x2xi32> -> tensor<?x?x?xi32>
+  %0 = "mhlo.torch_index_select"(%lhs, %rhs) {batch_dims = -1 : i64, dim = -1 : i64} : (tensor<?x?x?xi32>, tensor<?x?x?xi32>) -> tensor<?x?x?xi32>
+  %dshape = util.do_not_optimize(%0) : tensor<?x?x?xi32>
+  %result = tensor.cast %dshape : tensor<?x?x?xi32> to tensor<2x2x2xi32>
+  check.expect_eq_const(%result,
+    dense<[[[100, 101],[111, 110]],
+           [[200, 200],[211, 211]]]> : tensor<2x2x2xi32>) : tensor<2x2x2xi32>
+  return
 }
-
-// CHECK: 2x2x2xi32=[
-// CHECK-SAME:   [100 101][111 110]
-// CHECK-SAME: ][
-// CHECK-SAME:   [200 200][211 211]
-// CHECK-SAME: ]
