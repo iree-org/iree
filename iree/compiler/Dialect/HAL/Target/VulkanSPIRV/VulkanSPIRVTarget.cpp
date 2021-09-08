@@ -119,7 +119,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   std::string name() const override { return "vulkan"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<Vulkan::VulkanDialect, spirv::SPIRVDialect>();
+    registry
+        .insert<Vulkan::VulkanDialect, spirv::SPIRVDialect, gpu::GPUDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
