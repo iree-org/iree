@@ -54,6 +54,7 @@ iree_check_single_backend_test_suite(
     "reverse.mlir"
     "rsqrt.mlir"
     "scatter.mlir"
+    "scatter_dynamic.mlir"
     "select.mlir"
     "sine.mlir"
     "slice.mlir"

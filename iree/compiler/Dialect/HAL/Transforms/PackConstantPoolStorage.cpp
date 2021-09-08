@@ -78,8 +78,7 @@ class PackConstantPoolStoragePass
       builder.setInsertionPointAfter(splatValueOp);
       auto splatOp = builder.create<ConstantPoolSplatOp>(
           splatValueOp.getLoc(), splatValueOp.getName(),
-          splatValueOp.value().cast<SplatElementsAttr>(), SymbolRefAttr{},
-          IREE::Util::ByteRangeAttr{});
+          splatValueOp.value().cast<SplatElementsAttr>());
       splatOp.setNested();
       splatValueOp.erase();
     }

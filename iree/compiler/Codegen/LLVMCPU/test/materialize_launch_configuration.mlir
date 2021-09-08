@@ -1,6 +1,6 @@
 // RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))' -cse -canonicalize -split-input-file %s | IreeFileCheck %s
 
-hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
+hal.executable private @matmul_tensors  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -61,7 +61,7 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}[64, 64], [32, 32, 32], [4, 4, 4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//      CHECK: hal.executable.entry_point @matmul_tensors
+//      CHECK: hal.executable.entry_point public @matmul_tensors
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -76,11 +76,11 @@ hal.executable @matmul_tensors attributes {sym_visibility = "private"} {
 
 //      CHECK: #[[CONFIG:.+]] = {passPipeline = 0 : i32}
 //  CHECK-NOT: #config
-//      CHECK: hal.executable.entry_point @add_no_config
+//      CHECK: hal.executable.entry_point public @add_no_config
 // CHECK-SAME:     translation.info = #[[CONFIG]]
 //  CHECK-NOT:     #config
 
-hal.executable @add_no_config attributes {sym_visibility = "private"} {
+hal.executable private @add_no_config  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -115,7 +115,7 @@ hal.executable @add_no_config attributes {sym_visibility = "private"} {
           }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -126,7 +126,7 @@ hal.executable @add_no_config attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @add attributes {sym_visibility = "private"} {
+hal.executable private @add  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -184,7 +184,7 @@ hal.executable @add attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -194,7 +194,7 @@ hal.executable @add attributes {sym_visibility = "private"} {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[64, 64]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//      CHECK: hal.executable.entry_point @add
+//      CHECK: hal.executable.entry_point public @add
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -207,7 +207,7 @@ hal.executable @add attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @add4D attributes {sym_visibility = "private"} {
+hal.executable private @add4D  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -288,7 +288,7 @@ hal.executable @add4D attributes {sym_visibility = "private"} {
           }
           return
         }
-        hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface private @io  {
           hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
           hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
           hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -298,7 +298,7 @@ hal.executable @add4D attributes {sym_visibility = "private"} {
   }
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[0, 64, 64, 64]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//      CHECK: hal.executable.entry_point @add4D
+//      CHECK: hal.executable.entry_point public @add4D
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -311,7 +311,7 @@ hal.executable @add4D attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @batch_matmul_tensors attributes {sym_visibility = "private"} {
+hal.executable private @batch_matmul_tensors  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -382,7 +382,7 @@ hal.executable @batch_matmul_tensors attributes {sym_visibility = "private"} {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [1, 4, 4, 4], tileSizes = {{\[}}[1, 32, 32], [1, 16, 16, 16], [1, 4, 4, 4]{{\]}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//      CHECK: hal.executable.entry_point @batch_matmul_tensors
+//      CHECK: hal.executable.entry_point public @batch_matmul_tensors
 // CHECK-NEXT: (%[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: index)
@@ -394,7 +394,7 @@ hal.executable @batch_matmul_tensors attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @preset_config_matmul_tensors attributes {sym_visibility = "private"} {
+hal.executable private @preset_config_matmul_tensors  {
   hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @preset_config attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
@@ -434,7 +434,7 @@ hal.executable @preset_config_matmul_tensors attributes {sym_visibility = "priva
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

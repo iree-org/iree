@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -mlir-print-local-scope -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
 
-hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
+hal.executable private @static_1d_sort  {
   hal.interface @io {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
   }
@@ -25,7 +25,7 @@ hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
         flow.dispatch.tensor.store %2, %0, offsets = [], sizes = [], strides = [] : tensor<1000xi32> -> !flow.dispatch.tensor<readwrite:1000xi32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
       }
     }
@@ -34,7 +34,7 @@ hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
 
 // Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
-// CHECK-LABEL: hal.executable.entry_point @static_1d_sort
+// CHECK-LABEL: hal.executable.entry_point public @static_1d_sort
 //  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
@@ -47,7 +47,7 @@ hal.executable @static_1d_sort attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @static_3d_sort attributes {sym_visibility = "private"} {
+hal.executable private @static_3d_sort  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -98,7 +98,7 @@ hal.executable @static_3d_sort attributes {sym_visibility = "private"} {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point @static_3d_sort
+//          CHECK-LABEL: hal.executable.entry_point public @static_3d_sort
 //           CHECK-SAME:   translation.info = {passPipeline = 5 : i32, workloadPerWorkgroup = [16, 1]}
 //           CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
@@ -112,7 +112,7 @@ hal.executable @static_3d_sort attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
+hal.executable private @static_1d_fft  {
   hal.interface @io {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
@@ -140,7 +140,7 @@ hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
         flow.dispatch.tensor.store %4#1, %1, offsets = [], sizes = [], strides = [] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:32xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
         hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
       }
@@ -150,7 +150,7 @@ hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
 
 // Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
-// CHECK-LABEL: hal.executable.entry_point @static_1d_fft
+// CHECK-LABEL: hal.executable.entry_point public @static_1d_fft
 //  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
@@ -163,7 +163,7 @@ hal.executable @static_1d_fft attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @static_3d_fft attributes {sym_visibility = "private"} {
+hal.executable private @static_3d_fft  {
   hal.interface @io {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
@@ -191,7 +191,7 @@ hal.executable @static_3d_fft attributes {sym_visibility = "private"} {
         flow.dispatch.tensor.store %4#1, %1, offsets = [], sizes = [], strides = [] : tensor<64x128x32xf32> -> !flow.dispatch.tensor<readwrite:64x128x32xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
         hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
       }
@@ -201,7 +201,7 @@ hal.executable @static_3d_fft attributes {sym_visibility = "private"} {
 
 // Right now n-D fft does not support tiling too.
 
-// CHECK-LABEL: hal.executable.entry_point @static_3d_fft
+// CHECK-LABEL: hal.executable.entry_point public @static_3d_fft
 //  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):

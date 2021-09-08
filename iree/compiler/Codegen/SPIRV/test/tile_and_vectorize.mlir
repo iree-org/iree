@@ -10,7 +10,7 @@
 
 #config = {tileSizes = [[8, 16, 0], [], [1, 1, 1]]}
 
-hal.executable @matmul attributes {sym_visibility = "private"} {
+hal.executable private @matmul  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -67,7 +67,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -92,7 +92,7 @@ hal.executable @matmul attributes {sym_visibility = "private"} {
 
 #config = {tileSizes = [[1, 4, 32], [], [1, 1, 1]]}
 
-hal.executable @conv_1d attributes {sym_visibility = "private"} {
+hal.executable private @conv_1d  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -137,7 +137,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
         linalg.conv_1d_nwc_wcf { __internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -183,7 +183,7 @@ hal.executable @conv_1d attributes {sym_visibility = "private"} {
 
 #config = {tileSizes = [[0, 1, 4, 32], [], [0, 1, 1, 1]]}
 
-hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
+hal.executable private @conv_no_padding  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -266,7 +266,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -318,7 +318,7 @@ hal.executable @conv_no_padding attributes {sym_visibility = "private"} {
 
 #config = {tileSizes = [[0, 0, 1, 4, 32], [], [0, 0, 1, 1, 1]]}
 
-hal.executable @conv_3d attributes {sym_visibility = "private"} {
+hal.executable private @conv_3d  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -361,7 +361,7 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
         linalg.conv_3d_ndhwc_dhwcf {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -399,7 +399,7 @@ hal.executable @conv_3d attributes {sym_visibility = "private"} {
 #config = {tileSizes = [[1, 4, 32], [], [1, 1, 1]]}
 
 module  {
-  hal.executable @pooling_nhwc_max attributes {sym_visibility = "private"} {
+  hal.executable private @pooling_nhwc_max  {
     hal.interface @io {
       hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -433,7 +433,7 @@ module  {
           linalg.pooling_nhwc_max {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>) outs(%12 : memref<2x?x?x6xf32, #map7>)
           return
         }
-        hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface private @io  {
           hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
           hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
           hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

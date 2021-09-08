@@ -2,7 +2,7 @@
 
 #config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
 
-hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "private"} {
+hal.executable private @fuse_and_vectorize_fill_matmul  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -51,7 +51,7 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -72,7 +72,7 @@ hal.executable @fuse_and_vectorize_fill_matmul attributes {sym_visibility = "pri
 
 #config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
 
-hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "private"} {
+hal.executable private @fuse_and_vectorize_matmul_add  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -132,7 +132,7 @@ hal.executable @fuse_and_vectorize_matmul_add attributes {sym_visibility = "priv
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b2_ro_external, set=0, binding=2, type="StorageBuffer", access="Read"

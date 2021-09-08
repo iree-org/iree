@@ -5,7 +5,7 @@
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-hal.executable @kernel_matmul attributes {sym_visibility = "private"} {
+hal.executable private @kernel_matmul  {
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
     gpu.container_module,
     spv.target_env = #spv.target_env<#spv.vce<v1.0,
@@ -41,7 +41,7 @@ hal.executable @kernel_matmul attributes {sym_visibility = "private"} {
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-hal.executable @kernel_matmul attributes {sym_visibility = "private"} {
+hal.executable private @kernel_matmul  {
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       gpu.container_module,
       spv.target_env = #spv.target_env<#spv.vce<v1.0,
@@ -88,7 +88,7 @@ hal.executable @kernel_matmul attributes {sym_visibility = "private"} {
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-hal.executable @kernel_matmul attributes {sym_visibility = "private"} {
+hal.executable private @kernel_matmul  {
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       gpu.container_module,
       spv.target_env = #spv.target_env<#spv.vce<v1.0,

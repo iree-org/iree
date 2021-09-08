@@ -26,6 +26,10 @@ iree_status_t iree_hal_cuda_executable_layout_create(
 iree_host_size_t iree_hal_cuda_base_binding_index(
     iree_hal_executable_layout_t* executable_layout, uint32_t set);
 
+// Return the base index for push constant data.
+iree_host_size_t iree_hal_cuda_push_constant_index(
+    iree_hal_executable_layout_t* base_executable_layout);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

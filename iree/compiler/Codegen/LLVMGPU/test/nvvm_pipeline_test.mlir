@@ -27,7 +27,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
         flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -36,8 +36,8 @@ hal.executable @simpleMath_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-//       CHECK:   hal.executable.variant @cuda
+// CHECK-LABEL: hal.executable public @simpleMath_ex_dispatch_0
+//       CHECK:   hal.executable.variant public @cuda
 //       CHECK:   llvm.fadd
 
 // -----
@@ -45,7 +45,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
 #map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
-hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable @dot_dispatch_0 {
   hal.interface @io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -90,7 +90,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -99,8 +99,8 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
   }
 }
 
-//     CHECK-LABEL: hal.executable @dot_dispatch_0
-//           CHECK:   hal.executable.variant @cuda
+//     CHECK-LABEL: hal.executable public @dot_dispatch_0
+//           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
 //   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //           CHECK:   llvm.br
@@ -133,7 +133,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
   iterator_types = ["parallel", "parallel", "reduction"]
 }
 
-hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable @dot_dispatch_0 {
   hal.interface @io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -183,7 +183,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -192,8 +192,8 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
   }
 }
 
-//   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.variant @cuda
+//   CHECK-LABEL: hal.executable public @dot_dispatch_0
+//         CHECK:   hal.executable.variant public @cuda
 //         CHECK:   llvm.br
 // CHECK-COUNT-8:   "llvm.intr.fmuladd"({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //         CHECK:   llvm.br
@@ -201,7 +201,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @conv2d_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable @conv2d_dispatch_0 {
 hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.interface @io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -257,7 +257,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
       }
       return
     }
-    hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface private @io  {
       hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -266,8 +266,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 }
 }
 
-//   CHECK-LABEL: hal.executable @conv2d_dispatch_0
-//         CHECK:   hal.executable.variant @cuda
+//   CHECK-LABEL: hal.executable public @conv2d_dispatch_0
+//         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-3:   llvm.load %{{.*}} : !llvm.ptr<f32>
 //         CHECK:   lvm.fmul %{{.*}}, %{{.*}}  : f32
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : f32
@@ -298,7 +298,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
         flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
       }
@@ -306,8 +306,8 @@ hal.executable @simpleMath_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-//       CHECK:   hal.executable.variant @cuda
+// CHECK-LABEL: hal.executable public @simpleMath_ex_dispatch_0
+//       CHECK:   hal.executable.variant public @cuda
 //       CHECK:   llvm.mlir.global private constant @{{.*}}(dense<[1.000000e+00, 2.000000e+00, 3.000000e+00, 4.000000e+00, 5.000000e+00, 6.000000e+00, 7.000000e+00, 8.000000e+00, 9.000000e+00, 1.000000e+01, 1.100000e+01, 1.200000e+01, 1.300000e+01, 1.400000e+01, 1.500000e+01, 1.600000e+01]> : tensor<16xf32>)
 //       CHECK:   llvm.fadd
 
@@ -344,7 +344,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
       }
       return
     }
-    hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface private @io  {
       hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
     }
@@ -352,8 +352,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 }
 }
 
-// CHECK-LABEL: hal.executable @reduction_dispatch
-//       CHECK:   hal.executable.variant @cuda
+// CHECK-LABEL: hal.executable public @reduction_dispatch
+//       CHECK:   hal.executable.variant public @cuda
 //       CHECK:   llvm.fadd
 
 // -----
@@ -389,7 +389,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
       }
       return
     }
-    hal.interface @io attributes {sym_visibility = "private"} {
+    hal.interface private @io  {
       hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -398,8 +398,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 }
 }
 
-//   CHECK-LABEL: hal.executable @vector_add_dispatch
-//         CHECK:   hal.executable.variant @cuda
+//   CHECK-LABEL: hal.executable public @vector_add_dispatch
+//         CHECK:   hal.executable.variant public @cuda
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : vector<4xf32
 //         CHECK:   llvm.store %{{.*}} : !llvm.ptr<vector<4xf32>>
 
@@ -442,7 +442,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
           }
           return
         }
-        hal.interface @io attributes {sym_visibility = "private"} {
+        hal.interface private @io  {
           hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
           hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
         }
@@ -450,7 +450,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
   }
 }
 
-//   CHECK-LABEL: hal.executable @vector_reduction_dispatch
-//         CHECK:   hal.executable.variant @cuda
+//   CHECK-LABEL: hal.executable public @vector_reduction_dispatch
+//         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-4:   llvm.fadd
 //         CHECK:   llvm.store %{{.*}} : !llvm.ptr<vector<4xf32>>

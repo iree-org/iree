@@ -8,10 +8,10 @@ from mlir.dialects.iree_pydm.importer.test_util import *
 
 
 # CHECK-LABEL: func @binary_lt_
-# CHECK-DAG: %[[L:.*]] = iree_pydm.load_free_var "x"
-# CHECK-DAG: %[[R:.*]] = iree_pydm.load_free_var "y"
-# CHECK: %[[LP:.*]], %[[RP:.*]] = iree_pydm.dynamic_binary_promote %[[L]], %[[R]]
-# CHECK: iree_pydm.apply_compare "lt", %[[LP]], %[[RP]]
+# CHECK-DAG: %[[L:.*]] = load_var %x
+# CHECK-DAG: %[[R:.*]] = load_var %y
+# CHECK: %[[LP:.*]], %[[RP:.*]] = dynamic_binary_promote %[[L]], %[[R]]
+# CHECK: apply_compare "lt", %[[LP]], %[[RP]]
 @test_import_global
 def binary_lt_():
   x = 1
@@ -20,8 +20,8 @@ def binary_lt_():
 
 
 # CHECK-LABEL: func @binary_gt_
-# CHECK: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "gt"
+# CHECK: dynamic_binary_promote
+# CHECK: apply_compare "gt"
 @test_import_global
 def binary_gt_():
   x = 1
@@ -30,8 +30,8 @@ def binary_gt_():
 
 
 # CHECK-LABEL: func @binary_lte_
-# CHECK: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "le"
+# CHECK: dynamic_binary_promote
+# CHECK: apply_compare "le"
 @test_import_global
 def binary_lte_():
   x = 1
@@ -40,8 +40,8 @@ def binary_lte_():
 
 
 # CHECK-LABEL: func @binary_gte_
-# CHECK: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "ge"
+# CHECK: dynamic_binary_promote
+# CHECK: apply_compare "ge"
 @test_import_global
 def binary_gte_():
   x = 1
@@ -50,8 +50,8 @@ def binary_gte_():
 
 
 # CHECK-LABEL: func @binary_eq_
-# CHECK: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "eq"
+# CHECK: dynamic_binary_promote
+# CHECK: apply_compare "eq"
 @test_import_global
 def binary_eq_():
   x = 1
@@ -60,8 +60,8 @@ def binary_eq_():
 
 
 # CHECK-LABEL: func @binary_neq_
-# CHECK: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "ne"
+# CHECK: dynamic_binary_promote
+# CHECK: apply_compare "ne"
 @test_import_global
 def binary_neq_():
   x = 1
@@ -70,8 +70,8 @@ def binary_neq_():
 
 
 # CHECK-LABEL: func @binary_is_
-# CHECK-NOT: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "is"
+# CHECK-NOT: dynamic_binary_promote
+# CHECK: apply_compare "is"
 @test_import_global
 def binary_is_():
   x = 1
@@ -80,8 +80,8 @@ def binary_is_():
 
 
 # CHECK-LABEL: func @binary_is_not_
-# CHECK-NOT: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "isnot"
+# CHECK-NOT: dynamic_binary_promote
+# CHECK: apply_compare "isnot"
 @test_import_global
 def binary_is_not_():
   x = 1
@@ -90,8 +90,8 @@ def binary_is_not_():
 
 
 # CHECK-LABEL: func @binary_in_
-# CHECK-NOT: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "in"
+# CHECK-NOT: dynamic_binary_promote
+# CHECK: apply_compare "in"
 @test_import_global
 def binary_in_():
   x = 1
@@ -100,8 +100,8 @@ def binary_in_():
 
 
 # CHECK-LABEL: func @binary_not_in_
-# CHECK-NOT: iree_pydm.dynamic_binary_promote
-# CHECK: iree_pydm.apply_compare "notin"
+# CHECK-NOT: dynamic_binary_promote
+# CHECK: apply_compare "notin"
 @test_import_global
 def binary_not_in_():
   x = 1
@@ -110,30 +110,28 @@ def binary_not_in_():
 
 
 # CHECK-LABEL: @short_circuit
-# CHECK-DAG: %[[FALSE:.*]] = iree_pydm.constant false
-# CHECK-DAG: %[[X:.*]] = iree_pydm.load_free_var "x"
-# CHECK-DAG: %[[Y:.*]] = iree_pydm.load_free_var "y"
-# CHECK: %[[XP:.*]], %[[YP:.*]] = iree_pydm.dynamic_binary_promote %[[X]], %[[Y]]
-# CHECK: %[[R1:.*]] = iree_pydm.apply_compare "lt", %[[XP]], %[[YP]]
-# CHECK: %[[RP1:.*]] = iree_pydm.bool_to_pred %[[R1]]
-# CHECK: %[[RESULT:.*]] = scf.if %[[RP1]] {{.*}} {
-# CHECK:   %[[Z:.*]] = iree_pydm.load_free_var "z"
+# CHECK-DAG: %[[FALSE:.*]] = constant false
+# CHECK-DAG: %[[X:.*]] = load_var %x
+# CHECK-DAG: %[[Y:.*]] = load_var %y
+# CHECK: %[[XP:.*]], %[[YP:.*]] = dynamic_binary_promote %[[X]], %[[Y]]
+# CHECK: %[[R1:.*]] = apply_compare "lt", %[[XP]], %[[YP]]
+# CHECK: %[[RESULT:.*]] = functional_if %[[R1]] {{.*}} {
+# CHECK:   %[[Z:.*]] = load_var %z
 # NOTE: Promotion happens on original loaded values, not already promoted
 # values.
-# CHECK:   %[[YP1:.*]], %[[ZP1:.*]] = iree_pydm.dynamic_binary_promote %[[Y]], %[[Z]]
-# CHECK:   %[[R2:.*]] = iree_pydm.apply_compare "eq", %[[YP1]], %[[ZP1]]
-# CHECK:   %[[RP2:.*]] = iree_pydm.bool_to_pred %[[R2]]
-# CHECK:   %[[RESULT1:.*]] = scf.if %[[RP2]] {{.*}} {
-# CHECK:     %[[OMEGA:.*]] = iree_pydm.load_free_var "omega"
-# CHECK:     %[[ZP2:.*]], %[[OMEGAP2:.*]] = iree_pydm.dynamic_binary_promote %[[Z]], %[[OMEGA]]
-# CHECK:     %[[R3:.*]] = iree_pydm.apply_compare "ge", %[[ZP2]], %[[OMEGAP2]]
-# CHECK:     scf.yield %[[R3]]
+# CHECK:   %[[YP1:.*]], %[[ZP1:.*]] = dynamic_binary_promote %[[Y]], %[[Z]]
+# CHECK:   %[[R2:.*]] = apply_compare "eq", %[[YP1]], %[[ZP1]]
+# CHECK:   %[[RESULT1:.*]] = functional_if %[[R2]] {{.*}} {
+# CHECK:     %[[OMEGA:.*]] = load_var %omega
+# CHECK:     %[[ZP2:.*]], %[[OMEGAP2:.*]] = dynamic_binary_promote %[[Z]], %[[OMEGA]]
+# CHECK:     %[[R3:.*]] = apply_compare "ge", %[[ZP2]], %[[OMEGAP2]]
+# CHECK:     yield %[[R3]]
 # CHECK:   } else {
-# CHECK:     scf.yield %[[FALSE]]
+# CHECK:     yield %[[FALSE]]
 # CHECK:   }
-# CHECK:   scf.yield %[[RESULT1]]
+# CHECK:   yield %[[RESULT1]]
 # CHECK: } else {
-# CHECK:   scf.yield %[[FALSE]]
+# CHECK:   yield %[[FALSE]]
 # CHECK: }
 @test_import_global
 def short_circuit():
@@ -146,8 +144,8 @@ def short_circuit():
 
 # CHECK-LABEL: nested_short_circuit_expression
 # Verify that the nested expression is evaluated in the context of the if.
-# CHECK: scf.if {{.*}} {
-# CHECK:   iree_pydm.apply_binary "add"
+# CHECK: functional_if {{.*}} {
+# CHECK:   apply_binary "add"
 # CHECK: } else {
 @test_import_global
 def nested_short_circuit_expression():

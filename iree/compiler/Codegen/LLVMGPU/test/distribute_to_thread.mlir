@@ -7,7 +7,7 @@
 #map2 = affine_map<(d0) -> (2, -d0 + 1024)>
 #map3 = affine_map<(d0) -> (256, -d0 + 1024)>
 #map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
-hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable private @dot_dispatch_0  {
 hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
   hal.executable.entry_point @dot_dispatch_0 attributes {
     interface = @legacy_io,
@@ -50,7 +50,7 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
       }
       return
     }
-    hal.interface @legacy_io attributes {sym_visibility = "private"} {
+    hal.interface private @legacy_io  {
       hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
       hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -59,8 +59,8 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
 }
 }
 
-//   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.variant @cuda
+//   CHECK-LABEL: hal.executable private @dot_dispatch_0
+//         CHECK:   hal.executable.variant public @cuda
 //         CHECK:  memref.global "private" @{{.*}} : memref<4x256xf32, 3>
 //         CHECK:  memref.global "private" @{{.*}} : memref<2x4xf32, 3>
 //     CHECK-DAG:  %[[C0:.+]] = constant 0 : index
@@ -112,7 +112,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
       }
@@ -120,7 +120,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
   }
 }
 //      CHECK: #[[CONFIG:.+]] = {tileSizes = {{\[}}[]{{\]}}}
-//      CHECK: hal.executable @reduction_dispatch
+//      CHECK: hal.executable public @reduction_dispatch
 //      CHECK: linalg.fill
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
 //      CHECK: linalg.generic

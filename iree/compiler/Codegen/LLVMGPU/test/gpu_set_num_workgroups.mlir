@@ -24,7 +24,7 @@ hal.executable @add_dispatch_0 {
         flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16384xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -35,7 +35,7 @@ hal.executable @add_dispatch_0 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[128], [], [4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
-//      CHECK: hal.executable.entry_point @add_dispatch_0
+//      CHECK: hal.executable.entry_point public @add_dispatch_0
 // CHECK-SAME:     passPipeline = 3 : i32
 // CHECK-SAME:     workloadPerWorkgroup = [128]
 // CHECK-SAME:     workgroup_size = [32 : index, 1 : index, 1 : index]
@@ -49,7 +49,7 @@ hal.executable @add_dispatch_0 {
 
 // -----
 
-hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
+hal.executable private @dot_dispatch_1  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
     builtin.module  {
@@ -84,7 +84,7 @@ hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @legacy_io attributes {sym_visibility = "private"} {
+      hal.interface private @legacy_io  {
         hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -95,7 +95,7 @@ hal.executable @dot_dispatch_1 attributes {sym_visibility = "private"} {
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[4, 2, 4], [], [1, 1]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
-//      CHECK: hal.executable.entry_point @dot_dispatch_1
+//      CHECK: hal.executable.entry_point public @dot_dispatch_1
 // CHECK-SAME:     passPipeline = 4 : i32
 // CHECK-SAME:     workloadPerWorkgroup = [2, 4]
 // CHECK-SAME:     workgroup_size = [2 : index, 4 : index, 1 : index]
@@ -135,7 +135,7 @@ hal.executable @reduction_dispatch {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
       }
@@ -145,7 +145,7 @@ hal.executable @reduction_dispatch {
 
 //  CHECK-DAG: #[[CONFIG0:.+]] = {passPipeline = 2 : i32}
 //  CHECK-DAG: #[[CONFIG1:.+]] = {tileSizes = {{\[}}[]{{\]}}}
-//      CHECK: hal.executable.entry_point @predict_dispatch_153
+//      CHECK: hal.executable.entry_point public @predict_dispatch_153
 // CHECK-SAME:     translation.info = #[[CONFIG0]]
 // CHECK-SAME:     workgroup_size = [1 : index, 1 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index,

@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -531,37 +532,6 @@ void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                      builder.getStringAttr(name));
 }
 
-static ParseResult parseExecutableOp(OpAsmParser &parser,
-                                     OperationState *result) {
-  StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-
-  // Parse the module body.
-  auto *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
-    return failure();
-  }
-
-  // Ensure that this module has a valid terminator.
-  ExecutableOp::ensureTerminator(*body, parser.getBuilder(), result->location);
-  return success();
-}
-
-static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(
-      op->getAttrs(),
-      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/false);
-}
-
 static LogicalResult verifyExecutableOp(ExecutableOp op) {
   // TODO(benvanik): check export name conflicts.
   return success();
@@ -571,8 +541,20 @@ static LogicalResult verifyExecutableOp(ExecutableOp op) {
 // flow.dispatch.entry
 //===----------------------------------------------------------------------===//
 
+void DispatchEntryOp::build(OpBuilder &builder, OperationState &state,
+                            StringRef sym_name, FlatSymbolRefAttr function_ref,
+                            IntegerAttr workgroup_rank) {
+  build(builder, state, /*sym_visibility=*/nullptr,
+        builder.getStringAttr(sym_name), function_ref, workgroup_rank);
+}
+
 static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
                                         OperationState *result) {
+  StringAttr visibilityAttr;
+  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
+    return failure();
+  }
+
   FlatSymbolRefAttr functionRefAttr;
   if (failed(parser.parseAttribute(functionRefAttr, "function_ref",
                                    result->attributes))) {
@@ -600,6 +582,8 @@ static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
 }
 
 static void printDispatchEntryOp(OpAsmPrinter &p, DispatchEntryOp op) {
+  p << ' ';
+  printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
   p.printSymbolName(op.function_ref());
   if (op.sym_name() != op.function_ref()) {
