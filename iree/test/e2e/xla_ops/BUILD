@@ -62,6 +62,7 @@ iree_check_single_backend_test_suite(
             "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
+            "rng_uniform.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
@@ -207,6 +208,7 @@ iree_check_single_backend_test_suite(
             "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
+            "rng_uniform.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
@@ -291,6 +293,7 @@ iree_check_single_backend_test_suite(
             "scatter.mlir",  # TODO(GH-6601): Enable the test.
             "scatter_dynamic.mlir",  # TODO(GH-6601): Enable the test.
             "sort.mlir",
+            "rng_uniform.mlir",  # TODO(GH-6995): Enable the test.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -340,6 +343,7 @@ iree_check_single_backend_test_suite(
             "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
+            "rng_uniform.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
