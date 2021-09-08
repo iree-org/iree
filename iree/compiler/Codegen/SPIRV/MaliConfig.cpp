@@ -226,10 +226,6 @@ static LogicalResult setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
                          /*output_height=*/tileSize[0] / workgroupSize[2],
                          /*output_width=*/tileSize[1] / workgroupSize[1],
                          /*output_channel=*/tileSize[2] / workgroupSize[0]});
-    // Finally, for each invocation, we use tiling to generate loops to loop
-    // over the filter's height (step 1), width (step 1), and input channel
-    // (step 4) dimensions.
-    tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});
 
     auto funcOp = op->getParentOfType<FuncOp>();
     if (failed(setOpConfigAndEntryPointFnTranslation(
@@ -237,21 +233,8 @@ static LogicalResult setOpConfig(linalg::Conv2DNhwcHwcfOp op) {
       return failure();
     }
 
-    // Let the entry point region to return fully static number of workgroups.
-    // This is needed for folding `affine.min` ops to expose static-shaped tiled
-    // convolution for vectorization.
-    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
-    OpBuilder builder(op.getContext());
-    auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
-                               std::array<Value, 3>) {
-      std::array<Value, 3> xyz;
-      for (unsigned i = 0; i < 3; ++i) {
-        int64_t count = outputShape[i + 1] / tileSize[i];
-        xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
-      }
-      return xyz;
-    };
-    return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
+    return defineConvWorkgroupCountRegion(
+        op, llvm::makeArrayRef(outputShape).drop_front(), tileSize);
   }
   return success();
 }
@@ -302,9 +285,6 @@ static LogicalResult setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
                          /*output_height=*/tileSize[0] / workgroupSize[2],
                          /*output_width=*/tileSize[1] / workgroupSize[1],
                          /*output_channel=*/tileSize[2] / workgroupSize[0]});
-    // Finally, for each invocation, we use tiling to generate loops to loop
-    // over the filter's height (step 1) and width (step 1) dimensions.
-    tileSizes.push_back({0, 0, 0, 0, 1, 1});
 
     auto funcOp = op->getParentOfType<FuncOp>();
     if (failed(setOpConfigAndEntryPointFnTranslation(
@@ -312,21 +292,8 @@ static LogicalResult setOpConfig(linalg::DepthwiseConv2DNhwOp op) {
       return failure();
     }
 
-    // Let the entry point region to return fully static number of workgroups.
-    // This is needed for folding `affine.min` ops to expose static-shaped tiled
-    // convolution for vectorization.
-    // TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
-    OpBuilder builder(op.getContext());
-    auto numWorkgroupsFn = [&](OpBuilder &b, Location loc,
-                               std::array<Value, 3>) {
-      std::array<Value, 3> xyz;
-      for (unsigned i = 0; i < 3; ++i) {
-        int64_t count = outputShape[i + 1] / tileSize[i];
-        xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
-      }
-      return xyz;
-    };
-    return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
+    return defineConvWorkgroupCountRegion(
+        op, llvm::makeArrayRef(outputShape).drop_front(), tileSize);
   }
   return success();
 }

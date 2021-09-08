@@ -311,7 +311,7 @@ hal.executable private @conv_no_padding  {
 //         CHECK:             scf.for %[[IV5:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
 //         CHECK:               %[[OUT:.+]] = memref.subview %[[SV2]][0, %[[IV3]], %[[IV4]], %[[IV5]]]
 //         CHECK:               linalg.conv_2d_nhwc_hwcf
-//    CHECK-SAME:                 __internal_linalg_transform__ = "tile_conv_filter"
+//    CHECK-SAME:                 __internal_linalg_transform__ = "vectorize"
 //    CHECK-SAME:                 outs(%[[OUT]]
 
 // -----

@@ -26,6 +26,14 @@ namespace iree_compiler {
 
 namespace detail {
 
+/// Lets the entry point region to return fully static number of workgroups.
+// This is needed for folding `affine.min` ops to expose static-shaped tiled
+// convolution for vectorization.
+// TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
+LogicalResult defineConvWorkgroupCountRegion(
+    Operation *op, ArrayRef<int64_t> outputShape,
+    ArrayRef<int64_t> workgroupTileSizes);
+
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///
 /// If the given `rootOp` has known good CodeGen configuration, attaches a
