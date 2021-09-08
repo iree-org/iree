@@ -53,16 +53,9 @@ static LogicalResult setOpConfig(linalg::MatmulOp op) {
   // Deduce the configuration for the N dimension. Start with the best workgroup
   // X size, and reduce by a factor of two each time.
   for (int64_t x = bestX; x >= 2; x >>= 1) {
-    int64_t chosenTileSize = 0;
-    // Also scale the thread tiling size by a factor of two each time. Don't go
-    // below four as we want vector load.
-    for (int64_t t = bestThreadN; t >= 4; t >>= 1) {
-      if (dimN % (x * t) == 0) {
-        chosenTileSize = t;
-        break;
-      }
-    }
-    if (chosenTileSize) {
+    // Handle 4 elements per thread. We need this for vectorized load.
+    int64_t chosenTileSize = 4;
+    if (dimN % (x * chosenTileSize) == 0) {
       workgroupSize[0] = x;
       workgroupTileSizes[1] = x * chosenTileSize;
       invocationTileSizes[1] = chosenTileSize;

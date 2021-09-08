@@ -63,17 +63,17 @@ hal.executable @matmul_1024x2048x512 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point @matmul_1024x2048x512
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [256, 16]}
+//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [128, 16]}
 //           CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 256)>()[%[[X]]]
+//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%[[X]]]
 //           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
 
 //                CHECK: func @matmul_1024x2048x512()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[16, 256, 4], [], [8, 8, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[16, 128, 16], [], [8, 4, 16]]}
 
 // -----
 
