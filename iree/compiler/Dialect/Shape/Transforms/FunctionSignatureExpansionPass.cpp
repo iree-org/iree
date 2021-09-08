@@ -21,10 +21,95 @@
 namespace mlir {
 namespace iree_compiler {
 namespace Shape {
+
+static LogicalResult expandCallGraphTypesForCall(
+    CallOp callOp, const TypeExpander &typeExpander) {
+  Location loc = callOp.getLoc();
+
+  OpBuilder builder(callOp);
+  // Create the operands list of the new `CallOp`.
+  SmallVector<Value> newOperands;
+  if (failed(typeExpander.expandSourceValuesToTarget(
+          loc, llvm::to_vector<6>(callOp.getOperands()), newOperands,
+          builder))) {
+    return failure();
+  }
+
+  // Create the new result types for the new `CallOp` and track the indices
+  // in the new call op's results that correspond to the old call op's
+  // results.
+  //
+  // expandedResultIndices[i] = "list of new result indices that old result
+  // i expanded to".
+  SmallVector<Type> newResultTypes;
+  SmallVector<SmallVector<unsigned>> expandedResultIndices;
+  for (Type resultType : callOp.getResultTypes()) {
+    unsigned oldSize = newResultTypes.size();
+    if (failed(typeExpander.convertType(resultType, newResultTypes))) {
+      return failure();
+    }
+    auto &resultMapping = expandedResultIndices.emplace_back();
+    for (unsigned i = oldSize, e = newResultTypes.size(); i < e; i++)
+      resultMapping.push_back(i);
+  }
+
+  CallOp newCallOp = builder.create<CallOp>(loc, callOp.getCallee(),
+                                            newResultTypes, newOperands);
+
+  // Build a replacement value for each result to replace its uses. If a
+  // result has multiple mapping values, it needs to be materialized as a
+  // single value.
+  SmallVector<Value, 2> replacedValues;
+  replacedValues.reserve(callOp.getNumResults());
+  for (unsigned i = 0, e = callOp.getNumResults(); i < e; ++i) {
+    auto decomposedValues = llvm::to_vector<6>(
+        llvm::map_range(expandedResultIndices[i],
+                        [&](unsigned i) { return newCallOp.getResult(i); }));
+    if (decomposedValues.empty()) {
+      // No replacement is required.
+      replacedValues.push_back(nullptr);
+    } else if (decomposedValues.size() == 1) {
+      replacedValues.push_back(decomposedValues.front());
+    } else {
+      Value materialized = typeExpander.castToSource(loc, callOp.getType(i),
+                                                     decomposedValues, builder);
+      replacedValues.push_back(materialized);
+    }
+  }
+  callOp.replaceAllUsesWith(replacedValues);
+  return success();
+}
+
+static LogicalResult expandCallGraphTypes(ModuleOp module,
+                                          const TypeExpander &typeExpander) {
+  for (auto funcOp : module.getOps<FuncOp>()) {
+    OpBuilder builder(funcOp);
+    if (failed(typeExpander.expandFunctionSignature(funcOp, builder)) ||
+        failed(typeExpander.expandAllReturnLikeTerminators<mlir::ReturnOp>(
+            funcOp, builder))) {
+      return funcOp.emitError()
+             << "couldn't expand function signature or return";
+    }
+    bool hadError = false;
+    SmallVector<Operation *> toErase;
+    funcOp.walk([&](CallOp callOp) {
+      if (failed(expandCallGraphTypesForCall(callOp, typeExpander))) {
+        hadError = true;
+        return;
+      }
+      toErase.push_back(callOp);
+    });
+    if (hadError) return failure();
+    for (Operation *op : toErase) op->erase();
+  }
+  return success();
+}
+
 namespace {
 
 class ExpandFunctionDynamicDimsPass
-    : public PassWrapper<ExpandFunctionDynamicDimsPass, FunctionPass> {
+    : public PassWrapper<ExpandFunctionDynamicDimsPass,
+                         OperationPass<ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<ShapeDialect>();
   }
@@ -37,20 +122,16 @@ class ExpandFunctionDynamicDimsPass
     return "Expands dynamic dimensions in function signatures.";
   }
 
-  void runOnFunction() override {
-    auto funcOp = getFunction();
+  void runOnOperation() override {
     auto &typeExpander = getDynamicShapeTypeExpander();
-    OpBuilder builder(funcOp);
-    if (failed(typeExpander.expandFunctionSignature(funcOp, builder)) ||
-        failed(typeExpander.expandAllReturnLikeTerminators<mlir::ReturnOp>(
-            funcOp, builder))) {
-      return signalPassFailure();
-    }
+    if (failed(expandCallGraphTypes(getOperation(), typeExpander)))
+      signalPassFailure();
   }
 };
 
 class ExpandFunctionRankedShapeDimsPass
-    : public PassWrapper<ExpandFunctionRankedShapeDimsPass, FunctionPass> {
+    : public PassWrapper<ExpandFunctionRankedShapeDimsPass,
+                         OperationPass<ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<ShapeDialect>();
   }
@@ -63,15 +144,10 @@ class ExpandFunctionRankedShapeDimsPass
     return "Expands ranked_shape types at function boundaries to loose dims.";
   }
 
-  void runOnFunction() override {
-    auto funcOp = getFunction();
+  void runOnOperation() override {
     auto &typeExpander = getShapeToPrimitiveTypeExpander();
-    OpBuilder builder(funcOp);
-    if (failed(typeExpander.expandFunctionSignature(funcOp, builder)) ||
-        failed(typeExpander.expandAllReturnLikeTerminators<mlir::ReturnOp>(
-            funcOp, builder))) {
-      return signalPassFailure();
-    }
+    if (failed(expandCallGraphTypes(getOperation(), typeExpander)))
+      signalPassFailure();
   }
 };
 
@@ -79,14 +155,14 @@ class ExpandFunctionRankedShapeDimsPass
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OperationPass<FuncOp>> createExpandFunctionDynamicDimsPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createExpandFunctionDynamicDimsPass() {
   return std::make_unique<Shape::ExpandFunctionDynamicDimsPass>();
 }
 
 // For any function which contains ranked_shape argument/result types,
 // expands them to individual dynamic dimensions, inserting appropriate casts
 // within the function.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 createExpandFunctionRankedShapeDimsPass() {
   return std::make_unique<Shape::ExpandFunctionRankedShapeDimsPass>();
 }

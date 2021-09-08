@@ -19,13 +19,14 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "config_adreno_matmul.mlir",
+            "config_linalg_ext_ops.mlir",
             "convert_to_spirv.mlir",
             "distribute_to_global_id.mlir",
             "fold_gpu_procid_uses.mlir",
             "pipeline_matmul_cooperative_matrix.mlir",
             "pipeline_matmul_vectorization.mlir",
             "remove_one_trip_tiled_loop.mlir",
-            "set_lowering_config.mlir",
             "tile_and_distribute_scatter.mlir",
             "tile_and_distribute_sort.mlir",
             "tile_and_vectorize.mlir",

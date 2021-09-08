@@ -1,5 +1,5 @@
-# Publishes a draft snapshot, after performing validation to make sure all
-# packages are stable (coming soon).
+# Publishes a draft snapshot, after performing validation to make sure all linux
+# packages are stable.
 name: Validate and Publish Release
 
 on:
@@ -8,13 +8,71 @@ on:
       release_id:
         description: 'Release id to publish'
         required: true
-        default: ''
-
-# TODO(jennik): Add more validation. https://github.com/google/iree/issues/6316
+      package_version:
+        description: 'Version of the package'
+        required: true
+      build_run_id:
+        description: 'Run ID for the build_package.yml workflow that triggered this workflow'
+        required: true
 
 jobs:
+  validate_packages:
+    name: "Validate packages"
+    # TODO(jennik): Look into testing windows and macos builds.
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Download packages
+        id: download_packages
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
+          workflow: build_package.yml
+          run_id: ${{ github.event.inputs.build_run_id }}
+      - name: Extract and display downloaded files
+        run: |
+          tar -xf artifact/iree-dist-snapshot-${{ github.event.inputs.package_version }}-linux-x86_64.tar.xz
+          pwd
+          ls -R
+      - name: Set up python
+        id: set_up_python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - name: Install python packages
+        id: install_python_packages
+        run: |
+          python -m pip install -f file://$PWD/artifact/ iree-compiler-snapshot iree-jax-snapshot iree-runtime-snapshot iree-tools-tflite-snapshot iree-tools-tf-snapshot iree-tools-xla-snapshot
+      - name: Run iree-benchmark-module
+        id: run_iree_benchmark_module
+        run: ./bin/iree-benchmark-module --help
+      - name: Run iree-benchmark-trace
+        id: run_iree_benchmark_trace
+        run: ./bin/iree-benchmark-trace --help
+      - name: Run iree-flatcc-cli
+        id: run_iree_flatcc_cli
+        run: ./bin/iree-flatcc-cli --help
+      - name: Run iree-opt
+        id: run_iree_opt
+        run: ./bin/iree-opt --help
+      - name: Run iree-run-mlir
+        id: run_iree_run_mlir
+        run: ./bin/iree-run-mlir --help
+      - name: Run iree-run-module
+        id: run_iree_run_module
+        run: ./bin/iree-run-module --help
+      - name: Run iree-run-trace
+        id: run_iree_run_trace
+        run: ./bin/iree-run-trace --help
+      - name: Run iree-tblgen
+        id: run_iree_tblgen
+        run: ./bin/iree-tblgen --help
+      - name: Run iree-translate
+        id: run_iree_translate
+        run: ./bin/iree-translate --help
+
   publish_release:
     name: "Publish release"
+    needs: validate_packages
     runs-on: ubuntu-18.04
     steps:
       - name: Publish Release

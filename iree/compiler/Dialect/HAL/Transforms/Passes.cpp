@@ -96,8 +96,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // on explicit shape types (such as ranked_shape). After this pass, these
   // composite types will be expanded to primitives (i.e. one 'index' for each
   // dynamic dim in the case of ranked_shape).
-  passManager.addNestedPass<FuncOp>(
-      Shape::createExpandFunctionRankedShapeDimsPass());
+  passManager.addPass(Shape::createExpandFunctionRankedShapeDimsPass());
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());

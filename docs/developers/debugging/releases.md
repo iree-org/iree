@@ -84,3 +84,50 @@ Other tips:
   Release mode `main-dist` package above once, which will drop binaries in the
   `iree-install` directory. Then build the `py-runtime-pkg` or equiv and
   iterate further in the build directory. Ditto for TF/XLA/etc.
+
+## Testing releases on your fork
+
+To avoid interrupting the regular releases published on the IREE github, you
+can test any changes to the release process on your own fork.  Some setup is
+required before these github actions will work on your fork and development
+branch.
+
+To run
+[`schedule_snapshot_release.yml`](https://github.com/google/iree/blob/main/.github/workflows/schedule_snapshot_release.yml),
+comment out
+[this line](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/schedule_snapshot_release.yml#L14):
+```yaml
+# Don't run this in everyone's forks.
+if: github.repository == 'google/iree'
+```
+
+And change the branch from 'main' to the branch you are developing on
+[here](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/schedule_snapshot_release.yml#L37):
+```yaml
+- name: Pushing changes
+  uses: ad-m/github-push-action@v0.6.0
+  with:
+    github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+    branch: main
+    tags: true
+```
+
+To speed up
+[`build_package.yml`](https://github.com/google/iree/blob/main/.github/workflows/build_package.yml),
+you may want to comment out some of the builds
+[here](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/build_package.yml#L34-L87).
+The
+[`py-pure-pkgs`](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/build_package.yml#L52)
+build takes only ~2 minutes and the
+[`py-runtime-pkg`](https://github.com/google/iree/blob/392449e986493bf710e3da637ebf807715da9ffe/.github/workflows/build_package.yml#L39)
+build takes ~5, while the others can take several hours.
+
+From your development branch, you can manually run the
+[Schedule Snapshot Release](https://github.com/google/iree/actions/workflows/schedule_snapshot_release.yml)
+action, which invokes the
+[Build Native Release Packages](https://github.com/google/iree/actions/workflows/build_package.yml)
+action, which finally invokes the
+[Validate and Publish Release](https://github.com/google/iree/actions/workflows/validate_and_publish_release.yml)
+action.  If you already have a draft release and know the release id, package
+version, and run ID from a previous Build Native Release Packages run, you can
+also manually run just the Validate and Publish Release action.
