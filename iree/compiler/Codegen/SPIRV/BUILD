@@ -13,6 +13,7 @@ package(
 cc_library(
     name = "SPIRV",
     srcs = [
+        "AdrenoConfig.cpp",
         "ConvertToSPIRVPass.cpp",
         "KernelConfig.cpp",
         "MaliConfig.cpp",

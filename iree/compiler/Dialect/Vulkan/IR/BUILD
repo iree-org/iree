@@ -46,7 +46,6 @@ cc_library(
         ":VulkanEnumsGen",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:Support",

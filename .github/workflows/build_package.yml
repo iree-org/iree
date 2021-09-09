@@ -263,4 +263,4 @@ jobs:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
-          inputs: '{"release_id": "${{ github.event.inputs.release_id }}"}'
+          inputs: '{"release_id": "${{ github.event.inputs.release_id }}", "package_version": "${{ github.event.inputs.package_version }}", "build_run_id": "${{ github.run_id }}"}'

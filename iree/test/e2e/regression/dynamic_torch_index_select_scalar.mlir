@@ -1,19 +1,35 @@
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot -function-input="5x1x5xi32=[[1,2,3,4,5]] [[6,7,8,9,10]] [[11,12,13,14,15]] [[16,17,18,19,20]] [[21,22,23,24,25]]" -function-input="i32=0" | IreeFileCheck %s)
-// RUN: [[ $IREE_VMVX_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=vmvx -function-input="5x1x5xi32=[[1,2,3,4,5]] [[6,7,8,9,10]] [[11,12,13,14,15]] [[16,17,18,19,20]] [[21,22,23,24,25]]" -function-input="i32=0" | IreeFileCheck %s)
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s --iree-input-type=mhlo -iree-hal-target-backends=vulkan-spirv -function-input="5x1x5xi32=[[1,2,3,4,5]] [[6,7,8,9,10]] [[11,12,13,14,15]] [[16,17,18,19,20]] [[21,22,23,24,25]]" -function-input="i32=0" | IreeFileCheck %s)
-
-// CHECK-LABEL: EXEC @torch_index_select1
-func @torch_index_select1(%arg0: tensor<?x?x?xi32>, %arg1: tensor<i32>) -> tensor<?x?xi32> {
-  %0 = "mhlo.torch_index_select"(%arg0, %arg1) {batch_dims = 0 : i64, dim = 0 : i64} : (tensor<?x?x?xi32>, tensor<i32>) -> tensor<?x?xi32>
-  return %0 : tensor<?x?xi32>
+func @torch_index_select1() {
+  %lhs = util.dynamic_shape_constant
+    dense<[[[1,2,3,4,5]],
+           [[6,7,8,9,10]],
+           [[11,12,13,14,15]],
+           [[16,17,18,19,20]],
+           [[21,22,23,24,25]]]> : tensor<5x1x5xi32> -> tensor<?x?x?xi32>
+  %rhs = util.unfoldable_constant dense<0> : tensor<i32>
+  %0 = "mhlo.torch_index_select"(%lhs, %rhs) {batch_dims = 0 : i64, dim = 0 : i64} : (tensor<?x?x?xi32>, tensor<i32>) -> tensor<?x?xi32>
+  %dshape = util.do_not_optimize(%0) : tensor<?x?xi32>
+  %result = tensor.cast %dshape : tensor<?x?xi32> to tensor<1x5xi32>
+  check.expect_eq_const(%result,
+    dense<[[1, 2, 3, 4, 5]]> : tensor<1x5xi32>) : tensor<1x5xi32>
+  return
 }
 
-// CHECK: 1x5xi32=[1 2 3 4 5]
-
-// CHECK-LABEL: EXEC @torch_index_select2
-func @torch_index_select2(%arg0: tensor<?x?x?xi32>, %arg1: tensor<i32>) -> tensor<?x?xi32> {
-  %0 = "mhlo.torch_index_select"(%arg0, %arg1) {batch_dims = 0 : i64, dim = 1 : i64} : (tensor<?x?x?xi32>, tensor<i32>) -> tensor<?x?xi32>
-  return %0 : tensor<?x?xi32>
+func @torch_index_select2() {
+   %lhs = util.dynamic_shape_constant
+    dense<[[[1,2,3,4,5]],
+           [[6,7,8,9,10]],
+           [[11,12,13,14,15]],
+           [[16,17,18,19,20]],
+           [[21,22,23,24,25]]]> : tensor<5x1x5xi32> -> tensor<?x?x?xi32>
+  %rhs = util.unfoldable_constant dense<0> : tensor<i32>
+  %0 = "mhlo.torch_index_select"(%lhs, %rhs) {batch_dims = 0 : i64, dim = 1 : i64} : (tensor<?x?x?xi32>, tensor<i32>) -> tensor<?x?xi32>
+  %dshape = util.do_not_optimize(%0) : tensor<?x?xi32>
+  %result = tensor.cast %dshape : tensor<?x?xi32> to tensor<5x5xi32>
+  check.expect_eq_const(%result,
+    dense<[[1, 2, 3, 4, 5],
+           [6, 7, 8, 9, 10],
+           [11, 12, 13, 14, 15],
+           [16, 17, 18, 19, 20],
+           [21, 22, 23, 24, 25]]> : tensor<5x5xi32>) : tensor<5x5xi32>
+  return
 }
-
-// CHECK: 5x5xi32=[1 2 3 4 5][6 7 8 9 10][11 12 13 14 15][16 17 18 19 20][21 22 23 24 25]

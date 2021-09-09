@@ -23,6 +23,7 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/Internalize.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
@@ -141,6 +142,7 @@ class CUDATargetBackend final : public TargetBackend {
   std::string name() const override { return "cuda"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<gpu::GPUDialect>();
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);
   }
