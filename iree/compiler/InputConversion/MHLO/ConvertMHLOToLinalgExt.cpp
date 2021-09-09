@@ -28,6 +28,42 @@
 namespace mlir {
 namespace iree_compiler {
 
+namespace {
+
+static Type convertInteger(IntegerType intType) {
+  return IntegerType::get(intType.getContext(),
+                          intType.getIntOrFloatBitWidth());
+}
+
+static Optional<Type> convertTensor(TensorType tensorType) {
+  if (!tensorType.hasRank() || tensorType.getRank() != 0) return llvm::None;
+  Type elementType = tensorType.getElementType();
+  if (auto intType = elementType.dyn_cast<IntegerType>()) {
+    elementType = convertInteger(intType);
+  }
+  return elementType;
+}
+
+static Value materializeUnrealizedConversion(OpBuilder &builder, Type type,
+                                             ValueRange inputs, Location loc) {
+  return builder.create<UnrealizedConversionCastOp>(loc, type, inputs[0])
+      ->getResult(0);
+}
+
+class MhloToStdTypeConverter : public TypeConverter {
+ public:
+  MhloToStdTypeConverter() {
+    addConversion([](Type type) { return type; });
+
+    addConversion(convertTensor);
+    addConversion(convertInteger);
+
+    addTargetMaterialization(materializeUnrealizedConversion);
+    addSourceMaterialization(materializeUnrealizedConversion);
+    addArgumentMaterialization(materializeUnrealizedConversion);
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Utils
 //===----------------------------------------------------------------------===//
@@ -47,8 +83,6 @@ static SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements) {
   return ret;
 }
 
-namespace {
-
 //===----------------------------------------------------------------------===//
 // Region operations lowering.
 //===----------------------------------------------------------------------===//
@@ -60,20 +94,13 @@ struct LinalgExtRegionHLOOpConversion : public OpConversionPattern<OpTy> {
       OpTy op, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const final {
     if (!isInBodyOfLinalgExtOps(op)) return failure();
-    if (!op.getResult().getType().template isa<TensorType>()) return failure();
+    TensorType origRetType = op.getType().template dyn_cast<TensorType>();
+    if (!origRetType) return failure();
     SmallVector<Value> scalarArgs;
-    for (auto arg : args) {
-      if (auto ty = arg.getType().template dyn_cast<TensorType>()) {
-        assert(ty.hasRank() && ty.getRank() == 0 &&
-               "Have non-0D tensors in the region?");
-        scalarArgs.push_back(
-            rewriter.create<tensor::ExtractOp>(op.getLoc(), arg));
-      } else {
-        scalarArgs.push_back(arg);
-      }
-    }
-    Value result = lmhlo::HloOpToStdScalarOp::map<OpTy>(
-        op, getElementTypeOrSelf(op.getType()), scalarArgs, &rewriter);
+    Type newRetType = getElementTypeOrSelf(
+        this->typeConverter->convertType(origRetType.getElementType()));
+    Value result =
+        lmhlo::HloOpToStdScalarOp::map<OpTy>(op, newRetType, args, &rewriter);
     rewriter.replaceOp(op, result);
     return success();
   }
@@ -99,12 +126,12 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
   using OpConversionPattern<mhlo::SortOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mhlo::SortOp op, ArrayRef<Value> args,
+      mhlo::SortOp mhloSortOp, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const final {
     auto sortOp = rewriter.create<linalg_ext::SortOp>(
-        op.getLoc(), op.getResultTypes(),
-        /*inputs=*/ValueRange{}, args, op.dimensionAttr());
-    rewriter.inlineRegionBefore(op.comparator(), sortOp.region(),
+        mhloSortOp.getLoc(), mhloSortOp.getResultTypes(),
+        /*inputs=*/ValueRange{}, args, mhloSortOp.dimensionAttr());
+    rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.region(),
                                 sortOp.region().begin());
     Region &region = sortOp.region();
     Block &block = region.front();
@@ -116,7 +143,7 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
     }
     rewriter.applySignatureConversion(&region, signature_converter);
 
-    rewriter.replaceOp(op, sortOp->getResults());
+    rewriter.replaceOp(mhloSortOp, sortOp->getResults());
     return success();
   }
 };
@@ -391,28 +418,79 @@ struct ConvertMHLOToLinalgExtPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg_ext::LinalgExtDialect, linalg::LinalgDialect,
                     IREE::Flow::FlowDialect, StandardOpsDialect,
-                    tensor::TensorDialect>();
+                    complex::ComplexDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
     MLIRContext *context = &getContext();
 
+    MhloToStdTypeConverter typeConverter;
     patterns.insert<SortOpConversion, ScatterOpConversion, FftOpConversion>(
-        context);
-    patterns.insert<LinalgExtRegionHLOOpConversion<mhlo::CompareOp>,
-                    LinalgExtRegionHLOOpConversion<mhlo::AddOp>,
-                    LinalgExtRegionHLOOpConversion<mhlo::SubOp>,
-                    LinalgExtRegionHLOOpConversion<mhlo::BitcastConvertOp>,
-                    LinalgExtRegionReturnOpConversion>(context,
-                                                       PatternBenefit(1000));
+        typeConverter, context);
+    // FIXME: It shouldn't be necessary to list every matching MHLO op here,
+    // especially since they're already listed in
+    // populateHLOToLinalgConversionPattern and in HloOpToStdScalarOp. These
+    // lists are all the same. Can we leverage SFINAE here?
+    patterns
+        .insert<LinalgExtRegionHLOOpConversion<mhlo::AbsOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::AddOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::AndOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::Atan2Op>,
+                LinalgExtRegionHLOOpConversion<mhlo::BitcastConvertOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::CeilOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ClampOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::CompareOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ComplexOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ConvertOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::CopyOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::CosOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::DivOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ExpOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::Expm1Op>,
+                LinalgExtRegionHLOOpConversion<mhlo::FloorOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ImagOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::IsFiniteOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::LogOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::LogisticOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::Log1pOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::MaxOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::MinOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::MulOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::NegOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::NotOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::OrOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::PowOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::RealOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::RemOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::RsqrtOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::SelectOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ShiftLeftOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ShiftRightArithmeticOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ShiftRightLogicalOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::SignOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::SinOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::SqrtOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::SubOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::TanhOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::XorOp>,
+                LinalgExtRegionReturnOpConversion>(typeConverter, context);
 
     ConversionTarget target(getContext());
     target.addLegalDialect<linalg_ext::LinalgExtDialect, linalg::LinalgDialect,
                            IREE::Flow::FlowDialect, StandardOpsDialect,
-                           tensor::TensorDialect>();
+                           tensor::TensorDialect, complex::ComplexDialect>();
     target.addIllegalOp<mhlo::SortOp, mhlo::ScatterOp, mhlo::FftOp>();
-    target.addLegalOp<mhlo::ComplexOp>();
+    // FFT conversion creates complex ops which will be converted by the normal
+    // MHLO lowering, but these should still be converted if present inside
+    // other linalg_ext op regions.
+    target.addDynamicallyLegalOp<mhlo::ComplexOp>(
+        [](mhlo::ComplexOp complexOp) {
+          return !isInBodyOfLinalgExtOps(complexOp);
+        });
+    // We deliberately allow unrealized casts to persist. These should fall away
+    // when the rest of MHLO is converted.
+    target.addLegalOp<UnrealizedConversionCastOp>();
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
