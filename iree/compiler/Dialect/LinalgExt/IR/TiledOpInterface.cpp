@@ -39,7 +39,8 @@ void registerTiledOpInterfaceExternalModels(DialectRegistry &registry) {
   // upstream bugs exposed by this. Leaving the restructuring in place, but
   // avoiding the interface hook till those are addressed.
   //
-  // registry.addOpInterface<tensor::InsertSliceOp, InsertSliceTiledOpInterface>();
+  // registry.addOpInterface<tensor::InsertSliceOp,
+  // InsertSliceTiledOpInterface>();
 }
 
 }  // namespace linalg_ext

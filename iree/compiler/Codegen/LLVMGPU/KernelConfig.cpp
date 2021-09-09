@@ -6,14 +6,14 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 
+#include <numeric>
+
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
-
-#include <numeric>
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
