@@ -506,7 +506,7 @@ emitc::CallOp failableCall(
   }
 
   builder.setInsertionPointToEnd(condBlock);
-  auto branchOp = builder.create<CondBranchOp>(
+  builder.create<CondBranchOp>(
       location, conditionI1.getResult(0),
       negateCondition ? failureBlock : continuationBlock,
       negateCondition ? continuationBlock : failureBlock);
@@ -520,8 +520,6 @@ emitc::CallOp returnIfError(OpBuilder &builder, Location location,
                             StringAttr callee, ArrayAttr args,
                             ArrayAttr templateArgs, ArrayRef<Value> operands) {
   auto blockBuilder = [&builder, &location](emitc::CallOp &callOp) {
-    auto ctx = builder.getContext();
-
     Block *block = builder.getBlock();
     mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
 
@@ -608,7 +606,7 @@ mlir::CallOp failableCall(
   }
 
   builder.setInsertionPointToEnd(condBlock);
-  auto branchOp = builder.create<CondBranchOp>(
+  builder.create<CondBranchOp>(
       location, conditionI1.getResult(0),
       negateCondition ? failureBlock : continuationBlock,
       negateCondition ? continuationBlock : failureBlock);
@@ -621,8 +619,6 @@ mlir::CallOp failableCall(
 mlir::CallOp returnIfError(OpBuilder &builder, Location location,
                            mlir::FuncOp &callee, ArrayRef<Value> operands) {
   auto blockBuilder = [&builder, &location](mlir::CallOp &callOp) {
-    auto ctx = builder.getContext();
-
     Block *block = builder.getBlock();
     mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
 
@@ -874,7 +870,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp) {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{stateOp.getResult()});
 
-    auto refSizeOp = builder.create<emitc::CallOp>(
+    builder.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/builder.getI32Type(),
         /*callee=*/StringAttr::get(ctx, "sizeof"),
@@ -1330,10 +1326,7 @@ class FuncOpConversion : public OpConversionPattern<mlir::FuncOp> {
       signatureConverter.addInputs(arg.index(), convertedType);
     }
 
-    Block &entryBlock = funcOp.getBlocks().front();
-
-    Block *newEntryBlock = rewriter.applySignatureConversion(
-        &funcOp.getBody(), signatureConverter);
+    rewriter.applySignatureConversion(&funcOp.getBody(), signatureConverter);
 
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
@@ -1386,7 +1379,6 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
                                     ArrayRef<Value> operands,
                                     ConversionPatternRewriter &rewriter,
                                     mlir::FuncOp funcOp) const {
-    auto ctx = op.getContext();
     auto loc = op.getLoc();
 
     SmallVector<Value, 4> updatedOperands;
@@ -1405,7 +1397,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
       return failure();
     };
 
-    auto callOp = returnIfError(
+    returnIfError(
         /*rewriter=*/rewriter,
         /*location=*/loc,
         /*callee=*/funcOp,
@@ -1471,7 +1463,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
       return failure();
     }
 
-    auto callOp = returnIfError(
+    returnIfError(
         /*rewriter=*/rewriter,
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, funcName.getValue()),
@@ -1524,7 +1516,7 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
         bool move = ptr->second.isLastValueUse(operand, op.getOperation());
 
-        auto assignOp = rewriter.create<emitc::CallOp>(
+        rewriter.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
             /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain_or_move"),
@@ -1887,7 +1879,6 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
       IREE::VM::BranchOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
-    auto loc = op.getLoc();
 
     if (llvm::any_of(operands, [&ctx](Value operand) {
           Type type = operand.getType();
@@ -2402,7 +2393,7 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
     }
 
     if (failable) {
-      auto callOp = returnIfError(
+      returnIfError(
           /*rewriter=*/rewriter,
           /*location=*/loc,
           /*callee=*/StringAttr::get(ctx, funcName),
@@ -2594,7 +2585,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{refOp.getResult()});
 
-    auto getValueOp = returnIfError(
+    returnIfError(
         /*rewriter=*/rewriter,
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_get_value_as"),
@@ -2788,8 +2779,8 @@ class ListGetRefOpConversion
     }
 
     rewriter.setInsertionPointToEnd(condBlock);
-    auto branchOp = rewriter.create<CondBranchOp>(
-        loc, invalidType.getResult(0), failureBlock, continuationBlock);
+    rewriter.create<CondBranchOp>(loc, invalidType.getResult(0), failureBlock,
+                                  continuationBlock);
 
     rewriter.replaceOp(getOp, ref.getValue());
 
@@ -2851,7 +2842,7 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{refOp.getResult()});
 
-    auto callOp = returnIfError(
+    returnIfError(
         /*rewriter=*/rewriter,
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_set_value"),
@@ -2909,7 +2900,7 @@ class ListSetRefOpConversion
     StringRef callee =
         move ? "iree_vm_list_set_ref_move" : "iree_vm_list_set_ref_retain";
 
-    auto callOp = returnIfError(
+    returnIfError(
         /*rewriter=*/rewriter,
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, callee),
