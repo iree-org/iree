@@ -71,11 +71,9 @@ func @tile_generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   flow.dispatch.workgroups
-// CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[ARG1]], %[[D0]], %[[D1]])
+// CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[ARG1]])
 // CHECK-NEXT:     %[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
-// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
 //  CHECK-DAG:     %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG2]], {{.*}}
 //  CHECK-DAG:     %[[LOAD3:.+]] = flow.dispatch.tensor.load %[[ARG3]], {{.*}}
@@ -162,10 +160,8 @@ func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tensor<?x
 //   CHECK-DAG:     %[[N:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //   CHECK-DAG:     %[[K:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //       CHECK:     %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[K]], %[[M]], %[[C1]]]
-//  CHECK-SAME:       (%[[ARG0]], %[[M]], %[[K]])
+//  CHECK-SAME:       (%[[ARG0]])
 //  CHECK-NEXT:       (%[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
-//  CHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>) {
 //       CHECK:          %[[ONE:.+]] = constant 1.0
 //   CHECK-DAG:          %[[INPUT:.+]] = flow.dispatch.tensor.load %[[ARG2]]
