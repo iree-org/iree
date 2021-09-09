@@ -79,6 +79,8 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "vmvx"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -98,6 +100,8 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
 )
 
 iree_check_single_backend_test_suite(
