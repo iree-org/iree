@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "config_adreno_conv.mlir"
     "config_adreno_matmul.mlir"
     "config_linalg_ext_ops.mlir"
     "convert_to_spirv.mlir"

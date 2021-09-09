@@ -67,6 +67,24 @@ static LogicalResult setTranslationUsingDistributeToGlobalId(
   return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
 }
 
+namespace detail {
+LogicalResult defineConvWorkgroupCountRegion(
+    Operation *op, ArrayRef<int64_t> outputShape,
+    ArrayRef<int64_t> workgroupTileSizes) {
+  auto numWorkgroupsFn = [&](OpBuilder &b, Location loc, std::array<Value, 3>) {
+    std::array<Value, 3> xyz;
+    for (unsigned i = 0; i < 3; ++i) {
+      int64_t count = outputShape[i] / workgroupTileSizes[i];
+      xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
+    }
+    return xyz;
+  };
+  OpBuilder builder(op->getContext());
+  return defineWorkgroupCountRegion(builder, op->getParentOfType<FuncOp>(),
+                                    numWorkgroupsFn);
+}
+}  // namespace detail
+
 //===----------------------------------------------------------------------===//
 // Matmul Default Configuration
 //===----------------------------------------------------------------------===//
