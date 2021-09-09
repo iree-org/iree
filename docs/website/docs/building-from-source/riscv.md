@@ -148,7 +148,7 @@ iree/tools/iree-translate \
   -iree-llvm-target-triple=riscv64 \
   -iree-llvm-target-cpu=generic-rv64 \
   -iree-llvm-target-abi=lp64d \
-  -iree-llvm-target-cpu-features="+m,+a,+f,+experimental-v" \
+  -iree-llvm-target-cpu-features="+m,+a,+f,+d,+experimental-v" \
   -riscv-v-vector-bits-min=128 -riscv-v-fixed-length-vector-lmul-max=8 \
   iree_input.mlir -o mobilenet-dylib.vmfb
 ```
