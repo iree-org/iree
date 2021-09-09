@@ -119,6 +119,11 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
           .cast<FunctionType>();
     }
 
+    /// Returns the python return type of the function (second return type).
+    Type getPyReturnType() {
+      return getType().getResult(1);
+    }
+
     /// Hook for OpTrait::FunctionLike, returns the number of function
     /// arguments. Depends on the type attribute being correct as checked by
     /// verifyType.
