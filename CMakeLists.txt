@@ -193,6 +193,7 @@ if(${IREE_ENABLE_CCACHE})
   endif()
 endif()
 
+option(IREE_DEV_MODE "Configure settings to optimize for IREE development (as opposed to CI or release)" OFF)
 
 #-------------------------------------------------------------------------------
 # IREE assertions

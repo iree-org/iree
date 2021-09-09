@@ -156,7 +156,9 @@ function(iree_select_compiler_opts OPTS)
     ""
     "ALL;CLANG;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
   )
-  set(_OPTS)
+  # OPTS is a variable containing the *name* of the variable being populated, so
+  # we need to dereference it twice.
+  set(_OPTS "${${OPTS}}")
   list(APPEND _OPTS "${_IREE_SELECTS_ALL}")
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     list(APPEND _OPTS "${_IREE_SELECTS_GCC}")
