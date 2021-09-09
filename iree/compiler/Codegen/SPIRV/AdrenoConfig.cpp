@@ -26,13 +26,17 @@ namespace detail {
 // Matmul
 //===----------------------------------------------------------------------===//
 
-static LogicalResult setOpConfig(linalg::MatmulOp op) {
+static LogicalResult setOpConfig(linalg::LinalgOp op) {
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
   if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
   if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
 
-  int64_t dimM = lhsShape[0], dimK = lhsShape[1], dimN = rhsShape[1];
+  bool isBM = isa<linalg::BatchMatmulOp>(op);
+
+  int64_t dimM = lhsShape[0 + isBM];
+  int64_t dimK = lhsShape[1 + isBM];
+  int64_t dimN = rhsShape[1 + isBM];
 
   // The core idea is to distribute the matmul M/N dimension to the workgroup
   // Y/X dimension, with each thread in a workgroup handling multiple vector
@@ -46,9 +50,11 @@ static LogicalResult setOpConfig(linalg::MatmulOp op) {
   int64_t residualThreads = bestX * bestY;
   int64_t residualTilingFactor = (bestThreadM + bestThreadK) * bestThreadN;
 
-  SmallVector<int64_t, 3> workgroupSize(3, 1);        // (X, Y, Z)
-  SmallVector<int64_t, 4> workgroupTileSizes(3, 0);   // (M, N, K)
-  SmallVector<int64_t, 4> invocationTileSizes(3, 0);  // (M, N, K)
+  SmallVector<int64_t, 3> workgroupSize(3, 1);               // (X, Y, Z)
+  SmallVector<int64_t, 4> workgroupTileSizes(3 + isBM, 0);   // (B, M, N, K)
+  SmallVector<int64_t, 4> invocationTileSizes(3 + isBM, 0);  // (B, M, N, K)
+
+  if (isBM) workgroupTileSizes[0] = invocationTileSizes[0] = 1;
 
   // Deduce the configuration for the N dimension. Start with the best workgroup
   // X size, and reduce by a factor of two each time.
@@ -57,15 +63,15 @@ static LogicalResult setOpConfig(linalg::MatmulOp op) {
     int64_t chosenTileSize = 4;
     if (dimN % (x * chosenTileSize) == 0) {
       workgroupSize[0] = x;
-      workgroupTileSizes[1] = x * chosenTileSize;
-      invocationTileSizes[1] = chosenTileSize;
+      workgroupTileSizes[1 + isBM] = x * chosenTileSize;
+      invocationTileSizes[1 + isBM] = chosenTileSize;
       residualThreads /= x;
       assert(residualTilingFactor % chosenTileSize == 0);
       residualTilingFactor /= chosenTileSize;
       break;
     }
   }
-  if (workgroupTileSizes[1] == 0) return success();
+  if (workgroupTileSizes[1 + isBM] == 0) return success();
 
   // Deduce the configuration for the M dimension. Start with the best workgroup
   // Y size, and reduce by a factor of two each time.
@@ -81,20 +87,20 @@ static LogicalResult setOpConfig(linalg::MatmulOp op) {
     }
     if (chosenTileSize) {
       workgroupSize[1] = y;
-      workgroupTileSizes[0] = y * chosenTileSize;
-      invocationTileSizes[0] = chosenTileSize;
+      workgroupTileSizes[0 + isBM] = y * chosenTileSize;
+      invocationTileSizes[0 + isBM] = chosenTileSize;
       assert(residualTilingFactor > chosenTileSize);
       residualTilingFactor -= chosenTileSize;
       break;
     }
   }
-  if (workgroupTileSizes[0] == 0) return success();
+  if (workgroupTileSizes[0 + isBM] == 0) return success();
 
   // Deduce the configuration for the K dimension. We need some power of two
   // here so that we can do vector load.
   for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 1; t >>= 1) {
     if (dimK % t == 0) {
-      workgroupTileSizes[2] = invocationTileSizes[2] = t;
+      workgroupTileSizes[2 + isBM] = invocationTileSizes[2 + isBM] = t;
       break;
     }
   }
@@ -116,7 +122,8 @@ static LogicalResult setOpConfig(linalg::MatmulOp op) {
 LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &,
                                      Operation *rootOp) {
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::MatmulOp>([](auto op) { return setOpConfig(op); })
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
+          [](auto op) { return setOpConfig(op); })
       .Default([](Operation *) { return success(); });
 }
 
