@@ -58,13 +58,15 @@ static Optional<SmallVector<int64_t, 4>> getCooperativeMatmulSubgroupSize(
 /// Returns true if the target environment attached to `op`'s ancestor op
 /// supports cooperative matrix.
 bool useCooperativeMatrix(Operation *op) {
-  auto targetEnv = spirv::TargetEnv(getSPIRVTargetEnvAttr(op));
+  auto attr = getSPIRVTargetEnvAttr(op);
+  if (!attr) return false;
+
+  auto targetEnv = spirv::TargetEnv(attr);
   return targetEnv.allows(spirv::Capability::CooperativeMatrixNV) &&
          targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix);
 }
 
 Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
-  auto targetEnv = spirv::TargetEnv(getSPIRVTargetEnvAttr(op));
   bool useCoopMatrix = useCooperativeMatrix(op);
 
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
@@ -109,6 +111,7 @@ Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
     }
   } else if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
     if (useCoopMatrix) {
+      auto targetEnv = spirv::TargetEnv(getSPIRVTargetEnvAttr(op));
       return getCooperativeMatmulSubgroupSize(
           targetEnv.getResourceLimits(),
           contractOp.getLhsType().getElementType(),

@@ -8,8 +8,7 @@ hal.executable private @conv_static_shape_f32  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_static_shape_f32 attributes {
       interface = @io,
       ordinal = 0 : index,
@@ -22,7 +21,7 @@ hal.executable private @conv_static_shape_f32  {
       %z = constant 28: index
       hal.return %x, %y, %z: index, index, index
     }
-    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module {
       func @conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c32 = constant 32 : index
@@ -108,8 +107,7 @@ hal.executable private @depthwise_conv_static_shape_f32  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
       interface = @io,
       ordinal = 0 : index,
@@ -122,7 +120,7 @@ hal.executable private @depthwise_conv_static_shape_f32  {
       %z = constant 14: index
       hal.return %x, %y, %z: index, index, index
     }
-    builtin.module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module {
       func @depthwise_conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c96 = constant 96 : index
