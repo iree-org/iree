@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -49,6 +50,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   //     createLinalgTileAndVectorizeWorkgroupsPass());
 
   // Linalg -> SCF.
+  nestedModulePM.addNestedPass<FuncOp>(
+      linalg_ext::createLinalgExtToLoopsPass());
   nestedModulePM.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(createCSEPass());

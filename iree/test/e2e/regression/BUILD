@@ -28,6 +28,8 @@ BACKEND_TESTS = [
     "dynamic_torch_index_select_scalar.mlir",
     "dynamic_torch_index_select_vector.mlir",
     "linalg_ops.mlir",
+    "linalg_ext_ops.mlir",
+    "tensor_insert_slice.mlir",
 ]
 
 iree_lit_test_suite(
@@ -50,7 +52,6 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
-            "linalg_ext_ops.mlir",
             "lowering_config.mlir",
         ] + BACKEND_TESTS,
     ),
@@ -61,16 +62,6 @@ iree_lit_test_suite(
         "//iree/tools:iree-translate",
     ],
     tags = ["hostonly"],
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_regression_dylib-llvm-aot",
-    srcs = [
-        "linalg_ext_ops.mlir",
-        "tensor_insert_slice.mlir",
-    ] + BACKEND_TESTS,
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
 )
 
 iree_check_single_backend_test_suite(
