@@ -161,6 +161,11 @@ APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
     file. In addition, Bazel is hard to use out of tree, so these steps will
     involve working from the source tree (instead of the build tree).
 
+???+ Note
+    Due to the difficulties using Bazel and compiling TensorFlow, only
+    compilation on Linux with clang is supported. Other OS's and compilers are
+    "best effort" with patches to improve support welcome.
+
     === "Linux and MacOS"
 
         ``` shell
