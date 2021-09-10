@@ -26,8 +26,8 @@ import time
 
 from typing import Any, Dict, Optional
 
-from common.benchmark_description import (BenchmarkInfo, BenchmarkResults,
-                                          get_output)
+from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
+                                         execute_cmd_and_get_output)
 from common.noisy_benchmarks import NOISY_BENCHMARKS
 
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/google/iree/commit'
@@ -82,16 +82,16 @@ def get_model_description(benchmark_info: BenchmarkInfo) -> Optional[str]:
 
 def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
   """Gets the commit hash for the given commit."""
-  return get_output(['git', 'rev-parse', commit],
-                    cwd=THIS_DIRECTORY,
-                    verbose=verbose)
+  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+                                    cwd=THIS_DIRECTORY,
+                                    verbose=verbose)
 
 
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
-  count = get_output(['git', 'rev-list', '--count', commit],
-                     cwd=THIS_DIRECTORY,
-                     verbose=verbose)
+  count = execute_cmd_and_get_output(['git', 'rev-list', '--count', commit],
+                                     cwd=THIS_DIRECTORY,
+                                     verbose=verbose)
   return int(count)
 
 
@@ -100,7 +100,7 @@ def get_git_commit_info(commit: str, verbose: bool = False) -> Dict[str, str]:
   cmd = [
       'git', 'show', '--format=%H:::%h:::%an:::%ae:::%s', '--no-patch', commit
   ]
-  info = get_output(cmd, cwd=THIS_DIRECTORY, verbose=verbose)
+  info = execute_cmd_and_get_output(cmd, cwd=THIS_DIRECTORY, verbose=verbose)
   segments = info.split(':::')
   return {
       'hash': segments[0],

@@ -43,7 +43,7 @@ import markdown_strings as md
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from common.benchmark_description import BenchmarkResults, get_output
+from common.benchmark_definition import BenchmarkResults, execute_cmd_and_get_output
 from common.noisy_benchmarks import NOISY_BENCHMARKS
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
@@ -72,16 +72,16 @@ def get_required_env_var(var: str) -> str:
 
 def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
   """Gets the commit hash for the given commit."""
-  return get_output(['git', 'rev-parse', commit],
-                    cwd=THIS_DIRECTORY,
-                    verbose=verbose)
+  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+                                    cwd=THIS_DIRECTORY,
+                                    verbose=verbose)
 
 
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
-  count = get_output(['git', 'rev-list', '--count', commit],
-                     cwd=THIS_DIRECTORY,
-                     verbose=verbose)
+  count = execute_cmd_and_get_output(['git', 'rev-list', '--count', commit],
+                                     cwd=THIS_DIRECTORY,
+                                     verbose=verbose)
   return int(count)
 
 
@@ -89,9 +89,10 @@ def get_origin_tree_commit(distance: int, verbose: bool = False) -> str:
   """Returns the hash for the commit with the given distance from top of the
   tree for the origin base branch."""
   base_branch = get_required_env_var("BUILDKITE_PULL_REQUEST_BASE_BRANCH")
-  get_output(['git', 'fetch', '--prune', '--', 'origin', base_branch],
-             cwd=THIS_DIRECTORY,
-             verbose=verbose)
+  execute_cmd_and_get_output(
+      ['git', 'fetch', '--prune', '--', 'origin', base_branch],
+      cwd=THIS_DIRECTORY,
+      verbose=verbose)
   return get_git_commit_hash(f'origin/{base_branch}~{distance}', verbose)
 
 

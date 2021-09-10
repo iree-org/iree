@@ -32,7 +32,7 @@ steps:
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf tracy-capture.tgz"
-      - "python3 build_tools/android/run_benchmarks.py --normal_benchmark_tool=build-android/iree/tools/iree-benchmark-module --traced_benchmark_tool=build-android-trace/iree/tools/iree-benchmark-module --trace_capture_tool=tracy-capture -o benchmark-results-pixel-4-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-pixel-4-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --normal_benchmark_tool=build-android/iree/tools/iree-benchmark-module --traced_benchmark_tool=build-android-trace/iree/tools/iree-benchmark-module --trace_capture_tool=tracy-capture -o benchmark-results-pixel-4-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-pixel-4-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
       - "android-soc=snapdragon-855"
@@ -52,7 +52,7 @@ steps:
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf tracy-capture.tgz"
-      - "python3 build_tools/android/run_benchmarks.py --normal_benchmark_tool=build-android/iree/tools/iree-benchmark-module --traced_benchmark_tool=build-android-trace/iree/tools/iree-benchmark-module --trace_capture_tool=tracy-capture -o benchmark-results-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --normal_benchmark_tool=build-android/iree/tools/iree-benchmark-module --traced_benchmark_tool=build-android-trace/iree/tools/iree-benchmark-module --trace_capture_tool=tracy-capture -o benchmark-results-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
       - "android-soc=exynos-990"
@@ -69,7 +69,7 @@ steps:
     commands:
       - "git clean -f"
       - "buildkite-agent artifact download benchmark-results-*.json ./"
-      - "python3 build_tools/android/post_benchmarks_as_pr_comment.py --verbose --query-base benchmark-results-*.json"
+      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base benchmark-results-*.json"
     key: "post-on-pr"
     if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
@@ -79,7 +79,7 @@ steps:
     commands:
       - "git clean -f"
       - "buildkite-agent artifact download benchmark-results-*.json ./"
-      - "python3 build_tools/android/upload_benchmarks_to_dashboard.py --verbose benchmark-results-*.json"
+      - "python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py --verbose benchmark-results-*.json"
     key: "upload-to-dashboard"
     branches: "main"
     agents:
