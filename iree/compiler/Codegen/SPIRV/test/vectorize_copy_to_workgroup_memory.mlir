@@ -5,7 +5,7 @@
 
 #map0 = affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>
 
-module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
   func @copy(%arg0: memref<4096x4096xf32>) attributes {spv.entry_point_abi = {local_size = dense<[128, 1, 1]> : vector<3xi32>}} {
     %a = memref.alloc() : memref<128x32xf32, 3>
     %c0 = constant 0 : index

@@ -10,16 +10,7 @@ hal.executable private @matmul_static_shape  {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
-        #spv.target_env<#spv.vce<v1.5,
-          [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
-           StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
-           UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
-           GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
-           GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
-           VariablePointersStorageBuffer, CooperativeMatrixNV],
-          [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
-           SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers,
-           SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+        #spv.target_env<#spv.vce<v1.5, [Shader, CooperativeMatrixNV], [SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
           {cooperative_matrix_properties_nv = [
             {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
              m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},
@@ -272,16 +263,7 @@ hal.executable private @matmul_static_shape  {
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
-        #spv.target_env<#spv.vce<v1.5,
-          [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
-           StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
-           UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
-           GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
-           GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
-           VariablePointersStorageBuffer, CooperativeMatrixNV],
-          [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
-           SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers,
-           SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+        #spv.target_env<#spv.vce<v1.5, [Shader, CooperativeMatrixNV], [SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
           {cooperative_matrix_properties_nv = [
             {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
              m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},

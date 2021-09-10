@@ -8,16 +8,8 @@ hal.executable private @parallel_4D  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @parallel_4D attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    builtin.module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+    hal.executable.entry_point @parallel_4D attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       func @parallel_4D() {
         %c0 = constant 0 : index
         %dim0 = hal.interface.load.constant offset = 0 : index
@@ -88,16 +80,8 @@ hal.executable private @parallel_4D_static  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @parallel_4D_static attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    builtin.module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+    hal.executable.entry_point @parallel_4D_static attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       func @parallel_4D_static() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<3x4x5x6xf32>
@@ -160,16 +144,8 @@ hal.executable private @scalar_add  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @scalar_add attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    builtin.module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+    hal.executable.entry_point @scalar_add attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       func @scalar_add() attributes {hal.num_workgroups_fn = @scalar_add__num_workgroups__} {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<f32>
