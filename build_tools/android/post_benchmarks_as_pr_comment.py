@@ -44,6 +44,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 from common.benchmark_description import BenchmarkResults, get_output
+from common.noisy_benchmarks import NOISY_BENCHMARKS
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
@@ -126,7 +127,8 @@ class AggregateBenchmarkLatency:
 
 
 def aggregate_all_benchmarks(
-    benchmark_files: Sequence[str]) -> Dict[str, AggregateBenchmarkLatency]:
+    benchmark_files: Sequence[str],
+    verbose: bool = False) -> Dict[str, AggregateBenchmarkLatency]:
   """Aggregates all benchmarks in the given files.
 
   Args:
@@ -155,6 +157,12 @@ def aggregate_all_benchmarks(
       name = str(benchmark_case["benchmark"])
       if name in aggregate_results:
         raise ValueError(f"Duplicated benchmarks: {name}")
+
+      # Filter noisy benchmarks out.
+      if any([regex.match(name) is not None for regex, _ in NOISY_BENCHMARKS]):
+        if verbose:
+          print(f"Skipping noisy benchmark '{name}'")
+        continue
 
       # Now scan all benchmark iterations and find the aggregate results.
       mean_time = file_results.get_aggregate_time(benchmark_index, "mean")
@@ -305,7 +313,7 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
                                   query_base: bool,
                                   verbose: bool = False) -> Tuple[str, str]:
   """Gets the full/abbreviated markdown summary of all benchmarks in files."""
-  all_benchmarks = aggregate_all_benchmarks(benchmark_files)
+  all_benchmarks = aggregate_all_benchmarks(benchmark_files, verbose=verbose)
 
   build_url = get_required_env_var("BUILDKITE_BUILD_URL")
   pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
