@@ -38,7 +38,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
     with multiple Python versions. Explicitly setting this is recommended.
     Note that mixed case of the option.
 
-???+ Setup
+### Setup
     We recommend using virtual environments to manage python packages, such
     as through `venv`, which may need to be installed via your system
     package manager ([about](https://docs.python.org/3/library/venv.html),
@@ -80,7 +80,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
 
     When done, close your shell or run `deactivate`.
 
-???+ Usage
+### Usage
     From the `iree-build` directory:
 
     === "Linux and MacOS"
@@ -136,7 +136,7 @@ These tools packages are needed in order for the frontend specific, high-level
 APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
 `import iree.compiler.xla`, and `import iree.jax` to be fully functional.
 
-???+ Setup
+### Setup
     A relatively recent `tf-nightly` release is needed to run tests.
 
     === "Linux and MacOS"
@@ -151,7 +151,7 @@ APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
         python -m pip install -r integrations\tensorflow\bindings\python\build_requirements.txt
         ```
 
-???+ TensorFlow
+### TensorFlow
     TensorFlow frontends can only be built with [Bazel](https://bazel.build/),
     and this must be done as a manual step (we used to have automation for this,
     but Bazel integrates poorly with automation and it made diagnosis and cross
@@ -187,7 +187,7 @@ APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
     Importer binaries can be found under `bazel-bin/iree_tf_compiler` and can
     be used from the command line if desired.
 
-???+ IREE
+### IREE
     The main IREE build will embed binaries built above and enable additional
     Python APIs. Within the build, the binaries are symlinked, so can be
     rebuilt per above without re-running these steps for edit-and-continue

@@ -24,11 +24,11 @@ compilers:
     3. Install [Ninja](https://ninja-build.org/) (typically "ninja-build"
        package).
 
-On a relatively recent Debian/Ubuntu:
+    On a relatively recent Debian/Ubuntu:
 
-``` shell
-sudo apt install cmake ninja-build clang lld
-```
+    ``` shell
+    sudo apt install cmake ninja-build clang lld
+    ```
 
 === "Windows"
 
