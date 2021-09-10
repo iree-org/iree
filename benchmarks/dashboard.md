@@ -12,10 +12,11 @@ evaluate, those numbers may or may not be relevant. For example, for somebody
 working solely on better kernel code generation, the end-to-end model reference
 latency is unlikely meaningful given it also includes runtime overhead. The
 environment could also vary per benchmark run in uncontrollable ways, causing
-instability in the results. This is especially true for Android, where a tight
-compromise between performance and thermal/battery limits is made. Too many
-aspects can affect the benchmarking results. So before going into details, it's
-worth nothing the general guideline to IREE benchmarking as context.
+instability in the results. This is especially true for mobile and embedded
+systems, where a tight compromise between performance and thermal/battery limits
+is made. Too many aspects can affect the benchmarking results. So before going
+into details, it's worth nothing the general guideline to IREE benchmarking as
+context.
 
 The overarching goal for benchmarking here is to track IREE's performance
 progress and guard against regression. So the benchmarks are meant to understand
