@@ -96,8 +96,11 @@ iree_cc_library(
   DEPS
     ::TiledOpInterfaceGen
     LLVMSupport
+    MLIRAffine
     MLIRIR
+    MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRViewLikeInterface
   PUBLIC
 )

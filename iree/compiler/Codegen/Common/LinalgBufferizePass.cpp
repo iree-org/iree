@@ -1045,8 +1045,6 @@ static Value getAliasingBufferForResult(OpBuilder &b, tensor::ExtractSliceOp op,
   Value srcTensor = op.source();
   Value inputBuffer = bvm.lookup(srcTensor);
 
-  ShapedType sourceType = op.getSourceType();
-  ShapedType resultType = op.getType();
   return createSubviewOp(b, loc, op.getType().getRank(), inputBuffer,
                          op.getMixedOffsets(), op.getMixedSizes(),
                          op.getMixedStrides());
@@ -1278,7 +1276,6 @@ static LogicalResult convertInterfaceStoreTensorOp(
   Value storeTo = bvm.lookup(storeOp.target());
   Value storeFrom = bvm.lookup(storeOp.value());
 
-  MemRefType resultType;
   Value subview = createSubviewOp(
       b, storeOp.getLoc(), storeFrom.getType().cast<ShapedType>().getRank(),
       storeTo, storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
