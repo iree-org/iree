@@ -43,7 +43,7 @@ import markdown_strings as md
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from common.benchmark_description import BenchmarkResults, execute_cmd_and_get_output
+from common.benchmark_definition import BenchmarkResults, execute_cmd_and_get_output
 from common.noisy_benchmarks import NOISY_BENCHMARKS
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"

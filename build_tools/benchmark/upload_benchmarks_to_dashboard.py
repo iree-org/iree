@@ -26,8 +26,8 @@ import time
 
 from typing import Any, Dict, Optional
 
-from common.benchmark_description import (BenchmarkInfo, BenchmarkResults,
-                                          execute_cmd_and_get_output)
+from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
+                                         execute_cmd_and_get_output)
 from common.noisy_benchmarks import NOISY_BENCHMARKS
 
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/google/iree/commit'

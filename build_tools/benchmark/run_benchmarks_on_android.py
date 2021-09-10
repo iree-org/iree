@@ -57,9 +57,9 @@ import time
 
 from typing import Any, Dict, Optional, Sequence, Tuple
 
-from common.benchmark_description import (AndroidDeviceInfo, BenchmarkInfo,
-                                          BenchmarkResults,
-                                          execute_cmd_and_get_output)
+from common.benchmark_definition import (AndroidDeviceInfo, BenchmarkInfo,
+                                         BenchmarkResults,
+                                         execute_cmd_and_get_output)
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
