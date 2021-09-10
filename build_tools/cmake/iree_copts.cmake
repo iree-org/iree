@@ -68,96 +68,15 @@ set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IREE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(IREE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
+# Key compilation options
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
-  CLANG
-    # Set clang diagnostics. These largely match the set of warnings used within
-    # Google. They have not been audited super carefully by the IREE team but
-    # are generally thought to be a good set and consistency with those used
-    # internally is very useful when importing. If you feel that some of these
-    # should be different, please raise an issue!
-
-    # Please keep these in sync with build_tools/bazel/iree.bazelrc
-
-    "-Wall"
-
-    # Disable warnings we don't care about or that generally have a low
-    # signal/noise ratio.
-    "-Wno-ambiguous-member-template"
-    "-Wno-char-subscripts"
-    "-Wno-deprecated-declarations"
-    "-Wno-extern-c-compat" # Matches upstream. Cannot impact due to extern C inclusion method.
-    "-Wno-gnu-alignof-expression"
-    "-Wno-gnu-variable-sized-type-not-at-end"
-    "-Wno-ignored-optimization-argument"
-    "-Wno-invalid-offsetof" # Technically UB but needed for intrusive ptrs
-    "-Wno-invalid-source-encoding"
-    "-Wno-mismatched-tags"
-    "-Wno-pointer-sign"
-    "-Wno-reserved-user-defined-literal"
-    "-Wno-return-type-c-linkage"
-    "-Wno-self-assign-overloaded"
-    "-Wno-sign-compare"
-    "-Wno-signed-unsigned-wchar"
-    "-Wno-strict-overflow"
-    "-Wno-trigraphs"
-    "-Wno-unknown-pragmas"
-    "-Wno-unknown-warning-option"
-    "-Wno-unused-command-line-argument"
-    "-Wno-unused-const-variable"
-    "-Wno-unused-function"
-    "-Wno-unused-local-typedef"
-    "-Wno-unused-private-field"
-    "-Wno-user-defined-warnings"
-    # Explicitly enable some additional warnings.
-    # Some of these aren't on by default, or under -Wall, or are subsets of
-    # warnings turned off above.
-    "-Wno-ambiguous-member-template"
-    "-Wctad-maybe-unsupported"
-    "-Wfloat-overflow-conversion"
-    "-Wfloat-zero-conversion"
-    "-Wfor-loop-analysis"
-    "-Wformat-security"
-    "-Wgnu-redeclared-enum"
-    "-Wimplicit-fallthrough"
-    "-Winfinite-recursion"
-    "-Wliteral-conversion"
-    "-Wnon-virtual-dtor"
-    "-Woverloaded-virtual"
-    "-Wself-assign"
-    "-Wstring-conversion"
-    "-Wtautological-overlap-compare"
-    "-Wthread-safety"
-    "-Wthread-safety-beta"
-    "-Wunused-comparison"
-    "-Wvla"
-
-    # Turn off some additional warnings (CMake only)
-    "-Wno-strict-prototypes"
-    "-Wno-shadow-uncaptured-local"
-    "-Wno-gnu-zero-variadic-macro-arguments"
-    "-Wno-shadow-field-in-constructor"
-    "-Wno-unreachable-code-return"
-    "-Wno-missing-variable-declarations"
-    "-Wno-gnu-label-as-value"
   CLANG_OR_GCC
-    "-Wno-unused-parameter"
-    "-Wno-unused-variable"
-    "-Wno-undef"
     "-fvisibility=hidden"
     # NOTE: The RTTI setting must match what LLVM was compiled with (defaults
     # to RTTI disabled).
     "$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>"
     "$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>"
-
   MSVC_OR_CLANG_CL
-    # Default warning level (severe + significant + production quality).
-    # This does not include level 4, "informational", warnings or those that
-    # are off by default.
-    # https://docs.microsoft.com/en-us/cpp/build/reference/compiler-option-warning-level
-    # Note that we set CMake policy CMP0092 (if found), making this explicit:
-    # https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
-    "/W3"
-
     # Exclude a bunch of rarely-used APIs, such as crypto/DDE/shell.
     # https://docs.microsoft.com/en-us/windows/win32/winprog/using-the-windows-headers
     # NOTE: this is not really required anymore for build performance but does
@@ -206,6 +125,94 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # but it's better to not get spurious failures during LTCG.
     # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
     "/bigobj"
+)
+
+# Compiler diagnostics.
+# Please keep these in sync with build_tools/bazel/iree.bazelrc
+iree_select_compiler_opts(IREE_DEFAULT_COPTS
+  # Clang diagnostics. These largely match the set of warnings used within
+  # Google. They have not been audited super carefully by the IREE team but are
+  # generally thought to be a good set and consistency with those used
+  # internally is very useful when importing. If you feel that some of these
+  # should be different (especially more strict), please raise an issue!
+  CLANG
+    "-Werror"
+    "-Wall"
+
+    # Disable warnings we don't care about or that generally have a low
+    # signal/noise ratio.
+    "-Wno-ambiguous-member-template"
+    "-Wno-char-subscripts"
+    "-Wno-deprecated-declarations"
+    "-Wno-extern-c-compat" # Matches upstream. Cannot impact due to extern C inclusion method.
+    "-Wno-gnu-alignof-expression"
+    "-Wno-gnu-variable-sized-type-not-at-end"
+    "-Wno-ignored-optimization-argument"
+    "-Wno-invalid-offsetof" # Technically UB but needed for intrusive ptrs
+    "-Wno-invalid-source-encoding"
+    "-Wno-mismatched-tags"
+    "-Wno-pointer-sign"
+    "-Wno-reserved-user-defined-literal"
+    "-Wno-return-type-c-linkage"
+    "-Wno-self-assign-overloaded"
+    "-Wno-sign-compare"
+    "-Wno-signed-unsigned-wchar"
+    "-Wno-strict-overflow"
+    "-Wno-trigraphs"
+    "-Wno-unknown-pragmas"
+    "-Wno-unknown-warning-option"
+    "-Wno-unused-command-line-argument"
+    "-Wno-unused-const-variable"
+    "-Wno-unused-function"
+    "-Wno-unused-local-typedef"
+    "-Wno-unused-private-field"
+    "-Wno-user-defined-warnings"
+
+    # Explicitly enable some additional warnings.
+    # Some of these aren't on by default, or under -Wall, or are subsets of
+    # warnings turned off above.
+    "-Wctad-maybe-unsupported"
+    "-Wfloat-overflow-conversion"
+    "-Wfloat-zero-conversion"
+    "-Wfor-loop-analysis"
+    "-Wformat-security"
+    "-Wgnu-redeclared-enum"
+    "-Wimplicit-fallthrough"
+    "-Winfinite-recursion"
+    "-Wliteral-conversion"
+    "-Wnon-virtual-dtor"
+    "-Woverloaded-virtual"
+    "-Wself-assign"
+    "-Wstring-conversion"
+    "-Wtautological-overlap-compare"
+    "-Wthread-safety"
+    "-Wthread-safety-beta"
+    "-Wunused-comparison"
+    "-Wvla"
+
+  # Disable some warnings to get GCC to build. Until we have a CI for this, we
+  # just need it for releases and extra diagnostics (or Werror) only bring pain.
+  # TODO(#6959): Trim these down and add -Werror -Wall once we have a CI.
+  GCC
+    "-Wno-unused-but-set-parameter"
+    "-Wno-comment"
+    "-Wno-attributes"
+    "-Wno-strict-prototypes"
+    "-Wno-shadow-uncaptured-local"
+    "-Wno-gnu-zero-variadic-macro-arguments"
+    "-Wno-shadow-field-in-constructor"
+    "-Wno-unreachable-code-return"
+    "-Wno-missing-variable-declarations"
+    "-Wno-gnu-label-as-value"
+
+  MSVC_OR_CLANG_CL
+    # Default warning level (severe + significant + production quality).
+    # This does not include level 4, "informational", warnings or those that
+    # are off by default.
+    # https://docs.microsoft.com/en-us/cpp/build/reference/compiler-option-warning-level
+    # Note that we set CMake policy CMP0092 (if found), making this explicit:
+    # https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
+    "/W3"
 
     # "nonstandard extension used : zero-sized array in struct/union"
     # This happens with unsized or zero-length arrays at the end of structs,
@@ -258,6 +265,16 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "/wd4267"  # initializing: possible loss of data
     "/wd5105"  # allow: macro expansion producing 'defined' has undefined behavior
 )
+
+# Set some things back to warnings that are really annoying as build errors
+# during active development (but we still want as errors on CI).
+if (IREE_DEV_MODE)
+  iree_select_compiler_opts(IREE_DEFAULT_COPTS
+    CLANG_OR_GCC
+      "-Wno-error=unused-parameter"
+      "-Wno-error=unused-variable"
+  )
+endif()
 
 # On MSVC, CMake sets /GR by default (enabling RTTI), but we set /GR-
 # (disabling it) above. To avoid Command line warning D9025 which warns about
