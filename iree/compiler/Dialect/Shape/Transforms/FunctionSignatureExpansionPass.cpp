@@ -65,16 +65,9 @@ static LogicalResult expandCallGraphTypesForCall(
     auto decomposedValues = llvm::to_vector<6>(
         llvm::map_range(expandedResultIndices[i],
                         [&](unsigned i) { return newCallOp.getResult(i); }));
-    if (decomposedValues.empty()) {
-      // No replacement is required.
-      replacedValues.push_back(nullptr);
-    } else if (decomposedValues.size() == 1) {
-      replacedValues.push_back(decomposedValues.front());
-    } else {
-      Value materialized = typeExpander.castToSource(loc, callOp.getType(i),
-                                                     decomposedValues, builder);
-      replacedValues.push_back(materialized);
-    }
+    Value materialized = typeExpander.castToSource(loc, callOp.getType(i),
+                                                   decomposedValues, builder);
+    replacedValues.push_back(materialized);
   }
   callOp.replaceAllUsesWith(replacedValues);
   return success();
