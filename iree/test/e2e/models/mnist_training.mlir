@@ -22,9 +22,9 @@
 module  {
   util.global private mutable @__iree_flow___sm_node14__optimizer.iter = dense<0> : tensor<i32>
   util.global private @__iree_flow___sm_node16__optimizer.learning_rate = dense<0.00999999977> : tensor<f32>
-  util.global private mutable @"__iree_flow___sm_node22__model.layer-2.kernel" = dense<0.000000e+0> : tensor<784x128xf32>
+  util.global private mutable @"__iree_flow___sm_node22__model.layer-2.kernel" = dense<1.100000e+0> : tensor<784x128xf32>
   util.global private mutable @"__iree_flow___sm_node23__model.layer-2.bias" = dense<0.000000e+00> : tensor<128xf32>
-  util.global private mutable @"__iree_flow___sm_node32__model.layer-4.kernel" = dense<0.000000e+0> : tensor<128x10xf32>
+  util.global private mutable @"__iree_flow___sm_node32__model.layer-4.kernel" = dense<1.200000e+0> : tensor<128x10xf32>
   util.global private mutable @"__iree_flow___sm_node33__model.layer-4.bias" = dense<0.000000e+00> : tensor<10xf32>
   // CHECK-LABEL: EXEC @learn
   func @learn(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,4,32,28,28,1],[\22ndarray\22,\22i32\22,1,32]],\22r\22:[[\22ndarray\22,\22f32\22,0]],\22v\22:1}"} {

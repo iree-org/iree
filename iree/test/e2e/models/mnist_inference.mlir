@@ -15,9 +15,9 @@
 #map2 = affine_map<(d0, d1) -> (d0)>
 #map3 = affine_map<(d0, d1) -> (d0, 0)>
 module  {
-  util.global private @"__iree_flow___sm_node22__model.layer-2.kernel" = dense<0.000000e+00> : tensor<784x128xf32>
+  util.global private @"__iree_flow___sm_node22__model.layer-2.kernel" = dense<1.100000e+00> : tensor<784x128xf32>
   util.global private @"__iree_flow___sm_node23__model.layer-2.bias" = dense<0.000000e+00> : tensor<128xf32>
-  util.global private @"__iree_flow___sm_node32__model.layer-4.kernel" = dense<0.000000e+00> : tensor<128x10xf32>
+  util.global private @"__iree_flow___sm_node32__model.layer-4.kernel" = dense<1.200000e+00> : tensor<128x10xf32>
   util.global private @"__iree_flow___sm_node33__model.layer-4.bias" = dense<0.000000e+00> : tensor<10xf32>
   // CHECK-LABEL: EXEC @predict
   func @predict(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,4,32,28,28,1]],\22r\22:[[\22ndarray\22,\22f32\22,2,32,10]],\22v\22:1}"} {
