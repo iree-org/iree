@@ -23,6 +23,7 @@
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
@@ -308,9 +309,9 @@ class HALDispatchABI {
 
   Value getIndexValue(Location loc, int64_t value, OpBuilder &builder) {
     SmallVector<Value> folded;
-    builder.createOrFold<UnrealizedConversionCastOp>(
+    builder.createOrFold<LLVM::ConstantOp>(
         folded, loc, typeConverter->convertType(builder.getIndexType()),
-        builder.createOrFold<ConstantIndexOp>(loc, value));
+        builder.getI64IntegerAttr(value));
     return folded.front();
   }
 
@@ -674,6 +675,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
   populateLinalgToLLVMConversionPatterns(converter, patterns);
+  populateReconcileUnrealizedCastsPatterns(patterns);
 
   // clang-format off
   patterns.insert<
