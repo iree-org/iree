@@ -308,11 +308,9 @@ class HALDispatchABI {
   }
 
   Value getIndexValue(Location loc, int64_t value, OpBuilder &builder) {
-    SmallVector<Value> folded;
-    builder.createOrFold<LLVM::ConstantOp>(
-        folded, loc, typeConverter->convertType(builder.getIndexType()),
+    return builder.createOrFold<LLVM::ConstantOp>(
+        loc, typeConverter->convertType(builder.getIndexType()),
         builder.getI64IntegerAttr(value));
-    return folded.front();
   }
 
   Value castValueToType(Location loc, Value value, Type resultType,
