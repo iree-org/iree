@@ -10,19 +10,18 @@ posting results compared against their base commit as comments.
 
 ## Benchmarking philosophy
 
-Benchmarking and interpret results properly is a delicate task. Typically we can
-pull numbers from various parts of a system, but depending on what we are trying
-to evalulate, those numbers may or may not be relevant. For example, for
-somebody working solely on better kernel code generation, the end-to-end model
-reference latency is unlikely meaningful given it involves lots of runtime
-overhead. Also the environment could vary per benchmark run in uncontrollable
-manner, causing unstability in the results. This is especially true for Android,
-where we face tight compromise between performance and thermal/battery limits.
-Too many aspects can affect the benchmarking results. So before going into
-details, it's worth nothing the general guideline to IREE benchmarking as
-context.
+Benchmarking and interpreting results properly is a delicate task. We can record
+metrics from various parts of a system, but depending on what we are trying to
+evaluate, those numbers may or may not be relevant. For example, for somebody
+working solely on better kernel code generation, the end-to-end model reference
+latency is unlikely meaningful given it also includes runtime overhead. The
+environment could also vary per benchmark run in uncontrollable ways, causing
+instability in the results. This is especially true for Android, where a tight
+compromise between performance and thermal/battery limits is made. Too many
+aspects can affect the benchmarking results. So before going into details, it's
+worth nothing the general guideline to IREE benchmarking as context.
 
-The overaching goal for benchmarking here is to track IREE's performance
+The overarching goal for benchmarking here is to track IREE's performance
 progress and guard against regression. So the benchmarks are meant to understand
 the performance of IREE _itself_, not the absolute capability of the exercised
 hardware. In order to fulfill the above goal, we have the following guidelines
@@ -30,9 +29,9 @@ for benchmarking:
 
 * We choose representative real-world models with varying characteristics.
 * We cover different IREE backends and different modes for each backend so that
-  folks working on different component can find the metrics they need.
+  folks working on different components can find the metrics they need.
 
-## Benchmark specification
+## Model benchmark specification
 
 Each benchmark in IREE has a unique identifier with the following format:
 
@@ -57,7 +56,7 @@ This field specifies the original model source:
 
 ### Model name
 
-THis field specifies the input model:
+This field specifies the input model:
 
 * `DeepLabV3` [[source](https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/default/1)]:
   Vision model for semantic image segmentation.
@@ -109,7 +108,7 @@ This field specifies the IREE HAL driver:
 
 ### Device name and target architecture
 
-This two fields are tightly coupled. They specify the device and hardware
+These two fields are tightly coupled. They specify the device and hardware
 target for executing the benchmark.
 
 Right now there are two Android devices:
