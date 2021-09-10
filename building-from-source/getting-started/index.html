@@ -769,9 +769,16 @@
 <!-- TODO(scotttodd): Introduction, when to build from source -->
 
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>You will need to install <a href="https://cmake.org/">CMake</a>, along with a C/C++
-compiler:</p>
-<div class="tabbed-set" data-tabs="1:1"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux and MacOS</label><div class="tabbed-content">
+<p>You will need to install <a href="https://cmake.org/">CMake</a>, the
+<a href="https://ninja-build.org/">Ninja</a> CMake generator, and the clang or MSVC C/C++
+compilers:</p>
+<details class="note" open="open"><summary>Note</summary><p>You are welcome to try different CMake generators and compilers, but IREE
+devs and CIs exclusively use these and other configurations are "best
+effort". Additionally, compilation on macOS is "best effort" as well, though
+we generally expect it to work due to its similarity with Linux. Patches to
+improve support for these are always welcome.</p>
+</details>
+<div class="tabbed-set" data-tabs="1:1"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux and macOS</label><div class="tabbed-content">
 <ol>
 <li>
 <p>Install a compiler/linker (typically "clang" and "lld" package).</p>
@@ -856,9 +863,6 @@ In particular, note that several useful LLVM debugging features are only
 available in <code>Debug</code> builds. See the
 <a href="https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html">official CMake documentation</a>
 for general details.</p>
-</details>
-<details class="tip" open="open"><summary>Tip</summary><p>You are welcome to try different CMake generators, but IREE devs and CIs
-exclusively use <a href="https://ninja-build.org/">Ninja</a>.</p>
 </details>
 <h2 id="whats-next">What's next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
 <!-- TODO(scotttodd): "at this point you can..." -->
