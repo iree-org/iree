@@ -778,7 +778,7 @@ effort". Additionally, compilation on macOS is "best effort" as well, though
 we generally expect it to work due to its similarity with Linux. Patches to
 improve support for these are always welcome.</p>
 </details>
-<div class="tabbed-set" data-tabs="1:1"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux and macOS</label><div class="tabbed-content">
+<div class="tabbed-set" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux and macOS</label><div class="tabbed-content">
 <ol>
 <li>
 <p>Install a compiler/linker (typically "clang" and "lld" package).</p>
@@ -791,12 +791,11 @@ improve support for these are always welcome.</p>
    package).</p>
 </li>
 </ol>
-</div>
-</div>
 <p>On a relatively recent Debian/Ubuntu:</p>
 <div class="highlight"><pre><span></span><code>sudo apt install cmake ninja-build clang lld
 </code></pre></div>
-<div class="tabbed-set" data-tabs="2:1"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><label for="__tabbed_2_1">Windows</label><div class="tabbed-content">
+</div>
+<input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><label for="__tabbed_1_2">Windows</label><div class="tabbed-content">
 <ol>
 <li>
 <p>Install MSVC from Visual Studio or "Tools for Visual Studio" on the
@@ -829,7 +828,7 @@ git submodule update --init
 </code></pre></div>
 <p>Configure then build all targets using CMake:</p>
 <p>Configure CMake:</p>
-<div class="tabbed-set" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><label for="__tabbed_3_1">Linux and MacOS</label><div class="tabbed-content">
+<div class="tabbed-set" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><label for="__tabbed_2_1">Linux and MacOS</label><div class="tabbed-content">
 <div class="highlight"><pre><span></span><code><span class="c1"># Recommended for simple development using clang and lld:</span>
 cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
     -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
@@ -846,7 +845,7 @@ cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
 <span class="c1">#   -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache</span>
 </code></pre></div>
 </div>
-<input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><label for="__tabbed_3_2">Windows</label><div class="tabbed-content">
+<input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><label for="__tabbed_2_2">Windows</label><div class="tabbed-content">
 <div class="highlight"><pre><span></span><code>cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
     -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
     -DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON
