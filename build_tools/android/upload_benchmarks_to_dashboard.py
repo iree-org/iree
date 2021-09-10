@@ -37,6 +37,10 @@ COMMON_DESCRIIPTION = """
 <br>
 For the graph, the x axis is the Git commit index, and the y axis is the
 measured latency in milliseconds.
+<br>
+See <a href="https://github.com/google/iree/tree/main/benchmarks/dashboard.md">
+https://github.com/google/iree/tree/main/benchmarks/dashboard.md
+</a> for benchmark philosophy, specification, and definitions.
 """
 
 # A non-exhaustive list of models and their source URLs.
