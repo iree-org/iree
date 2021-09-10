@@ -44,6 +44,7 @@ iree_cc_library(
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRPass
+    MLIRReconcileUnrealizedCasts
     MLIRSCF
     MLIRSCFToStandard
     MLIRStandard
