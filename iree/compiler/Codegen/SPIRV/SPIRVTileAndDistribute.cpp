@@ -238,12 +238,16 @@ static void populateTilingConvFilterPatterns(
     MLIRContext *context, RewritePatternSet &patterns,
     linalg::LinalgTransformationFilter marker) {
   auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    SmallVector<Value, 4> tileSizes;
-    SmallVector<int64_t, 4> fourthLevel = getTileSizes(op, 3);
-    tileSizes.reserve(fourthLevel.size());
+    SmallVector<int64_t, 4> sizes;
+    if (isa<linalg::Conv2DNhwcHwcfOp>(op)) {
+      sizes.assign({0, 0, 0, 0, 1, 1, 4});
+    } else if (isa<linalg::DepthwiseConv2DNhwOp>(op)) {
+      sizes.assign({0, 0, 0, 0, 1, 1});
+    }
 
     Location loc = op->getLoc();
-    for (int64_t size : fourthLevel) {
+    SmallVector<Value, 4> tileSizes;
+    for (int64_t size : sizes) {
       tileSizes.push_back(builder.create<ConstantIndexOp>(loc, size));
     }
     return tileSizes;
@@ -254,8 +258,7 @@ static void populateTilingConvFilterPatterns(
                            .setTileSizeComputationFunction(getTileSizeFn);
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>>(
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>>(
       context, tilingOptions, marker);
 }
 

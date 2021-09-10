@@ -47,6 +47,7 @@ iree_cc_library(
     LLVMNVPTXCodeGen
     LLVMSupport
     LLVMTarget
+    MLIRGPUOps
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
     MLIRNVVMIR

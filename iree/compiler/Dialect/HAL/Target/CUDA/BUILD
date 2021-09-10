@@ -55,6 +55,7 @@ cc_library(
         "@llvm-project//llvm:NVPTXCodeGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:NVVMDialect",
