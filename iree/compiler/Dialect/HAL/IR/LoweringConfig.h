@@ -62,7 +62,7 @@ IREE::HAL::TranslationInfo getTranslationInfo(
 /// Get the pass pipeline specified in the `translationInfo`
 inline Optional<IREE::HAL::DispatchLoweringPassPipeline>
 getLoweringPassPipeline(IREE::HAL::TranslationInfo translationInfo) {
-  return IREE::HAL::symbolizeEnum<IREE::HAL::DispatchLoweringPassPipeline>(
+  return IREE::HAL::symbolizeDispatchLoweringPassPipeline(
       translationInfo.passPipeline().getValue());
 }
 
@@ -154,7 +154,7 @@ inline SmallVector<int64_t, 4> getNativeVectorSize(Operation *op) {
 /// Get the pass pipeline specified in the `loweringConfig`
 inline Optional<IREE::HAL::DispatchLoweringPassPipeline>
 getLoweringPassPipeline(IREE::HAL::LoweringConfig config) {
-  return IREE::HAL::symbolizeEnum<IREE::HAL::DispatchLoweringPassPipeline>(
+  return IREE::HAL::symbolizeDispatchLoweringPassPipeline(
       config.passPipeline().getValue());
 }
 
