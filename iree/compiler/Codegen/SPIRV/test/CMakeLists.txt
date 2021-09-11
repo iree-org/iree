@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "config_adreno_conv.mlir"
     "config_adreno_matmul.mlir"
     "config_linalg_ext_ops.mlir"
+    "config_linalg_ops.mlir"
     "convert_to_spirv.mlir"
     "distribute_to_global_id.mlir"
     "fold_gpu_procid_uses.mlir"

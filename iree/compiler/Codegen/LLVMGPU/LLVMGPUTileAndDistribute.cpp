@@ -106,22 +106,21 @@ static void populateTilingToInvocationPatterns(
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  patterns
-      .insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-              linalg::LinalgTilingPattern<linalg::FillOp>,
-              linalg::LinalgTilingPattern<linalg::CopyOp>,
-              linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-              linalg::LinalgTilingPattern<linalg::GenericOp>,
-              linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
-              linalg_ext::TiledOpInterfaceTilingPattern<linalg_ext::ScatterOp>>(
-          context, tilingOptions,
-          linalg::LinalgTransformationFilter(
-              {Identifier::get(getWorkgroupMarker(), context),
-               Identifier::get(getWorkgroupKTiledMarker(), context),
-               Identifier::get(getWorkgroupMemoryMarker(), context)},
-              Identifier::get(getVectorizeMarker(), context)));
+  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::FillOp>,
+                  linalg::LinalgTilingPattern<linalg::CopyOp>,
+                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::GenericOp>,
+                  linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
+                  linalg_ext::TiledOpInterfaceTilingPattern>(
+      context, tilingOptions,
+      linalg::LinalgTransformationFilter(
+          {Identifier::get(getWorkgroupMarker(), context),
+           Identifier::get(getWorkgroupKTiledMarker(), context),
+           Identifier::get(getWorkgroupMemoryMarker(), context)},
+          Identifier::get(getVectorizeMarker(), context)));
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {

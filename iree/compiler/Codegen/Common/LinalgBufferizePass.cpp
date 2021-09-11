@@ -746,14 +746,20 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
 
 /// Creates a subview operation given the `src`, `offsets`, `sizes` and
 /// `strides`. Handles the corner case where the `offsets`, `sizes` and
-/// `strides` are empty in which case just forward the `src` value.
-/// TODO(ataei): Instead create memref.subview %v [][][] folder.
-static Value createSubviewOp(OpBuilder &b, Location loc, Value src,
-                             ArrayRef<OpFoldResult> offsets,
+/// `strides` are empty in which case just forward the `src` value.  If the
+/// `resultRank` does not match the source rank, uses a rank-reduced subview.
+static Value createSubviewOp(OpBuilder &b, Location loc, unsigned resultRank,
+                             Value src, ArrayRef<OpFoldResult> offsets,
                              ArrayRef<OpFoldResult> sizes,
-                             ArrayRef<OpFoldResult> strides,
-                             MemRefType resultType = MemRefType()) {
+                             ArrayRef<OpFoldResult> strides) {
   if (offsets.empty() && sizes.empty() && strides.empty()) return src;
+  MemRefType resultType;
+  MemRefType srcType = src.getType().cast<MemRefType>();
+  if (srcType.getRank() != resultRank) {
+    resultType = memref::SubViewOp::inferRankReducedResultType(
+                     resultRank, srcType, offsets, sizes, strides)
+                     .cast<MemRefType>();
+  }
   return b.create<memref::SubViewOp>(loc, resultType, src, offsets, sizes,
                                      strides);
 }
@@ -798,12 +804,18 @@ static Value getSubviewOpForTensorStoreOp(OpBuilder &b, Operation *storeOp,
                                           const BlockAndValueMapping &bvm) {
   SmallVector<Value, 4> operandsOfSubviewOp;
   auto op = cast<OffsetSizeAndStrideOpInterface>(storeOp);
-  Value target = TypeSwitch<Operation *, Value>(op)
-                     .Case<IREE::Flow::DispatchTensorStoreOp>(
-                         [&](auto storeOp) { return storeOp.target(); })
-                     .Case<tensor::InsertSliceOp>(
-                         [&](auto storeOp) { return storeOp.dest(); })
-                     .Default([](Operation *) { return nullptr; });
+  Value target, source;
+  std::tie(source, target) =
+      TypeSwitch<Operation *, std::tuple<Value, Value>>(op)
+          .Case<IREE::Flow::DispatchTensorStoreOp>([&](auto storeOp) {
+            return std::make_tuple(storeOp.value(), storeOp.target());
+          })
+          .Case<tensor::InsertSliceOp>([&](auto storeOp) {
+            return std::make_tuple(storeOp.source(), storeOp.dest());
+          })
+          .Default([](Operation *) {
+            return std::make_tuple<Value, Value>(nullptr, nullptr);
+          });
   if (!target) return nullptr;
 
   // Clone the offset, size and stride values. They will be CSE-ed later.
@@ -851,8 +863,9 @@ static Value getSubviewOpForTensorStoreOp(OpBuilder &b, Operation *storeOp,
   subViewOffsets = cloneIndexValues(op.getMixedOffsets());
   subViewSizes = cloneIndexValues(op.getMixedSizes());
   subViewStrides = cloneIndexValues(op.getMixedStrides());
-  Value subview = createSubviewOp(b, op.getLoc(), bvm.lookup(target),
-                                  subViewOffsets, subViewSizes, subViewStrides);
+  Value subview = createSubviewOp(
+      b, op.getLoc(), source.getType().cast<ShapedType>().getRank(),
+      bvm.lookup(target), subViewOffsets, subViewSizes, subViewStrides);
   return subview;
 }
 
@@ -995,7 +1008,9 @@ static Value getAliasingBufferForResult(OpBuilder &b,
                                         BlockAndValueMapping &bvm) {
   Location loc = loadOp.getLoc();
   Value memref = bvm.lookup(loadOp.source());
-  return createSubviewOp(b, loc, memref, loadOp.getMixedOffsets(),
+  return createSubviewOp(b, loc,
+                         loadOp.result().getType().cast<ShapedType>().getRank(),
+                         memref, loadOp.getMixedOffsets(),
                          loadOp.getMixedSizes(), loadOp.getMixedStrides());
 }
 
@@ -1030,20 +1045,9 @@ static Value getAliasingBufferForResult(OpBuilder &b, tensor::ExtractSliceOp op,
   Value srcTensor = op.source();
   Value inputBuffer = bvm.lookup(srcTensor);
 
-  ShapedType sourceType = op.getSourceType();
-  ShapedType resultType = op.getType();
-  SmallVector<OpFoldResult> offsets = op.getMixedOffsets();
-  SmallVector<OpFoldResult> sizes = op.getMixedSizes();
-  SmallVector<OpFoldResult> strides = op.getMixedStrides();
-  MemRefType subViewResultType =
-      (resultType.getRank() < sourceType.getRank()
-           ? memref::SubViewOp::inferRankReducedResultType(
-                 resultType.getRank(), inputBuffer.getType().cast<MemRefType>(),
-                 offsets, sizes, strides)
-                 .cast<MemRefType>()
-           : MemRefType());
-  return b.create<memref::SubViewOp>(loc, subViewResultType, inputBuffer,
-                                     offsets, sizes, strides);
+  return createSubviewOp(b, loc, op.getType().getRank(), inputBuffer,
+                         op.getMixedOffsets(), op.getMixedSizes(),
+                         op.getMixedStrides());
 }
 
 /// Returns output buffers that aliases inputs.
@@ -1271,9 +1275,11 @@ static LogicalResult convertInterfaceStoreTensorOp(
   b.setInsertionPoint(storeOp);
   Value storeTo = bvm.lookup(storeOp.target());
   Value storeFrom = bvm.lookup(storeOp.value());
-  Value subview =
-      createSubviewOp(b, storeOp.getLoc(), storeTo, storeOp.getMixedOffsets(),
-                      storeOp.getMixedSizes(), storeOp.getMixedStrides());
+
+  Value subview = createSubviewOp(
+      b, storeOp.getLoc(), storeFrom.getType().cast<ShapedType>().getRank(),
+      storeTo, storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+      storeOp.getMixedStrides());
 
   b.create<linalg::CopyOp>(storeOp->getLoc(), storeFrom, subview);
   return success();
@@ -1289,7 +1295,6 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
                                               BufferizationPlan &plan) {
   Location loc = op.getLoc();
   Value result = op.getResult();
-  ShapedType resultType = op.getType();
   Value resultBuffer = bvm.lookup(result);
 
   // If `dest` and `result` are not equivalent, need a copy for that.
@@ -1310,16 +1315,8 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
   SmallVector<OpFoldResult> offsets = op.getMixedOffsets();
   SmallVector<OpFoldResult> sizes = op.getMixedSizes();
   SmallVector<OpFoldResult> strides = op.getMixedStrides();
-  MemRefType subViewResultType =
-      (sourceType.getRank() < resultType.getRank()
-           ? memref::SubViewOp::inferRankReducedResultType(
-                 sourceType.getRank(),
-                 resultBuffer.getType().cast<MemRefType>(), offsets, sizes,
-                 strides)
-                 .cast<MemRefType>()
-           : MemRefType());
-  Value subViewOp = createSubviewOp(b, loc, resultBuffer, offsets, sizes,
-                                    strides, subViewResultType);
+  Value subViewOp = createSubviewOp(b, loc, sourceType.getRank(), resultBuffer,
+                                    offsets, sizes, strides);
   b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
   return success();
 }

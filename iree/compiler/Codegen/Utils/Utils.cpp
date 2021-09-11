@@ -215,7 +215,7 @@ LogicalResult getComputeOps(FuncOp funcOp,
   if (failed(getFilteredOps(
           funcOp,
           [](Operation *op) {
-            return isa<linalg::LinalgOp, linalg_ext::LinalgExtOp>(op);
+            return isa<linalg::LinalgOp, linalg_ext::TiledOpInterface>(op);
           },
           computeOps, tiledLoops))) {
     return failure();
@@ -232,6 +232,9 @@ LogicalResult getComputeOps(FuncOp funcOp,
                             "expected all markers within op to be the same");
       marker = getMarkerOrNull(op);
     }
+  }
+  if (!marker.hasValue() && !tiledLoops.empty()) {
+    marker = getWorkgroupMarker();
   }
   if (marker.hasValue()) {
     for (auto op : computeOps) {

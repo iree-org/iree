@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute, cse))))' %s | IreeFileCheck %s
 
 hal.executable private @static_3d_sort  {
   hal.interface @io {
@@ -52,10 +52,11 @@ hal.executable private @static_3d_sort  {
 //       CHECK:     %[[WG_INPUT:.+]] = memref.subview %[[ARG0]]
 //       CHECK:     %[[WG_INPUT_CAST:.+]] = memref.cast %[[WG_INPUT]]
 //       CHECK:     %[[WG_OUTPUT:.+]] = memref.subview %[[ARG1]]
-//       CHECK:     linalg.copy(%[[WG_INPUT_CAST]], %[[WG_OUTPUT]])
 //       CHECK:     %[[TID_X:.+]] = "gpu.thread_id"() {dimension = "x"}
 //       CHECK:     %[[TID_Y:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK:     %[[T_OUTPUT:.+]] = memref.subview %[[WG_OUTPUT]][%[[TID_Y]], 0, %[[TID_X]]] [1, 32, 1] [1, 1, 1]
-//       CHECK:     %[[T_OUTPUT_CAST:.+]] = memref.cast %[[T_OUTPUT]]
+//       CHECK:     %[[COPY_SOURCE:.+]] = memref.subview %[[WG_INPUT_CAST]][%[[TID_Y]], 0, %[[TID_X]]]
+//       CHECK:     %[[COPY_DEST:.+]] = memref.subview %[[WG_OUTPUT]][%[[TID_Y]], 0, %[[TID_X]]]
+//       CHECK:     linalg.copy(%[[COPY_SOURCE]], %[[COPY_DEST]])
+//       CHECK:     %[[T_OUTPUT_CAST:.+]] = memref.cast %[[COPY_DEST]]
 //       CHECK:     linalg_ext.sort dimension(1)
 //  CHECK-SAME:       outs(%[[T_OUTPUT_CAST]]
