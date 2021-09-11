@@ -74,7 +74,7 @@ hal.executable private @matmul_tensors  {
 
 // -----
 
-//      CHECK: #[[CONFIG:.+]] = {passPipeline = 0 : i32}
+//      CHECK: #[[CONFIG:.+]] = {passPipeline = "CPUDefault"}
 //  CHECK-NOT: #config
 //      CHECK: hal.executable.entry_point public @add_no_config
 // CHECK-SAME:     translation.info = #[[CONFIG]]
@@ -428,7 +428,7 @@ hal.executable private @preset_config_matmul_tensors  {
             %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 512, s0)>(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
             %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {passPipeline = 1 : i32, tileSizes = [[32, 32, 32]]}} ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {passPipeline = "CPUVectorization", tileSizes = [[32, 32, 32]]}} ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:128x512xf32>
           }
         }
@@ -446,7 +446,7 @@ hal.executable private @preset_config_matmul_tensors  {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //      CHECK: hal.executable.entry_point
-// CHECK-SAME:     translation.info = {passPipeline = 1 : i32, workloadPerWorkgroup = [32, 32]}
+// CHECK-SAME:     translation.info = {passPipeline = "CPUVectorization", workloadPerWorkgroup = [32, 32]}
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //  CHECK-DAG:     %[[NWG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
@@ -514,7 +514,7 @@ hal.executable @tensor_insert {
 }
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:   translation.info = {passPipeline = 0 : i32, workloadPerWorkgroup = [64, 64]}
+// CHECK-SAME:   translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64]}
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index

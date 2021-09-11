@@ -28,8 +28,7 @@ IREE::HAL::TranslationInfo buildTranslationInfo(
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workloadPerWorkgroup, MLIRContext *context) {
   OpBuilder builder(context);
-  auto pipelineAttr =
-      IREE::HAL::DispatchLoweringPassPipelineAttr::get(context, passPipeline);
+  auto pipelineAttr = StringAttr::get(context, stringifyEnum(passPipeline));
   ArrayAttr workloadPerWorkgroupAttr = nullptr;
   if (!workloadPerWorkgroup.empty()) {
     workloadPerWorkgroupAttr = builder.getI64ArrayAttr(workloadPerWorkgroup);

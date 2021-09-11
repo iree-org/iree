@@ -13,7 +13,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
     hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
     }
     builtin.module {
       func @fuse_and_vectorize_fill_matmul() {
@@ -83,7 +83,7 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
     hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
     }
     builtin.module {
       func @fuse_and_vectorize_matmul_add() {

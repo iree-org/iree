@@ -13,7 +13,7 @@ hal.executable private @conv_static_shape_f32  {
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [4: index, 4: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = constant 2: index
@@ -112,7 +112,7 @@ hal.executable private @depthwise_conv_static_shape_f32  {
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [8: index, 2: index, 2: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = constant 6: index

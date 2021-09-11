@@ -12,7 +12,7 @@ hal.executable private @matmul_static_shape_f16  {
     hal.executable.entry_point @matmul_static_shape_f16 attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
     }
     builtin.module {
       func @matmul_static_shape_f16() {
@@ -78,7 +78,7 @@ hal.executable private @matmul_static_shape_f32  {
     hal.executable.entry_point @matmul_static_shape_f32 attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
     }
     builtin.module {
       func @matmul_static_shape_f32() {

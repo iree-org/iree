@@ -49,7 +49,7 @@ hal.executable @tensor_insert {
 }
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:   translation.info = {passPipeline = 5 : i32, workloadPerWorkgroup = [64, 1]}
+// CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [64, 1]}
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
@@ -103,7 +103,7 @@ hal.executable @tensor_insert {
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 16], [], [1, 1]{{\]}}}
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:   translation.info = {passPipeline = 5 : i32, workloadPerWorkgroup = [16, 1]}
+// CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [16, 1]}
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index

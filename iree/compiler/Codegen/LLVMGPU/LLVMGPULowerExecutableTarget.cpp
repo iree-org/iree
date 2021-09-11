@@ -77,10 +77,11 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     auto entryPointOp = it.second;
     if (IREE::HAL::TranslationInfo translationInfo =
             getTranslationInfo(entryPointOp)) {
-      IREE::HAL::DispatchLoweringPassPipeline currPipeline =
-          translationInfo.passPipeline().getValue();
+      Optional<IREE::HAL::DispatchLoweringPassPipeline> currPipeline =
+          getLoweringPassPipeline(translationInfo);
+      if (!currPipeline) continue;
       if (passPipeline) {
-        if (currPipeline != passPipeline.getValue()) {
+        if (currPipeline.getValue() != passPipeline.getValue()) {
           moduleOp.emitError(
               "unhandled compilation of entry point function with different "
               "pass pipelines within a module");
