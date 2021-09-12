@@ -18,7 +18,7 @@ import re
 #   use a string here. What value to set depends on the noise range of the
 #   particular benchmark.
 NOISY_BENCHMARKS = [
-    (re.compile(r"^PoseNet.*GPU-Mali-G77"), "100%"),
     (re.compile(r"^DeepLabV3.*GPU-Mali-G77"), "100%"),
     (re.compile(r"^MobileSSD.*GPU-Mali-G77"), "100%"),
+    (re.compile(r"^PoseNet.*GPU-Mali-G77"), "100%"),
 ]
