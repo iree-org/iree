@@ -10,8 +10,10 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
@@ -114,6 +116,33 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       workgroupSize);
 }
 
+static LogicalResult setFftConfig(FuncOp entryPoint, linalg_ext::FftOp op) {
+  auto partitionedLoops = getPartitionedLoops(op);
+  unsigned loopDepth = partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSize(loopDepth, 0);
+  SmallVector<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
+
+  // Tiling along partitioned loops with size 1.
+  for (int64_t loopIndex : partitionedLoops) {
+    workgroupTileSize[loopIndex] = 1;
+  }
+  auto rank = op.getOperandRank();
+  if (workgroupTileSize.size() >= rank && workgroupTileSize[rank - 1] != 0) {
+    APInt value;
+    if (matchPattern(op.getStage(), m_ConstantInt(&value))) {
+      workgroupTileSize[rank - 1] = 1 << value.getSExtValue();
+    } else {
+      op.emitError("non-constant stage might not work for fft op");
+      return failure();
+    }
+  }
+  TileSizesListType tileSizes = {workgroupTileSize};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+      workgroupSize);
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
 static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   IREE::HAL::DispatchLoweringPassPipeline passPipeline =
@@ -198,6 +227,9 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
         linalgOp.getNumParallelLoops() >= 2) {
       return setContractConfig(entryPointFn, linalgOp);
     }
+  }
+  if (auto fftOp = dyn_cast<linalg_ext::FftOp>(computeOp)) {
+    return setFftConfig(entryPointFn, fftOp);
   }
   return setRootDefaultConfig(entryPointFn, computeOp);
 }
