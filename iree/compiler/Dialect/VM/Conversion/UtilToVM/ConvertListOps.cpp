@@ -27,9 +27,14 @@ class ListCreateOpConversion
       IREE::Util::ListCreateOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Util::ListCreateOpAdaptor srcOperands(operands);
+    Value initialCapacity = srcOperands.initial_capacity();
+    if (!initialCapacity) {
+      initialCapacity = rewriter.create<IREE::VM::ConstI32Op>(
+          srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
+    }
     rewriter.replaceOpWithNewOp<IREE::VM::ListAllocOp>(
         srcOp, typeConverter->convertType(srcOp.result().getType()),
-        srcOperands.initial_capacity());
+        initialCapacity);
     return success();
   }
 };
