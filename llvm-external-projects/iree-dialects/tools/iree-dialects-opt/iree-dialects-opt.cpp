@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
@@ -15,6 +16,8 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
+using namespace mlir::iree;
+using namespace mlir::iree_pydm;
 
 int main(int argc, char **argv) {
   registerAsmPrinterCLOptions();
@@ -22,6 +25,9 @@ int main(int argc, char **argv) {
 
   registerTransformsPasses();
   registerSCFPasses();
+
+  // Local dialects.
+  registerIREEPyDMTransformsPasses();
 
   DialectRegistry registry;
   registry.insert<
