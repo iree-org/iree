@@ -63,7 +63,7 @@ hal.executable @matmul_1024x2048x512 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @matmul_1024x2048x512
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [128, 16]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [128, 16]}
 //           CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
@@ -140,7 +140,7 @@ hal.executable @matmul_3136x24x96 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @matmul_3136x24x96
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [8, 224]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 224]}
 //           CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
@@ -217,7 +217,7 @@ hal.executable @matmul_196x64x192 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @matmul_196x64x192
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 28]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 28]}
 //           CHECK-SAME:   workgroup_size = [16 : index, 4 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
@@ -289,7 +289,7 @@ hal.executable @matmul_12544x96x16 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @matmul_12544x96x16
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 64]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 64]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
@@ -366,7 +366,7 @@ hal.executable @matmul_49x160x576 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @matmul_49x160x576
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 7]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 7]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
@@ -454,7 +454,7 @@ hal.executable @batch_matmul_4x384x384 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @batch_matmul_4x384x384
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [128, 16, 1]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [128, 16, 1]}
 //           CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%[[X]]]
@@ -541,7 +541,7 @@ hal.executable @batch_matmul_4x8x8 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @batch_matmul_4x8x8
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [8, 8, 1]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 8, 1]}
 //           CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[X]]]

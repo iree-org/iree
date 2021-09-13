@@ -59,6 +59,13 @@ IREE::HAL::TranslationInfo buildTranslationInfo(
 IREE::HAL::TranslationInfo getTranslationInfo(
     IREE::HAL::ExecutableEntryPointOp entryPointOp);
 
+/// Get the pass pipeline specified in the `translationInfo`
+inline Optional<IREE::HAL::DispatchLoweringPassPipeline>
+getLoweringPassPipeline(IREE::HAL::TranslationInfo translationInfo) {
+  return IREE::HAL::symbolizeDispatchLoweringPassPipeline(
+      translationInfo.passPipeline().getValue());
+}
+
 /// Returns the workgroup size specified on the `entryPointOp`.
 SmallVector<int64_t> getWorkgroupSize(
     IREE::HAL::ExecutableEntryPointOp entryPointOp);
@@ -142,6 +149,13 @@ inline SmallVector<int64_t, 4> getNativeVectorSize(Operation *op) {
   auto configAttr = getLoweringConfig(op);
   if (!configAttr) return {};
   return getNativeVectorSize(configAttr);
+}
+
+/// Get the pass pipeline specified in the `loweringConfig`
+inline Optional<IREE::HAL::DispatchLoweringPassPipeline>
+getLoweringPassPipeline(IREE::HAL::LoweringConfig config) {
+  return IREE::HAL::symbolizeDispatchLoweringPassPipeline(
+      config.passPipeline().getValue());
 }
 
 }  // namespace iree_compiler

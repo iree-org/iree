@@ -248,8 +248,8 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     if (auto config = getLoweringConfig(computeOp)) {
       IREE::HAL::DispatchLoweringPassPipeline passPipeline =
           IREE::HAL::DispatchLoweringPassPipeline::CPUDefault;
-      if (auto passPipelineAttr = config.passPipeline()) {
-        passPipeline = passPipelineAttr.getValue();
+      if (auto setPassPipeline = getLoweringPassPipeline(config)) {
+        passPipeline = setPassPipeline.getValue();
       }
       SmallVector<int64_t, 4> workgroupSize;
       if (auto workgroupSizeAttr = config.workgroupSize()) {

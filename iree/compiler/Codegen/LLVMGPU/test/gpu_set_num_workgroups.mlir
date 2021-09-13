@@ -36,7 +36,7 @@ hal.executable @add_dispatch_0 {
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[128], [], [4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
 //      CHECK: hal.executable.entry_point public @add_dispatch_0
-// CHECK-SAME:     passPipeline = 3 : i32
+// CHECK-SAME:     passPipeline = "LLVMGPUVectorize"
 // CHECK-SAME:     workloadPerWorkgroup = [128]
 // CHECK-SAME:     workgroup_size = [32 : index, 1 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index,
@@ -96,7 +96,7 @@ hal.executable private @dot_dispatch_1  {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
 //      CHECK: hal.executable.entry_point public @dot_dispatch_1
-// CHECK-SAME:     passPipeline = 4 : i32
+// CHECK-SAME:     passPipeline = "LLVMGPUMatmulSimt"
 // CHECK-SAME:     workloadPerWorkgroup = [2, 4]
 // CHECK-SAME:     workgroup_size = [2 : index, 4 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index,
@@ -143,7 +143,7 @@ hal.executable @reduction_dispatch {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG0:.+]] = {passPipeline = 2 : i32}
+//  CHECK-DAG: #[[CONFIG0:.+]] = {passPipeline = "LLVMGPUDistribute"}
 //  CHECK-DAG: #[[CONFIG1:.+]] = {tileSizes = {{\[}}[]{{\]}}}
 //      CHECK: hal.executable.entry_point public @predict_dispatch_153
 // CHECK-SAME:     translation.info = #[[CONFIG0]]
@@ -201,7 +201,7 @@ hal.executable @tensor_insert {
 }
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:   translation.info = {passPipeline = 2 : i32, workloadPerWorkgroup = [128, 1]}
+// CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUDistribute", workloadPerWorkgroup = [128, 1]}
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
@@ -249,7 +249,7 @@ hal.executable @tensor_insert {
 //  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 128], [], [1, 4]{{\]}}}
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:   translation.info = {passPipeline = 3 : i32, workloadPerWorkgroup = [128, 1]}
+// CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUVectorize", workloadPerWorkgroup = [128, 1]}
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = constant 1 : index

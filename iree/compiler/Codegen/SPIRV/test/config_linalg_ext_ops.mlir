@@ -35,7 +35,7 @@ hal.executable private @static_1d_sort  {
 // Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
 // CHECK-LABEL: hal.executable.entry_point public @static_1d_sort
-//  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
+//  CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize"}
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
 //  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
@@ -99,7 +99,7 @@ hal.executable private @static_3d_sort  {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @static_3d_sort
-//           CHECK-SAME:   translation.info = {passPipeline = 5 : i32, workloadPerWorkgroup = [16, 1]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [16, 1]}
 //           CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
@@ -151,7 +151,7 @@ hal.executable private @static_1d_fft  {
 // Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
 // CHECK-LABEL: hal.executable.entry_point public @static_1d_fft
-//  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
+//  CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize"}
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
 //  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
@@ -202,7 +202,7 @@ hal.executable private @static_3d_fft  {
 // Right now n-D fft does not support tiling too.
 
 // CHECK-LABEL: hal.executable.entry_point public @static_3d_fft
-//  CHECK-SAME:   translation.info = {passPipeline = 6 : i32}
+//  CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize"}
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
 //  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index

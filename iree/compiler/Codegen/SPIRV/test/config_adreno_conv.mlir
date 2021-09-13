@@ -75,7 +75,7 @@ hal.executable @conv_112x112x512 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @conv_112x112x512
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [256, 8, 1]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [256, 8, 1]}
 //           CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C2:.+]] = constant 2 : index
@@ -164,7 +164,7 @@ hal.executable @conv_112x112x32 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @conv_112x112x32
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 16, 4]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 16, 4]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
@@ -252,7 +252,7 @@ hal.executable @conv_16x16x16 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @conv_16x16x16
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 8, 8]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 8, 8]}
 //           CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
@@ -341,7 +341,7 @@ hal.executable @dwconv_28x28x144 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @dwconv_28x28x144
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 8, 8]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 8, 8]}
 //           CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C9:.+]] = constant 9 : index
@@ -430,7 +430,7 @@ hal.executable @dwconv_4x4x8 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @dwconv_4x4x8
-//           CHECK-SAME:   translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [8, 4, 4]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 4, 4]}
 //           CHECK-SAME:   workgroup_size = [2 : index, 4 : index, 4 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index

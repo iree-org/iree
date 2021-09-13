@@ -12,7 +12,7 @@ hal.executable private @batch_matmul_static_shape  {
     hal.executable.entry_point @batch_matmul_static_shape attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8, 1]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8, 1]}
     }
     builtin.module {
       func @batch_matmul_static_shape() {
@@ -380,7 +380,7 @@ hal.executable private @fused_fill_batch_matmul  {
     hal.executable.entry_point @fused_fill_batch_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8, 1]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8, 1]}
     }
     builtin.module {
       func @fused_fill_batch_matmul() {
