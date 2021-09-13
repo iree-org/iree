@@ -270,10 +270,7 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     # Set different threshold for noisy benchmarks.
     for regex, threshold in NOISY_BENCHMARKS:
       if regex.match(name):
-        if threshold.endswith("%"):
-          similar_threshold = float(threshold.rstrip("%")) / 100
-        else:
-          raise ValueError("Absolute threshold value support unimplemented")
+        similar_threshold = float(threshold) / 100
         break
 
     current = results.mean_time
