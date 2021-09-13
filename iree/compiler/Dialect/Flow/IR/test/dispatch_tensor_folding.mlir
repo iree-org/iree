@@ -37,7 +37,6 @@ func @canonicalizePartiallyStaticOperands(%arg0: !flow.dispatch.tensor<readonly:
 //      CHECK-SAME: strides = [%[[STRIDE]], 1]
 //      CHECK-SAME: !flow.dispatch.tensor<readonly:4x4xf32> -> tensor<?x2xf32>
 
-
 // -----
 
 func @canonicalizeDimOfTensorTile(%arg0: !flow.dispatch.tensor<readonly:250x1024xf32>, %arg1 : index, %arg2: index) {
@@ -48,6 +47,7 @@ func @canonicalizeDimOfTensorTile(%arg0: !flow.dispatch.tensor<readonly:250x1024
     "test.sink"(%2) : (index) -> ()
     return
 }
+
 // CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (64, -s0 + 250)>
 // CHECK: @canonicalizeDimOfTensorTile
 // CHECK: %[[ARG0:.+]]: !flow.dispatch.tensor<readonly:250x1024xf32>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index

@@ -50,8 +50,8 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 }  // namespace
 
 namespace {
-struct LLVMCPUTilePadAndVectorizePass
-    : public LLVMCPUTilePadAndVectorizeBase<LLVMCPUTilePadAndVectorizePass> {
+struct LLVMCPUTileAndVectorizePass
+    : public LLVMCPUTileAndVectorizeBase<LLVMCPUTileAndVectorizePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
                     vector::VectorDialect>();
@@ -60,7 +60,7 @@ struct LLVMCPUTilePadAndVectorizePass
 };
 }  // namespace
 
-void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
+void LLVMCPUTileAndVectorizePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
@@ -69,20 +69,13 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
     OwningRewritePatternList l1patterns(&getContext());
     l1patterns.insert<TileWorkgroups>(
         context,
-        linalg::LinalgTilingOptions()
-            .setTileSizeComputationFunction(
-                [](OpBuilder &builder,
-                   Operation *operation) -> SmallVector<Value, 4> {
-                  return getTileSizes(
-                      builder, operation,
-                      static_cast<unsigned>(TilingLevel::Level1Tiles));
-                })
-            .setPaddingValueComputationFunction(
-                [](OpBuilder &b, OpOperand &op) -> Value {
-                  auto t = getElementTypeOrSelf(op.get().getType());
-                  return b.create<ConstantOp>(op.getOwner()->getLoc(), t,
-                                              b.getZeroAttr(t));
-                }),
+        linalg::LinalgTilingOptions().setTileSizeComputationFunction(
+            [](OpBuilder &builder,
+               Operation *operation) -> SmallVector<Value, 4> {
+              return getTileSizes(
+                  builder, operation,
+                  static_cast<unsigned>(TilingLevel::Level1Tiles));
+            }),
         linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupMarker(), context),
             Identifier::get(getWorkgroupL1TileMarker(), context)));
@@ -105,10 +98,11 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
       return signalPassFailure();
     }
   }
+
   // Second level of tiling patterns{
   {
-    OwningRewritePatternList l1patterns(&getContext());
-    l1patterns.insert<TileWorkgroups>(
+    OwningRewritePatternList l2patterns(&getContext());
+    l2patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
@@ -121,7 +115,7 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
             Identifier::get(getWorkgroupL1TileMarker(), context),
             Identifier::get(getVectorizeMarker(), context)));
 
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns)))) {
       return signalPassFailure();
     }
   }
@@ -199,8 +193,8 @@ void LLVMCPUTilePadAndVectorizePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTilePadAndVectorizePass() {
-  return std::make_unique<LLVMCPUTilePadAndVectorizePass>();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass() {
+  return std::make_unique<LLVMCPUTileAndVectorizePass>();
 }
 
 }  // namespace iree_compiler
