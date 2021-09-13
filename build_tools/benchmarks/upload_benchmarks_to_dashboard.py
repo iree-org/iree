@@ -216,7 +216,7 @@ def add_new_iree_series(series_id: str,
   # Adjust average threshold for noisy benchmarks.
   for regex, threshold in NOISY_BENCHMARKS:
     if regex.match(series_id):
-      average_range = threshold
+      average_range = f'{threshold}%'
       break
 
   payload = compose_series_payload(IREE_PROJECT_ID,

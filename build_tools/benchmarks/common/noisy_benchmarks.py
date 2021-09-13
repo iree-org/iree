@@ -13,12 +13,10 @@ import re
 # - A threshold for computing the benchmark value average. Benchmark sample
 #   values from consecutive runs and within the given range will be considered
 #   as similar (with some noise). They will be used to compute the moving
-#   average. It is a string that sent to Dana as API call JSON payloadsdirectly.
-#   There are two formats supported: a percentage or an absolute value. So we
-#   use a string here. What value to set depends on the noise range of the
-#   particular benchmark.
+#   average. The number will be interpreted as a percentage. What value to set
+#   depends on the noise range of the particular benchmark.
 NOISY_BENCHMARKS = [
-    (re.compile(r"^PoseNet.*GPU-Mali-G77"), "100%"),
-    (re.compile(r"^DeepLabV3.*GPU-Mali-G77"), "100%"),
-    (re.compile(r"^MobileSSD.*GPU-Mali-G77"), "100%"),
+    (re.compile(r"^DeepLabV3.*GPU-Mali-G77"), 100),
+    (re.compile(r"^MobileSSD.*GPU-Mali-G77"), 100),
+    (re.compile(r"^PoseNet.*GPU-Mali-G77"), 100),
 ]
