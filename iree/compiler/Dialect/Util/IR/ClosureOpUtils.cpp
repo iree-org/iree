@@ -87,6 +87,7 @@ void excludeClosureOperandsAndResults(
     }
     remainingResultDims = remainingResultDims.drop_front(numDynamicDims);
   }
+  assert(remainingResultDims.empty());
 }
 
 void eraseRegionResults(Region &region,
@@ -248,10 +249,9 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   SmallVector<Value, 4> preservedResults;
   SmallVector<unsigned, 4> elidedResults;
   for (auto result : llvm::enumerate(closureOp.getClosureResults())) {
-    // You can drop a result if the use is empty, and that it is only written to
-    // within the dispatch region.
-    if (result.value().use_empty() &&
-        !closureOp.getResultAccess(result.index()).isRead) {
+    // You can drop a result if the use is empty and not read via a tie.
+    auto access = closureOp.getResultAccess(result.index());
+    if (result.value().use_empty() && !access.isRead) {
       elidedResults.push_back(result.index());
     } else {
       preservedResults.push_back(result.value());

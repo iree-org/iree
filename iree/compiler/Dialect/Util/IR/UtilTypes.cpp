@@ -13,6 +13,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
@@ -175,6 +176,7 @@ SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {
   return indices;
 }
 
+// static
 Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
   Value baseValue = derivedValue;
   while (auto definingOp =
@@ -186,31 +188,46 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
   return baseValue;
 }
 
-bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
-  auto storageAttr =
-      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
-  if (!storageAttr) return false;
-  auto valueAttrs = storageAttr.getValue();
-  if (valueAttrs.empty()) return false;
-  auto tiedOp = cast<TiedOpInterface>(op);
-  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
-  for (unsigned i = 0; i < valueAttrs.size(); ++i) {
-    int64_t index = valueAttrs[i].cast<IntegerAttr>().getInt();
-    index = index != TiedOpInterface::kUntiedIndex
-                ? tiedOperandsOffset + index
-                : TiedOpInterface::kUntiedIndex;
-    if (index == operandIndex) return true;
+// static
+bool TiedOpInterface::hasAnyTiedUses(Value value) {
+  for (auto &use : value.getUses()) {
+    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
+    if (!tiedOp) continue;
+    if (tiedOp.isOperandTied(use.getOperandNumber())) return true;
   }
   return false;
 }
 
-LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
-  auto storageAttr =
-      tiedOp->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
-  if (!storageAttr || storageAttr.getValue().empty()) {
-    return success();
+bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
+  auto tiedOp = dyn_cast<TiedOpInterface>(op);
+  if (!tiedOp) return false;
+  SmallVector<Value> results;
+  auto tiedIndices = tiedOp.getTiedResultOperandIndices();
+  for (unsigned i = 0; i < tiedIndices.size(); ++i) {
+    if (tiedIndices[i] == operandIndex) {
+      return true;
+    }
   }
-  auto tiedOperandIndices = storageAttr.getValue();
+  return false;
+}
+
+SmallVector<Value> detail::getOperandTiedResults(Operation *op,
+                                                 unsigned operandIndex) {
+  auto tiedOp = dyn_cast<TiedOpInterface>(op);
+  if (!tiedOp) return {};
+  SmallVector<Value> results;
+  auto tiedIndices = tiedOp.getTiedResultOperandIndices();
+  for (unsigned i = 0; i < tiedIndices.size(); ++i) {
+    if (tiedIndices[i] == operandIndex) {
+      results.push_back(op->getResult(i));
+    }
+  }
+  return results;
+}
+
+LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
+  auto tiedOperandIndices = tiedOp.getTiedResultOperandIndices();
+  if (tiedOperandIndices.empty()) return success();
   if (tiedOperandIndices.size() != tiedOp->getNumResults()) {
     return tiedOp.emitError("op results/tied operand indices mismatch");
   }
@@ -263,6 +280,86 @@ void excludeTiedOperandAndResultIndices(
     }
     tiedOperandIndices.push_back(tiedOperandIndex);
   }
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::SizeAwareTypeInterface
+//===----------------------------------------------------------------------===//
+
+static bool isValueUsableForOp(Value value, Operation *forOp) {
+  if (forOp->getBlock() == nullptr) {
+    // Op is not in a block; can't analyze (maybe?).
+    return false;
+  }
+  auto *definingBlock = value.getParentBlock();
+  if (definingBlock == forOp->getBlock()) {
+    // Defined in the same block; ensure block order.
+    if (value.isa<BlockArgument>()) return true;
+    if (value.getDefiningOp()->isBeforeInBlock(forOp)) return true;
+  } else if (definingBlock->isEntryBlock()) {
+    // Entry block always dominates - fast path for constants.
+    return true;
+  } else {
+    // See if block the value is defined in dominates the forOp block.
+    // TODO(benvanik): optimize this, it's terribly expensive to recompute.
+    DominanceInfo dominanceInfo(forOp->getParentOp());
+    return dominanceInfo.dominates(definingBlock, forOp->getBlock());
+  }
+  return false;
+}
+
+// static
+Value SizeAwareTypeInterface::findSizeValue(Value resourceValue,
+                                            Operation *forOp) {
+  // See if the value is produced by a size-aware op; we can just ask for the
+  // size it has tied.
+  auto *definingOp = resourceValue.getDefiningOp();
+  if (auto sizeAwareOp =
+          llvm::dyn_cast_or_null<IREE::Util::SizeAwareOpInterface>(
+              definingOp)) {
+    return sizeAwareOp.getResultSizeFromValue(resourceValue);
+  }
+
+  // Walk the users to see if any can report the size.
+  for (auto &use : resourceValue.getUses()) {
+    auto sizeAwareOp =
+        llvm::dyn_cast<IREE::Util::SizeAwareOpInterface>(use.getOwner());
+    if (!sizeAwareOp) continue;
+    auto sizeValue = sizeAwareOp.getOperandSize(use.getOperandNumber());
+    if (!sizeValue) continue;
+    if (isValueUsableForOp(sizeValue, forOp)) return sizeValue;
+  }
+
+  return {};
+}
+
+// static
+Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
+                                             OpBuilder &builder) {
+  auto sizeAwareType =
+      resourceValue.getType().dyn_cast<IREE::Util::SizeAwareTypeInterface>();
+  if (!sizeAwareType) {
+    return {};  // Not a sized type.
+  }
+  if (!builder.getInsertionPoint().getNodePtr()->isKnownSentinel()) {
+    Operation &insertionPt = *builder.getInsertionPoint();
+    auto sizeValue = sizeAwareType.findSizeValue(resourceValue, &insertionPt);
+    if (sizeValue) {
+      return sizeValue;  // Found in IR.
+    }
+  }
+  // TODO(benvanik): make this cleaner.
+  auto *definingOp = resourceValue.getDefiningOp();
+  if (auto sizeAwareOp =
+          llvm::dyn_cast_or_null<IREE::Util::SizeAwareOpInterface>(
+              definingOp)) {
+    return sizeAwareOp.getResultSizeFromValue(resourceValue);
+  } else if (auto inferSizeType =
+                 resourceValue.getType()
+                     .dyn_cast<IREE::Util::InferTypeSizeInterface>()) {
+    return inferSizeType.inferSizeFromValue(loc, resourceValue, builder);
+  }
+  return {};
 }
 
 //===----------------------------------------------------------------------===//

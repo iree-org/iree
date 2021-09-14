@@ -156,6 +156,7 @@ void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
                                llvm::Optional<unsigned> operandIndex);
 SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op);
 bool isOperandTied(Operation *tiedOp, unsigned operandIndex);
+SmallVector<Value> getOperandTiedResults(Operation *op, unsigned operandIndex);
 LogicalResult verifyTiedOp(TiedOpInterface tiedOp);
 }  // namespace detail
 

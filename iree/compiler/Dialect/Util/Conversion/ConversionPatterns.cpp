@@ -31,23 +31,24 @@ class GenericConvertTypesConversion : public OpConversionPattern<T> {
   LogicalResult matchAndRewrite(
       T op, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Type> newTypes;
+    SmallVector<Type> resultTypes;
     bool anyChanged = false;
-    for (auto oldNew : llvm::zip(op->getOperands(), newOperands)) {
-      auto oldValue = std::get<0>(oldNew);
-      auto newValue = std::get<1>(oldNew);
-      if (oldValue.getType() != newValue.getType()) {
-        anyChanged = true;
-        break;
-      }
-    }
     for (auto oldType : op.getOperation()->getResultTypes()) {
-      auto newType = this->getTypeConverter()->convertType(oldType);
-      if (oldType != newType) anyChanged = true;
-      newTypes.push_back(newType);
+      SmallVector<Type> newTypes;
+      if (failed(this->getTypeConverter()->convertType(oldType, newTypes))) {
+        return rewriter.notifyMatchFailure(op, "unsupported result type");
+      }
+      if (newTypes.size() != 1 || newTypes.front() != oldType) {
+        anyChanged = true;
+      }
+      // TODO(benvanik): figure out this silly expansion stuff. Seems broken.
+      // resultTypes.append(newTypes);
+      resultTypes.push_back(newTypes.front());
     }
     if (!anyChanged) return failure();
-    rewriter.replaceOpWithNewOp<T>(op, newTypes, newOperands, op->getAttrs());
+    auto newOp = rewriter.create<T>(op.getLoc(), resultTypes, newOperands,
+                                    op->getAttrs());
+    rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
 };
@@ -59,6 +60,19 @@ void populateUtilConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns) {
   patterns.insert<GenericConvertTypesConversion<IREE::Util::DoNotOptimizeOp>>(
       typeConverter, context);
+
+  typeConverter.addConversion([&](IREE::Util::PtrType type,
+                                  SmallVectorImpl<Type> &results) {
+    SmallVector<Type> targetTypes;
+    if (failed(typeConverter.convertType(type.getTargetType(), targetTypes))) {
+      return failure();
+    }
+    results.reserve(targetTypes.size());
+    for (auto targetType : targetTypes) {
+      results.push_back(IREE::Util::PtrType::get(targetType));
+    }
+    return success();
+  });
 
   typeConverter.addConversion([&](IREE::Util::ListType type) {
     auto elementType = typeConverter.convertType(type.getElementType());
@@ -76,9 +90,13 @@ void populateUtilConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns) {
   conversionTarget.addDynamicallyLegalOp<IREE::Util::DoNotOptimizeOp>(
       [&](IREE::Util::DoNotOptimizeOp op) {
-        return llvm::all_of(op.getResultTypes(), [&typeConverter](Type t) {
-          return typeConverter.isLegal(t);
-        });
+        return llvm::all_of(op.getOperandTypes(),
+                            [&typeConverter](Type t) {
+                              return typeConverter.isLegal(t);
+                            }) &&
+               llvm::all_of(op.getResultTypes(), [&typeConverter](Type t) {
+                 return typeConverter.isLegal(t);
+               });
       });
 
   conversionTarget.addDynamicallyLegalOp<IREE::Util::ListCreateOp>(
