@@ -525,7 +525,7 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
 static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                                ShapedType rhsType, ValueRange rhsDynamicDims) {
   if (lhsType.hasStaticShape() && rhsType.hasStaticShape() &&
-      lhsType.getNumElements() == rhsType.getNumElements()) {
+      lhsType == rhsType) {
     // Static shape equivalence means we can fast-path the check.
     return true;
   }

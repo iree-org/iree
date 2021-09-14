@@ -660,7 +660,7 @@ Value DispatchOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
 }
 
 std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
-  return getODSOperandIndexAndLength(1);
+  return getODSOperandIndexAndLength(1);  // $operands
 }
 
 //===----------------------------------------------------------------------===//
