@@ -48,6 +48,29 @@ static Value getElementCount(Location loc, Value baseValue,
   return value;
 }
 
+// Returns the total bit count of elements of the given type.
+static Value getElementBitCount(Location loc, Value elementType,
+                                OpBuilder &builder) {
+  return builder.createOrFold<AndOp>(
+      loc,
+      builder.createOrFold<IndexCastOp>(loc, builder.getIndexType(),
+                                        elementType),
+      builder.createOrFold<ConstantIndexOp>(loc, 0xFF));
+}
+
+// Returns the rounded-up byte count of elements of the given type.
+static Value getElementByteCount(Location loc, Value elementType,
+                                 OpBuilder &builder) {
+  auto c1 = builder.createOrFold<ConstantIndexOp>(loc, 1);
+  auto c8 = builder.createOrFold<ConstantIndexOp>(loc, 8);
+  auto bitCount = getElementBitCount(loc, elementType, builder);
+  return builder.createOrFold<UnsignedDivIOp>(
+      loc,
+      builder.createOrFold<SubIOp>(
+          loc, builder.createOrFold<AddIOp>(loc, bitCount, c8), c1),
+      c8);
+}
+
 namespace {
 
 /// Expands hal.allocator.compute_size to IR performing the math.

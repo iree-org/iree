@@ -73,10 +73,6 @@ Value getValueSize(Location loc, Value value, OpBuilder &builder) {
   }
 
   auto type = value.getType();
-  if (auto awareType = type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
-    auto sizeValue = awareType.getSize(value);
-    if (sizeValue) return sizeValue;
-  }
   if (auto inferType = type.dyn_cast<IREE::Util::InferTypeSizeInterface>()) {
     return inferType.inferSizeFromValue(loc, value, builder);
   }
@@ -185,7 +181,11 @@ int32_t TensorRewriteAdaptor::getElementType() {
 }
 
 IntegerAttr TensorRewriteAdaptor::getElementTypeAttr() {
-  return IREE::HAL::getElementTypeAttr(getTensorType().getElementType());
+  auto type = getTensorType().getElementType();
+  auto elementType = getElementTypeValue(type);
+  if (!elementType) return {};
+  return IntegerAttr::get(IntegerType::get(type.getContext(), 32),
+                          elementType.getValue());
 }
 
 int32_t TensorRewriteAdaptor::getEncodingType() {
@@ -194,7 +194,10 @@ int32_t TensorRewriteAdaptor::getEncodingType() {
 
 IntegerAttr TensorRewriteAdaptor::getEncodingTypeAttr() {
   // TODO(#6762): get encoding attribute from the tensor type.
-  return IREE::HAL::getEncodingTypeAttr({}, loc_.getContext());
+  auto encodingType = getEncodingTypeValue({});
+  if (!encodingType) return {};
+  return IntegerAttr::get(IntegerType::get(loc_.getContext(), 32),
+                          encodingType.getValue());
 }
 
 llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims() {

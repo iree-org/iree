@@ -326,52 +326,11 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
   return llvm::None;
 }
 
-IntegerAttr getElementTypeAttr(Type type) {
-  auto elementType = getElementTypeValue(type);
-  if (!elementType) return {};
-  return IntegerAttr::get(IntegerType::get(type.getContext(), 32),
-                          elementType.getValue());
-}
-
-size_t getElementBitCount(IntegerAttr elementType) {
-  return static_cast<size_t>((elementType.getValue().getZExtValue()) & 0xFF);
-}
-
-Value getElementBitCount(Location loc, Value elementType, OpBuilder &builder) {
-  return builder.createOrFold<AndOp>(
-      loc,
-      builder.createOrFold<IndexCastOp>(loc, builder.getIndexType(),
-                                        elementType),
-      builder.createOrFold<ConstantIndexOp>(loc, 0xFF));
-}
-
-size_t getElementByteCount(IntegerAttr elementType) {
-  return (getElementBitCount(elementType) + 8 - 1) / 8;
-}
-
-Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
-  auto c1 = builder.createOrFold<ConstantIndexOp>(loc, 1);
-  auto c8 = builder.createOrFold<ConstantIndexOp>(loc, 8);
-  auto bitCount = getElementBitCount(loc, elementType, builder);
-  return builder.createOrFold<UnsignedDivIOp>(
-      loc,
-      builder.createOrFold<SubIOp>(
-          loc, builder.createOrFold<AddIOp>(loc, bitCount, c8), c1),
-      c8);
-}
-
 llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
   // TODO(#6762): encoding attribute handling/mapping to enums.
   assert(!attr && "encoding types other than default not yet supported");
   // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
   return 1;
-}
-
-IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context) {
-  auto encodingType = getEncodingTypeValue(attr);
-  if (!encodingType) return {};
-  return IntegerAttr::get(IntegerType::get(context, 32),
-                          encodingType.getValue());
 }
 
 //===----------------------------------------------------------------------===//
