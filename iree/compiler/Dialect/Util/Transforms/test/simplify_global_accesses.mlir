@@ -1,14 +1,14 @@
-// RUN: iree-opt -split-input-file -iree-util-simplify-global-accesses %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-util-simplify-global-accesses)' %s | IreeFileCheck %s
 
 util.global private @varA = dense<1> : tensor<2xi32>
 util.global private @varB = dense<3> : tensor<2x4xi32>
 
 // CHECK-LABEL: @constants()
 func @constants() {
-  // CHECK-NEXT: %[[VAR_A:.+]] = util.global.load @varA : tensor<2xi32>
-  // CHECK-NEXT: %[[VAR_B:.+]] = util.global.load @varB : tensor<2x4xi32>
-  // CHECK-NEXT: constant 10
+  // CHECK-DAG: constant 10
   %w = constant 10 : index
+  // CHECK-DAG: %[[VAR_A:.+]] = util.global.load @varA : tensor<2xi32>
+  // CHECK-DAG: %[[VAR_B:.+]] = util.global.load @varB : tensor<2x4xi32>
   %varA = util.global.load @varA : tensor<2xi32>
   // CHECK-NEXT: %[[T:.+]] = flow.dispatch @ex::@dispatch0{{.+}}(%[[VAR_A]])
   %d0 = flow.dispatch @ex::@dispatch0[%w](%varA) : (tensor<2xi32>) -> tensor<2xi32>
