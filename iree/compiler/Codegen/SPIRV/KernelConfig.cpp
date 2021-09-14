@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
@@ -83,6 +84,8 @@ static LogicalResult defineConvWorkgroupCountRegion(
     std::array<Value, 3> xyz;
     for (unsigned i = 0; i < 3; ++i) {
       int64_t count = outputShape[i] / workgroupTileSizes[i];
+      // This is meant for perfectly tilable cases. Double check that.
+      assert(outputShape[i] % workgroupTileSizes[i] == 0 && count != 0);
       xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
     }
     return xyz;
@@ -139,15 +142,28 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
   // Deduce the configruation for the OW and OH dimension. Try to make them even
   // if possible given we typically have images with the same height and width.
-  if (ow == oh && residualThreads != 1 &&
-      llvm::Log2_64(residualThreads) % 2 == 0) {
-    int64_t yz = 1 << (llvm::Log2_64(residualThreads) / 2);
+  bool tileToSquare = false;
+  unsigned log2Threads = llvm::Log2_64(residualThreads);
+  if (ow == oh && residualThreads != 1 && log2Threads % 2 == 0) {
+    int64_t yz = 1 << (log2Threads / 2);
+
     int64_t chosenTileSize = 1 << (llvm::Log2_64(residualTilingFactor) / 2);
-    while (ow % chosenTileSize != 0) chosenTileSize >>= 1;
-    workgroupSize[1] = workgroupSize[2] = yz;
-    workgroupTileSizes[2] = workgroupTileSizes[1] = yz * chosenTileSize;
-    invocationTileSizes[2] = invocationTileSizes[1] = chosenTileSize;
-  } else {
+    while (chosenTileSize >= 1 && ow % (yz * chosenTileSize) != 0) {
+      chosenTileSize >>= 1;
+    }
+
+    if (chosenTileSize != 0) {
+      workgroupSize[1] = workgroupSize[2] = yz;
+      workgroupTileSizes[2] = workgroupTileSizes[1] = yz * chosenTileSize;
+      invocationTileSizes[2] = invocationTileSizes[1] = chosenTileSize;
+      tileToSquare = true;
+    }
+  }
+
+  // Otherwise treat OW and OH separately to allow them to have different number
+  // of threads and tiling size.
+  if (!tileToSquare) {
+    // Decide the tiling and distribution parameters for one dimension.
     auto decideOneDim = [&](int64_t inputDim, int64_t &wgDimSize,
                             int64_t &wgTileSize, int64_t &invoTileSize) {
       for (int64_t dim = residualThreads; dim >= 1; dim >>= 1) {
@@ -372,8 +388,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
                                       Operation *rootOp) {
   LogicalResult result = success();
-  // First try to find a proper CodeGen configuration for the current
-  // target architecture.
+  // First try to find a proper CodeGen configuration to tile and vectorize for
+  // the current target architecture.
   switch (targetEnv.getVendorID()) {
     case spirv::Vendor::ARM:
       result = detail::setMaliCodeGenConfig(targetEnv, rootOp);
@@ -398,11 +414,16 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
           [limits](auto op) { return setOpConfig(limits, op); })
       .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
-          [](auto op) {
-            // It's common to see 32 threads per subgroup for GPUs.
-            // The tiling factor 32 is just a best guess.
-            return detail::setConvOpConfig(op, /*subgroupSize=*/32,
-                                           /*bestTilingFactor=*/32);
+          [limits](auto op) {
+            // Try to tile and vectorize first. It's common to see 32 threads
+            // per subgroup for GPUs.
+            auto result = detail::setConvOpConfig(op, /*subgroupSize=*/32,
+                                                  /*bestTilingFactor=*/32);
+            if (failed(result)) return result;
+            if (getLoweringConfig(op)) return result;
+
+            // If unsuccessful, try to tile and distribute.
+            return setDefaultOpConfig(limits, op);
           })
       .Default([](Operation *) { return success(); });
 };

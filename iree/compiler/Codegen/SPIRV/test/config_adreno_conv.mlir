@@ -341,16 +341,16 @@ hal.executable @dwconv_28x28x144 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @dwconv_28x28x144
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 8, 8]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
 //           CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C9:.+]] = constant 9 : index
-//           CHECK-NEXT:   %[[C3:.+]] = constant 3 : index
-//           CHECK-NEXT:   hal.return %[[C9]], %[[C3]], %[[C3]]
+//           CHECK-NEXT:   %[[C7:.+]] = constant 7 : index
+//           CHECK-NEXT:   hal.return %[[C9]], %[[C7]], %[[C7]]
 
 //                CHECK: func @dwconv_28x28x144()
 //                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 8, 8, 16], [], [0, 2, 2, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 1, 1, 4]]}
 
 // -----
 
