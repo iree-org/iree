@@ -21,17 +21,6 @@ func @unused_load() {
 
 // -----
 
-util.global private @v_const = dense<1.0> : tensor<8xf32>
-// CHECK-LABEL: @fold_immutable_const
-func @fold_immutable_const() -> tensor<8xf32> {
-  // CHECK-NEXT: %[[CONST:.+]] = constant dense<1.{{.+}}> : tensor<8xf32>
-  %0 = util.global.load @v_const : tensor<8xf32>
-  // CHECK-NEXT: return %[[CONST]] : tensor<8xf32>
-  return %0 : tensor<8xf32>
-}
-
-// -----
-
 util.global private @v_const {noinline} = dense<1.0> : tensor<8xf32>
 // CHECK-LABEL: @no_fold_noinline_immutable_const
 func @no_fold_noinline_immutable_const() -> tensor<8xf32> {

@@ -340,8 +340,6 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
   }];
 
   let verifier = [{ return verifyGlobalLoadOp(*this); }];
-
-  let hasFolder = 1;
 }
 
 def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {

@@ -20,6 +20,7 @@ iree_lit_test_suite(
             "block_patterns.mlir",
             "combine_initializers.mlir",
             "drop_compiler_hints.mlir",
+            "fold_globals.mlir",
             "simplify_global_accesses.mlir",
         ],
         include = ["*.mlir"],

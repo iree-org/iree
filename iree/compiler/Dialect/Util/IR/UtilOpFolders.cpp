@@ -47,27 +47,25 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
 // Inlines constant stores from initializers into the global initializer.
 // This is not strictly required but can help our initialization code perform
 // more efficient initialization of large numbers of primitive values.
-struct InlineConstInitializer : public OpRewritePattern<InitializerOp> {
+struct InlineConstantGlobalInitializer
+    : public OpRewritePattern<InitializerOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Operation *> deadOps;
-    op.walk([&](Operation *op) {
-      if (!isa<GlobalStoreOp>(op)) return;
-      auto value = op->getOperand(0);
+    op.walk([&](GlobalStoreOp storeOp) {
       Attribute valueAttr;
-      if (!matchPattern(value, m_Constant(&valueAttr))) return;
-      auto globalRefAttr = op->getAttrOfType<SymbolRefAttr>("global");
-      assert(globalRefAttr);
-      auto globalOp =
-          SymbolTable::lookupNearestSymbolFrom<GlobalOp>(op, globalRefAttr);
-      if (valueAttr && !valueAttr.isa<UnitAttr>()) {
-        globalOp.initial_valueAttr(valueAttr);
-      } else {
-        globalOp.clearInitialValue();
-      }
-      deadOps.push_back(op);
+      if (!matchPattern(storeOp.value(), m_Constant(&valueAttr))) return;
+      auto globalOp = storeOp.getGlobalOp();
+      rewriter.updateRootInPlace(globalOp, [&]() {
+        if (valueAttr && !valueAttr.isa<UnitAttr>()) {
+          globalOp.initial_valueAttr(valueAttr);
+        } else {
+          globalOp.clearInitialValue();
+        }
+      });
+      deadOps.push_back(storeOp);
     });
     if (deadOps.empty()) return failure();
     for (auto deadOp : deadOps) rewriter.eraseOp(deadOp);
@@ -79,32 +77,12 @@ struct InlineConstInitializer : public OpRewritePattern<InitializerOp> {
 
 void InitializerOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<DropEmptyInitializerOp, InlineConstInitializer>(context);
+  results.insert<DropEmptyInitializerOp, InlineConstantGlobalInitializer>(
+      context);
 }
 
 void GlobalOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                            MLIRContext *context) {}
-
-OpFoldResult GlobalLoadOp::fold(ArrayRef<Attribute> operands) {
-  auto globalOp =
-      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, globalAttr());
-  if (!globalOp) return {};
-  if (globalOp->getAttr("noinline")) {
-    // Inlining of the constant has been disabled.
-    return {};
-  } else if (globalOp.is_mutable()) {
-    // We can't inline mutable globals as they may be changed at any time.
-    // There may still be other folders/canonicalizers that can help (such as
-    // store-forwarding).
-    return {};
-  } else if (!globalOp.initial_value()) {
-    // Uninitialized globals (or those with initializers) can't be folded as
-    // we don't yet know the value. InlineConstantGlobalOpInitializer may
-    // help.
-    return {};
-  }
-  return globalOp.initial_value().getValue();
-}
 
 namespace {
 

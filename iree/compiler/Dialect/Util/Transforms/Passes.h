@@ -17,6 +17,7 @@ namespace Util {
 std::unique_ptr<OperationPass<void>> createApplyPatternsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass();
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 
@@ -25,6 +26,7 @@ inline void registerTransformPasses() {
   createApplyPatternsPass();
   createCombineInitializersPass();
   createDropCompilerHintsPass();
+  createFoldGlobalsPass();
   createSimplifyGlobalAccessesPass();
 }
 
