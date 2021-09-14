@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "block_patterns.mlir"
     "combine_initializers.mlir"
     "drop_compiler_hints.mlir"
     "simplify_global_accesses.mlir"
