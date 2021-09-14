@@ -169,8 +169,8 @@ static LogicalResult setOpConfig(linalg::LinalgOp linalgOp,
   // if possible given we typically have images with the same height and width.
   if (ow == oh && residualThreads != 1 &&
       llvm::Log2_64(residualThreads) % 2 == 0) {
-    int64_t yz = 1 << (llvm::Log2_64(residualThreads) / 2);
-    int64_t chosenTileSize = 1 << (llvm::Log2_64(residualTilingFactor) / 2);
+    int64_t yz = 1ull << (llvm::Log2_64(residualThreads) / 2);
+    int64_t chosenTileSize = 1ull << (llvm::Log2_64(residualTilingFactor) / 2);
     while (ow % chosenTileSize != 0) chosenTileSize >>= 1;
     workgroupSize[1] = workgroupSize[2] = yz;
     workgroupTileSizes[2] = workgroupTileSizes[1] = yz * chosenTileSize;
