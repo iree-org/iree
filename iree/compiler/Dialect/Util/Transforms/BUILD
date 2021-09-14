@@ -13,6 +13,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "CombineInitializers.cpp",
         "DropCompilerHints.cpp",
         "SimplifyGlobalAccesses.cpp",
     ],
