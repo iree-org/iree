@@ -127,4 +127,48 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_matmul_default_dylib-llvm-aot
+  SRCS
+    "matmul_f32.mlir"
+    "matmul_i8.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+  OPT_FLAGS
+    "--iree-flow-export-matmul-test-funcs"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_matmul_f32_mmt4d_8x1x8_dylib-llvm-aot
+  SRCS
+    "matmul_f32.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+  OPT_FLAGS
+    "--iree-flow-export-matmul-test-funcs"
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
+    "--iree-codegen-vectorize-linalg-mmt4d"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_matmul_i8_mmt4d_8x4x8_dylib-llvm-aot
+  SRCS
+    "matmul_i8.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+  OPT_FLAGS
+    "--iree-flow-export-matmul-test-funcs"
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
+    "--iree-codegen-vectorize-linalg-mmt4d"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

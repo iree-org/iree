@@ -106,6 +106,11 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createInjectDispatchTracingPass();
 // Exports all functions and dispatch executables as `() -> ()` benchmark funcs.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
 
+// Exports all functions and dispatch executables as `() -> ()` matmul test
+// funcs.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createExportMatmulTestFuncsPass();
+
 //===----------------------------------------------------------------------===//
 // Linalg transforms
 //===----------------------------------------------------------------------===//

@@ -37,6 +37,7 @@ iree_cc_library(
     "DispatchLinalgOnTensors.cpp"
     "ExpandGlobalDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
+    "ExportMatmulTestFuncs.cpp"
     "FormStreams.cpp"
     "FusionOfTensorOps.cpp"
     "HoistUnstreamableOps.cpp"
@@ -75,6 +76,8 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::Modules::Check::IR
+    iree::compiler::Dialect::Modules::Check::IR::CheckDialect
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Shape::Utils::TypeConversion

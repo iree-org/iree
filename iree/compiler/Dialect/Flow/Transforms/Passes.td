@@ -57,6 +57,12 @@ def ExportBenchmarkFuncs :
   let constructor = "mlir::iree_compiler::IREE::Flow::createExportBenchmarkFuncsPass()";
 }
 
+def ExportMatmulTestFuncs :
+    Pass<"iree-flow-export-matmul-test-funcs", "mlir::ModuleOp"> {
+  let summary = "Exports matmul test functions";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createExportMatmulTestFuncsPass()";
+}
+
 def FormStreams :
     Pass<"iree-flow-form-streams", "mlir::FuncOp"> {
   let summary = "Identifies dispatches that can be grouped into streams within functions.";

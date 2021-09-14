@@ -51,8 +51,8 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;OPT_TOOL"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
     ${ARGN}
   )
 
@@ -84,6 +84,10 @@ function(iree_check_test)
         "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
         "--iree-llvm-target-triple=${_TARGET_TRIPLE}"
         ${_RULE_COMPILER_FLAGS}
+      OPT_TOOL
+        ${_RULE_OPT_TOOL}
+      OPT_FLAGS
+        ${_RULE_OPT_FLAGS}
       TESTONLY
     )
   else(ANDROID)
@@ -97,6 +101,10 @@ function(iree_check_test)
         "-mlir-print-op-on-diagnostic=false"
         "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
         ${_RULE_COMPILER_FLAGS}
+      OPT_TOOL
+        ${_RULE_OPT_TOOL}
+      OPT_FLAGS
+        ${_RULE_OPT_FLAGS}
       TESTONLY
     )
   endif(ANDROID)
@@ -199,6 +207,10 @@ endfunction()
 #       different args per test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
+#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
+#       if OPT_FLAGS is specified.
+#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
+#       these flags.
 function(iree_check_single_backend_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -211,8 +223,8 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS"
+    "NAME;TARGET_BACKEND;DRIVER;OPT_TOOL"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
     ${ARGN}
   )
 
@@ -258,6 +270,10 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_RUNNER_ARGS}
       LABELS
         ${_RULE_LABELS}
+      OPT_TOOL
+        ${_RULE_OPT_TOOL}
+      OPT_FLAGS
+        ${_RULE_OPT_FLAGS}
     )
   endforeach()
 endfunction()
@@ -286,6 +302,10 @@ endfunction()
 #       test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
+#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
+#       if OPT_FLAGS is specified.
+#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
+#       these flags.
 function(iree_check_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -294,8 +314,8 @@ function(iree_check_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
-    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS"
+    "NAME;OPT_TOOL"
+    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;OPT_FLAGS"
     ${ARGN}
   )
 
@@ -332,6 +352,10 @@ function(iree_check_test_suite)
         ${_RULE_RUNNER_ARGS}
       LABELS
         ${_RULE_LABELS}
+      OPT_TOOL
+        ${_RULE_OPT_TOOL}
+      OPT_FLAGS
+        ${_RULE_OPT_FLAGS}
     )
   endforeach()
 endfunction()
