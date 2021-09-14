@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "CombineInitializers.cpp"
     "DropCompilerHints.cpp"
     "SimplifyGlobalAccesses.cpp"
   DEPS

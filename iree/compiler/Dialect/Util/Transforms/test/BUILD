@@ -17,6 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "combine_initializers.mlir",
             "drop_compiler_hints.mlir",
             "simplify_global_accesses.mlir",
         ],
