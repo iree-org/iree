@@ -648,7 +648,7 @@ Block *InitializerOp::addBlock() {
 static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
   // If one is a shaped type, then they both must be and have compatible
   // shapes.
-  if (globalType.isa<ShapedType>() || accessType.isa<ShapedType>()) {
+  if (globalType.isa<ShapedType>() && accessType.isa<ShapedType>()) {
     return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
   }
 

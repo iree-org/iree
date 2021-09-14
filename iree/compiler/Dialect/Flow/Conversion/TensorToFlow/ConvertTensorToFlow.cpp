@@ -160,7 +160,7 @@ struct ConvertTensorInsertSlicePattern
     auto destDynamicDims = getDynamicDimValues(rewriter, loc, dest);
     rewriter.replaceOpWithNewOp<TensorUpdateOp>(
         insertOp, insertOp.getType(), dest, destDynamicDims, offsetVals, source,
-        sourceDynamicDims, nullptr);
+        sourceDynamicDims, rewriter.getIndexArrayAttr({0}));
     return success();
   }
 };
