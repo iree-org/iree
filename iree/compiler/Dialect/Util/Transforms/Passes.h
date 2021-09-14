@@ -16,7 +16,7 @@ namespace Util {
 
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createSimplifyGlobalAccessesPass();
+std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 
 // Register all Passes
 inline void registerTransformPasses() {

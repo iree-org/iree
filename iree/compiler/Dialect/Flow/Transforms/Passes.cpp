@@ -84,9 +84,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Simplify util.global accesses early on; this can help with dispatch
   // region formation as redundant store-loads are removed.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Util::createSimplifyGlobalAccessesPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
 
+  // Cleanup and canonicalization of util.global (and other util ops).
+  passManager.addPass(IREE::Util::createApplyPatternsPass());
+  passManager.addPass(IREE::Util::createFoldGlobalsPass());
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
@@ -152,14 +157,27 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // iree-benchmark-module to benchmark each dispatch individually, as well as
   // exporting all original model entry points.
   if (clExportBenchmarkFuncs) {
-    passManager.addPass(createExportBenchmarkFuncsPass());
+    passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
   }
 
   // Inject tracing that logs both input and output tensors from all dispatches.
   // We do this after deduping so that the executable names match later stages.
   if (clTraceDispatchTensors) {
-    passManager.addNestedPass<mlir::FuncOp>(createInjectDispatchTracingPass());
+    passManager.addNestedPass<mlir::FuncOp>(
+        IREE::Flow::createInjectDispatchTracingPass());
   }
+
+  // Cleanup the IR after we are done.
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+
+  passManager.addNestedPass<IREE::Flow::ExecutableOp>(
+      mlir::createCanonicalizerPass());
+  passManager.addNestedPass<IREE::Flow::ExecutableOp>(mlir::createCSEPass());
+
+  // Symbol DCE any remaining variables/functions that are now no longer
+  // required.
+  passManager.addPass(mlir::createSymbolDCEPass());
 
   //----------------------------------------------------------------------------
   // Stream formation.

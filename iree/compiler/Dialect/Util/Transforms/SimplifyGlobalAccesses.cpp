@@ -36,17 +36,17 @@ static DenseSet<StringRef> gatherImmutableGlobals(mlir::ModuleOp moduleOp) {
 
 // Hoists all loads of immutable globals in |funcOp| to the entry block.
 // |immutableGlobals| is used for lookups of which globals are immutable.
-static void hoistImmutableLoads(mlir::FuncOp funcOp,
+static void hoistImmutableLoads(Region &region,
                                 DenseSet<StringRef> &immutableGlobals) {
   // Since CSE of loads isn't a thing yet we perform a basic deduping here by
   // folding all subsequent loads into the first one found. This works only for
   // immutable globals as otherwise we'd have to ensure stores and
   // side-effects were properly observed.
   DenseMap<Attribute, Operation *> loadOps;
-  auto *entryBlock = &funcOp.getBlocks().front();
+  auto *entryBlock = &region.getBlocks().front();
   Operation *lastEntryOp = nullptr;
   SmallVector<std::pair<Operation *, Operation *>> opReplacements;
-  for (auto &block : funcOp) {
+  for (auto &block : region) {
     auto ops = llvm::to_vector<8>(block.getOps<IREE::Util::GlobalLoadOp>());
     for (auto &op : ops) {
       if (!immutableGlobals.contains(op.global())) continue;
@@ -223,8 +223,7 @@ static bool rearrangeBlockGlobalAccesses(
 namespace {
 
 class SimplifyGlobalAccessesPass
-    : public PassWrapper<SimplifyGlobalAccessesPass,
-                         OperationPass<mlir::FuncOp>> {
+    : public PassWrapper<SimplifyGlobalAccessesPass, OperationPass<void>> {
  public:
   StringRef getArgument() const override {
     return "iree-util-simplify-global-accesses";
@@ -236,10 +235,14 @@ class SimplifyGlobalAccessesPass
   }
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
-    if (funcOp.empty()) return;
+    auto callableOp = dyn_cast<CallableOpInterface>(getOperation());
+    if (!callableOp || !callableOp.getCallableRegion() ||
+        callableOp.getCallableRegion()->empty()) {
+      return;
+    }
+    auto &region = *callableOp.getCallableRegion();
 
-    auto moduleOp = funcOp->getParentOfType<mlir::ModuleOp>();
+    auto moduleOp = callableOp->getParentOfType<mlir::ModuleOp>();
     assert(moduleOp && "func not in a module");
 
     // Build a set of all immutable globals for fast lookup.
@@ -248,11 +251,11 @@ class SimplifyGlobalAccessesPass
     // Hoist immutable globals first. These have no hazards and don't care
     // about control flow - like `constant` - so getting them handled first
     // avoids the need for us to do the full analysis.
-    hoistImmutableLoads(funcOp, immutableGlobals);
+    hoistImmutableLoads(region, immutableGlobals);
 
     // We can't optimize the function if there are indirect loads/stores.
     // Note that constant loads are still ok above.
-    for (auto &block : funcOp) {
+    for (auto &block : region) {
       for (auto &op : block) {
         if (isa<IREE::Util::GlobalLoadIndirectOp>(op) ||
             isa<IREE::Util::GlobalStoreIndirectOp>(op)) {
@@ -267,7 +270,7 @@ class SimplifyGlobalAccessesPass
     // For each block in the function hoist loads and sink stores.
     // This does no cross-block movement, though it really should. Maybe when a
     // real compiler engineer sees this they'll be inspired to do this properly.
-    for (auto &block : funcOp) {
+    for (auto &block : region) {
       LLVM_DEBUG(llvm::dbgs() << "==== REARRANGING BLOCK ACCESSES ====\n");
       while (rearrangeBlockGlobalAccesses(block, immutableGlobals)) {
         // NOTE: block is processed until no more ops are removed. Will always
@@ -279,8 +282,7 @@ class SimplifyGlobalAccessesPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createSimplifyGlobalAccessesPass() {
+std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass() {
   return std::make_unique<SimplifyGlobalAccessesPass>();
 }
 
