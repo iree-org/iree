@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
@@ -59,6 +60,20 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
                        BlockAndValueMapping &valueMapping) const final {
     // Sure!
     return true;
+  }
+
+  void handleTerminator(Operation *op, Block *newDest) const final {
+    auto returnOp = dyn_cast<IREE::Util::InitializerReturnOp>(op);
+    if (!returnOp) return;
+    // util.initialize.return takes no args.
+    OpBuilder builder(op);
+    builder.create<mlir::BranchOp>(op->getLoc(), newDest, ValueRange{});
+    op->erase();
+  }
+
+  void handleTerminator(Operation *op,
+                        ArrayRef<Value> valuesToReplace) const final {
+    // util.initialize.return takes no args.
   }
 };
 
