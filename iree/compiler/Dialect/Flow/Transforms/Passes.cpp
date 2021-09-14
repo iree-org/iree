@@ -77,7 +77,15 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+  Option<bool> streamFormation{
+      *this, "stream-formation",
+      llvm::cl::desc("Whether to build flow.streams for async scheduling."),
+      llvm::cl::init(true)};
+};
+
+static void buildFlowTransformPassPipeline(
+    OpPassManager &passManager, const TransformOptions &transformOptions) {
   passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
 
   // Simplify util.global accesses early on; this can help with dispatch
@@ -199,46 +207,49 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Pre-conditions:
   //   - Full formation of dispatch regions
   //----------------------------------------------------------------------------
+  if (transformOptions.streamFormation) {
+    // Cleanup the IR before we try to form streams.
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
-  // Form streams.
-  // Cleanup the IR before we try to form streams.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+    // Outline large constants into globals so we can efficiently manage them.
+    passManager.addPass(IREE::Flow::createOutlineLargeConstantsPass());
 
-  // Reorder blocks to increase the grouping of streamable ops.
-  passManager.addNestedPass<mlir::FuncOp>(createHoistUnstreamableOpsPass());
+    // Reorder blocks to increase the grouping of streamable ops.
+    passManager.addNestedPass<mlir::FuncOp>(
+        IREE::Flow::createHoistUnstreamableOpsPass());
 
-  // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
-  // arbitrary ordering.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+    // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
+    // arbitrary ordering.
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
-  // Clone constants that escape basic blocks until we have better analysis.
-  passManager.addNestedPass<mlir::FuncOp>(createInsertConstantClonesPass());
+    // Clone constants that escape basic blocks until we have better analysis.
+    passManager.addNestedPass<mlir::FuncOp>(
+        IREE::Flow::createInsertConstantClonesPass());
 
-  // Group streamable ops into streams.
-  passManager.addNestedPass<mlir::FuncOp>(createFormStreamsPass());
+    // Group streamable ops into streams.
+    passManager.addNestedPass<mlir::FuncOp>(
+        IREE::Flow::createFormStreamsPass());
 
-  // Prior to leaving the pipeline we need to clean things up for following
-  // layers. These transforms may be undone by subsequent CSE/folding passes.
-  passManager.addPass(createOutlineLargeConstantsPass());
+    // Forming streams involves a fair amount of subgraph stitching, which can
+    // cause duplication. Run CSE to collapse.
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+  }
+}
 
-  // Forming streams involves a fair amount of subgraph stitching, which can
-  // cause duplication. Run CSE to collapse.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-
-  // Symbol DCE any remaining variables/functions that are now no longer
-  // required.
-  passManager.addPass(mlir::createSymbolDCEPass());
+void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  TransformOptions options;
+  buildFlowTransformPassPipeline(passManager, options);
 }
 
 void registerFlowTransformPassPipeline() {
-  PassPipelineRegistration<> transformPassPipeline(
+  PassPipelineRegistration<TransformOptions> transformPassPipeline(
       "iree-flow-transformation-pipeline",
       "Runs the full IREE flow dialect transformation pipeline",
-      [](OpPassManager &passManager) {
-        buildFlowTransformPassPipeline(passManager);
+      [](OpPassManager &passManager, const TransformOptions &transformOptions) {
+        buildFlowTransformPassPipeline(passManager, transformOptions);
       });
 }
 
