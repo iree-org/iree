@@ -4,9 +4,6 @@
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
 func @parse_print_do_not_optimize(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
-  // CHECK: util.do_not_optimize()
-  util.do_not_optimize()
-
   // CHECK-NEXT: util.do_not_optimize(%[[ARG0]]) : tensor<i32>
   %1 = util.do_not_optimize(%arg0) : tensor<i32>
 

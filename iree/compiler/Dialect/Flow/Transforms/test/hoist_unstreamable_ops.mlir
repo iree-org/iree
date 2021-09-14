@@ -48,19 +48,6 @@ func @dynamic_tensor(%input: tensor<?x?xf32>, %shape: !shapex.ranked_shape<[?,?]
 
 // -----
 
-// CHECK-LABEL: @side_effects(
-func @side_effects() {
-  // CHECK-DAG: constant 1
-  // CHECK-DAG: constant 2
-  %c1 = constant 1 : index
-  // CHECK: util.do_not_optimize()
-  util.do_not_optimize()
-  %c2 = constant 2 : index
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @dependencies(
 func @dependencies() {
   // CHECK-DAG: constant 1
