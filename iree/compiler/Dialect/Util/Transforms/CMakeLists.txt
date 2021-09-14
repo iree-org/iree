@@ -15,15 +15,20 @@ iree_cc_library(
     Transforms
   HDRS
     "Passes.h"
+    "Patterns.h"
   SRCS
+    "ApplyPatterns.cpp"
     "CombineInitializers.cpp"
     "DropCompilerHints.cpp"
+    "Patterns.cpp"
     "SimplifyGlobalAccesses.cpp"
   DEPS
     LLVMSupport
     MLIRIR
     MLIRPass
+    MLIRStandard
     MLIRSupport
+    MLIRTransforms
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )
