@@ -6,7 +6,7 @@ func @tiled_mmt4d(%lhs: memref<1x1x4x4xf32>, %rhs: memref<1x1x4x4xf32>, %dst: me
 }
 
 // CHECK: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK: func @tiled_mmt4d(%[[LHS:.+]]: memref<1x1x4x4xf32>, %[[RHS:.+]]: memref<1x1x4x4xf32>, %[[DST:.+]]: memref<1x1x4x4xf32>
 //      CHECK:   %[[LHS_4DVEC:.+]] = vector.transfer_read %[[LHS]]

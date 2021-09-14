@@ -654,27 +654,31 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
       } -> tensor<9xi1>
   return %256 : tensor<9xi1>
 }
-// CHECK-LABEL: func @inline_dag_3
+
+//       CHECK: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+
+//       CHECK: func @inline_dag_3
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<9xi32>
 //  CHECK-SAME:   %[[ARG1:.+]]: tensor<18xi32>
 //  CHECK-SAME:   %[[ARG2:.+]]: tensor<i32>
 //       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[ARG0]], %[[ARG1]]
 //       CHECK:   flow.dispatch.workgroups
-//  CHECK-SAME:     (%[[UPDATE]], %[[ARG2]])
-//  CHECK-NEXT:     (%[[ARG3:.+]]: !flow.dispatch.tensor<readonly:18xi32>
-//  CHECK-SAME:      %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:i32>,
+//  CHECK-SAME:     (%[[ARG2]], %[[UPDATE]])
+//  CHECK-NEXT:     (%[[ARG3:.+]]: !flow.dispatch.tensor<readonly:i32>,
+//  CHECK-SAME:      %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:18xi32>,
 //   CHECK-DAG:     %[[C5:.+]] = constant 5 : i32
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : i32
 //   CHECK-DAG:     %[[C9:.+]] = constant 9 : i32
 //   CHECK-DAG:     %[[ARG3V:.+]] = flow.dispatch.tensor.load %[[ARG3]]
-//   CHECK-DAG:     %[[ARG4V:.+]] = flow.dispatch.tensor.load %[[ARG4]]
-//   CHECK-DAG:     %[[EXTRACT:.+]] = tensor.extract %[[ARG4V]]
+//   CHECK-DAG:     %[[EXTRACT:.+]] = tensor.extract %[[ARG3V]]
 //   CHECK-DAG:     %[[CMP1:.+]] = cmpi slt, %[[EXTRACT]]
 //   CHECK-DAG:     %[[SELECT1:.+]] = select %[[CMP1]], %[[EXTRACT]], %[[C9]]
 //   CHECK-DAG:     %[[CMP2:.+]] = cmpi sgt, %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[SELECT2:.+]] = select %[[CMP2]], %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[INDEX_CAST:.+]] = index_cast %[[SELECT2]]
-//   CHECK-DAG:     tensor.extract_slice %[[ARG3V]][%[[INDEX_CAST]]]
+//       CHECK:     scf.for %[[IV0:.+]] =
+//       CHECK:       %[[OFFSET:.+]] = affine.apply #[[MAP0]](%[[IV0]])[%[[INDEX_CAST]]
+//       CHECK:       %[[ARG4V:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [%[[OFFSET]]
 //       CHECK:     flow.return
 
 // -----

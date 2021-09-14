@@ -40,7 +40,7 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     if (M1 != 1 || K1 != 1 || N1 != 1) return failure();
 
     int M0 = lhsType.getShape()[2];
-    int N0 = rhsType.getShape()[3];
+    int N0 = rhsType.getShape()[2];
     int K0 = lhsType.getShape()[3];
 
     auto loc = mmt4DOp.getLoc();
@@ -49,7 +49,7 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     auto vecType = VectorType::get({1, 1, M0, N0}, rewriter.getF32Type());
 
     auto lhsVecType2D = VectorType::get({M0, K0}, rewriter.getF32Type());
-    auto rhsVecType2D = VectorType::get({K0, N0}, rewriter.getF32Type());
+    auto rhsVecType2D = VectorType::get({N0, K0}, rewriter.getF32Type());
     auto dstVecType2D = VectorType::get({M0, N0}, rewriter.getF32Type());
 
     auto identityMap = rewriter.getMultiDimIdentityMap(4);
@@ -77,7 +77,7 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     auto k = rewriter.getAffineDimExpr(2);
 
     auto map0 = AffineMap::get(3, 0, {m, k}, rewriter.getContext());
-    auto map1 = AffineMap::get(3, 0, {k, n}, rewriter.getContext());
+    auto map1 = AffineMap::get(3, 0, {n, k}, rewriter.getContext());
     auto map2 = AffineMap::get(3, 0, {m, n}, rewriter.getContext());
 
     ArrayAttr indexingMaps = rewriter.getAffineMapArrayAttr({map0, map1, map2});
