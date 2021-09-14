@@ -16,11 +16,7 @@ hal.executable private @matmul  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-                        {max_compute_workgroup_invocations = 128 : i32,
-                         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 8: index, 1: index],
@@ -94,15 +90,7 @@ hal.executable private @conv_1d  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.3,
-          [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic,
-           GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative],
-          [SPV_KHR_storage_buffer_storage_class]>,
-          SwiftShader:CPU,
-          {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32,
-           max_compute_workgroup_invocations = 128 : i32,
-           max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_1d attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 4: index, 1: index],
@@ -185,11 +173,7 @@ hal.executable private @conv_no_padding  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-                        {max_compute_workgroup_invocations = 128 : i32,
-                         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_no_padding attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 4: index, 1: index],
@@ -316,14 +300,7 @@ hal.executable private @conv_3d  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.3,
-          [Shader, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic,
-           GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative],
-          [SPV_KHR_storage_buffer_storage_class]>, SwiftShader:CPU,
-          {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 16384 : i32,
-           max_compute_workgroup_invocations = 128 : i32,
-           max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>, subgroup_size = 4 : i32}>}> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_3d attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 4: index, 1: index],
@@ -397,10 +374,7 @@ module  {
       hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
-    hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-        spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>}> {
+    hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
       hal.executable.entry_point @pooling_nhwc_max attributes {
         interface = @io, ordinal = 0 : index,
         workgroup_size = [32: index, 4: index, 1: index],

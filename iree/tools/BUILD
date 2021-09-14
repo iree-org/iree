@@ -105,6 +105,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/LinalgExt/IR",
+        "//iree/compiler/Dialect/LinalgExt/IR:TiledOpInterface",
         "//iree/compiler/Dialect/LinalgExt/Transforms",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
         "//iree/compiler/Dialect/Modules/VMVX/Transforms",

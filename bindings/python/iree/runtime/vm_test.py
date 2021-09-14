@@ -78,6 +78,12 @@ class VmTest(absltest.TestCase):
     logging.info("variant_list: %s", l)
     self.assertEqual(l.size, 0)
 
+  def test_variant_list_i64(self):
+    l = iree.runtime.VmVariantList(5)
+    # Push a value that exceeds 32-bit range.
+    l.push_int(10 * 1000 * 1000 * 1000)
+    self.assertEqual(str(l), "<VmVariantList(1): [10000000000]>")
+
   def test_variant_list_buffers(self):
     ET = iree.runtime.HalElementType
     for dt, et in ((np.int8, ET.SINT_8), (np.int16, ET.SINT_16),

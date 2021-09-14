@@ -38,81 +38,83 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
     with multiple Python versions. Explicitly setting this is recommended.
     Note that mixed case of the option.
 
-???+ Setup
-    We recommend using virtual environments to manage python packages, such
-    as through `venv`, which may need to be installed via your system
-    package manager ([about](https://docs.python.org/3/library/venv.html),
-    [tutorial](https://docs.python.org/3/tutorial/venv.html)):
+### Setup
 
-    === "Linux and MacOS"
+We recommend using virtual environments to manage python packages, such
+as through `venv`, which may need to be installed via your system
+package manager ([about](https://docs.python.org/3/library/venv.html),
+[tutorial](https://docs.python.org/3/tutorial/venv.html)):
 
-        ``` shell
-        # Make sure your 'python' is what you expect. Note that on multi-python
-        # systems, this may have a version suffix, and on many Linuxes and MacOS where
-        # python2 and python3 co-exist, you may also want to use `python3`.
-        which python
-        python --version
+=== "Linux and MacOS"
 
-        # Create a persistent virtual environment (first time only).
-        python -m venv iree.venv
+    ``` shell
+    # Make sure your 'python' is what you expect. Note that on multi-python
+    # systems, this may have a version suffix, and on many Linuxes and MacOS where
+    # python2 and python3 co-exist, you may also want to use `python3`.
+    which python
+    python --version
 
-        # Activate the virtual environment (per shell).
-        # Now the `python` command will resolve to your virtual environment
-        # (even on systems where you typically use `python3`).
-        source iree.venv/bin/activate
+    # Create a persistent virtual environment (first time only).
+    python -m venv iree.venv
 
-        # Upgrade PIP. On Linux, many packages cannot be installed for older
-        # PIP versions. See: https://github.com/pypa/manylinux
-        python -m pip install --upgrade pip
+    # Activate the virtual environment (per shell).
+    # Now the `python` command will resolve to your virtual environment
+    # (even on systems where you typically use `python3`).
+    source iree.venv/bin/activate
 
-        # Install IREE build pre-requisites.
-        python -m pip install -r ./bindings/python/build_requirements.txt
-        ```
+    # Upgrade PIP. On Linux, many packages cannot be installed for older
+    # PIP versions. See: https://github.com/pypa/manylinux
+    python -m pip install --upgrade pip
 
-    === "Windows"
+    # Install IREE build pre-requisites.
+    python -m pip install -r ./bindings/python/build_requirements.txt
+    ```
 
-        ``` powershell
-        python -m venv .venv
-        .venv\Scripts\activate.bat
-        python -m pip install --upgrade pip
-        python -m pip install -r bindings\python\build_requirements.txt
-        ```
+=== "Windows"
 
-    When done, close your shell or run `deactivate`.
+    ``` powershell
+    python -m venv .venv
+    .venv\Scripts\activate.bat
+    python -m pip install --upgrade pip
+    python -m pip install -r bindings\python\build_requirements.txt
+    ```
 
-???+ Usage
-    From the `iree-build` directory:
+When done, close your shell or run `deactivate`.
 
-    === "Linux and MacOS"
+### Usage
 
-        ``` shell
-        cmake \
-          -GNinja \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-          -DIREE_BUILD_PYTHON_BINDINGS=ON \
-          -DPython3_EXECUTABLE="$(which python)" \
-          .
-        cmake --build .
+From the `iree-build` directory:
 
-        # Add ./bindings/python to PYTHONPATH and use the API.
-        export PYTHONPATH="$PWD/bindings/python"
-        python -c "import iree.compiler"
-        python -c "import iree.runtime"
-        ```
+=== "Linux and MacOS"
 
-    === "Windows"
+    ``` shell
+    cmake \
+        -GNinja \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DIREE_BUILD_PYTHON_BINDINGS=ON \
+        -DPython3_EXECUTABLE="$(which python)" \
+        .
+    cmake --build .
 
-        ``` powershell
-        cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_PYTHON_BINDINGS=ON .
-        cmake --build .
+    # Add ./bindings/python to PYTHONPATH and use the API.
+    export PYTHONPATH="$PWD/bindings/python"
+    python -c "import iree.compiler"
+    python -c "import iree.runtime"
+    ```
 
-        # Add bindings\python to PYTHONPATH and use the API.
-        set PYTHONPATH="$pwd\bindings\python;%PYTHONPATH%"
-        python -c "import iree.compiler"
-        python -c "import iree.runtime"
-        ```
+=== "Windows"
 
-    Tests can now be run individually via python or via ctest.
+    ``` powershell
+    cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_PYTHON_BINDINGS=ON .
+    cmake --build .
+
+    # Add bindings\python to PYTHONPATH and use the API.
+    set PYTHONPATH="$pwd\bindings\python;%PYTHONPATH%"
+    python -c "import iree.compiler"
+    python -c "import iree.runtime"
+    ```
+
+Tests can now be run individually via python or via ctest.
 
 
 ## Building TensorFlow Frontend Bindings
@@ -136,65 +138,73 @@ These tools packages are needed in order for the frontend specific, high-level
 APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
 `import iree.compiler.xla`, and `import iree.jax` to be fully functional.
 
-???+ Setup
-    A relatively recent `tf-nightly` release is needed to run tests.
+### Setup
 
-    === "Linux and MacOS"
+A relatively recent `tf-nightly` release is needed to run tests.
 
-        ``` shell
-        python -m pip install -r ./integrations/tensorflow/bindings/python/build_requirements.txt
-        ```
-
-    === "Windows"
-
-        ``` powershell
-        python -m pip install -r integrations\tensorflow\bindings\python\build_requirements.txt
-        ```
-
-???+ TensorFlow
-    TensorFlow frontends can only be built with [Bazel](https://bazel.build/),
-    and this must be done as a manual step (we used to have automation for this,
-    but Bazel integrates poorly with automation and it made diagnosis and cross
-    platform usage unreliable). The recommended version of Bazel (used by CI
-    systems) can be found in the
-    [.bazelversion](https://github.com/google/iree/blob/main/.bazelversion)
-    file. In addition, Bazel is hard to use out of tree, so these steps will
-    involve working from the source tree (instead of the build tree).
-
-    === "Linux and MacOS"
-
-        ``` shell
-        # From the iree source directory.
-        cd integrations/tensorflow
-        python ../../configure_bazel.py
-        bazel build iree_tf_compiler:importer-binaries
-        ```
-
-    === "Windows"
-
-        ``` powershell
-        # From the iree source directory.
-        cd integrations\tensorflow
-        python ..\..\configure_bazel.py
-        bazel build iree_tf_compiler:importer-binaries
-        ```
-
-    Importer binaries can be found under `bazel-bin/iree_tf_compiler` and can
-    be used from the command line if desired.
-
-???+ IREE
-    The main IREE build will embed binaries built above and enable additional
-    Python APIs. Within the build, the binaries are symlinked, so can be
-    rebuilt per above without re-running these steps for edit-and-continue
-    style work.
+=== "Linux and MacOS"
 
     ``` shell
-    # From the iree-build/ directory.
-    cmake -DIREE_BUILD_TENSORFLOW_ALL=ON .
-    cmake --build .
-
-    # Validate.
-    python -c "import iree.tools.tf as _; print(_.get_tool('iree-import-tf'))"
-    python -c "import iree.tools.tflite as _; print(_.get_tool('iree-import-tflite'))"
-    python -c "import iree.tools.xla as _; print(_.get_tool('iree-import-xla'))"
+    python -m pip install -r ./integrations/tensorflow/bindings/python/build_requirements.txt
     ```
+
+=== "Windows"
+
+    ``` powershell
+    python -m pip install -r integrations\tensorflow\bindings\python\build_requirements.txt
+    ```
+
+### TensorFlow
+
+TensorFlow frontends can only be built with [Bazel](https://bazel.build/),
+and this must be done as a manual step (we used to have automation for this,
+but Bazel integrates poorly with automation and it made diagnosis and cross
+platform usage unreliable). The recommended version of Bazel (used by CI
+systems) can be found in the
+[.bazelversion](https://github.com/google/iree/blob/main/.bazelversion)
+file. In addition, Bazel is hard to use out of tree, so these steps will
+involve working from the source tree (instead of the build tree).
+
+???+ Note
+    Due to the difficulties using Bazel and compiling TensorFlow, only
+    compilation on Linux with clang is supported. Other OS's and compilers are
+    "best effort" with patches to improve support welcome.
+
+=== "Linux and MacOS"
+
+    ``` shell
+    # From the iree source directory.
+    cd integrations/tensorflow
+    python ../../configure_bazel.py
+    bazel build iree_tf_compiler:importer-binaries
+    ```
+
+=== "Windows"
+
+    ``` powershell
+    # From the iree source directory.
+    cd integrations\tensorflow
+    python ..\..\configure_bazel.py
+    bazel build iree_tf_compiler:importer-binaries
+    ```
+
+Importer binaries can be found under `bazel-bin/iree_tf_compiler` and can
+be used from the command line if desired.
+
+### IREE
+
+The main IREE build will embed binaries built above and enable additional
+Python APIs. Within the build, the binaries are symlinked, so can be
+rebuilt per above without re-running these steps for edit-and-continue
+style work.
+
+``` shell
+# From the iree-build/ directory.
+cmake -DIREE_BUILD_TENSORFLOW_ALL=ON .
+cmake --build .
+
+# Validate.
+python -c "import iree.tools.tf as _; print(_.get_tool('iree-import-tf'))"
+python -c "import iree.tools.tflite as _; print(_.get_tool('iree-import-tflite'))"
+python -c "import iree.tools.xla as _; print(_.get_tool('iree-import-xla'))"
+```

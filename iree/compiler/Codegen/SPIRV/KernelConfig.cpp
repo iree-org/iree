@@ -323,23 +323,9 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
 
     // If the dispatch region does not contain tiled and distributed Linalg ops,
     // invoke the pipeline to distribute to global invocations.
-    if (computeOps.empty() || llvm::none_of(computeOps, [](Operation *op) {
+    if (tiledLoops.empty() && llvm::none_of(computeOps, [](Operation *op) {
           return hasMarker(op, getWorkgroupMarker());
         })) {
-      auto isInsertExtractSliceOp = [](Operation *op) {
-        return isa<tensor::InsertSliceOp, tensor::ExtractSliceOp>(op);
-      };
-      // TODO(ravishankarm): `tensor.insert_slice` is not a compute op but still
-      // needs to be handled in dispatch region. For now it is handled in
-      // ConvertToGPU pass. Eventually this will be handled as a compute
-      // op. This is just to keep scope of change to dynamic pass pipelines
-      // limited. Remove this when dropping ConvertToGPU pass.
-      if (failed(getFilteredOps(funcOp, isInsertExtractSliceOp, computeOps,
-                                tiledLoops)) ||
-          computeOps.empty()) {
-        continue;
-      }
-
       std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
       if (failed(
               setTranslationUsingDistributeToGlobalId(funcOp, workgroupSize))) {
@@ -368,23 +354,38 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
 
     // If there are still no root op, check for any linalg.generic op.
     if (!rootOperation) {
-      for (Operation *computeOp : computeOps) {
-        if (isa<linalg::FillOp, linalg::CopyOp>(computeOp)) continue;
-
+      for (Operation *computeOp : reverse(computeOps)) {
         if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
 
         // Check if the op configuration was set.
-        if (!getLoweringConfig(computeOp)) continue;
-
-        if (rootOperation) {
+        if (!getLoweringConfig(computeOp)) {
           return computeOp->emitOpError(
-              "unhandled multiple roots in dispatch region");
+              "without known roots, the last operation in the tiled loop body "
+              "is expected to be set as root");
         }
         rootOperation = computeOp;
+        break;
       }
     }
 
     if (!rootOperation) {
+      // If the tiled loops are not empty then this could be a corner case of
+      // tensor.insert_slice being tiled and distributed, that just shows up as
+      // a `flow.dispatch.tensor.load` and a `flow.dispatch.tensor.store` (or as
+      // a copy. For now just treat the tiled loops not being empty as an
+      // indicator of that. Need a better way of information flow from flow
+      // dialect to hal.
+      if (!tiledLoops.empty()) {
+        const int64_t subgroupSize =
+            limits.subgroup_size().getValue().getSExtValue();
+        std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
+        SmallVector<int64_t> workloadPerWorkgroup(tiledLoops.size(), 1);
+        workloadPerWorkgroup.front() = subgroupSize * 4;
+        setTranslationInfo(
+            funcOp, IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute,
+            workgroupSize, workloadPerWorkgroup);
+        return success();
+      }
       return funcOp.emitError("contains no root Linalg operation");
     }
 

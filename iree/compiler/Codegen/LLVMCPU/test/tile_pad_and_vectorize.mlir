@@ -46,7 +46,9 @@ module  {
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
 }
-// CHECK-LABEL: @dot_383x383x513_dispatch_0
+//     CHECK: #[[MAP1:.+]] = affine_map<(d0) -> (64, -d0 + 383)>
+//     CHECK: #[[MAP2:.+]] = affine_map<(d0) -> (64, -d0 + 513)>
+//     CHECK: @dot_383x383x513_dispatch_0
 // CHECK-DAG: %[[CST:.+]] = constant 0.000000e+00 : f32
 // CHECK-DAG: %[[C0:.+]] = constant 0 : index
 // CHECK-DAG: %[[C4:.+]] = constant 4 : index
@@ -56,12 +58,16 @@ module  {
 //     CHECK: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x383xf32>
 //     CHECK: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x513xf32>
 //     CHECK: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>
+//     CHECK: scf.for %[[I_WG_IDX:.+]] = {{.*}} to %c383
+//     CHECK: scf.for %[[J_WG_IDX:.+]] = {{.*}} to %c513
+//     CHECK: %[[LHS_WG_TILE_DIM0:.+]] = affine.min #[[MAP1]](%[[I_WG_IDX]])
 //     CHECK: %[[LHS_WG_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]]
+//     CHECK: %[[RHS_WG_TILE_DIM1:.+]] = affine.min #[[MAP2]](%[[J_WG_IDX]])
 //     CHECK: %[[RHS_WG_TILE:.+]] = flow.dispatch.tensor.load %[[RHS]]
 //     CHECK: %[[DST_WG_TILE_INIT:.+]] = linalg.init_tensor
 //     CHECK: %[[DST_WG_TILE_INIT_C0:.+]] = linalg.fill(%[[CST]], %[[DST_WG_TILE_INIT]])
-//     CHECK: {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C383]] step %[[C32]] iter_args(%[[DST_WG_TILE_0:.+]] = %[[DST_WG_TILE_INIT_C0]])
-//     CHECK:    {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C513]] step %[[C32]] iter_args(%[[DST_WG_TILE_1:.+]] = %[[DST_WG_TILE_0]])
+//     CHECK: {{.*}} = scf.for {{.*}} = %[[C0]] to %[[LHS_WG_TILE_DIM0]] step %[[C32]] iter_args(%[[DST_WG_TILE_0:.+]] = %[[DST_WG_TILE_INIT_C0]])
+//     CHECK:    {{.*}} = scf.for {{.*}} = %[[C0]] to %[[RHS_WG_TILE_DIM1]] step %[[C32]] iter_args(%[[DST_WG_TILE_1:.+]] = %[[DST_WG_TILE_0]])
 //     CHECK:       {{.*}} = scf.for {{.*}} = %[[C0]] to %[[C383]] step %[[C32]] iter_args(%[[DST_WG_TILE_2:.+]] = %[[DST_WG_TILE_1]])
 //     CHECK:           %[[LHS_L1_TILE:.+]] = tensor.extract_slice %[[LHS_WG_TILE]]
 //     CHECK:           %[[RHS_L1_TILE:.+]] = tensor.extract_slice %[[RHS_WG_TILE]]

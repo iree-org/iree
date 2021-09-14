@@ -4,10 +4,18 @@
 
 ## Prerequisites
 
-You will need to install [CMake](https://cmake.org/), along with a C/C++
-compiler:
+You will need to install [CMake](https://cmake.org/), the
+[Ninja](https://ninja-build.org/) CMake generator, and the clang or MSVC C/C++
+compilers:
 
-=== "Linux and MacOS"
+???+ Note
+    You are welcome to try different CMake generators and compilers, but IREE
+    devs and CIs exclusively use these and other configurations are "best
+    effort". Additionally, compilation on macOS is "best effort" as well, though
+    we generally expect it to work due to its similarity with Linux. Patches to
+    improve support for these are always welcome.
+
+=== "Linux and macOS"
 
     1. Install a compiler/linker (typically "clang" and "lld" package).
 
@@ -16,11 +24,11 @@ compiler:
     3. Install [Ninja](https://ninja-build.org/) (typically "ninja-build"
        package).
 
-On a relatively recent Debian/Ubuntu:
+    On a relatively recent Debian/Ubuntu:
 
-``` shell
-sudo apt install cmake ninja-build clang lld
-```
+    ``` shell
+    sudo apt install cmake ninja-build clang lld
+    ```
 
 === "Windows"
 
@@ -95,10 +103,6 @@ cmake --build ../iree-build/
     available in `Debug` builds. See the
     [official CMake documentation](https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html)
     for general details.
-
-???+ Tip
-    You are welcome to try different CMake generators, but IREE devs and CIs
-    exclusively use [Ninja](https://ninja-build.org/).
 
 
 ## What's next?

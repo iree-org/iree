@@ -57,8 +57,9 @@ import time
 
 from typing import Any, Dict, Optional, Sequence, Tuple
 
-from common.benchmark_description import (AndroidDeviceInfo, BenchmarkInfo,
-                                          BenchmarkResults, get_output)
+from common.benchmark_definition import (AndroidDeviceInfo, BenchmarkInfo,
+                                         BenchmarkResults,
+                                         execute_cmd_and_get_output)
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
@@ -96,8 +97,9 @@ def get_benchmark_repetition_count(runner: str) -> int:
 
 
 def get_git_commit_hash(commit: str) -> str:
-  return get_output(['git', 'rev-parse', commit],
-                    cwd=os.path.dirname(os.path.realpath(__file__)))
+  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+                                    cwd=os.path.dirname(
+                                        os.path.realpath(__file__)))
 
 
 def adb_push_to_tmp_dir(content: str,
@@ -114,7 +116,7 @@ def adb_push_to_tmp_dir(content: str,
   """
   filename = os.path.basename(content)
   android_path = os.path.join(ANDROID_TMP_DIR, relative_dir, filename)
-  get_output(
+  execute_cmd_and_get_output(
       ["adb", "push", os.path.abspath(content), android_path], verbose=verbose)
   return android_path
 
@@ -138,7 +140,7 @@ def adb_execute_in_dir(cmd_args: Sequence[str],
   cmd.append("&&")
   cmd.extend(cmd_args)
 
-  return get_output(cmd, verbose=verbose)
+  return execute_cmd_and_get_output(cmd, verbose=verbose)
 
 
 def adb_start_in_dir(cmd_args: Sequence[str],
@@ -356,7 +358,7 @@ def run_benchmarks_for_category(
       # the signal to let the previously waiting benchmark tool to complete.
       capture_filename = re.sub(r" +", "-", str(benchmark_info)) + ".tracy"
       capture_cmd = [trace_capture_tool, "-f", "-o", capture_filename]
-      capture_log = get_output(capture_cmd, verbose=verbose)
+      capture_log = execute_cmd_and_get_output(capture_cmd, verbose=verbose)
       if verbose:
         print(capture_log)
 
@@ -488,14 +490,14 @@ def main(args):
 
   # Clear the benchmark directory on the Android device first just in case
   # there are leftovers from manual or failed runs.
-  get_output(["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
-             verbose=args.verbose)
+  execute_cmd_and_get_output(["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
+                             verbose=args.verbose)
 
   # Tracy client and server communicate over port 8086 by default. If we want
   # to capture traces along the way, forward port via adb.
   if (args.traced_benchmark_tool is not None) and \
           (args.trace_capture_tool is not None):
-    get_output(["adb", "forward", "tcp:8086", "tcp:8086"])
+    execute_cmd_and_get_output(["adb", "forward", "tcp:8086", "tcp:8086"])
 
   results, captures = filter_and_run_benchmarks(
       device_info, args.build_dir, os.path.realpath(args.normal_benchmark_tool),
@@ -518,12 +520,12 @@ def main(args):
       os.remove(capture_filename)
 
     # Disable port forwarding.
-    get_output(["adb", "forward", "--remove", "tcp:8086"])
+    execute_cmd_and_get_output(["adb", "forward", "--remove", "tcp:8086"])
 
   if not args.no_clean:
     # Clear the benchmark directory on the Android device.
-    get_output(["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
-               verbose=args.verbose)
+    execute_cmd_and_get_output(["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
+                               verbose=args.verbose)
 
 
 if __name__ == "__main__":

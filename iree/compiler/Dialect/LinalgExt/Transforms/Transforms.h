@@ -32,22 +32,14 @@ FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TiledOpInterface tilableOp,
 /// Base rewrite pattern to tile and distribute operations that implement the
 /// `TiledOpInterface`.
 /// Base pattern for tiling TiledOpInterfaceOps.
-struct TiledOpInterfaceBaseTilingPattern : public RewritePattern {
+struct TiledOpInterfaceBaseTilingPattern
+    : public OpInterfaceRewritePattern<TiledOpInterface> {
   TiledOpInterfaceBaseTilingPattern(MLIRContext *context,
                                     linalg::LinalgTilingOptions options,
                                     linalg::LinalgTransformationFilter filter =
                                         linalg::LinalgTransformationFilter(),
                                     PatternBenefit benefit = 1)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
-        filter(filter),
-        options(options) {}
-
-  TiledOpInterfaceBaseTilingPattern(StringRef opName, MLIRContext *context,
-                                    linalg::LinalgTilingOptions options,
-                                    linalg::LinalgTransformationFilter filter =
-                                        linalg::LinalgTransformationFilter(),
-                                    PatternBenefit benefit = 1)
-      : RewritePattern(opName, benefit, context),
+      : OpInterfaceRewritePattern(context, benefit),
         filter(filter),
         options(options) {}
 
@@ -62,7 +54,6 @@ struct TiledOpInterfaceBaseTilingPattern : public RewritePattern {
   linalg::LinalgTilingOptions options;
 };
 
-template <typename OpTy>
 struct TiledOpInterfaceTilingPattern
     : public TiledOpInterfaceBaseTilingPattern {
   TiledOpInterfaceTilingPattern(MLIRContext *context,
@@ -70,26 +61,23 @@ struct TiledOpInterfaceTilingPattern
                                 linalg::LinalgTransformationFilter filter =
                                     linalg::LinalgTransformationFilter(),
                                 PatternBenefit benefit = 1)
-      : TiledOpInterfaceBaseTilingPattern(OpTy::getOperationName(), context,
-                                          options, filter, benefit) {}
+      : TiledOpInterfaceBaseTilingPattern(context, options, filter, benefit) {}
 
-  LogicalResult matchAndRewrite(Operation *op,
+  LogicalResult matchAndRewrite(TiledOpInterface tilableOp,
                                 PatternRewriter &rewriter) const override {
-    auto tilableOp = dyn_cast<TiledOpInterface>(op);
-    if (!tilableOp) return failure();
     TiledOp tiledOp;
     // Check for failure.
     if (failed(TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
-            op, rewriter, tiledOp))) {
+            tilableOp, rewriter, tiledOp))) {
       return failure();
     }
     // Check for do-nothing case.
     if (!tiledOp.op) return failure();
-    if (tiledOp.op != op) {
+    if (tiledOp.op != tilableOp) {
       if (tiledOp.results.empty()) {
-        rewriter.eraseOp(op);
+        rewriter.eraseOp(tilableOp);
       } else {
-        rewriter.replaceOp(op, tiledOp.results);
+        rewriter.replaceOp(tilableOp, tiledOp.results);
       }
     }
     return success();

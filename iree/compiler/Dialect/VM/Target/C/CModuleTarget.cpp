@@ -135,8 +135,10 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string moduleName = moduleOp.getName().str();
   llvm::raw_ostream &output = emitter.ostream();
 
-  auto printCStringView = [](StringRef s) -> std::string {
-    return ("iree_make_cstring_view(\"" + s + "\")").str();
+  auto printStringView = [](StringRef s) -> std::string {
+    // We can't use iree_make_string_view because function calls are not allowed
+    // for constant expressions in C.
+    return ("{\"" + s + "\", " + std::to_string(s.size()) + "}").str();
   };
 
   // exports
@@ -169,8 +171,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
       }
 
       // TODO(simon-camp): support function-level reflection attributes
-      output << "{" << printCStringView(exportOp.export_name()) << ", "
-             << printCStringView(callingConvention.getValue())
+      output << "{" << printStringView(exportOp.export_name()) << ", "
+             << printStringView(callingConvention.getValue())
              << ", 0, NULL},\n";
     }
   }
@@ -194,7 +196,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
       return lhs.getName().compare(rhs.getName()) < 0;
     });
     for (auto importOp : importOps) {
-      output << "{" << printCStringView(importOp.getName()) << "},\n";
+      output << "{" << printStringView(importOp.getName()) << "},\n";
     }
   }
   output << "};\n";
@@ -237,7 +239,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string descriptorName = moduleName + "_descriptor_";
   output << "static const iree_vm_native_module_descriptor_t " << descriptorName
          << " = {\n"
-         << printCStringView(moduleName) << ",\n"
+         << printStringView(moduleName) << ",\n"
          << importName << "count_,\n"
          << importName << ",\n"
          << exportName << "count_,\n"

@@ -72,6 +72,5 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:       %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV]]] [100, 1] [1, 1]
 //       CHECK:       %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
 //       CHECK:       linalg_ext.scatter
-//  CHECK-SAME:         __internal_linalg_transform__ = "vectorize"
 //  CHECK-SAME:         ins(%[[T_UPDATE_CAST]], %[[T_INDEX]]
 //  CHECK-SAME:         outs(%[[T_TARGET_CAST]]

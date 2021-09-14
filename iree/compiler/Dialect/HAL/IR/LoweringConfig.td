@@ -11,27 +11,27 @@ include "iree/compiler/Dialect/HAL/IR/HALDialect.td"
 
 // List of pre-existing pipelines for translating executables.
 def CPU_Default
-    : I32EnumAttrCase<"CPUDefault", 0>;
+    : StrEnumAttrCase<"CPUDefault">;
 def CPU_Vectorization
-    : I32EnumAttrCase<"CPUVectorization", 1>;
+    : StrEnumAttrCase<"CPUVectorization">;
 def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 2>;
+    : StrEnumAttrCase<"LLVMGPUDistribute">;
 def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 3>;
+    : StrEnumAttrCase<"LLVMGPUVectorize">;
 def LLVMGPU_MatmulSimt
-    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 4>;
+    : StrEnumAttrCase<"LLVMGPUMatmulSimt">;
 def SPIRV_SimpleDistribute
-    : I32EnumAttrCase<"SPIRVDistribute", 5>;
+    : StrEnumAttrCase<"SPIRVDistribute">;
 def SPIRV_Vectorize
-    : I32EnumAttrCase<"SPIRVVectorize", 6>;
+    : StrEnumAttrCase<"SPIRVVectorize">;
 def SPIRV_DistributeToGlobalID
-    : I32EnumAttrCase<"SPIRVDistributeToGlobalID", 7>;
+    : StrEnumAttrCase<"SPIRVDistributeToGlobalID">;
 def None
-    : I32EnumAttrCase<"None", 0x7FFFFFFF>;
+    : StrEnumAttrCase<"None">;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
-def DispatchLoweringPassPipelineEnum : I32EnumAttr<
+def DispatchLoweringPassPipelineEnum : StrEnumAttr<
     "DispatchLoweringPassPipeline",
     "identifier for pass pipeline use to lower dispatch region",
     [CPU_Default, CPU_Vectorization, LLVMGPU_SimpleDistribute,

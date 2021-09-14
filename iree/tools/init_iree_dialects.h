@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -41,6 +42,8 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   mlir::iree::IREEDialect,
                   mlir::iree_pydm::IREEPyDMDialect>();
   // clang-format on
+
+  linalg_ext::registerTiledOpInterfaceExternalModels(registry);
 }
 
 }  // namespace iree_compiler

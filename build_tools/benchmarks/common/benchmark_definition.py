@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -19,7 +18,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Sequence
 
 __all__ = [
-    "AndroidDeviceInfo", "BenchmarkInfo", "BenchmarkResults", "get_output"
+    "AndroidDeviceInfo", "BenchmarkInfo", "BenchmarkResults",
+    "execute_cmd_and_get_output"
 ]
 
 # A map for IREE driver names. This allows us to normalize driver names like
@@ -33,7 +33,9 @@ IREE_DRIVER_NAME_MAP = {
 }
 
 
-def get_output(args: Sequence[str], verbose: bool = False, **kwargs) -> str:
+def execute_cmd_and_get_output(args: Sequence[str],
+                               verbose: bool = False,
+                               **kwargs) -> str:
   """Executes a command and returns its stdout."""
   if verbose:
     cmd = " ".join(args)
@@ -47,22 +49,22 @@ def get_output(args: Sequence[str], verbose: bool = False, **kwargs) -> str:
 
 def get_android_device_model(verbose: bool = False) -> str:
   """Returns the Android device model."""
-  model = get_output(["adb", "shell", "getprop", "ro.product.model"],
-                     verbose=verbose)
+  model = execute_cmd_and_get_output(
+      ["adb", "shell", "getprop", "ro.product.model"], verbose=verbose)
   model = re.sub(r"\W+", "-", model)
   return model
 
 
 def get_android_cpu_abi(verbose: bool = False) -> str:
   """Returns the CPU ABI for the Android device."""
-  return get_output(["adb", "shell", "getprop", "ro.product.cpu.abi"],
-                    verbose=verbose)
+  return execute_cmd_and_get_output(
+      ["adb", "shell", "getprop", "ro.product.cpu.abi"], verbose=verbose)
 
 
 def get_android_cpu_features(verbose: bool = False) -> Sequence[str]:
   """Returns the CPU features for the Android device."""
-  cpuinfo = get_output(["adb", "shell", "cat", "/proc/cpuinfo"],
-                       verbose=verbose)
+  cpuinfo = execute_cmd_and_get_output(["adb", "shell", "cat", "/proc/cpuinfo"],
+                                       verbose=verbose)
   features = []
   for line in cpuinfo.splitlines():
     if line.startswith("Features"):
@@ -73,7 +75,8 @@ def get_android_cpu_features(verbose: bool = False) -> Sequence[str]:
 
 def get_android_gpu_name(verbose: bool = False) -> str:
   """Returns the GPU name for the Android device."""
-  vkjson = get_output(["adb", "shell", "cmd", "gpu", "vkjson"], verbose=verbose)
+  vkjson = execute_cmd_and_get_output(["adb", "shell", "cmd", "gpu", "vkjson"],
+                                      verbose=verbose)
   vkjson = json.loads(vkjson)
   name = vkjson["devices"][0]["properties"]["deviceName"]
 

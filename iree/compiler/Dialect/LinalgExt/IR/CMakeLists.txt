@@ -30,6 +30,7 @@ iree_cc_library(
     ::LinalgExtOpsGen
     ::TiledOpInterface
     LLVMSupport
+    MLIRAffine
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRLinalg
@@ -95,8 +96,11 @@ iree_cc_library(
   DEPS
     ::TiledOpInterfaceGen
     LLVMSupport
+    MLIRAffine
     MLIRIR
+    MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRViewLikeInterface
   PUBLIC
 )

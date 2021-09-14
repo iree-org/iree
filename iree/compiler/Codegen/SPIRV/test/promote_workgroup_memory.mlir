@@ -12,11 +12,7 @@ hal.executable private @matmul_promote_workgroup_memory  {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 8: index, 1: index]
     }
-    builtin.module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-                        {max_compute_workgroup_invocations = 128 : i32,
-                         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+    builtin.module {
       func @matmul_promote_workgroup_memory() {
         %c32 = constant 32 : index
         %c50 = constant 50 : index
@@ -90,11 +86,7 @@ hal.executable private @conv_promote_workgroup_memory  {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 4: index, 1: index]
     }
-    builtin.module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-                        {max_compute_workgroup_invocations = 128 : i32,
-                         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+    builtin.module {
       func @conv_promote_workgroup_memory() {
         %c0 = constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<3x4x6x14xf32>

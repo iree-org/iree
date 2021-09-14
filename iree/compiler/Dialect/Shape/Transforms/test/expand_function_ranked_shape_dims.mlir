@@ -43,3 +43,18 @@ func @calls(%arg0 :!shapex.ranked_shape<[?,?]>) -> !shapex.ranked_shape<[?,?]> {
   %0 = std.call @calls(%arg0) : (!shapex.ranked_shape<[?,?]>) -> !shapex.ranked_shape<[?,?]>
   return %0 : !shapex.ranked_shape<[?,?]>
 }
+
+// -----
+// CHECK-LABEL:   func @oneUnknownDimension(
+// CHECK-SAME:                              %[[ARG:.*]]: index) -> index {
+// CHECK:           %[[ARG_RS:.*]] = shapex.make_ranked_shape %[[ARG]] : (index) -> !shapex.ranked_shape<[?]>
+// CHECK:           %[[ARG_DIM0:.*]] = shapex.ranked_dim %[[ARG_RS]][0] : !shapex.ranked_shape<[?]> -> index
+// CHECK:           %[[CALL:.*]] = call @oneUnknownDimension(%[[ARG_DIM0]]) : (index) -> index
+// CHECK:           %[[CALL_SHAPE:.*]] = shapex.make_ranked_shape %[[CALL]] : (index) -> !shapex.ranked_shape<[?]>
+// CHECK:           %[[CALL_DIM0:.*]] = shapex.ranked_dim %[[CALL_SHAPE]][0] : !shapex.ranked_shape<[?]> -> index
+// CHECK:           return %[[CALL_DIM0]] : index
+
+func @oneUnknownDimension(%arg0 :!shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[?]> {
+  %0 = std.call @oneUnknownDimension(%arg0) : (!shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[?]>
+  return %0 : !shapex.ranked_shape<[?]>
+}

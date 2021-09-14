@@ -218,6 +218,26 @@ class FunctionTest(absltest.TestCase):
     # assertEqual on bool arrays is fraught for... reasons.
     self.assertEqual("array([ True, False])", repr(result))
 
+  def testReturnTypeList(self):
+    vm_list = VmVariantList(2)
+    vm_list.push_int(1)
+    vm_list.push_int(2)
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_list(vm_list)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi":
+            json.dumps({
+                "a": [],
+                "r": [["py_homogeneous_list", "i64"]],
+            })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker()
+    self.assertEqual("[1, 2]", repr(result))
+
 
 if __name__ == "__main__":
   absltest.main()

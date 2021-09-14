@@ -381,11 +381,22 @@ def _vm_to_scalar(type_bound: type):
   return convert
 
 
+def _vm_to_pylist(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
+  # The descriptor for a pylist is like:
+  #   ['pylist', element_type]
+  sub_vm_list = vm_list.get_as_list(vm_index)
+  element_type_desc = desc[1:]
+  py_items = _extract_vm_sequence_to_python(
+      inv, sub_vm_list, element_type_desc * len(sub_vm_list))
+  return py_items
+
+
 VM_TO_PYTHON_CONVERTERS = {
     "ndarray": _vm_to_ndarray,
     "sdict": _vm_to_sdict,
     "slist": _vm_to_slist,
     "stuple": _vm_to_stuple,
+    "py_homogeneous_list": _vm_to_pylist,
 
     # Scalars.
     "i8": _vm_to_scalar(int),

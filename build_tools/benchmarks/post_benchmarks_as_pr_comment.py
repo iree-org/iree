@@ -43,7 +43,8 @@ import markdown_strings as md
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from common.benchmark_description import BenchmarkResults, get_output
+from common.benchmark_definition import BenchmarkResults, execute_cmd_and_get_output
+from common.noisy_benchmarks import NOISY_BENCHMARKS
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
@@ -55,7 +56,7 @@ IREE_PROJECT_ID = 'IREE'
 MAX_BASE_COMMIT_QUERY_COUNT = 10
 PERFBOARD_SERIES_PREFIX = "https://perf.iree.dev/serie?IREE?"
 # The ratio below which benchmarks will be considered as similar with base.
-SIMILAR_BECNHMARK_THRESHOLD = 0.05
+DEFAULT_SIMILAR_BECNHMARK_THRESHOLD = 0.05
 # The max number of rows to show per table.
 TABLE_SIZE_CUT = 3
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
@@ -71,16 +72,16 @@ def get_required_env_var(var: str) -> str:
 
 def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
   """Gets the commit hash for the given commit."""
-  return get_output(['git', 'rev-parse', commit],
-                    cwd=THIS_DIRECTORY,
-                    verbose=verbose)
+  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+                                    cwd=THIS_DIRECTORY,
+                                    verbose=verbose)
 
 
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
-  count = get_output(['git', 'rev-list', '--count', commit],
-                     cwd=THIS_DIRECTORY,
-                     verbose=verbose)
+  count = execute_cmd_and_get_output(['git', 'rev-list', '--count', commit],
+                                     cwd=THIS_DIRECTORY,
+                                     verbose=verbose)
   return int(count)
 
 
@@ -88,9 +89,10 @@ def get_origin_tree_commit(distance: int, verbose: bool = False) -> str:
   """Returns the hash for the commit with the given distance from top of the
   tree for the origin base branch."""
   base_branch = get_required_env_var("BUILDKITE_PULL_REQUEST_BASE_BRANCH")
-  get_output(['git', 'fetch', '--prune', '--', 'origin', base_branch],
-             cwd=THIS_DIRECTORY,
-             verbose=verbose)
+  execute_cmd_and_get_output(
+      ['git', 'fetch', '--prune', '--', 'origin', base_branch],
+      cwd=THIS_DIRECTORY,
+      verbose=verbose)
   return get_git_commit_hash(f'origin/{base_branch}~{distance}', verbose)
 
 
@@ -126,7 +128,8 @@ class AggregateBenchmarkLatency:
 
 
 def aggregate_all_benchmarks(
-    benchmark_files: Sequence[str]) -> Dict[str, AggregateBenchmarkLatency]:
+    benchmark_files: Sequence[str],
+    verbose: bool = False) -> Dict[str, AggregateBenchmarkLatency]:
   """Aggregates all benchmarks in the given files.
 
   Args:
@@ -247,14 +250,12 @@ def sort_benchmarks_and_get_table(benchmarks: Dict[str,
 
 def categorize_benchmarks_into_tables(benchmarks: Dict[
     str, AggregateBenchmarkLatency],
-                                      similar_threshold: float,
                                       size_cut: Optional[int] = None) -> str:
   """Splits benchmarks into regressed/improved/similar/raw categories and
   returns their markdown tables.
 
     Args:
-    - similar_threshold: the threshold under which a benchmark will be
-        considered as similar to its base commit.
+    - benchmarks: A dictionary of benchmark names to its aggregate info.
     - size_cut: If not None, only show the top N results for each table.
     """
   regressed, improved, similar, raw = {}, {}, {}, {}
@@ -264,6 +265,13 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     if results.base_mean_time is None:
       raw[name] = results
       continue
+
+    similar_threshold = DEFAULT_SIMILAR_BECNHMARK_THRESHOLD
+    # Set different threshold for noisy benchmarks.
+    for regex, threshold in NOISY_BENCHMARKS:
+      if regex.match(name):
+        similar_threshold = float(threshold) / 100
+        break
 
     current = results.mean_time
     base = results.base_mean_time
@@ -305,7 +313,7 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
                                   query_base: bool,
                                   verbose: bool = False) -> Tuple[str, str]:
   """Gets the full/abbreviated markdown summary of all benchmarks in files."""
-  all_benchmarks = aggregate_all_benchmarks(benchmark_files)
+  all_benchmarks = aggregate_all_benchmarks(benchmark_files, verbose=verbose)
 
   build_url = get_required_env_var("BUILDKITE_BUILD_URL")
   pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
@@ -342,17 +350,13 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
   # Compose the full benchmark tables.
   full_table = [md.header("Full Benchmark Summary", 2)]
   full_table.append(md.unordered_list([commit_info, pr_info, buildkite_info]))
-  full_table.append(
-      categorize_benchmarks_into_tables(all_benchmarks,
-                                        SIMILAR_BECNHMARK_THRESHOLD))
+  full_table.append(categorize_benchmarks_into_tables(all_benchmarks))
 
   # Compose the abbreviated benchmark tables.
   abbr_table = [md.header(ABBR_PR_COMMENT_TITLE, 2)]
   abbr_table.append(commit_info)
   abbr_table.append(
-      categorize_benchmarks_into_tables(all_benchmarks,
-                                        SIMILAR_BECNHMARK_THRESHOLD,
-                                        TABLE_SIZE_CUT))
+      categorize_benchmarks_into_tables(all_benchmarks, TABLE_SIZE_CUT))
   abbr_table.append("For more information:")
   # We don't know until a Gist is really created. Use a placeholder for now
   # and replace later.

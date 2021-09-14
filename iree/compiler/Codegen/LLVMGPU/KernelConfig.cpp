@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 
+#include <numeric>
+
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
@@ -141,29 +143,27 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
     }
   }
 
-  auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  bool outputSizeIsProblemSize =
-      genericOp &&
-      llvm::all_of(genericOp.getOutputOperands(),
-                   [&genericOp](OpOperand *outputOperand) {
-                     return genericOp.getTiedIndexingMap(outputOperand)
-                         .isProjectedPermutation();
-                   });
-  if (outputSizeIsProblemSize) {
-    // Calculate the problem size to adjust the tile size.
-    int64_t problemSize = 1;
-    entryPoint.walk([&problemSize](IREE::Flow::DispatchTensorStoreOp storeOp) {
-      ArrayRef<int64_t> shape = storeOp.target()
-                                    .getType()
-                                    .cast<IREE::Flow::DispatchTensorType>()
-                                    .getShape();
-      int64_t prod = 1;
-      for (int64_t dim : shape) prod *= dim;
-      problemSize = std::max(prod, problemSize);
-    });
-    // If the problem size is too small or if the op cannot be vectorized,
-    // reduce the vector size to prevent bad memory access patterns.
-    if ((problemSize / (cudaWarpSize * vectorSize)) < 64) vectorSize = 1;
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+    for (auto outputOperand : enumerate(genericOp.getOutputOperands())) {
+      if (!genericOp.getTiedIndexingMap(outputOperand.value())
+               .isProjectedPermutation()) {
+        vectorSize = 1;
+        break;
+      }
+      ArrayRef<int64_t> shape = getUntiledResultShape(
+          cast<linalg::LinalgOp>(op), outputOperand.index());
+      if (llvm::any_of(shape, ShapedType::isDynamic)) {
+        vectorSize = 1;
+        break;
+      }
+      int64_t problemSize = std::accumulate(
+          shape.begin(), shape.end(), 1,
+          [](const int64_t &a, const int64_t &b) { return a * b; });
+      if ((problemSize / (cudaWarpSize * vectorSize)) < 64) {
+        vectorSize = 1;
+        break;
+      }
+    }
   }
   // Pick a vectorSize of 1 for op that we know won't get vectorizedd.
   // TODO(thomasraoux): This could be improved by checking if the linalg op
@@ -220,12 +220,24 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     if (computeOps.empty()) {
+      std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+      SmallVector<int64_t> workloadPerWorkgroup;
+      if (!tiledLoops.empty()) {
+        // If the tiled loops are not empty then this could be a corner case of
+        // tensor.insert_slice being tiled and distributed, that just shows up
+        // as a `flow.dispatch.tensor.load` and a `flow.dispatch.tensor.store`.
+        // For now just treat the tiled loops not being empty as an indicator of
+        // that. Need a better way of information flow from flow dialect to hal.
+        workgroupSize[0] = cudaWarpSize;
+        workloadPerWorkgroup.resize(tiledLoops.size(), 1);
+        workloadPerWorkgroup.front() = cudaWarpSize * 4;
+      }
       // TODO(ravishankarm): Maybe this should just return without setting
       // anything. Without any compute ops, this shouldnt be using tile and
       // distribute.
       setTranslationInfo(
           funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          {1, 1, 1}, /*workloadPerWorkgroup=*/{});
+          workgroupSize, workloadPerWorkgroup);
       continue;
     }
 

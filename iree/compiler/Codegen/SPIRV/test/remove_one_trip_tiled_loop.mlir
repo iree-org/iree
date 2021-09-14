@@ -9,7 +9,7 @@ hal.executable private @static_shaped_conv  {
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb"> {
     hal.executable.entry_point @static_shaped_conv attributes {
       interface = @io, ordinal = 0 : index,
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]},
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]},
       workgroup_size = [4 : index, 4 : index, 1 : index]
     }
     builtin.module {

@@ -54,7 +54,7 @@ Builds the IREE python bindings. Defaults to `OFF`.
 
 Builds the IREE TFLite C API compatibility shim. Defaults to `ON`.
 
-### `IREE_BUILD_BINDINGS_TFLITE_JAVA`:BOOL
+#### `IREE_BUILD_BINDINGS_TFLITE_JAVA`:BOOL
 
 Builds the IREE TFLite Java bindings with the C API compatibility shim. Defaults to `ON`.
 
@@ -78,6 +78,12 @@ Semicolon-separated list of target backend to build, or `all` for building all
 compiler target backends. Case-insensitive. If an empty list is provided, will
 build no target backends. Defaults to `all`. Example:
 `-DIREE_TARGET_BACKENDS_TO_BUILD=Vulkan-SPIRV;VMLA`.
+
+#### `IREE_DEV_MODE`:BOOL
+
+Configure settings to optimize for IREE development (as opposed to CI or
+release). Defaults to `OFF`. For example, this will downgrade some compiler
+diagnostics from errors to warnings.
 
 #### `IREE_ENABLE_LLD`:BOOL
 

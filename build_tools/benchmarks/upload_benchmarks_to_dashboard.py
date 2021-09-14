@@ -26,8 +26,9 @@ import time
 
 from typing import Any, Dict, Optional
 
-from common.benchmark_description import (BenchmarkInfo, BenchmarkResults,
-                                          get_output)
+from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
+                                         execute_cmd_and_get_output)
+from common.noisy_benchmarks import NOISY_BENCHMARKS
 
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/google/iree/commit'
 IREE_PROJECT_ID = 'IREE'
@@ -37,6 +38,10 @@ COMMON_DESCRIIPTION = """
 <br>
 For the graph, the x axis is the Git commit index, and the y axis is the
 measured latency in milliseconds.
+<br>
+See <a href="https://github.com/google/iree/tree/main/benchmarks/dashboard.md">
+https://github.com/google/iree/tree/main/benchmarks/dashboard.md
+</a> for benchmark philosophy, specification, and definitions.
 """
 
 # A non-exhaustive list of models and their source URLs.
@@ -77,16 +82,16 @@ def get_model_description(benchmark_info: BenchmarkInfo) -> Optional[str]:
 
 def get_git_commit_hash(commit: str, verbose: bool = False) -> str:
   """Gets the commit hash for the given commit."""
-  return get_output(['git', 'rev-parse', commit],
-                    cwd=THIS_DIRECTORY,
-                    verbose=verbose)
+  return execute_cmd_and_get_output(['git', 'rev-parse', commit],
+                                    cwd=THIS_DIRECTORY,
+                                    verbose=verbose)
 
 
 def get_git_total_commit_count(commit: str, verbose: bool = False) -> int:
   """Gets the total commit count in history ending with the given commit."""
-  count = get_output(['git', 'rev-list', '--count', commit],
-                     cwd=THIS_DIRECTORY,
-                     verbose=verbose)
+  count = execute_cmd_and_get_output(['git', 'rev-list', '--count', commit],
+                                     cwd=THIS_DIRECTORY,
+                                     verbose=verbose)
   return int(count)
 
 
@@ -95,7 +100,7 @@ def get_git_commit_info(commit: str, verbose: bool = False) -> Dict[str, str]:
   cmd = [
       'git', 'show', '--format=%H:::%h:::%an:::%ae:::%s', '--no-patch', commit
   ]
-  info = get_output(cmd, cwd=THIS_DIRECTORY, verbose=verbose)
+  info = execute_cmd_and_get_output(cmd, cwd=THIS_DIRECTORY, verbose=verbose)
   segments = info.split(':::')
   return {
       'hash': segments[0],
@@ -206,9 +211,18 @@ def add_new_iree_series(series_id: str,
                         verbose: bool = False):
   """Posts a new series to the dashboard."""
   url = get_required_env_var('IREE_DASHBOARD_URL')
+
+  average_range = '5%'
+  # Adjust average threshold for noisy benchmarks.
+  for regex, threshold in NOISY_BENCHMARKS:
+    if regex.match(series_id):
+      average_range = f'{threshold}%'
+      break
+
   payload = compose_series_payload(IREE_PROJECT_ID,
                                    series_id,
                                    series_description,
+                                   average_range=average_range,
                                    override=override)
   post_to_dashboard(f'{url}/apis/addSerie',
                     payload,
