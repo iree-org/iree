@@ -13,6 +13,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
@@ -126,23 +127,27 @@ llvm::Optional<unsigned> detail::getTiedResultOperandIndex(
   if (!storageAttr) return llvm::None;
   auto valueAttrs = storageAttr.getValue();
   if (valueAttrs.empty()) return llvm::None;
+  auto tiedOp = cast<TiedOpInterface>(op);
+  resultIndex -= tiedOp.getTiedResultsIndexAndLength().first;
   int64_t value = valueAttrs[resultIndex].cast<IntegerAttr>().getInt();
   if (value == TiedOpInterface::kUntiedIndex) return llvm::None;
-  auto tiedOp = cast<TiedOpInterface>(op);
   unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
   return tiedOperandsOffset + static_cast<unsigned>(value);
 }
 
 void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
                                        llvm::Optional<unsigned> operandIndex) {
+  auto tiedOp = cast<TiedOpInterface>(op);
+  auto resultRange = tiedOp.getTiedResultsIndexAndLength();
+  resultIndex -= resultRange.first;
+
   auto indices = getTiedResultOperandIndices(op);
   if (indices.empty()) {
-    indices.resize(op->getNumResults(), TiedOpInterface::kUntiedIndex);
+    indices.resize(resultRange.second, TiedOpInterface::kUntiedIndex);
   } else {
     // Well, getTiedResultOperandIndices() returns indices into the full range
     // of the op, but in the attribute, we expect to store ranges into the range
     // returned by `getTiedOperandsIndexAndLength`.
-    auto tiedOp = cast<TiedOpInterface>(op);
     unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
     for (auto &index : indices) {
       if (index != TiedOpInterface::kUntiedIndex) index -= tiedOperandsOffset;
@@ -164,8 +169,9 @@ SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {
   auto valueAttrs = storageAttr.getValue();
   if (valueAttrs.empty()) return indices;
   auto tiedOp = cast<TiedOpInterface>(op);
+  auto resultRange = tiedOp.getTiedResultsIndexAndLength();
   unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
-  indices.resize(op->getNumResults());
+  indices.resize(resultRange.second);
   for (unsigned i = 0; i < valueAttrs.size(); ++i) {
     int64_t index = valueAttrs[i].cast<IntegerAttr>().getInt();
     indices[i] = index != TiedOpInterface::kUntiedIndex
@@ -175,6 +181,7 @@ SmallVector<int64_t, 4> detail::getTiedResultOperandIndices(Operation *op) {
   return indices;
 }
 
+// static
 Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
   Value baseValue = derivedValue;
   while (auto definingOp =
@@ -186,32 +193,49 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
   return baseValue;
 }
 
-bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
-  auto storageAttr =
-      op->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
-  if (!storageAttr) return false;
-  auto valueAttrs = storageAttr.getValue();
-  if (valueAttrs.empty()) return false;
-  auto tiedOp = cast<TiedOpInterface>(op);
-  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
-  for (unsigned i = 0; i < valueAttrs.size(); ++i) {
-    int64_t index = valueAttrs[i].cast<IntegerAttr>().getInt();
-    index = index != TiedOpInterface::kUntiedIndex
-                ? tiedOperandsOffset + index
-                : TiedOpInterface::kUntiedIndex;
-    if (index == operandIndex) return true;
+// static
+bool TiedOpInterface::hasAnyTiedUses(Value value) {
+  for (auto &use : value.getUses()) {
+    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
+    if (!tiedOp) continue;
+    if (tiedOp.isOperandTied(use.getOperandNumber())) return true;
   }
   return false;
 }
 
-LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
-  auto storageAttr =
-      tiedOp->getAttrOfType<ArrayAttr>(TiedOpInterface::getStorageAttrName());
-  if (!storageAttr || storageAttr.getValue().empty()) {
-    return success();
+bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
+  auto tiedOp = dyn_cast<TiedOpInterface>(op);
+  if (!tiedOp) return false;
+  SmallVector<Value> results;
+  auto tiedIndices = tiedOp.getTiedResultOperandIndices();
+  for (unsigned i = 0; i < tiedIndices.size(); ++i) {
+    if (tiedIndices[i] == operandIndex) {
+      return true;
+    }
   }
-  auto tiedOperandIndices = storageAttr.getValue();
-  if (tiedOperandIndices.size() != tiedOp->getNumResults()) {
+  return false;
+}
+
+SmallVector<Value> detail::getOperandTiedResults(Operation *op,
+                                                 unsigned operandIndex) {
+  auto tiedOp = dyn_cast<TiedOpInterface>(op);
+  if (!tiedOp) return {};
+  auto resultRange = tiedOp.getTiedResultsIndexAndLength();
+  SmallVector<Value> results;
+  auto tiedIndices = tiedOp.getTiedResultOperandIndices();
+  for (unsigned i = 0; i < tiedIndices.size(); ++i) {
+    if (tiedIndices[i] == operandIndex) {
+      results.push_back(op->getResult(resultRange.first + i));
+    }
+  }
+  return results;
+}
+
+LogicalResult detail::verifyTiedOp(TiedOpInterface tiedOp) {
+  auto tiedOperandIndices = tiedOp.getTiedResultOperandIndices();
+  if (tiedOperandIndices.empty()) return success();
+  auto resultRange = tiedOp.getTiedResultsIndexAndLength();
+  if (tiedOperandIndices.size() != resultRange.second) {
     return tiedOp.emitError("op results/tied operand indices mismatch");
   }
   return success();
@@ -263,6 +287,105 @@ void excludeTiedOperandAndResultIndices(
     }
     tiedOperandIndices.push_back(tiedOperandIndex);
   }
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::SizeAwareTypeInterface
+//===----------------------------------------------------------------------===//
+
+static bool isValueUsableForOp(Value value, Operation *forOp) {
+  if (forOp->getBlock() == nullptr) {
+    // Op is not in a block; can't analyze (maybe?).
+    return false;
+  }
+  auto *definingBlock = value.getParentBlock();
+  if (definingBlock == forOp->getBlock()) {
+    // Defined in the same block; ensure block order.
+    if (value.isa<BlockArgument>()) return true;
+    if (value.getDefiningOp()->isBeforeInBlock(forOp)) return true;
+  } else if (definingBlock->isEntryBlock()) {
+    // Entry block always dominates - fast path for constants.
+    return true;
+  } else {
+    // See if block the value is defined in dominates the forOp block.
+    // TODO(benvanik): optimize this, it's terribly expensive to recompute.
+    DominanceInfo dominanceInfo(forOp->getParentOp());
+    return dominanceInfo.dominates(definingBlock, forOp->getBlock());
+  }
+  return false;
+}
+
+// static
+Value SizeAwareTypeInterface::findSizeValue(Value resourceValue,
+                                            Operation *forOp) {
+  // See if the value is produced by a size-aware op; we can just ask for the
+  // size it has tied. Walking upward is always good as we know any size we find
+  // dominates |forOp|.
+  SmallVector<Value> worklist;
+  worklist.push_back(resourceValue);
+  while (!worklist.empty()) {
+    auto value = worklist.pop_back_val();
+    auto *definingOp = value.getDefiningOp();
+    if (!definingOp) continue;
+    if (auto sizeAwareOp =
+            llvm::dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp)) {
+      return sizeAwareOp.getResultSizeFromValue(value);
+    }
+    if (auto tiedOp = llvm::dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+      auto tiedOperand = tiedOp.getTiedResultOperand(value);
+      if (tiedOperand) worklist.push_back(tiedOperand);
+    }
+  }
+
+  // Walk the users to see if any can report the size.
+  worklist.push_back(resourceValue);
+  while (!worklist.empty()) {
+    auto value = worklist.pop_back_val();
+    for (auto &use : value.getUses()) {
+      if (auto sizeAwareOp = llvm::dyn_cast<IREE::Util::SizeAwareOpInterface>(
+              use.getOwner())) {
+        auto sizeValue = sizeAwareOp.getOperandSize(use.getOperandNumber());
+        if (sizeValue) {
+          if (isValueUsableForOp(sizeValue, forOp)) return sizeValue;
+        }
+      }
+      if (auto tiedOp =
+              llvm::dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
+        worklist.append(tiedOp.getOperandTiedResults(use.getOperandNumber()));
+      }
+    }
+  }
+
+  return {};
+}
+
+// static
+Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
+                                             OpBuilder &builder) {
+  auto sizeAwareType =
+      resourceValue.getType().dyn_cast<IREE::Util::SizeAwareTypeInterface>();
+  if (!sizeAwareType) {
+    return {};  // Not a sized type.
+  }
+  if (!builder.getInsertionPoint().getNodePtr()->isKnownSentinel()) {
+    Operation &insertionPt = *builder.getInsertionPoint();
+    auto sizeValue = sizeAwareType.findSizeValue(resourceValue, &insertionPt);
+    if (sizeValue) {
+      return sizeValue;  // Found in IR.
+    }
+  }
+  // TODO(benvanik): make this cleaner.
+  auto *definingOp = resourceValue.getDefiningOp();
+  if (auto sizeAwareOp =
+          llvm::dyn_cast_or_null<IREE::Util::SizeAwareOpInterface>(
+              definingOp)) {
+    return sizeAwareOp.getResultSizeFromValue(resourceValue);
+  } else if (auto inferSizeType =
+                 resourceValue.getType()
+                     .dyn_cast<IREE::Util::InferTypeSizeInterface>()) {
+    return inferSizeType.inferSizeFromValue(loc, resourceValue, builder);
+  }
+  return {};
 }
 
 //===----------------------------------------------------------------------===//

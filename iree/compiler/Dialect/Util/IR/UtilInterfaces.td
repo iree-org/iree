@@ -150,7 +150,23 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*methodName=*/"getTiedOperandsIndexAndLength", (ins),
       /*args=*/[{}],
       /*defaultImplementation=*/[{
-        return {0, $_op.getNumOperands()};
+        return {0, $_op->getNumOperands()};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the set of results that may be tied to operands as an
+        (index, length) pair ala getODSResultIndexAndLength.
+
+        By default assumes all results may be tied. If an op treats some
+        results as special then the op can override this and specify only the
+        ones it will tie.
+      }],
+      /*retTy=*/"std::pair<unsigned, unsigned>",
+      /*methodName=*/"getTiedResultsIndexAndLength", (ins),
+      /*args=*/[{}],
+      /*defaultImplementation=*/[{
+        return {0, $_op->getNumResults()};
       }]
     >,
     InterfaceMethod<
@@ -249,6 +265,18 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         return IREE::Util::detail::isOperandTied($_op, operandIndex);
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a list of result values that are tied to the given operand.
+      }],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"getOperandTiedResults",
+      /*args=*/(ins "unsigned":$operandIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return IREE::Util::detail::getOperandTiedResults($_op, operandIndex);
+      }]
+    >,
   ];
 
   let extraClassDeclaration = [{
@@ -261,6 +289,9 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
     // from the given value by traversing tied ops. Note that the returned
     // value may be a block argument and have no defining op.
     static Value findTiedBaseValue(Value derivedValue);
+
+    // Returns true if any of |value|'s uses have tied it to a result.
+    static bool hasAnyTiedUses(Value value);
   }];
 
   let verify = [{
@@ -298,12 +329,17 @@ def Util_SizeAwareType : TypeInterface<"SizeAwareTypeInterface"> {
     associated with it in the IR. See `SizeAwareOp` for more information.
   }];
 
-  let methods = [
-    InterfaceMethod<
-      [{Returns a size for the given sized value.}],
-      "Value", "getSize", (ins "Value":$value)
-    >,
-  ];
+  let extraClassDeclaration = [{
+    // Walks the SSA use-def chain to find the size of the type.
+    // Returns nullptr if the size cannot be found or if it is defined after
+    // |forOp|.
+    static Value findSizeValue(Value resourceValue, Operation *forOp);
+
+    // Returns an SSA value representing the byte size of |value| or nullptr
+    // if not a sized value.
+    static Value queryValueSize(Location loc, Value resourceValue,
+                                OpBuilder &builder);
+  }];
 }
 
 def Util_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
