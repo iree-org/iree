@@ -337,6 +337,20 @@ def Util_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::ReferenceTypeInterface
+//===----------------------------------------------------------------------===//
+
+def Util_ReferenceType : TypeInterface<"ReferenceTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used to mark types as passed by-reference. These types may have
+    aliases/ties or be convertable into forms that do. This is in contrast to
+    the default of immutable by-value types.
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::GlobalTypeInterface
 //===----------------------------------------------------------------------===//
 

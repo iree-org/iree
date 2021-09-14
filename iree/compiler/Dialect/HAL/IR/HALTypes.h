@@ -46,23 +46,9 @@ namespace HAL {
 // type is unsupported in the ABI.
 llvm::Optional<int32_t> getElementTypeValue(Type type);
 
-// Returns an attribute with the MLIR element type or {}.
-IntegerAttr getElementTypeAttr(Type type);
-
-// Returns the total bit count of elements of the given type.
-size_t getElementBitCount(IntegerAttr elementType);
-Value getElementBitCount(Location loc, Value elementType, OpBuilder &builder);
-
-// Returns the rounded-up byte count of elements of the given type.
-size_t getElementByteCount(IntegerAttr elementType);
-Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder);
-
 // Returns a stable identifier for the MLIR encoding type or 0 (opaque) if the
 // type is unsupported in the ABI.
 llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr);
-
-// Returns an attribute with the MLIR encoding type or 0 (opaque).
-IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context);
 
 template <typename T>
 inline bool allEnumBitsSet(T value, T required) {
@@ -81,7 +67,8 @@ class AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
 
 class BufferType
     : public Type::TypeBase<BufferType, Type, TypeStorage,
-                            IREE::Util::InferTypeSizeInterface::Trait> {
+                            IREE::Util::InferTypeSizeInterface::Trait,
+                            IREE::Util::ReferenceTypeInterface::Trait> {
  public:
   using Base::Base;
 
@@ -90,7 +77,8 @@ class BufferType
 
 class BufferViewType
     : public Type::TypeBase<BufferViewType, Type, TypeStorage,
-                            IREE::Util::InferTypeSizeInterface::Trait> {
+                            IREE::Util::InferTypeSizeInterface::Trait,
+                            IREE::Util::ReferenceTypeInterface::Trait> {
  public:
   using Base::Base;
 
