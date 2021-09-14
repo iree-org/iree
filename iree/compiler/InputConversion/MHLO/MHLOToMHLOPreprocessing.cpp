@@ -753,7 +753,7 @@ class ExpandRngNormal : public OpRewritePattern<mhlo::RngNormalOp> {
         sinValues(halfNumElems);
     for (auto i : llvm::seq<unsigned>(0, numElems / 2)) {
       constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
-      constexpr float kTwoPi = 2.0 * M_PI;
+      constexpr float kTwoPi = static_cast<float>(2.0 * M_PI);
       float u1, u2;
       do {
         u1 = runif(rng);
