@@ -14,9 +14,11 @@ cc_library(
     name = "Analysis",
     srcs = [
         "Explorer.cpp",
+        "Position.cpp",
     ],
     hdrs = [
         "Explorer.h",
+        "Position.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Util/IR",
