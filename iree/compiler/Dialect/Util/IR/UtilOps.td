@@ -71,7 +71,9 @@ def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
-def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize"> {
+def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize", [
+  SameOperandsAndResultType,
+]> {
   let summary = "Prevents compiler optimizations of a value.";
   let description = [{
     Wraps any operands in an unoptimizable identity. This operation is declared
@@ -83,8 +85,10 @@ def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize"> {
   let results = (outs Variadic<AnyType>:$results);
   let verifier = [{ return verify$cppClass(*this); }];
   let builders = [
-    OpBuilder<(ins "ValueRange":$operands,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>
+    OpBuilder<(ins
+      "ValueRange":$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
   ];
 }
 
