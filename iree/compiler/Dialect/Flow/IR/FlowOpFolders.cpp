@@ -258,12 +258,15 @@ namespace {
 // arbitrarily late into the pipeline. Often, they keep alive
 // DispatchTensorLoadOp's that would otherwise be dead!
 //
-// To fix this, we convert the `std.dim` ops to `flow.dispatch.shape` ops.
+// To fix this:
+// (1) In the case of loading full tensor we convert the `std.dim` ops to
+// `flow.dispatch.shape` ops.
 // ```
 // dim(flow.dispatch.tensor.load(%x), %const)
 // ->
 // shapex.ranked_dim(flow.dispatch.shape(%x), %const)
 // ``
+// (2) When we are loading a tile we get replace dim with the size from sizes.
 struct ConvertDimOfDispatchInputLoadToDispatchShape
     : public OpRewritePattern<tensor::DimOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -276,10 +279,23 @@ struct ConvertDimOfDispatchInputLoadToDispatchShape
     Optional<int64_t> constantIndex = op.getConstantIndex();
     if (!constantIndex.hasValue()) return failure();
 
-    auto rankedShape =
-        rewriter.create<DispatchShapeOp>(op.getLoc(), loadOp.source());
-    rewriter.replaceOpWithNewOp<Shape::RankedDimOp>(op, rankedShape,
-                                                    *constantIndex);
+    // Full tensor:
+    if (loadOp.sizes().empty()) {
+      auto rankedShape =
+          rewriter.create<DispatchShapeOp>(op.getLoc(), loadOp.source());
+      rewriter.replaceOpWithNewOp<Shape::RankedDimOp>(op, rankedShape,
+                                                      *constantIndex);
+    } else {  // Tensor tile :
+      if (loadOp.getMixedSizes()[*constantIndex].is<Attribute>()) {
+        rewriter.replaceOpWithNewOp<ConstantOp>(
+            op, loadOp.getMixedSizes()[*constantIndex]
+                    .get<Attribute>()
+                    .dyn_cast<IntegerAttr>());
+      } else {
+        rewriter.replaceOp(
+            op, {loadOp.getMixedSizes()[*constantIndex].get<Value>()});
+      }
+    }
     return success();
   }
 };
