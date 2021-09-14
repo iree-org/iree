@@ -115,7 +115,7 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
   return %2 : tensor<1280xf32>
 }
 
-//  CHECK-DAG: #[[SIZE_MAP0:.+]] = affine_map<(d0, d1) -> (d1, -d0 + 1280)>
+//  CHECK-DAG: #[[SIZE_MAP0:.+]] = affine_map<(d0, d1) -> (d0, -d1 + 1280)>
 //  CHECK-DAG: #[[SIZE_MAP1:.+]] = affine_map<(d0, d1) -> (-d0 + 1280, d1)>
 
 //      CHECK: func @tile_parallel_reduction
@@ -127,7 +127,7 @@ func @tile_parallel_reduction(%arg0: tensor<7x7x1280xf32>) -> tensor<1280xf32> {
 // CHECK-NEXT:     (%[[ARG1:.+]]: !flow.dispatch.tensor<readonly:7x7x1280xf32>, %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:1280xf32>) {
 //      CHECK:   %[[WG_SIZE0:.+]] = flow.dispatch.workgroup.size[0] : index
 //      CHECK:   scf.for %[[IV:.+]] = %{{.+}} to %{{.+}} step %{{.+}}
-//      CHECK:     %[[SIZE0:.+]] = affine.min #[[SIZE_MAP0]](%[[IV]], %[[WG_SIZE0]])
+//      CHECK:     %[[SIZE0:.+]] = affine.min #[[SIZE_MAP0]](%[[WG_SIZE0]], %[[IV]])
 //      CHECK:     %[[IN:.+]] = flow.dispatch.tensor.load %[[ARG1]],
 // CHECK-SAME:       sizes = [7, 7, %[[SIZE0]]]
 //      CHECK:     %[[SIZE1:.+]] = affine.min #[[SIZE_MAP1]](%[[IV]], %[[WG_SIZE0]])
