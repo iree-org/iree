@@ -15,8 +15,10 @@ iree_cc_library(
     Analysis
   HDRS
     "Explorer.h"
+    "Position.h"
   SRCS
     "Explorer.cpp"
+    "Position.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis
