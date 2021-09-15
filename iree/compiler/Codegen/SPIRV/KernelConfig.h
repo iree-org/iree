@@ -18,8 +18,8 @@
 #include <array>
 
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -33,6 +33,12 @@ namespace detail {
 LogicalResult defineConvWorkgroupCountRegion(
     Operation *op, ArrayRef<int64_t> outputShape,
     ArrayRef<int64_t> workgroupTileSizes);
+
+/// Sets CodeGen configurations via attributes to the given matmul `linalgOp`
+/// with the given best workgroup size and tile size hints.
+LogicalResult setMatmulOpConfig(linalg::LinalgOp linalgOp,
+                                std::array<int64_t, 2> bestWorkgroupSizeXY,
+                                std::array<int64_t, 3> bestThreadTileSizeMNK);
 
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///
