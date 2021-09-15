@@ -115,7 +115,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   for (int64_t x = bestX; x >= 2; x >>= 1) {
     // Handle 4 elements per thread for the innermost dimension. We need this
     // for vectorized load.
-    int64_t chosenTileSize = 4;
+    int64_t chosenTileSize = bestThreadN;
     if (dimN % (x * chosenTileSize) == 0) {
       workgroupSize[0] = x;
       workgroupTileSizes[1 + isBM] = x * chosenTileSize;
