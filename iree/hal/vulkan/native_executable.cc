@@ -176,7 +176,7 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
   }
 
   if (flatbuffers_uint32_vec_len(
-          iree_SpirVExecutableDef_code_get(executable_def)) < 0) {
+          iree_SpirVExecutableDef_code_get(executable_def)) == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "executable SPIR-V code is missing/empty");
   }
