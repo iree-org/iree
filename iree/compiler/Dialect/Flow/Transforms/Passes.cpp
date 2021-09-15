@@ -67,9 +67,9 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
-   // Special case peephole optimizations.
-   passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
+  // Special case peephole optimizations.
   {
+    passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
     if (clEnableConvToImg2Col) {
       passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
     }
@@ -79,6 +79,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
           createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
     }
   }
+
   passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
 
   // Simplify util.global accesses early on; this can help with dispatch
