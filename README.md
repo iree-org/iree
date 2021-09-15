@@ -51,6 +51,11 @@ Buildkite | CMake         | Android    | arm64-v8a            | Runtime         
 BuildKite | CMake         | Android    | arm64-v8a            | Runtime Benchmarks           | [![buildkite status iree-benchmark](https://badge.buildkite.com/62e504b93171f4a19e5c46f8b9a99eb5dba050666640fbc21b.svg?branch=main)](https://buildkite.com/iree/iree-benchmark)
 BuildKite | CMake         | Linux      | x86-64               | Tracing + Standalone Runtime | [![buildkite status iree-build-configurations](https://badge.buildkite.com/3bc03ad54a6b785b3fdd0dd3d67fd93ed22ef2b538cb34adc3.svg?branch=main)](https://buildkite.com/iree/iree-build-configurations)
 
+## Architecture Overview
+
+![IREE Architecture](docs/website/docs/assets/images/iree_architecture.svg)
+
+See [our website](https://google.github.io/iree/) for more information.
 
 ## Presentations and Talks
 
