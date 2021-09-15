@@ -63,17 +63,17 @@ hal.executable @matmul_1024x2048x512 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @matmul_1024x2048x512
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [128, 16]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [128, 32]}
 //           CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[Y]]]
+//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
 
 //                CHECK: func @matmul_1024x2048x512()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[16, 128, 16], [], [8, 4, 16]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[32, 128, 4], [], [16, 4, 4]]}
 
 // -----
 
@@ -140,17 +140,17 @@ hal.executable @matmul_3136x24x96 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @matmul_3136x24x96
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 224]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 448]}
 //           CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 224)>()[%[[Y]]]
+//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 448)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
 
 //                CHECK: func @matmul_3136x24x96()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[224, 8, 16], [], [7, 4, 16]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[448, 8, 4], [], [14, 4, 4]]}
 
 // -----
 
@@ -227,7 +227,7 @@ hal.executable @matmul_196x64x192 {
 
 //                CHECK: func @matmul_196x64x192()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:      lowering.config = {tileSizes = [[28, 64, 16], [], [7, 4, 16]]}
+//  CHECK-SAME{LITERAL}:      lowering.config = {tileSizes = [[28, 64, 8], [], [7, 4, 8]]}
 
 // -----
 
@@ -289,17 +289,17 @@ hal.executable @matmul_12544x96x16 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @matmul_12544x96x16
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 64]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 128]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%[[Y]]]
+//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
 
 //                CHECK: func @matmul_12544x96x16()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config =  {tileSizes = [[64, 32, 16], [], [8, 4, 16]]}
+//  CHECK-SAME{LITERAL}:     lowering.config =  {tileSizes = [[128, 32, 4], [], [16, 4, 4]]}
 
 // -----
 
@@ -376,7 +376,7 @@ hal.executable @matmul_49x160x576 {
 
 //                CHECK: func @matmul_49x160x576()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[7, 32, 16], [], [7, 4, 16]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[7, 32, 8], [], [7, 4, 8]]}
 
 // -----
 
@@ -454,16 +454,16 @@ hal.executable @batch_matmul_4x384x384 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @batch_matmul_4x384x384
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [128, 16, 1]}
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [128, 32, 1]}
 //           CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[Y]]]
+//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z]]
 
 //                CHECK: func @batch_matmul_4x384x384()
 //                CHECK:   linalg.batch_matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 16, 128, 16], [], [1, 8, 4, 16]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 32, 128, 4], [], [1, 16, 4, 4]]}
 
 // -----
 
