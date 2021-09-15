@@ -158,7 +158,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           addCPUVectorizationPassPipeline(nestedModulePM, lowerToVectors);
           break;
         case IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors:
-          addTensorToVectorsPassPipeline(nestedModulePM);
+          addTensorToVectorsPassPipeline(nestedModulePM, lowerToVectors);
           break;
         default:
           llvm_unreachable("Unsupported pipeline on CPU target.");

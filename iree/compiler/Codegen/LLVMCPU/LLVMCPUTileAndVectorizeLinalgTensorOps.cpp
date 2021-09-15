@@ -52,11 +52,19 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 namespace {
 struct LLVMCPUTileAndVectorizePass
     : public LLVMCPUTileAndVectorizeBase<LLVMCPUTileAndVectorizePass> {
+  LLVMCPUTileAndVectorizePass(bool vectorize = true)
+      : lowerToVectors(vectorize) {}
+  LLVMCPUTileAndVectorizePass(const LLVMCPUTileAndVectorizePass &pass) {
+    lowerToVectors = pass.lowerToVectors;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
                     vector::VectorDialect>();
   }
   void runOnOperation() override;
+
+ private:
+  bool lowerToVectors;
 };
 }  // namespace
 
@@ -132,6 +140,11 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
       return signalPassFailure();
     }
   }
+
+  if (!lowerToVectors) {
+    return;
+  }
+
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns(&getContext());
@@ -193,8 +206,9 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass() {
-  return std::make_unique<LLVMCPUTileAndVectorizePass>();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
+    bool lowerToVectors) {
+  return std::make_unique<LLVMCPUTileAndVectorizePass>(lowerToVectors);
 }
 
 }  // namespace iree_compiler
