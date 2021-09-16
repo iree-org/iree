@@ -46,12 +46,6 @@ static llvm::cl::opt<std::string> sourceListingFlag{
     llvm::cl::init(""),
 };
 
-static llvm::cl::opt<bool> stripSymbolsFlag{
-    "iree-vm-bytecode-module-strip-symbols",
-    llvm::cl::desc("Strips all internal symbol names from the module"),
-    llvm::cl::init(false),
-};
-
 static llvm::cl::opt<bool> stripSourceMapFlag{
     "iree-vm-bytecode-module-strip-source-map",
     llvm::cl::desc("Strips the source map from the module"),
@@ -76,7 +70,6 @@ BytecodeTargetOptions getBytecodeTargetOptionsFromFlags() {
   targetOptions.outputFormat = outputFormatFlag;
   targetOptions.optimize = optimizeFlag;
   targetOptions.sourceListing = sourceListingFlag;
-  targetOptions.stripSymbols = stripSymbolsFlag;
   targetOptions.stripSourceMap = stripSourceMapFlag;
   targetOptions.stripDebugOps = stripDebugOpsFlag;
   targetOptions.emitPolyglotZip = emitPolyglotZipFlag;
