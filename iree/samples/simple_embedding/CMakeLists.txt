@@ -91,6 +91,8 @@ iree_bytecode_module(
     "-iree-llvm-target-triple=x86_64-pc-linux-elf"
     "-iree-llvm-link-embedded=true"
     "-iree-llvm-debug-symbols=false"
+    "-iree-vm-bytecode-module-strip-source-map=true"
+    "-iree-vm-emit-polyglot-zip=false"
   PUBLIC
 )
 
@@ -111,6 +113,8 @@ iree_bytecode_module(
     "-iree-llvm-target-abi=ilp32"
     "-iree-llvm-link-embedded=true"
     "-iree-llvm-debug-symbols=false"
+    "-iree-vm-bytecode-module-strip-source-map=true"
+    "-iree-vm-emit-polyglot-zip=false"
   PUBLIC
 )
 
@@ -131,6 +135,8 @@ iree_bytecode_module(
     "-iree-llvm-target-abi=lp64d"
     "-iree-llvm-link-embedded=true"
     "-iree-llvm-debug-symbols=false"
+    "-iree-vm-bytecode-module-strip-source-map=true"
+    "-iree-vm-emit-polyglot-zip=false"
   PUBLIC
 )
 
@@ -149,6 +155,8 @@ iree_bytecode_module(
     "-iree-llvm-target-float-abi=hard"
     "-iree-llvm-link-embedded=true"
     "-iree-llvm-debug-symbols=false"
+    "-iree-vm-bytecode-module-strip-source-map=true"
+    "-iree-vm-emit-polyglot-zip=false"
   PUBLIC
 )
 
@@ -166,6 +174,8 @@ iree_bytecode_module(
     "-iree-llvm-target-triple=aarch64-pc-linux-elf"
     "-iree-llvm-link-embedded=true"
     "-iree-llvm-debug-symbols=false"
+    "-iree-vm-bytecode-module-strip-source-map=true"
+    "-iree-vm-emit-polyglot-zip=false"
   PUBLIC
 )
 
