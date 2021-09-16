@@ -27,7 +27,9 @@ cc_library(
     ],
     deps = [
         "//iree/base:tracing",
-        "//iree/base/internal:flatcc",
+        "//iree/base/internal/flatcc:building",
+        "//iree/base/internal/flatcc:debugging",
+        "//iree/base/internal/flatcc:parsing",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
