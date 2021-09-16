@@ -138,7 +138,7 @@ class RemoveTripOneLoop final : public OpRewritePattern<scf::ForOp> {
 static void removeOneTripTiledLoops(MLIRContext *context, FuncOp funcOp,
                                     linalg::LinalgOp rootLinalgOp,
                                     ArrayRef<int64_t> workloadPerWorkgroup) {
-  unsigned numParallelDims = getNumOuterParallelLoops(rootLinalgOp);
+  unsigned numParallelDims = rootLinalgOp.getNumParallelLoops();
   unsigned numTiledDims =
       std::min<size_t>(numParallelDims, kNumMaxParallelDims);
   ArrayRef<int64_t> outputShape = getUntiledResultShape(rootLinalgOp, 0);

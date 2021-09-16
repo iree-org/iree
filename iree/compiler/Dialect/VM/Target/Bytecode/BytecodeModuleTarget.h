@@ -44,8 +44,6 @@ struct BytecodeTargetOptions {
   // original source locations and the VM IR.
   std::string sourceListing;
 
-  // Strips all internal symbol names. Import and export names will remain.
-  bool stripSymbols = false;
   // Strips source map information.
   bool stripSourceMap = false;
   // Strips vm ops with the VM_DebugOnly trait.

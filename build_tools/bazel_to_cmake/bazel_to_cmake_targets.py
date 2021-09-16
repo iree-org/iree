@@ -59,6 +59,7 @@ EXPLICIT_TARGET_MAPPING = {
     # Misc single targets
     "@com_google_benchmark//:benchmark": ["benchmark"],
     "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],
+    "@com_github_dvidelabs_flatcc//:parsing": ["flatcc::parsing"],
     "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
     "@com_github_yaml_libyaml//:yaml": ["yaml"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],

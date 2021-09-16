@@ -504,6 +504,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
       status = iree_vm_source_location_format(&source_location, builder);
     }
     if (iree_status_is_unavailable(status)) {
+      // TODO(benvanik): if this is an import/export we can get that name.
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "-"));
     } else if (!iree_status_is_ok(status)) {
       return status;
