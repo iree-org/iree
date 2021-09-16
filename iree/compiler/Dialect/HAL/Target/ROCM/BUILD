@@ -30,7 +30,6 @@ cc_library(
         "ROCMTarget.h",
     ],
     deps = [
-        "//iree/base/internal:flatcc",
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
