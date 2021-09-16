@@ -190,7 +190,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
       return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
                                   mmt4dL1TileSizes.end());
     }
-    return {1, 1, 4, 4, 1, 4};
+    return {1, 1, 1, 4, 4, 1};
   };
 
   auto getVectorSizes = [&]() -> SmallVector<int64_t> {
@@ -198,7 +198,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
       return SmallVector<int64_t>(mmt4dVectorSizes.begin(),
                                   mmt4dVectorSizes.end());
     }
-    return {1, 1, 4, 4, 1, 4};
+    return {1, 1, 1, 4, 4, 1};
   };
 
   SmallVector<int64_t, 4> nativeVectorSize = getVectorSizes();
