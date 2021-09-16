@@ -298,7 +298,7 @@ static inline uint16_t iree_math_f32_to_f16(const float f32_value) {
   const uint32_t mantissa = (u32_value & 0x007FFFFFu) >> (23 - 10);
   int32_t exp = ((u32_value & 0x7F800000u) >> 23) - 127 + 15;
   if (exp > 31) {
-    exp = 31;
+    exp = 31 << 10;
   } else if (exp < 0) {
     exp = 0;
   } else {
