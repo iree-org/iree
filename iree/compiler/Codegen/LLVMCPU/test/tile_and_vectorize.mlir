@@ -73,15 +73,13 @@ module  {
 //      CHECK:       {{.*}} = scf.for %[[L1_K:.+]] = %[[C0]] to %[[C383]] step %[[C32]] iter_args(%[[DST_WG_TILE_2:.+]] = %[[DST_WG_TILE_1]])
 //      CHECK:           %[[L2_I_BOUND:.+]] = affine.min #[[MAP5]](%[[LHS_WG_TILE_DIM0]], %[[L1_I]])
 //      CHECK:           %[[L2_K_BOUND:.+]] = affine.min #[[MAP6]](%[[L1_K]])
-//      CHECK:           %[[LHS_L1_TILE:.+]] = tensor.extract_slice %[[LHS_WG_TILE]]
 //      CHECK:           %[[L2_J_BOUND:.+]] = affine.min #[[MAP5]](%[[RHS_WG_TILE_DIM1]], %[[L1_J]])
-//      CHECK:           %[[RHS_L1_TILE:.+]] = tensor.extract_slice %[[RHS_WG_TILE]]
 //      CHECK:           %[[DST_L1_TILE:.+]] = tensor.extract_slice %[[DST_WG_TILE_2]]
 //      CHECK:           {{.*}} = scf.for {{.*}} = %[[C0]] to %[[L2_I_BOUND]] step %[[C4]] iter_args(%[[DST_VEC_TILE_0:.+]] = %[[DST_L1_TILE]])
 //      CHECK:              {{.*}} = scf.for {{.*}} = %[[C0]] to %[[L2_J_BOUND]] step %[[C4]] iter_args(%[[DST_VEC_TILE_1:.+]] = %[[DST_VEC_TILE_0]])
 //      CHECK:                {{.*}} = scf.for {{.*}} = %[[C0]] to %[[L2_K_BOUND]] step %[[C4]] iter_args(%[[DST_VEC_TILE_2:.+]] = %[[DST_VEC_TILE_1]])
-//      CHECK:                    %[[LHS_VEC_TILE:.+]] = tensor.extract_slice %[[LHS_L1_TILE]]
-//      CHECK:                    %[[RHS_VEC_TILE:.+]] = tensor.extract_slice %[[RHS_L1_TILE]]
+//      CHECK:                    %[[LHS_VEC_TILE:.+]] = tensor.extract_slice %[[LHS_WG_TILE]]
+//      CHECK:                    %[[RHS_VEC_TILE:.+]] = tensor.extract_slice %[[RHS_WG_TILE]]
 //      CHECK:                    %[[DST_VEC_TILE:.+]] = tensor.extract_slice %[[DST_VEC_TILE_2]]
 //      CHECK:                    linalg.matmul {__internal_linalg_transform__ = "vectorize"
 // CHECK-SAME:                   ins(%[[LHS_VEC_TILE]], %[[RHS_VEC_TILE]]
