@@ -1,5 +1,5 @@
-#config1 = {tileSizes = [[32, 32, 32]], passPipeline = 1 : i32}
-#config2 = {tileSizes = [[64, 64, 64]], passPipeline = 1 : i32}
+#config1 = {tileSizes = [[32, 32, 32]], passPipeline = "CPUVectorization"}
+#config2 = {tileSizes = [[64, 64, 64]], passPipeline = "CPUVectorization"}
 func @lowering_config_test() {
   %a = util.unfoldable_constant dense<1.0> : tensor<128x256xf32>
   %b = util.unfoldable_constant dense<2.0> : tensor<256x512xf32>
