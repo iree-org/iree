@@ -19,6 +19,8 @@ namespace Flow {
 namespace {
 
 // Expands a 2d tensor operand to 4d given its target shape.
+// Does not transpose.
+// Example: (M, N) --> (M1, M0, N1, N0)
 static Value expandTo4D(mlir::Location loc, PatternRewriter &rewriter,
                         Value operand, ArrayRef<int64_t> targetShape) {
   auto operandType = operand.getType().cast<RankedTensorType>();
@@ -31,8 +33,9 @@ static Value expandTo4D(mlir::Location loc, PatternRewriter &rewriter,
 }
 
 // Creates a linalg.generic that transposes operand using permutation indices.
-static Value transposeOperand(mlir::Location loc, PatternRewriter &rewriter,
-                              Value operand, ArrayRef<int64_t> indices) {
+// Example: (M1, M0, N1, N0) -> (M1, N1, M0, N0) if indices = {0, 2, 1, 3}.
+static Value transpose(mlir::Location loc, PatternRewriter &rewriter,
+                       Value operand, ArrayRef<int64_t> indices) {
   RankedTensorType operandTensorType =
       operand.getType().cast<RankedTensorType>();
   auto nloops = indices.size();
@@ -68,6 +71,7 @@ static Value transposeOperand(mlir::Location loc, PatternRewriter &rewriter,
 };
 
 // Collapses a 4d tensor operand to 2d given its target shape.
+// Example: (M1, M0, N1, N0) -> (M, N)
 static Value collapseTo2D(mlir::Location loc, PatternRewriter &rewriter,
                           Value operand, ArrayRef<int64_t> targetShape) {
   auto operandType = operand.getType().cast<RankedTensorType>();
@@ -79,18 +83,18 @@ static Value collapseTo2D(mlir::Location loc, PatternRewriter &rewriter,
   return reshapedOperand;
 }
 
-// Converts linalg.matmul -> linalg.mmt4d where M0, N0, K0 are compile time
-// constants.
+// Converts linalg.matmul to an equivalent subgraph using linalg.mmt4d.
+// Currently, M0, N0, K0 are compile time constants.
 // TODO(ataei): Move this pattern to linalg transforms upstream.
-class LinalgMatmulOpToLinalgMMT4dOpPattern
+class LinalgMatmulOpToLinalgMmt4DOpPattern
     : public OpRewritePattern<linalg::MatmulOp> {
  public:
-  LinalgMatmulOpToLinalgMMT4dOpPattern(MLIRContext *context, int M0, int N0,
-                                       int K0, PatternBenefit benefit = 1)
+  LinalgMatmulOpToLinalgMmt4DOpPattern(MLIRContext *context, int M0, int K0,
+                                       int N0, PatternBenefit benefit = 1)
       : OpRewritePattern<linalg::MatmulOp>(context, benefit),
-        M0Size(M0),
-        N0Size(N0),
-        K0Size(K0) {}
+        M0(M0),
+        K0(K0),
+        N0(N0) {}
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
@@ -114,28 +118,28 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
       return failure();
 
     int m = lhsType.getShape()[0];
-    int n = rhsType.getShape()[1];
     int k = rhsType.getShape()[0];
+    int n = rhsType.getShape()[1];
 
-    if (m % M0Size != 0 || n % N0Size != 0 || k % K0Size != 0) return failure();
+    if (m % M0 != 0 || n % N0 != 0 || k % K0 != 0) return failure();
 
-    int m1 = m / M0Size;
-    int n1 = n / N0Size;
-    int k1 = k / K0Size;
+    int m1 = m / M0;
+    int k1 = k / K0;
+    int n1 = n / N0;
 
-    auto lhs4D = expandTo4D(loc, rewriter, lhs, {m1, M0Size, k1, K0Size});
-    auto rhs4D = expandTo4D(loc, rewriter, rhs, {k1, K0Size, n1, N0Size});
-    auto dst4D = expandTo4D(loc, rewriter, dst, {m1, M0Size, n1, N0Size});
+    auto lhs4D = expandTo4D(loc, rewriter, lhs, {m1, M0, k1, K0});
+    auto rhs4D = expandTo4D(loc, rewriter, rhs, {k1, K0, n1, N0});
+    auto dst4D = expandTo4D(loc, rewriter, dst, {m1, M0, n1, N0});
 
-    auto lhs4DT = transposeOperand(loc, rewriter, lhs4D, {0, 2, 1, 3});
-    auto rhs4DT = transposeOperand(loc, rewriter, rhs4D, {2, 0, 3, 1});
-    auto dst4DT = transposeOperand(loc, rewriter, dst4D, {0, 2, 1, 3});
+    auto lhs4DT = transpose(loc, rewriter, lhs4D, {0, 2, 1, 3});
+    auto rhs4DT = transpose(loc, rewriter, rhs4D, {2, 0, 3, 1});
+    auto dst4DT = transpose(loc, rewriter, dst4D, {0, 2, 1, 3});
 
-    auto mmt4DResult = rewriter.create<linalg::Mmt4DOp>(
+    auto mmt4dResult = rewriter.create<linalg::Mmt4DOp>(
         loc, dst4DT.getType(), ValueRange{lhs4DT, rhs4DT}, ValueRange{dst4DT});
 
     auto mmt4dResultTransposed =
-        transposeOperand(loc, rewriter, mmt4DResult.getResult(0), {0, 2, 1, 3});
+        transpose(loc, rewriter, mmt4dResult.getResult(0), {0, 2, 1, 3});
 
     Value result = collapseTo2D(loc, rewriter, mmt4dResultTransposed, {m, n});
 
@@ -145,9 +149,9 @@ class LinalgMatmulOpToLinalgMMT4dOpPattern
   }
 
  private:
-  int M0Size;
-  int N0Size;
-  int K0Size;
+  const int M0;
+  const int K0;
+  const int N0;
 };
 
 /// Canonicalizes [linalg.init_tensor -> linalg.fill -> linalg.generic] ->
@@ -192,13 +196,33 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   }
 };
 
-class ConvertLinalgMatmulOpToLinalgMMT4dPass
-    : public ConvertMatmulToMMT4dBase<ConvertLinalgMatmulOpToLinalgMMT4dPass> {
+class ConvertLinalgMatmulToMmt4DPass final
+    : public ConvertLinalgMatmulToMmt4DBase<ConvertLinalgMatmulToMmt4DPass> {
  public:
-  ConvertLinalgMatmulOpToLinalgMMT4dPass(int M0, int N0, int K0)
-      : M0Size(M0), N0Size(K0), K0Size(N0) {}
+  ConvertLinalgMatmulToMmt4DPass() {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
+  }
+
+  LogicalResult initializeOptions(StringRef options) override {
+    if (failed(Pass::initializeOptions(options))) return failure();
+    auto failureWithMessage = [=](const char *msg) {
+      llvm::errs() << "illegal options `" << options << "` for pass `"
+                   << getArgument() << "`: " << msg << "\n";
+      return failure();
+    };
+    if (M0 == mlir::ShapedType::kDynamicSize ||
+        N0 == mlir::ShapedType::kDynamicSize ||
+        K0 == mlir::ShapedType::kDynamicSize) {
+      return failureWithMessage(
+          "currently all three values M0,K0,N0 must be "
+          "specified as a fixed size value, not 'dynamic', as the heuristic to "
+          "choose these values is not yet implemented.");
+    }
+    if (M0 == 0 || N0 == 0 || K0 == 0) {
+      return failureWithMessage("all three values M0,K0,N0 must be nonzero.");
+    }
+    return success();
   }
 
   void runOnOperation() override {
@@ -206,8 +230,8 @@ class ConvertLinalgMatmulOpToLinalgMMT4dPass
     // Main pattern.
     {
       OwningRewritePatternList patterns(&getContext());
-      patterns.insert<LinalgMatmulOpToLinalgMMT4dOpPattern>(context, M0Size,
-                                                            N0Size, K0Size);
+      patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(context, M0, K0,
+                                                            N0);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
     // Canonicalization.
@@ -219,17 +243,11 @@ class ConvertLinalgMatmulOpToLinalgMMT4dPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
   }
-
- private:
-  int M0Size;
-  int N0Size;
-  int K0Size;
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
-createConvertLinalgMatmulOpToLinalgMMT4dPass(int M0, int N0, int K0) {
-  return std::make_unique<ConvertLinalgMatmulOpToLinalgMMT4dPass>(M0, N0, K0);
+std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass() {
+  return std::make_unique<ConvertLinalgMatmulToMmt4DPass>();
 }
 
 }  // namespace Flow

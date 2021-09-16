@@ -112,10 +112,18 @@ def PadLinalgOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
 }
 
-def ConvertMatmulToMMT4d :
-    Pass<"iree-flow-convert-matmul-to-mmt4d", "FuncOp"> {
+def ConvertLinalgMatmulToMmt4D :
+    Pass<"iree-flow-convert-linalg-matmul-to-mmt4d", "FuncOp"> {
   let summary = "Convert linalg.matmul to linalg.mmt4d";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulOpToLinalgMMT4dPass()";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulToMmt4DPass()";
+  let options = [
+    Option<"M0", "M0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
+           "Specifies an explicit M-axis tile size, overriding the default heuristic.">,
+    Option<"K0", "K0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
+           "Specifies an explicit K-axis tile size, overriding the default heuristic.">,
+    Option<"N0", "N0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
+           "Specifies an explicit N-axis tile size, overriding the default heuristic.">,
+  ];
 }
 
 
