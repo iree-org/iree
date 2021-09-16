@@ -107,7 +107,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // to produce it from the original reflection metadata captured in the
   // previous pass.
   passManager.addPass(Shape::createExpandFunctionDynamicDimsPass());
-  
+
   passManager.addPass(createPadTensorToSubTensorInsertPass());
 
   // Elementwise, fusion, tiling and distribution.
