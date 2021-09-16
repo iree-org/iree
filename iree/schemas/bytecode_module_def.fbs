@@ -211,9 +211,6 @@ table BytecodeModuleDef {
   // Exported function definitions used to resolve imports.
   exported_functions:[ExportFunctionDef];
 
-  // All functions with internal linkage.
-  internal_functions:[InternalFunctionDef];
-
   // Read-only data segments (like non-code .text).
   // May optionally be compressed and decompressed by the loader.
   rodata_segments:[RodataSegmentDef];

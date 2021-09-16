@@ -151,20 +151,8 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
       iree_vm_BytecodeModuleDef_imported_functions(module_def);
   iree_vm_ExportFunctionDef_vec_t exported_functions =
       iree_vm_BytecodeModuleDef_exported_functions(module_def);
-  iree_vm_InternalFunctionDef_vec_t internal_functions =
-      iree_vm_BytecodeModuleDef_internal_functions(module_def);
   iree_vm_FunctionDescriptor_vec_t function_descriptors =
       iree_vm_BytecodeModuleDef_function_descriptors(module_def);
-
-  if (flatbuffers_vec_len(internal_functions) !=
-      flatbuffers_vec_len(function_descriptors)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "mismatched internal_functions/function_descriptors vectors (%zu != "
-        "%zu)",
-        flatbuffers_vec_len(internal_functions),
-        flatbuffers_vec_len(function_descriptors));
-  }
 
   for (size_t i = 0; i < iree_vm_ImportFunctionDef_vec_len(imported_functions);
        ++i) {
@@ -199,26 +187,19 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     iree_host_size_t internal_ordinal =
         iree_vm_ExportFunctionDef_internal_ordinal(export_def);
     if (internal_ordinal >=
-        iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
+        iree_vm_FunctionDescriptor_vec_len(function_descriptors)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "exports[%zu] internal_ordinal out of bounds (0 < %zu < %zu)", i,
           internal_ordinal,
-          iree_vm_InternalFunctionDef_vec_len(internal_functions));
+          iree_vm_FunctionDescriptor_vec_len(function_descriptors));
     }
   }
 
   flatbuffers_uint8_vec_t bytecode_data =
       iree_vm_BytecodeModuleDef_bytecode_data(module_def);
   for (size_t i = 0;
-       i < iree_vm_InternalFunctionDef_vec_len(internal_functions); ++i) {
-    iree_vm_InternalFunctionDef_table_t function_def =
-        iree_vm_InternalFunctionDef_vec_at(internal_functions, i);
-    if (!function_def) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "functions[%zu] missing body", i);
-    }
-
+       i < iree_vm_FunctionDescriptor_vec_len(function_descriptors); ++i) {
     iree_vm_FunctionDescriptor_struct_t function_descriptor =
         iree_vm_FunctionDescriptor_vec_at(function_descriptors, i);
     if (function_descriptor->bytecode_offset < 0 ||
@@ -241,6 +222,47 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     // TODO(benvanik): run bytecode verifier on contents.
   }
 
+  return iree_ok_status();
+}
+
+static iree_status_t iree_vm_bytecode_map_internal_ordinal(
+    iree_vm_bytecode_module_t* module, iree_vm_function_t function,
+    uint16_t* out_ordinal,
+    iree_vm_FunctionSignatureDef_table_t* out_signature_def) {
+  *out_ordinal = 0;
+  *out_signature_def = NULL;
+
+  uint16_t ordinal = function.ordinal;
+  iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
+  if (function.linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+    // Look up the internal ordinal index of this export in the function table.
+    iree_vm_ExportFunctionDef_vec_t exported_functions =
+        iree_vm_BytecodeModuleDef_exported_functions(module->def);
+    IREE_ASSERT_LT(ordinal,
+                   iree_vm_ExportFunctionDef_vec_len(exported_functions),
+                   "export ordinal out of range (0 < %zu < %zu)", ordinal,
+                   iree_vm_ExportFunctionDef_vec_len(exported_functions));
+    iree_vm_ExportFunctionDef_table_t function_def =
+        iree_vm_ExportFunctionDef_vec_at(exported_functions, function.ordinal);
+    ordinal = iree_vm_ExportFunctionDef_internal_ordinal(function_def);
+    signature_def = iree_vm_ExportFunctionDef_signature(function_def);
+  } else {
+    // TODO(benvanik): support querying the internal functions, which could be
+    // useful for debugging. Or maybe we just drop them forever?
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "cannot map imported/internal functions; no entry "
+                            "in the function table");
+  }
+
+  if (ordinal >= module->function_descriptor_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "function ordinal out of range (0 < %u < %zu)",
+                            function.ordinal,
+                            module->function_descriptor_count);
+  }
+
+  *out_ordinal = ordinal;
+  *out_signature_def = signature_def;
   return iree_ok_status();
 }
 
@@ -273,8 +295,7 @@ static iree_vm_module_signature_t iree_vm_bytecode_module_signature(
       iree_vm_BytecodeModuleDef_imported_functions(module->def));
   signature.export_function_count = iree_vm_ExportFunctionDef_vec_len(
       iree_vm_BytecodeModuleDef_exported_functions(module->def));
-  signature.internal_function_count = iree_vm_InternalFunctionDef_vec_len(
-      iree_vm_BytecodeModuleDef_internal_functions(module->def));
+  signature.internal_function_count = module->function_descriptor_count;
   return signature;
 }
 
@@ -308,11 +329,6 @@ static iree_status_t iree_vm_bytecode_module_get_function(
         iree_vm_ImportFunctionDef_vec_at(imported_functions, ordinal);
     name = iree_vm_ImportFunctionDef_full_name(import_def);
     signature = iree_vm_ImportFunctionDef_signature(import_def);
-    if (out_function) {
-      out_function->module = &module->interface;
-      out_function->linkage = linkage;
-      out_function->ordinal = (uint16_t)ordinal;
-    }
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
@@ -326,32 +342,13 @@ static iree_status_t iree_vm_bytecode_module_get_function(
         iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
     name = iree_vm_ExportFunctionDef_local_name(export_def);
     signature = iree_vm_ExportFunctionDef_signature(export_def);
-    if (out_function) {
-      out_function->module = &module->interface;
-      out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-      out_function->ordinal =
-          iree_vm_ExportFunctionDef_internal_ordinal(export_def);
-    }
-  } else {
-    iree_vm_InternalFunctionDef_vec_t internal_functions =
-        iree_vm_BytecodeModuleDef_internal_functions(module->def);
-    if (ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "function ordinal out of range (0 < %zu < %zu)", ordinal,
-          iree_vm_InternalFunctionDef_vec_len(internal_functions));
-    }
-    iree_vm_InternalFunctionDef_table_t function_def =
-        iree_vm_InternalFunctionDef_vec_at(internal_functions, ordinal);
-    name = iree_vm_InternalFunctionDef_local_name(function_def);
-    signature = iree_vm_InternalFunctionDef_signature(function_def);
-    if (out_function) {
-      out_function->module = &module->interface;
-      out_function->linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
-      out_function->ordinal = (uint16_t)ordinal;
-    }
   }
 
+  if (out_function) {
+    out_function->module = &module->interface;
+    out_function->linkage = linkage;
+    out_function->ordinal = (uint16_t)ordinal;
+  }
   if (out_name && name) {
     out_name->data = name;
     out_name->size = flatbuffers_string_len(name);
@@ -371,28 +368,26 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
     void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
     iree_host_size_t index, iree_string_view_t* key,
     iree_string_view_t* value) {
-  if (linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
-    iree_vm_function_t internal_function;
-    IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
-        self, linkage, ordinal, &internal_function, NULL, NULL));
-    ordinal = internal_function.ordinal;
+  if (linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "only exported functions can be queried");
   }
 
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  iree_vm_InternalFunctionDef_vec_t internal_functions =
-      iree_vm_BytecodeModuleDef_internal_functions(module->def);
+  iree_vm_ExportFunctionDef_vec_t exported_functions =
+      iree_vm_BytecodeModuleDef_exported_functions(module->def);
 
-  if (ordinal >= iree_vm_InternalFunctionDef_vec_len(internal_functions)) {
+  if (ordinal >= iree_vm_ExportFunctionDef_vec_len(exported_functions)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "function ordinal out of range (0 < %zu < %zu)", ordinal,
-        iree_vm_InternalFunctionDef_vec_len(internal_functions));
+        iree_vm_ExportFunctionDef_vec_len(exported_functions));
   }
 
-  iree_vm_InternalFunctionDef_table_t function_def =
-      iree_vm_InternalFunctionDef_vec_at(internal_functions, ordinal);
+  iree_vm_ExportFunctionDef_table_t function_def =
+      iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
   iree_vm_FunctionSignatureDef_table_t signature_def =
-      iree_vm_InternalFunctionDef_signature(function_def);
+      iree_vm_ExportFunctionDef_signature(function_def);
   if (!signature_def) {
     return iree_make_status(
         IREE_STATUS_NOT_FOUND,
@@ -438,8 +433,11 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
                             "function name required for query");
   }
 
-  // NOTE: we could organize imports/exports alphabetically so we could bsearch.
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  out_function->linkage = linkage;
+  out_function->module = &module->interface;
+
+  // NOTE: we could organize imports/exports alphabetically so we could bsearch.
   if (linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT) {
     iree_vm_ImportFunctionDef_vec_t imported_functions =
         iree_vm_BytecodeModuleDef_imported_functions(module->def);
@@ -450,12 +448,10 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
           iree_vm_ImportFunctionDef_vec_at(imported_functions, ordinal);
       if (iree_vm_flatbuffer_strcmp(
               iree_vm_ImportFunctionDef_full_name(import_def), name) == 0) {
-        return iree_vm_bytecode_module_get_function(self, linkage, ordinal,
-                                                    out_function, NULL, NULL);
+        out_function->ordinal = ordinal;
+        return iree_ok_status();
       }
     }
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "import with the given name not found");
   } else if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
     iree_vm_ExportFunctionDef_vec_t exported_functions =
         iree_vm_BytecodeModuleDef_exported_functions(module->def);
@@ -466,33 +462,13 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
           iree_vm_ExportFunctionDef_vec_at(exported_functions, ordinal);
       if (iree_vm_flatbuffer_strcmp(
               iree_vm_ExportFunctionDef_local_name(export_def), name) == 0) {
-        return iree_vm_bytecode_module_get_function(
-            self, IREE_VM_FUNCTION_LINKAGE_INTERNAL,
-            iree_vm_ExportFunctionDef_internal_ordinal(export_def),
-            out_function, NULL, NULL);
+        out_function->ordinal = ordinal;
+        return iree_ok_status();
       }
     }
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "export with the given name not found");
-  } else {
-    iree_vm_InternalFunctionDef_vec_t internal_functions =
-        iree_vm_BytecodeModuleDef_internal_functions(module->def);
-    for (size_t ordinal = 0;
-         ordinal < iree_vm_InternalFunctionDef_vec_len(internal_functions);
-         ++ordinal) {
-      iree_vm_InternalFunctionDef_table_t function_def =
-          iree_vm_InternalFunctionDef_vec_at(internal_functions, ordinal);
-      if (iree_vm_flatbuffer_strcmp(
-              iree_vm_InternalFunctionDef_local_name(function_def), name) ==
-          0) {
-        return iree_vm_bytecode_module_get_function(
-            self, IREE_VM_FUNCTION_LINKAGE_INTERNAL, ordinal, out_function,
-            NULL, NULL);
-      }
-    }
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "function with the given name not found");
   }
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "function with the given name not found");
 }
 
 static iree_status_t iree_vm_bytecode_location_format(
@@ -613,18 +589,19 @@ static iree_status_t iree_vm_bytecode_module_resolve_source_location(
     return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
   }
 
-  // Remap the function to its internal ordinal used in the debug database.
-  iree_vm_function_t function = frame->function;
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
-      self, function.linkage, function.ordinal, &function, NULL, NULL));
+  // Map the (potentially) export ordinal into the internal function ordinal in
+  // the function descriptor table.
+  uint16_t ordinal = 0;
+  iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_map_internal_ordinal(
+      module, frame->function, &ordinal, &signature_def));
 
   // Lookup the source map for the function, if available.
   iree_vm_FunctionSourceMapDef_vec_t source_maps_vec =
       iree_vm_DebugDatabaseDef_functions(debug_database_def);
   iree_vm_FunctionSourceMapDef_table_t source_map_def =
-      function.ordinal < iree_vm_FunctionSourceMapDef_vec_len(source_maps_vec)
-          ? iree_vm_FunctionSourceMapDef_vec_at(source_maps_vec,
-                                                function.ordinal)
+      ordinal < iree_vm_FunctionSourceMapDef_vec_len(source_maps_vec)
+          ? iree_vm_FunctionSourceMapDef_vec_at(source_maps_vec, ordinal)
           : NULL;
   if (!source_map_def) {
     return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
@@ -814,24 +791,14 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   IREE_ASSERT_ARGUMENT(out_result);
   memset(out_result, 0, sizeof(iree_vm_execution_result_t));
 
-  // Only internal functions store the information needed for execution. We
-  // allow exports here as well to make things easier to call externally.
-  iree_vm_function_t function = call->function;
-  if (function.linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_vm_bytecode_module_get_function(
-            self, function.linkage, function.ordinal, &function, NULL, NULL));
-  }
-
+  // Map the (potentially) export ordinal into the internal function ordinal in
+  // the function descriptor table.
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  if (function.ordinal >= module->function_descriptor_count) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "function ordinal out of range (0 < %u < %zu)",
-                            function.ordinal,
-                            module->function_descriptor_count);
-  }
+  uint16_t ordinal = 0;
+  iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_bytecode_map_internal_ordinal(module, call->function,
+                                                &ordinal, &signature_def));
 
   // Grab calling convention string. This is not great as we are guaranteed to
   // have a bunch of cache misses, but without putting it on the descriptor
@@ -842,12 +809,6 @@ static iree_status_t iree_vm_bytecode_module_begin_call(
   // into the noise. Similar to JNI, P/Invoke, etc you don't want to have
   // imports that cost less to execute than the marshaling overhead (dozens to
   // hundreds of instructions).
-  iree_vm_InternalFunctionDef_vec_t internal_functions =
-      iree_vm_BytecodeModuleDef_internal_functions(module->def);
-  iree_vm_InternalFunctionDef_table_t function_def =
-      iree_vm_InternalFunctionDef_vec_at(internal_functions, function.ordinal);
-  iree_vm_FunctionSignatureDef_table_t signature_def =
-      iree_vm_InternalFunctionDef_signature(function_def);
   flatbuffers_string_t calling_convention =
       signature_def
           ? iree_vm_FunctionSignatureDef_calling_convention(signature_def)
