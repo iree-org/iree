@@ -553,7 +553,7 @@ hal.executable private @static_1d_fft_stage2  {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
 //  CHECK-SAME:   translation.info = {
-//  CHECK-SAME:     passPipeline = "CPUVectorization"
+//  CHECK-SAME:     passPipeline = "CPUDefault"
 //  CHECK-SAME:     workloadPerWorkgroup = [64]}
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index):
 //  CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
@@ -618,7 +618,7 @@ hal.executable private @static_3d_fft_stage3  {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
 //  CHECK-SAME:   translation.info = {
-//  CHECK-SAME:     passPipeline = "CPUVectorization"
+//  CHECK-SAME:     passPipeline = "CPUDefault"
 //  CHECK-SAME:   workloadPerWorkgroup = [64, 64, 64]}
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index):
 //  CHECK-NEXT:   %[[T0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
