@@ -86,6 +86,7 @@ cc_binary(
     deps = [
         "//iree/base",
         "//iree/base/internal:file_io",
+        "//iree/base/internal/flatcc:debugging",
         "//iree/schemas:bytecode_module_def_c_fbs",
         "//iree/tools/utils:vm_util",
     ],

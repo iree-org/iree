@@ -14,6 +14,7 @@ def iree_bytecode_module(
         src,
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
+        embedded_linker_tool = "@llvm-project//lld:lld",
         c_identifier = "",
         **kwargs):
     native.genrule(
@@ -26,11 +27,12 @@ def iree_bytecode_module(
             " ".join([
                 "$(location %s)" % (translate_tool),
                 " ".join(flags),
+                "-iree-llvm-embedded-linker-path=$(location %s)" % (embedded_linker_tool),
                 "-o $(location %s.vmfb)" % (name),
                 "$(location %s)" % (src),
             ]),
         ]),
-        tools = [translate_tool],
+        tools = [translate_tool, embedded_linker_tool],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,
         **kwargs

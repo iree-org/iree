@@ -60,11 +60,6 @@ static llvm::cl::opt<int> clLinalgOpsPaddingSize(
                    "flow-padding-size"),
     llvm::cl::init(4));
 
-static llvm::cl::opt<bool> clEnableMatmulToMMT4d(
-    "iree-flow-enable-matmul-to-mmt4d",
-    llvm::cl::desc("Enable converting linalg.matmul into linalg.mmt4d"),
-    llvm::cl::init(false));
-
 // TODO(#1159): enable by default or remove this option once it works on
 //              a broader set of programs
 static llvm::cl::opt<bool> clEnableLinalgDetensorize(
@@ -118,13 +113,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
     if (clEnablePaddingLinalgOps) {
       passManager.addNestedPass<FuncOp>(
           createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
-    }
-    // Convert linalg.matmul -> linalg.mmt4d
-    if (clEnableMatmulToMMT4d) {
-      passManager.addNestedPass<FuncOp>(
-          createConvertLinalgMatmulOpToLinalgMMT4dPass(clLinalgOpsPaddingSize,
-                                                       clLinalgOpsPaddingSize,
-                                                       clLinalgOpsPaddingSize));
     }
   }
   passManager.addPass(createPadTensorToSubTensorInsertPass());

@@ -35,7 +35,6 @@ cc_library(
         ":LLVMTargetOptions",
         ":LinkerTool",
         ":StaticLibraryGenerator",
-        "//iree/base/internal:flatcc",
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common",
         "//iree/compiler/Codegen/LLVMCPU",

@@ -21,7 +21,6 @@ external_cc_library(
     "src/runtime/json_parser.c"
     "src/runtime/json_printer.c"
     "src/runtime/refmap.c"
-    "src/runtime/verifier.c"
   HDRS
     "include/flatcc/flatcc_accessors.h"
     "include/flatcc/flatcc_alloc.h"
@@ -43,6 +42,39 @@ external_cc_library(
     "include/flatcc/flatcc_unaligned.h"
     "include/flatcc/flatcc_verifier.h"
     "include/flatcc/reflection/flatbuffers_common_builder.h"
+    "include/flatcc/reflection/flatbuffers_common_reader.h"
+  DEPS
+    flatcc::parsing
+  PUBLIC
+)
+
+# A limited version of :runtime with only enough to parse and verify.
+external_cc_library(
+  PACKAGE
+    flatcc
+  NAME
+    parsing
+  ROOT
+    ${FLATCC_ROOT}
+  INCLUDES
+    "${FLATCC_ROOT}/include"
+  SRCS
+    "config/config.h"
+    "src/runtime/verifier.c"
+  HDRS
+    "include/flatcc/flatcc_accessors.h"
+    "include/flatcc/flatcc_alloc.h"
+    "include/flatcc/flatcc_assert.h"
+    "include/flatcc/flatcc_endian.h"
+    "include/flatcc/flatcc_epilogue.h"
+    "include/flatcc/flatcc_flatbuffers.h"
+    "include/flatcc/flatcc_identifier.h"
+    "include/flatcc/flatcc_portable.h"
+    "include/flatcc/flatcc_prologue.h"
+    "include/flatcc/flatcc_rtconfig.h"
+    "include/flatcc/flatcc_types.h"
+    "include/flatcc/flatcc_unaligned.h"
+    "include/flatcc/flatcc_verifier.h"
     "include/flatcc/reflection/flatbuffers_common_reader.h"
   PUBLIC
 )

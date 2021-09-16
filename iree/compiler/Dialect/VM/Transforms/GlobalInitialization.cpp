@@ -243,18 +243,12 @@ class GlobalInitializationPass
         deadOps.push_back(globalOp);
         continue;
       }
-      bool isIndirect = false;
-      bool isLoaded = false;
       bool isStored = false;
       for (auto use : uses.getValue()) {
         if (isa<IREE::VM::GlobalAddressOp>(use.getUser())) {
           // Can't analyze indirect variables; assume mutated.
-          isLoaded = true;
           isStored = true;
-          isIndirect = true;
           break;
-        } else if (isGlobalLoadOp(use.getUser())) {
-          isLoaded = true;
         } else if (isGlobalStoreOp(use.getUser())) {
           isStored = true;
         }

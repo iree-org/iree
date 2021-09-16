@@ -13,7 +13,6 @@ def iree_flatbuffer_c_library(
         testonly = False,
         **kwargs):
     flatcc = "@com_github_dvidelabs_flatcc//:flatcc"
-    flatcc_rt = "@com_github_dvidelabs_flatcc//:runtime"
 
     flags = [
         "-o$(RULEDIR)",
@@ -44,9 +43,6 @@ def iree_flatbuffer_c_library(
     native.cc_library(
         name = name,
         hdrs = outs,
-        deps = [
-            flatcc_rt,
-        ],
         testonly = testonly,
         **kwargs
     )

@@ -14,7 +14,7 @@
 #include "iree/base/tracing.h"
 
 // flatcc schemas:
-#include "iree/base/internal/flatcc.h"
+#include "iree/base/internal/flatcc/parsing.h"
 #include "iree/schemas/rocm_executable_def_reader.h"
 #include "iree/schemas/rocm_executable_def_verifier.h"
 

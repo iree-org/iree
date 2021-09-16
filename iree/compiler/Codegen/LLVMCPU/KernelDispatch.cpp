@@ -152,7 +152,7 @@ static LogicalResult setRootConfig(
                                                 vectorSizeVal};
     return setOpConfigAndEntryPointFnTranslation(
         entryPointFn, contractionOp, tileSizes, nativeVectorSize,
-        IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
+        IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors);
   }
   if (contractionOp.isRowMajorBatchMatmul()) {
     // TODO(ataei, ravishankarm): This should just use the configuration for
