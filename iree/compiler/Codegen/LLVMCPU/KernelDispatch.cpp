@@ -212,6 +212,46 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
 }
 
 /// Sets the lowering configuration for dispatch region with root op being a
+/// `ConvolutionOpInterface`.
+static LogicalResult setRootConfig(FuncOp entryPointFn,
+                                   linalg::ConvolutionOpInterface convOp) {
+  auto partitionedLoops = getPartitionedLoops(convOp);
+  // For conv ops, the partitioned loops are the inner dimensions of outputs. So
+  // get the output sizes.
+  auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
+  Value output = linalgOp.getOutputOperand(0)->get();
+  auto loopDims =
+      llvm::to_vector<4>(llvm::seq<unsigned>(0, linalgOp.getNumLoops()));
+  SmallVector<unsigned> loopToOutputDimMap = applyPermutationMap(
+      linalgOp.getIndexingMaps().back(), ArrayRef<unsigned>(loopDims));
+  ArrayRef<int64_t> outputUntiledShape = getUntiledResultShape(linalgOp, 0);
+  TileSizesListType tileSizes(1);
+  tileSizes[0].resize(partitionedLoops.back() + 1, 0);
+  bool firstLoop = true;
+  for (auto loop : llvm::reverse(partitionedLoops)) {
+    int64_t outputSize = outputUntiledShape[loopToOutputDimMap[loop]];
+    int64_t useTileSize =
+        (outputSize == ShapedType::kDynamicSize
+             ? defaultWorkgroupTileSize
+             : llvm::PowerOf2Floor(static_cast<uint64_t>(outputSize)) / 2);
+    if (firstLoop) {
+      tileSizes[0][loop] = std::max<int64_t>(
+          useTileSize, getNativeVectorSize(
+                           entryPointFn,
+                           output.getType().cast<ShapedType>().getElementType())
+                           .getValue());
+      firstLoop = false;
+    } else {
+      tileSizes[0][loop] = std::max<int64_t>(useTileSize, 1);
+    }
+  }
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, convOp, tileSizes,
+      /*nativeVectorSize =*/ArrayRef<int64_t>{},
+      IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
+}
+
+/// Sets the lowering configuration for dispatch region with root op being a
 /// generic op.
 static LogicalResult setDefaultRootConfig(FuncOp entryPointFn, Operation *op) {
   auto partitionedLoops = getPartitionedLoops(op);
@@ -272,7 +312,8 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     } else {
       auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
         return TypeSwitch<Operation *, LogicalResult>(op)
-            .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface>(
+            .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
+                  linalg::ConvolutionOpInterface>(
                 [&](auto op) { return setRootConfig(entryPointFn, op); })
             .Default([&](Operation *op) { return success(); });
       };
