@@ -84,19 +84,19 @@ hal.executable private @batch_matmul_static_shape  {
 //      CHECK:  %[[BCNTY:.+]] = hal.interface.workgroup.count[1]
 //      CHECK:  %[[BIDZ:.+]] = hal.interface.workgroup.id[2]
 //      CHECK:  %[[BCNTZ:.+]] = hal.interface.workgroup.count[2]
-//      CHECK:  scf.for %[[IVZ:.+]] = %[[BIDZ]] to %{{.+}} step %[[BCNTZ]]
 //      CHECK:  %[[BOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //      CHECK:  %[[UBY:.+]] = affine.apply #[[MAP0]]()[%[[BCNTY]]]
-//      CHECK:  scf.for %[[IVY:.+]] = %[[BOFFSET_Y]] to %{{.+}} step %[[UBY]]
 //      CHECK:  %[[BOFFSET_X:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
 //      CHECK:  %[[UBX:.+]] = affine.apply #[[MAP1]]()[%[[BCNTX]]]
-//      CHECK:  %[[SUBVIEW_ARG0:.+]] = memref.subview %[[ARG0]]
-// CHECK-SAME:      [%[[IVZ]], %[[IVY]], 0] [1, 8, 1024]
 //      CHECK:  %[[IIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //      CHECK:  %[[IIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //      CHECK:  %[[IIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //  CHECK-DAG:  %[[IOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[IIDY]]]
 //  CHECK-DAG:  %[[IOFFSET_X:.+]] = affine.apply #[[MAP2]]()[%[[IIDX]]]
+//      CHECK:  scf.for %[[IVZ:.+]] = %[[BIDZ]] to %{{.+}} step %[[BCNTZ]]
+//      CHECK:  scf.for %[[IVY:.+]] = %[[BOFFSET_Y]] to %{{.+}} step %[[UBY]]
+//      CHECK:  %[[SUBVIEW_ARG0:.+]] = memref.subview %[[ARG0]]
+// CHECK-SAME:      [%[[IVZ]], %[[IVY]], 0] [1, 8, 1024]
 //      CHECK:  scf.for %[[IVX:.+]] = %[[BOFFSET_X]] to %{{.+}} step %[[UBX]]
 //      CHECK:  %[[SUBVIEW_ARG1:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:      [%[[IVZ]], 0, %[[IVX]]] [1, 1024, 64]
