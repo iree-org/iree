@@ -131,6 +131,12 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
   // Generate an scf.for for the current loop depth.
   Value lb = loopBounds[loopDepth].offset;
   Value ub = loopBounds[loopDepth].size;
+  // TODO(#7073): Put the check back. This is required by tiling linalg_ext.fft
+  // op. We can put the check back after updating linalg_ext.fft semantics.
+  // if (!matchPattern(loopBounds[loopDepth].stride, m_One())) {
+  // return static_cast<LogicalResult>(
+  // tilableOp.emitOpError("expected stride to be 1"));
+  //}
   Value step = getValue(builder, loc, tileSizes[loopDepth]);
 
   // Update lb, ub and step for cyclic distribution.
