@@ -24,8 +24,8 @@ class BenchmarkThreshold:
   # A threshold for computing the benchmark value average. Benchmark sample
   # values from consecutive runs and within the given range will be considered
   # as similar (with some noise). They will be used to compute the moving
-  # average. The number will be interpreted as a percentage. What value to set
-  # depends on the noise range of the particular benchmark.
+  # average. The number will be interpreted according to the given unit.
+  # What value to set depends on the noise range of the particular benchmark.
   threshold: int
   unit: ThresholdUnit
 
