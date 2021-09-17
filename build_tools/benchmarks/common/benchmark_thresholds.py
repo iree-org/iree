@@ -12,8 +12,8 @@ from enum import Enum
 
 
 class ThresholdUnit(Enum):
-  PERCENTAGE = 0
-  VALUE = 1
+  PERCENTAGE = 0  # Percentage
+  VALUE_MS = 1  # Absolute value in milliseconds
 
 
 @dataclass
@@ -37,6 +37,7 @@ class BenchmarkThreshold:
 
 
 # A list of benchmarks and their similarity thresholds.
+# Order matters here: if multiple regexes match a single benchmark, the first match is used.
 BENCHMARK_THRESHOLDS = [
     # Unstable and noisy GPU benchmarks.
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 90,
@@ -50,7 +51,7 @@ BENCHMARK_THRESHOLDS = [
 
     # Fast GPU benchmarks that complete around 10ms, so using percentage is not suitable.
     BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Adreno"), 2,
-                       ThresholdUnit.VALUE),
+                       ThresholdUnit.VALUE_MS),
 
     # Default threshold for all benchmarks: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
