@@ -11,10 +11,12 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/IR/Matchers.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
 
@@ -173,6 +175,41 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
 }  // namespace detail
 
 //===----------------------------------------------------------------------===//
+// FFT Default Configuration
+//===----------------------------------------------------------------------===//
+
+static LogicalResult setOpConfig(spirv::ResourceLimitsAttr limits,
+                                 linalg_ext::FftOp op) {
+  const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
+  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute;
+
+  std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
+
+  auto partitionedLoops = getPartitionedLoops(op);
+  unsigned loopDepth = partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSize(loopDepth, 0);
+
+  // Tiling along partitioned loops with size 1.
+  for (int64_t loopIndex : partitionedLoops) {
+    workgroupTileSize[loopIndex] = 1;
+  }
+  auto rank = op.getOperandRank();
+  if (workgroupTileSize.size() >= rank && workgroupTileSize[rank - 1] != 0) {
+    APInt value;
+    if (matchPattern(op.getStage(), m_ConstantInt(&value))) {
+      workgroupTileSize[rank - 1] = 1 << value.getSExtValue();
+    } else {
+      op.emitError("non-constant stage might not work for fft op");
+      return failure();
+    }
+  }
+  TileSizesListType tileSizes = {workgroupTileSize};
+  return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
+                                               op, tileSizes, {}, pipeline,
+                                               workgroupSize);
+}
+
+//===----------------------------------------------------------------------===//
 // Default Configuration
 //===----------------------------------------------------------------------===//
 
@@ -306,6 +343,8 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
       })
+      .Case<linalg_ext::FftOp>(
+          [limits](auto op) { return setOpConfig(limits, op); })
       .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
           [limits](auto op) { return setDefaultOpConfig(limits, op); })
       .Default([](Operation *) { return success(); });

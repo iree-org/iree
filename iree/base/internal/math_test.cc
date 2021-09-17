@@ -6,6 +6,8 @@
 
 #include "iree/base/internal/math.h"
 
+#include <cfloat>
+
 #include "iree/testing/gtest.h"
 
 namespace {
@@ -159,6 +161,42 @@ TEST(RoundingTest, UpToNextPow264) {
   EXPECT_EQ(0ull, iree_math_round_up_to_pow2_u64(0x8000000000000001ull));
   EXPECT_EQ(0ull, iree_math_round_up_to_pow2_u64(kUint64Max - 1ull));
   EXPECT_EQ(0ull, iree_math_round_up_to_pow2_u64(kUint64Max));
+}
+
+//==============================================================================
+// FP16 support
+//==============================================================================
+
+TEST(F16ConversionTest, F32ToF16) {
+  // Within range, normal truncation.
+  EXPECT_EQ(0x3400, iree_math_f32_to_f16(0.25f));
+  EXPECT_EQ(0xd646, iree_math_f32_to_f16(-100.375f));
+  // Overflow
+  EXPECT_EQ(0x7fff, iree_math_f32_to_f16(FLT_MAX));
+  EXPECT_EQ(0xffff, iree_math_f32_to_f16(-FLT_MAX));
+  // Underflow
+  EXPECT_EQ(0, iree_math_f32_to_f16(FLT_MIN));
+  EXPECT_EQ(0x8000, iree_math_f32_to_f16(-FLT_MIN));
+}
+
+TEST(F16ConversionTest, F32ToF16ToF32) {
+  constexpr float kF16Max = 65504.f;
+  constexpr float kF16Min = 0.0000610351563f;
+  // Within range, should just recover.
+  EXPECT_EQ(0.25f, iree_math_f16_to_f32(iree_math_f32_to_f16(0.25f)));
+  EXPECT_EQ(-100.375f, iree_math_f16_to_f32(iree_math_f32_to_f16(-100.375f)));
+  EXPECT_EQ(kF16Max, iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Max)));
+  EXPECT_EQ(kF16Min, iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min)));
+  // Overflow
+  EXPECT_GE(FLT_MAX, iree_math_f16_to_f32(iree_math_f32_to_f16(FLT_MAX)));
+  EXPECT_LT(-FLT_MAX, iree_math_f16_to_f32(iree_math_f32_to_f16(-FLT_MAX)));
+  EXPECT_GT(kF16Max + 1.f,
+            iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Max + 1.f)));
+  // Underflow
+  EXPECT_EQ(0.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(FLT_MIN)));
+  EXPECT_EQ(0.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-FLT_MIN)));
+  EXPECT_EQ(0.0f,
+            iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min - kF16Min / 2)));
 }
 
 }  // namespace

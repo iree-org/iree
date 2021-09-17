@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -211,6 +212,42 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
       IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
 }
 
+/// Sets the lowering configuration for dispatch region for linalg_ext.fft root
+/// op.
+static LogicalResult setRootConfig(FuncOp entryPointFn,
+                                   linalg_ext::FftOp fftOp) {
+  auto partitionedLoops = getPartitionedLoops(fftOp);
+  unsigned maxDepth = partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSizes(maxDepth,
+                                             defaultWorkgroupTileSize);
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
+    if (!partitionedLoopsSet.count(dim)) {
+      workgroupTileSizes[dim] = 0;
+    }
+  }
+
+  auto rank = fftOp.getOperandRank();
+  if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
+    APInt value;
+    if (matchPattern(fftOp.getStage(), m_ConstantInt(&value))) {
+      workgroupTileSizes[rank - 1] = 1 << value.getSExtValue();
+      workgroupTileSizes[rank - 1] =
+          std::max(workgroupTileSizes[rank - 1],
+                   static_cast<int64_t>(defaultWorkgroupTileSize));
+    } else {
+      fftOp.emitError("non-constant stage might not work for fft op");
+      return failure();
+    }
+  }
+  TileSizesListType tileSizes = {workgroupTileSizes};
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, fftOp, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+      IREE::HAL::DispatchLoweringPassPipeline::CPUDefault);
+}
+
 /// Sets the lowering configuration for dispatch region with root op being a
 /// generic op.
 static LogicalResult setDefaultRootConfig(FuncOp entryPointFn, Operation *op) {
@@ -272,7 +309,8 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     } else {
       auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
         return TypeSwitch<Operation *, LogicalResult>(op)
-            .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface>(
+            .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
+                  linalg_ext::FftOp>(
                 [&](auto op) { return setRootConfig(entryPointFn, op); })
             .Default([&](Operation *op) { return success(); });
       };

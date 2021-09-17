@@ -488,3 +488,113 @@ func @slice_insert_rank_reduce(%source :tensor<?x?xf32>, %dest: tensor<?x?x?xf32
 //      CHECK:       scf.yield %[[UPDATE]]
 //      CHECK:     scf.yield %[[YIELD1]]
 //      CHECK:   return %[[RESULT]]
+
+// -----
+
+func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
+    %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<1024xf32>, tensor<1024xf32>) {
+  %cst1 = constant 5 : index
+  %0:2 = linalg_ext.fft
+  {__internal_linalg_transform__ = "tiling_1d_stage5_fft_input"}
+    ins(%cst1, %arg2, %arg3: index, tensor<16xf32>, tensor<16xf32>)
+    outs(%arg0, %arg1: tensor<1024xf32>, tensor<1024xf32>)
+  : tensor<1024xf32>, tensor<1024xf32>
+  return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
+}
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
+// CHECK:      func @fft_1d_stage_5(
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
+// CHECK-DAG:    %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:    %[[C5:.+]] = constant 5 : index
+// CHECK-DAG:    %[[C32:.+]] = constant 32 : index
+// CHECK-DAG:    %[[C1024:.+]] = constant 1024 : index
+// CHECK:        %[[RES:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C1024]] step %[[C32]]
+// CHECK-SAME:       iter_args(%[[ARG5:.+]] = %[[ARG0]], %[[ARG6:.+]] = %[[ARG1]])
+// CHECK-SAME:       -> (tensor<1024xf32>, tensor<1024xf32>) {
+// CHECK:          %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C32]], %[[C1024]]]
+// CHECK:          %[[SLICE1:.+]] = tensor.extract_slice %[[ARG5]][%[[I]]] [%[[SIZE]]] [1] : tensor<1024xf32> to tensor<?xf32>
+// CHECK:          %[[SLICE2:.+]] = tensor.extract_slice %[[ARG6]][%[[I]]] [%[[SIZE]]] [1] : tensor<1024xf32> to tensor<?xf32>
+// CHECK:          %[[FFT:.+]]:2 = linalg_ext.fft
+// CHECK-SAME:       {__internal_linalg_transform__ = "tiling_1d_stage5_fft_output"}
+// CHECK-SAME:       ins(%[[C5]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, tensor<16xf32>, tensor<16xf32>)
+// CHECK-SAME:       outs(%[[SLICE1]], %[[SLICE2]] : tensor<?xf32>, tensor<?xf32>)
+// CHECK:          %[[INSERT1:.+]] = tensor.insert_slice %[[FFT]]#0 into %[[ARG5]][%[[I]]] [%[[SIZE]]] [1] : tensor<?xf32> into tensor<1024xf32>
+// CHECK:          %[[INSERT2:.+]] = tensor.insert_slice %[[FFT]]#1 into %[[ARG6]][%[[I]]] [%[[SIZE]]] [1] : tensor<?xf32> into tensor<1024xf32>
+// CHECK:          scf.yield %[[INSERT1]], %[[INSERT2]]
+// CHECK:        return %[[RES]]#0, %[[RES]]#1 : tensor<1024xf32>, tensor<1024xf32>
+
+// -----
+
+func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
+    %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<3x1024xf32>, tensor<3x1024xf32>) {
+  %cst1 = constant 5 : index
+  %0:2 = linalg_ext.fft
+  {__internal_linalg_transform__ = "tiling_2d_stage5_fft_input"}
+    ins(%cst1, %arg2, %arg3: index, tensor<16xf32>, tensor<16xf32>)
+    outs(%arg0, %arg1: tensor<3x1024xf32>, tensor<3x1024xf32>)
+  : tensor<3x1024xf32>, tensor<3x1024xf32>
+  return %0#0, %0#1 : tensor<3x1024xf32>, tensor<3x1024xf32>
+}
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
+// CHECK:      func @fft_2d_stage_5(
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
+// CHECK-DAG:    %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:    %[[C3:.+]] = constant 3 : index
+// CHECK-DAG:    %[[C5:.+]] = constant 5 : index
+// CHECK-DAG:    %[[C10:.+]] = constant 10 : index
+// CHECK-DAG:    %[[C32:.+]] = constant 32 : index
+// CHECK-DAG:    %[[C1024:.+]] = constant 1024 : index
+// CHECK:        %[[RES:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C10]]
+// CHECK-SAME:       iter_args(%[[ARG5:.+]] = %[[ARG0]], %[[ARG6:.+]] = %[[ARG1]])
+// CHECK-SAME:       -> (tensor<3x1024xf32>, tensor<3x1024xf32>) {
+// CHECK:          %[[SZ1:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C10]], %[[C3]]]
+// CHECK:          %{{.+}} = scf.for %[[J:.+]] = %[[C0]] to %[[C1024]] step %[[C32]]
+// CHECK-SAME:         iter_args(%[[ARG8:.+]] = %[[ARG5]], %[[ARG9:.+]] = %[[ARG6]]) -> (tensor<3x1024xf32>, tensor<3x1024xf32>) {
+// CHECK:            %[[SZ2:.+]] = affine.min #[[MAP1]](%[[J]])[%[[C32]], %[[C1024]]]
+// CHECK:            %[[SLICE1:.+]] = tensor.extract_slice %[[ARG8]][%[[I]], %[[J]]] [%[[SZ1]], %[[SZ2]]] [1, 1]
+// CHECK:            %[[SLICE2:.+]] = tensor.extract_slice %[[ARG9]][%[[I]], %[[J]]] [%[[SZ1]], %[[SZ2]]] [1, 1]
+// CHECK:          %[[FFT:.+]]:2 = linalg_ext.fft
+// CHECK-SAME:       {__internal_linalg_transform__ = "tiling_2d_stage5_fft_output"}
+// CHECK-SAME:       ins(%[[C5]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, tensor<16xf32>, tensor<16xf32>)
+// CHECK-SAME:       outs(%[[SLICE1]], %[[SLICE2]] : tensor<?x?xf32>, tensor<?x?xf32>)
+// CHECK:          %[[INSERT1:.+]] = tensor.insert_slice %[[FFT]]#0 into %[[ARG8]][%[[I]], %[[J]]] [%[[SZ1]], %[[SZ2]]] [1, 1]
+// CHECK:          %[[INSERT2:.+]] = tensor.insert_slice %[[FFT]]#1 into %[[ARG9]][%[[I]], %[[J]]] [%[[SZ1]], %[[SZ2]]] [1, 1]
+// CHECK:          scf.yield %[[INSERT1]], %[[INSERT2]] : tensor<3x1024xf32>, tensor<3x1024xf32>
+
+// -----
+
+func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
+    %arg2: memref<16xf32>, %arg3: memref<16xf32>) {
+  %cst1 = constant 5 : index
+  linalg_ext.fft
+  {__internal_linalg_transform__ = "tiling_1d_stage5_fft_input"}
+    ins(%cst1, %arg2, %arg3: index, memref<16xf32>, memref<16xf32>)
+    outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
+  return
+}
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK:      func @fft_1d_stage_5_memref(
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
+// CHECK-DAG:    %[[C0:.+]] = constant 0 : index
+// CHECK-DAG:    %[[C5:.+]] = constant 5 : index
+// CHECK-DAG:    %[[C32:.+]] = constant 32 : index
+// CHECK-DAG:    %[[C1024:.+]] = constant 1024 : index
+// CHECK:        scf.for %[[I:.+]] = %[[C0]] to %[[C1024]] step %[[C32]] {
+// CHECK:          %[[SZ:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C32]], %[[C1024]]]
+// CHECK:          %[[SUB1:.+]] = memref.subview %[[ARG0]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, #[[MAP1]]>
+// CHECK:          %[[SUB2:.+]] = memref.subview %[[ARG1]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, #[[MAP1]]>
+// CHECK:          linalg_ext.fft
+// CHECK-SAME:       {__internal_linalg_transform__ = "tiling_1d_stage5_fft_output"}
+// CHECK-SAME:       ins(%[[C5]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, memref<16xf32>, memref<16xf32>)
+// CHECK-SAME:       outs(%[[SUB1]], %[[SUB2]] : memref<?xf32, #[[MAP1]]>, memref<?xf32, #[[MAP1]]>)
