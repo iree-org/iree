@@ -21,4 +21,10 @@ def IREEImportPublic :
   let constructor = "mlir::iree_compiler::createIREEImportPublicPass()";
 }
 
+def PromoteI1ToI8 :
+    Pass<"iree-promote-i1-to-i8", "mlir::FuncOp"> {
+  let summary = "Legalizes i1 tensor constants to i8s";
+  let constructor = "mlir::iree_compiler::createPromoteI1ToI8Pass()";
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES

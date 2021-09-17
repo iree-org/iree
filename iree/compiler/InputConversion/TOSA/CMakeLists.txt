@@ -51,7 +51,6 @@ iree_cc_library(
     MLIRTosaToSCF
     MLIRTosaToStandard
     MLIRTransforms
-    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::InputConversion::Common
   PUBLIC
 )

@@ -20,6 +20,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "iree_import_public.mlir",
+            "promote_i1_to_i8.mlir",
             "top_level_scf_to_cfg.mlir",
         ],
         include = ["*.mlir"],

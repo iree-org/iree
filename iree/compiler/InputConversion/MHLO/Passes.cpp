@@ -64,6 +64,8 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
       mlir::iree_compiler::createConvertMHLOToLinalgExtPass());
   passManager.addNestedPass<FuncOp>(
       mlir::iree_compiler::createMHLOToLinalgOnTensorsPass());
+  passManager.addNestedPass<FuncOp>(
+      mlir::iree_compiler::createPromoteI1ToI8Pass());
 
   // Note that some MHLO ops are left by the above and must resolve via
   // canonicalization. See comments in the above pass and find a better way.

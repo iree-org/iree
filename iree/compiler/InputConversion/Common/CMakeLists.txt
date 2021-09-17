@@ -41,6 +41,7 @@ iree_cc_library(
   SRCS
     "IREEImportPublic.cpp"
     "Passes.cpp"
+    "PromoteI1ToI8Pass.cpp"
     "TopLevelSCFToCFG.cpp"
   DEPS
     ::PassHeaders

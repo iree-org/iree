@@ -34,7 +34,6 @@ iree_lit_test_suite(
     "outline_large_constants.mlir"
     "pad_linalg_ops.mlir"
     "pad_tensor_to_tensor.mlir"
-    "promote_i1_to_i8.mlir"
     "strip_and_splat_constant_variables.mlir"
     "transformation.mlir"
     "verify_input_ir.mlir"

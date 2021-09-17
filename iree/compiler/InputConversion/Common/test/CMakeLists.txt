@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "iree_import_public.mlir"
+    "promote_i1_to_i8.mlir"
     "top_level_scf_to_cfg.mlir"
   DATA
     iree::tools::IreeFileCheck

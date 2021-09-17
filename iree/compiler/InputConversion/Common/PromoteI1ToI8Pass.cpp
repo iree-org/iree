@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/InputConversion/Common/PassDetail.h"
+#include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
@@ -14,8 +14,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
 
 namespace {
 
@@ -46,18 +44,6 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
     auto newConst = rewriter.createOrFold<ConstantOp>(
         loc, attr.mapValues(rewriter.getIntegerType(8),
                             [&](APInt src) { return src.zext(8); }));
-
-    // We need to move the insertion to just before its first use case. This is
-    // needed as it is possible we are reusing an existing ConstantOp
-    // containing the same values that occurs in a future line. Moving to the
-    // first use case avoids declaring out of order operations.
-    Operation *firstUser = *op.getResult().getUsers().begin();
-    for (auto checkOp : op.getResult().getUsers()) {
-      if (checkOp->isBeforeInBlock(firstUser)) {
-        firstUser = checkOp;
-      }
-    }
-    rewriter.setInsertionPoint(firstUser);
 
     auto initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, ArrayRef<Value>({}), resultTy.getShape(),
@@ -105,11 +91,9 @@ class PromoteI1ToI8Pass : public PromoteI1ToI8Base<PromoteI1ToI8Pass> {
   }
 };
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass() {
+std::unique_ptr<OperationPass<FuncOp>> createPromoteI1ToI8Pass() {
   return std::make_unique<PromoteI1ToI8Pass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

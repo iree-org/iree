@@ -6,12 +6,13 @@
 
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
 #include "mlir/Conversion/TosaToSCF/TosaToSCF.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Dialect/Tosa/Transforms/Passes.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -43,7 +44,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(tosa::createTosaMakeBroadcastablePass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createPromoteI1ToI8Pass());
+  passManager.addNestedPass<FuncOp>(createPromoteI1ToI8Pass());
   passManager.addNestedPass<FuncOp>(tosa::createTosaToLinalgOnTensors());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 

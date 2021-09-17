@@ -53,7 +53,6 @@ cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/InputConversion/Common",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFToStandard",

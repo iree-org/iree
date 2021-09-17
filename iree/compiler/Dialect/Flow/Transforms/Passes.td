@@ -133,12 +133,6 @@ def PadTensorToSubTensorInsert :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
 }
 
-def PromoteI1ToI8 :
-    Pass<"iree-flow-promote-i1-to-i8", "mlir::FuncOp"> {
-  let summary = "Legalizes i1 tensor constants to i8s";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
-}
-
 def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
   let summary = "Strips constant util.globals and replaces them with splats.";

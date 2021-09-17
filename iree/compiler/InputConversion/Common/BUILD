@@ -46,6 +46,7 @@ cc_library(
     srcs = [
         "IREEImportPublic.cpp",
         "Passes.cpp",
+        "PromoteI1ToI8Pass.cpp",
         "TopLevelSCFToCFG.cpp",
     ],
     hdrs = [

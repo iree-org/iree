@@ -52,7 +52,6 @@ cc_library(
         "PadTensorToSubTensorInsert.cpp",
         "PassDetail.h",
         "Passes.cpp",
-        "PromoteI1ToI8Pass.cpp",
         "StripAndSplatConstantVariables.cpp",
         "TypeConverter.cpp",
         "VerifyInputLegality.cpp",

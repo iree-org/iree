@@ -27,6 +27,7 @@ void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
 
 std::unique_ptr<OperationPass<FuncOp>> createTopLevelSCFToCFGPass();
 std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
+std::unique_ptr<OperationPass<FuncOp>> createPromoteI1ToI8Pass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
