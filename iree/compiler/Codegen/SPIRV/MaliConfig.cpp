@@ -177,17 +177,18 @@ static LogicalResult setOpConfig(linalg::MatmulOp op) {
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &,
+LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                    Operation *rootOp) {
+  int64_t subgroupSize = targetEnv.getResourceLimits().subgroup_size().getInt();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
           [](auto op) { return setOpConfig(op); })
-      .Case<linalg::Conv2DNhwcHwcfOp>([](auto op) {
-        return setConvOpConfig(op, /*subgroupSize=*/16,
+      .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
+        return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })
-      .Case<linalg::DepthwiseConv2DNhwOp>([](auto op) {
-        return setConvOpConfig(op, /*subgroupSize=*/16,
+      .Case<linalg::DepthwiseConv2DNhwOp>([subgroupSize](auto op) {
+        return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })
       .Default([](Operation *) { return success(); });

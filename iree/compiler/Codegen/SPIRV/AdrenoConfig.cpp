@@ -120,17 +120,18 @@ static LogicalResult setOpConfig(linalg::LinalgOp op) {
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &,
+LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
+  int64_t subgroupSize = targetEnv.getResourceLimits().subgroup_size().getInt();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
           [](auto op) { return setOpConfig(op); })
-      .Case<linalg::Conv2DNhwcHwcfOp>([](auto op) {
-        return setConvOpConfig(op, /*subgroupSize=*/64,
+      .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
+        return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/32);
       })
-      .Case<linalg::DepthwiseConv2DNhwOp>([](auto op) {
-        return setConvOpConfig(op, /*subgroupSize=*/64,
+      .Case<linalg::DepthwiseConv2DNhwOp>([subgroupSize](auto op) {
+        return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })
       .Default([](Operation *) { return success(); });
