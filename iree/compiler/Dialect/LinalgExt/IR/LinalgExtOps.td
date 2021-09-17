@@ -178,17 +178,9 @@ def LinalgExt_SortOp : LinalgExt_Op<"sort",
   }];
 }
 
-def LinalgExt_FftOp : LinalgExt_Op<"fft", [
-  DeclareOpInterfaceMethods<TiledOpInterface,
-                            [
-                              "getPartitionableLoops", "getTiledImplementation",
-                              "generateScalarImplementation"
-                            ]>,
-  DeclareOpInterfaceMethods<LinalgExtInterface,
-                            // FftOp does not have a region, so we have to
-                            // overwrite the method.
-                            ["payloadUsesValueFromOperand"]>
-]> {
+def LinalgExt_FftOp : LinalgExt_Op<"fft",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+        ["generateScalarImplementation"]>]> {
   let summary = "Fft operator";
   let description = [{
     Apply 1D FFT to innermost dim. This is an iterative FFT, not recurrsive.

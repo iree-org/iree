@@ -30,9 +30,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
-    iree::base::internal::flatcc::building
-    iree::base::internal::flatcc::debugging
-    iree::base::internal::flatcc::parsing
+    iree::base::internal::flatcc
     iree::base::tracing
     iree::compiler::Dialect::Util::IR
   PUBLIC

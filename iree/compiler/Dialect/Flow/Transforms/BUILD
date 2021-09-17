@@ -33,7 +33,6 @@ cc_library(
     srcs = [
         "ConvertConv2D1x1ToMatmulPass.cpp",
         "ConvertConv2DToImg2ColPass.cpp",
-        "ConvertLinalgMatmulToMmt4D.cpp",
         "ConvertToFlow.cpp",
         "DeduplicateExecutables.cpp",
         "DestructiveUpdateUtils.cpp",
@@ -46,6 +45,7 @@ cc_library(
         "InjectDispatchTracing.cpp",
         "InsertConstantClones.cpp",
         "InterchangeGenericOps.cpp",
+        "MatmulToMMT4dConversion.cpp",
         "OutlineDispatchRegions.cpp",
         "OutlineLargeConstants.cpp",
         "PadLinalgOps.cpp",

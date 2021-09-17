@@ -123,10 +123,11 @@ def LLVMCPUSynchronizeSymbolVisibility :
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
 }
 
-def LLVMCPUTileAndVectorize
-    : Pass<"iree-llvmcpu-tile-and-vectorize", "FuncOp"> {
-  let summary = "Tile and vectorize workgroups tiles";
-  let constructor = "mlir::iree_compiler::createLLVMCPUTileAndVectorizePass()";
+def LLVMCPUTilePadAndVectorize :
+    Pass<"iree-llvmcpu-tile-pad-and-vectorize", "FuncOp"> {
+  let summary = "Tile and pad workgroups tiles";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTilePadAndVectorizePass()";
 }
 
 def LLVMCPUUnfuseFMAOps :

@@ -22,7 +22,7 @@ iree_cc_library(
     "LLVMCPUPadWorkgroupTiles.cpp"
     "LLVMCPUPlanConvLoopOrder.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
-    "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
+    "LLVMCPUTilePadAndVectorize.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorization.cpp"
     "Passes.cpp"
