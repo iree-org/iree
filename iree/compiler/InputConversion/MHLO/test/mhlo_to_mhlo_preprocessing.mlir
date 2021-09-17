@@ -315,34 +315,24 @@ func @rng_normal(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<3x5xf32> {
 // CHECK-LABEL: func @rng_normal
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK-DAG:     %[[EPS:.+]] = mhlo.constant dense<1.1920929E-7> : tensor<f32>
-// CHECK-DAG:     %[[ONE:.+]] = mhlo.constant dense<1.000000e+00> : tensor<f32>
-// CHECK-DAG:     %[[SHAPE:.+]] = mhlo.constant dense<16> : tensor<1xi64>
-// CHECK-DAG:     %[[NEG_TWO:.+]] = mhlo.constant dense<-2.000000e+00> : tensor<8xf32>
-// CHECK-DAG:     %[[TWO_PI:.+]] = mhlo.constant dense<6.28318548> : tensor<8xf32>
-// CHECK:         %[[RNG:.+]] = "mhlo.rng_uniform"(%[[EPS]], %[[ONE]], %[[SHAPE]])
-// CHECK:         %[[U1:.+]] = tensor.extract_slice %[[RNG]][0] [8] [1] : tensor<16xf32> to tensor<8xf32>
-// CHECK:         %[[U2:.+]] = tensor.extract_slice %[[RNG]][8] [8] [1] : tensor<16xf32> to tensor<8xf32>
+// CHECK-DAG:     %{{.*}} = mhlo.constant dense<{{.*}}> : tensor<8xf32>
+// CHECK-DAG:     %{{.*}} = mhlo.constant dense<{{.*}}> : tensor<8xf32>
+// CHECK-DAG:     %{{.*}} = mhlo.constant dense<{{.*}}> : tensor<8xf32>
 // CHECK:         %[[SIGMA:.+]] = "mhlo.broadcast"(%[[ARG1]]) {broadcast_sizes = dense<8> : tensor<1xi64>} : (tensor<f32>) -> tensor<8xf32>
 //
-//                mag = sigma * sqrt(-2.0 * log(u1));
+//                mag = sigma * sqrt(-2.0 * log(u1)) where sqrt values are
+//                constants.
 //
-// CHECK:         %[[T1:.+]] = "mhlo.log"(%[[U1]]) : (tensor<8xf32>) -> tensor<8xf32>
-// CHECK:         %[[T2:.+]] = mhlo.multiply %[[T1]], %[[NEG_TWO]] : tensor<8xf32>
-// CHECK:         %[[T3:.+]] = "mhlo.sqrt"(%[[T2]]) : (tensor<8xf32>) -> tensor<8xf32>
-// CHECK:         %[[MAG:.+]] = mhlo.multiply %[[SIGMA]], %[[T3]] : tensor<8xf32>
+// CHECK:         %[[MAG:.+]] = mhlo.multiply %[[SIGMA]], %{{.*}} : tensor<8xf32>
 //
 //                z0  = mag * cos(two_pi * u2) + mu;
 //                z1  = mag * sin(two_pi * u2) + mu;
 //
 // CHECK:         %[[MU:.+]] = "mhlo.broadcast"(%[[ARG0]]) {broadcast_sizes = dense<8> : tensor<1xi64>} : (tensor<f32>) -> tensor<8xf32>
-// CHECK:         %[[T4:.+]] = mhlo.multiply %[[U2]], %[[TWO_PI]] : tensor<8xf32>
-// CHECK:         %[[T5:.+]] = "mhlo.cosine"(%[[T4]]) : (tensor<8xf32>) -> tensor<8xf32>
-// CHECK:         %[[T6:.+]] = mhlo.multiply %[[MAG]], %[[T5]] : tensor<8xf32>
-// CHECK:         %[[Z0:.+]] = mhlo.add %[[T6:.+]], %[[MU]] : tensor<8xf32>
-// CHECK:         %[[T7:.+]] = "mhlo.sine"(%[[T4]]) : (tensor<8xf32>) -> tensor<8xf32>
-// CHECK:         %[[T8:.+]] = mhlo.multiply %[[MAG]], %[[T7]] : tensor<8xf32>
-// CHECK:         %[[Z1:.+]] = mhlo.add %[[T8:.+]], %[[MU]] : tensor<8xf32>
+// CHECK:         %[[T1:.+]] = mhlo.multiply %[[MAG]], %{{.*}} : tensor<8xf32>
+// CHECK:         %[[Z0:.+]] = mhlo.add %[[T1:.+]], %[[MU]] : tensor<8xf32>
+// CHECK:         %[[T2:.+]] = mhlo.multiply %[[MAG]], %{{.*}} : tensor<8xf32>
+// CHECK:         %[[Z1:.+]] = mhlo.add %[[T2:.+]], %[[MU]] : tensor<8xf32>
 //
 //                Concate and reshape the output.
 // CHECK:         %[[CON:.+]] = "mhlo.concatenate"(%[[Z0]], %[[Z1]]) {dimension = 0 : i64} : (tensor<8xf32>, tensor<8xf32>) -> tensor<16xf32>

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <numeric>
+#include <random>
 
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -69,11 +70,16 @@ static DenseIntElementsAttr make1DElementsAttr(OpBuilder &b, int64_t start,
       b, llvm::to_vector<4>(llvm::seq<int64_t>(start, start + num)));
 }
 
+static Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
+                         ArrayRef<float> values) {
+  RankedTensorType ty = RankedTensorType::get(shapes, b.getF32Type());
+  return b.create<mhlo::ConstOp>(DenseFPElementsAttr::get(ty, values))
+      .getResult();
+}
+
 static Value getF32SplatConst(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
                               float value) {
-  RankedTensorType ty = RankedTensorType::get(shapes, b.getF32Type());
-  return b.create<mhlo::ConstOp>(DenseFPElementsAttr::get(ty, {value}))
-      .getResult();
+  return getF32Const(b, shapes, {value});
 }
 
 class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
@@ -746,7 +752,7 @@ class RankReducedDotGeneral : public OpRewritePattern<mhlo::DotGeneralOp> {
 
 // Generates Gaussian noise with uniform random generator based on Box-Muller
 // transform.
-class ExpandRngNormalToRngUniform : public OpRewritePattern<mhlo::RngNormalOp> {
+class ExpandRngNormal : public OpRewritePattern<mhlo::RngNormalOp> {
  public:
   using OpRewritePattern<mhlo::RngNormalOp>::OpRewritePattern;
 
@@ -763,46 +769,49 @@ class ExpandRngNormalToRngUniform : public OpRewritePattern<mhlo::RngNormalOp> {
     auto halfNumElems = numElems / 2;
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-    Value epsilon = getF32SplatConst(b, /*shapes=*/{},
-                                     std::numeric_limits<float>::epsilon());
-    Value upperBound = getF32SplatConst(b, /*shapes=*/{}, 1.0);
 
-    // Create pairs of random numbers, make sure u1 is greater than epsilon.
-    auto shapeTensor =
-        b.create<mhlo::ConstOp>(make1DElementsAttr(rewriter, numElems));
-    auto rngType = RankedTensorType::get({numElems}, resTy.getElementType());
-    auto rng =
-        b.create<mhlo::RngUniformOp>(rngType, epsilon, upperBound, shapeTensor);
-    OpFoldResult zero = b.getIndexAttr(0);
-    OpFoldResult one = b.getIndexAttr(1);
-    OpFoldResult half = b.getIndexAttr(halfNumElems);
-    auto u1 = b.create<tensor::ExtractSliceOp>(rng, zero, half, one);
-    auto u2 = b.create<tensor::ExtractSliceOp>(rng, half, half, one);
+    // Explicitly set the seed to 0, so we have stateless generator. This is not
+    // a hard limit. Random generator is still a new topic, and we start with
+    // stateless random generator.
+    std::mt19937 rng{0};
+    std::uniform_real_distribution<> runif(0.0, 1.0);
+    SmallVector<float> sqrtValues(halfNumElems), cosValues(halfNumElems),
+        sinValues(halfNumElems);
+    for (auto i : llvm::seq<unsigned>(0, numElems / 2)) {
+      constexpr float kEpsilon = std::numeric_limits<float>::epsilon();
+      constexpr float kTwoPi = 2.0 * M_PI;
+      float u1, u2;
+      do {
+        u1 = runif(rng);
+        u2 = runif(rng);
+      } while (u1 <= kEpsilon);
+      sqrtValues[i] = -2.0 * log(u1);
+      cosValues[i] = cos(kTwoPi * u2);
+      sinValues[i] = sin(kTwoPi * u2);
+    }
 
     // mag = sigma * sqrt(-2.0 * log(u1));
+    Value mag = getF32Const(b, /*shapes=*/{halfNumElems}, sqrtValues);
     Value sigma = b.create<mhlo::BroadcastOp>(
-        u1.getType(), op.sigma(), make1DElementsAttr(b, halfNumElems));
-    Value mag = b.create<mhlo::LogOp>(u1);
-    mag = b.create<mhlo::MulOp>(
-        mag, getF32SplatConst(b, /*shapes=*/{halfNumElems}, -2.0));
+        mag.getType(), op.sigma(), make1DElementsAttr(b, halfNumElems));
     mag = b.create<mhlo::MulOp>(sigma, b.create<mhlo::SqrtOp>(mag));
 
     // z0 = mag * cos(two_pi * u2) + mu;
     // z1 = mag * sin(two_pi * u2) + mu;
-    Value twoPi = getF32SplatConst(b, /*shapes=*/{halfNumElems}, 2.0 * M_PI);
-    Value mu = b.create<mhlo::BroadcastOp>(u1.getType(), op.mu(),
+    Value mu = b.create<mhlo::BroadcastOp>(mag.getType(), op.mu(),
                                            make1DElementsAttr(b, halfNumElems));
-    Value val = b.create<mhlo::MulOp>(twoPi, u2);
-    Value z0 = b.create<mhlo::CosOp>(val);
+    Value z0 = getF32Const(b, /*shapes=*/{halfNumElems}, cosValues);
     z0 = b.create<mhlo::MulOp>(mag, z0);
     z0 = b.create<mhlo::AddOp>(z0, mu);
-    Value z1 = b.create<mhlo::SinOp>(val);
+    Value z1 = getF32Const(b, /*shapes=*/{halfNumElems}, sinValues);
     z1 = b.create<mhlo::MulOp>(mag, z1);
     z1 = b.create<mhlo::AddOp>(z1, mu);
 
     Value res = b.create<mhlo::ConcatenateOp>(ValueRange{z0, z1},
                                               b.getI64IntegerAttr(0));
     if (numElems != resTy.getNumElements()) {
+      OpFoldResult zero = b.getIndexAttr(0);
+      OpFoldResult one = b.getIndexAttr(1);
       OpFoldResult size = b.getIndexAttr(resTy.getNumElements());
       res = b.create<tensor::ExtractSliceOp>(res, zero, size, one);
     }
@@ -927,8 +936,7 @@ struct MHLOToMHLOPreprocessingPass
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
                     AdjustDepthwiseFilterShape, DecomposeLog1PPattern,
-                    DecomposeExpM1Pattern, ExpandRngNormalToRngUniform>(
-        context);
+                    DecomposeExpM1Pattern, ExpandRngNormal>(context);
 
     // dot_general canoncalization patterns.
     mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);
