@@ -30,6 +30,7 @@ iree_cc_library(
   SRCS
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
+    "ConvertLinalgMatmulToMmt4D.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
@@ -42,7 +43,6 @@ iree_cc_library(
     "InjectDispatchTracing.cpp"
     "InsertConstantClones.cpp"
     "InterchangeGenericOps.cpp"
-    "MatmulToMMT4dConversion.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineLargeConstants.cpp"
     "PadLinalgOps.cpp"

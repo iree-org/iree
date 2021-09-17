@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-namespace iree;
+namespace iree_flatcc;
 
 // HACK: flatcc public API headers are incomplete and some things only exist
 // when pulled in via generated headers. So here we give ourselves something to
 // include that's always available and cheap.
 //
-// Instead of directly including this file use iree/base/internal/flatcc.h.
+// Instead of directly including this file use iree/base/internal/flatcc/*.h.
 //
 // Normally including any generated file will include the appropriate headers in
 // the required order (as they are non-hermetic), but that requires that we have

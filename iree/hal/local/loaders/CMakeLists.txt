@@ -59,7 +59,7 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal::dynamic_library
-    iree::base::internal::flatcc
+    iree::base::internal::flatcc::parsing
     iree::base::tracing
     iree::hal
     iree::hal::local

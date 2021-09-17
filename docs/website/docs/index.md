@@ -60,8 +60,6 @@ to low-level parallel pipelined hardware/API like
 dense computation on the hardware in the form of hardware/API-specific binaries
 like [SPIR-V](https://www.khronos.org/spir/).
 
-<!-- TODO(scotttodd): text borders so this is easier to read on dark backgrounds -->
-<!-- TODO(scotttodd): use the same .svg as the README (point README at this path) -->
 ![IREE Architecture](assets/images/iree_architecture.svg)
 
 ## Workflow overview

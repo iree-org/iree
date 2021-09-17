@@ -52,6 +52,7 @@ iree_check_single_backend_test_suite(
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
+    "rng_normal.mlir"
     "rng_uniform.mlir"
     "rsqrt.mlir"
     "scatter.mlir"
@@ -78,6 +79,72 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_dylib_embedded-llvm-aot_dylib
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
+    "-iree-llvm-link-embedded=true"
 )
 
 iree_check_single_backend_test_suite(
@@ -122,6 +189,7 @@ iree_check_single_backend_test_suite(
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
+    "rng_normal.mlir"
     "rng_uniform.mlir"
     "rsqrt.mlir"
     "scatter.mlir"
@@ -244,6 +312,7 @@ iree_check_single_backend_test_suite(
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
+    "rng_normal.mlir"
     "rng_uniform.mlir"
     "rsqrt.mlir"
     "scatter.mlir"
@@ -267,70 +336,3 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-## TODO(#6748): This is moved below the `bazel-to-cmake-preserves`
-## line till bazel builds can pass in this mode. Once the bazel builds
-## are fixed these can be just deleted (and the auto-generated version
-## can be used)
-iree_check_single_backend_test_suite(
-  NAME
-    check_dylib_embedded-llvm-aot_dylib
-  SRCS
-    "abs.mlir"
-    "add.mlir"
-    "batch_norm_inference.mlir"
-    "broadcast.mlir"
-    "broadcast_add.mlir"
-    "broadcast_in_dim.mlir"
-    "clamp.mlir"
-    "compare.mlir"
-    "concatenate.mlir"
-    "constant.mlir"
-    "convert.mlir"
-    "convolution.mlir"
-    "cosine.mlir"
-    "divide.mlir"
-    "dot.mlir"
-    "dot_general.mlir"
-    "dynamic_slice.mlir"
-    "dynamic_update_slice.mlir"
-    "exponential.mlir"
-    "exponential_minus_one.mlir"
-    "fft.mlir"
-    "finite.mlir"
-    "floor.mlir"
-    "gather.mlir"
-    "iota.mlir"
-    "log.mlir"
-    "log_plus_one.mlir"
-    "maximum.mlir"
-    "minimum.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "reduce.mlir"
-    "reduce_window.mlir"
-    "remainder.mlir"
-    "reshape.mlir"
-    "reverse.mlir"
-    "rsqrt.mlir"
-    "scatter.mlir"
-    "scatter_dynamic.mlir"
-    "select.mlir"
-    "sine.mlir"
-    "slice.mlir"
-    "sort.mlir"
-    "sqrt.mlir"
-    "subtract.mlir"
-    "tanh.mlir"
-    "torch_index_select.mlir"
-    "transpose.mlir"
-    "while.mlir"
-  TARGET_BACKEND
-    "dylib-llvm-aot"
-  DRIVER
-    "dylib"
-  COMPILER_FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-llvm-link-embedded=true"
-)

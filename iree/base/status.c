@@ -436,7 +436,7 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t iree_status_allocate_vf(
 
   // Compute the total number of bytes (including NUL) required to store the
   // message.
-  size_t message_size =
+  int message_size =
       vsnprintf(/*buffer=*/NULL, /*buffer_count=*/0, format, varargs_0);
   if (message_size < 0) return iree_status_from_code(code);
   ++message_size;  // NUL byte
@@ -589,7 +589,7 @@ iree_status_annotate_vf(iree_status_t base_status, const char* format,
 
   // Compute the total number of bytes (including NUL) required to store the
   // message.
-  size_t message_size =
+  int message_size =
       vsnprintf(/*buffer=*/NULL, /*buffer_count=*/0, format, varargs_0);
   if (message_size < 0) return base_status;
   ++message_size;  // NUL byte

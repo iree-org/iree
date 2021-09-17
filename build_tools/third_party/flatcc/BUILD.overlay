@@ -15,7 +15,6 @@ cc_library(
         "src/runtime/json_parser.c",
         "src/runtime/json_printer.c",
         "src/runtime/refmap.c",
-        "src/runtime/verifier.c",
     ],
     hdrs = [
         "include/flatcc/flatcc_accessors.h",
@@ -52,7 +51,48 @@ cc_library(
         ],
     }),
     includes = [
-      "include/",
+        "include/",
+    ],
+    deps = [
+        ":parsing",
+    ],
+    strip_include_prefix = "include",
+)
+
+# A limited version of :runtime with only enough to parse and verify.
+cc_library(
+    name = "parsing",
+    srcs = [
+        "config/config.h",
+        "src/runtime/verifier.c",
+    ],
+    hdrs = [
+        "include/flatcc/flatcc_accessors.h",
+        "include/flatcc/flatcc_alloc.h",
+        "include/flatcc/flatcc_assert.h",
+        "include/flatcc/flatcc_endian.h",
+        "include/flatcc/flatcc_epilogue.h",
+        "include/flatcc/flatcc_flatbuffers.h",
+        "include/flatcc/flatcc_identifier.h",
+        "include/flatcc/flatcc_portable.h",
+        "include/flatcc/flatcc_prologue.h",
+        "include/flatcc/flatcc_rtconfig.h",
+        "include/flatcc/flatcc_types.h",
+        "include/flatcc/flatcc_unaligned.h",
+        "include/flatcc/flatcc_verifier.h",
+        "include/flatcc/reflection/flatbuffers_common_reader.h",
+    ] + glob(["include/flatcc/portable/**/*.h"]),
+    copts = [
+        "-Iexternal/com_github_dvidelabs_flatcc/config/",
+        "-Iexternal/com_github_dvidelabs_flatcc/include/",
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": [
+            "-Wno-implicit-fallthrough",
+        ],
+    }),
+    includes = [
+        "include/",
     ],
     strip_include_prefix = "include",
 )

@@ -38,7 +38,7 @@ of feedback on any [communication channels](#communication-channels)!
 
 CI System | Build System  | Platform   | Architecture         | Configuration / Component    | Status
 :-------: | :-----------: | :--------: | :------------------: | :--------------------------: | :----:
-Kokoro    | Bazel         | Linux      | x86-64               |                              | [![kokoro_status_bazel/linux/x86-swiftshader/core](https://storage.googleapis.com/iree-oss-build-badges/bazel/linux/x86-swiftshader/core/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-swiftshader/main_result.html)
+Kokoro    | Bazel         | Linux      | x86-64               |                              | [![kokoro status bazel/linux/x86-swiftshader/core](https://storage.googleapis.com/iree-oss-build-badges/bazel/linux/x86-swiftshader/core/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/linux/x86-swiftshader/core/main_result.html)
 Kokoro    | CMake & Bazel | Linux      | x86-64 (swiftshader) | Integrations                 | [![kokoro status cmake-bazel/linux/x86-swiftshader](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-swiftshader/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-swiftshader/main_result.html)
 Kokoro    | CMake & Bazel | Linux      | x86-64 (turing)      | Integrations                 | [![kokoro status cmake-bazel/linux/x86-turing](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-turing/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-turing/main_result.html)
 Kokoro    | CMake         | Linux      | x86-64 (swiftshader) |                              | [![kokoro status cmake/linux/x86-swiftshader](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader/main_result.html)
@@ -51,9 +51,15 @@ Buildkite | CMake         | Android    | arm64-v8a            | Runtime         
 BuildKite | CMake         | Android    | arm64-v8a            | Runtime Benchmarks           | [![buildkite status iree-benchmark](https://badge.buildkite.com/62e504b93171f4a19e5c46f8b9a99eb5dba050666640fbc21b.svg?branch=main)](https://buildkite.com/iree/iree-benchmark)
 BuildKite | CMake         | Linux      | x86-64               | Tracing + Standalone Runtime | [![buildkite status iree-build-configurations](https://badge.buildkite.com/3bc03ad54a6b785b3fdd0dd3d67fd93ed22ef2b538cb34adc3.svg?branch=main)](https://buildkite.com/iree/iree-build-configurations)
 
+## Architecture Overview
+
+![IREE Architecture](docs/website/docs/assets/images/iree_architecture.svg)
+
+See [our website](https://google.github.io/iree/) for more information.
 
 ## Presentations and Talks
 
+*   2021-06-09: IREE Runtime Design Tech Talk ([recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) and [slides](https://drive.google.com/file/d/1CA-FRRjZUbDFS4pGPiLT86lwghNxMN2M/view?usp=sharing))
 *   2020-08-20: IREE CodeGen: MLIR Open Design Meeting Presentation
     ([recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing)
     and

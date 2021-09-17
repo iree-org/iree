@@ -60,11 +60,6 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
                                                passPipeline, workgroupSize);
 }
 
-/// Returns the number of outer parallel loops of a linalgOp.
-/// Note: To be used only if needed. Use the `getPartitionedLoops` method if
-/// this is used to "guess" which loops are distributed.
-unsigned getNumOuterParallelLoops(linalg::LinalgOp op);
-
 /// Returns the untiled type of a tiled view for both tensor and memref
 /// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
 /// `subtensor` op chain (for tensors).

@@ -123,7 +123,6 @@ function(flatbuffer_c_library)
     )
   target_link_libraries(${_NAME}
     INTERFACE
-      flatcc::runtime
       ${IREE_DEFAULT_LINKOPTS}
   )
   target_compile_options(${_NAME}

@@ -202,30 +202,6 @@ iree_lit_test_suite(
 
 iree_cc_library(
   NAME
-    flatcc
-  HDRS
-    "flatcc.h"
-  DEPS
-    ::flatcc_dummy
-    flatcc::runtime
-  PUBLIC
-)
-
-flatbuffer_c_library(
-  NAME
-    flatcc_dummy
-  SRCS
-    "flatcc.fbs"
-  FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     fpu_state
   HDRS
     "fpu_state.h"
