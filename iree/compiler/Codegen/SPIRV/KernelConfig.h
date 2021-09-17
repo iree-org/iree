@@ -18,21 +18,20 @@
 #include <array>
 
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
 
 namespace detail {
 
-/// Lets the entry point region to return fully static number of workgroups.
-// This is needed for folding `affine.min` ops to expose static-shaped tiled
-// convolution for vectorization.
-// TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
-LogicalResult defineConvWorkgroupCountRegion(
-    Operation *op, ArrayRef<int64_t> outputShape,
-    ArrayRef<int64_t> workgroupTileSizes);
+/// Sets CodeGen configurations via attributes to the given convolution
+/// `linalgOp` by trying to achieve the given `bestTilingFactor`, which is how
+/// many scalar elements each thread should handle.
+LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
+                              const int64_t subgroupSize,
+                              const int64_t bestTilingFactor);
 
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///

@@ -9,11 +9,11 @@ hal.executable @conv_112x112x512 {
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 1024 : i32,
-        max_compute_workgroup_size = dense<[1024, 1024, 64]> : vector<3xi32>,
-        subgroup_size = 64 : i32}>
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+       subgroup_size = 16 : i32}>
     }> {
     hal.executable.entry_point public @conv_112x112x512 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
@@ -75,17 +75,17 @@ hal.executable @conv_112x112x512 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @conv_112x112x512
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [256, 8, 1]}
-//           CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 4, 1]}
+//           CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C2:.+]] = constant 2 : index
-//           CHECK-NEXT:   %[[C14:.+]] = constant 14 : index
+//           CHECK-NEXT:   %[[C8:.+]] = constant 8 : index
+//           CHECK-NEXT:   %[[C28:.+]] = constant 28 : index
 //           CHECK-NEXT:   %[[C112:.+]] = constant 112 : index
-//           CHECK-NEXT:   hal.return %[[C2]], %[[C14]], %[[C112]]
+//           CHECK-NEXT:   hal.return %[[C8]], %[[C28]], %[[C112]]
 
 //                CHECK: func @conv_112x112x512()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 8, 256], [], [0, 1, 8, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 4, 64], [], [0, 1, 4, 4]]}
 
 // -----
 
@@ -98,11 +98,11 @@ hal.executable @conv_112x112x32 {
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 1024 : i32,
-        max_compute_workgroup_size = dense<[1024, 1024, 64]> : vector<3xi32>,
-        subgroup_size = 64 : i32}>
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+       subgroup_size = 16 : i32}>
     }> {
     hal.executable.entry_point public @conv_112x112x32 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
@@ -164,17 +164,17 @@ hal.executable @conv_112x112x32 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @conv_112x112x32
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 16, 4]}
-//           CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 8, 1]}
+//           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
-//           CHECK-NEXT:   %[[C7:.+]] = constant 7 : index
-//           CHECK-NEXT:   %[[C28:.+]] = constant 28 : index
-//           CHECK-NEXT:   hal.return %[[C1]], %[[C7]], %[[C28]]
+//           CHECK-NEXT:   %[[C14:.+]] = constant 14 : index
+//           CHECK-NEXT:   %[[C112:.+]] = constant 112 : index
+//           CHECK-NEXT:   hal.return %[[C1]], %[[C14]], %[[C112]]
 
 //                CHECK: func @conv_112x112x32()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 16, 32], [], [0, 4, 2, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 8, 32], [], [0, 1, 4, 4]]}
 
 // -----
 
@@ -187,11 +187,11 @@ hal.executable @conv_16x16x16 {
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 1024 : i32,
-        max_compute_workgroup_size = dense<[1024, 1024, 64]> : vector<3xi32>,
-        subgroup_size = 64 : i32}>
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+       subgroup_size = 16 : i32}>
     }> {
     hal.executable.entry_point public @conv_16x16x16 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
@@ -252,16 +252,16 @@ hal.executable @conv_16x16x16 {
 }
 
 //          CHECK-LABEL: hal.executable.entry_point public @conv_16x16x16
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 8, 8]}
-//           CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
+//           CHECK-SAME:   workgroup_size = [4 : index, 2 : index, 2 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
-//           CHECK-NEXT:   %[[C2:.+]] = constant 2 : index
-//           CHECK-NEXT:   hal.return %[[C1]], %[[C2]], %[[C2]]
+//           CHECK-NEXT:   %[[C4:.+]] = constant 4 : index
+//           CHECK-NEXT:   hal.return %[[C1]], %[[C4]], %[[C4]]
 
 //                CHECK: func @conv_16x16x16()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 8, 8, 16], [], [0, 2, 2, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 2, 2, 4]]}
 
 // -----
 
@@ -274,11 +274,11 @@ hal.executable @dwconv_28x28x144 {
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 1024 : i32,
-        max_compute_workgroup_size = dense<[1024, 1024, 64]> : vector<3xi32>,
-        subgroup_size = 64 : i32}>
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+       subgroup_size = 16 : i32}>
     }> {
     hal.executable.entry_point public @dwconv_28x28x144 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
@@ -342,7 +342,7 @@ hal.executable @dwconv_28x28x144 {
 
 //          CHECK-LABEL: hal.executable.entry_point public @dwconv_28x28x144
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
-//           CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
+//           CHECK-SAME:   workgroup_size = [4 : index, 2 : index, 2 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C9:.+]] = constant 9 : index
 //           CHECK-NEXT:   %[[C7:.+]] = constant 7 : index
@@ -350,35 +350,36 @@ hal.executable @dwconv_28x28x144 {
 
 //                CHECK: func @dwconv_28x28x144()
 //                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 1, 1, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 2, 2, 4]]}
 
 // -----
 
 // Depthwise conv - tiny OC/OW/OH - starving the GPU.
 
-hal.executable @dwconv_4x4x8 {
+hal.executable @dwconv_1x2x8 {
   hal.interface public @io {
     hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 1024 : i32,
-        max_compute_workgroup_size = dense<[1024, 1024, 64]> : vector<3xi32>,
-        subgroup_size = 64 : i32}>
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+       subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @dwconv_4x4x8 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point public @dwconv_1x2x8 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
-      func @dwconv_4x4x8() {
+      func @dwconv_1x2x8() {
         %c0 = constant 0 : index
         %c8 = constant 8 : index
-        %c4 = constant 4 : index
+        %c2 = constant 2 : index
+        %c1 = constant 1 : index
         %cst = constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x9x9x8xf32>
+        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x3x5x8xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x3x8xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x4x4x8xf32>
+        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x1x2x8xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -390,31 +391,31 @@ hal.executable @dwconv_4x4x8 {
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
         %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_z, %workgroup_size_z]
         %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_z, %workgroup_size_z]
-        scf.for %arg0 = %3 to %c4 step %4 {
+        scf.for %arg0 = %3 to %c1 step %4 {
           %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
           %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-          scf.for %arg1 = %5 to %c4 step %6 {
+          scf.for %arg1 = %5 to %c2 step %6 {
             %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
             %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
             scf.for %arg2 = %7 to %c8 step %8 {
               %9 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg0)
-              %10 = affine.min affine_map<(d0)[s0] -> (s0 * 2 + 1, d0 * -2 + 9)>(%arg0)[%workgroup_size_z]
+              %10 = affine.min affine_map<(d0)[s0] -> (s0 * 2 + 1, d0 * -2 + 5)>(%arg0)[%workgroup_size_z]
               %11 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg1)
-              %12 = affine.min affine_map<(d0)[s0] -> (s0 * 2 + 1, d0 * -2 + 9)>(%arg1)[%workgroup_size_y]
+              %12 = affine.min affine_map<(d0)[s0] -> (s0 * 2 + 1, d0 * -2 + 7)>(%arg1)[%workgroup_size_y]
               %13 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 8)>(%arg2)[%workgroup_size_x]
-              %14 = flow.dispatch.tensor.load %0, offsets = [0, %9, %11, %arg2], sizes = [1, %10, %12, %13], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x9x9x8xf32> -> tensor<1x?x?x?xf32>
+              %14 = flow.dispatch.tensor.load %0, offsets = [0, %9, %11, %arg2], sizes = [1, %10, %12, %13], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x3x5x8xf32> -> tensor<1x?x?x?xf32>
               %15 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 8)>(%arg2)[%workgroup_size_x]
               %16 = flow.dispatch.tensor.load %1, offsets = [0, 0, %arg2], sizes = [3, 3, %15], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x8xf32> -> tensor<3x3x?xf32>
-              %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
-              %18 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg1)[%workgroup_size_y]
+              %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1)>(%arg0)[%workgroup_size_z]
+              %18 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 2)>(%arg1)[%workgroup_size_y]
               %19 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 8)>(%arg2)[%workgroup_size_x]
-              %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 4, s0)>(%arg0)[%workgroup_size_z]
-              %21 = affine.min affine_map<(d0)[s0] -> (-d0 + 4, s0)>(%arg1)[%workgroup_size_y]
+              %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 1, s0)>(%arg0)[%workgroup_size_z]
+              %21 = affine.min affine_map<(d0)[s0] -> (-d0 + 2, s0)>(%arg1)[%workgroup_size_y]
               %22 = affine.min affine_map<(d0)[s0] -> (-d0 + 8, s0)>(%arg2)[%workgroup_size_x]
               %23 = linalg.init_tensor [1, %20, %21, %22] : tensor<1x?x?x?xf32>
-              %24 = linalg.fill(%cst, %23) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
+              %24 = linalg.fill(%cst, %23) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32> 
               %25 = linalg.depthwise_conv2D_nhw {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%14, %16 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>) outs(%24 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
-              flow.dispatch.tensor.store %25, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %17, %18, %19], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x4x4x8xf32>
+              flow.dispatch.tensor.store %25, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %17, %18, %19], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x1x2x8xf32>
             }
           }
         }
@@ -429,13 +430,14 @@ hal.executable @dwconv_4x4x8 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @dwconv_4x4x8
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 4, 4]}
-//           CHECK-SAME:   workgroup_size = [2 : index, 4 : index, 4 : index]
+//          CHECK-LABEL: hal.executable.entry_point public @dwconv_1x2x8
+//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 2, 1]}
+//           CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
 //           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
 //           CHECK-NEXT:   hal.return %[[C1]], %[[C1]], %[[C1]]
 
-//                CHECK: func @dwconv_4x4x8()
+//                CHECK: func @dwconv_1x2x8()
 //                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 8], [], [0, 1, 1, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 2, 8], [], [0, 1, 1, 4]]}
+
