@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional
 
 from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
                                          execute_cmd_and_get_output)
-from common.noisy_benchmarks import NOISY_BENCHMARKS
+from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/google/iree/commit'
 IREE_PROJECT_ID = 'IREE'
@@ -212,12 +212,13 @@ def add_new_iree_series(series_id: str,
   """Posts a new series to the dashboard."""
   url = get_required_env_var('IREE_DASHBOARD_URL')
 
-  average_range = '5%'
-  # Adjust average threshold for noisy benchmarks.
-  for regex, threshold in NOISY_BENCHMARKS:
-    if regex.match(series_id):
-      average_range = f'{threshold}%'
+  average_range = None
+  for threshold in BENCHMARK_THRESHOLDS:
+    if threshold.regex.match(series_id):
+      average_range = threshold.get_threshold_str()
       break
+  if average_range is None:
+    raise ValueError(f"no matched threshold setting for benchmark: {series_id}")
 
   payload = compose_series_payload(IREE_PROJECT_ID,
                                    series_id,
