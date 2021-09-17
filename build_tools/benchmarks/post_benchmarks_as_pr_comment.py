@@ -358,8 +358,11 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
   # Compose the abbreviated benchmark tables.
   abbr_table = [md.header(ABBR_PR_COMMENT_TITLE, 2)]
   abbr_table.append(commit_info)
-  abbr_table.append(
-      categorize_benchmarks_into_tables(all_benchmarks, TABLE_SIZE_CUT))
+  tables = categorize_benchmarks_into_tables(all_benchmarks, TABLE_SIZE_CUT)
+  if len(tables) == 0:
+    abbr_table.append("No improved or regressed benchmarks 🏖️")
+  else:
+    abbr_table.append(tables)
   abbr_table.append("For more information:")
   # We don't know until a Gist is really created. Use a placeholder for now
   # and replace later.
