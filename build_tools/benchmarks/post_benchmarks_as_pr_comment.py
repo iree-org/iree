@@ -279,7 +279,7 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     else:
       ratio = abs(current - base)
 
-    if ratio <= similar_threshold:
+    if ratio <= similar_threshold.threshold:
       similar[name] = results
     elif current > base:
       regressed[name] = results
