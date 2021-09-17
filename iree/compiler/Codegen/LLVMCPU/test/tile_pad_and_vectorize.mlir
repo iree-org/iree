@@ -59,9 +59,9 @@ module  {
 //     CHECK: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x513xf32>
 //     CHECK: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>
 //     CHECK: scf.for %[[I_WG_IDX:.+]] = {{.*}} to %c383
-//     CHECK: scf.for %[[J_WG_IDX:.+]] = {{.*}} to %c513
 //     CHECK: %[[LHS_WG_TILE_DIM0:.+]] = affine.min #[[MAP1]](%[[I_WG_IDX]])
 //     CHECK: %[[LHS_WG_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]]
+//     CHECK: scf.for %[[J_WG_IDX:.+]] = {{.*}} to %c513
 //     CHECK: %[[RHS_WG_TILE_DIM1:.+]] = affine.min #[[MAP2]](%[[J_WG_IDX]])
 //     CHECK: %[[RHS_WG_TILE:.+]] = flow.dispatch.tensor.load %[[RHS]]
 //     CHECK: %[[DST_WG_TILE_INIT:.+]] = linalg.init_tensor
