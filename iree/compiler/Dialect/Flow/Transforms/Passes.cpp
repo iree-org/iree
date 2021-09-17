@@ -37,12 +37,6 @@ static llvm::cl::opt<bool> clDemoteF32ToF16(
                    "unconditionally before main flow conversions"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnable1x1ConvToMatmul(
-    "iree-flow-enable-1x1-conv-to-matmul",
-    llvm::cl::desc("Enable converting 1x1 linalg convolution ops to linalg "
-                   "matmul ops pass."),
-    llvm::cl::init(true));
-
 static llvm::cl::opt<bool> clEnableConvToImg2Col(
     "iree-flow-enable-conv-img2col-transform",
     llvm::cl::desc("Enable converting convolution ops to img2col form."),
@@ -73,6 +67,19 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  // Special case peephole optimizations.
+  {
+    passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
+    if (clEnableConvToImg2Col) {
+      passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
+    }
+    // Pad linalg op
+    if (clEnablePaddingLinalgOps) {
+      passManager.addNestedPass<FuncOp>(
+          createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
+    }
+  }
+
   passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
 
   // Simplify util.global accesses early on; this can help with dispatch
@@ -101,20 +108,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // previous pass.
   passManager.addPass(Shape::createExpandFunctionDynamicDimsPass());
 
-  // Special case peephole optimizations.
-  {
-    if (clEnable1x1ConvToMatmul) {
-      passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
-    }
-    if (clEnableConvToImg2Col) {
-      passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
-    }
-    // Pad linalg op
-    if (clEnablePaddingLinalgOps) {
-      passManager.addNestedPass<FuncOp>(
-          createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
-    }
-  }
   passManager.addPass(createPadTensorToSubTensorInsertPass());
 
   // Elementwise, fusion, tiling and distribution.
