@@ -139,6 +139,7 @@ iree_check_single_backend_test_suite(
             "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
+            "rng_normal.mlir",
             "rng_uniform.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
