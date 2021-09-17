@@ -514,7 +514,10 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
 
 static LogicalResult verifyFftOp(FftOp op) {
   auto length = op.getFftLength();
-  if (length == ShapedType::kDynamicSize) return failure();
+  // After tiling, it could be dynamic shape. (Because
+  // subview/subtensor does not inference the type correctly
+  // on (1 << x)) cases).
+  if (length == ShapedType::kDynamicSize) return success();
   if (length & (length - 1)) {
     return op.emitOpError("only powers of 2 are handled currently");
   }
@@ -539,9 +542,6 @@ SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
   // merge them into one tensor.
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
                                        getParallelIteratorTypeName());
-  // TODO(hanchung): Mark the loop type as "parallel" after tiling is
-  // implemented.
-  iteratorTypes[0] = getReductionIteratorTypeName();
   return iteratorTypes;
 }
 
@@ -560,7 +560,7 @@ SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
     res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/one});
   }
 
-  Value size = builder.create<ConstantIndexOp>(loc, getFftLength());
+  Value size = getDimValue(builder, loc, getReal(), getOperandRank() - 1);
   Value stride = builder.create<ShiftLeftOp>(loc, one, getStage());
   res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
   return res;
@@ -571,9 +571,6 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
                                               Value wholeSize) {
   auto rank = getOperandRank();
   SmallVector<AffineMap> maps(operands.size(), b.getMultiDimIdentityMap(rank));
-  // TODO(hanchung): Use getLoopIteratorTypes(), once tiling method is
-  // implemented.
-  SmallVector<StringRef> iterTypes(rank, getParallelIteratorTypeName());
 
   auto f32Type = b.getF32Type();
   auto indexToF32 = [](OpBuilder &builder, Location loc, Value v) -> Value {
@@ -588,7 +585,7 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
   coeff = b.create<DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
 
   b.create<linalg::GenericOp>(
-      loc, TypeRange{}, ValueRange{}, operands, maps, iterTypes,
+      loc, TypeRange{}, ValueRange{}, operands, maps, getLoopIteratorTypes(),
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value lhsReal = args[0];
         Value lhsImag = args[1];
@@ -631,13 +628,11 @@ void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
   maps.append(
       2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
   maps.append(operands.size(), b.getMultiDimIdentityMap(rank));
-  // TODO(hanchung): Use getLoopIteratorTypes(), once tiling method is
-  // implemented.
-  SmallVector<StringRef> iterTypes(rank, getParallelIteratorTypeName());
 
   b.create<linalg::GenericOp>(
       loc, TypeRange{}, ValueRange{getRealCoeff(), getImagCoeff()}, operands,
-      maps, iterTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+      maps, getLoopIteratorTypes(),
+      [&](OpBuilder &b, Location loc, ValueRange args) {
         Value wReal = args[0];
         Value wImag = args[1];
         Value lhsReal = args[2];
@@ -713,6 +708,55 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   }
 
   return success();
+}
+
+bool FftOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
+
+SmallVector<unsigned> FftOp::getPartitionableLoops(
+    unsigned maxNumParallelDims) {
+  auto range = llvm::seq<unsigned>(0, getOperandRank());
+  SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+  // Indices matter for coeff computation.
+  if (!hasCoeff()) {
+    partitionableLoops.pop_back();
+  }
+  if (partitionableLoops.size() > maxNumParallelDims) {
+    partitionableLoops.erase(
+        partitionableLoops.begin(),
+        std::next(partitionableLoops.begin(),
+                  partitionableLoops.size() - maxNumParallelDims));
+  }
+  return partitionableLoops;
+}
+
+Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
+                                         ArrayRef<OpFoldResult> offsets,
+                                         ArrayRef<OpFoldResult> sizes,
+                                         SmallVectorImpl<Value> &results) {
+  int64_t rank = getOperandRank();
+  SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  Location loc = getLoc();
+  SmallVector<Value> tiledOperands(3);
+  tiledOperands[0] = getStage();
+  tiledOperands[1] = getRealCoeff();
+  tiledOperands[2] = getImagCoeff();
+  SmallVector<Type, 4> resultTypes;
+
+  for (auto out : outputs) {
+    tiledOperands.push_back(
+        getSlice(builder, getLoc(), out, offsets, sizes, strides));
+    if (hasTensorSemantics()) {
+      resultTypes.push_back(tiledOperands.back().getType());
+    }
+  }
+  Operation *tiledFftOp = cast<LinalgExtOp>(getOperation())
+                              .clone(builder, loc, resultTypes, tiledOperands);
+  for (auto result : llvm::enumerate(tiledFftOp->getResults())) {
+    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+        loc, result.value(), outputs[result.index()], offsets, sizes, strides);
+    results.push_back(insertSliceOp.getResult());
+  }
+  return tiledFftOp;
 }
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \

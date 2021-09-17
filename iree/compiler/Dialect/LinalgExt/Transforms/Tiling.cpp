@@ -131,10 +131,12 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
   // Generate an scf.for for the current loop depth.
   Value lb = loopBounds[loopDepth].offset;
   Value ub = loopBounds[loopDepth].size;
-  if (!matchPattern(loopBounds[loopDepth].stride, m_One())) {
-    return static_cast<LogicalResult>(
-        tilableOp.emitOpError("expected stride to be 1"));
-  }
+  // TODO(#7073): Put the check back. This is required by tiling linalg_ext.fft
+  // op. We can put the check back after updating linalg_ext.fft semantics.
+  // if (!matchPattern(loopBounds[loopDepth].stride, m_One())) {
+  // return static_cast<LogicalResult>(
+  // tilableOp.emitOpError("expected stride to be 1"));
+  //}
   Value step = getValue(builder, loc, tileSizes[loopDepth]);
 
   // Update lb, ub and step for cyclic distribution.
@@ -342,7 +344,9 @@ struct InsertSliceTiledOpInterface
 LogicalResult TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
     TiledOpInterface tilableOp, PatternRewriter &rewriter,
     TiledOp &result) const {
-  if (failed(filter.checkAndNotify(rewriter, tilableOp))) return failure();
+  if (failed(filter.checkAndNotify(rewriter, tilableOp))) {
+    return failure();
+  }
   if (failed(verifySupportedTilingOptions(rewriter, tilableOp, options))) {
     return failure();
   }
@@ -440,6 +444,20 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
       linalg::LinalgTransformationFilter(
           Identifier::get("distribute_input", context),
           Identifier::get("distribute_output", context)));
+
+  patterns.add<TiledOpInterfaceTilingPattern>(
+      context,
+      linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{32}),
+      linalg::LinalgTransformationFilter(
+          Identifier::get("tiling_1d_stage5_fft_input", context),
+          Identifier::get("tiling_1d_stage5_fft_output", context)));
+
+  patterns.add<TiledOpInterfaceTilingPattern>(
+      context,
+      linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{10, 32}),
+      linalg::LinalgTransformationFilter(
+          Identifier::get("tiling_2d_stage5_fft_input", context),
+          Identifier::get("tiling_2d_stage5_fft_output", context)));
 
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();

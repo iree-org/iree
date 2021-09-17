@@ -257,3 +257,110 @@ hal.executable @tensor_insert {
 //      CHECK:   hal.return %[[NWGSX]], %[[ARG1]], %[[C1]]
 //      CHECK:   linalg.copy
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
+
+// -----
+
+hal.executable private @static_1d_fft_stage2  {
+  hal.interface @io {
+    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+  }
+  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+    hal.executable.entry_point @static_1d_fft_stage2 attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
+      builtin.func @static_1d_fft_stage2() {
+        %c0 = constant 0 : index
+        %c2 = constant 2 : index
+        %cst = constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
+        %cst_0 = constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
+        %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
+        %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
+        %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
+        %4:2 = linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
+        flow.dispatch.tensor.store %4#0, %0, offsets = [], sizes = [], strides = [] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:32xf32>
+        flow.dispatch.tensor.store %4#1, %1, offsets = [], sizes = [], strides = [] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:32xf32>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[4]]}
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
+//  CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUDistribute"
+//  CHECK-SAME:   workloadPerWorkgroup = [4]}
+//  CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
+//  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %{{.+}}: index, %{{.+}}: index):
+//  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//  CHECK-NEXT:   %[[T:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
+//  CHECK-NEXT:   hal.return %[[T]], %[[ONE]], %[[ONE]]
+
+//       CHECK: func @static_1d_fft_stage2()
+//       CHECK:   linalg_ext.fft
+//  CHECK-SAME:     lowering.config = #[[CONFIG]]
+
+// -----
+
+
+hal.executable private @static_3d_fft_stage3  {
+  hal.interface @io {
+    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+  }
+  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+    hal.executable.entry_point @static_3d_fft_stage3 attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
+      builtin.func @static_3d_fft_stage3() {
+        %c0 = constant 0 : index
+        %c3 = constant 3 : index
+        %c64 = constant 64 : index
+        %c128 = constant 128 : index
+        %c32 = constant 32 : index
+        %cst = constant dense<[1.000000e+00, 0.707106769, 6.12323426E-17, -0.707106769]> : tensor<4xf32>
+        %cst_0 = constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
+        %0 = memref.buffer_cast %cst_0 : memref<4xf32>
+        %1 = memref.buffer_cast %cst : memref<4xf32>
+        %2 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : memref<64x128x32xf32>
+        %3 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : memref<64x128x32xf32>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        scf.for %arg0 = %workgroup_id_z to %c64 step %workgroup_count_z {
+          scf.for %arg1 = %workgroup_id_y to %c128 step %workgroup_count_y {
+            %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_id_x]
+            %5 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_count_x]
+            scf.for %arg2 = %4 to %c32 step %5 {
+              %6 = memref.subview %2[%arg0, %arg1, %arg2] [1, 1, 4] [1, 1, 1] : memref<64x128x32xf32> to memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
+              %7 = memref.cast %6 : memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>> to memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
+              %8 = memref.subview %3[%arg0, %arg1, %arg2] [1, 1, 4] [1, 1, 1] : memref<64x128x32xf32> to memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
+              %9 = memref.cast %8 : memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>> to memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
+              linalg_ext.fft {__internal_linalg_transform__ = "workgroup"}
+                ins(%c3, %1, %0 : index, memref<4xf32>, memref<4xf32>)
+                outs(%7, %9 : memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>, memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>)
+            }
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 1, 8]]}
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
+//  CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUDistribute"
+//  CHECK-SAME:   workloadPerWorkgroup = [8, 1, 1]}
+//  CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
+//  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index):
+//  CHECK-NEXT:   %[[T:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
+//  CHECK-NEXT:   hal.return %[[T]], %[[ARG1]], %[[ARG2]]
+
+//       CHECK: func @static_3d_fft_stage3()
+//       CHECK:   linalg_ext.fft
+//  CHECK-SAME:     lowering.config = #[[CONFIG]]
