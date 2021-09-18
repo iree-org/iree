@@ -105,7 +105,7 @@ typedef enum iree_status_code_e {
 // meaning `return iree_status_from_code(IREE_STATUS_INTERNAL);` (etc) is valid,
 // though not as useful as constructing via iree_make_status (which captures
 // additional info).
-typedef struct iree_status_handle_t* iree_status_t;
+typedef IREE_MUST_USE_VALUE struct iree_status_handle_t* iree_status_t;
 
 // Returns an iree_status_t from the an iree_status_code_t.
 #define iree_status_from_code(code)                          \

@@ -85,6 +85,23 @@
 #endif  // IREE_HAVE_ATTRIBUTE(nodiscard)
 
 //===----------------------------------------------------------------------===//
+// IREE_MUST_USE_VALUE
+//===----------------------------------------------------------------------===//
+
+// Annotation that can be used on types, where supported.
+#if IREE_HAVE_ATTRIBUTE(nodiscard)
+#define IREE_MUST_USE_VALUE [[nodiscard]]
+#elif (defined(__clang__) && IREE_HAVE_ATTRIBUTE(warn_unused_result)) || \
+    (defined(__GNUC__) && (__GNUC__ >= 4))
+#define IREE_MUST_USE_VALUE __attribute__((warn_unused_result))
+#elif defined(_MSC_VER) && (_MSC_VER >= 1700)
+#define IREE_MUST_USE_VALUE
+#else
+#define IREE_MUST_USE_VALUE
+#endif  // IREE_HAVE_ATTRIBUTE(nodiscard)
+
+
+//===----------------------------------------------------------------------===//
 // IREE_RESTRICT
 //===----------------------------------------------------------------------===//
 
