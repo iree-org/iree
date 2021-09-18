@@ -183,27 +183,6 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
       return signalPassFailure();
     }
   }
-  //
-  // Hosit hierarchical tiling indexing and other loop invariant transfer
-  // ops computation.
-  //
-  // Programmatic controlled lowering of vector.transfer only.
-  {
-    VectorTransferToSCFOptions vectorToSCFOptions =
-        VectorTransferToSCFOptions().setUnroll(true);
-    OwningRewritePatternList vectorToLoopsPatterns(&getContext());
-    populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
-                                          vectorToSCFOptions);
-    // Hosit hierarchical tiling indexing and other loop invariant transfer
-    // ops computation.
-    linalg::hoistRedundantVectorTransfers(funcOp);
-
-    memref::populateFoldSubViewOpPatterns(vectorToLoopsPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorToLoopsPatterns)))) {
-      return signalPassFailure();
-    }
-  }
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
