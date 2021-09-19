@@ -1,11 +1,11 @@
 # RUN: %PYTHON %s | iree-dialects-opt -split-input-file | FileCheck --enable-var-scope --dump-input-filter=all %s
 
 from typing import List
-from mlir.dialects.iree_pydm.importer import *
-from mlir.dialects.iree_pydm.importer.test_util import *
+from iree.compiler.dialects.iree_pydm.importer import *
+from iree.compiler.dialects.iree_pydm.importer.test_util import *
 
-from mlir.dialects import iree_pydm as d
-from mlir import ir
+from iree.compiler.dialects import iree_pydm as d
+from iree.compiler import ir
 
 ################################################################################
 # Pyfunc intrinsics
