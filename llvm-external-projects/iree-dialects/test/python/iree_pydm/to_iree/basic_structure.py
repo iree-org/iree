@@ -3,7 +3,7 @@
 # crash.
 
 from typing import List
-from mlir.dialects.iree_pydm.importer.test_util import *
+from iree.compiler.dialects.iree_pydm.importer.test_util import *
 
 
 # CHECK-LABEL: @return_none_no_args
