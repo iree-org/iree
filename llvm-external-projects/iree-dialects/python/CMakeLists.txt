@@ -28,6 +28,7 @@ declare_mlir_dialect_python_bindings(
     dialects/iree_pydm/__init__.py
   SOURCES_GLOB
     dialects/iree_pydm/importer/*.py
+    dialects/iree_pydm/rtl/*.py
   DIALECT_NAME iree_pydm
 )
 
@@ -56,6 +57,7 @@ set(_source_components
   # TODO: Core is now implicitly building/registering all dialects, increasing
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
+  MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.std
   IREEDialectsPythonSources
   IREEDialectsPythonExtensions

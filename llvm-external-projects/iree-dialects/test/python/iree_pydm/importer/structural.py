@@ -10,3 +10,13 @@ from mlir.dialects.iree_pydm.importer.test_util import *
 @test_import_global
 def expr_statement(x: int):
   x
+
+
+# CHECK-LABEL @make_tuple
+@test_import_global
+def make_tuple(x, y) -> tuple:
+  # CHECK: %[[X:.*]] = load_var %x
+  # CHECK: %[[Y:.*]] = load_var %y
+  # CHECK: %[[RESULT:.*]] = make_tuple %[[X]], %[[Y]]
+  # CHECK: return %[[RESULT]]
+  return x, y
