@@ -144,6 +144,13 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
     }
   }];
 
+  let builders = [
+    OpBuilder<(ins "StringAttr":$name, "FunctionType":$type), [{
+      build($_builder, $_state, name, TypeAttr::get(type),
+            nullptr, nullptr, nullptr, nullptr);
+    }]>
+  ];
+
   let parser = [{ return ::parseFuncOp(parser, result); }];
   let printer = [{ return ::print(*this, p); }];
   let verifier = [{ return ::verify(*this); }];
@@ -433,6 +440,58 @@ def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
   let results = (outs IREEPyDM_TupleType:$tuple);
   let assemblyFormat = [{
     $slots `:` type($slots) `->` type(results) attr-dict
+  }];
+}
+
+def IREEPyDM_DynamicUnpackOp : IREEPyDM_PureOp<"dynamic_unpack"> {
+  let summary = "Dynamically unpacks a tuple/sequence into a fixed number of values";
+  let description = [{
+    This is the most generic form of sequence unpacking for use in extracting
+    values, when the arity is statically known. When more specific types are
+    known, this op will generally decay into a more statically verifiable
+    form or be elided entirely.
+
+    This op includes dynamic result casting so as to keep everything related
+    to the unpack local to a single op until/if more information is known.
+  }];
+  let arguments = (ins IREEPyDM_AnyValueType:$sequence);
+  let results = (outs
+    IREEPyDM_ExceptionResultType:$exc_result,
+    Variadic<IREEPyDM_AnyValueType>:$slots);
+  let assemblyFormat = [{
+    $sequence `:` type($sequence) `->` type($exc_result) `,` `[` type($slots) `]` attr-dict
+  }];
+}
+
+def IREEPyDM_GetTypeCodeOp : IREEPyDM_PureOp<"get_type_code"> {
+  let summary = "Gets the type code (BuiltinTypeCode) of an arbitrary value";
+  let description = [{
+    Every PyDM value has a type that can be represented by a type code.
+    See the `BuiltinTypeCode` enumeration for constants and encodings.
+  }];
+  let arguments = (ins IREEPyDM_AnyValueType:$value);
+  let results = (outs IREEPyDM_IntegerType);
+  let assemblyFormat = [{
+    $value `:` type($value) attr-dict
+  }];
+}
+
+def IREEPyDM_GetNumericPromotionOrderOp : IREEPyDM_PureOp<"get_numeric_promotion_order"> {
+  let summary = "Gets the promotion order of a value";
+  let description = [{
+    Every numeric type is assigned a promotion order which:
+      - When equal, means that no promotion is needed.
+      - Is greater then another, means the both should be promoted based on
+        the greater.
+    TODO: There are additional special considerations for unsigned->signed
+    promotion. This order only represents signed.
+
+    Non-numeric values have a promotion order of 0.
+  }];
+  let arguments = (ins IREEPyDM_AnyValueType:$value);
+  let results = (outs IREEPyDM_IntegerType);
+  let assemblyFormat = [{
+    $value `:` type($value) attr-dict
   }];
 }
 
