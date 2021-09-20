@@ -27,7 +27,7 @@ from iree.compiler.api import driver
 with ir.Context() as ctx:
   chlo.register_chlo_dialect(ctx)
   mhlo.register_mhlo_dialect(ctx)
-  iree_dialect.register_iree_dialect(ctx)
+  iree_dialect.register_dialect(ctx)
 
   input_module = ir.Module.parse(r"""
     builtin.module  {

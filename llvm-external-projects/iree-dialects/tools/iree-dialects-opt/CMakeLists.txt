@@ -7,6 +7,7 @@ set(LIBS
   MLIRTransforms
   IREEDialectsIREEDialect
   IREEDialectsIREEPyDMDialect
+  IREEDialectsIREEPyDMRTLPasses
   IREEDialectsIREEPyDMToIREEPasses
 )
 

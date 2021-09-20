@@ -65,7 +65,7 @@ class Importer:
     #   - annotation parsing
     # Also, since this is just a toy right now, sticking to pos params.
     code_object = f.__code__
-    with ic.scoped_ip(ir.InsertionPoint(ic.module.body)) as ip, ip, ic.loc:
+    with ic.scoped_ip(ir.InsertionPoint(ic.module_body)) as ip, ip, ic.loc:
       f_signature = inspect.signature(f)
       f_params = f_signature.parameters
       arg_names = list(f_params.keys())
@@ -593,6 +593,20 @@ class ExpressionImporter(BaseNodeVisitor):
       ic.abort(f"TODO: keyword calls are not yet supported")
     fctx.update_loc(node)
     self._set_result(func_expr.get_call_result(args=args))
+
+  def visit_Tuple(self, node: ast.Tuple):
+    fctx = self.fctx
+    ic = fctx.ic
+
+    element_values: List[ir.Value] = []
+    for elt in node.elts:
+      sub_expression = ExpressionImporter(fctx)
+      sub_expression.visit(elt)
+      element_values.append(sub_expression.get_immediate())
+    fctx.update_loc(node)
+
+    with ic.ip, ic.loc:
+      self._set_result(d.MakeTupleOp(d.TupleType.get(), element_values).result)
 
   def visit_UnaryOp(self, node: ast.UnaryOp):
     fctx = self.fctx
