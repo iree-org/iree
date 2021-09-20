@@ -629,3 +629,73 @@ hal.executable private @static_3d_fft_stage3  {
 //       CHECK: func @static_3d_fft_stage3()
 //       CHECK:   linalg_ext.fft
 //  CHECK-SAME:     lowering.config = #[[CONFIG]]
+
+// -----
+
+hal.executable private @outs_fusion {
+  hal.interface @io {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read|Write"
+  }
+  hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
+    hal.executable.entry_point @outs_fusion_fn attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
+      builtin.func @outs_fusion_fn() {
+        %c0 = constant 0 : index
+        %cst = constant 0.0 : f32
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+        %2 = hal.interface.load.constant offset = 0 : index
+        %3 = hal.interface.load.constant offset = 1 : index
+        %4 = hal.interface.load.constant offset = 2 : index
+        %5 = hal.interface.binding.subspan @io::@arg2[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %lb_y = affine.apply affine_map<(d0)[s0] -> (d0 * s0)>(%workgroup_id_y)[%workgroup_size_y]
+        %step_y = affine.apply affine_map<(d0)[s0] -> (d0 * s0)>(%workgroup_count_y)[%workgroup_size_y]
+        %lb_x = affine.apply affine_map<(d0)[s0] -> (d0 * s0)>(%workgroup_id_x)[%workgroup_size_x]
+        %step_x = affine.apply affine_map<(d0)[s0] -> (d0 * s0)>(%workgroup_count_x)[%workgroup_size_x]
+        scf.for %iv0 = %lb_y to %2 step %step_y {
+          scf.for %iv1 = %lb_x to %3 step %step_x {
+            %tile_m = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%iv0)[%workgroup_size_y, %2]
+            %tile_n = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%iv1)[%workgroup_size_x, %3]
+            %init = linalg.init_tensor[%tile_m, %tile_n] : tensor<?x?xf32>
+            %fill = linalg.generic {
+                indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+                iterator_types = ["parallel", "parallel"]}
+                outs(%init : tensor<?x?xf32>) {
+                ^bb0(%arg0: f32):
+                  linalg.yield %cst : f32
+                } -> tensor<?x?xf32>
+            %lhs = flow.dispatch.tensor.load %0, offsets = [%iv0, 0], sizes = [%tile_m, %4], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+            %rhs = flow.dispatch.tensor.load %0, offsets = [0, %iv1], sizes = [%4, %tile_n], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+            %gemm = linalg.generic {
+                indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                                 affine_map<(d0, d1, d2) -> (d2, d1)>,
+                                 affine_map<(d0, d1, d2) -> (d0, d1)>],
+                iterator_types = ["parallel", "parallel", "reduction"]}
+                ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>)
+                outs(%fill : tensor<?x?xf32>) {
+                ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+                  %6 = mulf %arg0, %arg1 : f32
+                  %7 = addf %6, %arg2 : f32
+                  linalg.yield %6 : f32
+                } -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %gemm, %5, offsets = [%iv0, %iv1], sizes = [%tile_m, %tile_n], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+          }
+        }
+        return
+      }
+    }
+  }
+}
+//      CHECK: #[[CONFIG:.+]] = {tileSizes = {{\[}}[64, 64]{{\]}}}
+//      CHECK: linalg.generic
+// CHECK-SAME:   lowering.config = #[[CONFIG]]
+//      CHECK: linalg.generic
+// CHECK-SAME:   lowering.config = #[[CONFIG]]

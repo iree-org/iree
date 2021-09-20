@@ -338,23 +338,12 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     }
   }
 
-  // If no root operation found, check if the dispatch region contains a single
-  // generic op and chose pipeline based on that.
+  // If no root operation found, set a configuration for all ops.
   if (!rootOp) {
     for (auto computeOp : computeOps) {
       if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
-      // Ignore fill ops. They never end up in their own dispatch, so are never
-      // root ops.
-      if (isa<linalg::FillOp>(computeOp)) continue;
       if (failed(setDefaultRootConfig(entryPointFn, computeOp))) {
         return failure();
-      }
-      if (getLoweringConfig(computeOp)) {
-        if (rootOp) {
-          return computeOp->emitError(
-              "unhandled multiple roots in dispatch region");
-        }
-        rootOp = computeOp;
       }
     }
   }
