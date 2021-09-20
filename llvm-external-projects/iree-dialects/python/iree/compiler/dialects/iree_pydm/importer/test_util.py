@@ -13,5 +13,5 @@ def test_import_global(f):
   ic = ImportContext()
   imp = Importer(ic)
   imp.import_global_function(f)
-  print(ic.module.operation)
+  print(ic._root_module)
   return f

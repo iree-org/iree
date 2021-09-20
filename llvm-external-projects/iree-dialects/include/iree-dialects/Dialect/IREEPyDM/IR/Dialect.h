@@ -17,6 +17,7 @@ namespace iree_pydm {
 // Each built-in (to the compiler) type has a unique code, enumerated here.
 // Generally, the closed part of the type system will have type codes <
 // FirstCustom.
+// If editing, also update the constants in rtl/modules/constants.py.
 enum class BuiltinTypeCode : int {
   // Built-in types, ordered by rough "core-ness" so that lower numbers
   // are easier to spot for common cases.
