@@ -70,11 +70,11 @@ hal.executable private @matmul  {
 // CHECK-LABEL: func @matmul
 //   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//   CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//   CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
+//   CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //       CHECK:   scf.for
-//   CHECK-DAG:     %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:     %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//   CHECK-DAG:     %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//   CHECK-DAG:     %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //       CHECK:     scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //       CHECK:       scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
 //       CHECK:         scf.for %{{.+}} = %[[C0]] to %{{.*}} step %[[C1]]
@@ -144,8 +144,8 @@ hal.executable private @conv_1d  {
 //       CHECK: %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //       CHECK: %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //       CHECK: scf.for %[[IV0:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//       CHECK:   %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[TIDZ]], %[[IV0]], 0] [1, %{{.+}}, 1]
 //       CHECK:   scf.for %[[IV1:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-//       CHECK:     %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[TIDZ]], %[[IV0]], 0] [1, %{{.+}}, 1]
 //       CHECK:     %[[ARG1SV2:.+]] = memref.subview %[[ARG1SV1]][0, 0, %[[IV1]]] [3, 1, 1]
 //       CHECK:     %[[RETSV2:.+]] = memref.subview %[[RETSV1]][%[[TIDZ]], %[[IV0]], %[[IV1]]] [1, 1, 1]
 //       CHECK:     linalg.conv_1d_nwc_wcf
@@ -271,17 +271,17 @@ hal.executable private @conv_no_padding  {
 //         CHECK:   %[[BSTEPY:.+]] = affine.apply #[[MAP0]]()[%[[NBLOCKSY]]]
 //         CHECK:   %[[BOFFSETX:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
 //         CHECK:   %[[BSTEPX:.+]] = affine.apply #[[MAP1]]()[%[[NBLOCKSX]]]
+//     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//     CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//     CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
+//     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
+//     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
+//     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
 //         CHECK:   scf.for %[[IV0:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
 //         CHECK:     scf.for %[[IV1:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
 //         CHECK:       scf.for %[[IV2:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
 //         CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV0]], %[[IV1]], %[[IV2]], 0]
 //         CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV0]], %[[IV1]], %[[IV2]], 0]
-//     CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//     CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//     CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//     CHECK-DAG:         %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//     CHECK-DAG:         %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//     CHECK-DAG:         %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
 //         CHECK:         scf.for %[[IV3:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
 //         CHECK:           scf.for %[[IV4:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //         CHECK:             scf.for %[[IV5:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]

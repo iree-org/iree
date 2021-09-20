@@ -153,7 +153,7 @@ static Optional<Value> allocateWorkgroupMemory(
         return -1;
       }));
   if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
-  Type allocType =
+  MemRefType allocType =
       MemRefType::get(shape, subview.getType().getElementType(), {},
                       gpu::GPUDialect::getWorkgroupAddressSpace());
   b.setInsertionPoint(&moduleOp.front());

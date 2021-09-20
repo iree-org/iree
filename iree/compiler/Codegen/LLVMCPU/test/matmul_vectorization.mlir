@@ -88,16 +88,16 @@ hal.executable private @dynamic_matmul  {
 // CHECK-PROMOTED-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 // CHECK-PROMOTED-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 // CHECK-PROMOTED-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+// CHECK-PROMOTED-DAG:   %[[A_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[A_PROMOTED_TILE]][0, 0] [64, 128]
+// CHECK-PROMOTED-DAG:   %[[B_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[B_PROMOTED_TILE]][0, 0] [128, 64]
+// CHECK-PROMOTED-DAG:   %[[C_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[C_PROMOTED_TILE]][0, 0] [64, 64]
 //     CHECK-PROMOTED:   scf.for %[[IV0:.+]] =
+//     CHECK-PROMOTED:     %[[A_TILE:.+]] = memref.subview %[[ARG0]][%[[IV0]], 0] [64, 128]
 //     CHECK-PROMOTED:     scf.for %[[IV1:.+]] =
-// CHECK-PROMOTED-DAG:       %[[A_TILE:.+]] = memref.subview %[[ARG0]][%[[IV0]], 0] [64, 128]
 // CHECK-PROMOTED-DAG:       %[[B_TILE:.+]] = memref.subview %[[ARG1]][0, %[[IV1]]] [128, 64]
 // CHECK-PROMOTED-DAG:       %[[C_TILE:.+]] = memref.subview %[[RET0]][%[[IV0]], %[[IV1]]] [64, 64]
-// CHECK-PROMOTED-DAG:       %[[A_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[A_PROMOTED_TILE]][0, 0] [64, 128]
 // CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[A_PROMOTED_TILE]])
-// CHECK-PROMOTED-DAG:       %[[B_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[B_PROMOTED_TILE]][0, 0] [128, 64]
 // CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[B_PROMOTED_TILE]])
-// CHECK-PROMOTED-DAG:       %[[C_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[C_PROMOTED_TILE]][0, 0] [64, 64]
 // CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[C_PROMOTED_TILE]])
 //     CHECK-PROMOTED:       linalg.copy(%[[A_TILE]], %[[A_PROMOTED_TILE_VIEW]])
 //     CHECK-PROMOTED:       linalg.copy(%[[B_TILE]], %[[B_PROMOTED_TILE_VIEW]])
