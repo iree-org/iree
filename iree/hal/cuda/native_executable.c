@@ -14,7 +14,7 @@
 #include "iree/hal/cuda/status_util.h"
 
 // flatcc schemas:
-#include "iree/base/internal/flatcc.h"
+#include "iree/base/internal/flatcc/parsing.h"
 #include "iree/schemas/cuda_executable_def_reader.h"
 #include "iree/schemas/cuda_executable_def_verifier.h"
 

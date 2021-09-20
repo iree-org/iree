@@ -304,3 +304,38 @@ func @reorder_broadcast_in_dim_scalar_unary_diff_type(%arg0: tensor<complex<f32>
   %2 = "mhlo.imag"(%0) : (tensor<1x8x8x64xcomplex<f32>>) -> tensor<1x8x8x64xf32>
   return %1, %2: tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>
 }
+
+// -----
+
+func @rng_normal(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<3x5xf32> {
+  %shape = mhlo.constant dense<[3, 5]> : tensor<2xi64>
+  %0 = "mhlo.rng_normal"(%arg0, %arg1, %shape) : (tensor<f32>, tensor<f32>, tensor<2xi64>) -> tensor<3x5xf32>
+  return %0 : tensor<3x5xf32>
+}
+// CHECK-LABEL: func @rng_normal
+// CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %{{.*}} = mhlo.constant dense<{{.*}}> : tensor<8xf32>
+// CHECK-DAG:     %{{.*}} = mhlo.constant dense<{{.*}}> : tensor<8xf32>
+// CHECK-DAG:     %{{.*}} = mhlo.constant dense<{{.*}}> : tensor<8xf32>
+// CHECK:         %[[SIGMA:.+]] = "mhlo.broadcast"(%[[ARG1]]) {broadcast_sizes = dense<8> : tensor<1xi64>} : (tensor<f32>) -> tensor<8xf32>
+//
+//                mag = sigma * sqrt(-2.0 * log(u1)) where sqrt values are
+//                constants.
+//
+// CHECK:         %[[MAG:.+]] = mhlo.multiply %[[SIGMA]], %{{.*}} : tensor<8xf32>
+//
+//                z0  = mag * cos(two_pi * u2) + mu;
+//                z1  = mag * sin(two_pi * u2) + mu;
+//
+// CHECK:         %[[MU:.+]] = "mhlo.broadcast"(%[[ARG0]]) {broadcast_sizes = dense<8> : tensor<1xi64>} : (tensor<f32>) -> tensor<8xf32>
+// CHECK:         %[[T1:.+]] = mhlo.multiply %[[MAG]], %{{.*}} : tensor<8xf32>
+// CHECK:         %[[Z0:.+]] = mhlo.add %[[T1:.+]], %[[MU]] : tensor<8xf32>
+// CHECK:         %[[T2:.+]] = mhlo.multiply %[[MAG]], %{{.*}} : tensor<8xf32>
+// CHECK:         %[[Z1:.+]] = mhlo.add %[[T2:.+]], %[[MU]] : tensor<8xf32>
+//
+//                Concate and reshape the output.
+// CHECK:         %[[CON:.+]] = "mhlo.concatenate"(%[[Z0]], %[[Z1]]) {dimension = 0 : i64} : (tensor<8xf32>, tensor<8xf32>) -> tensor<16xf32>
+// CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[CON]][0] [15] [1] : tensor<16xf32> to tensor<15xf32>
+// CHECK:         %[[RES:.+]] = "mhlo.reshape"(%[[SLICE]]) : (tensor<15xf32>) -> tensor<3x5xf32>
+// CHECK:         return %[[RES]]

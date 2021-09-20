@@ -1,5 +1,9 @@
 include(AddMLIRPython)
 
+# Specifies that all MLIR packages are co-located under npcomp.
+# TODO: Add an upstream cmake param for this vs having a global here.
+add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
+
 ################################################################################
 # Sources
 ################################################################################
@@ -13,7 +17,7 @@ declare_mlir_python_sources(IREEDialectsPythonSources.Dialects
 
 declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEDialectsPythonSources.Dialects
-  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mlir"
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/IreeBinding.td
   SOURCES dialects/iree.py
   DIALECT_NAME iree
@@ -21,13 +25,14 @@ declare_mlir_dialect_python_bindings(
 
 declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEDialectsPythonSources.Dialects
-  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mlir"
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/IreePyDmBinding.td
   SOURCES
     dialects/_iree_pydm_ops_ext.py
     dialects/iree_pydm/__init__.py
   SOURCES_GLOB
     dialects/iree_pydm/importer/*.py
+    dialects/iree_pydm/rtl/*.py
   DIALECT_NAME iree_pydm
 )
 
@@ -56,6 +61,7 @@ set(_source_components
   # TODO: Core is now implicitly building/registering all dialects, increasing
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
+  MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.std
   IREEDialectsPythonSources
   IREEDialectsPythonExtensions
@@ -64,14 +70,14 @@ set(_source_components
 add_mlir_python_common_capi_library(IREEDialectsAggregateCAPI
   INSTALL_COMPONENT IREEDialectsPythonModules
   INSTALL_DESTINATION python_packages/iree_dialects/mlir/_mlir_libs
-  OUTPUT_DIRECTORY "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/mlir/_mlir_libs"
+  OUTPUT_DIRECTORY "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/iree/compiler/_mlir_libs"
   RELATIVE_INSTALL_ROOT "../../../.."
   DECLARED_SOURCES ${_source_components}
 )
 
 add_mlir_python_modules(IREEDialectsPythonModules
-  ROOT_PREFIX "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/mlir"
-  INSTALL_PREFIX "python_packages/iree_dialects/mlir"
+  ROOT_PREFIX "${IREE_DIALECTS_BINARY_DIR}/python_packages/iree_dialects/iree/compiler"
+  INSTALL_PREFIX "python_packages/iree_dialects/iree/compiler"
   DECLARED_SOURCES ${_source_components}
   COMMON_CAPI_LINK_LIBS
     IREEDialectsAggregateCAPI

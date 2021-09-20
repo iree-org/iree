@@ -15,10 +15,17 @@ from ... import iree_pydm as d
 from .... import ir
 
 
-def def_pyfunc_intrinsic(f=None, *, symbol: Optional[str] = None):
+def def_pyfunc_intrinsic(
+    f=None,
+    *,
+    symbol: Optional[str] = None,
+    visibility: Optional[str] = None,
+) -> FuncProvidingIntrinsic:
   """Defines an intrinsic function that will be included in the module."""
   if f is None:
-    return functools.partial(def_pyfunc_intrinsic, symbol=symbol)
+    return functools.partial(def_pyfunc_intrinsic,
+                             symbol=symbol,
+                             visibility=visibility)
 
   if symbol is None:
     symbol = f.__name__
@@ -26,12 +33,12 @@ def def_pyfunc_intrinsic(f=None, *, symbol: Optional[str] = None):
   class PyIntrinsicFunc(FuncProvidingIntrinsic):
     """The intrinsic which will compile the func and emit calls to it."""
 
-    def get_provided_func_symbol(self, stage: ImportStage) -> str:
+    def get_or_create_provided_func_symbol(self, stage: ImportStage) -> str:
       ic = stage.ic
       symbol_attr = ir.FlatSymbolRefAttr.get(symbol, context=ic.context)
       existing = ic.lookup_symbol(symbol_attr)
       if not existing:
-        _import_global_function(stage, f, symbol=symbol)
+        _import_global_function(stage, f, symbol=symbol, visibility=visibility)
       return symbol
 
     def emit_call(self, stage: ImportStage, args: Sequence[ir.Value],
@@ -39,13 +46,16 @@ def def_pyfunc_intrinsic(f=None, *, symbol: Optional[str] = None):
       ic = stage.ic
       if keywords:
         ic.abort(f"{self} only supports positional arguments")
-      resolved_symbol = self.get_provided_func_symbol(stage)
+      resolved_symbol = self.get_or_create_provided_func_symbol(stage)
       with ic.ip, ic.loc:
         exc_result, call_result = d.DynamicCallOp(
             d.ExceptionResultType.get(), d.ObjectType.get(),
             ir.FlatSymbolRefAttr.get(resolved_symbol), args).results
         d.RaiseOnFailureOp(exc_result)
         return call_result
+
+    def __call__(self, *args, **kwargs):
+      return f(*args, **kwargs)
 
     def __repr__(self):
       return f"<py intrinsic {symbol}>"
@@ -82,6 +92,9 @@ def def_ir_macro_intrinsic(f=None):
           ic.abort(f"compiler intrinsic macro must return an IR Value: {f}")
         return result
 
+    def __call__(self, *args, **kwargs):
+      return f(*args, **kwargs)
+
     def __repr__(self):
       return f"<IR macro {self}>"
 
@@ -114,10 +127,12 @@ def def_pattern_call_intrinsic(match_generic: Sequence[Any] = (),
         ic.abort(f"{self} only supports positional arguments")
 
       generic_symbol_names = [
-          i.get_provided_func_symbol(stage) for i in generic_intrinsics
+          i.get_or_create_provided_func_symbol(stage)
+          for i in generic_intrinsics
       ]
       specific_symbol_names = [
-          i.get_provided_func_symbol(stage) for i in specific_intrinsics
+          i.get_or_create_provided_func_symbol(stage)
+          for i in specific_intrinsics
       ]
 
       with ic.ip, ic.loc:
@@ -138,10 +153,15 @@ def def_pattern_call_intrinsic(match_generic: Sequence[Any] = (),
   return IrPatternCallIntrinsic()
 
 
-def _import_global_function(parent_stage: ImportStage, f, *,
-                            symbol: str) -> d.FuncOp:
+def _import_global_function(parent_stage: ImportStage,
+                            f,
+                            *,
+                            symbol: str,
+                            visibility: Optional[str] = None) -> d.FuncOp:
   """In a fresh import context, import a global function."""
   # Note that we are bringing out own hooks, since intrinsics are compiled with
   # defaults.
   importer = Importer(parent_stage.ic, hooks=DefaultImportHooks())
-  return importer.import_global_function(f, symbol=symbol, visibility="private")
+  return importer.import_global_function(f,
+                                         symbol=symbol,
+                                         visibility=visibility)

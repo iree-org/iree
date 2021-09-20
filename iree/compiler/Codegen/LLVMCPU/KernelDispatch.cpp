@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -152,7 +153,7 @@ static LogicalResult setRootConfig(
                                                 vectorSizeVal};
     return setOpConfigAndEntryPointFnTranslation(
         entryPointFn, contractionOp, tileSizes, nativeVectorSize,
-        IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
+        IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors);
   }
   if (contractionOp.isRowMajorBatchMatmul()) {
     // TODO(ataei, ravishankarm): This should just use the configuration for
@@ -182,23 +183,33 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
       return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
                                   mmt4dWorkgroupTileSizes.end());
     }
-    return {64, 32};
+    return {48, 32};
   };
 
   auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
+    auto lhsShape = getUntiledShape(mmt4dOp.inputs()[0]);
+    auto rhsShape = getUntiledShape(mmt4dOp.inputs()[1]);
+    int M0 = lhsShape[2];
+    int N0 = rhsShape[2];
+    int K0 = lhsShape[3];
     if (!mmt4dL1TileSizes.empty()) {
       return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
                                   mmt4dL1TileSizes.end());
     }
-    return {1, 1, 4, 4, 1, 4};
+    return {1, 1, 1, M0, N0, K0};
   };
 
   auto getVectorSizes = [&]() -> SmallVector<int64_t> {
+    auto lhsShape = getUntiledShape(mmt4dOp.inputs()[0]);
+    auto rhsShape = getUntiledShape(mmt4dOp.inputs()[1]);
+    int M0 = lhsShape[2];
+    int N0 = rhsShape[2];
+    int K0 = lhsShape[3];
     if (!mmt4dVectorSizes.empty()) {
       return SmallVector<int64_t>(mmt4dVectorSizes.begin(),
                                   mmt4dVectorSizes.end());
     }
-    return {1, 1, 4, 4, 1, 4};
+    return {1, 1, 1, M0, N0, K0};
   };
 
   SmallVector<int64_t, 4> nativeVectorSize = getVectorSizes();
@@ -209,6 +220,42 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
       IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
+}
+
+/// Sets the lowering configuration for dispatch region for linalg_ext.fft root
+/// op.
+static LogicalResult setRootConfig(FuncOp entryPointFn,
+                                   linalg_ext::FftOp fftOp) {
+  auto partitionedLoops = getPartitionedLoops(fftOp);
+  unsigned maxDepth = partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSizes(maxDepth,
+                                             defaultWorkgroupTileSize);
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
+    if (!partitionedLoopsSet.count(dim)) {
+      workgroupTileSizes[dim] = 0;
+    }
+  }
+
+  auto rank = fftOp.getOperandRank();
+  if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
+    APInt value;
+    if (matchPattern(fftOp.getStage(), m_ConstantInt(&value))) {
+      workgroupTileSizes[rank - 1] = 1 << value.getSExtValue();
+      workgroupTileSizes[rank - 1] =
+          std::max(workgroupTileSizes[rank - 1],
+                   static_cast<int64_t>(defaultWorkgroupTileSize));
+    } else {
+      fftOp.emitError("non-constant stage might not work for fft op");
+      return failure();
+    }
+  }
+  TileSizesListType tileSizes = {workgroupTileSizes};
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, fftOp, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+      IREE::HAL::DispatchLoweringPassPipeline::CPUDefault);
 }
 
 /// Sets the lowering configuration for dispatch region with root op being a
@@ -272,7 +319,8 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     } else {
       auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
         return TypeSwitch<Operation *, LogicalResult>(op)
-            .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface>(
+            .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
+                  linalg_ext::FftOp>(
                 [&](auto op) { return setRootConfig(entryPointFn, op); })
             .Default([&](Operation *op) { return success(); });
       };
@@ -290,23 +338,12 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     }
   }
 
-  // If no root operation found, check if the dispatch region contains a single
-  // generic op and chose pipeline based on that.
+  // If no root operation found, set a configuration for all ops.
   if (!rootOp) {
     for (auto computeOp : computeOps) {
       if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
-      // Ignore fill ops. They never end up in their own dispatch, so are never
-      // root ops.
-      if (isa<linalg::FillOp>(computeOp)) continue;
       if (failed(setDefaultRootConfig(entryPointFn, computeOp))) {
         return failure();
-      }
-      if (getLoweringConfig(computeOp)) {
-        if (rootOp) {
-          return computeOp->emitError(
-              "unhandled multiple roots in dispatch region");
-        }
-        rootOp = computeOp;
       }
     }
   }

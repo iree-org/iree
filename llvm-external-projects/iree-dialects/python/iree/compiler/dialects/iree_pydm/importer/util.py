@@ -10,6 +10,7 @@ from typing import Any, Mapping, Optional, Sequence, Union
 import contextlib
 import inspect
 
+from ... import builtin as builtin_d
 from ... import iree_pydm as d
 from .... import ir
 # TODO: Upstream emit_error and use that instead.
@@ -54,17 +55,24 @@ class ImportContext:
   def __init__(self,
                *,
                context: Optional[ir.Context] = None,
-               module: Optional[ir.Module] = None):
+               module: Optional[builtin_d.ModuleOp] = None):
     self.context = context if context else create_context()
     self.loc = ir.Location.unknown(context=self.context)
+    self._root_module: Optional[ir.Module] = None
     if module:
       self.module = module
     else:
-      self.module = ir.Module.create(self.loc)
+      self._root_module = ir.Module.create(self.loc)
+      self.module = self._root_module.operation
+    # TODO: Add a "body" attribute to builtin.module.
+    self.module_body = self.module.regions[0].blocks[0]
     self._ip_stack = []
 
   def __str__(self):
-    return str(self.module)
+    if self._root_module:
+      return str(self._root_module)
+    else:
+      return str(self.module)
 
   def set_file_line_col(self, file: str, line: int, col: int):
     self.loc = ir.Location.file(file, line, col, context=self.context)
@@ -104,7 +112,7 @@ class ImportContext:
     raise EmittedError(loc, message)
 
   def lookup_symbol(self, symbol_attr):
-    return _lookup_nearest_symbol_from(self.module.operation, symbol_attr)
+    return _lookup_nearest_symbol_from(self.module, symbol_attr)
 
   def box(self, value: ir.Value, to_typed: Optional[bool] = True) -> ir.Value:
     """Boxes a value if necessary."""
@@ -245,7 +253,7 @@ class FuncProvidingIntrinsic(Intrinsic):
   function symbol.
   """
 
-  def get_provided_func_symbol(self, stage: ImportStage) -> str:
+  def get_or_create_provided_func_symbol(self, stage: ImportStage) -> str:
     raise NotImplementedError()
 
 
@@ -314,12 +322,16 @@ class DefaultImportHooks(ImportHooks):
       # to preserve providence.
       # TODO: Better heuristic?
       # TODO: Support typing annotations, not just raw types.
+      # TODO: Box/unbox differently on argument/return boundaries.
       if annot is str:
         return d.ObjectType.get_typed(d.StrType.get())
       if annot is list:
         return d.ObjectType.get_typed(d.ListType.get())
       if annot is tuple:
-        return d.ObjectType.get_typed(d.TupleType.get())
+        # TODO: Tuple is used exclusively at the moment for multi results in the
+        # RTL so we let it through unboxed. This should be a special type hint
+        # enabling this behavior.
+        return d.TupleType.get()
       if annot is type:
         return d.ObjectType.get_typed(d.TypeType.get())
 
@@ -375,11 +387,21 @@ class PassthroughModuleIntrinsic(Intrinsic):
     except AttributeError:
       return Intrinsic.UNBOUND_VALUE
 
-    # We only return values that are modules or intrinsics.
+    # We only return values that are modules or intrinsics and primitive,
+    # immutable python values (which then get inlined).
     if isinstance(child, _ModuleType):
       return PassthroughModuleIntrinsic(child)
     elif isinstance(child, Intrinsic):
       return child
+    elif child is None or _isinstance_multi(child, bool, int, float):
+      return stage.ic.emit_constant(child)
     else:
       ic.abort(f"when resolving '{attr_name}' against module {m}, "
                f"encountered an unsupported type ({child.__class__})")
+
+
+def _isinstance_multi(value, *types):
+  for t in types:
+    if isinstance(value, t):
+      return True
+  return False

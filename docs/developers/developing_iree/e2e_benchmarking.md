@@ -66,17 +66,7 @@ include those relevant for benchmarking):
 # Example for a generic module `ModuleName`:
 /tmp/iree/modules/ModuleName
   ├── iree_vmvx  # Or any other IREE backend.
-  │   ├── compiled.vmfb
-  │   │   # A flatbuffer containing IREE's compiled code.
-  │   └── traces
-  │       # Directory with a trace for each unittest in vision_model_test.py.
-  │       ├── traced_function_1
-  │       │   # Directory storing logs and serialization for a specific trace.
-  │       │   └── flagfile
-  │       │       # An Abseil flagfile containing arguments
-  │       │       # iree-benchmark-module needs to benchmark this trace.
-  │       ├── traced_function_2
-  │       └── ...
+  │   └── compiled.vmfb # A flatbuffer containing IREE's compiled code.
   └── tflite
       ├── module_method_1.tflite
       │   # A method on ModuleName compiled to bytes with TFLite, which can
@@ -96,22 +86,11 @@ include those relevant for benchmarking):
 # Example for MatrixOpsStaticModule:
 /tmp/iree/modules/MatrixOpsStaticModule
   ├── iree_llvmaot
-  │   ├── compiled.vmfb
-  │   └── traces
-  │       ├── basic_matmul
-  │       │   └── flagfile
-  │       ├── matmul_broadcast_singleton_dimension
-  │       │   └── flagfile
-  │       ├── matmul_lhs_batch
-  │       │   └── flagfile
-  │       └── matmul_rhs_batch
-  │           └── flagfile
+  │   └── compiled.vmfb
   ├── iree_vmvx
-  │   ├── compiled.vmfb
-  │   └── traces  # ...same as iree_llvmaot/traces above.
+  │   └──compiled.vmfb
   ├── iree_vulkan
-  │   ├── compiled.vmfb
-  │   └── traces  # ...same as iree_llvmaot/traces above.
+  │   └── compiled.vmfb
   └── tflite
       ├── basic_matmul.tflite
       ├── matmul_broadcast_singleton_dimension.tflite
@@ -130,54 +109,31 @@ include those relevant for benchmarking):
 
 ## 2. Benchmarking IREE on desktop
 
-### 2.1 Optional: Build the `iree-benchmark-module`
+See also ./benchmarking.md
 
-This step is optional, but allows running the benchmarks without running `bazel`
-at the same time.
-
-```shell
-$ bazel build -c opt //iree/tools:iree-benchmark-module
-```
-
-This creates `bazel-bin/iree/tools/iree-benchmark-module`. The rest of the guide
-will use this binary, but you could also use
-`bazel run iree/tools:iree-benchmark-module` in its place if your prefer.
-
-### 2.2 Benchmark the model on IREE
-
-The E2E tests generate a flagfile with all of the information that
-`iree-benchmark-module` needs to benchmark each trace. Namely it handles
-providing the following flags:
-
-| Flag              | Description                                      |
-|-------------------|--------------------------------------------------|
-| --module_file     | Absolute path to the IREE compiled VM flatbuffer |
-| --function_inputs | A comma delimited string of input tensors        |
-| --driver          | The backend driver to use for the benchmark      |
-| --entry_function  | The method on the TensorFlow module to benchmark |
-
-You can find the flagfile to benchmark a specific TensorFlow module on a
-specific IREE backend and trace at the following path:
+Use iree-benchmark-module to benchmark the generated model. For example, to
+benchmark a static left-hand-side batched matmul using `MatrixOpsStaticModule`
+on VMVX run:
 
 ```shell
-/tmp/iree/modules/ModuleName/backend/traces/trace_name/flagfile
+$ iree/tools/iree-benchmark-module \
+  --module_file=/tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb \
+  --driver=vmvx \
+  --entry_function=matmul_lhs_batch \
+  --function_input=256x64x32xf32=2 \
+  --function_input=32x16xf32=3
+
+
 ```
 
-For example, if we wanted to benchmark a static left-hand-side batched matmul
-using `MatrixOpsStaticModule` on VMLA we would run the following command:
+Note that the arguments to `--function_input` are shapes plus an arbitrary value
+to populate a splat. Some more complicated models might have very different
+performance characteristics depending on the input data, so this manual
+specification will not work well.
 
-```shell
-$ ./bazel-bin/iree/tools/iree-benchmark-module \
-  --flagfile="/tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/traces/matmul_lhs_batch/flagfile"
-```
+TODO(#6688): Discuss new yaml trace files.
 
-If you ran `applications_test.py` then you'll be able to benchmark
-`MobileNetV3Small` on `imagenet` input shapes. For example:
 
-```shell
-$ ./bazel-bin/iree/tools/iree-benchmark-module \
-  --flagfile="/tmp/iree/modules/MobileNetV3Small/imagenet/iree_vmvx/traces/predict/flagfile"
-```
 
 ## 3. Benchmarking TFLite on desktop
 
@@ -210,8 +166,8 @@ $ ls bazel-bin/tensorflow/lite/tools/benchmark/
 
 ### 3.2 Benchmark the model on TFLite
 
-TFLite doesn't support flagfiles, so we need to manually pass the path to the
-graph file via `cat`. TFLite will generate fake inputs for the model.
+We pass TFLite the graph generated from the test above (located at the path from
+graph_path). It will generate fake inputs for the model.
 
 Using `MatrixOpsStaticModule`'s left-hand-side batched matmul again as an
 example we can run the benchmark as follows:
@@ -265,14 +221,12 @@ $ adb push /tmp/iree/modules/MatrixOpsStaticModule/iree_vmvx/* \
 
 ```shell
 $ adb shell /data/local/tmp/iree-benchmark-module \
-  --flagfile="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/traces/matmul_lhs_batch/flagfile" \
-  --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb"
+  --module_file="/data/local/tmp/MatrixOpsStaticModule/iree_vmvx/compiled.vmfb" \
+  --driver=vmvx \
+  --entry_function=matmul_lhs_batch \
+  --function_input=256x64x32xf32=2 \
+  --function_input=32x16xf32=3
 ```
-
-Note: Because the flagfile uses absolute paths, the `--module_file` flag must be
-specified manually if the location of the compiled flatbuffer (`compiled.vmfb`)
-changes. The flagfile can still take care of specifying the input data, driver
-and entry function however.
 
 ## 5. Benchmarking TFLite on Android
 

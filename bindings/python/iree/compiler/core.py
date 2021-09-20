@@ -110,8 +110,6 @@ class CompilerOptions:
       debugging.
     strip_source_map: Whether to strip source map information (used to generate
       better errors).
-    strip_symbols: Whether to strip extra symbols not needed for execution
-      (but which may aid debugging).
     crash_reproducer_path: File name to output an MLIR crash dump to if there
       is a compiler failure.
     enable_tflite_bindings: Support the IREE TFLite runtime bindings API shim.
@@ -133,7 +131,6 @@ class CompilerOptions:
                extended_diagnostics: bool = False,
                strip_debug_ops: bool = False,
                strip_source_map: bool = False,
-               strip_symbols: bool = False,
                crash_reproducer_path: Optional[str] = None,
                enable_tflite_bindings: bool = False,
                enable_benchmark: bool = False):
@@ -148,7 +145,6 @@ class CompilerOptions:
     self.extended_diagnostics = extended_diagnostics
     self.strip_debug_ops = strip_debug_ops
     self.strip_source_map = strip_source_map
-    self.strip_symbols = strip_symbols
     self.crash_reproducer_path = crash_reproducer_path
     self.enable_tflite_bindings = enable_tflite_bindings
     self.enable_benchmark = enable_benchmark
@@ -203,8 +199,6 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
     cl.append("--iree-vm-bytecode-module-strip-debug-ops")
   if options.strip_source_map:
     cl.append("--iree-vm-bytecode-module-strip-source-map")
-  if options.strip_symbols:
-    cl.append("--iree-vm-bytecode-module-strip-symbols")
   crash_reproducer_path = tfs.alloc_optional(
       "core-reproducer.mlir", export_as=options.crash_reproducer_path)
   if crash_reproducer_path:

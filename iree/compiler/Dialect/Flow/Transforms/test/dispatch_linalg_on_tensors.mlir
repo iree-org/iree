@@ -1051,3 +1051,25 @@ func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : ten
 //      CHECK:       flow.dispatch.tensor.store %[[SCATTER_TILE]], %[[ARG5]], offsets = [], sizes = [], strides = []
 // CHECK-NEXT:     }
 //      CHECK:  return %[[RESULT]]
+
+// -----
+
+// Check that we are distributing along the last three dimensions for NHWC-output pooling op.
+
+func @pooling_nwhc_sum_static(%input: tensor<1x33x33x160xf32>) -> tensor<1x1x1x160xf32> {
+  %cst = constant 0.0 : f32
+  %1 = linalg.init_tensor [1, 1, 1, 160] : tensor<1x1x1x160xf32>
+  %2 = linalg.fill(%cst, %1) : f32, tensor<1x1x1x160xf32> -> tensor<1x1x1x160xf32>
+  %3 = linalg.init_tensor [33, 33] : tensor<33x33xf32>
+  %4 = linalg.pooling_nhwc_sum {dilations = dense<1> : vector<2xi64>, strides = dense<33> : vector<2xi64>} ins(%input, %3 : tensor<1x33x33x160xf32>, tensor<33x33xf32>) outs(%2 : tensor<1x1x1x160xf32>) -> tensor<1x1x1x160xf32>
+  return %4 : tensor<1x1x1x160xf32>
+}
+
+// CHECK-LABEL: func @pooling_nwhc_sum_static
+//       CHECK:   flow.dispatch.workgroups
+//  CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<readonly:1x33x33x160xf32>, %[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x1x1x160xf32>)
+//       CHECK:     scf.for %[[Z:.+]] =
+//       CHECK:       scf.for %[[Y:.+]] =
+//       CHECK:         scf.for %[[X:.+]] =
+//       CHECK:           %[[POOL:.+]] = linalg.pooling_nhwc_sum
+//       CHECK:           flow.dispatch.tensor.store %[[POOL]], %[[OUTPUT]], offsets = [0, %[[Z]], %[[Y]], %[[X]]], sizes = [1, %{{.+}}, %{{.+}}, %{{.+}}]

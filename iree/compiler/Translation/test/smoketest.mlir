@@ -5,12 +5,6 @@ module @simple_module {
 // CHECK: "exported_functions":
 // CHECK: "local_name": "func"
 
-// CHECK: "internal_functions":
-// CHECK: "local_name": "func"
-func @func(%arg0 : i32) -> i32 {
-  return %arg0 : i32
-}
-
 // CHECK: "function_descriptors":
 // CHECK-NEXT: {
 // CHECK-NEXT:   "bytecode_offset": 0
@@ -18,6 +12,10 @@ func @func(%arg0 : i32) -> i32 {
 // CHECK-NEXT:   "i32_register_count": 1
 // CHECK-NEXT:   "ref_register_count": 0
 // CHECK-NEXT: }
+func @func(%arg0 : i32) -> i32 {
+  return %arg0 : i32
+}
+
 // CHECK: "bytecode_data": [
 // CHECK-NEXT:   84,
 // CHECK-NEXT:   0,
