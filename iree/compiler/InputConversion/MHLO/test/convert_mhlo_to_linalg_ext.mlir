@@ -66,6 +66,27 @@ func @sort_2d(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
 
 // -----
 
+func @sort_default_dimension(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
+  %0 = "mhlo.sort"(%arg0) ( {
+  ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):  // no predecessors
+    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = "GT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    "mhlo.return"(%1) : (tensor<i1>) -> ()
+  }) {dimension = -1 : i64, is_stable = false} : (tensor<16x32xi32>) -> (tensor<16x32xi32>)
+  return %0 : tensor<16x32xi32>
+}
+// CHECK-LABEL: func @sort_default_dimension(
+// CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:  )
+// CHECK:         %[[SORT:.+]] = linalg_ext.sort
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      outs(%[[ARG0]] : tensor<16x32xi32>)
+// CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
+// CHECK:             %[[CMP:.+]] = cmpi sgt, %[[ARG1]], %[[ARG2]]
+// CHECK:             linalg_ext.yield %[[CMP]]
+// CHECK:         return %[[SORT]]
+
+// -----
+
 func @sort_unsigned(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
   %1 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors

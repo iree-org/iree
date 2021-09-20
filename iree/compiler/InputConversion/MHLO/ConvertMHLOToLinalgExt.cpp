@@ -128,9 +128,16 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
   LogicalResult matchAndRewrite(
       mhlo::SortOp mhloSortOp, ArrayRef<Value> args,
       ConversionPatternRewriter &rewriter) const final {
+    // If no dimension number is provided, then the last dimension is chosen
+    // by default.
+    IntegerAttr dim = mhloSortOp.dimensionAttr();
+    if (dim.getSInt() == -1) {
+      dim = rewriter.getI64IntegerAttr(
+          args[0].getType().cast<ShapedType>().getRank() - 1);
+    }
     auto sortOp = rewriter.create<linalg_ext::SortOp>(
         mhloSortOp.getLoc(), mhloSortOp.getResultTypes(),
-        /*inputs=*/ValueRange{}, args, mhloSortOp.dimensionAttr());
+        /*inputs=*/ValueRange{}, args, dim);
     rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.region(),
                                 sortOp.region().begin());
     Region &region = sortOp.region();
