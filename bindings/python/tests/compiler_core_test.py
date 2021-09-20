@@ -159,6 +159,7 @@ class CompilerTest(unittest.TestCase):
         optimize=False,
         strip_debug_ops=True,
         strip_source_map=True,
+        strip_symbols=True,
         crash_reproducer_path="foobar.txt",
         # Re-enable when benchmarking pass is fixed: #6196
         # enable_benchmark=True,
