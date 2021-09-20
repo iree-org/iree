@@ -44,6 +44,9 @@ set(_source_components
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
 
+  # Passes should also be disaggregated.
+  MLIRPythonSources.Passes
+
   # Core dialects (constrained to IREE input dialects).
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.linalg

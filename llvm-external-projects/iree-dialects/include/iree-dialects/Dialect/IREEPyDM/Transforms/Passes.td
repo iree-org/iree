@@ -19,6 +19,19 @@ def LowerIREEPyDMToRTL : Pass<"lower-iree-pydm-to-rtl", "ModuleOp"> {
   let constructor = "mlir::iree_pydm::createLowerIREEPyDMToRTLPass()";
 }
 
+def LinkIREEPyDMRTL : Pass<"link-iree-pydm-rtl", "ModuleOp"> {
+  let summary = "Links any unresolved symbols functions against a runtime library";
+  let description = [{
+    Given a runtime library consisting of module-of-modules containing
+    exported functions, repeatedly inlines matching references until no
+    further unresolved externals are present.
+  }];
+  let options = [
+    Option<"rtlFile", "rtl-file", "std::string", /*default=*/"std::string()",
+           "File containing the RTL to link. Required for non-API use.">,
+  ];
+  let constructor = "mlir::iree_pydm::createLinkIREEPyDMRTLPass()";
+}
 
 def ConvertIREEPyDMToIREE : Pass<"convert-iree-pydm-to-iree", "ModuleOp"> {
   let summary = "Convert iree_pydm modules to the IREE+related dialects";

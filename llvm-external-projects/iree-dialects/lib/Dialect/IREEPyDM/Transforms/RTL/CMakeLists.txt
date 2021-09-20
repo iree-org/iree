@@ -1,4 +1,6 @@
 add_mlir_library(IREEDialectsIREEPyDMRTLPasses
+  LinkageAnalysis.cpp
+  LinkRTLPass.cpp
   LowerToRTLPass.cpp
 
   DEPENDS
@@ -8,6 +10,7 @@ add_mlir_library(IREEDialectsIREEPyDMRTLPasses
   IREEDialectsIREEPyDMDialect
   IREEDialectsIREEDialect
   MLIRIR
+  MLIRParser
   MLIRTransformUtils
 )
 
