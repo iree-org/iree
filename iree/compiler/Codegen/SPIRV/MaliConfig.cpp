@@ -34,7 +34,7 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
         if (inputType.getElementType().isF16()) {
           threadMNK = {8, 8, 4};
         } else {
-          threadMNK = {7, 4, 4};
+          threadMNK = {6, 4, 4};
         }
         return setMatmulOpConfig(op, workgroupXY, threadMNK);
       })
