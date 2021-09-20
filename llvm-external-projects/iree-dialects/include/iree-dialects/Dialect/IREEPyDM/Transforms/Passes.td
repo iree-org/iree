@@ -9,6 +9,17 @@
 
 include "mlir/Pass/PassBase.td"
 
+def LowerIREEPyDMToRTL : Pass<"lower-iree-pydm-to-rtl", "ModuleOp"> {
+  let summary = "Lowers PyDM ops with runtime implementations to calls";
+  let description = [{
+    Once type propagation and optimizations are done, most still-remaining
+    generic (object-based) ops need to be lowered to runtime library calls.
+    This pass makes such conversions and emits imports.
+  }];
+  let constructor = "mlir::iree_pydm::createLowerIREEPyDMToRTLPass()";
+}
+
+
 def ConvertIREEPyDMToIREE : Pass<"convert-iree-pydm-to-iree", "ModuleOp"> {
   let summary = "Convert iree_pydm modules to the IREE+related dialects";
   let description = [{
@@ -16,7 +27,6 @@ def ConvertIREEPyDMToIREE : Pass<"convert-iree-pydm-to-iree", "ModuleOp"> {
     dialect + various standard dialects.
   }];
   let constructor = "mlir::iree_pydm::createConvertIREEPyDMToIREEPass()";
-  let dependentDialects = ["iree::IREEDialect"];
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_CONVERSION_TO_IREE_PASSES_TD

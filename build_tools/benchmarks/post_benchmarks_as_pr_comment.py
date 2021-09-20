@@ -44,7 +44,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 from common.benchmark_definition import BenchmarkResults, execute_cmd_and_get_output
-from common.noisy_benchmarks import NOISY_BENCHMARKS
+from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, ThresholdUnit
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
@@ -55,8 +55,6 @@ IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.
 MAX_BASE_COMMIT_QUERY_COUNT = 10
 PERFBOARD_SERIES_PREFIX = "https://perf.iree.dev/serie?IREE?"
-# The ratio below which benchmarks will be considered as similar with base.
-DEFAULT_SIMILAR_BECNHMARK_THRESHOLD = 0.05
 # The max number of rows to show per table.
 TABLE_SIZE_CUT = 3
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
@@ -266,17 +264,22 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
       raw[name] = results
       continue
 
-    similar_threshold = DEFAULT_SIMILAR_BECNHMARK_THRESHOLD
-    # Set different threshold for noisy benchmarks.
-    for regex, threshold in NOISY_BENCHMARKS:
-      if regex.match(name):
-        similar_threshold = float(threshold) / 100
+    similar_threshold = None
+    for threshold in BENCHMARK_THRESHOLDS:
+      if threshold.regex.match(name):
+        similar_threshold = threshold
         break
+    if similar_threshold is None:
+      raise ValueError(f"no matched threshold setting for benchmark: {name}")
 
     current = results.mean_time
     base = results.base_mean_time
-    ratio = abs(current - base) / base
-    if ratio <= similar_threshold:
+    if similar_threshold.unit == ThresholdUnit.PERCENTAGE:
+      ratio = abs(current - base) / base
+    else:
+      ratio = abs(current - base)
+
+    if ratio <= similar_threshold.threshold:
       similar[name] = results
     elif current > base:
       regressed[name] = results
@@ -355,8 +358,11 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
   # Compose the abbreviated benchmark tables.
   abbr_table = [md.header(ABBR_PR_COMMENT_TITLE, 2)]
   abbr_table.append(commit_info)
-  abbr_table.append(
-      categorize_benchmarks_into_tables(all_benchmarks, TABLE_SIZE_CUT))
+  tables = categorize_benchmarks_into_tables(all_benchmarks, TABLE_SIZE_CUT)
+  if len(tables) == 0:
+    abbr_table.append("No improved or regressed benchmarks 🏖️")
+  else:
+    abbr_table.append(tables)
   abbr_table.append("For more information:")
   # We don't know until a Gist is really created. Use a placeholder for now
   # and replace later.

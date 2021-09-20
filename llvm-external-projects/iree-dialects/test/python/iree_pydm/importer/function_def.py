@@ -1,7 +1,7 @@
 # RUN: %PYTHON %s | iree-dialects-opt | FileCheck --enable-var-scope --dump-input-filter=all %s
 
 from typing import List
-from mlir.dialects.iree_pydm.importer.test_util import *
+from iree.compiler.dialects.iree_pydm.importer.test_util import *
 
 
 # CHECK-LABEL: func @fully_typed_with_return

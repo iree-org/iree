@@ -183,23 +183,33 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
       return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
                                   mmt4dWorkgroupTileSizes.end());
     }
-    return {64, 32};
+    return {48, 32};
   };
 
   auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
+    auto lhsShape = getUntiledShape(mmt4dOp.inputs()[0]);
+    auto rhsShape = getUntiledShape(mmt4dOp.inputs()[1]);
+    int M0 = lhsShape[2];
+    int N0 = rhsShape[2];
+    int K0 = lhsShape[3];
     if (!mmt4dL1TileSizes.empty()) {
       return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
                                   mmt4dL1TileSizes.end());
     }
-    return {1, 1, 4, 4, 1, 4};
+    return {1, 1, 1, M0, N0, K0};
   };
 
   auto getVectorSizes = [&]() -> SmallVector<int64_t> {
+    auto lhsShape = getUntiledShape(mmt4dOp.inputs()[0]);
+    auto rhsShape = getUntiledShape(mmt4dOp.inputs()[1]);
+    int M0 = lhsShape[2];
+    int N0 = rhsShape[2];
+    int K0 = lhsShape[3];
     if (!mmt4dVectorSizes.empty()) {
       return SmallVector<int64_t>(mmt4dVectorSizes.begin(),
                                   mmt4dVectorSizes.end());
     }
-    return {1, 1, 4, 4, 1, 4};
+    return {1, 1, 1, M0, N0, K0};
   };
 
   SmallVector<int64_t, 4> nativeVectorSize = getVectorSizes();
