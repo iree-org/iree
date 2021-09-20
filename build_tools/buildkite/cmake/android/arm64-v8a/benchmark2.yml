@@ -57,7 +57,7 @@ steps:
     agents:
       - "android-soc=exynos-990"
       - "android-version=11"
-      - "queue=benchmark-android"
+      - "queue=benchmark-android2"
     artifact_paths:
       - "benchmark-results-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.json"
       - "trace-captures-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.tgz"
