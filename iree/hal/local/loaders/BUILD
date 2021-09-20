@@ -61,7 +61,7 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal:dynamic_library",
-        "//iree/base/internal/flatcc:parsing",
+        "//iree/base/internal:flatcc",
         "//iree/hal",
         "//iree/hal/local",
         "//iree/hal/local:executable_library",

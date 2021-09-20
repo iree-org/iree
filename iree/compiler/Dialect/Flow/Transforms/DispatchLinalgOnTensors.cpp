@@ -131,6 +131,18 @@ static void removeFusionGroupsAttribute(Operation *op) {
 // Utility methods
 //===----------------------------------------------------------------------===//
 
+/// Returns the number of consecutive outer loops that are "parallel". This is a
+/// copy of the function from
+/// iree/compiler/Codegen/CodegenUtils/FunctionUtils.h that is duplicated
+/// here to avoid adding an build dependency.
+static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
+  return op.iterator_types()
+      .getValue()
+      .take_while(
+          [](Attribute attr) -> bool { return isParallelIterator(attr); })
+      .size();
+}
+
 /// Given the `shape` of the computation with the first element being the
 /// slowest varying and last element being the fastest warying returns the
 /// workload value with
@@ -641,19 +653,19 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
 /// Returns the loops that are partitioned during dispatch region formations, in
 /// order, i.e. starting from the outer-most to innermost.
 static SmallVector<unsigned> getPartitionedLoops(Operation *op) {
+  SmallVector<unsigned> partitionedLoops;
   if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
     return {0, 1};
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    SmallVector<unsigned> partitionedLoops;
-    for (auto indexedIterator : llvm::enumerate(linalgOp.iterator_types())) {
-      if (isParallelIterator(indexedIterator.value())) {
-        partitionedLoops.push_back(indexedIterator.index());
-      }
-    }
-    // Only keep the last kNumMaxParallelDims if we have more than that.
-    while (partitionedLoops.size() > kNumMaxParallelDims) {
-      partitionedLoops.erase(partitionedLoops.begin());
+    size_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
+    partitionedLoops =
+        llvm::to_vector<4>(llvm::seq<unsigned>(0, numOuterParallelLoops));
+    if (partitionedLoops.size() > kNumMaxParallelDims) {
+      partitionedLoops.erase(
+          partitionedLoops.begin(),
+          std::next(partitionedLoops.begin(),
+                    numOuterParallelLoops - kNumMaxParallelDims));
     }
     return partitionedLoops;
   }

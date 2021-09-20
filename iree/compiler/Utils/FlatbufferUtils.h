@@ -24,9 +24,7 @@
 #include "mlir/Support/LogicalResult.h"
 
 // clang-format off: order matters here as some of the LLVM includes conflict:
-#include "iree/base/internal/flatcc/building.h"
-#include "iree/base/internal/flatcc/debugging.h"
-#include "iree/base/internal/flatcc/parsing.h"
+#include "iree/base/internal/flatcc.h"
 // clang-format on
 
 namespace mlir {

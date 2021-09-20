@@ -18,6 +18,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+static llvm::cl::opt<bool> clUseTensorPadTileAndVectorize(
+    "iree-codegen-linalg-to-llvm-use-tensor-to-vectors",
+    llvm::cl::desc("If enabled will use tensor -> vector transformation pass"),
+    llvm::cl::init(false));
+
 static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
                                    ArrayRef<int64_t> staticShape,
                                    Type elementType,
@@ -34,40 +39,27 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
   // re-enable.
   // passManager.addNestedPass<FuncOp>(createPadLinalgWorkgroupTilesPass());
 
-  // Use stack allocation on CPU side.
-  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-
-  // Tile and vectorize linalg ops on buffers.
-  passManager.addNestedPass<FuncOp>(
-      createLLVMCPUVectorizationPass(lowerToVectors));
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-
-  passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
-
-  passManager.addNestedPass<FuncOp>(createLLVMCPUPlanConvLoopOrderPass());
-}
-
-void addTensorToVectorsPassPipeline(OpPassManager &passManager,
-                                    bool lowerToVectors) {
-  passManager.addPass(createCanonicalizerPass());
-
-  // Tile and vectorize linalg ops on tensors.
-  passManager.addNestedPass<FuncOp>(
-      createLLVMCPUTileAndVectorizePass(lowerToVectors));
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  if (clUseTensorPadTileAndVectorize) {
+    // Tile and vectorize linalg ops on tensors.
+    passManager.addNestedPass<FuncOp>(createLLVMCPUTilePadAndVectorizePass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  }
 
   // Use stack allocation on CPU side.
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
-  passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  if (!clUseTensorPadTileAndVectorize) {
+    // Tile and vectorize linalg ops on buffers.
+    passManager.addNestedPass<FuncOp>(
+        createLLVMCPUVectorizationPass(lowerToVectors));
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  }
 
-  passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+  passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
   passManager.addNestedPass<FuncOp>(createLLVMCPUPlanConvLoopOrderPass());
 }

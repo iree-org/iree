@@ -29,6 +29,7 @@ cc_library(
         "VulkanSPIRVTarget.h",
     ],
     deps = [
+        "//iree/base/internal:flatcc",
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common",
         "//iree/compiler/Codegen/SPIRV",

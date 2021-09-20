@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRSPIRVSerialization
     MLIRSupport
     MLIRVector
+    iree::base::internal::flatcc
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::SPIRV
