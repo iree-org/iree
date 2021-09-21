@@ -8,6 +8,27 @@
 # to various slices of IREE's codebase (intended for external consumption).
 # Generally, libraries are aggregated per-directory.
 
+# iree_aggregate_library()
+#
+# Builds aggregate static (and shared in the future) libraries from all
+# objects built in libraries as part of a list of packages.
+#
+# Parameters:
+# NAME: name of target (see Note)
+# DEPS: List of other libraries to be linked in to the binary targets.
+# PACKAGES: List of underscore_cased package names like "iree_hal". Does
+# not recurse into sub-packages.
+# OUTPUT_NAME: The 'OUTPUT_NAME' property, which controls the actual filename
+# on disk.
+#
+# iree_cc_library(
+#   NAME
+#     awesome
+#   PACKAGES
+#     iree_hal
+#     iree_vm
+# )
+
 function(iree_aggregate_library)
   cmake_parse_arguments(
     _RULE

@@ -112,6 +112,8 @@ function(iree_cc_library)
 
     # We define everything else on the regular rule. However, the object
     # library needs compiler definition related properties, so we forward them.
+    # We also forward link libraries -- not because the OBJECT libraries do
+    # linking but because they get transitive compile definitions from them.
     # Yes. This is state of the art.
     # Note that SYSTEM scope matches here, in the property name and in the
     # include directories below on the main rule. If ever removing this,
@@ -131,6 +133,10 @@ function(iree_cc_library)
     target_compile_definitions(${_OBJECTS_NAME}
       PUBLIC
         $<TARGET_PROPERTY:${_NAME},INTERFACE_COMPILE_DEFINITIONS>
+    )
+    target_link_libraries(${_OBJECTS_NAME}
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_LINK_LIBRARIES>
     )
 
     # Only OBJECT libraries need the CXX_STANDARD set.
