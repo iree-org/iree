@@ -155,9 +155,6 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     buildSPIRVCodegenPassPipeline(passManager);
   }
 
-  // TODO(antiagainst): Re-enable SPIR-V linking once the tensorflow integration
-  // crash is fixed.
-#if 0
   LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
     // Note: Vulkan flavored SPIR-V does not have linking in the conventional
     // sense. For example, there is no cross-module symbol reference and symbol
@@ -207,7 +204,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     SmallVector<mlir::ModuleOp, 8> innerModuleOps;
     innerModuleOps.reserve(sourceExecutableOpGroups.size());
-    for (auto hashExecutablePair : sourceExecutableOpGroups) {
+    for (const auto &hashExecutablePair : sourceExecutableOpGroups) {
       llvm::hash_code hash = hashExecutablePair.first;
       const auto &sourceExecutableOps = hashExecutablePair.second;
 
@@ -269,7 +266,6 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     return success();
   }
-#endif
 
   LogicalResult serializeExecutable(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
