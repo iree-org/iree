@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y \
   python3 \
   zlib1g-dev
 
-ARG SWIFTSHADER_COMMIT=e32890c54793664e21891a504793cc8c0c7a34fb
+ARG SWIFTSHADER_COMMIT=755b78dc66b2362621a78b6964a9df3af94e960c
 
 RUN git clone https://github.com/google/swiftshader
 RUN cd swiftshader && git checkout "${SWIFTSHADER_COMMIT?}" && cd ..
