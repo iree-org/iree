@@ -1,5 +1,9 @@
 # Types and Shapes
 
+_This page gives background information on types and shapes then outlines IREE's
+specific requirements at each layer of its systems. This is intended as a
+reference page for developers working on IREE and adjacent projects._
+
 IREE supports compiling programs from a variety of frontend frameworks to a
 number of backends and uses a collection of MLIR dialects and passes to connect
 between each slice through the system. Each layer of the stack has its its own
@@ -47,7 +51,67 @@ Meanwhile, types are most constrained by hardware and device APIs, where only
 specific low level primitives are defined or where certain operations are
 supported by efficient hardware implementations.
 
-### Conversion process
+### Strategies for converting between types
+
+When converting to a more constrained type system or targeting an interface
+where certain types come with execution latency, memory bandwidth, or
+representation clarity improvements, there are several strategies available for
+performing conversions.
+
+Note that each conversion generally loses some information, so care must be
+taken to preserve correct (or approximately correct, where that is acceptable)
+behavior.
+
+#### Emulation
+
+#### Truncation / Demotion
+
+#### Extension / Promotion
+
+#### Packing
+
+TODO: pack i1 into i8/i32 (vectorization)
+
+## Shapes
+
+Shapes can also be grouped in a few different ways:
+
+* Ranked (`[1, 2, ?]`) vs unranked (`[*]`)
+* Static (`[3, 4]`) vs dynamic (`[?, 4]`, `[3, ?]`)
+* Scalar (`i32`) vs 0 rank tensor (`tensor<i32>`) vs higher rank tensor
+  (`tensor<1x1xi32>`)
+
+IREE requires that shapes be ranked (known, fixed number of dimensions).
+
+IREE aims to fully support dynamic shapes (also see the
+[dynamic shapes sample](https://github.com/google/iree/tree/main/iree/samples/dynamic_shapes)),
+though historically static shapes have been most reliably supported. Note that
+for optimal performance prefer to only mark slow varying dimensions like batch
+index or timestamp (as opposed to inner dimensions like image x/y/channel) as
+dynamic.
+
+The process by which static shapes are deduced from dynamic shape dimensions is
+known as "shape inference". Program authors working in a high level framework
+will typically only specify the computation shapes at the edges of the program
+they are authoring directly, while the underlying framework will create many
+dynamically shaped operations in the middle. Shape inference runs prior to the
+bulk of IREE's core compilation and it propagates these outer static shapes
+through the full program.
+
+As with any high efficiency compute programming model, IREE can benefit from
+programs using certain standard data dimensions/shapes. For example, compute
+kernels operating on `256x256` matrices are more likely to use system resources
+efficiently than those operating on `10000x3x9x17x3` tensors. Similarly, there
+is potential for partially constrained shapes to act as hints to the compiler,
+such as "dynamic but between 512 and 1024".
+
+## Layouts and tiling
+
+TODO: dense vs sparse
+
+TODO: dispatch grids
+
+## Conversion process
 
 IREE lowers programs from representations produced by high level frondends down
 to low level host code with scheduling logic and device code containing fused
@@ -55,12 +119,12 @@ kernels of dense computation. The phases of compilation can be segmented by
 which MLIR dialects are primarily being transformed:
 
 ```
-Frontends (PyTorch, JAX, TensorFlow, TOSA, etc.)
+frontends (PyTorch, JAX, TensorFlow, TOSA, etc.)
   * Includes user code, serialized ML models / programs, and other libraries
 
                                     ↓
 
-Import dialects (`iree`, `tensor`, `linalg`, etc.)
+import dialects (`iree`, `tensor`, `linalg`, etc.)
 
                                     ↓
 
@@ -68,31 +132,31 @@ Import dialects (`iree`, `tensor`, `linalg`, etc.)
 
                                     ↓
 
-               `stream` dialect                    |      code generation
-  (device placement and asynchronous scheduling)   |    (SPIR-V, LLVM, etc.)
+`stream` dialect (device placement and asynchronous scheduling)
 
                                     ↓
 
 `hal` dialect (Hardware Abstraction Layer for buffer and execution management)
 
-                                    ↓
+                              ↙           ↘
 
-`vm` dialect (Virtual Machine for setting up and dispatching workloads)
+       host code generation         |      device code generation
+      (CPU, Vulkan API, etc.)       |   (x86 via LLVM, SPIR-V, etc.)
+
+                              ↘           ↙
+
+`vm` dialect (Virtual Machine for dispatching workloads)
 ```
 
 See also https://google.github.io/iree/#project-architecture.
 
-#### Requirements for import dialects
+### Requirements for import dialects
 
-#### Requirements for `flow` dialect
+### Requirements for the `flow` dialect
 
-#### Requirements for `stream` dialect
+### Requirements for the `stream` dialect
 
-#### Requirements for code generation
-
-TODO: LLVM / SPIR-V emulation of types?
-
-#### Requirements for `hal` dialect
+### Requirements for the `hal` dialect
 
 The Hardware Abstraction Layer maps nearly directly to underlying hardware APIs
 such as Vulkan, Metal, and CUDA.
@@ -105,32 +169,15 @@ such as Vulkan, Metal, and CUDA.
   int64) to be optionally available. On embedded systems or certain
   accelerators there may be no floating support at all.
 
-#### Requirements for `vm` dialect
+#### Requirements for host code generation
+
+#### Requirements for device code generation
+
+TODO: LLVM / SPIR-V emulation of types?
+
+### Requirements for the `vm` dialect
 
 IREE's Virtual Machine aims to be maximally portable, so it implements support
 for i64, f32, and f64 behind extensions. See
 [iree/base/config.h](https://github.com/google/iree/blob/main/iree/base/config.h)
 for the specifics of each extension.
-
-### Strategies for converting between types
-
-#### Emulating
-
-#### Truncating / Demotion
-
-#### Extending / Promotion
-
-#### Packing
-
-TODO: pack i1 into i8/i32 (vectorization)
-
-## Shapes
-
-TODO: static vs dynamic
-TODO: ranked vs unranked
-TODO: shape inference, https://mlir.llvm.org/docs/ShapeInference/
-
-## Layouts and tiling
-
-TODO: dense vs sparse
-TODO: dispatch grids
