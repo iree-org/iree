@@ -198,7 +198,7 @@ class SPIRVRemoveOneTripTiledLoopPass
     // This pass seems to be only needed for the convolution vectorization. So
     // filter out the necessary conv ops.
     SmallVector<Operation *> rootOp;
-    SmallVector<Operation *> tiledLoops;
+    SmallVector<TiledLoopInfo> tiledLoops;
     if (failed(getFilteredOps(
             funcOp,
             [](Operation *op) {

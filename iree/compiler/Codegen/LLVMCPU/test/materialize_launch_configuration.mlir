@@ -35,11 +35,11 @@ hal.executable private @matmul_tensors  {
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %8 = muli %workgroup_size_y, %workgroup_id_y : index
-        %9 = muli %workgroup_size_y, %workgroup_count_y : index
+        %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_id_y]
+        %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_count_y]
         scf.for %arg0 = %8 to %M step %9 {
-          %10 = muli %workgroup_size_x, %workgroup_id_x : index
-          %11 = muli %workgroup_size_x, %workgroup_count_x : index
+          %10 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_id_x]
+          %11 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_count_x]
           scf.for %arg1 = %10 to %N step %11 {
             %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %N]
             %13 = memref.subview %0[%arg0, 0] [%12, %K] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
@@ -59,9 +59,10 @@ hal.executable private @matmul_tensors  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}[64, 64], [32, 32, 32], [4, 4, 4]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}{{\[}}{{\]}}, [32, 32, 32], [4, 4, 4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point public @matmul_tensors
+// CHECK-SAME:   translation.info = {passPipeline = "CPUTensorToVectors", workloadPerWorkgroup = [64, 64]}
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -73,12 +74,6 @@ hal.executable private @matmul_tensors  {
 // CHECK-SAME:   lowering.config = #[[CONFIG]]
 
 // -----
-
-//      CHECK: #[[CONFIG:.+]] = {passPipeline = "CPUDefault"}
-//  CHECK-NOT: #config
-//      CHECK: hal.executable.entry_point public @add_no_config
-// CHECK-SAME:     translation.info = #[[CONFIG]]
-//  CHECK-NOT:     #config
 
 hal.executable private @add_no_config  {
   hal.interface @io {
@@ -124,6 +119,11 @@ hal.executable private @add_no_config  {
   }
 }
 
+//       CHECK:  #[[CONFIG:[a-zA-Z]+]] = {passPipeline = "CPUDefault"}
+//       CHECK:  hal.executable private @add_no_config
+//       CHECK:  hal.executable.entry_point public @add_no_config
+//  CHECK-SAME:      translation.info = #[[CONFIG]]
+
 // -----
 
 hal.executable private @add  {
@@ -158,11 +158,11 @@ hal.executable private @add  {
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %8 = muli %workgroup_size_y, %workgroup_id_y : index
-        %9 = muli %workgroup_size_y, %workgroup_count_y : index
+        %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_id_y]
+        %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_count_y]
         scf.for %arg0 = %8 to %M step %9 {
-          %10 = muli %workgroup_size_x, %workgroup_id_x : index
-          %11 = muli %workgroup_size_x, %workgroup_count_x : index
+          %10 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_id_x]
+          %11 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_count_x]
           scf.for %arg1 = %10 to %N step %11 {
             %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %M]
             %13 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %N]
@@ -192,9 +192,9 @@ hal.executable private @add  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[64, 64]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point public @add
+// CHECK-SAME:   translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64]}
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -203,7 +203,6 @@ hal.executable private @add  {
 //  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
 //      CHECK: linalg.generic
-// CHECK-SAME:  lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -248,14 +247,14 @@ hal.executable private @add4D  {
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %workgroup_id_z = hal.interface.workgroup.id[2] : index
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
-        %28 = muli %workgroup_size_z, %workgroup_id_z : index
-        %29 = muli %workgroup_size_z, %workgroup_count_z : index
+        %28 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_z, %workgroup_id_z]
+        %29 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_z, %workgroup_count_z]
         scf.for %arg20 = %28 to %M step %29 {
-          %8 = muli %workgroup_size_y, %workgroup_id_y : index
-          %9 = muli %workgroup_size_y, %workgroup_count_y : index
+          %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_id_y]
+          %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_count_y]
           scf.for %arg0 = %8 to %N step %9 {
-            %10 = muli %workgroup_size_x, %workgroup_id_x : index
-            %11 = muli %workgroup_size_x, %workgroup_count_x : index
+            %10 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_id_x]
+            %11 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_count_x]
             scf.for %arg1 = %10 to %K step %11 {
               %212 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg20)[%workgroup_size_z, %M]
               %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %N]
@@ -296,9 +295,9 @@ hal.executable private @add4D  {
       }
     }
   }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[0, 64, 64, 64]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point public @add4D
+// CHECK-SAME:   translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64, 64]}
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -307,7 +306,6 @@ hal.executable private @add4D  {
 //  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]]]
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[D2]] : index, index, index
 //      CHECK: linalg.generic
-// CHECK-SAME:  lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -352,14 +350,14 @@ hal.executable private @batch_matmul_tensors  {
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %workgroup_id_z = hal.interface.workgroup.id[2] : index
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
-        %28 = muli %workgroup_size_z, %workgroup_id_z : index
-        %29 = muli %workgroup_size_z, %workgroup_count_z : index
+        %28 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_z, %workgroup_id_z]
+        %29 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_z, %workgroup_count_z]
         scf.for %arg20 = %28 to %B step %29 {
-          %8 = muli %workgroup_size_y, %workgroup_id_y : index
-          %9 = muli %workgroup_size_y, %workgroup_count_y : index
+          %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_id_y]
+          %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_count_y]
           scf.for %arg0 = %8 to %M step %9 {
-            %10 = muli %workgroup_size_x, %workgroup_id_x : index
-            %11 = muli %workgroup_size_x, %workgroup_count_x : index
+            %10 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_id_x]
+            %11 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_count_x]
             scf.for %arg1 = %10 to %N step %11 {
               %212 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg20)[%workgroup_size_z, %B]
               %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %N]
@@ -380,15 +378,16 @@ hal.executable private @batch_matmul_tensors  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [1, 4, 4, 4], tileSizes = {{\[}}[1, 32, 32], [1, 16, 16, 16], [1, 4, 4, 4]{{\]}}
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [1, 4, 4, 4], tileSizes = {{\[}}[], [1, 32, 32, 32], [1, 4, 4, 4]{{\]}}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point public @batch_matmul_tensors
 // CHECK-NEXT: (%[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: index)
+//  CHECK-DAG:  %[[C1:.+]] = constant 1 : index
 //  CHECK-DAG:  %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //  CHECK-DAG:  %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
-//      CHECK:  hal.return %[[D0]], %[[D1]], %[[ARG2]]
+//      CHECK:  hal.return %[[D0]], %[[D1]], %[[C1]]
 //      CHECK:  linalg.batch_matmul
 // CHECK-SAME:    lowering.config = #[[CONFIG]]
 
@@ -442,7 +441,7 @@ hal.executable private @preset_config_matmul_tensors  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [], tileSizes = {{\[}}[32, 32, 32]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {passPipeline = "CPUVectorization", tileSizes = {{\[}}[32, 32, 32]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //      CHECK: hal.executable.entry_point
@@ -589,14 +588,21 @@ hal.executable private @static_3d_fft_stage3  {
         %3 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : memref<64x128x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_z = hal.interface.workgroup.id[2] : index
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        %workgroup_size_z = hal.interface.workgroup.size[2] : index
+        %lb_z = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_z, %workgroup_size_z]
+        %step_z = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_z, %workgroup_size_z]
         scf.for %arg0 = %workgroup_id_z to %c64 step %workgroup_count_z {
+          %lb_y = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+          %step_y = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
           scf.for %arg1 = %workgroup_id_y to %c128 step %workgroup_count_y {
-            %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_id_x]
-            %5 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_count_x]
+            %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+            %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
             scf.for %arg2 = %4 to %c32 step %5 {
               %6 = memref.subview %2[%arg0, %arg1, %arg2] [1, 1, 4] [1, 1, 1] : memref<64x128x32xf32> to memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
               %7 = memref.cast %6 : memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>> to memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
@@ -694,8 +700,5 @@ hal.executable private @outs_fusion {
     }
   }
 }
-//      CHECK: #[[CONFIG:.+]] = {tileSizes = {{\[}}[64, 64]{{\]}}}
-//      CHECK: linalg.generic
-// CHECK-SAME:   lowering.config = #[[CONFIG]]
-//      CHECK: linalg.generic
-// CHECK-SAME:   lowering.config = #[[CONFIG]]
+//      CHECK: hal.executable.entry_point public @outs_fusion_fn
+// CHECK-SAME:   translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64]}

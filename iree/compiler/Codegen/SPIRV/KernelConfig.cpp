@@ -513,8 +513,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;
 
-    SmallVector<Operation *, 4> computeOps;
-    SmallVector<Operation *, 4> tiledLoops;
+    SmallVector<Operation *> computeOps;
+    SmallVector<TiledLoopInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return funcOp.emitOpError("failed to get compute ops");
     }
