@@ -33,6 +33,12 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                               const int64_t subgroupSize,
                               const int64_t bestTilingFactor);
 
+/// Sets CodeGen configurations via attributes to the given matmul `linalgOp`
+/// with the given best workgroup size and tile size hints.
+LogicalResult setMatmulOpConfig(linalg::LinalgOp linalgOp,
+                                std::array<int64_t, 2> bestWorkgroupSizeXY,
+                                std::array<int64_t, 3> bestThreadTileSizeMNK);
+
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///
 /// If the given `rootOp` has known good CodeGen configuration, attaches a
