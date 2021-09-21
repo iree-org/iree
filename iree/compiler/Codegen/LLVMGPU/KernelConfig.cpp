@@ -221,7 +221,41 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
 }
 
+/// Propagate the configuration annotated in the incoming IR.
+static LogicalResult setUserConfig(FuncOp entryPointFn, Operation *computeOp,
+                                   IREE::HAL::LoweringConfig config) {
+  IREE::HAL::DispatchLoweringPassPipeline passPipeline =
+      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize;
+  if (auto setPassPipeline = getLoweringPassPipeline(config)) {
+    passPipeline = setPassPipeline.getValue();
+  }
+  SmallVector<int64_t, 4> workgroupSize;
+  if (auto workgroupSizeAttr = config.workgroupSize()) {
+    workgroupSize = llvm::to_vector<4>(
+        llvm::map_range(workgroupSizeAttr, [](Attribute intAttr) {
+          return intAttr.cast<IntegerAttr>().getInt();
+        }));
+  }
+  if (failed(setOpConfigAndEntryPointFnTranslation(
+          entryPointFn, computeOp, config, passPipeline, workgroupSize))) {
+    return failure();
+  }
+  // Reset the op configuration to drop the pass-pipeline and workgroup size
+  // info. The op does not carry that information anymore.
+  auto resetConfig = IREE::HAL::LoweringConfig::get(
+      config.tileSizes(), config.nativeVectorSize(),
+      /*passPipeline =*/nullptr,
+      /*workgroupSize =*/nullptr, computeOp->getContext());
+  setLoweringConfig(computeOp, resetConfig);
+  return success();
+}
+
 static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
+  if (IREE::HAL::LoweringConfig config = getLoweringConfig(computeOp)) {
+    // If the op already has a lowering config coming from the IR use this and
+    // bypass the heuristic.
+    return setUserConfig(entryPointFn, computeOp, config);
+  }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp) &&
         linalgOp.getNumParallelLoops() >= 2) {
