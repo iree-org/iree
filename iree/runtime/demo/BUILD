@@ -4,6 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# THIS FILE IS NOT UPDATED AUTOMATICALLY FOR CMAKE. PLEASE UPDATE THE
+# CMakeLists.txt IF EDITING.
+
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 

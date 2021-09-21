@@ -250,6 +250,7 @@ iree_fix_ndebug()
 include(iree_macros)
 include(iree_copts)
 include(sanitizers)
+include(iree_aggregate_library)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
@@ -321,6 +322,20 @@ if(Python3_FOUND)
     message(FATAL_ERROR "check_submodule_init.py failed, see the logs above")
   endif()
 endif()
+
+#-------------------------------------------------------------------------------
+# Object collection target.
+# Building mondo libraries requires collecting all object files that should
+# go into them.
+# We hang these off of the __IREE_OBJECT_MAPPINGS__ target (in iree_cc_library)
+# by defining properties with names like:
+#   IREE_OBJECTS_iree_runtime
+#   IREE_DEPS_iree_runtime
+# Libraries defined in each directory will populate this corresponding
+# property.
+#-------------------------------------------------------------------------------
+
+add_custom_target(__IREE_OBJECT_MAPPINGS__)
 
 #-------------------------------------------------------------------------------
 # MLIR/LLVM Dependency
@@ -472,6 +487,7 @@ add_subdirectory(build_tools/embed_data/)
 
 add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
+add_subdirectory(iree/libraries)
 add_subdirectory(iree/modules)
 add_subdirectory(iree/runtime)
 add_subdirectory(iree/schemas)

@@ -83,6 +83,7 @@ function(external_cc_library)
   # Prefix the library with the package name.
   string(REPLACE "::" "_" _PACKAGE_NAME ${_RULE_PACKAGE})
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  set(_OBJECTS_NAME ${_NAME}.objects)
 
   # Prefix paths with the root.
   list(TRANSFORM _RULE_HDRS PREPEND ${_RULE_ROOT})
@@ -105,12 +106,41 @@ function(external_cc_library)
   endif()
 
   if(NOT _RULE_IS_INTERFACE)
-    add_library(${_NAME} STATIC "")
-    target_sources(${_NAME}
+    add_library(${_OBJECTS_NAME} OBJECT)
+    add_library(${_NAME} STATIC "$<TARGET_OBJECTS:${_OBJECTS_NAME}>")
+    target_sources(${_OBJECTS_NAME}
       PRIVATE
         ${_RULE_SRCS}
         ${_RULE_HDRS}
     )
+
+    # We define everything else on the regular rule. However, the object
+    # library needs compiler definition related properties, so we forward them.
+    # Yes. This is state of the art.
+    # Note that SYSTEM scope matches here, in the property name and in the
+    # include directories below on the main rule. If ever removing this,
+    # remove it from all places.
+    target_include_directories(${_OBJECTS_NAME} SYSTEM
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
+    )
+    target_include_directories(${_OBJECTS_NAME}
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_INCLUDE_DIRECTORIES>
+    )
+    target_compile_options(${_OBJECTS_NAME}
+      PRIVATE
+        $<TARGET_PROPERTY:${_NAME},COMPILE_OPTIONS>
+    )
+    target_compile_definitions(${_OBJECTS_NAME}
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_COMPILE_DEFINITIONS>
+    )
+
+    # Only OBJECT libraries need the CXX_STANDARD set.
+    set_property(TARGET ${_OBJECTS_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
+    set_property(TARGET ${_OBJECTS_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+
     target_include_directories(${_NAME} SYSTEM
       PUBLIC
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
@@ -137,18 +167,28 @@ function(external_cc_library)
     )
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
 
+    # Add our objects to the __IREE_OBJECT_MAPPINGS__ target property. See
+    # the comment on that target in the main CMakeLists.txt.
+    set_property(TARGET __IREE_OBJECT_MAPPINGS__
+      APPEND PROPERTY
+        IREE_OBJECTS_${_PACKAGE_NAME} $<TARGET_OBJECTS:${_OBJECTS_NAME}>
+    )
+    set_property(TARGET __IREE_OBJECT_MAPPINGS__
+      APPEND PROPERTY
+        IREE_DEPS_${_PACKAGE_NAME} ${_OBJECTS_NAME}
+    )
+
     # Add all external targets to a a folder in the IDE for organization.
     if(_RULE_PUBLIC)
       set_property(TARGET ${_NAME} PROPERTY FOLDER third_party)
+      set_property(TARGET ${_OBJECTS_NAME} PROPERTY FOLDER third_party)
     elseif(_RULE_TESTONLY)
       set_property(TARGET ${_NAME} PROPERTY FOLDER third_party/test)
+      set_property(TARGET ${_OBJECTS_NAME} PROPERTY FOLDER third_party/test)
     else()
       set_property(TARGET ${_NAME} PROPERTY FOLDER third_party/internal)
+      set_property(TARGET ${_OBJECTS_NAME} PROPERTY FOLDER third_party/test)
     endif()
-
-    # INTERFACE libraries can't have the CXX_STANDARD property set
-    set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
-    set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
   else()
     # Generating header-only library
     add_library(${_NAME} INTERFACE)
