@@ -20,6 +20,7 @@ namespace iree_pydm {
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertIREEPyDMToIREEPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLowerIREEPyDMToRTLPass();
+std::unique_ptr<OperationPass<ModuleOp>> createLinkIREEPyDMRTLPass();
 
 #define GEN_PASS_REGISTRATION
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h.inc"

@@ -19,7 +19,7 @@ from ..importer import (
 )
 
 from ... import builtin as builtin_d
-from .... import ir
+from .... import (ir, passmanager, transforms as unused_transforms)
 
 
 class RtlModule:
@@ -45,7 +45,7 @@ class RtlModule:
                     f=None,
                     *,
                     symbol: Optional[str] = None,
-                    visibility: Optional[str] = None) -> FuncProvidingIntrinsic:
+                    visibility: Optional[str] = None):
     """Marks a python function for export in the created module.
 
     This is typically used as a decorator and returns a FuncProvidingIntrinsic.
@@ -61,12 +61,11 @@ class RtlModule:
     self.exported_funcs.append(intrinsic)
     return intrinsic
 
-  def internal_pyfunc(
-      self,
-      f=None,
-      *,
-      symbol: Optional[str] = None,
-      visibility: Optional[str] = "private") -> FuncProvidingIntrinsic:
+  def internal_pyfunc(self,
+                      f=None,
+                      *,
+                      symbol: Optional[str] = None,
+                      visibility: Optional[str] = "private"):
     if f is None:
       return functools.partial(self.internal_pyfunc,
                                symbol=symbol,
@@ -101,3 +100,10 @@ class RtlBuilder:
     for f in rtl_module.exported_funcs:
       # Getting the symbol implies exporting it into the module.
       f.get_or_create_provided_func_symbol(stage)
+
+  def optimize(self):
+    """Optimizes the RTL modules by running through stage 1 compilation."""
+    with self.context:
+      # TODO: Create a real pass pipeline to do first stage optimizations.
+      pm = passmanager.PassManager.parse("builtin.module(canonicalize,cse)")
+      pm.run(self.root_module)

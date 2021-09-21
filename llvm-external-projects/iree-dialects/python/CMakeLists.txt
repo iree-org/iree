@@ -63,6 +63,7 @@ set(_source_components
   MLIRPythonSources.Core
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.std
+  MLIRPythonSources.Passes
   IREEDialectsPythonSources
   IREEDialectsPythonExtensions
 )

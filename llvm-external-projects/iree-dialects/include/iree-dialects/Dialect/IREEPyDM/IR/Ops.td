@@ -142,6 +142,11 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
     ArrayRef<Type> getCallableResults() {
       return getType().getResults();
     }
+
+    /// Defines SymbolOpInterface::isDeclaration().
+    bool isDeclaration() {
+      return body().empty();
+    }
   }];
 
   let builders = [

@@ -36,6 +36,9 @@ config.test_exec_root = os.path.join(config.iree_dialects_obj_root, 'test')
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 config.substitutions.append(('%shlibext', config.llvm_shlib_ext))
+config.substitutions.append(
+    ('%resources_dir', os.path.join(config.iree_dialects_obj_root,
+                                    'resources')))
 
 llvm_config.with_system_environment(['HOME', 'INCLUDE', 'LIB', 'TMP', 'TEMP'])
 
