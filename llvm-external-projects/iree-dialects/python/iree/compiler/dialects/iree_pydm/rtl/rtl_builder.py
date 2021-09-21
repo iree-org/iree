@@ -30,10 +30,14 @@ def main():
                       type=str,
                       nargs="*",
                       help="RTL module to build")
+  parser.add_argument("--output", type=str)
   parser.add_argument("--verbose", dest="verbose", action="store_true")
-  parser.set_defaults(modules=(".booleans", ".numerics"), verbose=False)
+  parser.set_defaults(modules=(".booleans", ".numerics"),
+                      output=None,
+                      cpp_output=None,
+                      verbose=False)
   args = parser.parse_args()
-  relative_package = __package__ + ".modules"
+  relative_package = f"{__package__}.modules"
 
   if args.verbose:
     logging.basicConfig(level=logging.DEBUG)
@@ -50,7 +54,18 @@ def main():
     logging.info("Emitting module %s", rtl_module.name)
     builder.emit_module(rtl_module)
 
-  print(builder.root_module)
+  builder.optimize()
+  assembly_mlir = builder.root_module.operation.get_asm(enable_debug_info=True)
+
+  # Write it out to a raw .mlir file
+  if args.output is None or args.output == "-":
+    output_io = sys.stdout
+  else:
+    output_io = open(args.output, "wt")
+  try:
+    output_io.write(assembly_mlir)
+  finally:
+    output_io.close()
 
 
 if __name__ == "__main__":
