@@ -275,7 +275,7 @@ def categorize_benchmarks_into_tables(benchmarks: Dict[
     current = results.mean_time
     base = results.base_mean_time
     if similar_threshold.unit == ThresholdUnit.PERCENTAGE:
-      ratio = abs(current - base) / base
+      ratio = abs(current - base) / base * 100
     else:
       ratio = abs(current - base)
 

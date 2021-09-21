@@ -37,7 +37,8 @@ class BenchmarkThreshold:
 
 
 # A list of benchmarks and their similarity thresholds.
-# Order matters here: if multiple regexes match a single benchmark, the first match is used.
+# Order matters here: if multiple regexes match a single benchmark, the first
+# match is used.
 BENCHMARK_THRESHOLDS = [
     # Unstable and noisy GPU benchmarks.
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 90,
@@ -49,8 +50,9 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(re.compile(r"^PoseNet.*GPU-Mali"), 90,
                        ThresholdUnit.PERCENTAGE),
 
-    # Fast GPU benchmarks that complete around 10ms, so using percentage is not suitable.
-    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Adreno"), 2,
+    # Fast GPU benchmarks that complete around 10ms; using percentage is
+    # not suitable.
+    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Adreno"), 1,
                        ThresholdUnit.VALUE_MS),
 
     # Default threshold for all benchmarks: 5%.
