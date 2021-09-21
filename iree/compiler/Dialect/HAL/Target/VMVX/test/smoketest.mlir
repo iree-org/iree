@@ -16,7 +16,7 @@ flow.executable @add_dispatch_0 {
   flow.dispatch.entry @entry attributes {
     workgroup_rank = 3 : index
   }
-  module  {
+  builtin.module  {
     func @entry(%arg0: !flow.dispatch.tensor<readonly:16xf32>, %arg1: !flow.dispatch.tensor<readonly:16xf32>, %arg2: !flow.dispatch.tensor<writeonly:16xf32>) {
       %0 = linalg.init_tensor [16] : tensor<16xf32>
       %1 = flow.dispatch.tensor.load %arg0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
@@ -34,14 +34,14 @@ flow.executable @add_dispatch_0 {
 
 }
 
-// CHECK-LABEL: hal.executable @add_dispatch_0
-//  CHECK-NEXT:   hal.interface @io {
-//  CHECK-NEXT:    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-LABEL: hal.executable public @add_dispatch_0
+//  CHECK-NEXT:   hal.interface public @io {
+//  CHECK-NEXT:    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+//  CHECK-NEXT:    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.variant @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-//  CHECK-NEXT:     hal.executable.entry_point @entry attributes {
+//  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+//  CHECK-NEXT:     hal.executable.entry_point public @entry attributes {
 //  CHECK-SAME:       interface = @io,
 //  CHECK-SAME:       ordinal = 0 : index
 //  CHECK-SAME:     }

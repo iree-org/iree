@@ -638,7 +638,7 @@ struct ResolveConstantPoolLoadToRuntimeBuffer
                                 PatternRewriter &rewriter) const override {
     auto *constOp = SymbolTable::lookupNearestSymbolFrom(op, op.constant());
     SymbolRefAttr runtimeBufferSymRef;
-    ByteRangeAttr runtimeBufferRange;
+    Attribute runtimeBufferRange;
     if (auto spanOp = dyn_cast<ConstantPoolSpanOp>(constOp)) {
       runtimeBufferSymRef = spanOp.runtime_bufferAttr();
       runtimeBufferRange = spanOp.runtime_rangeAttr();

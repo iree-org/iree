@@ -389,7 +389,7 @@ void iree_task_wait_initialize(iree_task_scope_t* scope,
 typedef struct iree_task_dispatch_statistics_t {
   // TODO(benvanik): statistics counters.
   // NOTE: each of these increases the command buffer storage requirements; we
-  // should always guard these with a compiler flag.
+  // should always guard these with IREE_STATISTICS_ENABLE.
   iree_atomic_int32_t reserved;
 } iree_task_dispatch_statistics_t;
 

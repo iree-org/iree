@@ -42,6 +42,22 @@ extern "C" {
 // Returns true iff all bits from |rhs| are set in |lhs|.
 #define iree_all_bits_set(lhs, rhs) (((lhs) & (rhs)) == (rhs))
 
+#if IREE_STATISTICS_ENABLE
+// Evalutes the expression code only if statistics are enabled.
+//
+// Example:
+//  struct {
+//    IREE_STATISTICS(uint32_t stats_only_value);
+//  } my_object;
+//  IREE_STATISTICS(my_object.stats_only_value = 5);
+//  IREE_STATISTICS({
+//    my_object.stats_only_value = 5;
+//  });
+#define IREE_STATISTICS(expr) expr
+#else
+#define IREE_STATISTICS(expr)
+#endif  // IREE_STATISTICS_ENABLE
+
 //===----------------------------------------------------------------------===//
 // Byte buffers and memory utilities
 //===----------------------------------------------------------------------===//

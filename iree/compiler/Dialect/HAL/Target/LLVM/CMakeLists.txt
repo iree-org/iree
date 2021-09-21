@@ -45,7 +45,6 @@ iree_cc_library(
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
     MLIRTargetLLVMIRExport
-    iree::base::internal::flatcc
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::PassHeaders

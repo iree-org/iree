@@ -128,10 +128,11 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       auto entryPointOp = it.second;
       if (IREE::HAL::TranslationInfo translationInfo =
               getTranslationInfo(entryPointOp)) {
-        IREE::HAL::DispatchLoweringPassPipeline currPipeline =
-            translationInfo.passPipeline().getValue();
+        Optional<IREE::HAL::DispatchLoweringPassPipeline> currPipeline =
+            getLoweringPassPipeline(translationInfo);
+        if (!currPipeline) continue;
         if (passPipeline) {
-          if (currPipeline != passPipeline.getValue()) {
+          if (currPipeline.getValue() != passPipeline.getValue()) {
             moduleOp.emitError(
                 "unhandled compilation of entry point function with different "
                 "pass pipelines within a module");
@@ -150,10 +151,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           executableLoweringPipeline.nest<ModuleOp>();
       switch (passPipeline.getValue()) {
         case IREE::HAL::DispatchLoweringPassPipeline::CPUDefault:
+        case IREE::HAL::DispatchLoweringPassPipeline::None:
           addCPUDefaultPassPipeline(nestedModulePM);
           break;
         case IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization:
           addCPUVectorizationPassPipeline(nestedModulePM, lowerToVectors);
+          break;
+        case IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors:
+          addTensorToVectorsPassPipeline(nestedModulePM, lowerToVectors);
           break;
         default:
           llvm_unreachable("Unsupported pipeline on CPU target.");

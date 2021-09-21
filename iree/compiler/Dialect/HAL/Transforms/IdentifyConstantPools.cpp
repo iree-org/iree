@@ -182,7 +182,7 @@ class IdentifyConstantPoolsPass
       } else {
         // Build an initializer function to populate the global with the
         // constant value on startup.
-        changeToGlobalInitializerFunc(globalOp, valueOp);
+        makeGlobalInitializer(globalOp, valueOp);
       }
     }
 
@@ -205,31 +205,26 @@ class IdentifyConstantPoolsPass
 
   // Constructs a function that can be used as an initializer for a global
   // and inserts it by the global op in the module.
-  FuncOp changeToGlobalInitializerFunc(IREE::Util::GlobalOp globalOp,
-                                       IREE::HAL::ConstantPoolValueOp valueOp) {
+  void makeGlobalInitializer(IREE::Util::GlobalOp globalOp,
+                             IREE::HAL::ConstantPoolValueOp valueOp) {
     // Create the function and make the global point to it for init.
     OpBuilder moduleBuilder(globalOp.getContext());
     moduleBuilder.setInsertionPointAfter(globalOp);
-    auto initializerName = (globalOp.getName() + "_initializer").str();
-    auto initializerFunc = moduleBuilder.create<FuncOp>(
-        globalOp.getLoc(), initializerName,
-        moduleBuilder.getFunctionType({}, {globalOp.type()}));
-    initializerFunc.setPrivate();
-    globalOp->removeAttr("initial_value");
-    globalOp->setAttr("initializer",
-                      moduleBuilder.getSymbolRefAttr(initializerFunc));
+    auto initializerOp =
+        moduleBuilder.create<IREE::Util::InitializerOp>(globalOp.getLoc());
+    globalOp.removeInitial_valueAttr();
 
     // Emit a constant load that will later on be turned into a runtime buffer
     // reference.
-    auto funcBuilder = OpBuilder::atBlockBegin(initializerFunc.addEntryBlock());
+    auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
     auto constValue = funcBuilder.createOrFold<IREE::HAL::ConstantPoolLoadOp>(
         globalOp.getLoc(), globalOp.type(),
-        funcBuilder.getSymbolRefAttr(
-            valueOp->getParentOfType<ConstantPoolOp>().getName(),
-            {funcBuilder.getSymbolRefAttr(valueOp)}));
-    funcBuilder.create<mlir::ReturnOp>(globalOp.getLoc(), constValue);
-
-    return initializerFunc;
+        SymbolRefAttr::get(funcBuilder.getContext(),
+                           valueOp->getParentOfType<ConstantPoolOp>().getName(),
+                           {SymbolRefAttr::get(valueOp)}));
+    funcBuilder.create<IREE::Util::GlobalStoreOp>(globalOp.getLoc(), constValue,
+                                                  globalOp.getName());
+    funcBuilder.create<IREE::Util::InitializerReturnOp>(globalOp.getLoc());
   }
 
   // Replaces uses of each global with references to the constant pool value.
@@ -259,9 +254,9 @@ class IdentifyConstantPoolsPass
     OpBuilder builder(globalLoadOp);
     auto poolLoadOp = builder.create<ConstantPoolLoadOp>(
         globalLoadOp.getLoc(), globalLoadOp.getType(),
-        builder.getSymbolRefAttr(
-            valueOp->getParentOfType<ConstantPoolOp>().getName(),
-            {builder.getSymbolRefAttr(valueOp)}));
+        SymbolRefAttr::get(builder.getContext(),
+                           valueOp->getParentOfType<ConstantPoolOp>().getName(),
+                           {SymbolRefAttr::get(valueOp)}));
     globalLoadOp.replaceAllUsesWith(poolLoadOp.result());
     globalLoadOp.erase();
   }

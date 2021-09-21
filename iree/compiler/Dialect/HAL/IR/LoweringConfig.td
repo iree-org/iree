@@ -11,30 +11,35 @@ include "iree/compiler/Dialect/HAL/IR/HALDialect.td"
 
 // List of pre-existing pipelines for translating executables.
 def CPU_Default
-    : I32EnumAttrCase<"CPUDefault", 0>;
+    : StrEnumAttrCase<"CPUDefault">;
 def CPU_Vectorization
-    : I32EnumAttrCase<"CPUVectorization", 1>;
+    : StrEnumAttrCase<"CPUVectorization">;
+def CPU_TensorToVectors
+    : StrEnumAttrCase<"CPUTensorToVectors">;
 def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 2>;
+    : StrEnumAttrCase<"LLVMGPUDistribute">;
 def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 3>;
+    : StrEnumAttrCase<"LLVMGPUVectorize">;
 def LLVMGPU_MatmulSimt
-    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 4>;
+    : StrEnumAttrCase<"LLVMGPUMatmulSimt">;
 def SPIRV_SimpleDistribute
-    : I32EnumAttrCase<"SPIRVDistribute", 5>;
+    : StrEnumAttrCase<"SPIRVDistribute">;
 def SPIRV_Vectorize
-    : I32EnumAttrCase<"SPIRVVectorize", 6>;
+    : StrEnumAttrCase<"SPIRVVectorize">;
 def SPIRV_DistributeToGlobalID
-    : I32EnumAttrCase<"SPIRVDistributeToGlobalID", 7>;
+    : StrEnumAttrCase<"SPIRVDistributeToGlobalID">;
+def None
+    : StrEnumAttrCase<"None">;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
-def DispatchLoweringPassPipelineEnum : I32EnumAttr<
+def DispatchLoweringPassPipelineEnum : StrEnumAttr<
     "DispatchLoweringPassPipeline",
     "identifier for pass pipeline use to lower dispatch region",
-    [CPU_Default, CPU_Vectorization, LLVMGPU_SimpleDistribute,
-     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, SPIRV_SimpleDistribute, SPIRV_Vectorize,
-     SPIRV_DistributeToGlobalID]> {
+    [CPU_Default, CPU_TensorToVectors, CPU_Vectorization,
+     LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
+     SPIRV_SimpleDistribute, SPIRV_Vectorize, SPIRV_DistributeToGlobalID,
+     None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
@@ -58,6 +63,12 @@ def HAL_LoweringConfigAttr :
         DefaultValuedAttr<TileSizesListAttr, "{}">>,
     StructFieldAttr<"nativeVectorSize",
         DefaultValuedAttr<I64ArrayAttr, "{}">>,
+    StructFieldAttr<"passPipeline",
+        DefaultValuedAttr<
+            DispatchLoweringPassPipelineEnum,
+            "IREE::HAL::DispatchLoweringPassPipeline::None">>,
+    StructFieldAttr<"workgroupSize",
+        DefaultValuedAttr<I64ArrayAttr, "{}">>
   ]>;
 
 #endif // IREE_COMPILER_DIALECT_HAL_IR_LOWERINGCONFIG

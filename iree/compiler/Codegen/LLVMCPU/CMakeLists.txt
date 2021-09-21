@@ -22,7 +22,7 @@ iree_cc_library(
     "LLVMCPUPadWorkgroupTiles.cpp"
     "LLVMCPUPlanConvLoopOrder.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
-    "LLVMCPUTilePadAndVectorize.cpp"
+    "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorization.cpp"
     "Passes.cpp"
@@ -44,6 +44,7 @@ iree_cc_library(
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRPass
+    MLIRReconcileUnrealizedCasts
     MLIRSCF
     MLIRSCFToStandard
     MLIRStandard

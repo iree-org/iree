@@ -2,7 +2,7 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization{promote-workgroup-to-full-tiles}),cse'}))" -split-input-file %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
 
 #config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
-hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
+hal.executable private @dynamic_matmul  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -13,7 +13,7 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @matmul_128x128x128() {
         %c0 = constant 0 : index
         %c128 = constant 128 : index
@@ -88,16 +88,16 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
 // CHECK-PROMOTED-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 // CHECK-PROMOTED-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 // CHECK-PROMOTED-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+// CHECK-PROMOTED-DAG:   %[[A_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[A_PROMOTED_TILE]][0, 0] [64, 128]
+// CHECK-PROMOTED-DAG:   %[[B_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[B_PROMOTED_TILE]][0, 0] [128, 64]
+// CHECK-PROMOTED-DAG:   %[[C_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[C_PROMOTED_TILE]][0, 0] [64, 64]
 //     CHECK-PROMOTED:   scf.for %[[IV0:.+]] =
+//     CHECK-PROMOTED:     %[[A_TILE:.+]] = memref.subview %[[ARG0]][%[[IV0]], 0] [64, 128]
 //     CHECK-PROMOTED:     scf.for %[[IV1:.+]] =
-// CHECK-PROMOTED-DAG:       %[[A_TILE:.+]] = memref.subview %[[ARG0]][%[[IV0]], 0] [64, 128]
 // CHECK-PROMOTED-DAG:       %[[B_TILE:.+]] = memref.subview %[[ARG1]][0, %[[IV1]]] [128, 64]
 // CHECK-PROMOTED-DAG:       %[[C_TILE:.+]] = memref.subview %[[RET0]][%[[IV0]], %[[IV1]]] [64, 64]
-// CHECK-PROMOTED-DAG:       %[[A_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[A_PROMOTED_TILE]][0, 0] [64, 128]
 // CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[A_PROMOTED_TILE]])
-// CHECK-PROMOTED-DAG:       %[[B_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[B_PROMOTED_TILE]][0, 0] [128, 64]
 // CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[B_PROMOTED_TILE]])
-// CHECK-PROMOTED-DAG:       %[[C_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[C_PROMOTED_TILE]][0, 0] [64, 64]
 // CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[C_PROMOTED_TILE]])
 //     CHECK-PROMOTED:       linalg.copy(%[[A_TILE]], %[[A_PROMOTED_TILE_VIEW]])
 //     CHECK-PROMOTED:       linalg.copy(%[[B_TILE]], %[[B_PROMOTED_TILE_VIEW]])
@@ -115,7 +115,7 @@ hal.executable @dynamic_matmul attributes {sym_visibility = "private"} {
 // -----
 
 #config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
-hal.executable @matmul_i8_i8_i32 attributes {sym_visibility = "private"} {
+hal.executable private @matmul_i8_i8_i32  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -126,7 +126,7 @@ hal.executable @matmul_i8_i8_i32 attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @matmul_i8_i8_i32_128x128x128() {
         %c0 = constant 0 : index
         %c128 = constant 128 : index

@@ -30,8 +30,6 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
 }
 
 void addGPUVectorizationPassPipeline(OpPassManager &pm) {
-  // Convert tensor to buffers.
-  addLinalgBufferizePasses(pm, gpuAllocationFunction);
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
@@ -53,8 +51,6 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
-  // Convert tensor to buffers.
-  addLinalgBufferizePasses(pm, gpuAllocationFunction);
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
@@ -80,9 +76,6 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
-  // Convert tensor to buffers.
-  addLinalgBufferizePasses(pm, gpuAllocationFunction);
-
   //===--------------------------------------------------------------------===//
   // Initial clean up.
   //===--------------------------------------------------------------------===//
@@ -135,6 +128,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
+  OpPassManager &bufferizePassPM = pm.nest<ModuleOp>();
+  addLinalgBufferizePasses(bufferizePassPM, gpuAllocationFunction);
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//

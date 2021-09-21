@@ -17,4 +17,15 @@
 /// Include the ODS generated interface header files.
 #include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.h.inc"
 
+namespace mlir {
+namespace iree_compiler {
+namespace linalg_ext {
+
+/// Registers external models implemented for the `TiledOpInterface`.
+void registerTiledOpInterfaceExternalModels(DialectRegistry &registry);
+
+}  // namespace linalg_ext
+}  // namespace iree_compiler
+}  // namespace mlir
+
 #endif  // IREE_COMPILER_DIALECT_LINALGEXT_IR_TILEDOPINTERFACE_H_

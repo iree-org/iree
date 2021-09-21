@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -18,14 +19,6 @@ namespace mlir {
 namespace iree_compiler {
 
 bool isEntryPoint(FuncOp func) { return func.isPublic(); }
-
-unsigned getNumOuterParallelLoops(linalg::LinalgOp op) {
-  return op.iterator_types()
-      .getValue()
-      .take_while(
-          [](Attribute attr) -> bool { return isParallelIterator(attr); })
-      .size();
-}
 
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
@@ -58,19 +51,19 @@ void setTranslationInfo(FuncOp entryPointFn,
 }
 
 SmallVector<unsigned> getPartitionedLoops(Operation *op) {
-  SmallVector<unsigned> partitionedLoops;
   if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
     return {0, 1};
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    size_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
-    partitionedLoops =
-        llvm::to_vector<4>(llvm::seq<unsigned>(0, numOuterParallelLoops));
-    if (partitionedLoops.size() > kNumMaxParallelDims) {
-      partitionedLoops.erase(
-          partitionedLoops.begin(),
-          std::next(partitionedLoops.begin(),
-                    numOuterParallelLoops - kNumMaxParallelDims));
+    SmallVector<unsigned> partitionedLoops;
+    for (auto indexedIterator : llvm::enumerate(linalgOp.iterator_types())) {
+      if (isParallelIterator(indexedIterator.value())) {
+        partitionedLoops.push_back(indexedIterator.index());
+      }
+    }
+    // Only keep the last kNumMaxParallelDims if we have more than that.
+    while (partitionedLoops.size() > kNumMaxParallelDims) {
+      partitionedLoops.erase(partitionedLoops.begin());
     }
     return partitionedLoops;
   }
@@ -81,31 +74,27 @@ SmallVector<unsigned> getPartitionedLoops(Operation *op) {
 }
 
 LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
-    ArrayRef<int64_t> nativeVectorSizes,
+    FuncOp entryPointFn, Operation *op, IREE::HAL::LoweringConfig config,
     IREE::HAL::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize) {
-  IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, nativeVectorSizes, op->getContext());
-  setLoweringConfig(op, config);
   auto partitionedLoops = getPartitionedLoops(op);
   SmallVector<int64_t, 3> workloadPerWorkgroup;
-  if (!tileSizes.empty() && !tileSizes[0].empty() &&
-      !partitionedLoops.empty()) {
+  auto tileSizes = getTileSizes(config, 0);
+  if (!tileSizes.empty() && !partitionedLoops.empty()) {
     for (unsigned depth : partitionedLoops) {
-      if (depth >= tileSizes[0].size()) {
+      if (depth >= tileSizes.size()) {
         return op->emitOpError(
                    "illegal configuration for lowering op, expect first level "
                    "tile size to contain at least ")
                << partitionedLoops.back() << " elements";
       }
-      if (tileSizes[0][depth] == 0) {
+      if (tileSizes[depth] == 0) {
         return op->emitOpError("illegal to set tilesize of loop ")
                << depth
                << " to zero since it is set to be partitioned at the flow "
                   "level";
       }
-      workloadPerWorkgroup.push_back(tileSizes[0][depth]);
+      workloadPerWorkgroup.push_back(tileSizes[depth]);
     }
     if (!workloadPerWorkgroup.empty()) {
       workloadPerWorkgroup =
@@ -167,9 +156,13 @@ ArrayRef<int64_t> getUntiledShape(Value tiledView) {
 ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
                                         unsigned resultNum) {
   // Check the shape of the `outs` operand.
-  ArrayRef<int64_t> outputShape =
-      getUntiledShape(linalgOp.outputs()[resultNum]);
-  if (!llvm::any_of(outputShape, ShapedType::isDynamic)) return outputShape;
+  auto outputShape = getUntiledShape(linalgOp.outputs()[resultNum]);
+  if (llvm::none_of(outputShape, ShapedType::isDynamic)) return outputShape;
+
+  // For Linalg ops with buffer semantics, there won't exist op results and
+  // hence IR users. Also directly return.
+  if (linalgOp.hasBufferSemantics()) return outputShape;
+
   // Try to use the result value and check if the untiled shape can be obtained
   // based on the uses.
   Value result = linalgOp->getResult(resultNum);
@@ -214,7 +207,7 @@ LogicalResult getComputeOps(FuncOp funcOp,
   if (failed(getFilteredOps(
           funcOp,
           [](Operation *op) {
-            return isa<linalg::LinalgOp, linalg_ext::LinalgExtOp>(op);
+            return isa<linalg::LinalgOp, linalg_ext::TiledOpInterface>(op);
           },
           computeOps, tiledLoops))) {
     return failure();
@@ -231,6 +224,9 @@ LogicalResult getComputeOps(FuncOp funcOp,
                             "expected all markers within op to be the same");
       marker = getMarkerOrNull(op);
     }
+  }
+  if (!marker.hasValue() && !tiledLoops.empty()) {
+    marker = getWorkgroupMarker();
   }
   if (marker.hasValue()) {
     for (auto op : computeOps) {

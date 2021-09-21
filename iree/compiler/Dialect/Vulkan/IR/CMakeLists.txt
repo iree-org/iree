@@ -29,7 +29,6 @@ iree_cc_library(
     ::VulkanAttrsGen
     ::VulkanEnumsGen
     LLVMSupport
-    MLIRGPUOps
     MLIRIR
     MLIRSPIRV
     MLIRSupport

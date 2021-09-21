@@ -103,19 +103,12 @@ void populateLinalgToVectorVectorizeConvPatterns(
 void populateLinalgToVectorVectorizeMMT4dPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
-/// Populates `patterns` with conversions of Shape dialect to LLVM Dialect.
-void populateShapeToLLVMConversionPatterns(MLIRContext *context,
-                                           TypeConverter *converter,
-                                           OwningRewritePatternList &patterns);
-
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
 
 /// Performs the final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
-    std::string targetTriple = "", std::string targetDataLayout = "",
-    bool unfuseFMAOps = false);
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 
 /// Pass to lower the module an hal.executable.variant operation to external
 /// dialect. Currently this pass lowers to LLVM dialect, but could be
@@ -135,8 +128,9 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUPlanConvLoopOrderPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
-/// Multi-level tiling, padding and vectorization of  linalg ops on tensors.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTilePadAndVectorizePass();
+/// Multi-level tiling and vectorization of linalg ops on tensors.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
+    bool lowerToVectors = true);
 
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUVectorizationPass(
@@ -175,32 +169,19 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager);
 void addCPUVectorizationPassPipeline(OpPassManager &passManager,
                                      bool lowerToVectors = true);
 
+/// Populates the passes needed to multi level tile and lowering of linalg ops
+/// on tensors to vectors operations.
+void addTensorToVectorsPassPipeline(OpPassManager &passManager,
+                                    bool lowerToVectors = true);
+
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
 //----------------------------------------------------------------------------//
 
-/// Options for LLVM pipeline.
-struct LLVMCPUCodegenPassPipelineOptions
-    : public PassPipelineOptions<LLVMCPUCodegenPassPipelineOptions> {
-  Option<std::string> targetDataLayout{
-      *this, "target-data-layout",
-      llvm::cl::desc("Code generation target data layout."),
-      llvm::cl::init("")};
-  Option<std::string> targetTriple{
-      *this, "target-triple", llvm::cl::desc("Code generation target triple."),
-      llvm::cl::init("")};
-  Option<bool> unfuseFMAOps{
-      *this, "unfuse-fma-ops",
-      llvm::cl::desc("Enable rewriting llvm.fma to its unfused version."),
-      llvm::cl::init(false)};
-};
-
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.
-void buildLLVMCPUCodegenPassPipeline(
-    OpPassManager &passManager,
-    const LLVMCPUCodegenPassPipelineOptions &options);
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
 
 //------------------------------------------------------------------------------
 // LLVMGPU

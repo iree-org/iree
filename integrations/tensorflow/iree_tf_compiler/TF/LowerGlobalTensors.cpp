@@ -95,7 +95,8 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
           builder.create<iree_compiler::IREE::Util::GlobalAddressOp>(
               globalTensor.getLoc(),
               iree_compiler::IREE::Util::PtrType::get(globalTensor.type()),
-              builder.getSymbolRefAttr(
+              SymbolRefAttr::get(
+                  builder.getContext(),
                   symNameToFlowSymName[globalTensor.sym_name()]));
       typeConversionWorklist.push_back(variableAddressOp.getResult());
       func.getArgument(i).replaceAllUsesWith(variableAddressOp.getResult());

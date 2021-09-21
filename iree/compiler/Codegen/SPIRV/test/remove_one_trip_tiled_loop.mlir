@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-remove-one-trip-tiled-loop))))' %s | IreeFileCheck %s
 
-hal.executable @static_shaped_conv attributes {sym_visibility = "private"} {
+hal.executable private @static_shaped_conv  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -9,7 +9,7 @@ hal.executable @static_shaped_conv attributes {sym_visibility = "private"} {
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb"> {
     hal.executable.entry_point @static_shaped_conv attributes {
       interface = @io, ordinal = 0 : index,
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]},
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]},
       workgroup_size = [4 : index, 4 : index, 1 : index]
     }
     builtin.module {
@@ -55,7 +55,7 @@ hal.executable @static_shaped_conv attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

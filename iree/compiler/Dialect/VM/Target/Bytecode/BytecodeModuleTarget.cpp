@@ -8,6 +8,7 @@
 
 #include <algorithm>
 
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -16,7 +17,6 @@
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
-#include "iree/compiler/Dialect/VM/Target/Bytecode/ConstantEncoder.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -24,6 +24,7 @@
 #include "iree/schemas/bytecode_module_def_builder.h"
 #include "iree/schemas/bytecode_module_def_json_printer.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/CRC.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/IR/Attributes.h"
@@ -51,6 +52,61 @@ struct TypeDef {
   Type type;
   std::string full_name;
 };
+
+struct SerializedConstantRef {
+  flatbuffers_uint8_vec_ref_t ref = 0;
+  int64_t totalSize = 0;
+  uint32_t crc32 = 0;
+};
+
+// Serializes a constant attribute to the FlatBuffer as a binary blob.
+// Returns the size in bytes of the serialized value and the flatbuffers offset
+// to the uint8 vec containing the data. If |calculateCRC32| is provided then a
+// CRC32 of the data will be computed and returned as well.
+SerializedConstantRef serializeConstant(Location loc, Attribute valueAttr,
+                                        size_t alignment, bool calculateCRC32,
+                                        FlatbufferBuilder &fbb) {
+  flatcc_builder_start_vector(fbb, 1, alignment, FLATBUFFERS_COUNT_MAX(1));
+
+  auto value = valueAttr.dyn_cast<IREE::Util::SerializableAttrInterface>();
+  assert(value && "expected a serializable rodata value");
+
+  // TODO(benvanik): use fbb.streamUint8Vec + value.serializeToStream.
+  // Right now this will allocate a single slab of the entire storage size and
+  // write the contents into it. streamUint8Vec also does the same thing but
+  // we could extend it with custom fbb storage such that we could reserve the
+  // size in the file and then fix it up after we write it. The complication is
+  // that we need the CRC below and thus have to have the bytes in memory at
+  // some point. An interface member for computeCRC() could be useful as even
+  // though slow it would avoid the need to malloc everything. We could also
+  // switch implementations based on calculateCRC32 - models with GB of params
+  // are probably fine not to have nice hackability :)
+  uint64_t actualSize = value.getStorageSize();
+  if (actualSize > SIZE_MAX) {
+    mlir::emitError(loc) << "constant size " << actualSize
+                         << " exceeds native size_t; unable to serialize";
+    return {};
+  }
+  size_t size = static_cast<size_t>(value.getStorageSize());
+  uint8_t *bytePtr = flatbuffers_uint8_vec_extend(fbb, size);
+  if (failed(value.serializeToBuffer(llvm::support::endianness::little,
+                                     ArrayRef<char>((char *)bytePtr, size)))) {
+    return {};
+  }
+
+  uint8_t *dataPtr =
+      reinterpret_cast<uint8_t *>(flatcc_builder_vector_edit(fbb));
+  size_t totalSize = flatcc_builder_vector_count(fbb);
+  uint32_t crc32Value = 0;
+  if (calculateCRC32) {
+    crc32Value = llvm::crc32(0u, ArrayRef<uint8_t>(dataPtr, totalSize));
+  }
+  return SerializedConstantRef{
+      flatbuffers_uint8_vec_end(fbb),
+      static_cast<int64_t>(totalSize),
+      crc32Value,
+  };
+}
 
 LLVM_PACKED_START
 struct ZIPEndOfCentralDirectoryRecord {
@@ -432,23 +488,8 @@ static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
   if (!cconv.hasValue()) return {};
-  return createFunctionSignatureDef(funcOp.getType(), typeTable,
-                                    cconv.getValue(), /*reflectionAttrsRef=*/0,
-                                    fbb);
-}
-
-// Returns a serialized function signature.
-static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
-    IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-    FlatbufferBuilder &fbb) {
-  // Generate the signature calling convention string based on types.
-  // TODO(benvanik): only do this on exports. The runtime currently looks on
-  // internal functions, though, so we have to have it here.
-  auto cconv = makeCallingConventionString(funcOp);
-  if (!cconv.hasValue()) return {};
 
   // Reflection attributes.
-  // TODO(benvanik): move these to exports (or remove entirely).
   iree_vm_ReflectionAttrDef_vec_ref_t reflectionAttrsRef = 0;
   if (auto reflectionAttrs =
           funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
@@ -470,6 +511,18 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
 
   return createFunctionSignatureDef(funcOp.getType(), typeTable,
                                     cconv.getValue(), reflectionAttrsRef, fbb);
+}
+
+// Returns a serialized function signature.
+static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
+    IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
+    FlatbufferBuilder &fbb) {
+  // Generate the signature calling convention string based on types.
+  auto cconv = makeCallingConventionString(funcOp);
+  if (!cconv.hasValue()) return {};
+  return createFunctionSignatureDef(funcOp.getType(), typeTable,
+                                    cconv.getValue(), /*reflectionAttrsRef=*/0,
+                                    fbb);
 }
 
 // Builds a complete BytecodeModuleDef FlatBuffer object in |fbb|.
@@ -665,19 +718,6 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
             fbb, funcOp.ordinal().getValue().getLimitedValue());
         return iree_vm_ExportFunctionDef_end(fbb);
       }));
-  SmallVector<iree_vm_InternalFunctionDef_ref_t, 8> internalFuncRefs;
-  if (!targetOptions.stripSymbols) {
-    internalFuncRefs.reserve(internalFuncOps.size());
-    for (auto funcOp : internalFuncOps) {
-      auto localNameRef = fbb.createString(funcOp.getName());
-      auto signatureRef =
-          makeInternalFunctionSignatureDef(funcOp, typeOrdinalMap, fbb);
-      iree_vm_InternalFunctionDef_start(fbb);
-      iree_vm_InternalFunctionDef_local_name_add(fbb, localNameRef);
-      iree_vm_InternalFunctionDef_signature_add(fbb, signatureRef);
-      internalFuncRefs.push_back(iree_vm_InternalFunctionDef_end(fbb));
-    }
-  }
 
   // NOTE: we keep the vectors clustered here so that we can hopefully keep the
   // pages mapped at runtime; vector dereferences in flatbuffers require
@@ -687,7 +727,6 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   // of the file.
   auto rodataSegmentsRef = fbb.createOffsetVecDestructive(rodataSegmentRefs);
   auto rwdataSegmentsRef = fbb.createOffsetVecDestructive(rwdataSegmentRefs);
-  auto internalFuncsRef = fbb.createOffsetVecDestructive(internalFuncRefs);
   auto exportFuncsOffset = fbb.createOffsetVecDestructive(exportFuncRefs);
   auto importFuncsRef = fbb.createOffsetVecDestructive(importFuncRefs);
   auto typesRef = fbb.createOffsetVecDestructive(typeRefs);
@@ -715,7 +754,6 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   iree_vm_BytecodeModuleDef_types_add(fbb, typesRef);
   iree_vm_BytecodeModuleDef_imported_functions_add(fbb, importFuncsRef);
   iree_vm_BytecodeModuleDef_exported_functions_add(fbb, exportFuncsOffset);
-  iree_vm_BytecodeModuleDef_internal_functions_add(fbb, internalFuncsRef);
   iree_vm_BytecodeModuleDef_module_state_add(fbb, moduleStateDef);
   iree_vm_BytecodeModuleDef_rodata_segments_add(fbb, rodataSegmentsRef);
   iree_vm_BytecodeModuleDef_rwdata_segments_add(fbb, rwdataSegmentsRef);
@@ -731,6 +769,8 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
 LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                                         BytecodeTargetOptions targetOptions,
                                         llvm::raw_ostream &output) {
+  moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
+
   uint64_t startOffset = output.tell();
 
   if (failed(canonicalizeModule(targetOptions, moduleOp))) {

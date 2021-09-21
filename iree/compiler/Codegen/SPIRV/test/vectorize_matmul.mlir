@@ -2,29 +2,15 @@
 // TODO(antiagainst): Fix promotion to workgroup and enable the test.
 // | IreeFileCheck %s -check-prefix=PROMOTE
 
-hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @matmul_static_shape  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @io, ordinal = 0 : index,
-      workgroup_size = [32: index, 1: index, 1: index]
-    }
-    module attributes {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
-        #spv.target_env<#spv.vce<v1.5,
-          [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
-           StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
-           UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
-           GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
-           GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
-           VariablePointersStorageBuffer, CooperativeMatrixNV],
-          [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
-           SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers,
-           SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+        #spv.target_env<#spv.vce<v1.5, [Shader, CooperativeMatrixNV], [SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
           {cooperative_matrix_properties_nv = [
             {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
              m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},
@@ -37,7 +23,12 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
            max_compute_shared_memory_size = 49152 : i32,
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-           subgroup_size = 32 : i32}>} {
+           subgroup_size = 32 : i32}>}> {
+    hal.executable.entry_point @matmul_static_shape attributes {
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 1: index, 1: index]
+    }
+    builtin.module {
       func @matmul_static_shape() {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index
@@ -61,7 +52,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -264,29 +255,15 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @matmul_static_shape  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @io, ordinal = 0 : index,
-      workgroup_size = [32: index, 1: index, 1: index]
-    }
-    module attributes {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
-        #spv.target_env<#spv.vce<v1.5,
-          [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess,
-           StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess,
-           UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform,
-           GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot,
-           GroupNonUniformShuffle, GroupNonUniformShuffleRelative, VariablePointers,
-           VariablePointersStorageBuffer, CooperativeMatrixNV],
-          [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage,
-           SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers,
-           SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+        #spv.target_env<#spv.vce<v1.5, [Shader, CooperativeMatrixNV], [SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
           {cooperative_matrix_properties_nv = [
             {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
              m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},
@@ -299,7 +276,12 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
            max_compute_shared_memory_size = 49152 : i32,
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-           subgroup_size = 32 : i32}>} {
+           subgroup_size = 32 : i32}>}> {
+    hal.executable.entry_point @matmul_static_shape attributes {
+      interface = @io, ordinal = 0 : index,
+      workgroup_size = [32: index, 1: index, 1: index]
+    }
+    builtin.module {
       func @matmul_static_shape() {
         %c32 = constant 32 : index
         %c4096 = constant 4096 : index
@@ -323,7 +305,7 @@ hal.executable @matmul_static_shape attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

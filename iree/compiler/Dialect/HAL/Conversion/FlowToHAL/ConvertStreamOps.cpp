@@ -574,11 +574,12 @@ static LogicalResult allocateTransientBuffers(
     auto tensorValue = subspanOp.result();
     auto bufferValue = schedulingState.loadGlobal(
         IREE::HAL::BufferType::get(rewriter.getContext()),
-        subspanOp.runtime_buffer().getLeafReference(), rewriter);
-    auto offsetValue = schedulingState.lookupOrCreateIndex(
-        subspanOp.runtime_range().offset().getSExtValue(), rewriter);
-    auto lengthValue = schedulingState.lookupOrCreateIndex(
-        subspanOp.runtime_range().length().getSExtValue(), rewriter);
+        subspanOp.runtime_buffer().getLeafReference().getValue(), rewriter);
+    auto runtimeRange = subspanOp.runtime_range();
+    auto offsetValue =
+        schedulingState.lookupOrCreateIndex(runtimeRange.getOffset(), rewriter);
+    auto lengthValue =
+        schedulingState.lookupOrCreateIndex(runtimeRange.getLength(), rewriter);
     auto subspanValue = rewriter.createOrFold<IREE::HAL::BufferSubspanOp>(
         subspanOp.getLoc(), bufferValue.getType(), bufferValue, offsetValue,
         lengthValue);
@@ -912,7 +913,8 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
         variantOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
     auto entryPointIt =
         llvm::find_if(entryPointOps, [&](IREE::HAL::ExecutableEntryPointOp op) {
-          return op.getName() == dispatchOp.entry_point().getLeafReference();
+          return op.getNameAttr() ==
+                 dispatchOp.entry_point().getLeafReference();
         });
     if (entryPointIt == entryPointOps.end()) {
       return variantOp.emitError()
@@ -939,10 +941,10 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
                             executableLayout, bindingsAttr, schedulingState,
                             rewriter, caseBuilder);
 
-    auto entryPointSymRef = caseBuilder.getSymbolRefAttr(
-        executableOp.getName(),
-        {caseBuilder.getSymbolRefAttr(entryPointOp->getParentOp()),
-         caseBuilder.getSymbolRefAttr(entryPointOp)});
+    auto entryPointSymRef =
+        SymbolRefAttr::get(caseBuilder.getContext(), executableOp.getName(),
+                           {SymbolRefAttr::get(entryPointOp->getParentOp()),
+                            SymbolRefAttr::get(entryPointOp)});
     auto caseWorkgroupCount = calculateDispatchWorkgroupCount(
         loc, executableOp, entryPointOp, workgroupCount, caseBuilder);
     caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(

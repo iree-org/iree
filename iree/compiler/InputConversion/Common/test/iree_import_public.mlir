@@ -15,6 +15,14 @@ builtin.func @list_func(%arg0 : !iree.list<!iree.variant>) -> !iree.list<!iree.v
 }
 
 // -----
+// CHECK-LABEL: func @list_func_call
+// CHECK: call @list_func_call(%arg0) : (!util.list<?>) -> !util.list<?>
+builtin.func @list_func_call(%arg0 : !iree.list<!iree.variant>) -> !iree.list<!iree.variant> {
+  call @list_func_call(%arg0) : (!iree.list<!iree.variant>) -> !iree.list<!iree.variant>
+  return %arg0 : !iree.list<!iree.variant>
+}
+
+// -----
 // CHECK-LABEL: func @ptr_func
 // CHECK-SAME: (%arg0: !util.ptr<!hal.buffer_view>) -> !util.ptr<!hal.buffer_view>
 builtin.func @ptr_func(%arg0 : !iree.ptr<!iree.buffer_view>) -> !iree.ptr<!iree.buffer_view> {
@@ -170,15 +178,21 @@ builtin.func @tensor_trace(%arg0 : tensor<5xf32>, %arg1 : tensor<3xf32>) {
 builtin.module @globals {
   // CHECK: util.global public mutable @global1 = 50 : i32
   iree.global mutable @global1 = 50 : i32
-  // CHECK: util.global public mutable @global2 = 50 : i32
-  iree.global public mutable @global2 = 50 : i32
-  // CHECK: util.global private mutable @global3 = 50 : i32
-  iree.global private mutable @global3 = 50 : i32
-  // CHECK: util.global private @global4 = 50 : i32
-  iree.global private @global4 = 50 : i32
+  // CHECK: util.global public mutable @global2 = 51 : i32
+  iree.global public mutable @global2 = 51 : i32
+  // CHECK: util.global private mutable @global3 = 52 : i32
+  iree.global private mutable @global3 = 52 : i32
+  // CHECK: util.global private @global4 = 53 : i32
+  iree.global private @global4 = 53 : i32
 
-  // CHECK: util.global public @global5 initializer(@initializer) : tensor<4xi32>
+  // CHECK: util.global public @global5 : tensor<4xi32>
   iree.global @global5 initializer(@initializer) : tensor<4xi32>
+  // CHECK-NEXT: util.initializer {
+  // CHECK-NEXT:   %[[VALUE:.+]] = call @initializer() : () -> tensor<4xi32>
+  // CHECK-NEXT:   util.global.store %[[VALUE]], @global5 : tensor<4xi32>
+  // CHECK-NEXT:   util.initializer.return
+  // CHECK-NEXT: }
+  // CHECK: func private @initializer() -> tensor<4xi32>
   builtin.func private @initializer() -> tensor<4xi32>
 }
 

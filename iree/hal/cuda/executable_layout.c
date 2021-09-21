@@ -15,6 +15,7 @@
 typedef struct iree_hal_cuda_executable_layout_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
+  iree_host_size_t push_constant_base_index;
   iree_host_size_t set_layout_count;
   iree_hal_descriptor_set_layout_t* set_layouts[];
 } iree_hal_cuda_executable_layout_t;
@@ -26,6 +27,21 @@ static iree_hal_cuda_executable_layout_t* iree_hal_cuda_executable_layout_cast(
     iree_hal_executable_layout_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda_executable_layout_vtable);
   return (iree_hal_cuda_executable_layout_t*)base_value;
+}
+
+static void iree_hal_cuda_executable_layout_destroy(
+    iree_hal_executable_layout_t* base_executable_layout) {
+  iree_hal_cuda_executable_layout_t* executable_layout =
+      iree_hal_cuda_executable_layout_cast(base_executable_layout);
+  iree_allocator_t host_allocator = executable_layout->context->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  for (iree_host_size_t i = 0; i < executable_layout->set_layout_count; ++i) {
+    iree_hal_descriptor_set_layout_release(executable_layout->set_layouts[i]);
+  }
+  iree_allocator_free(host_allocator, executable_layout);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 iree_status_t iree_hal_cuda_executable_layout_create(
@@ -52,29 +68,18 @@ iree_status_t iree_hal_cuda_executable_layout_create(
                                  &executable_layout->resource);
     executable_layout->context = context;
     executable_layout->set_layout_count = set_layout_count;
+    iree_host_size_t binding_number = 0;
     for (iree_host_size_t i = 0; i < set_layout_count; ++i) {
       executable_layout->set_layouts[i] = set_layouts[i];
       iree_hal_descriptor_set_layout_retain(set_layouts[i]);
+      binding_number +=
+          iree_hal_cuda_descriptor_set_layout_binding_count(set_layouts[i]);
     }
+    executable_layout->push_constant_base_index = binding_number;
     *out_executable_layout = (iree_hal_executable_layout_t*)executable_layout;
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
-}
-
-static void iree_hal_cuda_executable_layout_destroy(
-    iree_hal_executable_layout_t* base_executable_layout) {
-  iree_hal_cuda_executable_layout_t* executable_layout =
-      iree_hal_cuda_executable_layout_cast(base_executable_layout);
-  iree_allocator_t host_allocator = executable_layout->context->host_allocator;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  for (iree_host_size_t i = 0; i < executable_layout->set_layout_count; ++i) {
-    iree_hal_descriptor_set_layout_release(executable_layout->set_layouts[i]);
-  }
-  iree_allocator_free(host_allocator, executable_layout);
-
-  IREE_TRACE_ZONE_END(z0);
 }
 
 iree_host_size_t iree_hal_cuda_base_binding_index(
@@ -89,6 +94,13 @@ iree_host_size_t iree_hal_cuda_base_binding_index(
     base_binding += binding_count;
   }
   return base_binding;
+}
+
+iree_host_size_t iree_hal_cuda_push_constant_index(
+    iree_hal_executable_layout_t* base_executable_layout) {
+  iree_hal_cuda_executable_layout_t* executable_layout =
+      iree_hal_cuda_executable_layout_cast(base_executable_layout);
+  return executable_layout->push_constant_base_index;
 }
 
 const iree_hal_executable_layout_vtable_t

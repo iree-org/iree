@@ -86,6 +86,7 @@ cc_binary(
     deps = [
         "//iree/base",
         "//iree/base/internal:file_io",
+        "//iree/base/internal/flatcc:debugging",
         "//iree/schemas:bytecode_module_def_c_fbs",
         "//iree/tools/utils:vm_util",
     ],
@@ -105,6 +106,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/LinalgExt/IR",
+        "//iree/compiler/Dialect/LinalgExt/IR:TiledOpInterface",
         "//iree/compiler/Dialect/LinalgExt/Transforms",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
         "//iree/compiler/Dialect/Modules/VMVX/Transforms",
@@ -121,6 +123,7 @@ cc_library(
         "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:IREEVM",
         "//llvm-external-projects/iree-dialects:IREEDialect",
+        "//llvm-external-projects/iree-dialects:IREEPyDMDialect",
         "@llvm-project//mlir:IR",
     ],
 )
@@ -355,6 +358,7 @@ cc_library(
         ":init_compiler_modules",
         ":init_iree_passes_and_dialects",
         ":init_mlir_passes_and_dialects",
+        ":init_passes_and_dialects",
         ":init_targets",
         ":init_translations",
         ":init_xla_dialects",

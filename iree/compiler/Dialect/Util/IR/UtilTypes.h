@@ -7,6 +7,9 @@
 #ifndef IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_
 #define IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_
 
+#include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Endian.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -171,5 +174,10 @@ void excludeTiedOperandAndResultIndices(
 #include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.h.inc"  // IWYU pragma: export
 #include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.h.inc"  // IWYU pragma: export
 #include "iree/compiler/Dialect/Util/IR/UtilTypeInterfaces.h.inc"  // IWYU pragma: export
+
+// clang-format off: must be included after all LLVM/MLIR headers.
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/Util/IR/UtilAttrs.h.inc"  // IWYU pragma: keep
+// clang-format on
 
 #endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_

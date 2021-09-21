@@ -12,7 +12,7 @@ hal.executable @ex0 {
       interface = @interface,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -172,7 +172,7 @@ hal.executable @ex0 {
       interface = @interface,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -308,7 +308,7 @@ hal.executable @ex0 {
       interface = @interface,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -361,7 +361,7 @@ func @dispatchWithShapeTies(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x1
 
 module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 
-hal.executable @ex attributes {sym_visibility = "private"} {
+hal.executable private @ex  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -371,7 +371,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -409,7 +409,7 @@ func @staticTiledDispatch(%input: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
 
 module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 
-hal.executable @ex attributes {sym_visibility = "private"} {
+hal.executable private @ex  {
   hal.interface @io attributes {push_constants = 4 : index} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -419,7 +419,7 @@ hal.executable @ex attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -469,7 +469,7 @@ func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: ind
 
 module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 
-hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable private @pad_dispatch_0  {
   hal.interface @interface_io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @wo1, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
@@ -479,11 +479,11 @@ hal.executable @pad_dispatch_0 attributes {sym_visibility = "private"} {
       interface = @interface_io,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
-hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
+hal.executable private @pad_dispatch_1  {
   hal.interface @interface_io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @rw1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
@@ -493,7 +493,7 @@ hal.executable @pad_dispatch_1 attributes {sym_visibility = "private"} {
       interface = @interface_io,
       ordinal = 0 : index
     }
-    module {}
+    builtin.module {}
   }
 }
 
@@ -564,7 +564,7 @@ func @cloneFromLargeBufferToSmallBuffer(%input: tensor<2xi32>) -> tensor<7xi32> 
   %1 = flow.ex.stream.fragment(%input) : (tensor<2xi32>) -> tensor<7xi32> =
       (%arg0: tensor<2xi32>) -> tensor<7xi32> {
     %c3 = constant 3 : index
-    %const_span = hal.constant.subspan @_const_pool_splats[#hal.byte_range<0, 32>] : tensor<7xi32>
+    %const_span = hal.constant.subspan @_const_pool_splats[#util.byte_range<0, 32>] : tensor<7xi32>
     // CHECK: %[[C0:.+]] = constant 0 : index
     // CHECK: %[[C28:.+]] = constant 28 : index
     // CHECK: %[[DSTBUF:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[C28]]}

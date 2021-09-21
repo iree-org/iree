@@ -18,13 +18,16 @@ namespace Shape {
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OperationPass<FuncOp>> createExpandFunctionDynamicDimsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createExpandFunctionDynamicDimsPass();
 
 // For any function which contains ranked_shape argument/result types,
 // expands them to individual dynamic dimensions, inserting appropriate casts
 // within the function.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 createExpandFunctionRankedShapeDimsPass();
+
+// Folds tensor.dim/memref.dim ops taking shape carrying ops as operands.
+std::unique_ptr<OperationPass<FuncOp>> createFoldDimOverShapeCarryingOpPass();
 
 // Cleans up any unnecessary shape placeholder ops. Can be run after all
 // shape calculation code has been lowered.
@@ -34,6 +37,7 @@ std::unique_ptr<OperationPass<FuncOp>> createCleanupShapePlaceholdersPass();
 inline void registerShapePasses() {
   createExpandFunctionDynamicDimsPass();
   createExpandFunctionRankedShapeDimsPass();
+  createFoldDimOverShapeCarryingOpPass();
   createCleanupShapePlaceholdersPass();
 }
 

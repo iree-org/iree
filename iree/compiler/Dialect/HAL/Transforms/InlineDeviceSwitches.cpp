@@ -133,7 +133,7 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
 }
 
 class InlineDeviceSwitchesPass
-    : public PassWrapper<InlineDeviceSwitchesPass, OperationPass<FuncOp>> {
+    : public PassWrapper<InlineDeviceSwitchesPass, OperationPass<void>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
@@ -150,7 +150,7 @@ class InlineDeviceSwitchesPass
   void runOnOperation() override {
     auto funcOp = getOperation();
     SmallVector<IREE::HAL::DeviceSwitchOp, 4> switchOps;
-    funcOp.walk([&](IREE::HAL::DeviceSwitchOp switchOp) {
+    funcOp->walk([&](IREE::HAL::DeviceSwitchOp switchOp) {
       switchOps.push_back(switchOp);
     });
     for (auto switchOp : switchOps) {
@@ -161,7 +161,7 @@ class InlineDeviceSwitchesPass
   }
 };
 
-std::unique_ptr<OperationPass<FuncOp>> createInlineDeviceSwitchesPass() {
+std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass() {
   return std::make_unique<InlineDeviceSwitchesPass>();
 }
 

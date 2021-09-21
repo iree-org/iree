@@ -1,28 +1,24 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-distribute-to-global-id))))' -canonicalize -cse %s | IreeFileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-hal.executable @parallel_4D attributes {sym_visibility = "private"} {
+hal.executable private @parallel_4D  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @parallel_4D attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+    hal.executable.entry_point @parallel_4D attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       func @parallel_4D() {
         %c0 = constant 0 : index
-        %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?x?x?xf32>
-        %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?x?x?xf32>
-        %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?x?x?xf32>
+        %dim0 = hal.interface.load.constant offset = 0 : index
+        %dim1 = hal.interface.load.constant offset = 1 : index
+        %dim2 = hal.interface.load.constant offset = 2 : index
+        %dim3 = hal.interface.load.constant offset = 3 : index
+        %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
+        %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
+        %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
         linalg.generic {
            indexing_maps = [#map0, #map0, #map0],
            iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
@@ -37,7 +33,7 @@ hal.executable @parallel_4D attributes {sym_visibility = "private"} {
       func private @parallel_4D__num_workgroups__
         (!shapex.ranked_shape<[?,?,?,?]>, !shapex.ranked_shape<[?,?,?,?]>,
          !shapex.ranked_shape<[?,?,?,?]>) -> (index, index, index)
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -77,23 +73,15 @@ hal.executable @parallel_4D attributes {sym_visibility = "private"} {
 // -----
 
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
+hal.executable private @parallel_4D_static  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @parallel_4D_static attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+    hal.executable.entry_point @parallel_4D_static attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       func @parallel_4D_static() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<3x4x5x6xf32>
@@ -110,7 +98,7 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -149,23 +137,15 @@ hal.executable @parallel_4D_static attributes {sym_visibility = "private"} {
   iterator_types = []
 }
 
-hal.executable @scalar_add attributes {sym_visibility = "private"} {
+hal.executable private @scalar_add  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @scalar_add attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.3,
-        [Shader], [SPV_KHR_storage_buffer_storage_class]>,
-        {max_compute_workgroup_invocations = 128 : i32,
-         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+    hal.executable.entry_point @scalar_add attributes {interface = @io, ordinal = 0 : index}
+    builtin.module {
       func @scalar_add() attributes {hal.num_workgroups_fn = @scalar_add__num_workgroups__} {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<f32>
@@ -180,7 +160,7 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
          }
          return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -198,7 +178,7 @@ hal.executable @scalar_add attributes {sym_visibility = "private"} {
 // -----
 
 // TODO(GH-4901): Convert these tests back to use dynamic shapes when linalg on tensors becomes default.
-hal.executable @reduce_sum attributes {sym_visibility = "private"} {
+hal.executable private @reduce_sum  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -209,7 +189,7 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index
     }
-    module {
+    builtin.module {
       func @reduce_sum() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<40x50x75xf32>
@@ -235,7 +215,7 @@ hal.executable @reduce_sum attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

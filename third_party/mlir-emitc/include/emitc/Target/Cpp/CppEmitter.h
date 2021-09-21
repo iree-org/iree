@@ -63,23 +63,23 @@ struct CppEmitter {
   explicit CppEmitter(raw_ostream &os, bool declareVariablesAtTop);
 
   /// Emits attribute or returns failure.
-  LogicalResult emitAttribute(Operation &op, Attribute attr);
+  LogicalResult emitAttribute(Location loc, Attribute attr);
 
   /// Emits operation 'op' with/without training semicolon or returns failure.
   LogicalResult emitOperation(Operation &op, bool trailingSemicolon);
 
   /// Emits type 'type' or returns failure.
-  LogicalResult emitType(Operation &op, Type type);
+  LogicalResult emitType(Location loc, Type type);
 
   /// Emits array of types as a std::tuple of the emitted types.
   /// - emits void for an empty array;
   /// - emits the type of the only element for arrays of size one;
   /// - emits a std::tuple otherwise;
-  LogicalResult emitTypes(Operation &op, ArrayRef<Type> types);
+  LogicalResult emitTypes(Location loc, ArrayRef<Type> types);
 
   /// Emits array of types as a std::tuple of the emitted types independently of
   /// the array size.
-  LogicalResult emitTupleType(Operation &op, ArrayRef<Type> types);
+  LogicalResult emitTupleType(Location loc, ArrayRef<Type> types);
 
   /// Emits an assignment for a variable which has been declared previously.
   LogicalResult emitVariableAssignment(OpResult result);
@@ -113,8 +113,8 @@ struct CppEmitter {
   /// Return the existing or a new label of a Block.
   StringRef getOrCreateName(Block &block);
 
-  /// Whether to map an mlir integer to a signed integer in C++.
-  bool shouldMapToSigned(IntegerType::SignednessSemantics val);
+  /// Whether to map an mlir integer to a unsigned integer in C++.
+  bool shouldMapToUnsigned(IntegerType::SignednessSemantics val);
 
   /// RAII helper function to manage entering/exiting C++ scopes.
   struct Scope {

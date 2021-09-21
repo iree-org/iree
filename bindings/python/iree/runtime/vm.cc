@@ -527,7 +527,35 @@ void AppendListContents(std::string& out, iree_vm_list_t* list,
     if (i > 0) out.append(", ");
 
     if (iree_vm_variant_is_value(variant)) {
-      out += std::to_string(variant.i32);
+      // Convert a value type to a string.
+      switch (variant.type.value_type) {
+        case IREE_VM_VALUE_TYPE_I8: {
+          out += std::to_string(variant.i8);
+          break;
+        }
+        case IREE_VM_VALUE_TYPE_I16: {
+          out += std::to_string(variant.i16);
+          break;
+        }
+        case IREE_VM_VALUE_TYPE_I32: {
+          out += std::to_string(variant.i32);
+          break;
+        }
+        case IREE_VM_VALUE_TYPE_I64: {
+          out += std::to_string(variant.i64);
+          break;
+        }
+        case IREE_VM_VALUE_TYPE_F32: {
+          out += std::to_string(variant.f32);
+          break;
+        }
+        case IREE_VM_VALUE_TYPE_F64: {
+          out += std::to_string(variant.f64);
+          break;
+        }
+        default:
+          throw RaiseValueError("Unsupported VM value type to string");
+      }
     } else if (iree_vm_variant_is_ref(variant)) {
       // Pretty print a subset of ABI impacting known types.
       if (iree_hal_buffer_isa(variant.ref)) {

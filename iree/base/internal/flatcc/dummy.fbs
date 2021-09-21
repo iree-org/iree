@@ -1,0 +1,22 @@
+// Copyright 2020 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+namespace iree_flatcc;
+
+// HACK: flatcc public API headers are incomplete and some things only exist
+// when pulled in via generated headers. So here we give ourselves something to
+// include that's always available and cheap.
+//
+// Instead of directly including this file use iree/base/internal/flatcc/*.h.
+//
+// Normally including any generated file will include the appropriate headers in
+// the required order (as they are non-hermetic), but that requires that we have
+// a generated file. Though most of the API is exposed through the main includes
+// there are various types that only get generated and included by way of the
+// common headers that are not easily included.
+struct __IncludeWorkaround {
+  reserved:int;
+}

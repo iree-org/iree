@@ -10,7 +10,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   }
   hal.executable.variant @rocm, target = #hal.executable.target<"rocm", "rocm-hsaco-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<writeonly:16xf32>) -> ()}
-  module  {
+  builtin.module  {
     func @add_dispatch_0() {
       %c0 = constant 0 : index
       %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
@@ -27,7 +27,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
         flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -36,8 +36,8 @@ hal.executable @simpleMath_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0
-//       CHECK:   hal.executable.variant @rocm
+// CHECK-LABEL: hal.executable public @simpleMath_ex_dispatch_0
+//       CHECK:   hal.executable.variant public @rocm
 //       CHECK:   llvm.fadd
 
 // -----
@@ -45,7 +45,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
 #map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
-hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
+hal.executable @dot_dispatch_0 {
   hal.interface @io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -53,7 +53,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
   }
   hal.executable.variant @rocm, target = #hal.executable.target<"rocm", "rocm-hsaco-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<writeonly:1024x1024xf32>) -> ()}
-    module  {
+    builtin.module  {
       func @dot_dispatch_0() {
         %cst = constant 0.000000e+00 : f32
         %c0 = constant 0 : index
@@ -90,7 +90,7 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -99,8 +99,8 @@ hal.executable @dot_dispatch_0 attributes {sym_visibility = "private"} {
   }
 }
 
-//   CHECK-LABEL: hal.executable @dot_dispatch_0
-//         CHECK:   hal.executable.variant @rocm
+//   CHECK-LABEL: hal.executable public @dot_dispatch_0
+//         CHECK:   hal.executable.variant public @rocm
 //       CHECK-NOT:   llvm.store
 //   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //           CHECK:   llvm.br

@@ -106,22 +106,21 @@ static void populateTilingToInvocationPatterns(
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  patterns
-      .insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-              linalg::LinalgTilingPattern<linalg::FillOp>,
-              linalg::LinalgTilingPattern<linalg::CopyOp>,
-              linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-              linalg::LinalgTilingPattern<linalg::GenericOp>,
-              linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
-              linalg_ext::TiledOpInterfaceTilingPattern<linalg_ext::ScatterOp>>(
-          context, tilingOptions,
-          linalg::LinalgTransformationFilter(
-              {Identifier::get(getWorkgroupMarker(), context),
-               Identifier::get(getWorkgroupKTiledMarker(), context),
-               Identifier::get(getWorkgroupMemoryMarker(), context)},
-              Identifier::get(getVectorizeMarker(), context)));
+  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::FillOp>,
+                  linalg::LinalgTilingPattern<linalg::CopyOp>,
+                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::GenericOp>,
+                  linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
+                  linalg_ext::TiledOpInterfaceTilingPattern>(
+      context, tilingOptions,
+      linalg::LinalgTransformationFilter(
+          {Identifier::get(getWorkgroupMarker(), context),
+           Identifier::get(getWorkgroupKTiledMarker(), context),
+           Identifier::get(getWorkgroupMemoryMarker(), context)},
+          Identifier::get(getVectorizeMarker(), context)));
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
@@ -134,8 +133,8 @@ static Optional<Value> allocateWorkgroupMemory(
     OpBuilder &b, memref::SubViewOp subview,
     ArrayRef<Value> boundingSubViewSize, DataLayout &layout) {
   // In CUDA workgroup memory is represented by a global variable. Create a
-  // global variable and a memref.GetGlobalOp at the beginning of the funtion to
-  // get the memref.
+  // global variable and a memref.GetGlobalOp at the beginning of the function
+  // to get the memref.
   OpBuilder::InsertionGuard guard(b);
   FuncOp funcOp = subview->getParentOfType<FuncOp>();
   if (!funcOp) {
@@ -154,7 +153,7 @@ static Optional<Value> allocateWorkgroupMemory(
         return -1;
       }));
   if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
-  Type allocType =
+  MemRefType allocType =
       MemRefType::get(shape, subview.getType().getElementType(), {},
                       gpu::GPUDialect::getWorkgroupAddressSpace());
   b.setInsertionPoint(&moduleOp.front());

@@ -63,7 +63,9 @@ endif()
 
 add_subdirectory(include)
 add_subdirectory(lib)
+add_subdirectory(resources)
 add_subdirectory(test)
+add_subdirectory(tools)
 
 if(MLIR_ENABLE_BINDINGS_PYTHON)
   add_subdirectory(python)

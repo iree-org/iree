@@ -22,8 +22,25 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
+// Used for custom printing support.
+struct UtilOpAsmInterface : public OpAsmDialectInterface {
+  using OpAsmDialectInterface::OpAsmDialectInterface;
+  /// Hooks for getting an alias identifier alias for a given symbol, that is
+  /// not necessarily a part of this dialect. The identifier is used in place of
+  /// the symbol when printing textual IR. These aliases must not contain `.` or
+  /// end with a numeric digit([0-9]+). Returns success if an alias was
+  /// provided, failure otherwise.
+  AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
+    if (auto compositeAttr = attr.dyn_cast<CompositeAttr>()) {
+      os << "composite_of_" << compositeAttr.getTotalLength() << "b";
+      return AliasResult::OverridableAlias;
+    }
+    return AliasResult::NoAlias;
+  }
+};
+
 // Used to control inlining behavior.
-struct IREEInlinerInterface : public DialectInlinerInterface {
+struct UtilInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
   bool isLegalToInline(Operation *call, Operation *callable,
@@ -47,81 +64,13 @@ struct IREEInlinerInterface : public DialectInlinerInterface {
 
 UtilDialect::UtilDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<UtilDialect>()) {
-  addInterfaces<IREEInlinerInterface>();
+  addInterfaces<UtilOpAsmInterface, UtilInlinerInterface>();
+  registerAttributes();
   registerTypes();
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"
       >();
-}
-
-Type UtilDialect::parseType(DialectAsmParser &parser) const {
-  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
-  llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (spec == "variant") {
-    return IREE::Util::VariantType::get(getContext());
-  } else if (spec.consume_front("ptr")) {
-    if (!spec.consume_front("<") || !spec.consume_back(">")) {
-      parser.emitError(parser.getCurrentLocation())
-          << "malformed ptr type '" << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    auto variableType = mlir::parseType(spec, getContext());
-    if (!variableType) {
-      parser.emitError(parser.getCurrentLocation())
-          << "invalid ptr object type specification: '"
-          << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    return IREE::Util::PtrType::getChecked(variableType, loc);
-  } else if (spec == "byte_buffer") {
-    return IREE::Util::ByteBufferType::get(getContext());
-  } else if (spec == "mutable_byte_buffer") {
-    return IREE::Util::MutableByteBufferType::get(getContext());
-  } else if (spec.consume_front("list")) {
-    if (!spec.consume_front("<") || !spec.consume_back(">")) {
-      parser.emitError(parser.getCurrentLocation())
-          << "malformed list type '" << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    Type elementType;
-    if (spec == "?") {
-      elementType = IREE::Util::VariantType::get(getContext());
-    } else {
-      elementType = mlir::parseType(spec, getContext());
-    }
-    if (!elementType) {
-      parser.emitError(parser.getCurrentLocation())
-          << "invalid list element type specification: '"
-          << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    return IREE::Util::ListType::getChecked(elementType, loc);
-  }
-  emitError(loc, "unknown IREE type: ") << spec;
-  return Type();
-}
-
-void UtilDialect::printType(Type type, DialectAsmPrinter &os) const {
-  if (type.isa<IREE::Util::VariantType>()) {
-    os << "variant";
-  } else if (auto ptrType = type.dyn_cast<IREE::Util::PtrType>()) {
-    os << "ptr<" << ptrType.getTargetType() << ">";
-  } else if (type.isa<IREE::Util::ByteBufferType>()) {
-    os << "byte_buffer";
-  } else if (type.isa<IREE::Util::MutableByteBufferType>()) {
-    os << "mutable_byte_buffer";
-  } else if (auto listType = type.dyn_cast<IREE::Util::ListType>()) {
-    os << "list<";
-    if (listType.getElementType().isa<IREE::Util::VariantType>()) {
-      os << "?";
-    } else {
-      os << listType.getElementType();
-    }
-    os << ">";
-  } else {
-    llvm_unreachable("unhandled IREE type");
-  }
 }
 
 }  // namespace Util

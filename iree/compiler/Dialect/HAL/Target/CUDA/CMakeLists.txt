@@ -47,6 +47,7 @@ iree_cc_library(
     LLVMNVPTXCodeGen
     LLVMSupport
     LLVMTarget
+    MLIRGPUOps
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
     MLIRNVVMIR
@@ -54,7 +55,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport
-    iree::base::internal::flatcc
+    iree::base::internal::flatcc::building
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Utils

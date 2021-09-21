@@ -22,7 +22,7 @@ iree_lit_test_suite(
     "pad_workgroup_tiles.mlir"
     "plan_conv_loop_order.mlir"
     "synchronize_symbol_visibility.mlir"
-    "tile_pad_and_vectorize.mlir"
+    "tile_and_vectorize.mlir"
     "unfused_fma.mlir"
     "vector_contract_to_aarch64_asm.mlir"
   DATA

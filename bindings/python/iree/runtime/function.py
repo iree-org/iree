@@ -329,7 +329,18 @@ PYTHON_TO_VM_CONVERTERS = {
 
 def _vm_to_ndarray(inv: Invocation, vm_list: VmVariantList, vm_index: int,
                    desc):
-  return vm_list.get_as_ndarray(vm_index)
+  # The descriptor for an ndarray is like:
+  #   ["ndarray", "<dtype>", <rank>, <dim>...]
+  #   ex: ['ndarray', 'i32', 1, 25948]
+  x = vm_list.get_as_ndarray(vm_index)
+  dtype_str = desc[1]
+  try:
+    dtype = ABI_TYPE_TO_DTYPE[dtype_str]
+  except KeyError:
+    _raise_return_error(inv, f"unrecognized dtype '{dtype_str}'")
+  if dtype != x.dtype:
+    x = x.astype(dtype)
+  return x
 
 
 def _vm_to_sdict(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
@@ -370,11 +381,22 @@ def _vm_to_scalar(type_bound: type):
   return convert
 
 
+def _vm_to_pylist(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc):
+  # The descriptor for a pylist is like:
+  #   ['pylist', element_type]
+  sub_vm_list = vm_list.get_as_list(vm_index)
+  element_type_desc = desc[1:]
+  py_items = _extract_vm_sequence_to_python(
+      inv, sub_vm_list, element_type_desc * len(sub_vm_list))
+  return py_items
+
+
 VM_TO_PYTHON_CONVERTERS = {
     "ndarray": _vm_to_ndarray,
     "sdict": _vm_to_sdict,
     "slist": _vm_to_slist,
     "stuple": _vm_to_stuple,
+    "py_homogeneous_list": _vm_to_pylist,
 
     # Scalars.
     "i8": _vm_to_scalar(int),
@@ -394,6 +416,7 @@ ABI_TYPE_TO_DTYPE = {
     "i64": np.int64,
     "f64": np.float64,
     "i16": np.int16,
+    "i8": np.int8,
     "i1": np.bool_,
 }
 

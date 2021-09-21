@@ -30,7 +30,9 @@ LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
     // TODO(benvanik): verify that the imports match.
     if (!existingOp) {
       auto clonedOp = cast<IREE::VM::ImportOp>(targetBuilder.clone(*importOp));
-      clonedOp.setName(fullName);
+      mlir::StringAttr fullNameAttr =
+          mlir::StringAttr::get(clonedOp.getContext(), fullName);
+      clonedOp.setName(fullNameAttr);
       clonedOp.setPrivate();
     }
   });
@@ -51,6 +53,12 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
     }
   }
   return success();
+}
+
+void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp) {
+  if (importOp->hasAttr("nosideeffects")) {
+    callOp->setAttr("nosideeffects", UnitAttr::get(importOp.getContext()));
+  }
 }
 
 namespace detail {

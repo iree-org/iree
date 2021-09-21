@@ -14,12 +14,20 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "config_adreno_conv.mlir"
+    "config_adreno_matmul.mlir"
+    "config_linalg_ext_ops.mlir"
+    "config_linalg_ops.mlir"
+    "config_mali_conv.mlir"
+    "config_mali_matmul.mlir"
     "convert_to_spirv.mlir"
     "distribute_to_global_id.mlir"
     "fold_gpu_procid_uses.mlir"
     "pipeline_matmul_cooperative_matrix.mlir"
     "pipeline_matmul_vectorization.mlir"
     "remove_one_trip_tiled_loop.mlir"
+    "tile_and_distribute_scatter.mlir"
+    "tile_and_distribute_sort.mlir"
     "tile_and_vectorize.mlir"
     "tile_and_vectorize_batch_matmul.mlir"
     "tile_and_vectorize_conv.mlir"

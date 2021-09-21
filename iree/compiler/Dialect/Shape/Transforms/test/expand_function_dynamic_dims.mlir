@@ -36,3 +36,18 @@ func @dynamicReturnInBlock(%arg0 : tensor<2x3xf32>) -> (tensor<?x3xf32>) {
   // CHECK: return %[[RESULT]], %[[SHAPE]] : tensor<?x3xf32>, !shapex.ranked_shape<[?,3]>
   return %1 : tensor<?x3xf32>
 }
+
+// -----
+// CHECK-LABEL:   func @calls(
+// CHECK-SAME:                %[[ARG:.*]]: tensor<1x?x2x?xf32>,
+// CHECK-SAME:                %[[ARG_SHAPE:.*]]: !shapex.ranked_shape<[1,?,2,?]>) -> (tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>) {
+func @calls(%arg0 : tensor<1x?x2x?xf32>) -> tensor<1x?x2x?xf32> {
+  // CHECK:           %[[ARG_TIED:.*]] = shapex.tie_shape %[[ARG]], %[[ARG_SHAPE]] : tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>
+  // CHECK:           %[[ARG_TIED_SHAPE:.*]] = shapex.get_ranked_shape %[[ARG_TIED]] : tensor<1x?x2x?xf32> -> !shapex.ranked_shape<[1,?,2,?]>
+  // CHECK:           %[[CALL_RESULT:.*]]:2 = call @calls(%[[ARG_TIED]], %[[ARG_TIED_SHAPE]]) : (tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>) -> (tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>)
+  %0 = std.call @calls(%arg0) : (tensor<1x?x2x?xf32>) -> tensor<1x?x2x?xf32>
+  // CHECK:           %[[CALL_RESULT_TIED:.*]] = shapex.tie_shape %[[CALL_RESULT]]#0, %[[CALL_RESULT]]#1 : tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>
+  // CHECK:           %[[CALL_RESULT_SHAPE:.*]] = shapex.get_ranked_shape %[[CALL_RESULT_TIED]] : tensor<1x?x2x?xf32> -> !shapex.ranked_shape<[1,?,2,?]>
+  // CHECK:           return %[[CALL_RESULT_TIED]], %[[CALL_RESULT_SHAPE]] : tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>
+  return %0 : tensor<1x?x2x?xf32>
+}

@@ -2,7 +2,7 @@
 
 #config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
-hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
+hal.executable private @conv_static_shape_f32  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -13,7 +13,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [4: index, 4: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = constant 2: index
@@ -21,7 +21,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
       %z = constant 28: index
       hal.return %x, %y, %z: index, index, index
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module {
       func @conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c32 = constant 32 : index
@@ -65,7 +65,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -101,7 +101,7 @@ hal.executable @conv_static_shape_f32 attributes {sym_visibility = "private"} {
 
 #config = {tileSizes = [[0, 2, 2, 32], [], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
 
-hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "private"} {
+hal.executable private @depthwise_conv_static_shape_f32  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -112,7 +112,7 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [8: index, 2: index, 2: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = constant 6: index
@@ -120,7 +120,7 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
       %z = constant 14: index
       hal.return %x, %y, %z: index, index, index
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module {
       func @depthwise_conv_static_shape_f32() {
         %cst = constant 0.000000e+00 : f32
         %c96 = constant 96 : index
@@ -166,7 +166,7 @@ hal.executable @depthwise_conv_static_shape_f32 attributes {sym_visibility = "pr
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

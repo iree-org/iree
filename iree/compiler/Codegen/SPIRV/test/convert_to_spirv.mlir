@@ -1,16 +1,17 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv)))' %s | IreeFileCheck %s
 
-hal.executable @push_constant attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.executable private @push_constant  {
+  hal.interface private @io attributes {push_constants = 5 : index} {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @push_constant attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>} {
+    builtin.module {
       // CHECK-LABEL: spv.module
       // CHECK: spv.GlobalVariable @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
       // CHECK: spv.func @push_constant()
@@ -24,7 +25,7 @@ hal.executable @push_constant attributes {sym_visibility = "private"} {
         return
       }
 
-      hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+      hal.interface private @io attributes {push_constants = 5 : index} {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
       }
@@ -34,18 +35,19 @@ hal.executable @push_constant attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @resource_bindings_in_same_func attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.executable private @resource_bindings_in_same_func  {
+  hal.interface private @io attributes {push_constants = 5 : index} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @resource_bindings_in_same_func attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>} {
+    builtin.module {
       // CHECK-LABEL: spv.module
       // CHECK: spv.GlobalVariable @[[ARG0:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spv.GlobalVariable @[[ARG1_0:.+]] bind(1, 3) {aliased} : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
@@ -81,7 +83,7 @@ hal.executable @resource_bindings_in_same_func attributes {sym_visibility = "pri
         return
       }
 
-      hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+      hal.interface private @io attributes {push_constants = 5 : index} {
         hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
@@ -92,12 +94,13 @@ hal.executable @resource_bindings_in_same_func attributes {sym_visibility = "pri
 
 // -----
 
-hal.executable @resource_bindings_in_multi_entry_func attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+hal.executable private @resource_bindings_in_multi_entry_func  {
+  hal.interface private @io attributes {push_constants = 5 : index} {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @resource_bindings_in_entry_func1 attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
@@ -106,7 +109,7 @@ hal.executable @resource_bindings_in_multi_entry_func attributes {sym_visibility
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>} {
+    builtin.module {
       // CHECK-LABEL: spv.module
       // CHECK: spv.GlobalVariable @[[FUNC1_ARG:.+]] bind(1, 2) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spv.GlobalVariable @[[FUNC1_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
@@ -141,7 +144,7 @@ hal.executable @resource_bindings_in_multi_entry_func attributes {sym_visibility
         return
       }
 
-      hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
+      hal.interface private @io attributes {push_constants = 5 : index} {
         hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
       }
@@ -151,18 +154,19 @@ hal.executable @resource_bindings_in_multi_entry_func attributes {sym_visibility
 
 // -----
 
-hal.executable @interface_binding attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @interface_binding  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @interface_binding attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, SwiftShader:CPU, {}>}  {
+    builtin.module {
       func @interface_binding() {
         %c0 = constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<8x5xf32>
@@ -175,7 +179,7 @@ hal.executable @interface_binding attributes {sym_visibility = "private"} {
 
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -197,24 +201,25 @@ hal.executable @interface_binding attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @interface_wg_id attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @interface_wg_id  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @interface_wg_id attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, SwiftShader:CPU, {}>}  {
+    builtin.module {
       func @interface_wg_id() {
         %0 = hal.interface.workgroup.id[0] : index
         %1 = hal.interface.workgroup.id[1] : index
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -235,24 +240,25 @@ hal.executable @interface_wg_id attributes {sym_visibility = "private"} {
 
 // -----
 
-hal.executable @interface_wg_count attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @interface_wg_count  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @interface_wg_count attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, SwiftShader:CPU, {}>}  {
+    builtin.module {
       func @interface_wg_count() {
         %0 = hal.interface.workgroup.count[0] : index
         %1 = hal.interface.workgroup.count[1] : index
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

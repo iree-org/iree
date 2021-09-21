@@ -302,7 +302,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_reshape(
   if (new_element_count != old_element_count) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "buffer view reshapes must have the same element "
-                            "count; target=%" PRIu64 ", existing=%" PRIu64,
+                            "count; target=%" PRIdsz ", existing=%" PRIdsz,
                             new_element_count, old_element_count);
   }
 

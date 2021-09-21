@@ -43,7 +43,7 @@ static LogicalResult printConstantOp(CppEmitter &emitter, Operation *operation,
 
     if (failed(emitter.emitVariableAssignment(result)))
       return failure();
-    return emitter.emitAttribute(*operation, value);
+    return emitter.emitAttribute(operation->getLoc(), value);
   }
 
   // Emit a variable declaration for an emitc.constant op without value.
@@ -57,7 +57,7 @@ static LogicalResult printConstantOp(CppEmitter &emitter, Operation *operation,
   // Emit a variable declaration.
   if (failed(emitter.emitAssignPrefix(*operation)))
     return failure();
-  return emitter.emitAttribute(*operation, value);
+  return emitter.emitAttribute(operation->getLoc(), value);
 }
 
 static LogicalResult printOperation(CppEmitter &emitter,
@@ -90,7 +90,7 @@ static LogicalResult printOperation(CppEmitter &emitter, BranchOp branchOp) {
 
   os << "goto ";
   if (!(emitter.hasBlockLabel(successor)))
-    return branchOp.emitOpError() << "Unable to find label for successor block";
+    return branchOp.emitOpError("unable to find label for successor block");
   os << emitter.getOrCreateName(successor);
   return success();
 }
@@ -115,8 +115,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
 
   os << "goto ";
   if (!(emitter.hasBlockLabel(trueSuccessor))) {
-    return condBranchOp.emitOpError()
-           << "Unable to find label for successor block";
+    return condBranchOp.emitOpError("unable to find label for successor block");
   }
   os << emitter.getOrCreateName(trueSuccessor) << ";\n";
   os << "} else {\n";
@@ -132,7 +131,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
   os << "goto ";
   if (!(emitter.hasBlockLabel(falseSuccessor))) {
     return condBranchOp.emitOpError()
-           << "Unable to find label for successor block";
+           << "unable to find label for successor block";
   }
   os << emitter.getOrCreateName(falseSuccessor) << ";\n";
   os << "}";
@@ -165,15 +164,15 @@ static LogicalResult printOperation(CppEmitter &emitter, emitc::CallOp callOp) {
       if (t.getType().isIndex()) {
         int64_t idx = t.getInt();
         if ((idx < 0) || (idx >= op.getNumOperands()))
-          return op.emitOpError() << "invalid operand index";
+          return op.emitOpError("invalid operand index");
         if (!emitter.hasValueInScope(op.getOperand(idx)))
-          return op.emitOpError()
-                 << "operand " << idx << "'s value not defined in scope";
+          return op.emitOpError("operand ")
+                 << idx << "'s value not defined in scope";
         os << emitter.getOrCreateName(op.getOperand(idx));
         return success();
       }
     }
-    if (failed(emitter.emitAttribute(op, attr)))
+    if (failed(emitter.emitAttribute(op.getLoc(), attr)))
       return failure();
 
     return success();
@@ -240,8 +239,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
   }
 
   for (auto pair : llvm::zip(iterArgs, operands)) {
-    if (failed(emitter.emitType(*forOp.getOperation(),
-                                std::get<0>(pair).getType())))
+    if (failed(emitter.emitType(forOp.getLoc(), std::get<0>(pair).getType())))
       return failure();
     os << " " << emitter.getOrCreateName(std::get<0>(pair)) << " = ";
     os << emitter.getOrCreateName(std::get<1>(pair)) << ";";
@@ -249,8 +247,8 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
   }
 
   os << "for (";
-  if (failed(emitter.emitType(*forOp.getOperation(),
-                              forOp.getInductionVar().getType())))
+  if (failed(
+          emitter.emitType(forOp.getLoc(), forOp.getInductionVar().getType())))
     return failure();
   os << " ";
   os << emitter.getOrCreateName(forOp.getInductionVar());
@@ -364,7 +362,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::YieldOp yieldOp) {
             os << emitter.getOrCreateName(result) << " = ";
 
             if (!emitter.hasValueInScope(operand))
-              return yieldOp.emitError() << "operand value not in scope";
+              return yieldOp.emitError("operand value not in scope");
             os << emitter.getOrCreateName(operand);
             return success();
           },
@@ -406,13 +404,13 @@ static LogicalResult printOperation(CppEmitter &emitter, FuncOp functionOp) {
   // We need to declare variables at top if the function has multiple blocks.
   if (!emitter.shouldDeclareVariablesAtTop() &&
       functionOp.getBlocks().size() > 1) {
-    return functionOp.emitOpError()
-           << "with multiple blocks needs variables declared at top";
+    return functionOp.emitOpError(
+        "with multiple blocks needs variables declared at top");
   }
 
   CppEmitter::Scope scope(emitter);
   raw_indented_ostream &os = emitter.ostream();
-  if (failed(emitter.emitTypes(*functionOp.getOperation(),
+  if (failed(emitter.emitTypes(functionOp.getLoc(),
                                functionOp.getType().getResults())))
     return failure();
   os << " " << functionOp.getName();
@@ -421,8 +419,7 @@ static LogicalResult printOperation(CppEmitter &emitter, FuncOp functionOp) {
   if (failed(interleaveCommaWithError(
           functionOp.getArguments(), os,
           [&](BlockArgument arg) -> LogicalResult {
-            if (failed(emitter.emitType(*functionOp.getOperation(),
-                                        arg.getType())))
+            if (failed(emitter.emitType(functionOp.getLoc(), arg.getType())))
               return failure();
             os << " " << emitter.getOrCreateName(arg);
             return success();
@@ -439,7 +436,7 @@ static LogicalResult printOperation(CppEmitter &emitter, FuncOp functionOp) {
             if (failed(emitter.emitVariableDeclaration(
                     result, /*trailingSemicolon=*/true))) {
               return WalkResult(
-                  op->emitError("Unable to declare result variable for op"));
+                  op->emitError("unable to declare result variable for op"));
             }
           }
           return WalkResult::advance();
@@ -461,7 +458,8 @@ static LogicalResult printOperation(CppEmitter &emitter, FuncOp functionOp) {
       if (emitter.hasValueInScope(arg))
         return functionOp.emitOpError(" block argument #")
                << arg.getArgNumber() << " is out of scope";
-      if (failed(emitter.emitType(*block.getParentOp(), arg.getType()))) {
+      if (failed(
+              emitter.emitType(block.getParentOp()->getLoc(), arg.getType()))) {
         return failure();
       }
       os << " " << emitter.getOrCreateName(arg) << ";\n";
@@ -475,7 +473,10 @@ static LogicalResult printOperation(CppEmitter &emitter, FuncOp functionOp) {
         return failure();
     }
     for (Operation &op : block.getOperations()) {
-      // Don't print additional semicolons after these operations.
+      // When generating code for an scf.if or std.cond_br op no semicolon needs
+      // to be printed after the closing brace.
+      // When generating code for an scf.for op, printing a trailing semicolon
+      // is handled within the printOperation function.
       bool trailingSemicolon = !isa<scf::IfOp, scf::ForOp, CondBranchOp>(op);
 
       if (failed(emitter.emitOperation(
@@ -507,16 +508,14 @@ StringRef CppEmitter::getOrCreateName(Block &block) {
   return *blockMapper.begin(&block);
 }
 
-bool CppEmitter::shouldMapToSigned(IntegerType::SignednessSemantics val) {
+bool CppEmitter::shouldMapToUnsigned(IntegerType::SignednessSemantics val) {
   switch (val) {
   case IntegerType::Signless:
-    return true;
-  case IntegerType::Signed:
-    return true;
-  case IntegerType::Unsigned:
     return false;
-  default:
-    llvm_unreachable("unhandled");
+  case IntegerType::Signed:
+    return false;
+  case IntegerType::Unsigned:
+    return true;
   }
 }
 
@@ -526,15 +525,17 @@ bool CppEmitter::hasBlockLabel(Block &block) {
   return blockMapper.count(&block);
 }
 
-LogicalResult CppEmitter::emitAttribute(Operation &op, Attribute attr) {
-  auto printInt = [&](APInt val, bool isSigned) {
+LogicalResult CppEmitter::emitAttribute(Location loc, Attribute attr) {
+  auto printInt = [&](APInt val, bool isUnsigned) {
     if (val.getBitWidth() == 1) {
       if (val.getBoolValue())
         os << "true";
       else
         os << "false";
     } else {
-      val.print(os, isSigned);
+      SmallString<128> strValue;
+      val.toString(strValue, 10, !isUnsigned, false);
+      os << strValue;
     }
   };
 
@@ -578,7 +579,7 @@ LogicalResult CppEmitter::emitAttribute(Operation &op, Attribute attr) {
   // Print integer attributes.
   if (auto iAttr = attr.dyn_cast<IntegerAttr>()) {
     if (auto iType = iAttr.getType().dyn_cast<IntegerType>()) {
-      printInt(iAttr.getValue(), shouldMapToSigned(iType.getSignedness()));
+      printInt(iAttr.getValue(), shouldMapToUnsigned(iType.getSignedness()));
       return success();
     }
     if (auto iType = iAttr.getType().dyn_cast<IndexType>()) {
@@ -593,7 +594,7 @@ LogicalResult CppEmitter::emitAttribute(Operation &op, Attribute attr) {
                          .dyn_cast<IntegerType>()) {
       os << '{';
       interleaveComma(dense, os, [&](APInt val) {
-        printInt(val, shouldMapToSigned(iType.getSignedness()));
+        printInt(val, shouldMapToUnsigned(iType.getSignedness()));
       });
       os << '}';
       return success();
@@ -618,16 +619,16 @@ LogicalResult CppEmitter::emitAttribute(Operation &op, Attribute attr) {
   // Print symbolic reference attributes.
   if (auto sAttr = attr.dyn_cast<SymbolRefAttr>()) {
     if (sAttr.getNestedReferences().size() > 1)
-      return op.emitError(" attribute has more than 1 nested reference");
-    os << sAttr.getRootReference();
+      return emitError(loc, "attribute has more than 1 nested reference");
+    os << sAttr.getRootReference().getValue();
     return success();
   }
 
   // Print type attributes.
   if (auto type = attr.dyn_cast<TypeAttr>())
-    return emitType(op, type.getValue());
+    return emitType(loc, type.getValue());
 
-  return op.emitError("cannot emit attribute of type ") << attr.getType();
+  return emitError(loc, "cannot emit attribute of type ") << attr.getType();
 }
 
 LogicalResult CppEmitter::emitOperands(Operation &op) {
@@ -659,7 +660,7 @@ CppEmitter::emitOperandsAndAttributes(Operation &op,
     if (llvm::is_contained(exclude, attr.first.strref()))
       return success();
     os << "/* " << attr.first << " */";
-    if (failed(emitAttribute(op, attr.second)))
+    if (failed(emitAttribute(op.getLoc(), attr.second)))
       return failure();
     return success();
   };
@@ -669,7 +670,7 @@ CppEmitter::emitOperandsAndAttributes(Operation &op,
 LogicalResult CppEmitter::emitVariableAssignment(OpResult result) {
   if (!hasValueInScope(result)) {
     return result.getDefiningOp()->emitOpError(
-        "result variable for the operation has not been declared.");
+        "result variable for the operation has not been declared");
   }
   os << getOrCreateName(result) << " = ";
   return success();
@@ -679,9 +680,9 @@ LogicalResult CppEmitter::emitVariableDeclaration(OpResult result,
                                                   bool trailingSemicolon) {
   if (hasValueInScope(result)) {
     return result.getDefiningOp()->emitError(
-        "result variable for the operation already declared.");
+        "result variable for the operation already declared");
   }
-  if (failed(emitType(*result.getOwner(), result.getType())))
+  if (failed(emitType(result.getOwner()->getLoc(), result.getType())))
     return failure();
   os << " " << getOrCreateName(result);
   if (trailingSemicolon)
@@ -722,7 +723,7 @@ LogicalResult CppEmitter::emitAssignPrefix(Operation &op) {
 
 LogicalResult CppEmitter::emitLabel(Block &block) {
   if (!hasBlockLabel(block))
-    return block.getParentOp()->emitError("Label for block not found.");
+    return block.getParentOp()->emitError("label for block not found");
   os << getOrCreateName(block) << ":\n";
   return success();
 }
@@ -742,7 +743,7 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
                 ModuleOp, ReturnOp>(
               [&](auto op) { return printOperation(*this, op); })
           .Default([&](Operation *) {
-            return op.emitOpError() << "unable to find printer for op";
+            return op.emitOpError("unable to find printer for op");
           });
 
   if (failed(status))
@@ -751,7 +752,7 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
   return success();
 }
 
-LogicalResult CppEmitter::emitType(Operation &op, Type type) {
+LogicalResult CppEmitter::emitType(Location loc, Type type) {
   if (auto iType = type.dyn_cast<IntegerType>()) {
     switch (iType.getWidth()) {
     case 1:
@@ -760,12 +761,12 @@ LogicalResult CppEmitter::emitType(Operation &op, Type type) {
     case 16:
     case 32:
     case 64:
-      if (shouldMapToSigned(iType.getSignedness()))
-        return (os << "int" << iType.getWidth() << "_t"), success();
-      else
+      if (shouldMapToUnsigned(iType.getSignedness()))
         return (os << "uint" << iType.getWidth() << "_t"), success();
+      else
+        return (os << "int" << iType.getWidth() << "_t"), success();
     default:
-      return op.emitError("cannot emit integer type ") << type;
+      return emitError(loc, "cannot emit integer type ") << type;
     }
   }
   if (auto fType = type.dyn_cast<FloatType>()) {
@@ -775,18 +776,18 @@ LogicalResult CppEmitter::emitType(Operation &op, Type type) {
     case 64:
       return (os << "double"), success();
     default:
-      return op.emitError("cannot emit float type ") << type;
+      return emitError(loc, "cannot emit float type ") << type;
     }
   }
   if (auto iType = type.dyn_cast<IndexType>())
     return (os << "size_t"), success();
   if (auto tType = type.dyn_cast<TensorType>()) {
     if (!tType.hasRank())
-      return op.emitError("cannot emit unranked tensor type");
+      return emitError(loc, "cannot emit unranked tensor type");
     if (!tType.hasStaticShape())
-      return op.emitError("cannot emit tensor type with non static shape");
+      return emitError(loc, "cannot emit tensor type with non static shape");
     os << "Tensor<";
-    if (failed(emitType(op, tType.getElementType())))
+    if (failed(emitType(loc, tType.getElementType())))
       return failure();
     auto shape = tType.getShape();
     for (auto dimSize : shape) {
@@ -797,30 +798,30 @@ LogicalResult CppEmitter::emitType(Operation &op, Type type) {
     return success();
   }
   if (auto tType = type.dyn_cast<TupleType>())
-    return emitTupleType(op, tType.getTypes());
+    return emitTupleType(loc, tType.getTypes());
   if (auto oType = type.dyn_cast<emitc::OpaqueType>()) {
     os << oType.getValue();
     return success();
   }
-  return op.emitError("cannot emit type ") << type;
+  return emitError(loc, "cannot emit type ") << type;
 }
 
-LogicalResult CppEmitter::emitTypes(Operation &op, ArrayRef<Type> types) {
+LogicalResult CppEmitter::emitTypes(Location loc, ArrayRef<Type> types) {
   switch (types.size()) {
   case 0:
     os << "void";
     return success();
   case 1:
-    return emitType(op, types.front());
+    return emitType(loc, types.front());
   default:
-    return emitTupleType(op, types);
+    return emitTupleType(loc, types);
   }
 }
 
-LogicalResult CppEmitter::emitTupleType(Operation &op, ArrayRef<Type> types) {
+LogicalResult CppEmitter::emitTupleType(Location loc, ArrayRef<Type> types) {
   os << "std::tuple<";
   if (failed(interleaveCommaWithError(
-          types, os, [&](Type type) { return emitType(op, type); })))
+          types, os, [&](Type type) { return emitType(loc, type); })))
     return failure();
   os << ">";
   return success();

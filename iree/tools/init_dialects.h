@@ -21,8 +21,8 @@ namespace mlir {
 namespace iree_compiler {
 
 inline void registerAllDialects(DialectRegistry &registry) {
-  registerIreeDialects(registry);
   registerMlirDialects(registry);
+  registerIreeDialects(registry);
   mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
 }

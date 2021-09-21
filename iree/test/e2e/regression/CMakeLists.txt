@@ -14,13 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "globals.mlir"
     "scalar.mlir"
     "tensor_cast.mlir"
@@ -37,10 +30,20 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_regression_linalg_ops_dylib-llvm-aot
+    check_regression_dylib-llvm-aot
   SRCS
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
     "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "lowering_config.mlir"
+    "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
@@ -51,9 +54,19 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_regression_linalg_ops_vmvx
+    check_regression_vmvx
   SRCS
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
+    "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
@@ -64,15 +77,54 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_regression_linalg_ops_vulkan-spirv
+    check_regression_vulkan-spirv
   SRCS
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
+    "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
     "vulkan"
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_cuda
+  SRCS
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
+    "linalg_ext_ops.mlir"
+    "linalg_ops.mlir"
+    "tensor_insert_slice.mlir"
+  TARGET_BACKEND
+    "cuda"
+  DRIVER
+    "cuda"
+  COMPILER_FLAGS
+    "-iree-input-type=mhlo"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

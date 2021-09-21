@@ -19,6 +19,7 @@
 #include "mlir/Support/MlirOptMain.h"
 #include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
+#include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
@@ -31,6 +32,7 @@ int main(int argc, char **argv) {
   registry.insert<mlir::tosa::TosaDialect>();
 
   mlir::iree_integrations::TFL::registerAllPasses();
+  mlir::tosa::registerLegalizeTosaPasses();
 
   if (failed(MlirOptMain(argc, argv, "IREE-TFL modular optimizer driver\n",
                          registry,

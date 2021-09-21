@@ -130,6 +130,7 @@ iree_cc_binary(
     flatcc::runtime
     iree::base
     iree::base::internal::file_io
+    iree::base::internal::flatcc::debugging
     iree::schemas::bytecode_module_def_c_fbs
     iree::tools::utils::vm_util
 )
@@ -196,6 +197,7 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_dialects.h"
       "init_iree_passes.h"
     DEPS
+      IREEDialectsIREEPyDMDialect
       IREEDialectsIREEDialect
       MLIRIR
       iree::compiler::Bindings::Native::Transforms
@@ -205,6 +207,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::IR::HALDialect
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::LinalgExt::IR
+      iree::compiler::Dialect::LinalgExt::IR::TiledOpInterface
       iree::compiler::Dialect::LinalgExt::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms

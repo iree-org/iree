@@ -79,6 +79,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Each executable needs a hal.interface to specify how the host and device
   // comminucate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass());
+  passManager.addPass(createCanonicalizerPass());
 
   // Translate each executable variant to its target IR form.
   passManager.nest<IREE::HAL::ExecutableOp>()
@@ -95,8 +96,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // on explicit shape types (such as ranked_shape). After this pass, these
   // composite types will be expanded to primitives (i.e. one 'index' for each
   // dynamic dim in the case of ranked_shape).
-  passManager.addNestedPass<FuncOp>(
-      Shape::createExpandFunctionRankedShapeDimsPass());
+  passManager.addPass(Shape::createExpandFunctionRankedShapeDimsPass());
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
@@ -133,6 +133,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Inline hal.device.switch ops and memoize their queries such that we can
   // better CSE/fold dispatch logic.
   passManager.addNestedPass<FuncOp>(createInlineDeviceSwitchesPass());
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      createInlineDeviceSwitchesPass());
   if (benchmarkDispatchRepeatCount != 1) {
     passManager.addNestedPass<FuncOp>(
         createBenchmarkBatchDispatchesPass(benchmarkDispatchRepeatCount));
@@ -141,6 +143,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createMemoizeDeviceQueriesPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
+
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      createCanonicalizerPass());
+  passManager.addNestedPass<IREE::Util::InitializerOp>(createCSEPass());
 
   // Run our own CSE on variable loads before moving on.
   // When specifying side effects can help MLIR's core CSE pass eliminate

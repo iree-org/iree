@@ -32,6 +32,10 @@ module @list_ops { module {
     // CHECK: vm.list.set.ref %[[LIST]], %c11, %[[BUFFER_VIEW]] : (!vm.list<?>, i32, !vm.ref<!hal.buffer_view>)
     util.list.set %list[%c11], %buffer_view : !hal.buffer_view -> !util.list<?>
 
+    // CHECK: %[[ZERO_CAPACITY:.+]] = vm.const.i32 0
+    // CHECK: %[[LIST:.+]] = vm.list.alloc %[[ZERO_CAPACITY]] : (i32) -> !vm.list<?>
+    %list_no_capacity = util.list.create : !util.list<?>
+
     return
   }
 } }

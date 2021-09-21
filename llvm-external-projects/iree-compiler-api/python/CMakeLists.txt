@@ -1,5 +1,9 @@
 include(AddMLIRPython)
 
+# Specifies that all MLIR packages are co-located under npcomp.
+# TODO: Add an upstream cmake param for this vs having a global here.
+add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
+
 ################################################################################
 # Sources
 ################################################################################
@@ -39,6 +43,9 @@ set(_source_components
   # TODO: Core is now implicitly building/registering all dialects, increasing
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
+
+  # Passes should also be disaggregated.
+  MLIRPythonSources.Passes
 
   # Core dialects (constrained to IREE input dialects).
   MLIRPythonSources.Dialects.builtin

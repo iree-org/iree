@@ -144,7 +144,7 @@ static ParseResult parseExportOp(OpAsmParser &parser, OperationState *result) {
 }
 
 static void printExportOp(OpAsmPrinter &p, ExportOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.function_ref());
   if (op.export_name() != op.function_ref()) {
     p << " as(\"" << op.export_name() << "\")";
@@ -156,7 +156,7 @@ static void printExportOp(OpAsmPrinter &p, ExportOp op) {
 void ExportOp::build(OpBuilder &builder, OperationState &result,
                      FuncOp functionRef, StringRef exportName,
                      ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, builder.getSymbolRefAttr(functionRef),
+  build(builder, result, SymbolRefAttr::get(functionRef),
         exportName.empty() ? functionRef.getName() : exportName, attrs);
 }
 
@@ -226,7 +226,7 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
 }
 
 static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printSymbolName(op.getName());
   p << "(";
   for (int i = 0; i < op.getNumFuncArguments(); ++i) {
@@ -304,7 +304,6 @@ static ParseResult parseInitializerOp(OpAsmParser &parser,
 }
 
 static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
-  p << "vm.initializer";
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
   p.printRegion(op.body());
 }
@@ -374,7 +373,7 @@ static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
 
 template <typename T>
 static void addMemoryEffectsForGlobal(
-    Operation *op, StringRef global,
+    Operation *op, mlir::FlatSymbolRefAttr global,
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   // HACK: works around the lack of symbol side effects in mlir by only saying
   // we have a side-effect if the variable we are loading is mutable.
@@ -388,27 +387,27 @@ static void addMemoryEffectsForGlobal(
 
 void GlobalLoadI32Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalI32Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalI32Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadI64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalI64Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalI64Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadF32Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalF32Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalF32Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadF64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalF64Op>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalF64Op>(*this, globalAttr(), effects);
 }
 
 void GlobalLoadRefOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  addMemoryEffectsForGlobal<GlobalRefOp>(*this, global(), effects);
+  addMemoryEffectsForGlobal<GlobalRefOp>(*this, globalAttr(), effects);
 }
 
 static LogicalResult verifyGlobalLoadOp(Operation *op) {
@@ -479,7 +478,7 @@ static ParseResult parseConstOp(OpAsmParser &parser, OperationState *result) {
 
 template <typename T>
 static void printConstOp(OpAsmPrinter &p, T &op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   p.printAttribute(op.value());
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
 }
@@ -698,7 +697,7 @@ void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
 }
 
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
-                     ElementsAttr value, ArrayRef<NamedAttribute> attrs) {
+                     Attribute value, ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("sym_name", builder.getStringAttr(name));
   result.addAttribute("value", value);
   result.addAttributes(attrs);
@@ -716,7 +715,8 @@ static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
 void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
                              StringRef rodataName,
                              ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute("rodata", builder.getSymbolRefAttr(rodataName));
+  result.addAttribute("rodata",
+                      SymbolRefAttr::get(builder.getContext(), rodataName));
   auto type =
       IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
   result.addTypes({type});
@@ -813,7 +813,7 @@ static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState *result) {
 
 template <typename T>
 static void printSwitchOp(OpAsmPrinter &p, T &op) {
-  p << op.getOperationName() << " ";
+  p << " ";
   p.printOperand(op.index());
   p << "[";
   p.printOperands(op.values());
@@ -852,6 +852,24 @@ Optional<MutableOperandRange> BranchOp::getMutableSuccessorOperands(
     unsigned index) {
   assert(index == 0 && "invalid successor index");
   return destOperandsMutable();
+}
+
+void CallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  if (!getOperation()->hasAttr("nosideeffects")) {
+    // TODO(benvanik): actually annotate this.
+    effects.emplace_back(MemoryEffects::Read::get());
+    effects.emplace_back(MemoryEffects::Write::get());
+  }
+}
+
+void CallVariadicOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  if (!getOperation()->hasAttr("nosideeffects")) {
+    // TODO(benvanik): actually annotate this.
+    effects.emplace_back(MemoryEffects::Read::get());
+    effects.emplace_back(MemoryEffects::Write::get());
+  }
 }
 
 static ParseResult parseCallVariadicOp(OpAsmParser &parser,
@@ -1003,7 +1021,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
 }
 
 static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
-  p << op.getOperationName() << ' ' << op->getAttr("callee") << '(';
+  p << ' ' << op->getAttr("callee") << '(';
   int operand = 0;
   llvm::interleaveComma(
       llvm::zip(op.segment_sizes(), op.segment_types()), p,
@@ -1116,7 +1134,7 @@ static ParseResult parseCondFailOp(OpAsmParser &parser,
 }
 
 static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
-  p << op.getOperationName() << ' ';
+  p << ' ';
   if (op.condition() != op.status()) {
     p << op.condition() << ", ";
   }

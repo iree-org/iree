@@ -41,7 +41,7 @@ to further qualify the path, and there are a few placeholders that will be
 expanded:
 
 * `{id}` - A per-process monotonically increasing number for each compiler
-  invocation. Can be overriden by the API if a better symbolic name is
+  invocation. Can be overridden by the API if a better symbolic name is
   available (i.e. test case, etc).
 * `{pid}` - Process ID of the current process.
 * `{main}` - Basename of `sys.argv[0]`, which is typically the name of the

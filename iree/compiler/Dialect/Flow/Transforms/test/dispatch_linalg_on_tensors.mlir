@@ -71,11 +71,9 @@ func @tile_generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   flow.dispatch.workgroups
-// CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[ARG1]], %[[D0]], %[[D1]])
+// CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[ARG1]])
 // CHECK-NEXT:     %[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
-// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
 //  CHECK-DAG:     %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG2]], {{.*}}
 //  CHECK-DAG:     %[[LOAD3:.+]] = flow.dispatch.tensor.load %[[ARG3]], {{.*}}
@@ -162,10 +160,8 @@ func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tensor<?x
 //   CHECK-DAG:     %[[N:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //   CHECK-DAG:     %[[K:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //       CHECK:     %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[K]], %[[M]], %[[C1]]]
-//  CHECK-SAME:       (%[[ARG0]], %[[M]], %[[K]])
+//  CHECK-SAME:       (%[[ARG0]])
 //  CHECK-NEXT:       (%[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
-//  CHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>) {
 //       CHECK:          %[[ONE:.+]] = constant 1.0
 //   CHECK-DAG:          %[[INPUT:.+]] = flow.dispatch.tensor.load %[[ARG2]]
@@ -658,27 +654,31 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
       } -> tensor<9xi1>
   return %256 : tensor<9xi1>
 }
-// CHECK-LABEL: func @inline_dag_3
+
+//       CHECK: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+
+//       CHECK: func @inline_dag_3
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<9xi32>
 //  CHECK-SAME:   %[[ARG1:.+]]: tensor<18xi32>
 //  CHECK-SAME:   %[[ARG2:.+]]: tensor<i32>
 //       CHECK:   %[[UPDATE:.+]] = flow.tensor.update %[[ARG0]], %[[ARG1]]
 //       CHECK:   flow.dispatch.workgroups
-//  CHECK-SAME:     (%[[UPDATE]], %[[ARG2]])
-//  CHECK-NEXT:     (%[[ARG3:.+]]: !flow.dispatch.tensor<readonly:18xi32>
-//  CHECK-SAME:      %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:i32>,
+//  CHECK-SAME:     (%[[ARG2]], %[[UPDATE]])
+//  CHECK-NEXT:     (%[[ARG3:.+]]: !flow.dispatch.tensor<readonly:i32>,
+//  CHECK-SAME:      %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:18xi32>,
 //   CHECK-DAG:     %[[C5:.+]] = constant 5 : i32
 //   CHECK-DAG:     %[[C0:.+]] = constant 0 : i32
 //   CHECK-DAG:     %[[C9:.+]] = constant 9 : i32
 //   CHECK-DAG:     %[[ARG3V:.+]] = flow.dispatch.tensor.load %[[ARG3]]
-//   CHECK-DAG:     %[[ARG4V:.+]] = flow.dispatch.tensor.load %[[ARG4]]
-//   CHECK-DAG:     %[[EXTRACT:.+]] = tensor.extract %[[ARG4V]]
+//   CHECK-DAG:     %[[EXTRACT:.+]] = tensor.extract %[[ARG3V]]
 //   CHECK-DAG:     %[[CMP1:.+]] = cmpi slt, %[[EXTRACT]]
 //   CHECK-DAG:     %[[SELECT1:.+]] = select %[[CMP1]], %[[EXTRACT]], %[[C9]]
 //   CHECK-DAG:     %[[CMP2:.+]] = cmpi sgt, %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[SELECT2:.+]] = select %[[CMP2]], %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[INDEX_CAST:.+]] = index_cast %[[SELECT2]]
-//   CHECK-DAG:     tensor.extract_slice %[[ARG3V]][%[[INDEX_CAST]]]
+//       CHECK:     scf.for %[[IV0:.+]] =
+//       CHECK:       %[[OFFSET:.+]] = affine.apply #[[MAP0]](%[[IV0]])[%[[INDEX_CAST]]
+//       CHECK:       %[[ARG4V:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [%[[OFFSET]]
 //       CHECK:     flow.return
 
 // -----
@@ -1051,3 +1051,25 @@ func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : ten
 //      CHECK:       flow.dispatch.tensor.store %[[SCATTER_TILE]], %[[ARG5]], offsets = [], sizes = [], strides = []
 // CHECK-NEXT:     }
 //      CHECK:  return %[[RESULT]]
+
+// -----
+
+// Check that we are distributing along the last three dimensions for NHWC-output pooling op.
+
+func @pooling_nwhc_sum_static(%input: tensor<1x33x33x160xf32>) -> tensor<1x1x1x160xf32> {
+  %cst = constant 0.0 : f32
+  %1 = linalg.init_tensor [1, 1, 1, 160] : tensor<1x1x1x160xf32>
+  %2 = linalg.fill(%cst, %1) : f32, tensor<1x1x1x160xf32> -> tensor<1x1x1x160xf32>
+  %3 = linalg.init_tensor [33, 33] : tensor<33x33xf32>
+  %4 = linalg.pooling_nhwc_sum {dilations = dense<1> : vector<2xi64>, strides = dense<33> : vector<2xi64>} ins(%input, %3 : tensor<1x33x33x160xf32>, tensor<33x33xf32>) outs(%2 : tensor<1x1x1x160xf32>) -> tensor<1x1x1x160xf32>
+  return %4 : tensor<1x1x1x160xf32>
+}
+
+// CHECK-LABEL: func @pooling_nwhc_sum_static
+//       CHECK:   flow.dispatch.workgroups
+//  CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<readonly:1x33x33x160xf32>, %[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x1x1x160xf32>)
+//       CHECK:     scf.for %[[Z:.+]] =
+//       CHECK:       scf.for %[[Y:.+]] =
+//       CHECK:         scf.for %[[X:.+]] =
+//       CHECK:           %[[POOL:.+]] = linalg.pooling_nhwc_sum
+//       CHECK:           flow.dispatch.tensor.store %[[POOL]], %[[OUTPUT]], offsets = [0, %[[Z]], %[[Y]], %[[X]]], sizes = [1, %{{.+}}, %{{.+}}, %{{.+}}]

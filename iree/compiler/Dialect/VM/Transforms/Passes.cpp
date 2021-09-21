@@ -22,19 +22,17 @@ namespace VM {
 void buildVMTransformPassPipeline(OpPassManager &passManager,
                                   TargetOptions targetOptions) {
   passManager.addNestedPass<mlir::FuncOp>(createLoopCoalescingPass());
-  passManager.addNestedPass<mlir::FuncOp>(createLoopFusionPass());
   passManager.addNestedPass<mlir::FuncOp>(createLoopInvariantCodeMotionPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
   passManager.addNestedPass<mlir::FuncOp>(createLowerToCFGPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
   passManager.addPass(createConversionPass(targetOptions));
 
-  passManager.addNestedPass<VM::ModuleOp>(createHoistInlinedRodataPass());
-  passManager.addNestedPass<VM::ModuleOp>(createDeduplicateRodataPass());
-  passManager.addNestedPass<VM::ModuleOp>(createGlobalInitializationPass());
+  passManager.addNestedPass<IREE::VM::ModuleOp>(createHoistInlinedRodataPass());
+  passManager.addNestedPass<IREE::VM::ModuleOp>(createDeduplicateRodataPass());
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
+      createGlobalInitializationPass());
 
   passManager.addPass(createInlinerPass());
   passManager.addPass(createCanonicalizerPass());
@@ -42,7 +40,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
 
   passManager.addPass(createSymbolDCEPass());
   if (targetOptions.optimizeForStackSize) {
-    passManager.addNestedPass<VM::ModuleOp>(createSinkDefiningOpsPass());
+    passManager.addNestedPass<IREE::VM::ModuleOp>(createSinkDefiningOpsPass());
   }
 }
 

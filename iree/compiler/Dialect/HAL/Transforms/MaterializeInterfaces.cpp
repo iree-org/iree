@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -59,16 +60,7 @@ static LogicalResult declareVariantOps(IREE::Flow::ExecutableOp sourceOp,
             sourceOp.getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
     targetSymbolTable.insert(targetContainerOp);
     OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-    auto moduleOp = containerBuilder.create<ModuleOp>(sourceOp.getLoc());
-
-    // TODO(benvanik): something more structured here; for now we just copy over
-    // any dialect attrs from the configuration to the inner module.
-    auto configAttr = targetAttr.getConfiguration();
-    if (configAttr) {
-      for (auto item : configAttr) {
-        moduleOp->setAttr(item.first, item.second);
-      }
-    }
+    containerBuilder.create<ModuleOp>(sourceOp.getLoc());
   }
 
   // Ensure that at least one target op got created. If it didn't that means
@@ -580,6 +572,8 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
 
   for (auto regionOperand : llvm::enumerate(regionOperands)) {
     auto blockArg = entryBlock->getArgument(regionOperand.index());
+    if (blockArg.use_empty()) continue;
+
     auto &value = regionOperand.value();
     switch (value.type) {
       case RegionOperand::Type::PUSH_CONSTANT: {
@@ -596,15 +590,43 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
           offset = entryBuilder.createOrFold<mlir::ConstantIndexOp>(
               clonedFuncOp.getLoc(), value.bindingOffset.staticOffset);
         }
-        auto bindingSymRefAttr = entryBuilder.getSymbolRefAttr(
-            interfaceOp.sym_name(),
-            {entryBuilder.getSymbolRefAttr(value.bindingOp)});
+
+        auto bindingSymRefAttr = SymbolRefAttr::get(
+            entryBuilder.getContext(), interfaceOp.sym_name(),
+            {SymbolRefAttr::get(value.bindingOp)});
+
+        SmallVector<Value, 4> dynamicDims;
+        auto blockArgType = blockArg.getType().cast<Flow::DispatchTensorType>();
+        OpBuilder::InsertionGuard guard(entryBuilder);
+
+        if (!blockArgType.hasStaticShape()) {
+          // We can expect its first user to be a tie_shape op to associate
+          // concrete dimension values. Originally we have such information
+          // maintained in the flow ops handling dynamic tensors. But during
+          // flow executable outlining, such information is transfered to
+          // tie_shape ops.
+          auto tieShapeOp =
+              cast<Flow::DispatchTieShapeOp>(*blockArg.user_begin());
+
+          entryBuilder.setInsertionPointAfter(
+              tieShapeOp.shape().getDefiningOp());
+
+          // Get the SSA values for all dynamic dimensions.
+          dynamicDims.reserve(blockArgType.getNumDynamicDims());
+          for (int i = 0; i < blockArgType.getRank(); ++i) {
+            if (!blockArgType.isDynamicDim(i)) continue;
+            dynamicDims.push_back(entryBuilder.create<Shape::RankedDimOp>(
+                tieShapeOp.getLoc(), tieShapeOp.shape(), i));
+          }
+          assert(dynamicDims.size() == blockArgType.getNumDynamicDims());
+        }
+
         auto subspanOp =
             entryBuilder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-                clonedFuncOp.getLoc(), blockArg.getType(), bindingSymRefAttr,
-                /*byte_offset=*/offset,
-                /*byte_length=*/Value{});
+                clonedFuncOp.getLoc(), blockArgType, bindingSymRefAttr,
+                /*byte_offset=*/offset, /*byte_length=*/Value{}, dynamicDims);
         blockArg.replaceAllUsesWith(subspanOp);
+
         break;
       }
       default:
@@ -640,8 +662,7 @@ void InterfaceBuilder::applyUsageMappings() {
         case DispatchBinding::Type::CONSTANT_STORAGE:
           attrs.push_back(IREE::HAL::ExConstantStorageAttr::get(
               builder.getStringAttr(usage.bindingOp.getName()),
-              builder.getStringAttr(
-                  usage.constant.constantBuffer.getLeafReference()),
+              usage.constant.constantBuffer.getLeafReference(),
               builder.getIndexAttr(usage.constant.minimumOffset),
               builder.getIndexAttr(usage.constant.maximumOffset -
                                    usage.constant.minimumOffset + 1)));
@@ -707,14 +728,13 @@ static void defineConstantBindings(FuncOp entryFuncOp,
     for (auto &operandInfo : constantInfo.getSecond()) {
       storageUsages.resize(operandInfo.constantRanges.size());
       for (auto attr : llvm::enumerate(operandInfo.constantRanges)) {
-        auto byteRangeAttr = attr.value().cast<ByteRangeAttr>();
+        auto byteRangeAttr = attr.value().cast<IREE::Util::ByteRangeAttr>();
         auto &usage = storageUsages[attr.index()];
         usage.constantBuffer = operandInfo.constantBuffer;
-        usage.minimumOffset = std::min(byteRangeAttr.offset().getSExtValue(),
-                                       usage.minimumOffset);
+        usage.minimumOffset =
+            std::min(byteRangeAttr.getOffset(), usage.minimumOffset);
         usage.maximumOffset = std::max(
-            (byteRangeAttr.offset() + byteRangeAttr.length()).getSExtValue() -
-                1,
+            (byteRangeAttr.getOffset() + byteRangeAttr.getLength()) - 1,
             usage.maximumOffset);
       }
     }
@@ -745,10 +765,9 @@ static void defineConstantBindings(FuncOp entryFuncOp,
     for (auto &operandInfo : constantInfo.getSecond()) {
       auto &operandOffset = storageOffsets[operandInfo.operandIndex];
       for (auto attr : llvm::enumerate(operandInfo.constantRanges)) {
-        auto byteRangeAttr = attr.value().cast<ByteRangeAttr>();
+        auto byteRangeAttr = attr.value().cast<IREE::Util::ByteRangeAttr>();
         auto &usage = storageUsages[attr.index()];
-        int64_t offset =
-            byteRangeAttr.offset().getSExtValue() - usage.minimumOffset;
+        int64_t offset = byteRangeAttr.getOffset() - usage.minimumOffset;
         switch (operandOffset) {
           case INT64_MIN:
             // First use; take offset directly as a starting point.
@@ -1075,9 +1094,8 @@ static LogicalResult declareEntryPointOps(
       targetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
           dispatchEntryOp.getLoc(),
           targetBuilder.getStringAttr(dispatchEntryOp.function_ref()),
-          targetBuilder.getIndexAttr(ordinal),
-          targetBuilder.getSymbolRefAttr(interfaceOp), ArrayAttr{},
-          IntegerAttr{});
+          targetBuilder.getIndexAttr(ordinal), SymbolRefAttr::get(interfaceOp),
+          ArrayAttr{}, IntegerAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();

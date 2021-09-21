@@ -2,8 +2,8 @@
 
 #config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
 
-hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @matmul_static_shape_f16  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -12,9 +12,9 @@ hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} 
     hal.executable.entry_point @matmul_static_shape_f16 attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module {
       func @matmul_static_shape_f16() {
         %cst = constant 0.000000e+00 : f16
         %c0 = constant 0 : index
@@ -45,7 +45,7 @@ hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} 
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -68,8 +68,8 @@ hal.executable @matmul_static_shape_f16 attributes {sym_visibility = "private"} 
 
 #config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
 
-hal.executable @matmul_static_shape_f32 attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @matmul_static_shape_f32  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -78,9 +78,9 @@ hal.executable @matmul_static_shape_f32 attributes {sym_visibility = "private"} 
     hal.executable.entry_point @matmul_static_shape_f32 attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module {
       func @matmul_static_shape_f32() {
         %c0 = constant 0 : index
         %cst = constant 0.000000e+00 : f32
@@ -111,7 +111,7 @@ hal.executable @matmul_static_shape_f32 attributes {sym_visibility = "private"} 
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

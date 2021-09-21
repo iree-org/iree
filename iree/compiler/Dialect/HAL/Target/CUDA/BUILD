@@ -41,7 +41,6 @@ cc_library(
     ],
     deps = [
         ":cuda_libdevice",
-        "//iree/base/internal:flatcc",
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
@@ -55,6 +54,7 @@ cc_library(
         "@llvm-project//llvm:NVPTXCodeGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:NVVMDialect",

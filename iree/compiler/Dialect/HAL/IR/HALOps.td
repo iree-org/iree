@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
@@ -28,7 +29,7 @@ class HAL_MakeTupleOp<string mnemonic, list<OpTrait> traits = []> :
 // TODO(benvanik): remove these as the sequencer/other HAL ops are added.
 
 def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let results = (outs
     HAL_Device:$result
@@ -112,7 +113,7 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
 //===----------------------------------------------------------------------===//
 
 def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer allocation size computation operation}];
   let description = [{
@@ -159,7 +160,7 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
 }
 
 def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     SameVariadicOperandSize,
   ]> {
   let summary = [{buffer view indices to byte offset computation operation}];
@@ -210,7 +211,7 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
 }
 
 def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     SameVariadicOperandSize,
   ]> {
   let summary = [{buffer view byte range computation operation}];
@@ -266,7 +267,7 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
 }
 
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{empty buffer allocation operation}];
@@ -297,7 +298,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
 }
 
 def HAL_AllocatorConstantOp : HAL_Op<"allocator.constant", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{constant buffer allocation operation}];
   let description = [{
@@ -330,7 +331,7 @@ def HAL_AllocatorConstantOp : HAL_Op<"allocator.constant", [
 }
 
 def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{allocator-supported host buffer wrapping operation}];
@@ -365,7 +366,7 @@ def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
 }
 
 def HAL_AllocatorPackOp : HAL_PureOp<"allocator.pack", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     AttrSizedOperandSegments,
   ]> {
   let summary = [{packs variable-sized slices into a single slab}];
@@ -473,7 +474,7 @@ def HAL_AllocatorPackOp : HAL_PureOp<"allocator.pack", [
 //===----------------------------------------------------------------------===//
 
 def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer allocator accessor operation}];
   let description = [{
@@ -497,7 +498,7 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
 }
 
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
   let summary = [{buffer subspan operation}];
@@ -523,7 +524,7 @@ def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
 }
 
 def HAL_BufferLengthOp : HAL_PureOp<"buffer.length", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer byte length accessor}];
   let description = [{
@@ -593,7 +594,7 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
 //===----------------------------------------------------------------------===//
 
 def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer view reference initializer}];
   let description = [{
@@ -640,7 +641,7 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
 }
 
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer view buffer accessor}];
   let description = [{
@@ -664,7 +665,7 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
 }
 
 def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{buffer view buffer byte length accessor}];
   let description = [{
@@ -821,7 +822,7 @@ def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
 //===----------------------------------------------------------------------===//
 
 def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{command buffer allocation operation}];
   let description = [{
@@ -1236,7 +1237,7 @@ def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
   ]> {
   let summary = [{pool of constants with similar lifetimes}];
   let description = [{
-    A pool of constants that share a similiar lifetime and that should be stored
+    A pool of constants that share a similar lifetime and that should be stored
     together both in the source files and at runtime. By logically grouping
     constants by their frequency and locality of access we can reduce the number
     of bindings required on hal.interface by sourcing constants from the same
@@ -1245,11 +1246,20 @@ def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_BufferConstraintsAttr:$buffer_constraints
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1283,13 +1293,24 @@ def HAL_ConstantPoolValueOp : HAL_Op<"constant_pool.value", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    ElementsAttr:$value
+    Util_AnySerializableAttr:$value
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Attribute":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value);
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
@@ -1304,20 +1325,36 @@ def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     TypeAttr:$tensor_type,
     SymbolRefAttr:$storage_buffer,
-    HAL_ByteRangeAttr:$storage_range,
+    Util_ByteRangeAttr:$storage_range,
     OptionalAttr<SymbolRefAttr>:$runtime_buffer,
-    OptionalAttr<HAL_ByteRangeAttr>:$runtime_range
+    OptionalAttr<Util_ByteRangeAttr>:$runtime_range
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `:` $tensor_type
     `=` $storage_buffer `[` $storage_range `]`
     (`->` $runtime_buffer^ `[` $runtime_range `]`)?
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Type":$tensor_type,
+      "::mlir::FlatSymbolRefAttr":$storage_buffer,
+      "::mlir::Attribute":$storage_range,
+      "::mlir::SymbolRefAttr":$runtime_buffer,
+      "::mlir::Attribute":$runtime_range
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, tensor_type, storage_buffer,
+            storage_range, runtime_buffer, runtime_range);
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
@@ -1331,21 +1368,33 @@ def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     ElementsAttr:$value,
     OptionalAttr<SymbolRefAttr>:$runtime_buffer,
-    OptionalAttr<HAL_ByteRangeAttr>:$runtime_range
+    OptionalAttr<Util_ByteRangeAttr>:$runtime_range
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value
     (`->` $runtime_buffer^ `[` $runtime_range `]`)?
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::ElementsAttr":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value, SymbolRefAttr{},
+            IREE::Util::ByteRangeAttr{});
+    }]>
+  ];
 }
 
 def HAL_ConstantPoolLoadOp : HAL_PureOp<"constant_pool.load", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{constant pool tensor load pseudo-op}];
   let description = [{
@@ -1387,18 +1436,29 @@ def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
   }];
 
   let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    ElementsAttr:$value
+    Util_AnySerializableAttr:$value
   );
 
   let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
     $sym_name `=` $value attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::mlir::Attribute":$value
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, value);
+    }]>
+  ];
 }
 
 def HAL_ConstantStorageLookupOp :
     HAL_PureOp<"constant_storage.lookup", [
-      DeclareOpInterfaceMethods<OpAsmOpInterface>,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     ]> {
   let summary = [{constant storage byte buffer accessor}];
   let description = [{
@@ -1418,7 +1478,7 @@ def HAL_ConstantStorageLookupOp :
 }
 
 def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{runtime constant buffer lookup pseudo-op}];
   let description = [{
@@ -1428,7 +1488,7 @@ def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
 
   let arguments = (ins
     SymbolRefAttr:$runtime_buffer,
-    HAL_ByteRangeAttr:$runtime_range
+    Util_ByteRangeAttr:$runtime_range
   );
   let results = (outs
     AnyRankedTensor:$result
@@ -1445,7 +1505,7 @@ def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
 //===----------------------------------------------------------------------===//
 
 def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     SameVariadicOperandSize,
   ]> {
   let summary = [{allocates a descriptor set from the device pool}];
@@ -1493,7 +1553,7 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
 
 def HAL_DescriptorSetLayoutCreateOp :
   HAL_PureOp<"descriptor_set_layout.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{creates a descriptor set layout}];
   let description = [{
@@ -1522,7 +1582,7 @@ def HAL_DescriptorSetLayoutCreateOp :
 }
 
 def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{descriptor set layout cache lookup pseudo-op}];
   let description = [{
@@ -1553,7 +1613,7 @@ def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup",
 //===----------------------------------------------------------------------===//
 
 def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{device allocator accessor operation}];
   let description = [{
@@ -1749,11 +1809,20 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name
     // TODO(benvanik): entry point types for verification.
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1798,7 +1867,8 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
     FlatSymbolRefAttr:$interface,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
@@ -1815,7 +1885,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
-      build($_builder, $_state, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
             workgroup_size, workgroup_local_memory, 0);
     }]>,
     OpBuilder<(ins
@@ -1825,8 +1895,19 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
-      build($_builder, $_state, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
             workgroup_size, workgroup_local_memory, 0);
+    }]>,
+    OpBuilder<(ins
+      "::mlir::StringAttr":$sym_name,
+      "::mlir::IntegerAttr":$ordinal,
+      "::mlir::FlatSymbolRefAttr":$interface,
+      "::mlir::ArrayAttr":$workgroup_size,
+      "::mlir::IntegerAttr":$workgroup_local_memory,
+      "int":$workgroup_count_regionCount
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
+            workgroup_size, workgroup_local_memory, workgroup_count_regionCount);
     }]>
   ];
 
@@ -1859,11 +1940,21 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     HAL_ExecutableTargetAttr:$target
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    `,` `target` `=` $target
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1900,12 +1991,19 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     StrAttr:$format,
     HAL_ExecutableDataAttr:$data,
     OptionalAttr<StrAttr>:$mime_type
     // TODO(benvanik): add compatibility and versioning attributes.
   );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1923,7 +2021,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
 }
 
 def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{creates an executable}];
   let description = [{
@@ -1956,7 +2054,7 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
 }
 
 def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{executable cache lookup pseudo-op}];
   let description = [{
@@ -1984,7 +2082,7 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
     OpBuilder<(ins "Value":$device, "StringRef":$executable),
     [{
       $_state.addOperands({device});
-      $_state.addAttribute("executable", $_builder.getSymbolRefAttr(executable));
+      $_state.addAttribute("executable", mlir::SymbolRefAttr::get($_builder.getContext(), executable));
       $_state.addTypes({ExecutableType::get($_builder.getContext())});
     }]>,
   ];
@@ -2024,11 +2122,20 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     OptionalAttr<IndexAttr>:$push_constants
   );
 
   let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -2085,12 +2192,37 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
     IndexAttr:$set,
     IndexAttr:$binding,
     HAL_DescriptorTypeAttr:$type,
     HAL_MemoryAccessBitfieldAttr:$access
   );
+
+  // TODO(scotttodd): enable assemblyFormat after figuring out how to keep
+  //   quotes around "type" and "access". The custom printer uses stringify*
+  // let assemblyFormat = [{
+  //   custom<SymbolVisibility>($sym_visibility)
+  //   $sym_name
+  //   `,` `set` `` `=` `` $set
+  //   `,` `binding` `` `=` `` $binding
+  //   `,` `type` `` `=` `` $type
+  //   `,` `access` `` `=` `` $access
+  //   attr-dict-with-keyword
+  // }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$sym_name,
+      "::llvm::APInt":$set,
+      "::llvm::APInt":$binding,
+      "IREE::HAL::DescriptorType":$type,
+      "IREE::HAL::MemoryAccessBitfield":$access
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, set, binding, type, access);
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     /// Returns a hash for the descriptor, considering the set, binding,
@@ -2100,7 +2232,7 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
 }
 
 def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{returns the index of the current workgroup in the grid}];
   let description = [{
@@ -2126,7 +2258,7 @@ def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
 }
 
 def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{returns the total workgroup count of the grid}];
   let description = [{
@@ -2153,7 +2285,7 @@ def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
 }
 
 def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{returns the size of each workgroup in invocations}];
   let description = [{
@@ -2200,7 +2332,9 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
 }
 
 def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
-    MemoryEffects<[MemAlloc]>]> {
+    AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>,
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>
+  ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
     // TODO(benvanik): add description
@@ -2209,7 +2343,8 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   let arguments = (ins
     SymbolRefAttr:$binding,
     HAL_DeviceSize:$byte_offset,
-    Optional<HAL_DeviceSize>:$byte_length
+    Optional<HAL_DeviceSize>:$byte_length,
+    HAL_ShapeDynamicDims:$dynamic_dims
   );
   let results = (outs
     Res<AnyType, "", [MemAlloc]>:$result
@@ -2217,8 +2352,10 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
 
   let assemblyFormat = [{
     $binding `[` $byte_offset ( `,` $byte_length^ )? `]`
-    attr-dict `:` type($result)
+    attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
+
+  let verifier = [{ return verifyInterfaceBindingSubspanOp(*this); }];
 
   let extraClassDeclaration = [{
     /// Returns the hal.interface.binding op associated with this op.
@@ -2232,7 +2369,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
 //===----------------------------------------------------------------------===//
 
 def HAL_ExecutableLayoutCreateOp : HAL_PureOp<"executable_layout.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{creates an executable layout}];
   let description = [{
@@ -2265,7 +2402,7 @@ def HAL_ExecutableLayoutCreateOp : HAL_PureOp<"executable_layout.create", [
 }
 
 def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{executable layout cache lookup pseudo-op}];
   let description = [{
@@ -2298,7 +2435,7 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 //===----------------------------------------------------------------------===//
 
 def HAL_SemaphoreCreateOp : HAL_Op<"semaphore.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
   let summary = [{semaphore allocation operation}];
   let description = [{

@@ -19,20 +19,23 @@ package(
 )
 
 BACKEND_TESTS = [
+    "dynamic_abs.mlir",
+    "dynamic_add.mlir",
+    "dynamic_dot.mlir",
+    "dynamic_reduce_min.mlir",
+    "dynamic_torch_index_select_high_rank.mlir",
+    "dynamic_torch_index_select_negative.mlir",
+    "dynamic_torch_index_select_scalar.mlir",
+    "dynamic_torch_index_select_vector.mlir",
     "linalg_ops.mlir",
+    "linalg_ext_ops.mlir",
+    "tensor_insert_slice.mlir",
 ]
 
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "dynamic_abs.mlir",
-            "dynamic_add.mlir",
-            "dynamic_dot.mlir",
-            "dynamic_torch_index_select_high_rank.mlir",
-            "dynamic_torch_index_select_negative.mlir",
-            "dynamic_torch_index_select_scalar.mlir",
-            "dynamic_torch_index_select_vector.mlir",
             "globals.mlir",
             "scalar.mlir",
             "tensor_cast.mlir",
@@ -49,7 +52,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
-            "linalg_ext_ops.mlir",
+            "lowering_config.mlir",
         ] + BACKEND_TESTS,
     ),
     data = [
@@ -62,9 +65,9 @@ iree_lit_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_regression_linalg_ops_dylib-llvm-aot",
+    name = "check_regression_dylib-llvm-aot",
     srcs = [
-        "linalg_ext_ops.mlir",
+        "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "dylib",
@@ -72,7 +75,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_regression_linalg_ops_vmvx",
+    name = "check_regression_vmvx",
     srcs = BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vmvx",
@@ -80,9 +83,25 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_regression_linalg_ops_vulkan-spirv",
+    name = "check_regression_vulkan-spirv",
     srcs = BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_cuda",
+    srcs = BACKEND_TESTS,
+    compiler_flags = ["-iree-input-type=mhlo"],
+    driver = "cuda",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
 )

@@ -5,7 +5,7 @@
 //       CHECK:   vector.transfer_read %{{.+}}[%c0], {{.+}} memref<4xf32, #{{.+}}>, vector<4xf32>
 //       CHECK:   addf %{{.*}}, %{{.*}} : vector<4xf32>
 //       CHECK:   vector.transfer_write {{.*}} : vector<4xf32>, memref<4xf32
-hal.executable @elementwise_static_shape attributes {sym_visibility = "private"} {
+hal.executable private @elementwise_static_shape  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
@@ -16,10 +16,7 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.5, [Shader], []>,
-        NVIDIA:DiscreteGPU, {subgroup_size = 32 : i32}>} {
+    builtin.module {
       func @elementwise_static_shape() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128xf32>
@@ -40,7 +37,7 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -57,21 +54,18 @@ hal.executable @elementwise_static_shape attributes {sym_visibility = "private"}
 //   CHECK-NOT:   vector.transfer_read
 //       CHECK:   scf.for
 //       CHECK:     scf.for
-hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
+hal.executable private @elementwise_transpose  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
+  hal.executable.variant @vulkan, target = #hal.executable.target<"spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @elementwise_transpose attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    module attributes {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.5, [Shader], []>,
-        NVIDIA:DiscreteGPU, {subgroup_size = 32 : i32}>} {
+    builtin.module {
       func @elementwise_transpose() {
         %c0 = constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128x8xf32>
@@ -92,7 +86,7 @@ hal.executable @elementwise_transpose attributes {sym_visibility = "private"} {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

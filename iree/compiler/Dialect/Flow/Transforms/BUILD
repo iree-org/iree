@@ -33,6 +33,7 @@ cc_library(
     srcs = [
         "ConvertConv2D1x1ToMatmulPass.cpp",
         "ConvertConv2DToImg2ColPass.cpp",
+        "ConvertLinalgMatmulToMmt4D.cpp",
         "ConvertToFlow.cpp",
         "DeduplicateExecutables.cpp",
         "DestructiveUpdateUtils.cpp",
@@ -45,7 +46,6 @@ cc_library(
         "InjectDispatchTracing.cpp",
         "InsertConstantClones.cpp",
         "InterchangeGenericOps.cpp",
-        "MatmulToMMT4dConversion.cpp",
         "OutlineDispatchRegions.cpp",
         "OutlineLargeConstants.cpp",
         "PadLinalgOps.cpp",
@@ -89,6 +89,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],

@@ -2,8 +2,8 @@
 
 #config = {tileSizes = [[1, 8, 64, 4], [], [1, 8, 4, 4]]}
 
-hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @batch_matmul_static_shape  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -12,9 +12,9 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
     hal.executable.entry_point @batch_matmul_static_shape attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8, 1]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8, 1]}
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module {
       func @batch_matmul_static_shape() {
         %c0 = constant 0 : index
         %c4 = constant 4 : index
@@ -54,7 +54,7 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -84,19 +84,19 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 //      CHECK:  %[[BCNTY:.+]] = hal.interface.workgroup.count[1]
 //      CHECK:  %[[BIDZ:.+]] = hal.interface.workgroup.id[2]
 //      CHECK:  %[[BCNTZ:.+]] = hal.interface.workgroup.count[2]
-//      CHECK:  scf.for %[[IVZ:.+]] = %[[BIDZ]] to %{{.+}} step %[[BCNTZ]]
 //      CHECK:  %[[BOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
 //      CHECK:  %[[UBY:.+]] = affine.apply #[[MAP0]]()[%[[BCNTY]]]
-//      CHECK:  scf.for %[[IVY:.+]] = %[[BOFFSET_Y]] to %{{.+}} step %[[UBY]]
 //      CHECK:  %[[BOFFSET_X:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
 //      CHECK:  %[[UBX:.+]] = affine.apply #[[MAP1]]()[%[[BCNTX]]]
-//      CHECK:  %[[SUBVIEW_ARG0:.+]] = memref.subview %[[ARG0]]
-// CHECK-SAME:      [%[[IVZ]], %[[IVY]], 0] [1, 8, 1024]
 //      CHECK:  %[[IIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //      CHECK:  %[[IIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //      CHECK:  %[[IIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //  CHECK-DAG:  %[[IOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[IIDY]]]
 //  CHECK-DAG:  %[[IOFFSET_X:.+]] = affine.apply #[[MAP2]]()[%[[IIDX]]]
+//      CHECK:  scf.for %[[IVZ:.+]] = %[[BIDZ]] to %{{.+}} step %[[BCNTZ]]
+//      CHECK:  scf.for %[[IVY:.+]] = %[[BOFFSET_Y]] to %{{.+}} step %[[UBY]]
+//      CHECK:  %[[SUBVIEW_ARG0:.+]] = memref.subview %[[ARG0]]
+// CHECK-SAME:      [%[[IVZ]], %[[IVY]], 0] [1, 8, 1024]
 //      CHECK:  scf.for %[[IVX:.+]] = %[[BOFFSET_X]] to %{{.+}} step %[[UBX]]
 //      CHECK:  %[[SUBVIEW_ARG1:.+]] = memref.subview %[[ARG1]]
 // CHECK-SAME:      [%[[IVZ]], 0, %[[IVX]]] [1, 1024, 64]
@@ -370,8 +370,8 @@ hal.executable @batch_matmul_static_shape attributes {sym_visibility = "private"
 
 #config = {tileSizes = [[1, 8, 64, 4], [], [1, 8, 4, 4]]}
 
-hal.executable @fused_fill_batch_matmul attributes {sym_visibility = "private"} {
-  hal.interface @io attributes {sym_visibility = "private"} {
+hal.executable private @fused_fill_batch_matmul  {
+  hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
@@ -380,9 +380,9 @@ hal.executable @fused_fill_batch_matmul attributes {sym_visibility = "private"} 
     hal.executable.entry_point @fused_fill_batch_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [64, 8, 1]}
+      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8, 1]}
     }
-    module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}  {
+    builtin.module {
       func @fused_fill_batch_matmul() {
         %zero = constant 0.0 : f32
         %c0 = constant 0 : index
@@ -422,7 +422,7 @@ hal.executable @fused_fill_batch_matmul attributes {sym_visibility = "private"} 
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
+      hal.interface private @io  {
         hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
         hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
         hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"

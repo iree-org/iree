@@ -76,8 +76,6 @@ static bool hasRootOpAttribute(Operation *op) {
 }
 /// Removes root attribute. Asserts if root attribute is not present.
 static void removeRootOpAttribute(Operation *op) {
-  assert(op->hasAttr(kRootOpAttr) &&
-         "removing root attribute from op that is not a root attribute");
   op->removeAttr(kRootOpAttr);
 }
 /// Sets the root attribute for an operation. The root attribute needs a number
@@ -133,18 +131,6 @@ static void removeFusionGroupsAttribute(Operation *op) {
 // Utility methods
 //===----------------------------------------------------------------------===//
 
-/// Returns the number of consecutive outer loops that are "parallel". This is a
-/// copy of the function from
-/// iree/compiler/Codegen/CodegenUtils/FunctionUtils.h that is duplicated
-/// here to avoid adding an build dependency.
-static size_t getNumOuterParallelLoops(linalg::LinalgOp op) {
-  return op.iterator_types()
-      .getValue()
-      .take_while(
-          [](Attribute attr) -> bool { return isParallelIterator(attr); })
-      .size();
-}
-
 /// Given the `shape` of the computation with the first element being the
 /// slowest varying and last element being the fastest warying returns the
 /// workload value with
@@ -198,7 +184,7 @@ static bool isRootOp(Operation *op) {
   }
   return (isa<linalg::LinalgOp>(op) &&
           !isa<linalg::GenericOp, linalg::FillOp>(op)) ||
-         isa<linalg_ext::LinalgExtOp>(op);
+         isa<linalg_ext::TiledOpInterface>(op);
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
@@ -655,19 +641,19 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
 /// Returns the loops that are partitioned during dispatch region formations, in
 /// order, i.e. starting from the outer-most to innermost.
 static SmallVector<unsigned> getPartitionedLoops(Operation *op) {
-  SmallVector<unsigned> partitionedLoops;
   if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
     return {0, 1};
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    size_t numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
-    partitionedLoops =
-        llvm::to_vector<4>(llvm::seq<unsigned>(0, numOuterParallelLoops));
-    if (partitionedLoops.size() > kNumMaxParallelDims) {
-      partitionedLoops.erase(
-          partitionedLoops.begin(),
-          std::next(partitionedLoops.begin(),
-                    numOuterParallelLoops - kNumMaxParallelDims));
+    SmallVector<unsigned> partitionedLoops;
+    for (auto indexedIterator : llvm::enumerate(linalgOp.iterator_types())) {
+      if (isParallelIterator(indexedIterator.value())) {
+        partitionedLoops.push_back(indexedIterator.index());
+      }
+    }
+    // Only keep the last kNumMaxParallelDims if we have more than that.
+    while (partitionedLoops.size() > kNumMaxParallelDims) {
+      partitionedLoops.erase(partitionedLoops.begin());
     }
     return partitionedLoops;
   }
@@ -808,29 +794,24 @@ struct TiledOpInterfacePattern
   using Base = linalg_ext::TiledOpInterfaceBaseTilingPattern;
   using Base::TiledOpInterfaceBaseTilingPattern;
 
-  LogicalResult matchAndRewrite(Operation *op,
+  LogicalResult matchAndRewrite(linalg_ext::TiledOpInterface tilableOp,
                                 PatternRewriter &rewriter) const override {
-    // Check if the op implements the LinalgExt interface and the
-    // TiledOpInterface.
-    auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op);
-    auto linalgExtOp = dyn_cast<linalg_ext::LinalgExtOp>(op);
-    if (!linalgExtOp || !tilableOp) return failure();
-    if (!hasRootOpAttribute(op)) return failure();
-    if (hasOnlyDimUses(op)) return failure();
+    if (!hasRootOpAttribute(tilableOp)) return failure();
+    if (hasOnlyDimUses(tilableOp)) return failure();
 
     SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
     SmallVector<Range> loopRanges = tilableOp.getLoopBounds(rewriter);
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(tilableOp);
     SmallVector<Value> count;
     for (auto dim : partitionedLoops) {
       count.push_back(loopRanges[dim].size);
     }
-    Location loc = op->getLoc();
+    Location loc = tilableOp->getLoc();
     auto workload = convertToWorkload(rewriter, loc, count);
 
     // Capture dynamic result dimensions.
     SmallVector<Value, 4> resultDynamicDims;
-    for (auto result : linalgExtOp.outputs()) {
+    for (auto result : tilableOp.getDestinationOperands()) {
       resultDynamicDims.append(
           Shape::buildOrFindDynamicDimsForValue(loc, result, rewriter));
     }
@@ -843,10 +824,10 @@ struct TiledOpInterfacePattern
     // output tensors".  Similarly to sequentialized SPMD loops, the semantics
     // is valid assuming a sequential ordering of execution.  After destructive
     // update rewrites, the abstraction gap disappears.
-    auto en =
-        buildOperandLessFlowDispatchWorkgroupOp(rewriter, loc, workload, op);
+    auto en = buildOperandLessFlowDispatchWorkgroupOp(rewriter, loc, workload,
+                                                      tilableOp);
     IREE::Flow::DispatchWorkgroupsOp dispatchOp = en.first;
-    auto clonedOp = cast<linalg_ext::LinalgExtOp>(en.second);
+    Operation *clonedOp = en.second;
     dispatchOp.result_dimsMutable().assign(resultDynamicDims);
 
     // Scoped within DispatchWorkgroupOp.
@@ -855,16 +836,13 @@ struct TiledOpInterfacePattern
 
     linalg_ext::TiledOp tiledOp;
     LogicalResult tilingResult = Base::matchAndRewriteBase(
-        cast<linalg_ext::TiledOpInterface>(clonedOp.getOperation()), rewriter,
-        tiledOp);
+        cast<linalg_ext::TiledOpInterface>(clonedOp), rewriter, tiledOp);
     if (failed(tilingResult)) {
       // GreedyPatternRewriter is not transactional and does not stop on
       // failure. Must explicitly delete on all failure paths.
       rewriter.eraseOp(dispatchOp);
       return failure();
     }
-    // Keep track of the tiledOpOperands for fusion.
-    SmallVector<Value> tiledOperands = clonedOp.getInputAndOutputOperands();
     if (tiledOp.op != clonedOp) {
       rewriter.replaceOp(clonedOp, tiledOp.results);
     }
@@ -873,7 +851,7 @@ struct TiledOpInterfacePattern
     // look into calling `pullInProducersInSameGroup`.
     removeRootOpAttribute(tiledOp.op);
 
-    rewriter.replaceOpWithIf(op, dispatchOp.getResults(),
+    rewriter.replaceOpWithIf(tilableOp, dispatchOp.getResults(),
                              [&](OpOperand &operand) {
                                return !isa<tensor::DimOp>(operand.getOwner());
                              });

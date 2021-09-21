@@ -18,8 +18,11 @@ iree_cc_library(
     "MemorySpace.h"
     "Utils.h"
   SRCS
+    "AdrenoConfig.cpp"
     "ConvertToSPIRVPass.cpp"
     "KernelConfig.cpp"
+    "MaliConfig.cpp"
+    "NVIDIAConfig.cpp"
     "Passes.cpp"
     "SPIRVCopyToWorkgroupMemory.cpp"
     "SPIRVDistributeToGlobalID.cpp"

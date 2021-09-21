@@ -9,12 +9,17 @@ util.global private @v_private_const = 5 : i32
 // -----
 
 // CHECK: vm.global.ref public @v_initialized : !vm.ref<!hal.buffer>
-util.global public @v_initialized initializer(@initializer) : !hal.buffer
+util.global public @v_initialized : !hal.buffer
 // CHECK-NEXT: vm.initializer {
 // CHECK-NEXT:   %[[REF:.+]] = vm.call @initializer() : () -> !vm.ref<!hal.buffer>
 // CHECK-NEXT:   vm.global.store.ref %[[REF]], @v_initialized : !vm.ref<!hal.buffer>
 // CHECK-NEXT:   vm.return
 // CHECK-NEXT: }
+util.initializer {
+  %0 = call @initializer() : () -> !hal.buffer
+  util.global.store %0, @v_initialized : !hal.buffer
+  util.initializer.return
+}
 // CHECK-NEXT: vm.func private @initializer() -> !vm.ref<!hal.buffer>
 func private @initializer() -> !hal.buffer
 
