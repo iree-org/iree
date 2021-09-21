@@ -339,8 +339,7 @@ def load_vm_flatbuffer(vm_flatbuffer: bytes,
   if backend is not None:
     driver = TARGET_BACKEND_TO_DRIVER[backend]
   vm_module = _binding.VmModule.from_flatbuffer(vm_flatbuffer)
-  config = Config(TARGET_BACKEND_TO_DRIVER[backend])
-  bound_module = load_vm_module(vm_module, config)
+  bound_module = load_vm_module(vm_module, Config(driver))
   return bound_module
 
 
