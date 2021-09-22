@@ -21,6 +21,7 @@ iree_lit_test_suite(
         [
             "config_adreno_conv.mlir",
             "config_adreno_matmul.mlir",
+            "config_default_matmul.mlir",
             "config_linalg_ext_ops.mlir",
             "config_linalg_ops.mlir",
             "config_mali_conv.mlir",
