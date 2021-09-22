@@ -74,6 +74,15 @@ PYBIND11_MODULE(_ireeDialects, m) {
       },
       py::arg("context") = py::none(), py::arg("load") = true);
 
+  iree_pydm_m.def(
+      "build_lower_to_iree_pass_pipeline",
+      [](MlirPassManager passManager) {
+        MlirOpPassManager opPassManager =
+            mlirPassManagerGetAsOpPassManager(passManager);
+        mlirIREEPyDMBuildLowerToIREEPassPipeline(opPassManager);
+      },
+      py::arg("pass_manager"));
+
 #define DEFINE_IREEPYDM_NULLARY_TYPE(Name)                                 \
   mlir_type_subclass(iree_pydm_m, #Name "Type", mlirTypeIsAIREEPyDM##Name, \
                      typeClass)                                            \

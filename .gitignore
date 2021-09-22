@@ -4,6 +4,7 @@
 .pytype/
 
 # Visual Studio files
+.env
 .vs/
 .vscode/
 *.sdf

@@ -9,7 +9,7 @@ WORKDIR /install-swiftshader
 
 RUN apt-get update && apt-get install -y git
 
-ARG SWIFTSHADER_COMMIT=e32890c54793664e21891a504793cc8c0c7a34fb
+ARG SWIFTSHADER_COMMIT=755b78dc66b2362621a78b6964a9df3af94e960c
 
 # zlib is needed for compiling SwiftShader.
 RUN apt-get update && apt-get install -y zlib1g-dev

@@ -207,7 +207,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     SmallVector<mlir::ModuleOp, 8> innerModuleOps;
     innerModuleOps.reserve(sourceExecutableOpGroups.size());
-    for (auto hashExecutablePair : sourceExecutableOpGroups) {
+    for (const auto &hashExecutablePair : sourceExecutableOpGroups) {
       llvm::hash_code hash = hashExecutablePair.first;
       const auto &sourceExecutableOps = hashExecutablePair.second;
 

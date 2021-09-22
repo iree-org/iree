@@ -23,7 +23,7 @@ endif()
 # a CMake min version of 3.0, which causes them to set it locally to OLD.
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 
-project(iree-compiler-backend LANGUAGES C CXX)
+project(iree-compiler-api LANGUAGES C CXX)
 
 # Directory layout.
 # When building in-tree, this directory exists relative to the overall
@@ -79,6 +79,10 @@ set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
 # TODO: Consider removing this upstream and just using the main
 # MLIR_ENABLE_BINDINGS_PYTHON option.
 set(MHLO_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
+
+# Required IREE settings.
+set(IREE_BUILD_PYTHON_BINDINGS ON CACHE BOOL "" FORCE)
+set(IREE_BUILD_OLD_PYTHON_COMPILER_API OFF CACHE BOOL "" FORCE)
 
 # TODO: Fix this upstream. Each of these system include hacks is broken in
 # a different way, so there is not an easy local fix. They should be removed

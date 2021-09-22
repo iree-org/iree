@@ -226,9 +226,9 @@ static inline const iree_vm_register_remap_list_t* VM_DecBranchOperandsImpl(
 #define VM_DecOperandRegF64(name)                          \
   *((double*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
   pc += kRegSize;
-#define VM_DecOperandRegRef(name, out_is_move)             \
-  &regs.ref[OP_I16(0) & regs.ref_mask];                    \
-  *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
+#define VM_DecOperandRegRef(name, out_is_move)                      \
+  &regs.ref[OP_I16(0) & regs.ref_mask];                             \
+  *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
   pc += kRegSize;
 #define VM_DecVariadicOperands(name) \
   VM_DecVariadicOperandsImpl(bytecode_data, &pc)
@@ -252,9 +252,9 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
 #define VM_DecResultRegF64(name)                          \
   ((double*)&regs.i32[OP_I16(0) & (regs.i32_mask & ~1)]); \
   pc += kRegSize;
-#define VM_DecResultRegRef(name, out_is_move)              \
-  &regs.ref[OP_I16(0) & regs.ref_mask];                    \
-  *(out_is_move) = OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT; \
+#define VM_DecResultRegRef(name, out_is_move)                       \
+  &regs.ref[OP_I16(0) & regs.ref_mask];                             \
+  *(out_is_move) = 0; /*= OP_I16(0) & IREE_REF_REGISTER_MOVE_BIT;*/ \
   pc += kRegSize;
 #define VM_DecVariadicResults(name) VM_DecVariadicOperands(name)
 
