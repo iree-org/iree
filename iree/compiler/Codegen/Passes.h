@@ -116,10 +116,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass(bool lowerToVectors = true);
 
-/// Pad linalg ops workgroup tiles into the next integer multiple of the target
-/// vector size.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUPadWorkgroupTilesPass();
-
 /// Converts linalg.conv into linalg.generic with a CPU-friendly iteration
 /// order.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUPlanConvLoopOrderPass();
