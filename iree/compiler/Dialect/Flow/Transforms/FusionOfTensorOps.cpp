@@ -79,12 +79,35 @@ struct FusionOfTensorOpsPass
                           consumer.getOwner()->operand_end());
           if (operands.size() >= kIreeMaxOperandCount) return false;
 
-          llvm::SmallDenseSet<Operation *, 4> numUsers;
-          for (Operation *user : producer.getUsers()) {
-            if (isa<linalg::GenericOp>(user)) continue;
-            numUsers.insert(user);
+          bool isBroadcast = false;
+          if (auto genericOp =
+                  dyn_cast<linalg::GenericOp>(producer.getOwner())) {
+            bool parallelOp =
+                llvm::all_of(genericOp.iterator_types(), [](Attribute attr) {
+                  return attr.cast<StringAttr>().getValue() ==
+                         getParallelIteratorTypeName();
+                });
+            if (parallelOp) {
+              for (OpOperand *opOperand : genericOp.getInputOperands()) {
+                AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
+                if (indexingMap.isProjectedPermutation() &&
+                    indexingMap.getNumDims() != indexingMap.getNumResults()) {
+                  isBroadcast = true;
+                  break;
+                }
+              }
+            }
           }
-          return numUsers.empty();
+          // Only fuse if it has a single linalg generic user. It is a
+          // simplistic heuristic to avoid duplicating ops that may be
+          // expensive.
+          // TODO: Add a cost model to allow ops to be duplicated.
+          if (!isBroadcast && !isa<ConstantOp>(producer.getOwner()) &&
+              !llvm::hasSingleElement(producer.getUsers()))
+            return false;
+          return llvm::all_of(producer.getUsers(), [](Operation *user) {
+            return isa<linalg::GenericOp>(user);
+          });
         };
     // Simple heuristic to decide if reshaope should be folded in the linalg.
     // If the source of the reshape is a linalg op fold to potentially allow the
