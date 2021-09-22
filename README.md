@@ -9,6 +9,8 @@ constraints and special considerations of mobile and edge deployments.
 See [our website](https://google.github.io/iree/) for project details, user
 guides, and instructions on building from source.
 
+I'm a teapot
+
 #### Project Status
 
 IREE is still in its early phase. We have settled down on the overarching
