@@ -177,12 +177,11 @@ func @scatter_update_scalar_1D(%arg0: tensor<8xi32>, %arg1: tensor<4x1xi32>,
     "mhlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
-    scatter_dimension_numbers = {
-      index_vector_dim = 1 : i64,
-      inserted_window_dims = dense<0> : tensor<1xi64>,
-      scatter_dims_to_operand_dims = dense<0> : tensor<1xi64>,
-      update_window_dims = dense<> : tensor<0xi64>
-    },
+    scatter_dimension_numbers = #mhlo.scatter<
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1,
+    >,
     unique_indices = false
   } : (tensor<8xi32>, tensor<4x1xi32>, tensor<4xi32>) -> tensor<8xi32>
   return %0 : tensor<8xi32>
@@ -206,12 +205,11 @@ func @scatter_update_scalar_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>,
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
     "mhlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {indices_are_sorted = false,
-      scatter_dimension_numbers = {
-        index_vector_dim = 1 : i64,
-        inserted_window_dims = dense<[0, 1]> : tensor<2xi64>,
-        scatter_dims_to_operand_dims = dense<[0, 1]> : tensor<2xi64>,
-        update_window_dims = dense<> : tensor<0xi64>
-      },
+      scatter_dimension_numbers = #mhlo.scatter<
+        inserted_window_dims = [0, 1],
+        scatter_dims_to_operand_dims = [0, 1],
+        index_vector_dim = 1,
+      >,
       unique_indices = false
   } : (tensor<4x3xi32>, tensor<3x2xi32>, tensor<3xi32>) -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
@@ -236,12 +234,12 @@ func @scatter_update_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
     "mhlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
-    scatter_dimension_numbers = {
-      index_vector_dim = 1 : i64,
-      inserted_window_dims = dense<0> : tensor<1xi64>,
-      scatter_dims_to_operand_dims = dense<0> : tensor<1xi64>,
-      update_window_dims = dense<1> : tensor<1xi64>
-    },
+    scatter_dimension_numbers = #mhlo.scatter<
+      update_window_dims = [1],
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1,
+    >,
     unique_indices = false
   } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x3xi32>) -> tensor<6x3xi32>
   return %0 : tensor<6x3xi32>
@@ -267,12 +265,12 @@ func @scatter_add_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
     "mhlo.return"(%1) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
-    scatter_dimension_numbers = {
-      index_vector_dim = 1 : i64,
-      inserted_window_dims = dense<0> : tensor<1xi64>,
-      scatter_dims_to_operand_dims = dense<0> : tensor<1xi64>,
-      update_window_dims = dense<1> : tensor<1xi64>
-    },
+    scatter_dimension_numbers = #mhlo.scatter<
+      update_window_dims = [1],
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1,
+    >,
     unique_indices = false
   } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x3xi32>) -> tensor<6x3xi32>
   return %0 : tensor<6x3xi32>
@@ -300,12 +298,11 @@ func @scatter_update_batch_scalar_1D(%arg0: tensor<8xi32>,
     "mhlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
-    scatter_dimension_numbers = {
-      index_vector_dim = 2 : i64,
-      inserted_window_dims = dense<0> : tensor<i64>,
-      scatter_dims_to_operand_dims = dense<0> : tensor<1xi64>,
-      update_window_dims = dense<> : tensor<0xi64>
-    },
+    scatter_dimension_numbers = #mhlo.scatter<
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 2,
+    >,
     unique_indices = false
   } : (tensor<8xi32>, tensor<3x4x1xi32>, tensor<3x4xi32>) -> tensor<8xi32>
   return %0 : tensor<8xi32>
@@ -333,12 +330,12 @@ func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
     "mhlo.return"(%arg4) : (tensor<i32>) -> ()
   }) {indices_are_sorted = false,
-      scatter_dimension_numbers = {
-        index_vector_dim = 2 : i64,
-        inserted_window_dims = dense<[0, 1]> : tensor<2xi64>,
-        scatter_dims_to_operand_dims = dense<[0, 1]> : tensor<2xi64>,
-        update_window_dims = dense<2> : tensor<1xi64>
-      },
+      scatter_dimension_numbers = #mhlo.scatter<
+        update_window_dims = [2],
+        inserted_window_dims = [0, 1],
+        scatter_dims_to_operand_dims = [0, 1],
+        index_vector_dim = 2,
+      >,
       unique_indices = false
   } : (tensor<1x24x512xi32>, tensor<?x3x2xi32>, tensor<?x3x512xi32>) -> tensor<1x24x512xi32>
   return %0 : tensor<1x24x512xi32>
