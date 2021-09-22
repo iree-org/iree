@@ -245,6 +245,49 @@ def LinalgExt_FftOp : LinalgExt_Op<"fft", [
   }];
 }
 
+def LinalgExt_ReverseOp : LinalgExt_Op<"reverse", [
+  DeclareOpInterfaceMethods<TiledOpInterface, ["generateScalarImplementation"]>,
+  DeclareOpInterfaceMethods<LinalgExtInterface,
+                            // ReverseOp does not have a region, so we have to
+                            // overwrite the method.
+                            ["payloadUsesValueFromOperand"]>]> {
+  let summary = "Reverse operator";
+  let description = [{
+    A temporary solution of a reverse op. The loop bound of the reverse
+    dimension is half of the shape because we can simply swap elements. E.g.,
+
+    for (int i = 0; i < n / 2; ++i) {
+      std::swap(a[i], a[n - 1 - i]);
+    }
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       I64Attr:$dimension
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    `dimension` `(` $dimension `)`
+    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`:` type($results)^)?
+  }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value operand() {
+      return getOutputOperand(0)->get();
+}
+    ShapedType getOperandType() {
+      return operand().getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType().getRank();
+    }
+    ArrayRef<int64_t> getOperandShape() {
+      return getOperandType().getShape();
+    }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//
