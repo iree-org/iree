@@ -79,11 +79,30 @@ struct FusionOfTensorOpsPass
                           consumer.getOwner()->operand_end());
           if (operands.size() >= kIreeMaxOperandCount) return false;
 
+          bool isBroadcast = false;
+          if (auto genericOp =
+                  dyn_cast<linalg::GenericOp>(producer.getOwner())) {
+            bool parallelOp =
+                llvm::all_of(genericOp.iterator_types(), [](Attribute attr) {
+                  return attr.cast<StringAttr>().getValue() ==
+                         getParallelIteratorTypeName();
+                });
+            if (parallelOp) {
+              for (OpOperand *opOperand : genericOp.getInputOperands()) {
+                AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
+                if (indexingMap.isProjectedPermutation() &&
+                    indexingMap.getNumDims() != indexingMap.getNumResults()) {
+                  isBroadcast = true;
+                  break;
+                }
+              }
+            }
+          }
           // Only fuse if it has a single linalg generic user. It is a
           // simplistic heuristic to avoid duplicating ops that may be
           // expensive.
           // TODO: Add a cost model to allow ops to be duplicated.
-          if (!isa<ConstantOp>(producer.getOwner()) &&
+          if (!isBroadcast && !isa<ConstantOp>(producer.getOwner()) &&
               !llvm::hasSingleElement(producer.getUsers()))
             return false;
           return llvm::all_of(producer.getUsers(), [](Operation *user) {
