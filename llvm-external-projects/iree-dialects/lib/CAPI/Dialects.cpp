@@ -8,7 +8,13 @@
 
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
+#include "mlir/CAPI/IR.h"
+#include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
+#include "mlir/CAPI/Support.h"
+#include "mlir/CAPI/Utils.h"
+#include "mlir/CAPI/Wrap.h"
 
 //===----------------------------------------------------------------------===//
 // IREEDialect
@@ -58,4 +64,10 @@ MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
 
   auto cppType = unwrap(primitive).cast<mlir::iree_pydm::PrimitiveType>();
   return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), cppType));
+}
+
+void mlirIREEPyDMBuildLowerToIREEPassPipeline(MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  // TODO: Should be a pass pipeline, not loose passes in the C impl.
+  passManagerCpp->addPass(mlir::iree_pydm::createConvertIREEPyDMToIREEPass());
 }
