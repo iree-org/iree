@@ -8,6 +8,7 @@
 #define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_C_DIALECTS_H
 
 #include "mlir-c/IR.h"
+#include "mlir-c/Pass.h"
 #include "mlir-c/Registration.h"
 
 #ifdef __cplusplus
@@ -49,6 +50,10 @@ IREEPYDM_DECLARE_NULLARY_TYPE(Type)
 MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDMObject(MlirType type);
 MLIR_CAPI_EXPORTED MlirType mlirIREEPyDMObjectTypeGet(MlirContext context,
                                                       MlirType primitive);
+
+/// Builds a pass pipeline which lowers the iree_pydm dialect to IREE.
+MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildLowerToIREEPassPipeline(
+    MlirOpPassManager passManager);
 
 #ifdef __cplusplus
 }
