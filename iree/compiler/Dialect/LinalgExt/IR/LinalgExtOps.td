@@ -246,15 +246,11 @@ def LinalgExt_FftOp : LinalgExt_Op<"fft", [
 }
 
 def LinalgExt_ReverseOp : LinalgExt_Op<"reverse", [
-  DeclareOpInterfaceMethods<TiledOpInterface,
-                            [
-                              "generateScalarImplementation"
-                            ]>,
+  DeclareOpInterfaceMethods<TiledOpInterface, ["generateScalarImplementation"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface,
                             // ReverseOp does not have a region, so we have to
                             // overwrite the method.
-                            ["payloadUsesValueFromOperand"]>
-]> {
+                            ["payloadUsesValueFromOperand"]>]> {
   let summary = "Reverse operator";
   let description = [{
     A temporary solution of a reverse op. The loop bound of the reverse
@@ -279,7 +275,7 @@ def LinalgExt_ReverseOp : LinalgExt_Op<"reverse", [
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value operand() {
       return getOutputOperand(0)->get();
-    }
+}
     ShapedType getOperandType() {
       return operand().getType().cast<ShapedType>();
     }
