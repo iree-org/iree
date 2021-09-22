@@ -117,13 +117,13 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       mlir::createLinalgFoldUnitExtentDimsPass());
   passManager.addNestedPass<mlir::FuncOp>(createInterchangeGenericOpsPass());
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<mlir::FuncOp>(createFusionOfTensorOpsPass());
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
   if (clEnableLinalgDetensorize) {
     passManager.addNestedPass<mlir::FuncOp>(
         mlir::createLinalgDetensorizePass());
   }
-  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<mlir::FuncOp>(
       createConvertToFlowBeforeDispatchFormation());
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
