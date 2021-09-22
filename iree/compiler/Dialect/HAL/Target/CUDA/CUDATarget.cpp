@@ -34,6 +34,12 @@
 static llvm::cl::opt<bool> dumpPtx("iree-cuda-dump-ptx", llvm::cl::init(false),
                                    llvm::cl::desc("Dump ptx"));
 
+static llvm::cl::opt<bool> clDisableLoopNounrollWa(
+    "iree-hal-cuda-disable-loop-nounroll-wa",
+    llvm::cl::desc(
+        "Disable the workaround for bug in ptxas for CUDA version before 11.4"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -51,7 +57,9 @@ static std::string translateModuleToISA(llvm::Module &module,
     // the no unroll metadata. This bug is fixed in cuda 11.4 but since we still
     // run on older driver we need to keep it.
     // TODO(thomasraoux): Remove it once we stop supporting older drivers.
-    codegenPasses.add(llvm::createSetNoUnrollPass());
+    if (!clDisableLoopNounrollWa) {
+      codegenPasses.add(llvm::createSetNoUnrollPass());
+    }
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
                                       llvm::CGFT_AssemblyFile);
     codegenPasses.run(module);
