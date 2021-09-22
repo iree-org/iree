@@ -81,6 +81,8 @@ else()
   option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 endif()
 
+option(IREE_BUILD_OLD_PYTHON_COMPILER_API "Builds the original Python compiler API" ON)
+
 #-------------------------------------------------------------------------------
 # Experimental project flags
 #-------------------------------------------------------------------------------
@@ -438,7 +440,7 @@ if(IREE_BUILD_TESTS)
   enable_testing(iree)
 endif()
 
-if(IREE_BUILD_PYTHON_BINDINGS)
+if(IREE_BUILD_PYTHON_BINDINGS AND NOT pybind11_FOUND)
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
 endif()
 
