@@ -717,6 +717,9 @@ struct TileAndDistributeLinalgOpsPattern
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
     if (!hasRootOpAttribute(op)) return failure();
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
 
     // TODO(ravishankarm): It is getting strange to track when to apply this
     // pattern and when not to. Need to revisit this, with dynamic shape cases
@@ -798,6 +801,9 @@ struct TiledOpInterfacePattern
                                 PatternRewriter &rewriter) const override {
     if (!hasRootOpAttribute(tilableOp)) return failure();
     if (hasOnlyDimUses(tilableOp)) return failure();
+    if (tilableOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
 
     SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
     SmallVector<Range> loopRanges = tilableOp.getLoopBounds(rewriter);
@@ -1079,7 +1085,7 @@ static unsigned decideFusableLinalgOps(mlir::FuncOp funcOp) {
     // order here.
     for (Operation &op : llvm::reverse(block)) {
       // Start with a root operation and fuse its producers.
-      if (!isRootOp(&op)) continue;
+      if (hasFusionGroupsAttribute(&op) || !isRootOp(&op)) continue;
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
 
