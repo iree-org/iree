@@ -172,24 +172,21 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     auto indicesRank = indicesType.getRank();
 
     if (indicesRank < 2) return false;
-    if (dimNumbers.index_vector_dim().getInt() != indicesRank - 1) return false;
+    if (dimNumbers.getIndexVectorDim() != indicesRank - 1) return false;
 
     auto indexDepth = indicesType.getShape().back();
-    auto scatterDimsToOperandDims =
-        extract1DVector(dimNumbers.scatter_dims_to_operand_dims());
+    auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
     if (scatterDimsToOperandDims.size() != indexDepth) return false;
     for (auto en : llvm::enumerate(scatterDimsToOperandDims)) {
       if (en.index() != en.value()) return false;
     }
 
-    auto insertedWindowDims =
-        extract1DVector(dimNumbers.inserted_window_dims());
+    auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
     for (auto en : llvm::enumerate(insertedWindowDims)) {
       if (en.index() != en.value()) return false;
     }
 
-    auto updateWindowDims = extract1DVector(dimNumbers.update_window_dims());
-    for (auto en : llvm::enumerate(updateWindowDims)) {
+    for (auto en : llvm::enumerate(dimNumbers.getUpdateWindowDims())) {
       if (en.index() + insertedWindowDims.size() != en.value()) return false;
     }
 

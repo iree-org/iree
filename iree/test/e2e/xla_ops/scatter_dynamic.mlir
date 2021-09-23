@@ -9,12 +9,12 @@ func @scatter_add_slice_2D_dynamic_num_updates() {
     "mhlo.return"(%1) : (tensor<i32>) -> ()
   }) {
     indices_are_sorted = false,
-    scatter_dimension_numbers = {
-      index_vector_dim = 1 : i64,
-      inserted_window_dims = dense<0> : tensor<1xi64>,
-      scatter_dims_to_operand_dims = dense<0> : tensor<1xi64>,
-      update_window_dims = dense<1> : tensor<1xi64>
-    },
+    scatter_dimension_numbers = #mhlo.scatter<
+      update_window_dims = [1],
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1,
+    >,
     unique_indices = false
   } : (tensor<6x3xi32>, tensor<?x1xi32>, tensor<?x3xi32>) -> tensor<6x3xi32>
   check.expect_eq_const(%0, dense<[[1, 1, 1],

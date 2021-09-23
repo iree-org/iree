@@ -13,6 +13,7 @@ filegroup(
     srcs = glob([
         "include/iree-dialects/Dialect/IREE/*.td",
         "include/iree-dialects/Dialect/IREEPyDM/IR/*.td",
+        "include/iree-dialects/Dialect/IREEPyDM/Transforms/*.td",
     ]),
 )
 
@@ -144,20 +145,50 @@ gentbl_cc_library(
     ],
 )
 
+gentbl_cc_library(
+    name = "IREEPyDMTransformsIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            ["-gen-pass-decls"],
+            "include/iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h.inc",
+        ),
+        (
+            ["-gen-pass-capi-header"],
+            "include/iree-dialects/Dialect/IREEPyDM/Transforms/Passes.capi.h.inc",
+        ),
+        (
+            ["-gen-pass-capi-impl"],
+            "include/iree-dialects/Dialect/IREEPyDM/Transforms/Passes.capi.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/IREEPyDM/Transforms/Passes.td",
+    deps = [
+        ":TdFiles",
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
 cc_library(
     name = "IREEPyDMDialect",
     srcs = glob([
         "lib/Dialect/IREEPyDM/IR/*.cpp",
     ]),
-    hdrs = glob(["include/iree-dialects/Dialect/IREEPyDM/IR/*.h"]),
+    hdrs = glob([
+        "include/iree-dialects/Dialect/IREEPyDM/IR/*.h",
+        "include/iree-dialects/Dialect/IREEPyDM/Transforms/*.h",
+    ]),
     includes = ["include"],
     deps = [
         ":IREEPyDMInterfacesIncGen",
         ":IREEPyDMOpsIncGen",
+        ":IREEPyDMTransformsIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:CallOpInterfaces",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
     ],
 )

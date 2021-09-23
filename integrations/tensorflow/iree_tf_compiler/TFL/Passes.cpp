@@ -12,6 +12,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/tosa/tfl_passes.h"
+#include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
 namespace mlir {
 namespace iree_integrations {
@@ -41,6 +42,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
 
   mlir::tosa::TOSATFLLegalizationPipelineOptions tosaOptions;
   mlir::tosa::createTFLtoTOSALegalizationPipeline(pm, tosaOptions);
+  mlir::tosa::createStripQuantTypesPass();
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
