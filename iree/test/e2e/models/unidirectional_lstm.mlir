@@ -74,8 +74,8 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
     dimension_numbers = #mhlo.gather<
       collapsed_slice_dims = [0],
       index_vector_dim = 0,
-			offset_dims = [0, 1],
-			start_index_map = [0],
+      offset_dims = [0, 1],
+      start_index_map = [0],
     >,
     slice_sizes = dense<1> : tensor<3xi64>
   } : (tensor<5x1x1xf32>, tensor<i64>) -> tensor<1x1xf32>
@@ -87,8 +87,8 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
     dimension_numbers = #mhlo.gather<
       collapsed_slice_dims = [0],
       index_vector_dim = 0,
-			offset_dims = [0, 1],
-			start_index_map = [0],
+      offset_dims = [0, 1],
+      start_index_map = [0],
     >,
     slice_sizes = dense<[1, 1, 64]> : tensor<3xi64>
   } : (tensor<5x1x64xf32>, tensor<i64>) -> tensor<1x64xf32>
