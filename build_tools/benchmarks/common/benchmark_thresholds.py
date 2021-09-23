@@ -41,13 +41,13 @@ class BenchmarkThreshold:
 # match is used.
 BENCHMARK_THRESHOLDS = [
     # Unstable and noisy GPU benchmarks.
-    BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 90,
+    BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 20,
                        ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Mali"), 30,
                        ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileSSD.*GPU-Mali"), 90,
+    BenchmarkThreshold(re.compile(r"^MobileSSD.*GPU-Mali"), 30,
                        ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^PoseNet.*GPU-Mali"), 90,
+    BenchmarkThreshold(re.compile(r"^PoseNet.*GPU-Mali"), 30,
                        ThresholdUnit.PERCENTAGE),
 
     # Fast GPU benchmarks that complete around 10ms; using percentage is
