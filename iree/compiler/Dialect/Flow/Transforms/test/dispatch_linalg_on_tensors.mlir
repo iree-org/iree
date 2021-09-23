@@ -1073,3 +1073,26 @@ func @pooling_nwhc_sum_static(%input: tensor<1x33x33x160xf32>) -> tensor<1x1x1x1
 //       CHECK:         scf.for %[[X:.+]] =
 //       CHECK:           %[[POOL:.+]] = linalg.pooling_nhwc_sum
 //       CHECK:           flow.dispatch.tensor.store %[[POOL]], %[[OUTPUT]], offsets = [0, %[[Z]], %[[Y]], %[[X]]], sizes = [1, %{{.+}}, %{{.+}}, %{{.+}}]
+
+// -----
+
+func @named_op_outs_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %cst1 = constant -1.0 : f64
+  %cstm1 = constant 1.0 : f64
+  %c12345 = constant 12345 : i32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
+  %fill = linalg.fill_rng_2d ins(%cst1, %cstm1, %c12345 : f64, f64, i32)
+      outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %matmul = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %matmul : tensor<?x?xf32>
+}
+// CHECK-LABEL: func @named_op_outs_fusion
+//       CHECK:   flow.dispatch.workgroups
+//       CHECK:     %[[FILL:.+]] = linalg.fill_rng_2d
+//       CHECK:     linalg.matmul
+//  CHECK-SAME:       outs(%[[FILL]] : tensor<?x?xf32>)
