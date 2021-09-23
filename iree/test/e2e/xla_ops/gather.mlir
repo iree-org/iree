@@ -7,12 +7,12 @@ func @foo() {
     [[21, 22, 23, 24, 25]]]> : tensor<5x1x5xi32>
   %start_indices = util.unfoldable_constant dense<2> : tensor<i64>
   %res = "mhlo.gather"(%input, %start_indices) {
-    dimension_numbers = {
-      collapsed_slice_dims = dense<0> : tensor<1xi64>,
-      index_vector_dim = 0 : i64,
-      offset_dims = dense<[0, 1]> : tensor<2xi64>,
-      start_index_map = dense<0> : tensor<1xi64>
-    },
+    dimension_numbers = #mhlo.gather<
+      collapsed_slice_dims = [0],
+      index_vector_dim = 0,
+			offset_dims = [0, 1],
+			start_index_map = [0],
+    >,
     slice_sizes = dense<[1, 1, 5]> : tensor<3xi64>
   } : (tensor<5x1x5xi32>, tensor<i64>) -> tensor<1x5xi32>
   check.expect_eq_const(%res, dense<[[11, 12, 13, 14, 15]]> : tensor<1x5xi32>) : tensor<1x5xi32>

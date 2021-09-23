@@ -70,12 +70,28 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
   cond_br %41, ^bb2(%26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>), ^bb3(%26, %31, %32, %33, %37, %38, %39 : tensor<i64>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
 ^bb2(%42: tensor<i64>, %43: tensor<i64>, %44: tensor<40xf32>, %45: tensor<i64>, %46: tensor<74x40xf32>, %47: tensor<i64>, %48: tensor<1x10xf32>, %49: tensor<1x10xf32>, %50: tensor<5x1x64xf32>, %51: tensor<5x1x1xf32>, %52: tensor<5x1x1xf32>, %53: tensor<5xi64>, %54: tensor<5x1x10xf32>, %55: tensor<5x1x10xf32>):  // pred: ^bb1
   %56 = mhlo.add %42, %cst_5 : tensor<i64>
-  %57 = "mhlo.gather"(%51, %42) {dimension_numbers = {collapsed_slice_dims = dense<0> : tensor<1xi64>, index_vector_dim = 0 : i64, offset_dims = dense<[0, 1]> : tensor<2xi64>, start_index_map = dense<0> : tensor<1xi64>}, slice_sizes = dense<1> : tensor<3xi64>, start_index_map = dense<0> : tensor<1xi64>} : (tensor<5x1x1xf32>, tensor<i64>) -> tensor<1x1xf32>
+  %57 = "mhlo.gather"(%51, %42) {
+    dimension_numbers = #mhlo.gather<
+      collapsed_slice_dims = [0],
+      index_vector_dim = 0,
+			offset_dims = [0, 1],
+			start_index_map = [0],
+    >,
+    slice_sizes = dense<1> : tensor<3xi64>
+  } : (tensor<5x1x1xf32>, tensor<i64>) -> tensor<1x1xf32>
   %58 = "mhlo.reshape"(%57) : (tensor<1x1xf32>) -> tensor<1xf32>
   %59 = "mhlo.broadcast_in_dim"(%58) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1xf32>) -> tensor<1x10xf32>
   %60 = mhlo.multiply %59, %6 : tensor<1x10xf32>
   %61 = "mhlo.compare"(%60, %7) {comparison_direction = "GT"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
-  %62 = "mhlo.gather"(%50, %42) {dimension_numbers = {collapsed_slice_dims = dense<0> : tensor<1xi64>, index_vector_dim = 0 : i64, offset_dims = dense<[0, 1]> : tensor<2xi64>, start_index_map = dense<0> : tensor<1xi64>}, slice_sizes = dense<[1, 1, 64]> : tensor<3xi64>} : (tensor<5x1x64xf32>, tensor<i64>) -> tensor<1x64xf32>
+  %62 = "mhlo.gather"(%50, %42) {
+    dimension_numbers = #mhlo.gather<
+      collapsed_slice_dims = [0],
+      index_vector_dim = 0,
+			offset_dims = [0, 1],
+			start_index_map = [0],
+    >,
+    slice_sizes = dense<[1, 1, 64]> : tensor<3xi64>
+  } : (tensor<5x1x64xf32>, tensor<i64>) -> tensor<1x64xf32>
   %63 = "mhlo.concatenate"(%62, %49) {dimension = 1 : i64} : (tensor<1x64xf32>, tensor<1x10xf32>) -> tensor<1x74xf32>
   %64 = "mhlo.dot"(%63, %46) {precision_config = ["DEFAULT", "DEFAULT"]} : (tensor<1x74xf32>, tensor<74x40xf32>) -> tensor<1x40xf32>
   %65 = "mhlo.reshape"(%44) : (tensor<40xf32>) -> tensor<1x40xf32>
