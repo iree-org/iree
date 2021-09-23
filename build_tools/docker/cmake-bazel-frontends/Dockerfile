@@ -12,15 +12,15 @@ RUN wget "https://github.com/google-research/google-research/tarball/${KWS_COMMI
   && tar --extract --gzip --file=google-research.tar.gz \
     --wildcards */kws_streaming --strip-components=1
 
-FROM gcr.io/iree-oss/cmake-python@sha256:51817f1a98f9ed9237577133b4c674b163280fd747c1745d6d0d93f0f2b01fb3 AS final
+FROM gcr.io/iree-oss/cmake-python@sha256:055eba8441ada5e0241f102241747e8d61196dca7f04316a0bfd68d2769883dc AS final
 
 # Install bazel.
-COPY --from=gcr.io/iree-oss/bazel@sha256:5e52c7d43b6fdff35d884b8b8b92b1b6e2151d675019edc92f09018e558e0f94 \
+COPY --from=gcr.io/iree-oss/bazel@sha256:31c3acef0aeb2976b63b8cb946bda1de9bc8b5319b7e079e507afad2a62d13e7 \
   /usr/bin/bazel* \
   /usr/bin/
 
-# Install tensorflow.
-RUN python3 -m pip install tf-nightly==2.7.0.dev20210806
+# Install TensorFlow and make sure the version of Keras we get matches.
+RUN python3 -m pip install keras-nightly==2.7.0.dev2021080600 tf-nightly==2.7.0.dev20210806
 
 # Install JAX.
 RUN python3 -m pip install --upgrade jax jaxlib flax

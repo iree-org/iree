@@ -25,7 +25,7 @@ RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
   && apt-get update \
   && apt-get install -y "bazel=${BAZEL_VERSION?}"
 
-FROM gcr.io/iree-oss/base@sha256:9b73f4e2b1239f65a19f2022e54f4b15310b805570831fbe2cf8b4dc928f1d10 AS final
+FROM gcr.io/iree-oss/base@sha256:e5ad55549adc27d5d1927b7857ff308d9b75fa1be8a110ed848b24e3816127c5 AS final
 ARG BAZEL_VERSION
 COPY --from=install-bazel \
   /usr/bin/bazel* \
