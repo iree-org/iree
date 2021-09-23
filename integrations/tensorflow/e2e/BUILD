@@ -80,7 +80,6 @@ ALL_SRCS = [
 # keep sorted
 TFLITE_FAILING = [
     "concat_test.py",
-    "control_flow_test.py",
     "einsum_dynamic_test.py",
     "einsum_static_test.py",
     "einsum_vector_test.py",
