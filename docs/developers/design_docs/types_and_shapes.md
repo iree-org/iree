@@ -124,7 +124,7 @@ frontends (PyTorch, JAX, TensorFlow, TOSA, etc.)
 
                                     ↓
 
-import dialects (`iree`, `tensor`, `linalg`, etc.)
+import dialects (`standard`, `tensor`, `linalg`, etc.)
 
                                     ↓
 
