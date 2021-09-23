@@ -10,8 +10,8 @@ func @foo() {
     dimension_numbers = #mhlo.gather<
       collapsed_slice_dims = [0],
       index_vector_dim = 0,
-			offset_dims = [0, 1],
-			start_index_map = [0],
+      offset_dims = [0, 1],
+      start_index_map = [0],
     >,
     slice_sizes = dense<[1, 1, 5]> : tensor<3xi64>
   } : (tensor<5x1x5xi32>, tensor<i64>) -> tensor<1x5xi32>
