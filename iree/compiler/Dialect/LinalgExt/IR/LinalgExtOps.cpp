@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SMLoc.h"
@@ -764,17 +765,27 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult verifyReverseOp(ReverseOp op) {
-  if (op.getNumInputs()) {
-    return op.emitOpError("expected no inputs");
+  if (op.getNumInputs() != 1) {
+    return op.emitOpError("expected exactly one input");
   }
   if (op.getNumOutputs() != 1) {
     return op.emitOpError("expected exactly one output");
   }
+  if (op.input().getType() != op.output().getType()) {
+    return op.emitOpError("expected input/output types are identical");
+  }
 
   int64_t rank = op.getOperandRank();
-  int dimension = op.dimension();
-  if (dimension < 0 || dimension >= rank) {
-    return op.emitOpError("dimension must be within (0, ") << rank << "]";
+  llvm::SmallSetVector<int64_t, 4> s;
+  for (auto dim : op.dims()) {
+    if (dim < 0 || dim >= rank) {
+      return op.emitOpError("all the dimensions must be within [0, ")
+             << rank << ")";
+    }
+    if (s.contains(dim)) {
+      return op.emitOpError("expected dimensions numbers are all unique");
+    }
+    s.insert(dim);
   }
 
   return success();
@@ -783,8 +794,9 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
 bool ReverseOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
 
 SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
+  // TODO(hanchung): Mark them parallel after tiling method is implemented.
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
+                                       getReductionIteratorTypeName());
   return iteratorTypes;
 }
 
@@ -794,12 +806,9 @@ SmallVector<Range> ReverseOp::getLoopBounds(OpBuilder &builder) {
   Value one = builder.create<ConstantIndexOp>(loc, 1);
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getOperandRank())) {
-    Value ub = getDimValue(builder, loc, operand(), dim);
+    Value ub = getDimValue(builder, loc, input(), dim);
     ranges.emplace_back(Range{zero, ub, one});
   }
-  auto dim = dimension();
-  ranges[dim].size = builder.create<SignedDivIOp>(
-      loc, ranges[dim].size, builder.create<ConstantIndexOp>(loc, 2));
   return ranges;
 }
 
@@ -807,18 +816,13 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
                                                       Location loc,
                                                       ValueRange ivs) {
   SmallVector<Value> mirrorIndices(ivs.begin(), ivs.end());
-  auto dim = dimension();
-  auto size = getDimValue(b, loc, operand(), dim);
-  size = b.create<SubIOp>(loc, size, b.create<ConstantIndexOp>(loc, 1));
-  mirrorIndices[dim] = b.create<SubIOp>(loc, size, mirrorIndices[dim]);
-
-  // for (int i = 0; i < n / 2; ++i) {
-  //   swap(array[i], array[n - 1 - i]);
-  // }
-  Value v1 = b.create<memref::LoadOp>(loc, operand(), ivs);
-  Value v2 = b.create<memref::LoadOp>(loc, operand(), mirrorIndices);
-  b.create<memref::StoreOp>(loc, v1, operand(), mirrorIndices);
-  b.create<memref::StoreOp>(loc, v2, operand(), ivs);
+  for (auto dim : dims()) {
+    auto size = getDimValue(b, loc, input(), dim);
+    size = b.create<SubIOp>(loc, size, b.create<ConstantIndexOp>(loc, 1));
+    mirrorIndices[dim] = b.create<SubIOp>(loc, size, mirrorIndices[dim]);
+  }
+  Value val = b.create<memref::LoadOp>(loc, input(), ivs);
+  b.create<memref::StoreOp>(loc, val, output(), mirrorIndices);
   return success();
 }
 
