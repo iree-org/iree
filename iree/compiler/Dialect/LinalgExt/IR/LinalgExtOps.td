@@ -253,8 +253,8 @@ def LinalgExt_ReverseOp : LinalgExt_Op<"reverse", [
                             ["payloadUsesValueFromOperand"]>]> {
   let summary = "Reverse operator";
   let description = [{
-    A temporary solution of a reverse op, which allows IREE tiles and
-    distributes reverse ops.
+    A temporary solution for lowering reverse ops into IREE, allowing IREE to
+    tile and distribute them.
     }
   }];
 
