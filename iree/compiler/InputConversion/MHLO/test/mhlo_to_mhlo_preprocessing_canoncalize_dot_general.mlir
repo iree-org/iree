@@ -2,13 +2,14 @@
 
 func @dot_general_to_dot(%arg0: tensor<1x32x128x4xf32>, %arg1: tensor<128x4x8x64xf32>) -> tensor<1x32x8x64xf32> {
   %0 = "mhlo.dot_general"(%arg0, %arg1) {
-      dot_dimension_numbers = {
-        lhs_batching_dimensions = dense<> : tensor<0xi64>,
-        lhs_contracting_dimensions = dense<[2, 3]> : tensor<2xi64>,
-        rhs_batching_dimensions = dense<> : tensor<0xi64>,
-        rhs_contracting_dimensions = dense<[0, 1]> : tensor<2xi64>
-      }, name = "dot_general_to_dot", precision_config = ["DEFAULT", "DEFAULT"]
-    } : (tensor<1x32x128x4xf32>, tensor<128x4x8x64xf32>) -> tensor<1x32x8x64xf32>
+    dot_dimension_numbers = #mhlo.dot<
+      lhs_batching_dimensions = [],
+      lhs_contracting_dimensions = [2, 3],
+      rhs_batching_dimensions = [],
+      rhs_contracting_dimensions = [0, 1],
+    >,
+    precision_config = ["DEFAULT", "DEFAULT"]
+  } : (tensor<1x32x128x4xf32>, tensor<128x4x8x64xf32>) -> tensor<1x32x8x64xf32>
   return %0 : tensor<1x32x8x64xf32>
 }
 
@@ -23,12 +24,13 @@ func @dot_general_to_dot(%arg0: tensor<1x32x128x4xf32>, %arg1: tensor<128x4x8x64
 
 func @dot_general_to_dot_general_rank_reduced(%arg0: tensor<1x8x32x64xf32>, %arg1 : tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32> {
   %0 = "mhlo.dot_general"(%arg0, %arg1) {
-    dot_dimension_numbers = {
-      lhs_batching_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      lhs_contracting_dimensions = dense<3> : tensor<1xi64>,
-      rhs_batching_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      rhs_contracting_dimensions = dense<2> : tensor<1xi64>
-    }, name = "dot_general_to_dot", precision_config = ["DEFAULT", "DEFAULT"]
+    dot_dimension_numbers = #mhlo.dot<
+      lhs_batching_dimensions = [0, 1],
+      lhs_contracting_dimensions = [3],
+      rhs_batching_dimensions = [0, 1],
+      rhs_contracting_dimensions = [2],
+    >,
+    precision_config = ["DEFAULT", "DEFAULT"]
   } : (tensor<1x8x32x64xf32>, tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -43,12 +45,13 @@ func @dot_general_to_dot_general_rank_reduced(%arg0: tensor<1x8x32x64xf32>, %arg
 
 func @dot_general_to_dot_general_rank_reduced_a_transposed(%arg0: tensor<1x8x64x32xf32>, %arg1: tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32> {
   %0 = "mhlo.dot_general"(%arg0, %arg1) {
-    dot_dimension_numbers = {
-      lhs_batching_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      lhs_contracting_dimensions = dense<2> : tensor<1xi64>,
-      rhs_batching_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      rhs_contracting_dimensions = dense<2> : tensor<1xi64>
-    }, name = "dot_general_to_dot_trans_a", precision_config = ["DEFAULT", "DEFAULT"]
+    dot_dimension_numbers = #mhlo.dot<
+      lhs_batching_dimensions = [0, 1],
+      lhs_contracting_dimensions = [2],
+      rhs_batching_dimensions = [0, 1],
+      rhs_contracting_dimensions = [2],
+    >,
+    precision_config = ["DEFAULT", "DEFAULT"]
   } : (tensor<1x8x64x32xf32>, tensor<1x8x64x32xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -63,12 +66,13 @@ func @dot_general_to_dot_general_rank_reduced_a_transposed(%arg0: tensor<1x8x64x
 
 func @dot_general_to_dot_general_rank_reduced_b_transposed(%arg0: tensor<1x8x32x64xf32>, %arg1: tensor<1x8x32x64xf32>) -> tensor<1x8x32x32xf32> {
   %0 = "mhlo.dot_general"(%arg0, %arg1) {
-    dot_dimension_numbers = {
-      lhs_batching_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      lhs_contracting_dimensions = dense<3> : tensor<1xi64>,
-      rhs_batching_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      rhs_contracting_dimensions = dense<3> : tensor<1xi64>
-    }, name = "dot_general_to_dot_trans_b", precision_config = ["DEFAULT", "DEFAULT"]
+    dot_dimension_numbers = #mhlo.dot<
+      lhs_batching_dimensions = [0, 1],
+      lhs_contracting_dimensions = [3],
+      rhs_batching_dimensions = [0,1 ],
+      rhs_contracting_dimensions = [3],
+    >,
+    precision_config = ["DEFAULT", "DEFAULT"]
   } : (tensor<1x8x32x64xf32>, tensor<1x8x32x64xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -85,12 +89,13 @@ func @dot_general_to_dot_general_rank_reduced_b_transposed(%arg0: tensor<1x8x32x
 
 func @dot_general_to_dot_general_rank_reduced_ab_transposed(%arg0: tensor<1x8x64x32xf32>, %arg1: tensor<1x8x32x64xf32>) -> tensor<1x8x32x32xf32> {
   %0 = "mhlo.dot_general"(%arg0, %arg1) {
-    dot_dimension_numbers = {
-      lhs_batching_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      lhs_contracting_dimensions = dense<2> : tensor<1xi64>,
-      rhs_batching_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      rhs_contracting_dimensions = dense<3> : tensor<1xi64>
-    }, name = "dot_general_to_dot_trans_ab", precision_config = ["DEFAULT", "DEFAULT"]
+    dot_dimension_numbers = #mhlo.dot<
+      lhs_batching_dimensions = [0, 1],
+      lhs_contracting_dimensions = [2],
+      rhs_batching_dimensions = [0, 1],
+      rhs_contracting_dimensions = [3],
+    >,
+    precision_config = ["DEFAULT", "DEFAULT"]
   } : (tensor<1x8x64x32xf32>, tensor<1x8x32x64xf32>) -> tensor<1x8x32x32xf32>
   return %0 : tensor<1x8x32x32xf32>
 }
@@ -107,12 +112,12 @@ func @dot_general_to_dot_general_rank_reduced_ab_transposed(%arg0: tensor<1x8x64
 
 func @dot_general_4d_transposed(%arg0: tensor<1x1x8x64xf32>, %arg1: tensor<1x512x8x64xf32>) -> tensor<1x8x1x512xf32> {
   %0 = "mhlo.dot_general"(%arg0, %arg1) {
-    dot_dimension_numbers = {
-      lhs_batching_dimensions = dense<[0, 2]> : tensor<2xi64>,
-      lhs_contracting_dimensions = dense<3> : tensor<1xi64>,
-      rhs_batching_dimensions = dense<[0, 2]> : tensor<2xi64>,
-      rhs_contracting_dimensions = dense<3> : tensor<1xi64>
-    },
+    dot_dimension_numbers = #mhlo.dot<
+      lhs_batching_dimensions = [0, 2],
+      lhs_contracting_dimensions = [3],
+      rhs_batching_dimensions = [0, 2],
+      rhs_contracting_dimensions = [3],
+    >,
     precision_config = ["DEFAULT", "DEFAULT"]
   } : (tensor<1x1x8x64xf32>, tensor<1x512x8x64xf32>) -> tensor<1x8x1x512xf32>
   return %0 : tensor<1x8x1x512xf32>

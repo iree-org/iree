@@ -536,11 +536,9 @@ class TransposeGenericDotGeneral : public OpRewritePattern<mhlo::DotGeneralOp> {
     if (!lhsShapeType || !rhsShapeType || !resultType) return failure();
 
     SmallVector<int64_t> lhsTargetOrder, rhsTargetOrder;
-    mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
-    auto lhsBatchingDims =
-        extract1DVector(dimNumbers.lhs_batching_dimensions());
-    auto lhsContractingDims =
-        extract1DVector(dimNumbers.lhs_contracting_dimensions());
+    mhlo::DotDimensionNumbersAttr dimNumbers = op.dot_dimension_numbers();
+    auto lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
+    auto lhsContractingDims = dimNumbers.getLhsContractingDimensions();
     SmallVector<bool> isLhsParallel(lhsShapeType.getRank(), true);
     for (auto i : lhsBatchingDims) {
       lhsTargetOrder.push_back(i);
@@ -559,10 +557,8 @@ class TransposeGenericDotGeneral : public OpRewritePattern<mhlo::DotGeneralOp> {
     }
 
     SmallVector<bool> isRhsParallel(rhsShapeType.getRank(), true);
-    auto rhsBatchingDims =
-        extract1DVector(dimNumbers.rhs_batching_dimensions());
-    auto rhsContractingDims =
-        extract1DVector(dimNumbers.rhs_contracting_dimensions());
+    auto rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
+    auto rhsContractingDims = dimNumbers.getRhsContractingDimensions();
     for (auto i : rhsBatchingDims) {
       rhsTargetOrder.push_back(i);
       isRhsParallel[i] = false;
@@ -585,19 +581,20 @@ class TransposeGenericDotGeneral : public OpRewritePattern<mhlo::DotGeneralOp> {
 
     int64_t numLhsContractionDims = lhsContractingDims.size();
     int64_t lhsContractionBase = lhsShapeType.getRank() - numLhsContractionDims;
-    int64_t numRhsContractionDims = rhsContractingDims.size();
     int64_t rhsContractionBase = rhsBatchingDims.size();
+    int64_t numRhsContractionDims =
+        rhsContractionBase + rhsContractingDims.size();
     auto lhsBatchingDimsAttr =
-        make1DElementsAttr(rewriter, 0, lhsBatchingDims.size());
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, lhsBatchingDims.size()));
     auto rhsBatchingDimsAttr =
-        make1DElementsAttr(rewriter, 0, rhsBatchingDims.size());
-    auto lhsContractingDimsAttr =
-        make1DElementsAttr(rewriter, lhsContractionBase, numLhsContractionDims);
-    auto rhsContractingDimsAttr =
-        make1DElementsAttr(rewriter, rhsContractionBase, numRhsContractionDims);
-    auto dimensionNumbers = mhlo::DotDimensionNumbers::get(
-        lhsBatchingDimsAttr, rhsBatchingDimsAttr, lhsContractingDimsAttr,
-        rhsContractingDimsAttr, rewriter.getContext());
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, rhsBatchingDims.size()));
+    auto lhsContractingDimsAttr = llvm::to_vector<4>(
+        llvm::seq<int64_t>(lhsContractionBase, lhsShapeType.getRank()));
+    auto rhsContractingDimsAttr = llvm::to_vector<4>(
+        llvm::seq<int64_t>(rhsContractionBase, numRhsContractionDims));
+    auto dimensionNumbers = mhlo::DotDimensionNumbersAttr::get(
+        rewriter.getContext(), lhsBatchingDimsAttr, rhsBatchingDimsAttr,
+        lhsContractingDimsAttr, rhsContractingDimsAttr);
 
     Value result = rewriter.create<mhlo::DotGeneralOp>(
         op.getLoc(), op.getType(), lhs, rhs, dimensionNumbers,
@@ -626,19 +623,15 @@ class RankReducedDotGeneral : public OpRewritePattern<mhlo::DotGeneralOp> {
       return failure();
     if (resultType.getRank() <= 3) return failure();
 
-    mhlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
-    auto lhsBatchingDims = llvm::to_vector<4>(
-        llvm::map_range(dimNumbers.lhs_batching_dimensions(),
-                        [](APInt v) { return v.getSExtValue(); }));
-    auto rhsBatchingDims = llvm::to_vector<4>(
-        llvm::map_range(dimNumbers.rhs_batching_dimensions(),
-                        [](APInt v) { return v.getSExtValue(); }));
-    auto lhsContractingDims = llvm::to_vector<4>(
-        llvm::map_range(dimNumbers.lhs_contracting_dimensions(),
-                        [](APInt v) { return v.getSExtValue(); }));
-    auto rhsContractingDims = llvm::to_vector<4>(
-        llvm::map_range(dimNumbers.rhs_contracting_dimensions(),
-                        [](APInt v) { return v.getSExtValue(); }));
+    mhlo::DotDimensionNumbersAttr dimNumbers = op.dot_dimension_numbers();
+    auto lhsBatchingDims =
+        llvm::to_vector<4>(dimNumbers.getLhsBatchingDimensions());
+    auto rhsBatchingDims =
+        llvm::to_vector<4>(dimNumbers.getRhsBatchingDimensions());
+    auto lhsContractingDims =
+        llvm::to_vector<4>(dimNumbers.getLhsContractingDimensions());
+    auto rhsContractingDims =
+        llvm::to_vector<4>(dimNumbers.getRhsContractingDimensions());
 
     if (lhsBatchingDims.empty() || rhsBatchingDims.empty()) return failure();
 
@@ -730,14 +723,13 @@ class RankReducedDotGeneral : public OpRewritePattern<mhlo::DotGeneralOp> {
     Value reshapedRhs = rewriter.create<mhlo::ReshapeOp>(
         loc, RankedTensorType::get(rhsNewShape, rhsShapeType.getElementType()),
         op.rhs());
-    auto dimensionNumbers = mhlo::DotDimensionNumbers::get(
-        /*lhs_batching_dimensions=*/make1DElementsAttr(rewriter, {0}),
-        /*rhs_batching_dimensions=*/make1DElementsAttr(rewriter, {0}),
-        /*lhs_contracting_dimensions=*/
-        make1DElementsAttr(rewriter, {lhsContractingDimIndex}),
+    auto dimensionNumbers = mhlo::DotDimensionNumbersAttr::get(
+        rewriter.getContext(),
+        /*lhs_batching_dimensions=*/{0},
+        /*rhs_batching_dimensions=*/{0},
+        /*lhs_contracting_dimensions=*/{lhsContractingDimIndex},
         /*rhs_contracting_dimensions=*/
-        make1DElementsAttr(rewriter, {rhsContractingDimIndex}),
-        rewriter.getContext());
+        {rhsContractingDimIndex});
     Value dotGeneralResult = rewriter.create<mhlo::DotGeneralOp>(
         loc, dotGeneralResultType, reshapedLhs, reshapedRhs, dimensionNumbers,
         op.precision_configAttr());
