@@ -16,7 +16,6 @@ cc_library(
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
         "LLVMCPULowerExecutableTarget.cpp",
-        "LLVMCPUPadWorkgroupTiles.cpp",
         "LLVMCPUPlanConvLoopOrder.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp",

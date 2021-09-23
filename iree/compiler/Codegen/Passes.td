@@ -103,13 +103,6 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
-def LLVMCPUPadWorkgroupTiles :
-    Pass<"iree-llvmcpu-pad-workgroup-tiles", "FuncOp"> {
-  let summary =
-      "Pad workgroup tiles to an integer multiple of tiling parameters.";
-  let constructor = "mlir::iree_compiler::createLLVMCPUPadWorkgroupTilesPass()";
-}
-
 def LLVMCPUPlanConvLoopOrder :
     Pass<"iree-llvmcpu-plan-conv-loop-order", "FuncOp"> {
   let summary =

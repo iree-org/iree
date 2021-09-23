@@ -759,6 +759,69 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
   return tiledFftOp;
 }
 
+//===----------------------------------------------------------------------===//
+// ReverseOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyReverseOp(ReverseOp op) {
+  if (op.getNumInputs()) {
+    return op.emitOpError("expected no inputs");
+  }
+  if (op.getNumOutputs() != 1) {
+    return op.emitOpError("expected exactly one output");
+  }
+
+  int64_t rank = op.getOperandRank();
+  int dimension = op.dimension();
+  if (dimension < 0 || dimension >= rank) {
+    return op.emitOpError("dimension must be within (0, ") << rank << "]";
+  }
+
+  return success();
+}
+
+bool ReverseOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
+
+SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
+  SmallVector<StringRef> iteratorTypes(getOperandRank(),
+                                       getParallelIteratorTypeName());
+  return iteratorTypes;
+}
+
+SmallVector<Range> ReverseOp::getLoopBounds(OpBuilder &builder) {
+  Location loc = getLoc();
+  Value zero = builder.create<ConstantIndexOp>(loc, 0);
+  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  SmallVector<Range> ranges;
+  for (auto dim : llvm::seq<int64_t>(0, getOperandRank())) {
+    Value ub = getDimValue(builder, loc, operand(), dim);
+    ranges.emplace_back(Range{zero, ub, one});
+  }
+  auto dim = dimension();
+  ranges[dim].size = builder.create<SignedDivIOp>(
+      loc, ranges[dim].size, builder.create<ConstantIndexOp>(loc, 2));
+  return ranges;
+}
+
+LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
+                                                      Location loc,
+                                                      ValueRange ivs) {
+  SmallVector<Value> mirrorIndices(ivs.begin(), ivs.end());
+  auto dim = dimension();
+  auto size = getDimValue(b, loc, operand(), dim);
+  size = b.create<SubIOp>(loc, size, b.create<ConstantIndexOp>(loc, 1));
+  mirrorIndices[dim] = b.create<SubIOp>(loc, size, mirrorIndices[dim]);
+
+  // for (int i = 0; i < n / 2; ++i) {
+  //   swap(array[i], array[n - 1 - i]);
+  // }
+  Value v1 = b.create<memref::LoadOp>(loc, operand(), ivs);
+  Value v2 = b.create<memref::LoadOp>(loc, operand(), mirrorIndices);
+  b.create<memref::StoreOp>(loc, v1, operand(), mirrorIndices);
+  b.create<memref::StoreOp>(loc, v2, operand(), ivs);
+  return success();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
   void OP_NAME::getEffects(                                               \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> \
@@ -772,6 +835,7 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
+DEFINE_OP_GET_EFFECTS(ReverseOp)
 
 }  // namespace linalg_ext
 }  // namespace iree_compiler

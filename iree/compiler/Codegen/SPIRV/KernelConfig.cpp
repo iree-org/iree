@@ -208,6 +208,10 @@ namespace detail {
 LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK) {
+  auto lhsType = op.inputs()[0].getType().cast<ShapedType>();
+  auto elementBits = lhsType.getElementType().getIntOrFloatBitWidth();
+  if (elementBits != 16 && elementBits != 32) return success();
+
   ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
   ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
   if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
@@ -282,12 +286,13 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
 
   // Deduce the configuration for the K dimension. We need some power of two
   // here so that we can do vector load.
-  for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 1; t >>= 1) {
+  for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 2; t >>= 1) {
     if (dimK % t == 0) {
       workgroupTileSizes[2 + isBM] = invocationTileSizes[2 + isBM] = t;
       break;
     }
   }
+  if (workgroupTileSizes[2 + isBM] == 0) return success();
 
   auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;

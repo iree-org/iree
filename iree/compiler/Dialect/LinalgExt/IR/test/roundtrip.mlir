@@ -387,3 +387,42 @@ func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 //  CHECK-SAME:    outs(%[[REAL]], %[[IMAG]] : tensor<1024xf32>, tensor<1024xf32>)
 //  CHECK-SAME:   : tensor<1024xf32>, tensor<1024xf32>
 //       CHECK:   return %[[RES]]#0, %[[RES]]#1
+
+// -----
+
+func @reverse_tensor(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
+  %0 = linalg_ext.reverse
+         dimension(0)
+         outs(%arg0 : tensor<3x5xi32>) : tensor<3x5xi32>
+  return %0 : tensor<3x5xi32>
+}
+// CHECK-LABEL: func @reverse_tensor
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<3x5xi32>
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.reverse dimension(0)
+//  CHECK-SAME:      outs(%[[ARG0]]
+
+// -----
+
+func @reverse_memref(%arg0: memref<3x5xi32>) {
+  linalg_ext.reverse
+    dimension(0)
+    outs(%arg0 : memref<3x5xi32>)
+  return
+}
+// CHECK-LABEL: func @reverse_memref
+//  CHECK-SAME:   %[[ARG0:.+]]: memref<3x5xi32>
+//       CHECK:   linalg_ext.reverse dimension(0)
+//  CHECK-SAME:      outs(%[[ARG0]]
+
+// -----
+
+func @reverse_dynamic_tensor(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+  %0 = linalg_ext.reverse
+         dimension(1)
+         outs(%arg0 : tensor<?x?xi32>) : tensor<?x?xi32>
+  return %0 : tensor<?x?xi32>
+}
+// CHECK-LABEL: func @reverse_dynamic_tensor
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xi32>
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.reverse dimension(1)
+//  CHECK-SAME:      outs(%[[ARG0]]
