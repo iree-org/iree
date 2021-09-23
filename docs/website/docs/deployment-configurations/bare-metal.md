@@ -70,6 +70,11 @@ and add the additional `-iree-llvm-static-library-output-path=` flag to specify
 the static library destination. This will produce a `.h\.o` file to link
 directly into the target application.
 
+When building the binary, you may want to use the linker `lld` built at
+`third_party/llvm-project/llvm/bin` (or in the `install/bin` from the host
+compiler distribution) instead of the system default linker
+to have the codegen and linker in sync.
+
 ## Build bare-metal runtime from the source
 
 A few CMake options and macros should be set to build a subset of IREE runtime

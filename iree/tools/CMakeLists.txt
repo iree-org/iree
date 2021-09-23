@@ -478,6 +478,21 @@ if(${IREE_BUILD_COMPILER})
     RUNTIME DESTINATION bin
   )
 
+  if(NOT LLD_SYMLINKS_TO_CREATE)
+  set(LLD_SYMLINKS_TO_CREATE
+    lld-link ld.lld ld64.lld ld64.lld.darwinnew ld64.lld.darwinold wasm-ld)
+  endif()
+
+  foreach(link ${LLD_SYMLINKS_TO_CREATE})
+    install(
+      CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink lld ${link} \
+          WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)"
+    )
+    install(
+      CODE "message(\"-- Create symlink: bin/${link} -> bin/lld\")"
+    )
+  endforeach()
+
   # General test dependency binary/scripts installed.
   install(
     PROGRAMS
