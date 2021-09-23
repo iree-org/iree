@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -24,6 +25,8 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "spirv-vectorize-load-store"
 
 constexpr int kMaxVectorNumBits = 128;
 constexpr int kMaxVectorNumElements = 4;
@@ -61,24 +64,25 @@ static Optional<unsigned> getBitWidth(Type type) {
   return {};
 }
 
-// Calculates the vector size we want to use based on the memref uses.
-static unsigned calculateMemrefVecSize(SmallVectorImpl<Operation *> &uses) {
-  unsigned minSize = kMaxVectorNumBits;
+// Calculates the vector bit count we want to use based on the memref uses.
+static unsigned calculateMemRefVectorNumBits(
+    SmallVectorImpl<Operation *> &uses) {
+  unsigned minBits = kMaxVectorNumBits;
   for (Operation *op : uses) {
     auto transferOp = dyn_cast<VectorTransferOpInterface>(op);
     if (!transferOp) return 0;
     Optional<unsigned> transferSize = getBitWidth(transferOp.getVectorType());
     if (!transferSize) return 0;
-    minSize = std::min(minSize, *transferSize);
+    minBits = std::min(minBits, *transferSize);
   }
-  return minSize;
+  return minBits;
 }
 
-/// If the memref is vectorizable return the vector size we want to use,
+/// If the memref is vectorizable return the vector bit count we want to use,
 /// otherwise return 0. If it returns a value greater than 0 it also returns the
 /// memref uses.
-static unsigned isMemRefAndVectorizable(Value value,
-                                        SmallVectorImpl<Operation *> &uses) {
+static unsigned isMemRefVectorizable(Value value,
+                                     SmallVectorImpl<Operation *> &uses) {
   auto memrefType = value.getType().dyn_cast<MemRefType>();
 
   // Require scalar element type
@@ -93,9 +97,17 @@ static unsigned isMemRefAndVectorizable(Value value,
   // buffer.
   if (memrefType.getShape().back() % 2 != 0) return 0;
 
-  if (kMaxVectorNumBits % memrefType.getElementTypeBitWidth() != 0) return 0;
+  unsigned elementNumBits = memrefType.getElementTypeBitWidth();
+  if (kMaxVectorNumBits % elementNumBits != 0) return 0;
 
-  if (getUsesIfAllTransferOp(value, uses)) return calculateMemrefVecSize(uses);
+  if (getUsesIfAllTransferOp(value, uses)) {
+    unsigned vectorBits = calculateMemRefVectorNumBits(uses);
+    unsigned vectorSize = vectorBits / elementNumBits;
+    // Again make sure we don't have vectors of odd numbers.
+    if (vectorSize % 2 != 0) return 0;
+    return vectorBits;
+  }
+
   return 0;
 }
 
@@ -142,7 +154,7 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
 
 void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
   SmallVector<Operation *, 4> vectorUses;
-  if (unsigned vectorSize = isMemRefAndVectorizable(value, vectorUses)) {
+  if (unsigned vectorSize = isMemRefVectorizable(value, vectorUses)) {
     valueToVectorBitsMap.insert(std::make_pair(value, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
@@ -346,7 +358,10 @@ class ProcessInterfaceBinding final
            !ShapedType::isDynamic(memrefType.getShape().back()));
 
     auto vecMemRef = getVectorizedMemRefType(rewriter, bindingOp.getResult());
-    if (!vecMemRef) return failure();
+    if (!vecMemRef) {
+      return rewriter.notifyMatchFailure(bindingOp,
+                                         "cannot get vectorized memref type");
+    }
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         bindingOp, *vecMemRef, bindingOp.binding(), bindingOp.byte_offset(),
         bindingOp.byte_length(), bindingOp.dynamic_dims());

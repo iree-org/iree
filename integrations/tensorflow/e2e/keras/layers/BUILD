@@ -127,6 +127,8 @@ FAILING_STATIC = [
             "AveragePooling3D",
             "Conv3DTranspose",
             "ConvLSTM2D",
+            "GRU",
+            "LSTM",
             "Softmax",
             "MaxPool3D",
             "ZeroPadding3D",

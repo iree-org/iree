@@ -378,6 +378,9 @@ struct AdjustConversionCast final
     if (castOp->getNumOperands() != 1) return failure();
 
     Value input = operands.front();
+    // We only want to handle cases where the cast op handles memref types.
+    if (!input.getType().isa<ShapedType>()) return failure();
+
     if (!isRankZeroOrOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
           castOp, "expected converted memref of rank <= 1");
@@ -514,9 +517,15 @@ struct FlattenMemRefSubspanPass
           return isRankZeroOrOneMemRef(subspanOp.getType());
         });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
+      // TODO: Explicitly allow allocation ops for now. Need to properly
+      // flatten.
+      if (isa<memref::AllocOp>(loadOp.memref().getDefiningOp())) return true;
       return isRankZeroOrOneMemRef(loadOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
+      // TODO: Explicitly allow allocation ops for now. Need to properly
+      // flatten.
+      if (isa<memref::AllocOp>(storeOp.memref().getDefiningOp())) return true;
       return isRankZeroOrOneMemRef(storeOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
@@ -531,8 +540,11 @@ struct FlattenMemRefSubspanPass
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
         [](UnrealizedConversionCastOp castOp) {
-          return castOp->getNumOperands() == 1 &&
-                 isRankZeroOrOneMemRef(castOp->getOperandTypes().front());
+          if (castOp->getNumOperands() != 1) return false;
+
+          Type inputType = castOp->getOperandTypes().front();
+          return !inputType.isa<ShapedType>() ||
+                 isRankZeroOrOneMemRef(inputType);
         });
 
     // Use partial conversion here so that we can ignore allocations created by
