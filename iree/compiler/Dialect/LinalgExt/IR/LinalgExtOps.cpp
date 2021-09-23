@@ -766,7 +766,7 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 
 static LogicalResult verifyReverseOp(ReverseOp op) {
   if (op.getNumInputs() != 1) {
-    return op.emitOpError("expected exactly one output");
+    return op.emitOpError("expected exactly one input");
   }
   if (op.getNumOutputs() != 1) {
     return op.emitOpError("expected exactly one output");
