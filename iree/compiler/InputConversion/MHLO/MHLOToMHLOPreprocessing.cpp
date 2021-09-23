@@ -129,7 +129,7 @@ class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
     // TODO(suderman): Add proper support for padding + dilation for codegen.
     // We can't extract padding if the left hand side has dilation.
     if (op.lhs_dilation().hasValue()) {
-      for (auto val : op.lhs_dilation().getValue().getIntValues()) {
+      for (auto val : op.lhs_dilation().getValue().getValues<APInt>()) {
         if (val != 1) {
           return failure();
         }

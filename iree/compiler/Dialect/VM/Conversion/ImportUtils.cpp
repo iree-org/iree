@@ -145,7 +145,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
   } else if (auto elementsAttr = attrValue.dyn_cast<DenseIntElementsAttr>()) {
     SmallVector<Value, 4> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
-    for (auto intAttr : elementsAttr.getAttributeValues()) {
+    for (auto intAttr : elementsAttr.getValues<Attribute>()) {
       elementValues.push_back(rewriter.createOrFold<mlir::ConstantOp>(
           loc, elementsAttr.getType().getElementType(), intAttr));
     }

@@ -71,8 +71,7 @@ struct ConvertConstExpandDimsPattern
     if (!matchPattern(op.dim(), m_Constant(&dimAttr))) {
       return rewriter.notifyMatchFailure(op, "not constant dim");
     }
-    int expandDim =
-        llvm::to_vector<1>(dimAttr.getIntValues())[0].getSExtValue();
+    int expandDim = (*dimAttr.value_begin<APInt>()).getSExtValue();
     auto dims = llvm::to_vector<6>(resultType.getShape());
     if (expandDim < 0) {
       expandDim += dims.size();

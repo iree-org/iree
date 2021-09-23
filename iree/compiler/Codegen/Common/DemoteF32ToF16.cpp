@@ -100,7 +100,7 @@ class GenericTypeConvert : public ConversionPattern {
       if (auto fpAttr = attr.second.dyn_cast<DenseFPElementsAttr>()) {
         std::vector<llvm::APFloat> args;
         if (!fpAttr.getType().getElementType().isF32()) continue;
-        for (llvm::APFloat f : fpAttr.getFloatValues()) {
+        for (llvm::APFloat f : fpAttr.getValues<APFloat>()) {
           bool losesInfo;
           f.convert(APFloat::IEEEhalf(), APFloat::rmTowardZero, &losesInfo);
           args.push_back(f);

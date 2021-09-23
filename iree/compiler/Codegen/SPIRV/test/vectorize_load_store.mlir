@@ -216,7 +216,6 @@ func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) {
   %c3 = constant 3: index
   %f0 = constant 0.0 : f32
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<20xf32>
-  %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<f32>
   %2 = hal.interface.binding.subspan @io::@ret1[%c0] : memref<20xf32>
   // CHECK-DAG: %[[INDEX0:.+]] = constant 3 : index
   // CHECK-DAG: %[[INDEX1:.+]] = constant 4 : index

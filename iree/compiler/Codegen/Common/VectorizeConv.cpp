@@ -56,7 +56,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 
     // This pattern does not handle convolutions with dilation.
     if (auto dilations = convOp.dilations()) {
-      auto values = dilations.getIntValues();
+      auto values = dilations.getValues<APInt>();
       if (llvm::any_of(values, [](const APInt &value) {
             return value.getSExtValue() != 1;
           })) {
