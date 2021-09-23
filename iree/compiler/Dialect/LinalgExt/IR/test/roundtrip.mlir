@@ -391,38 +391,78 @@ func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 // -----
 
 func @reverse_tensor(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
+  %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
   %0 = linalg_ext.reverse
-         dimension(0)
-         outs(%arg0 : tensor<3x5xi32>) : tensor<3x5xi32>
+         dimensions(dense<0> : tensor<1xi64>)
+         ins(%arg0 : tensor<3x5xi32>)
+         outs(%init : tensor<3x5xi32>) : tensor<3x5xi32>
   return %0 : tensor<3x5xi32>
 }
 // CHECK-LABEL: func @reverse_tensor
-//  CHECK-SAME:   %[[ARG0:.+]]: tensor<3x5xi32>
-//       CHECK:   %[[RESULT:.+]] = linalg_ext.reverse dimension(0)
-//  CHECK-SAME:      outs(%[[ARG0]]
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xi32>
+//       CHECK:   %[[INIT:.+]] = linalg.init_tensor [3, 5]
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.reverse
+//  CHECK-SAME:      dimensions(dense<0> : tensor<1xi64>)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[INIT]]
 
 // -----
 
-func @reverse_memref(%arg0: memref<3x5xi32>) {
+func @reverse_memref(%arg0: memref<3x5xi32>, %arg1: memref<3x5xi32>) {
   linalg_ext.reverse
-    dimension(0)
-    outs(%arg0 : memref<3x5xi32>)
+    dimensions(dense<0> : tensor<1xi64>)
+    ins(%arg0 : memref<3x5xi32>)
+    outs(%arg1 : memref<3x5xi32>)
   return
 }
 // CHECK-LABEL: func @reverse_memref
-//  CHECK-SAME:   %[[ARG0:.+]]: memref<3x5xi32>
-//       CHECK:   linalg_ext.reverse dimension(0)
-//  CHECK-SAME:      outs(%[[ARG0]]
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: memref<3x5xi32>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: memref<3x5xi32>
+//       CHECK:   linalg_ext.reverse
+//  CHECK-SAME:      dimensions(dense<0> : tensor<1xi64>)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[ARG1]]
 
 // -----
 
 func @reverse_dynamic_tensor(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
+  %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xi32>
   %0 = linalg_ext.reverse
-         dimension(1)
-         outs(%arg0 : tensor<?x?xi32>) : tensor<?x?xi32>
+         dimensions(dense<1> : tensor<1xi64>)
+         ins(%arg0 : tensor<?x?xi32>)
+         outs(%init : tensor<?x?xi32>) : tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }
 // CHECK-LABEL: func @reverse_dynamic_tensor
-//  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xi32>
-//       CHECK:   %[[RESULT:.+]] = linalg_ext.reverse dimension(1)
-//  CHECK-SAME:      outs(%[[ARG0]]
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xi32>
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//       CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]]]
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.reverse
+//  CHECK-SAME:      dimensions(dense<1> : tensor<1xi64>)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[INIT]]
+
+// -----
+
+func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
+  %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
+  %0 = linalg_ext.reverse
+         dimensions(dense<[0, 1]> : tensor<2xi64>)
+         ins(%arg0 : tensor<3x5xi32>)
+         outs(%init : tensor<3x5xi32>) : tensor<3x5xi32>
+  return %0 : tensor<3x5xi32>
+}
+// CHECK-LABEL: func @reverse_multi_dims
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xi32>
+//       CHECK:   %[[INIT:.+]] = linalg.init_tensor [3, 5]
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.reverse
+//  CHECK-SAME:      dimensions(dense<[0, 1]> : tensor<2xi64>)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[INIT]]
