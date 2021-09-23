@@ -440,7 +440,7 @@ if(IREE_BUILD_TESTS)
   enable_testing(iree)
 endif()
 
-if(IREE_BUILD_PYTHON_BINDINGS AND NOT pybind11_FOUND)
+if(IREE_BUILD_PYTHON_BINDINGS)
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
 endif()
 
