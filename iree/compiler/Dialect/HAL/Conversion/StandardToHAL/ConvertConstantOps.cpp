@@ -55,12 +55,12 @@ class ConstantTensorOpConversion
     // pack 1-bit tensors into wider storage before this lossy conversion. For
     // example bitwise ops on 8x32xi1 can be converted to ops on tensor<8xi32>.
     if (elementsTy.getElementType().isInteger(1)) {
-      elementsAttr =
-          elementsAttr.mapValues(rewriter.getIntegerType(8),
-                                 llvm::function_ref<APInt(const APInt &val)>(
-                                     [](const APInt &val) -> APInt {
-                                       return APInt(8, val.getBoolValue());
-                                     }));
+      elementsAttr = elementsAttr.cast<DenseIntOrFPElementsAttr>().mapValues(
+          rewriter.getIntegerType(8),
+          llvm::function_ref<APInt(const APInt &val)>(
+              [](const APInt &val) -> APInt {
+                return APInt(8, val.getBoolValue());
+              }));
     }
 
     auto buffer = rewriter.createOrFold<IREE::HAL::AllocatorConstantOp>(

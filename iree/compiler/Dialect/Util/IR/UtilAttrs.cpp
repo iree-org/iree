@@ -195,7 +195,7 @@ template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
 static LogicalResult serializeGenericIntElements(
     DenseIntElementsAttr attr, llvm::support::endianness endian,
     llvm::raw_ostream &os) {
-  for (const APInt &value : attr.getIntValues()) {
+  for (const APInt &value : attr.getValues<APInt>()) {
     elementType rawValue = llvm::support::endian::byte_swap<elementType>(
         value.extractBitsAsZExtValue(numBits, 0), endian);
     os.write((char *)&rawValue, sizeof(rawValue));
@@ -206,7 +206,7 @@ static LogicalResult serializeGenericIntElements(
 static LogicalResult serializeGenericF16Elements(
     DenseFPElementsAttr attr, llvm::support::endianness endian,
     llvm::raw_ostream &os) {
-  for (const APFloat &value : attr.getFloatValues()) {
+  for (const APFloat &value : attr.getValues<APFloat>()) {
     uint16_t rawValue = llvm::support::endian::byte_swap<uint16_t>(
         value.bitcastToAPInt().extractBitsAsZExtValue(16, 0), endian);
     os.write((char *)&rawValue, sizeof(rawValue));
@@ -217,7 +217,7 @@ static LogicalResult serializeGenericF16Elements(
 static LogicalResult serializeGenericF32Elements(
     DenseFPElementsAttr attr, llvm::support::endianness endian,
     llvm::raw_ostream &os) {
-  for (const APFloat &value : attr.getFloatValues()) {
+  for (const APFloat &value : attr.getValues<APFloat>()) {
     float rawValue =
         llvm::support::endian::byte_swap<float>(value.convertToFloat(), endian);
     os.write((char *)&rawValue, sizeof(rawValue));
@@ -228,7 +228,7 @@ static LogicalResult serializeGenericF32Elements(
 static LogicalResult serializeGenericF64Elements(
     DenseFPElementsAttr attr, llvm::support::endianness endian,
     llvm::raw_ostream &os) {
-  for (const APFloat &value : attr.getFloatValues()) {
+  for (const APFloat &value : attr.getValues<APFloat>()) {
     double rawValue = llvm::support::endian::byte_swap<double>(
         value.convertToDouble(), endian);
     os.write((char *)&rawValue, sizeof(rawValue));

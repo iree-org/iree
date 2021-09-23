@@ -260,7 +260,7 @@ struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
     ElementsAttr newValueAttr = valueAttr;
     if (newElType != oldElType) {
       // Values don't change, just their reported type.
-      newValueAttr = valueAttr.mapValues(
+      newValueAttr = valueAttr.cast<DenseIntOrFPElementsAttr>().mapValues(
           newElType, [](const APInt &oldEl) { return oldEl; });
     }
     rewriter.replaceOpWithNewOp<ConstantOp>(op, newValueAttr);

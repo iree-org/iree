@@ -152,7 +152,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
         failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";
     }
-    for (auto el : value.getAttributeValues()) {
+    for (auto el : value.getValues<Attribute>()) {
       if (failed(encodePrimitiveAttr(el))) {
         return currentOp_->emitOpError() << "failed to encode element " << el;
       }
