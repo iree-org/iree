@@ -82,6 +82,18 @@ gentbl_cc_library(
             ["-gen-op-defs"],
             "LinalgExtOps.cpp.inc",
         ),
+        (
+            [
+                "-gen-dialect-decls",
+            ],
+            "LinalgExtOpsDialect.h.inc",
+        ),
+        (
+            [
+                "-gen-dialect-defs",
+            ],
+            "LinalgExtOpsDialect.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtOps.td",

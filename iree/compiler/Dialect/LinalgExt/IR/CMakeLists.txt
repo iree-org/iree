@@ -53,6 +53,8 @@ iree_tablegen_library(
   OUTS
     -gen-op-decls LinalgExtOps.h.inc
     -gen-op-defs LinalgExtOps.cpp.inc
+    -gen-dialect-decls LinalgExtOpsDialect.h.inc
+    -gen-dialect-defs LinalgExtOpsDialect.cpp.inc
 )
 
 iree_tablegen_library(
