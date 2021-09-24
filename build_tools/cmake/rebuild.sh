@@ -30,6 +30,8 @@ cd build
 
 CMAKE_ARGS=(
   "-G" "Ninja"
+  # Let's make linking fast
+  "-DIREE_ENABLE_LLD=ON"
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
 
   # Enable docs build on the CI. The additional builds are pretty fast and

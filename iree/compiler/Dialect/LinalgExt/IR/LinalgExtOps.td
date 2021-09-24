@@ -253,37 +253,44 @@ def LinalgExt_ReverseOp : LinalgExt_Op<"reverse", [
                             ["payloadUsesValueFromOperand"]>]> {
   let summary = "Reverse operator";
   let description = [{
-    A temporary solution of a reverse op. The loop bound of the reverse
-    dimension is half of the shape because we can simply swap elements. E.g.,
-
-    for (int i = 0; i < n / 2; ++i) {
-      std::swap(a[i], a[n - 1 - i]);
+    A temporary solution for lowering reverse ops into IREE, allowing IREE to
+    tile and distribute them.
     }
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
                        Variadic<AnyShaped>:$outputs,
-                       I64Attr:$dimension
+                       I64ElementsAttr:$dimensions
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
-    `dimension` `(` $dimension `)`
+    `dimensions` `(` $dimensions `)`
     attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    `outs` `(` $outputs `:` type($outputs) `)`
+    (`outs` `(` $outputs^ `:` type($outputs) `)`)?
     (`:` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value operand() {
+    Value input() {
+      return getInputOperand(0)->get();
+    }
+    Value output() {
       return getOutputOperand(0)->get();
-}
+    }
     ShapedType getOperandType() {
-      return operand().getType().cast<ShapedType>();
+      return input().getType().cast<ShapedType>();
     }
     int64_t getOperandRank() {
       return getOperandType().getRank();
     }
-    ArrayRef<int64_t> getOperandShape() {
+    ArrayRef<int64_t> getOprerandShape() {
       return getOperandType().getShape();
+    }
+    SmallVector<int64_t> dims() {
+      SmallVector<int64_t> ret;
+      for (const APInt& elem : dimensions()) {
+        ret.push_back(elem.getLimitedValue());
+      }
+      return ret;
     }
   }];
 }

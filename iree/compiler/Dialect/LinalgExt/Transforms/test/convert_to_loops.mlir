@@ -484,26 +484,24 @@ func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
 
 // -----
 
-func @reverse_dim_0(%arg0: memref<?x?xi32>) {
+func @reverse_dim_0(%arg0: memref<?x?xi32>, %arg1: memref<?x?xi32>) {
   linalg_ext.reverse
-    dimension(0)
-    outs(%arg0 : memref<?x?xi32>)
+    dimensions(dense<0> : tensor<1xi64>)
+    ins(%arg0 : memref<?x?xi32>)
+    outs(%arg1 : memref<?x?xi32>)
   return
 }
 // CHECK-LABEL: func @reverse_dim_0
-// CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[IN:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = constant 1 : index
-// CHECK-DAG:     %[[C2:.+]] = constant 2 : index
 // CHECK-DAG:     %[[D0:.+]] = memref.dim %arg0, %c0 : memref<?x?xi32>
 // CHECK-DAG:     %[[D1:.+]] = memref.dim %arg0, %c1 : memref<?x?xi32>
-// CHECK-DAG:     %[[REV_UB:.+]] = divi_signed %[[D0]], %[[C2]] : index
-// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[REV_UB]] step %[[C1]]
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
 // CHECK:           scf.for %[[J:.+]] = %[[C0]] to %[[D1]] step %[[C1]]
-// CHECK:             %[[T0:.+]] = memref.dim %[[BUF]], %[[C0]]
+// CHECK:             %[[T0:.+]] = memref.dim %[[IN]], %[[C0]]
 // CHECK:             %[[T1:.+]] = subi %[[T0]], %[[C1]] : index
 // CHECK:             %[[T2:.+]] = subi %[[T1]], %[[I]] : index
-// CHECK:             %[[V0:.+]] = memref.load %[[BUF]][%[[I]], %[[J]]]
-// CHECK:             %[[V1:.+]] = memref.load %[[BUF]][%[[T2]], %[[J]]]
-// CHECK:             memref.store %[[V0]], %[[BUF]][%[[T2]], %[[J]]] : memref<?x?xi32>
-// CHECK:             memref.store %[[V1]], %[[BUF]][%[[I]], %[[J]]] : memref<?x?xi32>
+// CHECK:             %[[V0:.+]] = memref.load %[[IN]][%[[I]], %[[J]]]
+// CHECK:             memref.store %[[V0]], %[[OUT]][%[[T2]], %[[J]]] : memref<?x?xi32>

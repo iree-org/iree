@@ -20,13 +20,25 @@ endif()
 if(IREE_USE_LINKER)
   set(IREE_LINKER_FLAG "-fuse-ld=${IREE_USE_LINKER}")
 
+  iree_append("${IREE_LINKER_FLAG}"
+    CMAKE_REQUIRED_FLAGS
+    CMAKE_EXE_LINKER_FLAGS
+    CMAKE_MODULE_LINKER_FLAGS
+    CMAKE_SHARED_LINKER_FLAGS
+  )
+
   include(CheckCXXSourceCompiles)
-  set(CMAKE_REQUIRED_FLAGS "${IREE_LINKER_FLAG}")
-  check_cxx_source_compiles("int main() { return 0; }" CXX_SUPPORTS_CUSTOM_LINKER)
+  include(CheckCSourceCompiles)
+  set(MINIMAL_SRC "int main() { return 0; }")
+  check_cxx_source_compiles("${MINIMAL_SRC}" CXX_SUPPORTS_CUSTOM_LINKER)
+  check_c_source_compiles("${MINIMAL_SRC}" CC_SUPPORTS_CUSTOM_LINKER)
+
   if(NOT CXX_SUPPORTS_CUSTOM_LINKER)
-    message(FATAL_ERROR "Compiler does not support '-fuse-ld=${IREE_USE_LINKER}'")
+    message(FATAL_ERROR "Compiler '${CMAKE_CXX_COMPILER}' does not support '${IREE_LINKER_FLAG}'")
   endif()
 
-  iree_append("-fuse-ld=${IREE_USE_LINKER}"
-    CMAKE_EXE_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS)
+  if(NOT CC_SUPPORTS_CUSTOM_LINKER)
+    message(FATAL_ERROR "Compiler '${CMAKE_C_COMPILER}' does not support '${IREE_LINKER_FLAG}'")
+  endif()
+
 endif()
