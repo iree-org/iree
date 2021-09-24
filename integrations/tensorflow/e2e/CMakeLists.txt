@@ -24,7 +24,6 @@ iree_e2e_cartesian_product_test_suite(
     "tf"
   FAILING_CONFIGURATIONS
     "concat_test.py,tflite,"
-    "control_flow_test.py,tflite,"
     "einsum_dynamic_test.py,tflite,"
     "einsum_static_test.py,tflite,"
     "einsum_vector_test.py,tflite,"

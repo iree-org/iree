@@ -34,8 +34,6 @@ iree_e2e_cartesian_product_test_suite(
     ",,AveragePooling3D,,,,tflite"
     ",,Conv3DTranspose,,,,tflite"
     ",,ConvLSTM2D,,,,tflite"
-    ",,GRU,,,,tflite"
-    ",,LSTM,,,,tflite"
     ",,Softmax,,,,tflite"
     ",,MaxPool3D,,,,tflite"
     ",,ZeroPadding3D,,,,tflite"

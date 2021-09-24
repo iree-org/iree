@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -638,7 +639,7 @@ struct ResolveConstantPoolLoadToRuntimeBuffer
                                 PatternRewriter &rewriter) const override {
     auto *constOp = SymbolTable::lookupNearestSymbolFrom(op, op.constant());
     SymbolRefAttr runtimeBufferSymRef;
-    Attribute runtimeBufferRange;
+    Util::ByteRangeAttr runtimeBufferRange;
     if (auto spanOp = dyn_cast<ConstantPoolSpanOp>(constOp)) {
       runtimeBufferSymRef = spanOp.runtime_bufferAttr();
       runtimeBufferRange = spanOp.runtime_rangeAttr();
