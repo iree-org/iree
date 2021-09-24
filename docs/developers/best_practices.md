@@ -55,21 +55,9 @@ IREE runs its own suite of benchmarks continuously using the definitions at
 https://github.com/google/iree/tree/main/benchmarks. The flags set for these
 benchmarks represent the latest manually tuned values for workloads we track
 closely and referencing them may help with your own search for peak performance.
-
-Here is a non-exhaustive list of flags which can be tuned when compiling
-through the `iree-translate` tool, while full documentation can be found in the
-project source code for each flag:
-
-* `--iree-flow-inline-constants-max-byte-length=[integer]`: Maximum byte-length of constants
-that can be inlined into dispatch regions. We find values around 16 work best
-for when running on a GPU and values around 2048 work best on CPUs.
-* `--iree-llvm-loop-unrolling=true`: This flag and other flags like it in
-[LLVMTargetOptions.cpp](https://github.com/google/iree/blob/main/iree/compiler/Dialect/HAL/Target/LLVM/LLVMTargetOptions.cpp)
-turn on specific optimizations within LLVM when targeting CPUs.
-* `--iree-flow-dispatch-formation-enable-operand-fusion=true`: Enable fusing operand
-producers during dispatch region formation.
-* `--iree-enable-fusion-with-reduction-ops=true`: Allow fusing generic ops with
-reductions.
+You can use these flags in your own explorations, but note that as compiler
+performance matures, the existing flags will gradually be replaced with
+attributes for autotuning or command line options for experimental features.
 
 ## Practices for runtime use
 
