@@ -479,18 +479,35 @@ if(${IREE_BUILD_COMPILER})
   )
 
   if(NOT LLD_SYMLINKS_TO_CREATE)
-  set(LLD_SYMLINKS_TO_CREATE
-    lld-link ld.lld ld64.lld wasm-ld)
+    if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
+      set(LLD_SYMLINKS_TO_CREATE
+          lld-link.exe wasm-ld.exe)
+    else()
+      set(LLD_SYMLINKS_TO_CREATE
+          ld.lld ld64.lld wasm-ld)
+    endif()
   endif()
 
   foreach(link ${LLD_SYMLINKS_TO_CREATE})
-    install(
-      CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink lld ${link} \
-          WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)"
-    )
-    install(
-      CODE "message(\"-- Create symlink: bin/${link} -> bin/lld\")"
-    )
+    if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
+      install(
+        CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_hardlink lld.exe ${link} \
+            WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)"
+      )
+      install(
+        CODE "message(\
+          \"-- Create link: ${CMAKE_INSTALL_PREFIX}/bin/${link} -> ${CMAKE_INSTALL_PREFIX}/bin/lld.exe\")"
+      )
+    else()
+      install(
+        CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink lld ${link} \
+            WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)"
+      )
+      install(
+        CODE "message(
+          \"-- Create link: ${CMAKE_INSTALL_PREFIX}/bin/${link} -> ${CMAKE_INSTALL_PREFIX}/bin/lld\")"
+      )
+    endif()
   endforeach()
 
   # General test dependency binary/scripts installed.
