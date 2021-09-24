@@ -12,6 +12,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SMLoc.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -838,21 +839,24 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.emplace_back(
       getSlice(builder, loc, input(), offsets, sizes, strides));
 
+  AffineExpr sym0, sym1, sym2;
+  bindSymbols(builder.getContext(), sym0, sym1, sym2);
+  AffineMap map =
+      AffineMap::get(/*dimCount=*/0, /*symbolCount=*/3, {sym0 - sym1 - sym2});
   SmallVector<OpFoldResult> mirrorOffsets(offsets.begin(), offsets.end());
   for (auto dim : dims()) {
-    auto size = getDimValue(builder, loc, input(), dim);
-    Value mirrorOffset =
+    Value size = getDimValue(builder, loc, input(), dim);
+    Value offset =
         getValueOrCreateConstantIndexOp(builder, loc, mirrorOffsets[dim]);
-    mirrorOffset = builder.create<SubIOp>(loc, size, mirrorOffset);
-    mirrorOffset = builder.create<SubIOp>(
-        loc, mirrorOffset, getDimValue(builder, loc, tiledOperands[0], dim));
-    mirrorOffsets[dim] = mirrorOffset;
+    Value tileSize = getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]);
+    mirrorOffsets[dim] = builder.create<AffineApplyOp>(
+        loc, map, ValueRange{size, offset, tileSize}).getResult();
   }
 
   SmallVector<Type, 4> resultTypes;
   if (hasTensorSemantics()) {
     tiledOperands.emplace_back(
-        getSlice(builder, loc, output(), offsets, sizes, strides));
+        getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
     resultTypes.push_back(tiledOperands[1].getType());
   } else {
     tiledOperands.emplace_back(

@@ -610,6 +610,8 @@ func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
   return
 }
 // CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 - s1 - s2)>
 // CHECK:      func @reverse_memref(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
@@ -620,9 +622,8 @@ func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
 // CHECK:          %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C10]], %[[D0]]]
 // CHECK:          %[[SUB_IN:.+]] =  memref.subview %[[ARG0]][%[[I]]] [%[[SIZE]]] [1]
 // CHECK:          %[[T0:.+]] = memref.dim %[[ARG0]], %[[C0]] : memref<?xi32>
-// CHECK:          %[[T1:.+]] = subi %[[T0]], %[[I]] : index
-// CHECK:          %[[T2:.+]] = subi %[[T1]], %[[SIZE]] : index
-// CHECK:          %[[SUB_OUT:.+]] = memref.subview %[[ARG1]][%[[T2]]] [%[[SIZE]]] [1]
+// CHECK:          %[[IDX:.+]] = affine.apply #[[MAP2]]()[%[[T0]], %[[I]], %[[SIZE]]]
+// CHECK:          %[[SUB_OUT:.+]] = memref.subview %[[ARG1]][%[[IDX]]] [%[[SIZE]]] [1]
 // CHECK:          linalg_ext.reverse
 // CHECK-SAME:       dimensions(dense<0> : tensor<1xi64>)
 // CHECK-SAME:       {__internal_linalg_transform__ = "tiling_output"}
@@ -646,6 +647,7 @@ func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 }
 // CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 - s1 - s2)>
 // CHECK:      func @reverse_tensor_multi_dim(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-DAG:    %[[C0:.+]] = constant 0 : index
@@ -666,20 +668,18 @@ func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK:            %[[SUB_IN:.+]] = tensor.extract_slice
 // CHECK-SAME:         %[[ARG0]][%[[I]], %[[J]]] [%[[SIZE_I]], %[[SIZE_J]]] [1, 1]
 // CHECK:            %[[T0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?xi32>
-// CHECK:            %[[T1:.+]] = subi %[[T0]], %[[I]] : index
-// CHECK:            %[[T2:.+]] = subi %[[T1]], %[[SIZE_I]] : index
-// CHECK:            %[[T3:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xi32>
-// CHECK:            %[[T4:.+]] = subi %[[T3]], %[[J]] : index
-// CHECK:            %[[T5:.+]] = subi %[[T4]], %[[SIZE_J]] : index
+// CHECK:            %[[IDX0:.+]] = affine.apply #[[MAP2]]()[%[[T0]], %[[I]], %[[SIZE_I]]]
+// CHECK:            %[[T1:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xi32>
+// CHECK:            %[[IDX1:.+]] = affine.apply #[[MAP2]]()[%[[T1]], %[[J]], %[[SIZE_J]]]
 // CHECK:            %[[SUB_INIT:.+]] = tensor.extract_slice
-// CHECK-SAME:         %[[INIT]][%[[I]], %[[J]]] [%[[SIZE_I]], %[[SIZE_J]]] [1, 1]
+// CHECK-SAME:         %[[INIT]][%[[IDX0]], %[[IDX1]]] [%[[SIZE_I]], %[[SIZE_J]]] [1, 1]
 // CHECK:            %[[REV:.+]] = linalg_ext.reverse
 // CHECK-SAME:          dimensions(dense<[0, 1]> : tensor<2xi64>)
 // CHECK-SAME:          {__internal_linalg_transform__ = "tiling_output"}
 // CHECK-SAME:          ins(%[[SUB_IN]]
 // CHECK-SAME:          outs(%[[SUB_INIT]]
 // CHECK:            %[[RES3:.+]] = tensor.insert_slice %[[REV]] into
-// CHECK-SAME:         %[[INIT3]][%[[T2]], %[[T5]]] [%[[SIZE_I]], %[[SIZE_J]]] [1, 1]
+// CHECK-SAME:         %[[INIT3]][%[[IDX0]], %[[IDX1]]] [%[[SIZE_I]], %[[SIZE_J]]] [1, 1]
 // CHECK:            scf.yield %[[RES3]]
 // CHECK:          scf.yield %[[RES2]]
 // CHECK:        return %[[RES]]
