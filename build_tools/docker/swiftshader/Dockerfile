@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/cmake@sha256:57ee32f8b40b727b00054be9f3359f4980aca1556740aa70c3fcfb43eedc1a4f AS install-swiftshader
+FROM gcr.io/iree-oss/cmake@sha256:605a514784b0415dac9f0805f01110fa13d366e26b57a89716843a252a18c563 AS install-swiftshader
 WORKDIR /install-swiftshader
 
 RUN apt-get update && apt-get install -y git

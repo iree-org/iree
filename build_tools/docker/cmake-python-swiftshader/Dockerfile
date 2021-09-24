@@ -7,8 +7,8 @@
 # An image for building IREE using CMake and testing IREE with SwiftShader
 # Vulkan implementation.
 
-FROM gcr.io/iree-oss/cmake-python-vulkan@sha256:fae5b4ae5613551675db0af55cb8f1ec5371b2820a980a2d482dae76e1c6ee65 AS final
-COPY --from=gcr.io/iree-oss/swiftshader@sha256:7f3947c8494c7a7ae92a48a219b21b5e2ef34bff339a893d0254a33f047e9e10 \
+FROM gcr.io/iree-oss/cmake-python-vulkan@sha256:4b50e3b4e3e11059d9c385d080f3b512fae414c2f5b36ceae72a80c6bfc0cdf1 AS final
+COPY --from=gcr.io/iree-oss/swiftshader@sha256:54265ebefcd6464ade8a6b36a3105f6219a2bb804c4a3b2052880fd4213d72a3 \
   /swiftshader /swiftshader
 
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
