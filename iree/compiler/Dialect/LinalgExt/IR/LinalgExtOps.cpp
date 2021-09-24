@@ -849,8 +849,10 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
     Value offset =
         getValueOrCreateConstantIndexOp(builder, loc, mirrorOffsets[dim]);
     Value tileSize = getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]);
-    mirrorOffsets[dim] = builder.create<AffineApplyOp>(
-        loc, map, ValueRange{size, offset, tileSize}).getResult();
+    mirrorOffsets[dim] =
+        builder
+            .create<AffineApplyOp>(loc, map, ValueRange{size, offset, tileSize})
+            .getResult();
   }
 
   SmallVector<Type, 4> resultTypes;
