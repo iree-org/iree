@@ -119,10 +119,12 @@ static unsigned getReferenceTypeLengthInBytes(FuncOp entryPointFn) {
 }
 
 static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
-    ArrayRef<TiledLoopInfo> tiledLoops, int64_t nativeVectorSizeInElements) {
+    ArrayRef<TiledLoopInfo> tiledLoops,
+    ArrayRef<int64_t> nativeVectorSizeInElements) {
   if (tiledLoops.empty()) {
     return {};
   }
+  assert(tiledLoops.size() == nativeVectorSizeInElements.size());
   int64_t useDefaultWorkgroupTileSize = defaultWorkgroupTileSize;
   unsigned maxDim = 0;
   for (auto tiledLoop : tiledLoops) {
@@ -135,27 +137,28 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
     useDefaultWorkgroupTileSize /= 2;
   }
 
-  for (auto tiledLoop : tiledLoops) {
-    if (!tiledLoop.ub || !tiledLoop.ub.is<Attribute>() || !tiledLoop.lb ||
-        !tiledLoop.lb.is<Attribute>()) {
-      workloadPerWorkgroup[tiledLoop.distributionDim] =
+  for (auto tiledLoop : enumerate(tiledLoops)) {
+    if (!tiledLoop.value().ub || !tiledLoop.value().ub.is<Attribute>() ||
+        !tiledLoop.value().lb || !tiledLoop.value().lb.is<Attribute>()) {
+      workloadPerWorkgroup[tiledLoop.value().distributionDim] =
           defaultWorkgroupTileSize;
       continue;
     }
-    int64_t lb = tiledLoop.lb.get<Attribute>().cast<IntegerAttr>().getInt();
-    int64_t ub = tiledLoop.ub.get<Attribute>().cast<IntegerAttr>().getInt();
-    int64_t candidateTileSize =
-        (tiledLoop.distributionDim == 0 ? nativeVectorSizeInElements : 1);
+    int64_t lb =
+        tiledLoop.value().lb.get<Attribute>().cast<IntegerAttr>().getInt();
+    int64_t ub =
+        tiledLoop.value().ub.get<Attribute>().cast<IntegerAttr>().getInt();
+    int64_t candidateTileSize = nativeVectorSizeInElements[tiledLoop.index()];
     if (ub <= lb) {
-      // Avoid tiling this loop.
-      candidateTileSize = 0;
+      // Should be avoiding tiling this loop, but use tile size of 1.
+      candidateTileSize = 1;
     } else {
       candidateTileSize = std::max<int64_t>(
           llvm::PowerOf2Floor(static_cast<uint64_t>(ub - lb) / 2),
-          (tiledLoop.distributionDim == 0 ? nativeVectorSizeInElements : 1));
+          candidateTileSize);
     }
 
-    workloadPerWorkgroup[tiledLoop.distributionDim] =
+    workloadPerWorkgroup[tiledLoop.value().distributionDim] =
         std::min<int64_t>(candidateTileSize, useDefaultWorkgroupTileSize);
   }
   return workloadPerWorkgroup;
@@ -166,12 +169,16 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
 static LogicalResult setDefaultLaunchConfig(
     FuncOp entryPointFn, ArrayRef<TiledLoopInfo> tiledLoops) {
   unsigned typeWidthInBytes = getReferenceTypeLengthInBytes(entryPointFn);
-  int64_t nativeVectorSizeInBytes = clNativeVectorSizeInBytes;
-  if (auto fromConfig = getNativeVectorSizeInBytes(entryPointFn)) {
-    nativeVectorSizeInBytes = fromConfig.getValue();
+  SmallVector<int64_t> nativeVectorSizeInElements(tiledLoops.size(), 1);
+  if (!tiledLoops.empty()) {
+    int64_t nativeVectorSizeInBytes = clNativeVectorSizeInBytes;
+    if (auto fromConfig = getNativeVectorSizeInBytes(entryPointFn)) {
+      nativeVectorSizeInBytes = fromConfig.getValue();
+    }
+    nativeVectorSizeInElements.back() =
+        nativeVectorSizeInBytes / typeWidthInBytes;
   }
-  int64_t nativeVectorSizeInElements =
-      nativeVectorSizeInBytes / typeWidthInBytes;
+
   SmallVector<int64_t> workloadPerWorkgroup =
       getDefaultWorkloadPerWorkgroup(tiledLoops, nativeVectorSizeInElements);
 
@@ -189,17 +196,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
   if (getLoweringConfig(contractionOp)) return success();
 
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
-  Type elementType = lhsShapedType.getElementType();
-  if (!elementType.isIntOrFloat()) return success();
-  unsigned byteWidth = elementType.getIntOrFloatBitWidth() / 8;
-  int64_t vectorSize;
-  if (Optional<int64_t> nativeVectorSizeVal =
-          getNativeVectorSizeInBytes(entryPointFn)) {
-    vectorSize = nativeVectorSizeVal.getValue() / byteWidth;
-  } else {
-    vectorSize = matmulVectorSize;
-  }
-
   // Use the default distribution for the matmul loops.
   bool isBatchMatmul = lhsShapedType.getRank() == 3;
   if (isBatchMatmul) {
@@ -211,28 +207,73 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     return contractionOp.emitOpError(
         "expected op tbe distributed along 2 dimensions");
   }
+
+  Type elementType = lhsShapedType.getElementType();
+  if (!elementType.isIntOrFloat()) return success();
+  unsigned byteWidth = elementType.getIntOrFloatBitWidth() / 8;
+  int64_t vectorSize;
+  if (Optional<int64_t> nativeVectorSizeVal =
+          getNativeVectorSizeInBytes(entryPointFn)) {
+    vectorSize = nativeVectorSizeVal.getValue() / byteWidth;
+  } else {
+    vectorSize = matmulVectorSize;
+  }
+  SmallVector<int64_t> vectorSizeVals(tiledLoops.size(), 1);
+  vectorSizeVals.back() = vectorSize;
+  vectorSizeVals[vectorSizeVals.size() - 2] = vectorSize;
+
   SmallVector<int64_t> workloadPerWorkgroup = getDefaultWorkloadPerWorkgroup(
-      isBatchMatmul ? tiledLoops.drop_front() : tiledLoops, vectorSize);
+      isBatchMatmul ? tiledLoops.drop_front() : tiledLoops,
+      isBatchMatmul ? ArrayRef<int64_t>(vectorSizeVals).drop_front()
+                    : vectorSizeVals);
+
+  // Adjust the workload per workgroup to be a multiple of vector size to ensure
+  // that the op vectorizes.
+  auto getTileSize = [](int64_t lb, int64_t ub, int64_t maxSize,
+                        int64_t vectorSizeVal) -> int64_t {
+    if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize)
+      return maxSize;
+    int64_t dim = ub - lb;
+    if (dim < vectorSizeVal) return vectorSizeVal;
+    for (int64_t i = std::min(maxSize, dim); i > 0; --i) {
+      if (dim % i == 0 && i % vectorSizeVal == 0) {
+        return i;
+      }
+    }
+    return maxSize;
+  };
+  for (unsigned i = tiledLoops.size() - 2; i < tiledLoops.size(); ++i) {
+    if (!tiledLoops[i].lb.is<Attribute>() || !tiledLoops[i].ub.is<Attribute>())
+      continue;
+    int64_t lb = tiledLoops[i].lb.get<Attribute>().cast<IntegerAttr>().getInt();
+    int64_t ub = tiledLoops[i].ub.get<Attribute>().cast<IntegerAttr>().getInt();
+    workloadPerWorkgroup[tiledLoops.size() - 1 - i] =
+        getTileSize(lb, ub, workloadPerWorkgroup[tiledLoops.size() - 1 - i],
+                    vectorSizeVals[i]);
+  }
   setTranslationInfo(
       entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors,
       /*workgroupSize =*/ArrayRef<int64_t>{}, workloadPerWorkgroup);
 
-  SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes, nativeVectorSize;
+  SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;
   if (isBatchMatmul) {
     l1TileSizes.push_back(1);
-    vectorTileSizes.push_back(1);
-    nativeVectorSize.push_back(1);
   }
-  l1TileSizes.append(3, matmulL1TileSize);
-  vectorTileSizes.append(3, vectorSize);
-  nativeVectorSize.append(3, vectorSize);
+  for (unsigned i = tiledLoops.size() - 2; i < tiledLoops.size(); ++i) {
+    l1TileSizes.push_back(
+        getTileSize(0, workloadPerWorkgroup[tiledLoops.size() - 1 - i],
+                    matmulL1TileSize, vectorSizeVals[i]));
+  }
+  l1TileSizes.push_back(matmulL1TileSize);
+  vectorTileSizes.assign(vectorSizeVals.begin(), vectorSizeVals.end());
+  vectorTileSizes.push_back(vectorSize);
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty here since there is nothing to do in first
                             // level tiling.
   tileSizes.emplace_back(std::move(l1TileSizes));
   tileSizes.emplace_back(std::move(vectorTileSizes));
   IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, nativeVectorSize, entryPointFn.getContext());
+      buildConfigAttr(tileSizes, vectorSizeVals, entryPointFn.getContext());
   setLoweringConfig(contractionOp, config);
   return success();
 }
