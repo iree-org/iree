@@ -16,12 +16,8 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# TODO(b/200955828): this test needs an update.
-DISABLED_TESTS = [
-    "bert_encoder_unrolled_fake_weights.mlir",
-]
-
 CHECK_FRAMEWORK_TESTS = [
+    "bert_encoder_unrolled_fake_weights.mlir",
     "mobilenetv3_fake_weights.mlir",
 ]
 
@@ -40,7 +36,7 @@ iree_lit_test_suite(
         ],
         include =
             ["*.mlir"],
-        exclude = CHECK_FRAMEWORK_TESTS + DISABLED_TESTS,
+        exclude = CHECK_FRAMEWORK_TESTS,
     ),
     data = [
         "//iree/tools:IreeFileCheck",
