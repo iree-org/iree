@@ -441,7 +441,12 @@ if(IREE_BUILD_TESTS)
 endif()
 
 if(IREE_BUILD_PYTHON_BINDINGS)
-  add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+  if(NOT TARGET pybind11::module)
+    message(STATUS "Using bundled pybind11")
+    add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+  else()
+    message(STATUS "Not including bundled pybind11 (already configured)")
+  endif()
 endif()
 
 if(IREE_TARGET_BACKEND_METAL-SPIRV)

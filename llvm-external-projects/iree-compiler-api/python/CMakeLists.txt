@@ -16,6 +16,17 @@ declare_mlir_python_sources(IREECompilerAPIPythonSources
 )
 declare_mlir_python_sources(IREECompilerAPIPythonExtensions)
 
+declare_mlir_python_sources(IREECompilerAPIPythonTools
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  SOURCES
+    __init__.py
+    tf.py
+    tflite.py
+    xla.py
+  SOURCES_GLOB
+    tools/*.py
+)
+
 ################################################################################
 # Extensions
 ################################################################################
@@ -39,6 +50,7 @@ set(_source_components
   # Local sources.
   IREECompilerAPIPythonSources
   IREECompilerAPIPythonExtensions
+  IREECompilerAPIPythonTools
 
   # TODO: Core is now implicitly building/registering all dialects, increasing
   # build burden by ~5x. Make it stop.
@@ -82,3 +94,18 @@ add_mlir_python_modules(IREECompilerPythonModules
   COMMON_CAPI_LINK_LIBS
     IREECompilerAggregateCAPI
   )
+
+
+# Build the ireec tool into _mlir_libs.
+add_executable(
+  IREECompilerIREECTool
+    IREECTool.c
+)
+target_link_libraries(IREECompilerIREECTool IREECompilerAggregateCAPI)
+set_target_properties(IREECompilerIREECTool
+  PROPERTIES
+    OUTPUT_NAME "ireec"
+    RUNTIME_OUTPUT_DIRECTORY "${IREE_COMPILER_API_BINARY_DIR}/python_package/iree/compiler/_mlir_libs"
+    BUILD_RPATH_USE_ORIGIN ON
+)
+add_dependencies(IREECompilerPythonModules IREECompilerIREECTool)
