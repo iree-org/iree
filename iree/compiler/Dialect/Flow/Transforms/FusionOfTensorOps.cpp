@@ -87,7 +87,10 @@ struct FusionOfTensorOpsPass
                   return attr.cast<StringAttr>().getValue() ==
                          getParallelIteratorTypeName();
                 });
-            if (parallelOp) {
+            // Detect op that only broadcast input as fusing them makes the new
+            // op cheaper.
+            if (parallelOp &&
+                isa<linalg::YieldOp>(genericOp.getBody()->front())) {
               for (OpOperand *opOperand : genericOp.getInputOperands()) {
                 AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
                 if (indexingMap.isProjectedPermutation() &&
