@@ -12,11 +12,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SMLoc.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/StandardOps/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -794,9 +796,8 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
 bool ReverseOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
 
 SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
-  // TODO(hanchung): Mark them parallel after tiling method is implemented.
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getReductionIteratorTypeName());
+                                       getParallelIteratorTypeName());
   return iteratorTypes;
 }
 
@@ -824,6 +825,56 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   Value val = b.create<memref::LoadOp>(loc, input(), ivs);
   b.create<memref::StoreOp>(loc, val, output(), mirrorIndices);
   return success();
+}
+
+Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
+                                             ValueRange outputs,
+                                             ArrayRef<OpFoldResult> offsets,
+                                             ArrayRef<OpFoldResult> sizes,
+                                             SmallVectorImpl<Value> &results) {
+  int64_t rank = getOperandRank();
+  SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  Location loc = getLoc();
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, input(), offsets, sizes, strides));
+
+  AffineExpr sym0, sym1, sym2;
+  bindSymbols(builder.getContext(), sym0, sym1, sym2);
+  AffineMap map =
+      AffineMap::get(/*dimCount=*/0, /*symbolCount=*/3, {sym0 - sym1 - sym2});
+  SmallVector<OpFoldResult> mirrorOffsets(offsets.begin(), offsets.end());
+  for (auto dim : dims()) {
+    Value size = getDimValue(builder, loc, input(), dim);
+    Value offset =
+        getValueOrCreateConstantIndexOp(builder, loc, mirrorOffsets[dim]);
+    Value tileSize = getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]);
+    mirrorOffsets[dim] =
+        builder
+            .create<AffineApplyOp>(loc, map, ValueRange{size, offset, tileSize})
+            .getResult();
+  }
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasTensorSemantics()) {
+    tiledOperands.emplace_back(
+        getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
+    resultTypes.push_back(tiledOperands[1].getType());
+  } else {
+    tiledOperands.emplace_back(
+        getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
+  }
+
+  Operation *tiledRevOp = cast<LinalgExtOp>(getOperation())
+                              .clone(builder, loc, resultTypes, tiledOperands);
+
+  for (auto result : llvm::enumerate(tiledRevOp->getResults())) {
+    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+        loc, result.value(), outputs[result.index()], mirrorOffsets, sizes,
+        strides);
+    results.push_back(insertSliceOp.getResult());
+  }
+  return tiledRevOp;
 }
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
