@@ -66,7 +66,7 @@ class TempFileSaver:
     return TempFileSaver()
 
   def __init__(self,
-               temp_path_pattern: str = None,
+               temp_path_pattern: Optional[str] = None,
                *,
                invocation_id: Optional[str] = None):
     self.retained = False

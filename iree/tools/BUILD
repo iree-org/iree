@@ -353,8 +353,8 @@ cc_binary(
 
 cc_library(
     name = "iree_translate_lib",
-    hdrs = ["iree_translate_lib.h"],
     srcs = ["iree_translate_lib.cc"],
+    hdrs = ["iree_translate_lib.h"],
     deps = [
         ":init_compiler_modules",
         ":init_iree_passes_and_dialects",
