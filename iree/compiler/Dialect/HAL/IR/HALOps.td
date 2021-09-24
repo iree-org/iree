@@ -1347,9 +1347,9 @@ def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
       "StringRef":$sym_name,
       "::mlir::Type":$tensor_type,
       "::mlir::FlatSymbolRefAttr":$storage_buffer,
-      "::mlir::Attribute":$storage_range,
+      "::mlir::iree_compiler::IREE::Util::ByteRangeAttr":$storage_range,
       "::mlir::SymbolRefAttr":$runtime_buffer,
-      "::mlir::Attribute":$runtime_range
+      "::mlir::iree_compiler::IREE::Util::ByteRangeAttr":$runtime_range
     ), [{
       build($_builder, $_state, nullptr, sym_name, tensor_type, storage_buffer,
             storage_range, runtime_buffer, runtime_range);
