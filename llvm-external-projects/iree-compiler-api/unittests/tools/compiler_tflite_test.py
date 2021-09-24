@@ -31,7 +31,6 @@ class CompilerTest(unittest.TestCase):
     logging.info("%s", text)
     self.assertIn("tosa.mul", text)
 
-  @unittest.skip("IREE tosa compilation not implemented yet")
   def testCompileBinaryPbFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata",
                         "tflite_sample.fb")
@@ -58,7 +57,6 @@ class CompilerTest(unittest.TestCase):
     logging.info("%s", text)
     self.assertIn("tosa.mul", text)
 
-  @unittest.skip("IREE tosa compilation not implemented yet")
   def testCompileBinaryPbFileOutputFile(self):
     path = os.path.join(os.path.dirname(__file__), "testdata",
                         "tflite_sample.fb")
@@ -87,7 +85,6 @@ class CompilerTest(unittest.TestCase):
     logging.info("%s", text)
     self.assertIn("tosa.mul", text)
 
-  @unittest.skip("IREE tosa compilation not implemented yet")
   def testCompileBinaryPbBytes(self):
     path = os.path.join(os.path.dirname(__file__), "testdata",
                         "tflite_sample.fb")
