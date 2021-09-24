@@ -64,7 +64,7 @@ class CompilerToolError(Exception):
     tool_name = os.path.basename(process.args[0])
     super().__init__(f"Error invoking IREE compiler tool {tool_name}\n"
                      f"Diagnostics:\n{errs}\n\n"
-                     f"Invoked with:\n  {' '.join(process.args)}")
+                     f"Invoked with:\n {tool_name} {' '.join(process.args)}")
 
 
 def get_tool_path() -> List[str]:
