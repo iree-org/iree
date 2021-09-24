@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-tile-and-distribute))))' %s | IreeFileCheck %s
 
-#config = {tileSizes = [[2, 256, 4], [], [2, 4]]}
+#config = {tileSizes = [[2, 256, 4]]}
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #map0 = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
@@ -12,6 +12,7 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
   hal.executable.entry_point @dot_dispatch_0 attributes {
     interface = @legacy_io,
     ordinal = 0 : index,
+    translation.info = {passPipeline = "LLVMGPUMatmulSimt" : i32, workloadPerWorkgroup = [256, 2]},
     workgroup_size = [64 : index, 1 : index, 1 : index]}
   builtin.module  {
     builtin.func @dot_dispatch_0() {
@@ -92,7 +93,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
     hal.executable.entry_point @predict_dispatch_153 attributes {
       interface = @io,
       ordinal = 0 : index,
-      translation.info = {passPipeline = 2 : i32},
+      translation.info = {passPipeline = "LLVMGPUVectorize" : i32},
       workgroup_size = [1: index, 1: index, 1: index]}
     builtin.module  {
       builtin.func @predict_dispatch_153() {

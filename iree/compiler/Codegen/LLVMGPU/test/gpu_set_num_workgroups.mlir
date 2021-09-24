@@ -33,7 +33,7 @@ hal.executable @add_dispatch_0 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[128], [], [4]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[128]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
 //      CHECK: hal.executable.entry_point public @add_dispatch_0
 // CHECK-SAME:     passPipeline = "LLVMGPUVectorize"
@@ -92,7 +92,7 @@ hal.executable private @dot_dispatch_1  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[4, 2, 4], [], [1, 1]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[4, 2, 4]{{\]}}}
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
 //      CHECK: hal.executable.entry_point public @dot_dispatch_1
@@ -246,7 +246,7 @@ hal.executable @tensor_insert {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 128], [], [1, 4]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 128]{{\]}}}
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
 // CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUVectorize", workloadPerWorkgroup = [128, 1]}
@@ -401,7 +401,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = #hal.executable.target<"c
           %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg1)[%workgroup_size_x]
           %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
           %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-          %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {passPipeline = "LLVMGPUMatmulSimt", tileSizes = [[32, 256, 64], [], [4, 16]], workgroupSize = [16, 8, 1]}} ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+          %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {passPipeline = "LLVMGPUMatmulSimt", tileSizes = [[32, 256, 64]], workgroupSize = [16, 8, 1]}} ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
           flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:128x1024xf32>
         }
       }
@@ -416,7 +416,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = #hal.executable.target<"c
 }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = {{{.*}}tileSizes = {{\[}}[32, 256, 64], [], [4, 16]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {{{.*}}tileSizes = {{\[}}[32, 256, 64]{{\]}}}
 //      CHECK: hal.executable.entry_point public @_lowering_config_test_dispatch_1
 // CHECK-SAME:     passPipeline = "LLVMGPUMatmulSimt"
 // CHECK-SAME:     workloadPerWorkgroup = [256, 32]
