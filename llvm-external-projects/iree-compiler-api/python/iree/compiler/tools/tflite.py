@@ -50,6 +50,7 @@ class ImportOptions(CompilerOptions):
                import_extra_args: Sequence[str] = (),
                save_temp_tfl_input: Optional[str] = None,
                save_temp_iree_input: Optional[str] = None,
+               input_type: Optional[str] = "tosa",
                **kwargs):
     """Initialize options from keywords.
 
@@ -70,7 +71,7 @@ class ImportOptions(CompilerOptions):
       save_temp_iree_input: Optionally save the IR that is the result of the
         import (ready to be passed to IREE).
     """
-    super().__init__(**kwargs)
+    super().__init__(input_type=input_type, **kwargs)
     self.input_arrays = input_arrays
     self.output_arrays = output_arrays
     self.import_only = import_only
