@@ -72,15 +72,18 @@ class CMakeBuildPy(_build_py):
   def run(self):
     subprocess.check_call(["cmake", "--version"])
 
-    target_dir = self.build_lib
+    target_dir = os.path.abspath(self.build_lib)
+    print(f"Building in target dir: {target_dir}", file=sys.stderr)
     os.makedirs(target_dir, exist_ok=True)
     cmake_build_dir = os.getenv("IREE_COMPILER_API_CMAKE_BUILD_DIR")
     if not cmake_build_dir:
       cmake_build_dir = os.path.join(target_dir, "..", "cmake_build")
     os.makedirs(cmake_build_dir, exist_ok=True)
     cmake_build_dir = os.path.abspath(cmake_build_dir)
+    print(f"CMake build dir: {cmake_build_dir}", file=sys.stderr)
     cmake_install_dir = os.path.abspath(
         os.path.join(target_dir, "..", "cmake_install"))
+    print(f"CMake install dir: {cmake_install_dir}", file=sys.stderr)
     src_dir = os.path.abspath(os.path.dirname(__file__))
     cfg = "Release"
     cmake_args = [
@@ -115,19 +118,19 @@ class CMakeBuildPy(_build_py):
     cmake_cache_file = os.path.join(cmake_build_dir, "CMakeCache.txt")
     if os.path.exists(cmake_cache_file):
       os.remove(cmake_cache_file)
-    print(f"Configuring with: {cmake_args}")
+    print(f"Configuring with: {cmake_args}", file=sys.stderr)
     subprocess.check_call(["cmake", src_dir] + cmake_args, cwd=cmake_build_dir)
     subprocess.check_call(
         ["cmake", "--build", ".", "--target", "install/strip"] + build_args,
         cwd=cmake_build_dir)
-    print("Build complete.")
+    print("Build complete.", file=sys.stderr)
     if os.path.exists(target_dir):
       shutil.rmtree(target_dir)
-    print("Copying install to target.")
+    print("Copying install to target.", file=sys.stderr)
     shutil.copytree(os.path.join(cmake_install_dir, "python_package"),
                     target_dir,
                     symlinks=False)
-    print("Target populated.")
+    print("Target populated.", file=sys.stderr)
 
 
 class NoopBuildExtension(_build_ext):
