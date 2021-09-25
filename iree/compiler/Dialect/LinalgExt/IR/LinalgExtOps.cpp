@@ -773,8 +773,24 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
   if (op.getNumOutputs() != 1) {
     return op.emitOpError("expected exactly one output");
   }
-  if (op.input().getType() != op.output().getType()) {
-    return op.emitOpError("expected input/output types are identical");
+  auto inputType = op.input().getType().cast<ShapedType>();
+  auto outputType = op.output().getType().cast<ShapedType>();
+  if (inputType.getElementType() != outputType.getElementType()) {
+    return op.emitOpError(
+        "expected input/output element types to be identical");
+  }
+  ArrayRef<int64_t> inputShapes = inputType.getShape();
+  ArrayRef<int64_t> outputShapes = outputType.getShape();
+  if (inputShapes.size() != outputShapes.size()) {
+    return op.emitOpError("expexted input/output to have identical ranks");
+  }
+  if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
+                   [](std::tuple<int64_t, int64_t> s) {
+                     return std::get<0>(s) != ShapedType::kDynamicSize &&
+                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                            std::get<0>(s) != std::get<1>(s);
+                   })) {
+    return op.emitOpError("incompatible input/output shapes");
   }
 
   int64_t rank = op.getOperandRank();

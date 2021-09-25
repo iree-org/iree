@@ -383,9 +383,21 @@ func @scatter_original_rank_mismatch(
 
 // -----
 
-func @reverse_diff_types(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
+func @reverse_diff_element_type(%arg0: tensor<3x5xi32>) -> tensor<3x5xf32> {
+  %init = linalg.init_tensor [3, 5] : tensor<3x5xf32>
+  // expected-error @+1 {{expected input/output element types to be identical}}
+  %0 = linalg_ext.reverse
+         dimensions(dense<0> : tensor<1xi64>)
+         ins(%arg0 : tensor<3x5xi32>)
+         outs(%init : tensor<3x5xf32>) : tensor<3x5xf32>
+  return %0 : tensor<3x5xf32>
+}
+
+// -----
+
+func @reverse_diff_shape(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
   %init = linalg.init_tensor [3, 6] : tensor<3x6xi32>
-  // expected-error @+1 {{expected input/output types are identical}}
+  // expected-error @+1 {{incompatible input/output shapes}}
   %0 = linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
          ins(%arg0 : tensor<3x5xi32>)
