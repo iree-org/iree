@@ -172,8 +172,7 @@ def invoke_generate():
     os.makedirs(python_libdir, exist_ok=True)
     python_library = os.path.join(python_libdir,
                                   sysconfig.get_config_var('LIBRARY'))
-    with open(python_library, 'wb') as f:
-      pass
+    subprocess.check_call(["ar", "q", python_library])
 
   if python_library:
     cmake_args.append(f'-DPython3_LIBRARY:PATH={python_library}')
