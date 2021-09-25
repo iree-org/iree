@@ -20,6 +20,7 @@
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -94,18 +95,19 @@ class CMakeBuildPy(_build_py):
     # happens to be what exists on manylinux. We detect this and give it a dummy
     # library file to reference (which is checks exists but never gets
     # used).
-    python_libdir = sysconfig.get_config_var('LIBDIR')
-    python_library = sysconfig.get_config_var('LIBRARY')
-    if python_libdir and not os.path.isabs(python_library):
-      python_library = os.path.join(python_libdir, python_library)
-    if python_library and not os.path.exists(python_library):
-      print("Detected static linked python. Faking a library for cmake.")
-      fake_libdir = os.path.join(cmake_build_dir, "fake_python", "lib")
-      os.makedirs(fake_libdir, exist_ok=True)
-      fake_library = os.path.join(fake_libdir,
-                                  sysconfig.get_config_var('LIBRARY'))
-      subprocess.check_call(["ar", "q", fake_library])
-      cmake_args.append("-DPython3_LIBRARY:PATH={}".format(fake_library))
+    if platform.system() == "Linux":
+      python_libdir = sysconfig.get_config_var('LIBDIR')
+      python_library = sysconfig.get_config_var('LIBRARY')
+      if python_libdir and not os.path.isabs(python_library):
+        python_library = os.path.join(python_libdir, python_library)
+      if python_library and not os.path.exists(python_library):
+        print("Detected static linked python. Faking a library for cmake.")
+        fake_libdir = os.path.join(cmake_build_dir, "fake_python", "lib")
+        os.makedirs(fake_libdir, exist_ok=True)
+        fake_library = os.path.join(fake_libdir,
+                                    sysconfig.get_config_var('LIBRARY'))
+        subprocess.check_call(["ar", "q", fake_library])
+        cmake_args.append("-DPython3_LIBRARY:PATH={}".format(fake_library))
 
     build_args = []
     if os.path.exists(cmake_install_dir):
