@@ -118,10 +118,13 @@ class CMakeBuildPy(_build_py):
     cmake_cache_file = os.path.join(cmake_build_dir, "CMakeCache.txt")
     if os.path.exists(cmake_cache_file):
       os.remove(cmake_cache_file)
+    install_target = "install/strip"
+    if platform.system() == "Windows":
+      install_target = "install"
     print(f"Configuring with: {cmake_args}", file=sys.stderr)
     subprocess.check_call(["cmake", src_dir] + cmake_args, cwd=cmake_build_dir)
     subprocess.check_call(
-        ["cmake", "--build", ".", "--target", "install/strip"] + build_args,
+        ["cmake", "--build", ".", "--target", install_target] + build_args,
         cwd=cmake_build_dir)
     print("Build complete.", file=sys.stderr)
     if os.path.exists(target_dir):
