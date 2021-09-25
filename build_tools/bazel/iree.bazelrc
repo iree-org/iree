@@ -260,7 +260,7 @@ build:remote_cache_tf_integrations --config=_remote_cache_base
 # specific docker container the TF build is run in. The image URL is included
 # for clarity and so that this reference is automatically updated by
 # manage_images.py
-build:remote_cache_tf_integrations --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/cmake-bazel-frontends-swiftshader@sha256:72ee80555237bc828fcb59c02374ff6c13764746adbcd3e5b9ceb107dbd7ae68"}'
+build:remote_cache_tf_integrations --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/cmake-bazel-frontends-swiftshader@sha256:0629f4992d1f22722060722d03d60806dcf741ffe6376144eb5727d4ff883cca"}'
 
 ### Remote Execution ###
 # --config=rbe Execute and cache builds remotely.

@@ -3,7 +3,7 @@
 # that make up the IREE compiler input surface area. As a standalone
 # project intended for direct distribution, it hard-codes a number of important
 # CMake settings for producing optimal binaries and packages.
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.16.3)
 
 if(POLICY CMP0068)
   cmake_policy(SET CMP0068 NEW)
