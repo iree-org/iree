@@ -187,6 +187,7 @@ jobs:
         run: |
           # TODO: Can be removed once pip 21.3 is released.
           export CIBW_ENVIRONMENT="PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=ninja"
+          export CIBW_BEFORE_BUILD="pip install --upgrade pip=21.2.4"
           python -m cibuildwheel --output-dir bindist ./main_checkout/llvm-external-projects/iree-compiler-api
 
       # Pure python packages only need to do a minimal CMake configure and no
