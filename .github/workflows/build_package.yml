@@ -90,6 +90,9 @@ jobs:
           #   experimental: true
     env:
       CIBW_BUILD_VERBOSITY: 1
+      # TODO: Can be removed once pip 21.3 is released.
+      CIBW_ENVIRONMENT: "PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=ninja"
+
       # Note that on Linux, we run under docker with an altered path.
       CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output"
       CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout"
@@ -185,8 +188,6 @@ jobs:
         if: "matrix.build_package == 'py-compiler-pkg'"
         shell: bash
         run: |
-          # TODO: Can be removed once pip 21.3 is released.
-          export CIBW_ENVIRONMENT="PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=ninja"
           export CIBW_BEFORE_BUILD="pip install --upgrade pip==21.2.4"
           python -m cibuildwheel --output-dir bindist ./main_checkout/llvm-external-projects/iree-compiler-api
 
