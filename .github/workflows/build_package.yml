@@ -90,13 +90,12 @@ jobs:
           #   experimental: true
     env:
       CIBW_BUILD_VERBOSITY: 1
-      # TODO: Can be removed once pip 21.3 is released.
-      CIBW_ENVIRONMENT: "PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=ninja"
 
+      # TODO: in-tree-build can be removed once pip 21.3 is released.
       # Note that on Linux, we run under docker with an altered path.
-      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output"
-      CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout"
-      CIBW_ENVIRONMENT_WINDOWS: "REPO_DIR='${{ github.workspace }}\\main_checkout'"
+      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=ninja"
+      CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=ninja"
+      CIBW_ENVIRONMENT_WINDOWS: "REPO_DIR='${{ github.workspace }}\\main_checkout' PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=ninja"
 
       # Needs the bazel manylinux image.
       # TODO: Move this to our repo and pin.
