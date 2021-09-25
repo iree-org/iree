@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOpsDialect.cpp.inc"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
@@ -20,8 +21,7 @@ namespace mlir {
 namespace iree_compiler {
 namespace linalg_ext {
 
-LinalgExtDialect::LinalgExtDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context, TypeID::get<LinalgExtDialect>()) {
+void LinalgExtDialect::initialize() {
   // TODO(hanchung): Add interface to the dialect.
   // addInterfaces<IREEInlinerInterface>();
 #define GET_OP_LIST

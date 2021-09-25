@@ -892,6 +892,73 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ReverseOp)
 
+namespace {
+/// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
+/// changes.
+struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
+  using OpInterfaceRewritePattern<LinalgExtOp>::OpInterfaceRewritePattern;
+
+  LogicalResult matchAndRewrite(LinalgExtOp op,
+                                PatternRewriter &rewriter) const override {
+    // If no operand comes from a tensor::CastOp and can be folded then fail.
+    bool hasTensorCastOperand =
+        llvm::any_of(op.getInputAndOutputOperands(), [&](OpOperand *opOperand) {
+          if (opOperand->get().isa<BlockArgument>()) return false;
+          auto castOp = opOperand->get().getDefiningOp<tensor::CastOp>();
+          return castOp && canFoldIntoConsumerOp(castOp);
+        });
+    if (!hasTensorCastOperand) return failure();
+
+    SmallVector<Type, 4> newResultTypes;
+    newResultTypes.reserve(op->getNumResults());
+    SmallVector<Value, 4> newOperands;
+    newOperands.reserve(op->getNumOperands());
+    // Inputs may fold.
+    for (OpOperand *opOperand : op.getInputOperands()) {
+      auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
+      newOperands.push_back(canFoldIntoConsumerOp(tensorCastOp)
+                                ? tensorCastOp.source()
+                                : opOperand->get());
+    }
+    // Init tensors may fold, in which case the resultType must also change.
+    for (OpOperand *opOperand : op.getOutputOperands()) {
+      auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
+      bool fold = canFoldIntoConsumerOp(tensorCastOp);
+      newOperands.push_back(fold ? tensorCastOp.getOperand()
+                                 : opOperand->get());
+      newResultTypes.push_back(newOperands.back().getType());
+    }
+    // Clone op.
+    Operation *newOp =
+        op.clone(rewriter, op->getLoc(), newResultTypes, newOperands);
+    SmallVector<Value, 4> replacements;
+    replacements.reserve(newOp->getNumResults());
+    for (auto result : llvm::zip(op->getResults(), newOp->getResults())) {
+      Value oldResult = std::get<0>(result);
+      Value newResult = std::get<1>(result);
+      if (newResult.getType() != oldResult.getType()) {
+        replacements.push_back(rewriter.create<tensor::CastOp>(
+            op->getLoc(), oldResult.getType(), newResult));
+      } else {
+        replacements.push_back(newResult);
+      }
+    }
+    rewriter.replaceOp(op, replacements);
+
+    return success();
+  }
+};
+}  // namespace
+
+//===----------------------------------------------------------------------===//
+// LinalgExtDialect
+//===----------------------------------------------------------------------===//
+
+void LinalgExtDialect::getCanonicalizationPatterns(
+    RewritePatternSet &results) const {
+  results.add<FoldTensorCastOp>(getContext());
+}
+
 }  // namespace linalg_ext
 }  // namespace iree_compiler
 }  // namespace mlir
