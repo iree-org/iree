@@ -265,8 +265,8 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
                     matmulL1TileSize, vectorSizeVals[i]));
   }
   l1TileSizes.push_back(matmulL1TileSize);
+  vectorSizeVals.push_back(vectorSize);
   vectorTileSizes.assign(vectorSizeVals.begin(), vectorSizeVals.end());
-  vectorTileSizes.push_back(vectorSize);
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty here since there is nothing to do in first
                             // level tiling.
