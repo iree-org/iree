@@ -14,7 +14,7 @@
 #
 # It is recommended to build with Ninja and ccache. To do so, set environment
 # variables by prefixing to above invocations:
-#   CMAKE_GENERATOR=Ninja CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
+#   CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
 #
 # On CIs, it is often advantageous to re-use/control the CMake build directory.
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
@@ -61,6 +61,7 @@ class CMakeBuildPy(_build_py):
     src_dir = os.path.abspath(os.path.dirname(__file__))
     cfg = "Release"
     cmake_args = [
+        "-GNinja",
         "-DCMAKE_INSTALL_PREFIX={}".format(cmake_install_dir),
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DPython3_INCLUDE_DIRS={}".format(sysconfig.get_path("include")),
