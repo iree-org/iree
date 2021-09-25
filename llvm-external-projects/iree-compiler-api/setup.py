@@ -116,7 +116,7 @@ class NoopBuildExtension(_build_ext):
 
 
 setup(
-    name="iree-compiler-api",
+    name="iree-compiler-experimental",
     version="0.0.1",
     author="IREE Authors",
     author_email="iree-discuss@googlegroups.com",

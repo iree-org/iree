@@ -51,6 +51,9 @@ jobs:
           - os: ubuntu-18.04
             build_package: py-pure-pkgs
             experimental: false
+          - os: ubuntu-18.04
+            build_package: py-compiler-pkg
+            experimental: true
 
           # Windows packages.
           - os: windows-2019
@@ -176,6 +179,15 @@ jobs:
           # *output* of the build :( Make source packages.
           mkdir -p $package_dir && touch $package_dir/setup.py
           python -m cibuildwheel --output-dir bindist $package_dir
+
+      # Experimental iree.compiler package.
+      - name: Build compiler wheels (experimental)
+        if: "matrix.build_package == 'py-compiler-pkg'"
+        shell: bash
+        run: |
+          # TODO: Can be removed once pip 21.3 is released.
+          export CIBW_ENVIRONMENT="PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=ninja"
+          python -m cibuildwheel --output-dir bindist ./main_checkout/llvm-external-projects/iree-compiler-api
 
       # Pure python packages only need to do a minimal CMake configure and no
       # actual building, aside from setting up sources. If there are multiples,
