@@ -81,9 +81,9 @@ jobs:
 
       # TODO: in-tree-build can be removed once pip 21.3 is released.
       # Note that on Linux, we run under docker with an altered path.
-      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=Ninja"
-      CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=Ninja"
-      CIBW_ENVIRONMENT_WINDOWS: "REPO_DIR='${{ github.workspace }}\\main_checkout' PIP_USE_FEATURE=in-tree-build CMAKE_GENERATOR=Ninja"
+      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output CMAKE_GENERATOR=Ninja"
+      CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout CMAKE_GENERATOR=Ninja"
+      CIBW_ENVIRONMENT_WINDOWS: "REPO_DIR='${{ github.workspace }}\\main_checkout' CMAKE_GENERATOR=Ninja"
 
       # Needs the bazel manylinux image.
       # TODO: Move this to our repo and pin.
@@ -171,14 +171,18 @@ jobs:
           python -m cibuildwheel --output-dir bindist $package_dir
 
       # Experimental iree.compiler package.
-      - name: Build compiler wheels (experimental)
+      - name: Build compiler wheels
         if: "matrix.build_package == 'py-compiler-pkg'"
         shell: bash
         run: |
           # Need a newer pip to use in-tree-build. *but* the old default pip
           # can't accept the in-tree-build feature while upgrading itself.
-          # Facepalm.
-          export CIBW_BEFORE_BUILD="PIP_USE_FEATURE='' pip install --upgrade pip==21.2.4"
+          # Facepalm. Since there is no way to customize CIBW, we just manually
+          # install a pre-release build of 21.3, in which the in-tree-build
+          # feature is enabled by default, obviating the need to configure it.
+          # After the 2021 October release, this can just be changed to install
+          # pip >= 21.3 from official sources. I'm sorry about this folks.
+          export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip==21.3dev0 -f https://github.com/stellaraccident/pip/releases/tag/21.3dev20210925"
           python -m cibuildwheel --output-dir bindist ./main_checkout/llvm-external-projects/iree-compiler-api
 
       # Pure python packages only need to do a minimal CMake configure and no
