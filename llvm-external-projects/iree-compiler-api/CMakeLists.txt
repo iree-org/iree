@@ -36,6 +36,7 @@ else()
   message(STATUS "Building iree-compiler-api standalone")
   set(IREE_COMPILER_API_STANDALONE ON)
   set(IREE_BUILD_TESTS OFF)  # Conflicts with our tests if we are top-level.
+  set(IREE_BUILD_SAMPLES OFF)
   set(LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../iree-dialects")
   set(IREE_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../..")
   set(IREE_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/iree")
