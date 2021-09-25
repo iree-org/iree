@@ -72,6 +72,7 @@ class CMakeBuildPy(_build_py):
     subprocess.check_call(["cmake", "--version"])
 
     target_dir = self.build_lib
+    os.makedirs(target_dir, exist_ok=True)
     cmake_build_dir = os.getenv("IREE_COMPILER_API_CMAKE_BUILD_DIR")
     if not cmake_build_dir:
       cmake_build_dir = os.path.join(target_dir, "..", "cmake_build")
