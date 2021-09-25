@@ -1,0 +1,31 @@
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+################################################################################
+# CAPI
+################################################################################
+
+cc_library(
+    name = "CAPI",
+    srcs = [
+        "lib/CAPI/Compiler.cpp",
+        "lib/CAPI/Tools.cpp",
+    ],
+    hdrs = [
+        "include/iree-compiler-c/Compiler.h",
+        "include/iree-compiler-c/Tools.h",
+    ],
+    includes = ["include"],
+    deps = [
+        "//iree/compiler/Dialect/VM/IR",
+        "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/Translation:IREEVM",
+        "//iree/tools:init_targets",
+        "//iree/tools:iree_translate_lib",
+        "@llvm-project//mlir:CAPIIR",
+        "@llvm-project//mlir:IR",
+    ],
+)

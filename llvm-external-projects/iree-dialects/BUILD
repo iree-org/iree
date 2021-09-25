@@ -205,6 +205,7 @@ cc_library(
     hdrs = [
         "include/iree-dialects-c/Dialects.h",
     ],
+    includes = ["include"],
     deps = [
         ":IREEDialect",
         ":IREEPyDMDialect",

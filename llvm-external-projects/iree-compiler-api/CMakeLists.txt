@@ -23,36 +23,42 @@ endif()
 # a CMake min version of 3.0, which causes them to set it locally to OLD.
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 
-project(iree-compiler-api LANGUAGES C CXX)
+project(IREE_COMPILER_API LANGUAGES C CXX)
 
-# Directory layout.
-# When building in-tree, this directory exists relative to the overall
-# repository. However, when building from a source package, sub-directories
-# will be populated below this directory. This is the primary place that the
-# switch is done.
-set(IREE_COMPILER_API_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(IREE_COMPILER_API_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-
-set(IREE_COMPILER_API_INTREE ON)
-if(IREE_COMPILER_API_INTREE)
+if(IREE_COMPILER_API_SUB_PROJECT)
+  # Building as part of a top-level IREE project.
+  message(STATUS "Building iree-compiler-api as part of IREE")
+  set(LLVM_MAIN_SRC_DIR "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm")
+  set(LLVM_MAIN_BINARY_DIR "${IREE_BINARY_DIR}/third_party/llvm-project")
+  set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
+else()
+  # Standalone build.
+  message(STATUS "Building iree-compiler-api standalone")
+  set(IREE_COMPILER_API_STANDALONE ON)
   set(IREE_BUILD_TESTS OFF)  # Conflicts with our tests if we are top-level.
   set(LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../iree-dialects")
-  set(IREE_MAIN_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../..")
+  set(IREE_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../..")
+  set(IREE_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/iree")
   set(LLVM_MAIN_SRC_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/llvm-project/llvm")
+  set(LLVM_MAIN_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/llvm")
+  set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
   set(LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/mlir-hlo")
   enable_testing()
-else()
-  message(FATAL_ERROR "Non intree (source package) not yet supported")
 endif()
 
-# Configuration includes.
-include(${IREE_MAIN_SOURCE_DIR}/build_tools/cmake/iree_third_party_cmake_options.cmake)
+message(STATUS "iree-compiler-api Directories:
+  IREE_COMPILER_API_SOURCE_DIR = ${IREE_COMPILER_API_SOURCE_DIR}
+  IREE_COMPILER_API_BINARY_DIR = ${IREE_COMPILER_API_BINARY_DIR}
+  IREE_SOURCE_DIR = ${IREE_SOURCE_DIR}
+  IREE_BINARY_DIR = ${IREE_BINARY_DIR}
+  LLVM_MAIN_SRC_DIR = ${LLVM_MAIN_SRC_DIR}
+  LLVM_MAIN_BINARY_DIR = ${LLVM_MAIN_BINARY_DIR}
+")
 
-# Dependent directories.
 set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir)
-set(LLVM_MAIN_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/llvm")
-set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
-set(IREE_MAIN_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/iree")
+
+# Configuration includes.
+include(${IREE_SOURCE_DIR}/build_tools/cmake/iree_third_party_cmake_options.cmake)
 
 # CMake settings.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -61,30 +67,7 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 
-# Required MLIR settings.
-# TODO: We require an ordering of mlir-dependent external projects to be
-# loaded after mlir. We take advantage of the lexical ordering here by
-# prefixing, which feels gross but is stable. Investigate a better mechanism
-# upstream.
-iree_set_llvm_cmake_options()
-iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR})
-iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR})
-set(MLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
-set(MLIR_BINDINGS_PYTHON_LOCK_VERSION OFF CACHE BOOL "" FORCE)
-# TODO: Conflicting gtest.
-set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
-# TODO: Conflicting benchmark.
-set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
-
-# Required mlir-hlo settings.
-# TODO: Consider removing this upstream and just using the main
-# MLIR_ENABLE_BINDINGS_PYTHON option.
-set(MHLO_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
-
-# Required IREE settings.
-set(IREE_BUILD_PYTHON_BINDINGS ON CACHE BOOL "" FORCE)
-set(IREE_BUILD_OLD_PYTHON_COMPILER_API OFF CACHE BOOL "" FORCE)
-
+# Hack system includes to account for LLVM not doing includes right.
 # TODO: Fix this upstream. Each of these system include hacks is broken in
 # a different way, so there is not an easy local fix. They should be removed
 # one be one until this project builds. Since this is the first time all of this
@@ -100,8 +83,8 @@ add_system_include_hack(${LLVM_MAIN_SRC_DIR}/include)
 add_system_include_hack(${LLVM_MAIN_BINARY_DIR}/include)
 add_system_include_hack(${MLIR_MAIN_SRC_DIR}/include)
 add_system_include_hack(${MLIR_MAIN_BINARY_DIR}/include)
-add_system_include_hack(${IREE_MAIN_SOURCE_DIR})
-add_system_include_hack(${IREE_MAIN_BINARY_DIR})
+add_system_include_hack(${IREE_SOURCE_DIR})
+add_system_include_hack(${IREE_BINARY_DIR})
 add_system_include_hack(${LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR}/include)
 add_system_include_hack(${LLVM_MAIN_BINARY_DIR}/tools/iree-dialects/include)
 add_system_include_hack(${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR}/include)
@@ -127,13 +110,40 @@ find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION}
 mlir_detect_pybind11_install()
 find_package(pybind11 2.6 CONFIG REQUIRED)
 
-# Include LLVM.
-message(STATUS "Configuring LLVM from (${LLVM_MAIN_SRC_DIR} into ${LLVM_MAIN_BINARY_DIR})...")
-add_subdirectory("${LLVM_MAIN_SRC_DIR}" "${LLVM_MAIN_BINARY_DIR}" EXCLUDE_FROM_ALL)
+# Include IREE and LLVM if building standalone.
+if(IREE_COMPILER_API_STANDALONE)
+  # Required MLIR settings.
+  # TODO: We require an ordering of mlir-dependent external projects to be
+  # loaded after mlir. We take advantage of the lexical ordering here by
+  # prefixing, which feels gross but is stable. Investigate a better mechanism
+  # upstream.
+  iree_set_llvm_cmake_options()
+  iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR})
+  iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR})
+  set(MLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
+  set(MLIR_BINDINGS_PYTHON_LOCK_VERSION OFF CACHE BOOL "" FORCE)
+  # TODO: Conflicting gtest.
+  set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
+  # TODO: Conflicting benchmark.
+  set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
 
-# Include IREE.
-message(STATUS "Configuring IREE from (${IREE_MAIN_SOURCE_DIR} into ${IREE_MAIN_BINARY_DIR}")
-add_subdirectory("${IREE_MAIN_SOURCE_DIR}" "${IREE_MAIN_BINARY_DIR}" EXCLUDE_FROM_ALL)
+  # Required mlir-hlo settings.
+  # TODO: Consider removing this upstream and just using the main
+  # MLIR_ENABLE_BINDINGS_PYTHON option.
+  set(MHLO_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
+
+  # Required IREE settings.
+  set(IREE_BUILD_PYTHON_BINDINGS ON CACHE BOOL "" FORCE)
+  set(IREE_BUILD_OLD_PYTHON_COMPILER_API OFF CACHE BOOL "" FORCE)
+
+  # Include LLVM.
+  message(STATUS "Configuring LLVM from (${LLVM_MAIN_SRC_DIR} into ${LLVM_MAIN_BINARY_DIR})...")
+  add_subdirectory("${LLVM_MAIN_SRC_DIR}" "${LLVM_MAIN_BINARY_DIR}" EXCLUDE_FROM_ALL)
+
+  # Include IREE.
+  message(STATUS "Configuring IREE from (${IREE_SOURCE_DIR} into ${IREE_BINARY_DIR}")
+  add_subdirectory("${IREE_SOURCE_DIR}" "${IREE_BINARY_DIR}" EXCLUDE_FROM_ALL)
+endif()
 
 # Sub-directories.
 # Since building outside of the LLVM build system, setup options for local
