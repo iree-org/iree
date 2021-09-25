@@ -18,6 +18,7 @@
 #
 # On CIs, it is often advantageous to re-use/control the CMake build directory.
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
+import json
 import os
 import shutil
 import subprocess
@@ -28,6 +29,26 @@ from distutils.command.build import build as _build
 from setuptools import find_namespace_packages, setup, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
 from setuptools.command.build_py import build_py as _build_py
+
+# Setup and get version information.
+THIS_DIR = os.path.realpath(os.path.dirname(__file__))
+IREESRC_DIR = os.path.join(THIS_DIR, "..", "..")
+VERSION_INFO_FILE = os.path.join(IREESRC_DIR, "version_info.json")
+
+
+def load_version_info():
+  with open(VERSION_INFO_FILE, "rt") as f:
+    return json.load(f)
+
+
+try:
+  version_info = load_version_info()
+except FileNotFoundError:
+  print("version_info.json not found. Using defaults")
+  version_info = {}
+
+PACKAGE_SUFFIX = version_info.get("package-suffix") or "-dev"
+PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
 
 
 class CustomBuild(_build):
@@ -117,8 +138,8 @@ class NoopBuildExtension(_build_ext):
 
 
 setup(
-    name="iree-compiler-experimental",
-    version="0.0.1",
+    name=f"iree-compiler{PACKAGE_SUFFIX}",
+    version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-discuss@googlegroups.com",
     description="IREE Compiler API",
@@ -139,6 +160,13 @@ setup(
         "iree.compiler",
         "iree.compiler.*",
     ],),
+    entry_points={
+        "console_scripts": [
+            "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
+            # Transitional note: iree-translate resolves to ireec.
+            "iree-translate = iree.compiler.tools.scripts.ireec.__main__:main",
+        ],
+    },
     install_requires=[
         "numpy",
         "PyYAML",
