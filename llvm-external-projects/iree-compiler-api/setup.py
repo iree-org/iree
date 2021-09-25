@@ -103,8 +103,7 @@ class CMakeBuildPy(_build_py):
       os.makedirs(fake_libdir, exist_ok=True)
       fake_library = os.path.join(fake_libdir,
                                   sysconfig.get_config_var('LIBRARY'))
-      with open(fake_library, "wb"):
-        pass
+      subprocess.check_call(["ar", "q", fake_library])
       cmake_args.append("-DPython3_LIBRARY:PATH={}".format(fake_library))
 
     build_args = []
