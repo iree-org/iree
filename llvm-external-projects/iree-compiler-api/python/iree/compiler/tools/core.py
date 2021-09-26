@@ -21,6 +21,7 @@ __all__ = [
     "compile_file",
     "compile_str",
     "CompilerOptions",
+    "InputType",
     "OutputFormat",
 ]
 
@@ -32,7 +33,11 @@ DEFAULT_TESTING_DRIVER = "dylib"
 
 
 class InputType(Enum):
-  """The type of input pipeline to run prior to the core compiler."""
+  """Enumeration of allowable input types to the compiler.
+
+  An instance of this enum or the string form can be passed to
+  `CompilerOptions.input_type`.
+  """
   NONE = "none"
   MHLO = "mhlo"
   TOSA = "tosa"
@@ -85,17 +90,19 @@ class OutputFormat(Enum):
 class CompilerOptions:
   """Options to the compiler backend.
 
-  Keyword options:
+  Arguments:
     output_file: Optionally save the compiled binary to a file instead of
       returning it.
     target_backends: List of str names of target backends to compile into
       the binary. The resulting binary will run on targets that match one
       or more of the compiled backends.
     input_type: The type of input legalization to perform prior to full
-      compilation. Defaults to none.
-    output_format: Override the output format. See the OutputFormat enum.
+      compilation. Values can either be an `InputType` enum value or a
+      case-insensitive name. Defaults to `InputType.NONE`.
+    output_format: Override the output format. See the `OutputFormat` enum.
       Values can either be an enum value or a case-insensitive name of
-      the option. Typically used for debugging
+      the option. Typically used for debugging Defaults to
+      `OutputFormat.FLATBUFFER_BINARY`.
     extra_args: Optional list of additional arguments to pass to the compiler.
       Example: ["--print-ir-after-all"]
     optimize: Whether to apply some default high level optimizations (default
