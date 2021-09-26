@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to IREE Python API's documentation!
+Welcome to IREE's Python API documentation!
 ===========================================
 
 .. toctree::
