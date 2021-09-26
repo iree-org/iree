@@ -147,7 +147,7 @@ jobs:
         if: "matrix.build_package == 'main-dist-linux'"
         shell: bash
         run: |
-          docker run -it --rm -w=/work \
+          docker run --rm -w=/work \
             -v $PWD:/work \
             "${CIBW_MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py main-dist'
