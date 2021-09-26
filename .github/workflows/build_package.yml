@@ -33,6 +33,9 @@ jobs:
         include:
           # Ubuntu packages.
           - os: ubuntu-18.04
+            build_package: main-dist-linux
+            experimental: false
+          - os: ubuntu-18.04
             build_package: py-compiler-pkg
             experimental: false
           - os: ubuntu-18.04
@@ -131,27 +134,28 @@ jobs:
           EOF
           cat ./main_checkout/version_info.json
 
-      # The main distribution builds the main binary package, tests and compiler
-      # wheels (which are OS but not python version specific). The latter is
-      # purely opportunistic: it adds incrementally to the former and would
-      # otherwise take additional runner hours to build.
-      - name: Build core installation
-        if: "matrix.build_package == 'main-dist'"
+      # The main distribution consists of the project being built, installed
+      # and archived. We have to split it per operating system, and Linux
+      # is special because we build under a manylinux container which gives
+      # broad compatibility. We use the Python based manylinux containers
+      # since they come packaged with all dev tools we need. Note that the
+      # manylinux containers have a default python 2.x with all supported
+      # python versions under /opt/python (need to add one to the path). It
+      # is not enough to just invoke it directly because then pip managed
+      # console scripts (like cmake, ninja) will not be on the path.
+      - name: Main distribution (Linux)
+        if: "matrix.build_package == 'main-dist-linux'"
         shell: bash
         run: |
-          # Just need to build for one examplar python3 variant.
-          export CIBW_BUILD="cp38-*"
-          package_dir="./iree-install/python_packages/iree_compiler"
-          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py main-dist"
-          # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( Make source packages.
-          mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir bindist $package_dir
+          docker run -it --rm -w=/work \
+            -v $PWD:/work \
+            "${CIBW_MANYLINUX_X86_64_IMAGE}" \
+            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py main-dist'
 
       # Runtime wheels are version specific, so we build one for each python
       # version. We do this serially by deleting the CMakeCache and install
       # directory between runs. Most of the build will be incremental.
-      # We save a little bit of time by disabling the compiler build.
+      # We save a lot of time by disabling the compiler build.
       - name: Build runtime wheels
         if: "matrix.build_package == 'py-runtime-pkg'"
         shell: bash
