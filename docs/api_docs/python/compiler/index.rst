@@ -10,4 +10,5 @@ Compiler API
    iree_dialect.rst
    iree_pydm_dialect.rst
    mlir_dialects.rst
+   tensorflow_dialects.rst
    mlir.rst
