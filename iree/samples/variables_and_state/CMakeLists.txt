@@ -4,9 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# iree_runtime_runtime -> iree::hal::drivers dependency requires threading
-# TODO(#4298): Separate HAL driver registration from threading.
-if(NOT ${IREE_ENABLE_THREADING})
+if(NOT ${IREE_HAL_DRIVER_VMVX})
   return()
 endif()
 

@@ -16,7 +16,8 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_VMVX} AND (${IREE_TARGET_BACKEND_VMVX} OR DEFINED IREE_HOST_BINARY_ROOT))
+if((${IREE_HAL_DRIVER_VMVX} OR ${IREE_HAL_DRIVER_VMVX_SYNC})
+   AND (${IREE_TARGET_BACKEND_VMVX} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -65,7 +66,8 @@ endif()
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_DYLIB} AND (${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR DEFINED IREE_HOST_BINARY_ROOT))
+if((${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_DYLIB_SYNC})
+   AND (${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -187,7 +189,7 @@ run_binary_test(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_ENABLE_THREADING})
+if(${IREE_HAL_DRIVER_DYLIB})
 """,
     inline = True,
 )

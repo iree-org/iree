@@ -6,7 +6,8 @@
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
 
-# Tools has thread dependency from iree::hal::drivers
+# TODO(#6353)Tools has thread dependency in gtest and benchmark; they should
+# be separated into the runtime tools and compiler tools.
 if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
