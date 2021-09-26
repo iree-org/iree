@@ -57,27 +57,48 @@ class PyFileAccumulator {
 
 }  // namespace
 
+static const char BUILD_IREE_VM_PASS_PIPELINE_DOCSTRING[] =
+    R"(Populates VM compilation pass on a PassManager.
+
+This is the primary interface to IREE's backend compiler, providing compilation
+from a supported set of input dialects to the `vm` dialect, representing
+IREE's lowest level representation.
+)";
+
+static const char TRANSLATE_MODULE_TO_VM_BYTECODE_DOCSTRING[] =
+    R"(Given a `vm.module` translate it to VM bytecode.
+
+The provided `file` argument must be a valid `IO` object, capable of having
+binary data written to it.
+)";
+
 PYBIND11_MODULE(_ireeCompilerDriver, m) {
   m.doc() = "iree-compiler driver api";
   ireeCompilerRegisterTargetBackends();
 
-  py::class_<PyCompilerOptions>(m, "CompilerOptions")
+  py::class_<PyCompilerOptions>(m, "CompilerOptions",
+                                "Options for the IREE backend compiler.")
       .def(py::init<>())
-      .def("set_input_dialect_mhlo",
-           [](PyCompilerOptions &self) {
-             ireeCompilerOptionsSetInputDialectMHLO(self.options);
-           })
-      .def("set_input_dialect_tosa",
-           [](PyCompilerOptions &self) {
-             ireeCompilerOptionsSetInputDialectTOSA(self.options);
-           })
+      .def(
+          "set_input_dialect_mhlo",
+          [](PyCompilerOptions &self) {
+            ireeCompilerOptionsSetInputDialectMHLO(self.options);
+          },
+          "Sets the input type to the 'mhlo' dialect")
+      .def(
+          "set_input_dialect_tosa",
+          [](PyCompilerOptions &self) {
+            ireeCompilerOptionsSetInputDialectTOSA(self.options);
+          },
+          "Sets the input type to the 'tosa' dialect")
       .def(
           "add_target_backend",
           [](PyCompilerOptions &self, const std::string &targetBackend) {
             ireeCompilerOptionsAddTargetBackend(self.options,
                                                 targetBackend.c_str());
           },
-          py::arg("target_backend"));
+          py::arg("target_backend"),
+          "Adds a target backend (i.e. 'cpu', 'vulkan-spirv', etc)");
 
   m.def(
       "build_iree_vm_pass_pipeline",
@@ -86,7 +107,8 @@ PYBIND11_MODULE(_ireeCompilerDriver, m) {
             mlirPassManagerGetAsOpPassManager(passManager);
         ireeCompilerBuildIREEVMPassPipeline(options.options, opPassManager);
       },
-      py::arg("options"), py::arg("pass_manager"));
+      py::arg("options"), py::arg("pass_manager"),
+      BUILD_IREE_VM_PASS_PIPELINE_DOCSTRING);
 
   m.def(
       "translate_module_to_vm_bytecode",
@@ -100,5 +122,6 @@ PYBIND11_MODULE(_ireeCompilerDriver, m) {
           throw std::runtime_error("failure translating module to bytecode");
         }
       },
-      py::arg("options"), py::arg("module"), py::arg("file"));
+      py::arg("options"), py::arg("module"), py::arg("file"),
+      TRANSLATE_MODULE_TO_VM_BYTECODE_DOCSTRING);
 }

@@ -1,12 +1,10 @@
 # Lint-as: python3
-"""TFLite compiler interface."""
-
 # Copyright 2020 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
+"""Imports TFLite binaries via the `iree-import-tflite` tool."""
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
 from enum import Enum
@@ -173,7 +171,7 @@ def compile_str(fb_content: bytes, **kwargs):
   """Compiles in-memory TFLite flatbuffer to an IREE binary.
 
   Args:
-    xla_content: Flatbuffer content as bytes.
+    fb_content: Flatbuffer content as bytes.
     **kwargs: Keyword args corresponding to ImportOptions or CompilerOptions.
   Returns:
     A bytes-like object with the compiled output or None if output_file=

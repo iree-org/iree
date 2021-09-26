@@ -1,10 +1,48 @@
-"""Debugging support."""
-
 # Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+r'''
+A number of optional arguments to the compiler can be useful for debugging:
+
+* `extended_diagnostics=True` - Outputs verbose attached operations to \
+  diagnostics. Can output a large volume of information.
+* `crash_reproducer_path=... some .mlir file path...` - On a crash or error,\
+  a reproducer will be output at the listed path.
+* `extra_args=[...]` - Passes extra arguments to the compiler. Useful for \
+  various standard features of MLIR based compilers like `-print-ir-after-all`.
+
+
+In addition, the core compiler and frontend compiler APIs have a unified
+mechanism for saving their temporary files, which are often useful for post
+mortem debugging. Since the need for this is often as part of a larger system,
+it is exposed both via an environment variable and an API.
+
+In order to save all temporaries and reproducers, set the `IREE_SAVE_TEMPS`
+environment variable to a directory in which to dump artifacts. For complex
+programs that invoke the compiler many times, it will typically be necessary
+to further qualify the path, and there are a few placeholders that will be
+expanded:
+
+* `{id}` - A per-process monotonically increasing number for each compiler
+  invocation. Can be overridden by the API if a better symbolic name is
+  available (i.e. test case, etc).
+* `{pid}` - Process ID of the current process.
+* `{main}` - Basename of `sys.argv[0]`, which is typically the name of the
+  Python main file.
+
+For interactive use, the following (on a Unix-like system) should provide
+value:
+
+.. code-block:: bash
+
+  export IREE_SAVE_TEMPS="/tmp/ireedumps/{main}/{id}"
+
+For the context manager based API, refer to the
+`iree.compiler.tools.debugging.TempFileSaver` class.
+'''
 
 from typing import Optional
 
@@ -45,11 +83,17 @@ class TempFileSaver:
   policy for saving temporaries and deep implementations will inherit it.
 
   Proper usage from users wishing to establish a saver context:
+
+  .. code-block:: python
+
     with TempFileSaver():
       # Do things with temp files.
 
   Proper usage for implementors wishing to use an established saver context
   or set up a new one:
+
+  .. code-block:: python
+
     with TempFileSaver.implicit() as tfs:
       # Do things with temp files.
 
