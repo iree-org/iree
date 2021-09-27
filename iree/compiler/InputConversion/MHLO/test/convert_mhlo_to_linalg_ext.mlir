@@ -379,22 +379,22 @@ func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK:          %[[IDXVAL:.+]] = index_cast %[[IDX]] : i32 to index
 // CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[IDXVAL]]] : tensor<8xf32>
 // CHECK:          linalg.yield %[[LOAD]] : f32
-// CHECK:        %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<8xf32>
-// CHECK:        %[[C1:.+]] = constant 1 : index
-// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<1xf32>
-// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<8xf32>
+// CHECK-DAG:    %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<1xf32>
 // CHECK:        %[[R1:.+]]:2 = linalg_ext.fft
 // CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
-// CHECK:        %[[C2:.+]] = constant 2 : index
-// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<2xf32>
-// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[C2:.+]] = constant 2 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<2xf32>
 // CHECK:        %[[R2:.+]]:2 = linalg_ext.fft
 // CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
-// CHECK:        %[[C3:.+]] = constant 3 : index
-// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<4xf32>
-// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[C3:.+]] = constant 3 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<4xf32>
 // CHECK:        %[[R3:.+]]:2 = linalg_ext.fft
 // CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
@@ -428,22 +428,22 @@ func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>) {
 // CHECK:          %[[IDXVAL:.+]] = index_cast %[[IDX]] : i32 to index
 // CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[I]], %[[IDXVAL]]] : tensor<4x8xf32>
 // CHECK:          linalg.yield %[[LOAD]] : f32
-// CHECK:        %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<4x8xf32>
-// CHECK:        %[[C1:.+]] = constant 1 : index
-// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<1xf32>
-// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[IMAG:.+]] = constant dense<0.000000e+00> : tensor<4x8xf32>
+// CHECK-DAG:    %[[C1:.+]] = constant 1 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<1xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<1xf32>
 // CHECK:        %[[R1:.+]]:2 = linalg_ext.fft
 // CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
-// CHECK:        %[[C2:.+]] = constant 2 : index
-// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<2xf32>
-// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[C2:.+]] = constant 2 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<2xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<2xf32>
 // CHECK:        %[[R2:.+]]:2 = linalg_ext.fft
 // CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
-// CHECK:        %[[C3:.+]] = constant 3 : index
-// CHECK:        %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<4xf32>
-// CHECK:        %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[C3:.+]] = constant 3 : index
+// CHECK-DAG:    %[[COEF_REAL:.+]] = constant dense<{{.+}}> : tensor<4xf32>
+// CHECK-DAG:    %[[COEF_IMAG:.+]] = constant dense<{{.+}}> : tensor<4xf32>
 // CHECK:        %[[R3:.+]]:2 = linalg_ext.fft
 // CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1

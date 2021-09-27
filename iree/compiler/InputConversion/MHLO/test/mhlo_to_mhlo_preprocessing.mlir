@@ -83,8 +83,8 @@ func @reduce_window(%input: tensor<1x16x16x64xf32>) -> tensor<1x8x8x64xf32> {
 
 // CHECK-LABEL: @reduce_window_variadic
 func @reduce_window_variadic(%input0: tensor<1x16x16x64xf32>, %input1: tensor<1x16x16x64xi32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>) {
-  // CHECK: %[[INITVAL0:.+]] = mhlo.constant dense<0xFF800000> : tensor<f32>
-  // CHECK: %[[INITVAL1:.+]] = mhlo.constant dense<3> : tensor<i32>
+  // CHECK-DAG: %[[INITVAL0:.+]] = mhlo.constant dense<0xFF800000> : tensor<f32>
+  // CHECK-DAG: %[[INITVAL1:.+]] = mhlo.constant dense<3> : tensor<i32>
   %initval0 = mhlo.constant dense<0xFF800000> : tensor<f32>
   %initval1 = mhlo.constant dense<3> : tensor<i32>
 

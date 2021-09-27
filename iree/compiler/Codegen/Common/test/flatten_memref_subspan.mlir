@@ -13,8 +13,8 @@ hal.interface private @io  {
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 56 + s1 * 8 + s2 + s3 floordiv 4)>
 //      CHECK: func @load_subspan_with_offset
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
-//      CHECK:   %[[ZERO:.+]] = constant 0 : index
-//      CHECK:   %[[C336:.+]] = constant 336 : index
+//  CHECK-DAG:   %[[ZERO:.+]] = constant 0 : index
+//  CHECK-DAG:   %[[C336:.+]] = constant 336 : index
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[ZERO]]] : memref<?xf32>{%[[C336]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
 //      CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]]
@@ -35,8 +35,8 @@ hal.interface private @io  {
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 12 + s1 * 4 + s2 + s3 floordiv 4)>
 //      CHECK: func @store_subspan_with_offset
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
-//      CHECK:   %[[ZERO:.+]] = constant 0 : index
-//      CHECK:   %[[C24:.+]] = constant 24 : index
+//  CHECK-DAG:   %[[ZERO:.+]] = constant 0 : index
+//  CHECK-DAG:   %[[C24:.+]] = constant 24 : index
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[ZERO]]] : memref<?xf32>{%[[C24]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[SUBSPAN]][%[[INDEX]]] : memref<?xf32>
