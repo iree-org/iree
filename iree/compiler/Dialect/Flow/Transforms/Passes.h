@@ -78,6 +78,9 @@ createConvertToFlowAfterDispatchFormation();
 // Promote I1 tensor constants to I8 tensors to match later operations.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
 
+// Strips the signed/unsigned portion off of tensors.
+std::unique_ptr<OperationPass<mlir::FuncOp>> createStripSignednessPass();
+
 // Expands dynamic !shapex.ranked_shape dimensions in variables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createExpandGlobalDynamicDimsPass();

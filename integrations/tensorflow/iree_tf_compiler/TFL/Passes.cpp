@@ -42,7 +42,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
 
   mlir::tosa::TOSATFLLegalizationPipelineOptions tosaOptions;
   mlir::tosa::createTFLtoTOSALegalizationPipeline(pm, tosaOptions);
-  mlir::tosa::createStripQuantTypesPass();
+  pm.nest<FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
   pm.addPass(createCanonicalizerPass());
 
   //----------------------------------------------------------------------------

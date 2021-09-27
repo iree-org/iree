@@ -36,6 +36,7 @@ iree_lit_test_suite(
     "pad_tensor_to_tensor.mlir"
     "promote_i1_to_i8.mlir"
     "strip_and_splat_constant_variables.mlir"
+    "strip_signedness.mlir"
     "transformation.mlir"
     "verify_input_ir.mlir"
   DATA
