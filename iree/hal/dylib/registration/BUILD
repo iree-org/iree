@@ -60,7 +60,6 @@ cc_library(
         "//iree/hal/local",
         "//iree/hal/local:sync_driver",
         "//iree/hal/local/loaders:embedded_library_loader",
-        "//iree/hal/local/loaders:system_library_loader",
     ],
 )
 
