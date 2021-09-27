@@ -42,12 +42,6 @@ static llvm::cl::opt<bool> clEnableConvToImg2Col(
     llvm::cl::desc("Enable converting convolution ops to img2col form."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
-    "iree-flow-enable-padding-linalg-ops",
-    llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
-                   "flow-padding-size"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<int> clLinalgOpsPaddingSize(
     "iree-flow-linalg-ops-padding-size",
     llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
@@ -74,10 +68,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
       passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
     }
     // Pad linalg op
-    if (clEnablePaddingLinalgOps) {
-      passManager.addNestedPass<FuncOp>(
-          createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
-    }
+    passManager.addNestedPass<FuncOp>(
+        createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
   }
 
   passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
