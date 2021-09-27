@@ -19,9 +19,9 @@ iree_pydm.func @elide_as_bool_from_bool(%arg0 : !iree_pydm.bool) -> (!iree_pydm.
 // -----
 // CHECK-LABEL: @as_bool_from_integer_to_compare
 iree_pydm.func @as_bool_from_integer_to_compare(%arg0 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[Z:.*]] = constant 0 : i64 -> !iree_pydm.integer
-  // CHECK: %[[T:.*]] = constant true -> !iree_pydm.bool
-  // CHECK: %[[F:.*]] = constant false -> !iree_pydm.bool
+  // CHECK-DAG: %[[Z:.*]] = constant 0 : i64 -> !iree_pydm.integer
+  // CHECK-DAG: %[[T:.*]] = constant true -> !iree_pydm.bool
+  // CHECK-DAG: %[[F:.*]] = constant false -> !iree_pydm.bool
   // CHECK: %[[CMP:.*]] = apply_compare "eq", %arg0, %[[Z]]
   // CHECK: %[[SEL:.*]] = select %[[CMP]], %[[F]], %[[T]] : !iree_pydm.bool
   // CHECK: return %[[SEL]]
@@ -32,9 +32,9 @@ iree_pydm.func @as_bool_from_integer_to_compare(%arg0 : !iree_pydm.integer) -> (
 // -----
 // CHECK-LABEL: @as_bool_from_real_to_compare
 iree_pydm.func @as_bool_from_real_to_compare(%arg0 : !iree_pydm.real) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[Z:.*]] = constant 0.000000e+00 : f64 -> !iree_pydm.real
-  // CHECK: %[[T:.*]] = constant true -> !iree_pydm.bool
-  // CHECK: %[[F:.*]] = constant false -> !iree_pydm.bool
+  // CHECK-DAG: %[[Z:.*]] = constant 0.000000e+00 : f64 -> !iree_pydm.real
+  // CHECK-DAG: %[[T:.*]] = constant true -> !iree_pydm.bool
+  // CHECK-DAG: %[[F:.*]] = constant false -> !iree_pydm.bool
   // CHECK: %[[CMP:.*]] = apply_compare "eq", %arg0, %[[Z]]
   // CHECK: %[[SEL:.*]] = select %[[CMP]], %[[F]], %[[T]] : !iree_pydm.bool
   // CHECK: return %[[SEL]]
