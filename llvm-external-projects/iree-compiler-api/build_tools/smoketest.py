@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import io
+import subprocess
 
 from iree.compiler import ir
 from iree.compiler import passmanager
@@ -24,6 +25,7 @@ from iree.compiler.dialects import vector
 
 from iree.compiler.api import driver
 
+# Test the compiler API.
 with ir.Context() as ctx:
   chlo.register_chlo_dialect(ctx)
   mhlo.register_mhlo_dialect(ctx)
@@ -50,3 +52,7 @@ with ir.Context() as ctx:
   bytecode_io = io.BytesIO()
   driver.translate_module_to_vm_bytecode(options, input_module, bytecode_io)
   print(f"Bytecode module len = {len(bytecode_io.getbuffer())}")
+
+# Check console scripts.
+subprocess.check_output(["ireec", "-help"])
+subprocess.check_output(["iree-translate", "-help"])
