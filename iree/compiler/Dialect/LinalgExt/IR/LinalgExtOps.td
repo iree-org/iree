@@ -246,7 +246,9 @@ def LinalgExt_FftOp : LinalgExt_Op<"fft", [
 }
 
 def LinalgExt_ReverseOp : LinalgExt_Op<"reverse", [
-  DeclareOpInterfaceMethods<TiledOpInterface, ["generateScalarImplementation"]>,
+  DeclareOpInterfaceMethods<
+      TiledOpInterface,
+      ["generateScalarImplementation", "getTiledImplementation"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface,
                             // ReverseOp does not have a region, so we have to
                             // overwrite the method.

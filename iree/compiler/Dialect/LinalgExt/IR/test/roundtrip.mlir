@@ -451,6 +451,32 @@ func @reverse_dynamic_tensor(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 
 // -----
 
+func @reverse_static_dynamic_tensor(%arg0: tensor<3x5xi32>) -> tensor<?x?xi32> {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<3x5xi32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<3x5xi32>
+  %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xi32>
+  %0 = linalg_ext.reverse
+         dimensions(dense<1> : tensor<1xi64>)
+         ins(%arg0 : tensor<3x5xi32>)
+         outs(%init : tensor<?x?xi32>) : tensor<?x?xi32>
+  return %0 : tensor<?x?xi32>
+}
+// CHECK-LABEL: func @reverse_static_dynamic_tensor
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xi32>
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//       CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]]]
+//       CHECK:   %[[RESULT:.+]] = linalg_ext.reverse
+//  CHECK-SAME:      dimensions(dense<1> : tensor<1xi64>)
+//  CHECK-SAME:      ins(%[[ARG0]]
+//  CHECK-SAME:      outs(%[[INIT]]
+
+// -----
+
 func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
   %0 = linalg_ext.reverse

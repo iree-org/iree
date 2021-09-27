@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.16.3)
 
 # Do not set MSVC warning flags like /W3 by default (since 3.15):
 #   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
@@ -19,7 +19,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0116 OLD)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(iree ASM C CXX)
+project(IREE ASM C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
 set(IREE_IDE_FOLDER IREE)
@@ -339,6 +339,12 @@ else()
   message(STATUS "Adding bundled LLVM source dependency")
   iree_set_llvm_cmake_options()
 
+  # Enable MLIR Python bindings if IREE Python bindings enabled.
+  if(IREE_BUILD_PYTHON_BINDINGS)
+    set(MLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
+    set(MHLO_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
+  endif()
+
   # Disable LLVM's warnings.
   set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
 
@@ -441,7 +447,12 @@ if(IREE_BUILD_TESTS)
 endif()
 
 if(IREE_BUILD_PYTHON_BINDINGS)
-  add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+  if(NOT TARGET pybind11::module)
+    message(STATUS "Using bundled pybind11")
+    add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+  else()
+    message(STATUS "Not including bundled pybind11 (already configured)")
+  endif()
 endif()
 
 if(IREE_TARGET_BACKEND_METAL-SPIRV)
@@ -532,3 +543,22 @@ endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
     CACHE INTERNAL "IREE: Include Directories" FORCE)
+
+# Include the iree-compiler-api sub-project. We do this for development
+# and CI so that developers have access to the API and tools it provides
+# (otherwise, they would need to build multiple top-level projects).
+# However, logically, iree-compiler-api depends on iree, and for deployment
+# is always built standalone, taking responsibility to include iree and LLVM
+# as sub-projects.
+# The dependency mode is controlled by the variables
+# IREE_COMPILER_API_STANDALONE, which will be set if iree-compiler-api is
+# top-level. Otherwise, we set IREE_COMPILER_API_SUB_PROJECT, indicating it
+# is being embedded as a sub project.
+if(IREE_BUILD_COMPILER AND IREE_BUILD_PYTHON_BINDINGS)
+  if(NOT IREE_COMPILER_API_STANDALONE)
+    message(STATUS "Including iree-compiler-api as a sub-project")
+    set(IREE_COMPILER_API_SUB_PROJECT ON)
+    add_subdirectory(llvm-external-projects/iree-compiler-api
+        "${CMAKE_CURRENT_BINARY_DIR}/compiler-api")
+  endif()
+endif()

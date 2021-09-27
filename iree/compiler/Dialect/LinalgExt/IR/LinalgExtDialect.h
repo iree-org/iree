@@ -10,18 +10,8 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace linalg_ext {
-
-class LinalgExtDialect : public Dialect {
- public:
-  explicit LinalgExtDialect(MLIRContext* context);
-  static StringRef getDialectNamespace() { return "linalg_ext"; }
-};
-
-}  // namespace linalg_ext
-}  // namespace iree_compiler
-}  // namespace mlir
+// clang-format off: must be included after all LLVM/MLIR headers
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOpsDialect.h.inc"  // IWYU pragma: keep
+// clang-format on
 
 #endif  // IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTDIALECT_H_

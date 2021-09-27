@@ -336,9 +336,11 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
-      iree_translate_main
+      iree_translate_lib
+    HDRS
+      "iree_translate_lib.h"
     SRCS
-      "iree-translate-main.cc"
+      "iree_translate_lib.cc"
     DEPS
       ::init_compiler_modules
       ::init_iree_passes_and_dialects
@@ -365,8 +367,10 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-translate
+    SRCS
+      "iree-translate-main.cc"
     DEPS
-      ::iree_translate_main
+      ::iree_translate_lib
     DATA
       lld
     HOSTONLY

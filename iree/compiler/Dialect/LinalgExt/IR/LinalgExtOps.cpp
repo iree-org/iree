@@ -12,11 +12,13 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SMLoc.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/StandardOps/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -771,8 +773,24 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
   if (op.getNumOutputs() != 1) {
     return op.emitOpError("expected exactly one output");
   }
-  if (op.input().getType() != op.output().getType()) {
-    return op.emitOpError("expected input/output types are identical");
+  auto inputType = op.input().getType().cast<ShapedType>();
+  auto outputType = op.output().getType().cast<ShapedType>();
+  if (inputType.getElementType() != outputType.getElementType()) {
+    return op.emitOpError(
+        "expected input/output element types to be identical");
+  }
+  ArrayRef<int64_t> inputShapes = inputType.getShape();
+  ArrayRef<int64_t> outputShapes = outputType.getShape();
+  if (inputShapes.size() != outputShapes.size()) {
+    return op.emitOpError("expexted input/output to have identical ranks");
+  }
+  if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
+                   [](std::tuple<int64_t, int64_t> s) {
+                     return std::get<0>(s) != ShapedType::kDynamicSize &&
+                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                            std::get<0>(s) != std::get<1>(s);
+                   })) {
+    return op.emitOpError("incompatible input/output shapes");
   }
 
   int64_t rank = op.getOperandRank();
@@ -794,9 +812,8 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
 bool ReverseOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
 
 SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
-  // TODO(hanchung): Mark them parallel after tiling method is implemented.
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getReductionIteratorTypeName());
+                                       getParallelIteratorTypeName());
   return iteratorTypes;
 }
 
@@ -826,6 +843,56 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
+Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
+                                             ValueRange outputs,
+                                             ArrayRef<OpFoldResult> offsets,
+                                             ArrayRef<OpFoldResult> sizes,
+                                             SmallVectorImpl<Value> &results) {
+  int64_t rank = getOperandRank();
+  SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
+  Location loc = getLoc();
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, input(), offsets, sizes, strides));
+
+  AffineExpr sym0, sym1, sym2;
+  bindSymbols(builder.getContext(), sym0, sym1, sym2);
+  AffineMap map =
+      AffineMap::get(/*dimCount=*/0, /*symbolCount=*/3, {sym0 - sym1 - sym2});
+  SmallVector<OpFoldResult> mirrorOffsets(offsets.begin(), offsets.end());
+  for (auto dim : dims()) {
+    Value size = getDimValue(builder, loc, input(), dim);
+    Value offset =
+        getValueOrCreateConstantIndexOp(builder, loc, mirrorOffsets[dim]);
+    Value tileSize = getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]);
+    mirrorOffsets[dim] =
+        builder
+            .create<AffineApplyOp>(loc, map, ValueRange{size, offset, tileSize})
+            .getResult();
+  }
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasTensorSemantics()) {
+    tiledOperands.emplace_back(
+        getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
+    resultTypes.push_back(tiledOperands[1].getType());
+  } else {
+    tiledOperands.emplace_back(
+        getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
+  }
+
+  Operation *tiledRevOp = cast<LinalgExtOp>(getOperation())
+                              .clone(builder, loc, resultTypes, tiledOperands);
+
+  for (auto result : llvm::enumerate(tiledRevOp->getResults())) {
+    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+        loc, result.value(), outputs[result.index()], mirrorOffsets, sizes,
+        strides);
+    results.push_back(insertSliceOp.getResult());
+  }
+  return tiledRevOp;
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
   void OP_NAME::getEffects(                                               \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> \
@@ -840,6 +907,73 @@ DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ReverseOp)
+
+namespace {
+/// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
+/// changes.
+struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
+  using OpInterfaceRewritePattern<LinalgExtOp>::OpInterfaceRewritePattern;
+
+  LogicalResult matchAndRewrite(LinalgExtOp op,
+                                PatternRewriter &rewriter) const override {
+    // If no operand comes from a tensor::CastOp and can be folded then fail.
+    bool hasTensorCastOperand =
+        llvm::any_of(op.getInputAndOutputOperands(), [&](OpOperand *opOperand) {
+          if (opOperand->get().isa<BlockArgument>()) return false;
+          auto castOp = opOperand->get().getDefiningOp<tensor::CastOp>();
+          return castOp && canFoldIntoConsumerOp(castOp);
+        });
+    if (!hasTensorCastOperand) return failure();
+
+    SmallVector<Type, 4> newResultTypes;
+    newResultTypes.reserve(op->getNumResults());
+    SmallVector<Value, 4> newOperands;
+    newOperands.reserve(op->getNumOperands());
+    // Inputs may fold.
+    for (OpOperand *opOperand : op.getInputOperands()) {
+      auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
+      newOperands.push_back(canFoldIntoConsumerOp(tensorCastOp)
+                                ? tensorCastOp.source()
+                                : opOperand->get());
+    }
+    // Init tensors may fold, in which case the resultType must also change.
+    for (OpOperand *opOperand : op.getOutputOperands()) {
+      auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
+      bool fold = canFoldIntoConsumerOp(tensorCastOp);
+      newOperands.push_back(fold ? tensorCastOp.getOperand()
+                                 : opOperand->get());
+      newResultTypes.push_back(newOperands.back().getType());
+    }
+    // Clone op.
+    Operation *newOp =
+        op.clone(rewriter, op->getLoc(), newResultTypes, newOperands);
+    SmallVector<Value, 4> replacements;
+    replacements.reserve(newOp->getNumResults());
+    for (auto result : llvm::zip(op->getResults(), newOp->getResults())) {
+      Value oldResult = std::get<0>(result);
+      Value newResult = std::get<1>(result);
+      if (newResult.getType() != oldResult.getType()) {
+        replacements.push_back(rewriter.create<tensor::CastOp>(
+            op->getLoc(), oldResult.getType(), newResult));
+      } else {
+        replacements.push_back(newResult);
+      }
+    }
+    rewriter.replaceOp(op, replacements);
+
+    return success();
+  }
+};
+}  // namespace
+
+//===----------------------------------------------------------------------===//
+// LinalgExtDialect
+//===----------------------------------------------------------------------===//
+
+void LinalgExtDialect::getCanonicalizationPatterns(
+    RewritePatternSet &results) const {
+  results.add<FoldTensorCastOp>(getContext());
+}
 
 }  // namespace linalg_ext
 }  // namespace iree_compiler

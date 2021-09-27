@@ -9,7 +9,7 @@
 #   * Vulkan (using SwiftShader)
 #   * Python (including `venv` and common pip packages needed for Colab)
 
-FROM gcr.io/iree-oss/cmake-python-swiftshader@sha256:ea9fc25e603c4bdc9c4aeb6db8dc590df4e75ce80bf7899138505d6182241d43 AS final
+FROM gcr.io/iree-oss/cmake-python-swiftshader@sha256:e1f3fb0ba79f12d3dd620a84a805633ed3cb87b482758d2160b43ecf3eb9c1a9 AS final
 
 # Update setuptools per https://github.com/pypa/setuptools/issues/1694#issuecomment-466010982
 RUN apt-get update && apt-get install -y python3-venv python3.7-venv python-setuptools && \
