@@ -53,6 +53,7 @@ cc_library(
         "PassDetail.h",
         "Passes.cpp",
         "PromoteI1ToI8Pass.cpp",
+        "StripSignednessPass.cpp",
         "StripAndSplatConstantVariables.cpp",
         "TypeConverter.cpp",
         "VerifyInputLegality.cpp",

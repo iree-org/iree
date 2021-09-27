@@ -139,6 +139,12 @@ def PromoteI1ToI8 :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
 }
 
+def StripSignedness :
+    Pass<"iree-flow-strip-signedness", "mlir::FuncOp"> {
+  let summary = "Legalizes ui tensors constants to uis";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
+}
+
 def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
   let summary = "Strips constant util.globals and replaces them with splats.";

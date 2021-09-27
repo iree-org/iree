@@ -51,6 +51,7 @@ iree_cc_library(
     "Passes.cpp"
     "PromoteI1ToI8Pass.cpp"
     "StripAndSplatConstantVariables.cpp"
+    "StripSignednessPass.cpp"
     "TypeConverter.cpp"
     "VerifyInputLegality.cpp"
   DEPS
