@@ -22,7 +22,7 @@
 #define IREE_HAL_VMVX_WORKER_COUNT 0
 #define IREE_HAL_MAX_VMVX_WORKER_COUNT 16
 
-#define IREE_HAL_VMVX_SYNC_DRIVER_ID 0x53564D5658lu  // SVMVX
+#define IREE_HAL_VMVX_SYNC_DRIVER_ID 0x53564D58u  // SVMX
 
 static iree_status_t iree_hal_vmvx_sync_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
@@ -31,7 +31,8 @@ static iree_status_t iree_hal_vmvx_sync_driver_factory_enumerate(
       {
           .driver_id = IREE_HAL_VMVX_SYNC_DRIVER_ID,
           .driver_name = iree_string_view_literal("vmvx-sync"),
-          .full_name = iree_string_view_literal("VM-based reference backend"),
+          .full_name = iree_string_view_literal(
+              "synchronous VM-based reference backend"),
       },
   };
   *out_driver_info_count = IREE_ARRAYSIZE(driver_infos);

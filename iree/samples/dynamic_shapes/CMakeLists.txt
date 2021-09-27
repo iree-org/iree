@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# TODO(#4298): Separate HAL driver registration from threading.
 if(NOT ${IREE_HAL_DRIVER_DYLIB})
   return()
 endif()

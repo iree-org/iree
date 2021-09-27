@@ -29,7 +29,8 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_enumerate(
   static const iree_hal_driver_info_t default_driver_info = {
       .driver_id = IREE_HAL_DYLIB_SYNC_DRIVER_ID,
       .driver_name = iree_string_view_literal("dylib-sync"),
-      .full_name = iree_string_view_literal("AOT compiled dynamic libraries"),
+      .full_name = iree_string_view_literal(
+          "synchronous AOT compiled dynamic libraries"),
   };
   *out_driver_info_count = 1;
   *out_driver_infos = &default_driver_info;
