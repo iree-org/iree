@@ -29,7 +29,8 @@ namespace iree_compiler {
 // GPU backends to use.
 static llvm::cl::opt<int> clNativeVectorSizeInBytes(
     "iree-codegen-llvm-vector-size-in-bytes",
-    llvm::cl::desc("linalg.matmul vector tile size"), llvm::cl::init(16));
+    llvm::cl::desc("native vector size to use on the hardware"),
+    llvm::cl::init(16));
 
 static llvm::cl::opt<int> matmulWorkgroupTileSize(
     "iree-codegen-llvm-matmul-workgroup-size",
@@ -94,8 +95,10 @@ static Optional<int64_t> getNativeVectorSizeInBytes(FuncOp entryPointFn) {
   return nativeVectorSizeVal;
 }
 
-/// Return the type length in bytes. Looks throuigh all the interface binding
-/// ops to see the ABI types and guess-timates the type size to use.
+/// Returns the type length in bytes. Looks through all the interface binding
+/// ops to see the ABI types and guess-timates the type size to use. This is
+/// used to convert the vector size in bytes to vector size in number of
+/// elements.
 static unsigned getReferenceTypeLengthInBytes(FuncOp entryPointFn) {
   unsigned referenceTypeLengthInBytes = 4;
   entryPointFn.walk([&](IREE::HAL::InterfaceBindingSubspanOp subSpanOp) {
@@ -103,10 +106,11 @@ static unsigned getReferenceTypeLengthInBytes(FuncOp entryPointFn) {
     Type elementType = TypeSwitch<Type, Type>(type)
                            .Case<ShapedType, IREE::Flow::DispatchTensorType>(
                                [&](auto shapedType) -> Type {
-                                 if (shapedType.getRank() > 0) {
-                                   return shapedType.getElementType();
-                                 }
-                                 return nullptr;
+                                 // Ignore operands that are 0D tensors. These
+                                 // are not vector-loadable, so using these to
+                                 // get vector length would be a pessimization.
+                                 if (!shapedType.getRank()) return nullptr;
+                                 return shapedType.getElementType();
                                })
                            .Default([&](Type t) -> Type { return nullptr; });
     if (!elementType || !elementType.isIntOrFloat()) return;
@@ -125,17 +129,11 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
     return {};
   }
   assert(tiledLoops.size() == nativeVectorSizeInElements.size());
-  int64_t useDefaultWorkgroupTileSize = defaultWorkgroupTileSize;
   unsigned maxDim = 0;
   for (auto tiledLoop : tiledLoops) {
     maxDim = std::max<unsigned>(tiledLoop.distributionDim, maxDim);
   }
   SmallVector<int64_t> workloadPerWorkgroup(maxDim + 1, 1);
-  if (tiledLoops.size() == 1) {
-    useDefaultWorkgroupTileSize *= 2;
-  } else if (tiledLoops.size() == 3) {
-    useDefaultWorkgroupTileSize /= 2;
-  }
 
   for (auto tiledLoop : enumerate(tiledLoops)) {
     if (!tiledLoop.value().ub || !tiledLoop.value().ub.is<Attribute>() ||
@@ -153,13 +151,16 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
       // Should be avoiding tiling this loop, but use tile size of 1.
       candidateTileSize = 1;
     } else {
+      // Pick a value that evenly distributes the workload.
       candidateTileSize = std::max<int64_t>(
           llvm::PowerOf2Floor(static_cast<uint64_t>(ub - lb) / 2),
           candidateTileSize);
     }
 
+    // Limit the workload per workgroup to the default being the max to keep the
+    // work per invocation reasonable.
     workloadPerWorkgroup[tiledLoop.value().distributionDim] =
-        std::min<int64_t>(candidateTileSize, useDefaultWorkgroupTileSize);
+        std::min<int64_t>(candidateTileSize, defaultWorkgroupTileSize);
   }
   return workloadPerWorkgroup;
 }
@@ -231,8 +232,9 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
   // that the op vectorizes.
   auto getTileSize = [](int64_t lb, int64_t ub, int64_t maxSize,
                         int64_t vectorSizeVal) -> int64_t {
-    if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize)
+    if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
       return maxSize;
+    }
     int64_t dim = ub - lb;
     if (dim < vectorSizeVal) return vectorSizeVal;
     for (int64_t i = std::min(maxSize, dim); i > 0; --i) {
@@ -243,8 +245,10 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     return maxSize;
   };
   for (unsigned i = tiledLoops.size() - 2; i < tiledLoops.size(); ++i) {
-    if (!tiledLoops[i].lb.is<Attribute>() || !tiledLoops[i].ub.is<Attribute>())
+    if (!tiledLoops[i].lb.is<Attribute>() ||
+        !tiledLoops[i].ub.is<Attribute>()) {
       continue;
+    }
     int64_t lb = tiledLoops[i].lb.get<Attribute>().cast<IntegerAttr>().getInt();
     int64_t ub = tiledLoops[i].ub.get<Attribute>().cast<IntegerAttr>().getInt();
     workloadPerWorkgroup[tiledLoops.size() - 1 - i] =
