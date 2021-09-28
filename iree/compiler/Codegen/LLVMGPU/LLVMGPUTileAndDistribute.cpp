@@ -69,16 +69,11 @@ static void populateTilingReductionPatterns(
 /// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
-    ArrayRef<int64_t> workgroupSize, ArrayRef<int64_t> workloadPerWorkgroup) {
+    ArrayRef<int64_t> workgroupSize) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
-      [&](OpBuilder &builder, Operation *operation) {
+      [](OpBuilder &builder, Operation *operation) {
         SmallVector<Value, 4> tileSizesVal;
-        SmallVector<int64_t, 4> tileSizes;
-        for (auto workload : llvm::enumerate(workloadPerWorkgroup)) {
-          tileSizes.push_back(workload.value() /
-                              workgroupSize[workload.index()]);
-        }
-        std::reverse(tileSizes.begin(), tileSizes.end());
+        SmallVector<int64_t, 4> tileSizes = getTileSizes(operation, 2);
         if (tileSizes.empty()) return SmallVector<Value, 4>();
         SmallVector<unsigned> partitionedLoops = getPartitionedLoops(operation);
         llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
@@ -234,12 +229,6 @@ struct LLVMGPUTileAndDistributePass
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
         getEntryPoint(funcOp).workgroup_size().getValue(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-    auto workloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
-        getTranslationInfo(getEntryPoint(funcOp))
-            .workloadPerWorkgroup()
-            .getValue(),
-        [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     // Only promote to workgroup size if there are multiple warps.
@@ -282,7 +271,7 @@ struct LLVMGPUTileAndDistributePass
       // Apply last level of tiling and distribute to threads.
       OwningRewritePatternList threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(context, threadLevelTilingPatterns,
-                                         workgroupSize, workloadPerWorkgroup);
+                                         workgroupSize);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(threadLevelTilingPatterns));
     }
