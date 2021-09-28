@@ -13,6 +13,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/SymbolTable.h"
 
 namespace mlir {
@@ -38,6 +39,12 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
     entryPointOps[op.sym_name()] = op;
   }
   return entryPointOps;
+}
+
+IREE::HAL::TranslationInfo getTranslationInfo(FuncOp funcOp) {
+  auto entryPointOp = getEntryPoint(funcOp);
+  if (!entryPointOp) return nullptr;
+  return getTranslationInfo(entryPointOp);
 }
 
 void setTranslationInfo(FuncOp entryPointFn,
@@ -177,19 +184,309 @@ ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
   return result.getType().cast<ShapedType>().getShape();
 }
 
+//===----------------------------------------------------------------------===//
+// Get the tiled loops in the computation.
+//===----------------------------------------------------------------------===//
+
+/// Returns the first of `exprs` which is of the type `T`.
+template <typename T>
+static AffineExpr getAffineExprOfType(ArrayRef<AffineExpr> exprs) {
+  for (auto expr : exprs) {
+    if (expr.isa<T>()) return expr;
+  }
+  return nullptr;
+}
+
+/// Returns true if the `expr` is on of the types in {`T1`, `T2`, `T3...`}.
+template <typename T>
+static bool isaAffineExprOfType(AffineExpr expr) {
+  return expr.isa<T>();
+}
+template <typename T1, typename T2, typename... T3>
+static bool isaAffineExprOfType(AffineExpr expr) {
+  if (expr.isa<T1>()) {
+    return true;
+  }
+  return isaAffineExprOfType<T2, T3...>(expr);
+}
+
+/// Returns a Value that repreesnts the value for symbol or dim expr for the map
+/// in the `applyOp`.
+static Value getValueForDimOrSymbol(AffineApplyOp applyOp, AffineExpr expr) {
+  unsigned numDims = applyOp.getAffineMap().getNumDims();
+  if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+    return applyOp.getOperand(dimExpr.getPosition());
+  }
+  if (auto symbolExpr = expr.dyn_cast<AffineSymbolExpr>()) {
+    return applyOp.getOperand(numDims + symbolExpr.getPosition());
+  }
+  return nullptr;
+}
+static SmallVector<Value> getValuesForDimsOrSymbols(
+    AffineApplyOp applyOp, ArrayRef<AffineExpr> exprs) {
+  SmallVector<Value> vals;
+  for (auto expr : exprs) {
+    vals.push_back(getValueForDimOrSymbol(applyOp, expr));
+  }
+  return vals;
+}
+
+/// Returns the dimension for any operation that has the `dimension`
+/// attribute. Currently tested for `flow.dispatch.workgroup.(size|count|id)`,
+/// `hal.interface.workgroup.(size|count|id)`.
+template <typename T>
+static Optional<unsigned> getDimension(Operation *op) {
+  if (auto tOp = dyn_cast<T>(op)) {
+    return tOp.dimension().getZExtValue();
+  }
+  return llvm::None;
+}
+template <typename T1, typename T2, typename... T3>
+static Optional<unsigned> getDimension(Operation *op) {
+  if (!op) return llvm::None;
+  if (auto dimension = getDimension<T1>(op)) {
+    return dimension;
+  }
+  return getDimension<T2, T3...>(op);
+}
+
+/// Checks that all `vals` are defined by either
+/// `flow.dispatch.workgroup.(size|count|id)` or
+/// `hal.interface.workgroup.(size|count|id)` using the same `dimension`. If any
+/// element of `vals` is not defined by one of these ops, or the dimensions dont
+/// match, returns llvm::None. On success returns the dimension.  If
+/// `refDimension` is passed checks if the dimension matches the given value.
+template <typename... T>
+static Optional<unsigned> checkDimensions(
+    ArrayRef<Value> vals, Optional<unsigned> refDimension = llvm::None) {
+  for (auto v : vals) {
+    auto currDimension = getDimension<T...>(v.getDefiningOp());
+    if (!currDimension) return llvm::None;
+    if (refDimension) {
+      if (refDimension.getValue() != currDimension.getValue()) {
+        return llvm::None;
+      }
+    } else {
+      refDimension = currDimension.getValue();
+    }
+  }
+  return refDimension;
+}
+
+namespace {
+/// Visitor to walk `lb` of a distributed loop. Expected the expression to be of
+/// the form `a + b * c`, where `a` is the original `lb` and `b`, `c` are either
+/// hal.interface.workgroup.id or hal.interface.workgroup.size.
+class LowerBoundExprVisitor
+    : public AffineExprVisitor<LowerBoundExprVisitor, LogicalResult> {
+ public:
+  LowerBoundExprVisitor(AffineApplyOp applyOp, TiledLoopInfo &loopInfo)
+      : applyOp(applyOp), loopInfo(loopInfo) {}
+
+  LogicalResult visitSymbolExpr(AffineSymbolExpr /*expr*/) { return failure(); }
+  LogicalResult visitDimExpr(AffineDimExpr /*expr*/) { return failure(); }
+  LogicalResult visitConstantExpr(AffineConstantExpr /*expr*/) {
+    return failure();
+  }
+  LogicalResult visitAffineBinaryOpExpr(AffineBinaryOpExpr /*expr*/) {
+    return failure();
+  }
+
+  LogicalResult visitAddExpr(AffineBinaryOpExpr expr) {
+    AffineExpr offsetExpr =
+        getAffineExprOfType<AffineBinaryOpExpr>({expr.getLHS(), expr.getRHS()});
+    if (!offsetExpr) {
+      // One of the expressions has to be a binary op expr.
+      return failure();
+    }
+    // The other expression must be the undistributed `lb`.
+    AffineExpr lbExpr =
+        (offsetExpr == expr.getLHS() ? expr.getRHS() : expr.getLHS());
+    if (isaAffineExprOfType<AffineDimExpr, AffineSymbolExpr>(lbExpr)) {
+      Value v = getValueForDimOrSymbol(applyOp, lbExpr);
+      if (!v) {
+        return failure();
+      }
+      loopInfo.lb = getAsOpFoldResult(v);
+    } else if (auto constExpr = lbExpr.dyn_cast<AffineConstantExpr>()) {
+      loopInfo.lb = IntegerAttr::get(IndexType::get(applyOp.getContext()),
+                                     constExpr.getValue());
+    } else {
+      return failure();
+    }
+    return visit(offsetExpr);
+  }
+
+  LogicalResult visitMulExpr(AffineBinaryOpExpr expr) {
+    SmallVector<Value> vals =
+        getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
+    if (vals.size() != 2 || !vals[0] || !vals[1]) {
+      return failure();
+    }
+    Optional<unsigned> dimension =
+        checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp,
+                        IREE::HAL::InterfaceWorkgroupSizeOp>(vals);
+    if (!dimension) {
+      return failure();
+    }
+    loopInfo.distributionDim = dimension.getValue();
+    if (!loopInfo.lb) {
+      loopInfo.lb = IntegerAttr::get(IndexType::get(applyOp.getContext()), 0);
+    }
+    return success();
+  }
+
+ private:
+  AffineApplyOp applyOp;
+  TiledLoopInfo &loopInfo;
+};
+
+/// Visitor to walk the `step` of a distributed loop. Expected the expression to
+/// be of the form `a * b * c`, where they could be the dynamic `step` or
+/// defined by `hal.interface.workgroup.size`/`hal.interface.workgroup.count`
+/// operation.
+class StepExprVisitor
+    : public AffineExprVisitor<StepExprVisitor, LogicalResult> {
+ public:
+  StepExprVisitor(AffineApplyOp applyOp, TiledLoopInfo &loopInfo)
+      : applyOp(applyOp), loopInfo(loopInfo) {}
+
+  LogicalResult visitSymbolExpr(AffineSymbolExpr /*expr*/) { return failure(); }
+  LogicalResult visitDimExpr(AffineDimExpr /*expr*/) { return failure(); }
+  LogicalResult visitConstantExpr(AffineConstantExpr /*expr*/) {
+    return failure();
+  }
+  LogicalResult visitAffineBinaryOpExpr(AffineBinaryOpExpr /*expr*/) {
+    return failure();
+  }
+
+  LogicalResult visitMulExpr(AffineBinaryOpExpr expr) {
+    // Check if one of the operands is a binary op expr.
+    SmallVector<AffineExpr> sentinels;
+    if (auto e = getAffineExprOfType<AffineBinaryOpExpr>(
+            {expr.getLHS(), expr.getRHS()})) {
+      AffineExpr otherExpr =
+          (e == expr.getLHS() ? expr.getRHS() : expr.getLHS());
+      if (failed(processSentinel(otherExpr, sentinels))) {
+        return failure();
+      }
+      expr = e.cast<AffineBinaryOpExpr>();
+    } else {
+      loopInfo.step = IntegerAttr::get(IndexType::get(applyOp.getContext()), 1);
+    }
+
+    if (failed(processSentinel(expr.getLHS(), sentinels)) ||
+        failed(processSentinel(expr.getRHS(), sentinels))) {
+      return failure();
+    }
+    // Either there are 3 sentinels and step isnt set, or there are two
+    // sentinels and the step is set.
+    if (sentinels.size() == 3) {
+      if (loopInfo.step) {
+        return failure();
+      }
+      auto it = sentinels.begin();
+      for (auto ie = sentinels.end(); it != ie; ++it) {
+        Value v = getValueForDimOrSymbol(applyOp, *it);
+        if (!v.getDefiningOp<IREE::HAL::InterfaceWorkgroupSizeOp>() &&
+            !v.getDefiningOp<IREE::HAL::InterfaceWorkgroupCountOp>()) {
+          loopInfo.step = getAsOpFoldResult(v);
+          break;
+        }
+      }
+      if (it != sentinels.end()) {
+        sentinels.erase(it);
+      }
+    }
+
+    if (sentinels.size() != 2 || !loopInfo.step) {
+      return failure();
+    }
+    if (!checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp,
+                         IREE::HAL::InterfaceWorkgroupSizeOp>(
+            getValuesForDimsOrSymbols(applyOp, sentinels),
+            loopInfo.distributionDim)) {
+      return failure();
+    }
+    return success();
+  }
+
+ private:
+  LogicalResult processSentinel(AffineExpr e,
+                                SmallVectorImpl<AffineExpr> &sentinels) {
+    if (isaAffineExprOfType<AffineDimExpr, AffineSymbolExpr>(e)) {
+      sentinels.push_back(e);
+      return success();
+    } else if (auto constExpr = e.dyn_cast<AffineConstantExpr>()) {
+      if (loopInfo.step) {
+        return failure();
+      }
+      loopInfo.step = IntegerAttr::get(IndexType::get(applyOp.getContext()),
+                                       constExpr.getValue());
+      return success();
+    }
+    return failure();
+  }
+
+  AffineApplyOp applyOp;
+  TiledLoopInfo &loopInfo;
+};
+}  // namespace
+
+/// Checks if the `forOp` is a tiled + distributed op. Looks for the op of this
+/// form
+/// ```
+///   %dim = constant ... : index
+///   %id = flow.dispatch.workgroup.id[%dim]
+///   %count = flow.dispatch.workgroup.count[%dim]
+///   %size = flow.dispatch.workgroup.size[%dim]
+///   %offset = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 *
+///   s1)>(%lb)[%id, %size] %new_step = affine.apply affine_map<(d0)[s0, s1] ->
+///   (d0 * s0 * s1)>(%step)[%id, %size] scf.for %iv = %offset to %ub step
+///   %new_step {
+///     ...
+///   }
+/// ```
+static Optional<TiledLoopInfo> isTiledLoop(MLIRContext *context,
+                                           scf::ForOp forOp) {
+  TiledLoopInfo loopInfo;
+  auto lbApplyOp = forOp.lowerBound().getDefiningOp<AffineApplyOp>();
+  if (!lbApplyOp) {
+    return llvm::None;
+  }
+  LowerBoundExprVisitor lbVisitor(lbApplyOp, loopInfo);
+  auto stepApplyOp = forOp.step().getDefiningOp<AffineApplyOp>();
+  if (!stepApplyOp) {
+    return llvm::None;
+  }
+  StepExprVisitor stepVisitor(stepApplyOp, loopInfo);
+  if (failed(lbVisitor.visit(lbApplyOp.getAffineMap().getResults()[0])) ||
+      failed(stepVisitor.visit(stepApplyOp.getAffineMap().getResults()[0]))) {
+    return llvm::None;
+  }
+  if (!loopInfo.lb || !loopInfo.step) {
+    return llvm::None;
+  }
+  loopInfo.ub = getAsOpFoldResult(forOp.upperBound());
+  return loopInfo;
+}
+
 LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
                              SmallVectorImpl<Operation *> &filteredOps,
-                             SmallVectorImpl<Operation *> &tiledLoops) {
+                             SmallVectorImpl<TiledLoopInfo> &tiledLoops) {
   Region &region = funcOp.body();
   if (!llvm::hasSingleElement(region)) {
     return funcOp.emitError("unable dispatch function with multiple blocks");
   }
   Block *body = &region.front();
+  MLIRContext *context = funcOp.getContext();
   auto forOps = body->getOps<scf::ForOp>();
   while (!forOps.empty()) {
     if (!llvm::hasSingleElement(forOps)) return failure();
     scf::ForOp forOp = *(forOps.begin());
-    tiledLoops.push_back(forOp.getOperation());
+    if (auto tiledLoopInfo = isTiledLoop(context, forOp)) {
+      tiledLoops.emplace_back(std::move(tiledLoopInfo.getValue()));
+    }
     body = forOp.getBody();
     forOps = body->getOps<scf::ForOp>();
   }
@@ -203,7 +500,7 @@ LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
 
 LogicalResult getComputeOps(FuncOp funcOp,
                             SmallVectorImpl<Operation *> &computeOps,
-                            SmallVectorImpl<Operation *> &tiledLoops) {
+                            SmallVectorImpl<TiledLoopInfo> &tiledLoops) {
   if (failed(getFilteredOps(
           funcOp,
           [](Operation *op) {
@@ -230,41 +527,6 @@ LogicalResult getComputeOps(FuncOp funcOp,
   }
   if (marker.hasValue()) {
     for (auto op : computeOps) {
-      setMarker(op, marker.getValue());
-    }
-  }
-  return success();
-}
-
-LogicalResult getLinalgOps(FuncOp funcOp,
-                           SmallVectorImpl<linalg::LinalgOp> &linalgOps,
-                           SmallVectorImpl<Operation *> &tiledLoops) {
-  {
-    SmallVector<Operation *> computeOps;
-    if (failed(getFilteredOps(
-            funcOp, [](Operation *op) { return isa<linalg::LinalgOp>(op); },
-            computeOps, tiledLoops))) {
-      return failure();
-    }
-    for (auto op : computeOps) {
-      linalgOps.push_back(cast<linalg::LinalgOp>(op));
-    }
-  }
-
-  // Propagate markers to all ops. If one of the ops has a marker all ops in
-  // this loop need to have marker since body of the loop maps to a workgroup.
-  // TODO(ravishankarm): Temporary WAR till a better story w.r.t markers is
-  // figured out.
-  Optional<StringRef> marker = llvm::None;
-  for (auto op : linalgOps) {
-    if (hasMarker(op)) {
-      assert(!marker || marker.getValue() == getMarkerOrNull(op) &&
-                            "expected all markers within op to be the same");
-      marker = getMarkerOrNull(op);
-    }
-  }
-  if (marker.hasValue()) {
-    for (auto op : linalgOps) {
       setMarker(op, marker.getValue());
     }
   }
