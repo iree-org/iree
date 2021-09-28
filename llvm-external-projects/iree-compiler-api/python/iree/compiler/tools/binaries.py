@@ -35,6 +35,10 @@ _BUILTIN_TOOLS = [
 # a python module that provides a `get_tool` function for getting its absolute
 # path. This dictionary maps the tool name to the module.
 _TOOL_MODULE_MAP = {
+    # Note that ireec is builtin, but if not found, it can be resolved
+    # in the external 'core' module. This is used for some outside packaging
+    # options.
+    "ireec": "iree.tools.core",
     "iree-import-tflite": "iree.tools.tflite",
     "iree-import-xla": "iree.tools.xla",
     "iree-import-tf": "iree.tools.tf",
@@ -43,6 +47,7 @@ _TOOL_MODULE_MAP = {
 # Map of tool module to package name as distributed to archives (used for
 # error messages).
 _TOOL_MODULE_PACKAGES = {
+    "iree.tools.core": "<none>",
     "iree.tools.tf": "iree-tools-tf",
     "iree.tools.tflite": "iree-tools-tflite",
     "iree.tools.xla": "iree-tools-xla",
@@ -89,38 +94,41 @@ def find_tool(exe_name: str) -> str:
   is_builtin = exe_name in _BUILTIN_TOOLS
   if not is_builtin and exe_name not in _TOOL_MODULE_MAP:
     raise ValueError(f"IREE compiler tool '{exe_name}' is not a known tool")
-  # First search an explicit tool path.
+
+  # First search an explicit tool path (from environment).
   tool_path = get_tool_path()
   for path_entry in tool_path:
     if not path_entry:
       continue
     candidate_exe = os.path.join(path_entry, exe_name)
-    if os.path.isfile(candidate_exe) and os.access(candidate_exe, os.X_OK):
+    if _is_executable(candidate_exe):
       return candidate_exe
 
   if is_builtin:
     # Get builtin tool.
     candidate_exe = _get_builtin_tool(exe_name)
-  else:
-    # Attempt to load the tool module.
-    tool_module_name = _TOOL_MODULE_MAP[exe_name]
-    tool_module_package = _TOOL_MODULE_PACKAGES[tool_module_name]
-    try:
-      tool_module = importlib.import_module(tool_module_name)
-    except ModuleNotFoundError:
-      raise ValueError(
-          f"IREE compiler tool '{exe_name}' is not installed (it should have been "
-          f"found in the python module '{tool_module_name}', typically installed "
-          f"via the package {tool_module_package}).\n\n"
-          f"Either install the package or set the {_TOOL_PATH_ENVVAR} environment "
-          f"variable to contain the path of the tool executable "
-          f"(current {_TOOL_PATH_ENVVAR} = {repr(tool_path)})") from None
+    if _is_executable(candidate_exe):
+      return candidate_exe
 
-    # Ask the module for its tool.
-    candidate_exe = tool_module.get_tool(exe_name)
+  # Fall-through and attempt to find it via a tools module.
+  # Attempt to load the tool module.
+  tool_module_name = _TOOL_MODULE_MAP[exe_name]
+  tool_module_package = _TOOL_MODULE_PACKAGES[tool_module_name]
+  try:
+    tool_module = importlib.import_module(tool_module_name)
+  except ModuleNotFoundError:
+    raise ValueError(
+        f"IREE compiler tool '{exe_name}' is not installed (it should have been "
+        f"found in the python module '{tool_module_name}', typically installed "
+        f"via the package {tool_module_package}).\n\n"
+        f"Either install the package or set the {_TOOL_PATH_ENVVAR} environment "
+        f"variable to contain the path of the tool executable "
+        f"(current {_TOOL_PATH_ENVVAR} = {repr(tool_path)}).") from None
 
-  if (not candidate_exe or not os.path.isfile(candidate_exe) or
-      not os.access(candidate_exe, os.X_OK)):
+  # Ask the module for its tool.
+  candidate_exe = tool_module.get_tool(exe_name)
+
+  if (not _is_executable(candidate_exe)):
     raise ValueError(
         f"IREE compiler tool '{exe_name}' was located in module "
         f"'{tool_module_name}' but the file was not found or not executable: "
@@ -137,6 +145,16 @@ def _get_builtin_tool(exe_name: str) -> Optional[str]:
   this_path = os.path.dirname(__file__)
   tool_path = os.path.join(this_path, "..", "_mlir_libs", exe_name)
   return tool_path
+
+
+def _is_executable(candidate_exe: str) -> bool:
+  if not candidate_exe:
+    return False
+  if not os.path.isfile(candidate_exe):
+    return False
+  if not os.access(candidate_exe, os.X_OK):
+    return False
+  return True
 
 
 def invoke_immediate(command_line: List[str],
