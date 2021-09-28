@@ -959,7 +959,7 @@ hal.executable private @matmul_static {
     }
   }
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}[], [28, 8, 32], [4, 4, 4]{{\]}}
+//   CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}[], [28, 8, 24], [4, 4, 4]{{\]}}
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 28)>
 //       CHECK: hal.executable.entry_point public @matmul_static attributes

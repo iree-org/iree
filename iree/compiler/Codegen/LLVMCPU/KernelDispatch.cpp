@@ -268,7 +268,9 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
         getTileSize(0, workloadPerWorkgroup[tiledLoops.size() - 1 - i],
                     matmulL1TileSize, vectorSizeVals[i]));
   }
-  l1TileSizes.push_back(matmulL1TileSize);
+  // L1 tile size for k dimensions.
+  int64_t K = lhsShapedType.getShape().back();
+  l1TileSizes.push_back(getTileSize(0, K, matmulL1TileSize, vectorSize));
   vectorSizeVals.push_back(vectorSize);
   vectorTileSizes.assign(vectorSizeVals.begin(), vectorSizeVals.end());
   TileSizesListType tileSizes;
