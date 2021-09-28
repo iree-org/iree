@@ -231,7 +231,9 @@ static SmallVector<Value> getValuesForDimsOrSymbols(
   return vals;
 }
 
-/// Returns the dimension of `flow.dispatch.workgroup.(size|count|id)`.
+/// Returns the dimension for any operation that has the `dimension`
+/// attribute. Currently tested for `flow.dispatch.workgroup.(size|count|id)`,
+/// `hal.interface.workgroup.(size|count|id)`.
 template <typename T>
 static Optional<unsigned> getDimension(Operation *op) {
   if (auto tOp = dyn_cast<T>(op)) {
@@ -248,8 +250,9 @@ static Optional<unsigned> getDimension(Operation *op) {
   return getDimension<T2, T3...>(op);
 }
 
-/// Checks that all `vals` are defined by
-/// `flow.dispatch.workgroup.(size|count|id)` using the same `dimension`. If any
+/// Checks that all `vals` are defined by either
+/// `flow.dispatch.workgroup.(size|count|id)` or
+/// `hal.interface.workgroup.(size|count|id)` using the same `dimension`. If any
 /// element of `vals` is not defined by one of these ops, or the dimensions dont
 /// match, returns llvm::None. On success returns the dimension.  If
 /// `refDimension` is passed checks if the dimension matches the given value.
