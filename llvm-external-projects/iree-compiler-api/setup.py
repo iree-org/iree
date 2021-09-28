@@ -14,11 +14,13 @@
 #
 # It is recommended to build with Ninja and ccache. To do so, set environment
 # variables by prefixing to above invocations:
-#   CMAKE_GENERATOR=Ninja CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
+#   CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
 #
 # On CIs, it is often advantageous to re-use/control the CMake build directory.
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
+import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -28,6 +30,26 @@ from distutils.command.build import build as _build
 from setuptools import find_namespace_packages, setup, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
 from setuptools.command.build_py import build_py as _build_py
+
+# Setup and get version information.
+THIS_DIR = os.path.realpath(os.path.dirname(__file__))
+IREESRC_DIR = os.path.join(THIS_DIR, "..", "..")
+VERSION_INFO_FILE = os.path.join(IREESRC_DIR, "version_info.json")
+
+
+def load_version_info():
+  with open(VERSION_INFO_FILE, "rt") as f:
+    return json.load(f)
+
+
+try:
+  version_info = load_version_info()
+except FileNotFoundError:
+  print("version_info.json not found. Using defaults")
+  version_info = {}
+
+PACKAGE_SUFFIX = version_info.get("package-suffix") or "-dev"
+PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
 
 
 class CustomBuild(_build):
@@ -50,17 +72,22 @@ class CMakeBuildPy(_build_py):
   def run(self):
     subprocess.check_call(["cmake", "--version"])
 
-    target_dir = self.build_lib
+    target_dir = os.path.abspath(self.build_lib)
+    print(f"Building in target dir: {target_dir}", file=sys.stderr)
+    os.makedirs(target_dir, exist_ok=True)
     cmake_build_dir = os.getenv("IREE_COMPILER_API_CMAKE_BUILD_DIR")
     if not cmake_build_dir:
       cmake_build_dir = os.path.join(target_dir, "..", "cmake_build")
     os.makedirs(cmake_build_dir, exist_ok=True)
     cmake_build_dir = os.path.abspath(cmake_build_dir)
+    print(f"CMake build dir: {cmake_build_dir}", file=sys.stderr)
     cmake_install_dir = os.path.abspath(
         os.path.join(target_dir, "..", "cmake_install"))
+    print(f"CMake install dir: {cmake_install_dir}", file=sys.stderr)
     src_dir = os.path.abspath(os.path.dirname(__file__))
     cfg = "Release"
     cmake_args = [
+        "-GNinja",
         "-DCMAKE_INSTALL_PREFIX={}".format(cmake_install_dir),
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DPython3_INCLUDE_DIRS={}".format(sysconfig.get_path("include")),
@@ -71,19 +98,19 @@ class CMakeBuildPy(_build_py):
     # happens to be what exists on manylinux. We detect this and give it a dummy
     # library file to reference (which is checks exists but never gets
     # used).
-    python_libdir = sysconfig.get_config_var('LIBDIR')
-    python_library = sysconfig.get_config_var('LIBRARY')
-    if python_libdir and not os.path.isabs(python_library):
-      python_library = os.path.join(python_libdir, python_library)
-    if python_library and not os.path.exists(python_library):
-      print("Detected static linked python. Faking a library for cmake.")
-      fake_libdir = os.path.join(cmake_build_dir, "fake_python", "lib")
-      os.makedirs(fake_libdir, exist_ok=True)
-      fake_library = os.path.join(fake_libdir,
-                                  sysconfig.get_config_var('LIBRARY'))
-      with open(fake_library, "wb"):
-        pass
-      cmake_args.append("-DPython3_LIBRARY:PATH={}".format(fake_library))
+    if platform.system() == "Linux":
+      python_libdir = sysconfig.get_config_var('LIBDIR')
+      python_library = sysconfig.get_config_var('LIBRARY')
+      if python_libdir and not os.path.isabs(python_library):
+        python_library = os.path.join(python_libdir, python_library)
+      if python_library and not os.path.exists(python_library):
+        print("Detected static linked python. Faking a library for cmake.")
+        fake_libdir = os.path.join(cmake_build_dir, "fake_python", "lib")
+        os.makedirs(fake_libdir, exist_ok=True)
+        fake_library = os.path.join(fake_libdir,
+                                    sysconfig.get_config_var('LIBRARY'))
+        subprocess.check_call(["ar", "q", fake_library])
+        cmake_args.append("-DPython3_LIBRARY:PATH={}".format(fake_library))
 
     build_args = []
     if os.path.exists(cmake_install_dir):
@@ -91,19 +118,22 @@ class CMakeBuildPy(_build_py):
     cmake_cache_file = os.path.join(cmake_build_dir, "CMakeCache.txt")
     if os.path.exists(cmake_cache_file):
       os.remove(cmake_cache_file)
-    print(f"Configuring with: {cmake_args}")
+    install_target = "install/strip"
+    if platform.system() == "Windows":
+      install_target = "install"
+    print(f"Configuring with: {cmake_args}", file=sys.stderr)
     subprocess.check_call(["cmake", src_dir] + cmake_args, cwd=cmake_build_dir)
     subprocess.check_call(
-        ["cmake", "--build", ".", "--target", "install/strip"] + build_args,
+        ["cmake", "--build", ".", "--target", install_target] + build_args,
         cwd=cmake_build_dir)
-    print("Build complete.")
+    print("Build complete.", file=sys.stderr)
     if os.path.exists(target_dir):
       shutil.rmtree(target_dir)
-    print("Copying install to target.")
+    print("Copying install to target.", file=sys.stderr)
     shutil.copytree(os.path.join(cmake_install_dir, "python_package"),
                     target_dir,
                     symlinks=False)
-    print("Target populated.")
+    print("Target populated.", file=sys.stderr)
 
 
 class NoopBuildExtension(_build_ext):
@@ -116,8 +146,8 @@ class NoopBuildExtension(_build_ext):
 
 
 setup(
-    name="iree-compiler-api",
-    version="0.0.1",
+    name=f"iree-compiler{PACKAGE_SUFFIX}",
+    version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-discuss@googlegroups.com",
     description="IREE Compiler API",
@@ -138,6 +168,13 @@ setup(
         "iree.compiler",
         "iree.compiler.*",
     ],),
+    entry_points={
+        "console_scripts": [
+            "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
+            # Transitional note: iree-translate resolves to ireec.
+            "iree-translate = iree.compiler.tools.scripts.ireec.__main__:main",
+        ],
+    },
     install_requires=[
         "numpy",
         "PyYAML",

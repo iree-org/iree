@@ -17,7 +17,7 @@ repo_root="$(cd $(dirname $0)/.. && pwd)"
 wheelhouse="$repo_root/wheels"
 mkdir -p "$wheelhouse"
 
-echo "---- BUILDING iree-compiler-api ----"
+echo "---- BUILDING iree-compiler ----"
 if [ -x "$(command -v ccache)" ]; then
   echo "Using ccache"
   export CMAKE_C_COMPILER_LAUNCHER=ccache
@@ -31,8 +31,8 @@ $PYTHON -m pip wheel "${repo_root}" \
   --use-feature=in-tree-build \
   -w "$wheelhouse" -v
 
-echo "---- INSTALLING iree-compiler-api ----"
-$PYTHON -m pip install -f "$wheelhouse" --force-reinstall iree-compiler-api
+echo "---- INSTALLING iree-compiler ----"
+$PYTHON -m pip install -f "$wheelhouse" --force-reinstall iree-compiler-dev
 
 echo "---- QUICK SMOKE TEST ----"
 $PYTHON $repo_root/build_tools/smoketest.py

@@ -14,12 +14,12 @@ namespace mlir {
 namespace iree_compiler {
 
 enum class TilingLevel : unsigned {
-  // Tile linalg operations to workgroup threads.
+  // Tile linalg operations to threads.
   WorkGroupTiles = 0,
   // Tile linalg operation on workgroup thread into L1 block tiles.
-  Level1Tiles = 1,
+  L1Tiles = 1,
   // Tile linalg operations on L1 block tiles into vector tiles.
-  Level2Tiles = 2,
+  VectorTiles = 2,
   NumTileLevels = 3
 };
 

@@ -282,8 +282,8 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;
-    SmallVector<Operation *, 4> computeOps;
-    SmallVector<Operation *, 4> tiledLoops;
+    SmallVector<Operation *> computeOps;
+    SmallVector<TiledLoopInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return funcOp.emitOpError("failed to get compute ops");
     }

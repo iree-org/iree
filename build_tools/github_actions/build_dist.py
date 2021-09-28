@@ -117,9 +117,6 @@ def configure_bazel():
 def build_main_dist():
   """Builds the main distribution binaries.
 
-  Also builds python packages associated with the full distribution:
-    - iree-install/python_packages/iree_compiler
-
   Additional packages that are installable as part of a full build and do not
   benefit from a more restricted build can be added here.
   """
@@ -138,7 +135,7 @@ def build_main_dist():
       f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
       f"-DCMAKE_BUILD_TYPE=Release",
       f"-DIREE_BUILD_COMPILER=ON",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
+      f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
       f"-DIREE_BUILD_SAMPLES=OFF",
   ],
                  check=True)
