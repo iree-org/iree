@@ -299,9 +299,9 @@ function(iree_py_test)
     TEST_NAME "${_NAME_PATH}"
     LABELS "${_RULE_LABELS}"
     ENVIRONMENT
-      "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
+      "PYTHONPATH=${IREE_BINARY_DIR}/compiler-api/python_package:${IREE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
     COMMAND
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
+      "${IREE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
       "${_SRC_DIR}/${_RULE_SRCS}"
       ${_RULE_ARGS}

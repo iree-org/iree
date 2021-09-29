@@ -81,8 +81,6 @@ else()
   option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 endif()
 
-option(IREE_BUILD_OLD_PYTHON_COMPILER_API "Builds the original Python compiler API" ON)
-
 #-------------------------------------------------------------------------------
 # Experimental project flags
 #-------------------------------------------------------------------------------
@@ -560,5 +558,21 @@ if(IREE_BUILD_COMPILER AND IREE_BUILD_PYTHON_BINDINGS)
     set(IREE_COMPILER_API_SUB_PROJECT ON)
     add_subdirectory(llvm-external-projects/iree-compiler-api
         "${CMAKE_CURRENT_BINARY_DIR}/compiler-api")
+
+    # Write out a .env file to make IDEs and developers happy.
+    # Yes, we are writing this to the source dir. It is only for IDEs and if
+    # it gets clobbered, it is fine.
+    set(_pythonpath_env "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler-api/python_package;${CMAKE_CURRENT_BINARY_DIR}/bindings/python>\n")
+    file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env"
+      CONTENT "${_pythonpath_env}"
+    )
+    file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
+      CONTENT "${_pythonpath_env}"
+    )
+
+    # TODO: Remove this after about Dec-2021
+    if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/bindings/python/iree/compiler")
+      message(FATAL_ERROR "You are running in a build directory which needs some manual cleanup. Please delete the directory ${CMAKE_CURRENT_BINARY_DIR}/bindings/python/iree/compiler")
+    endif()
   endif()
 endif()
