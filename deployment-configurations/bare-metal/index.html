@@ -933,8 +933,8 @@ model execution is in a single-thread synchronous fashion.</p>
 operating system</li>
 <li><code>set(IREE_BINDINGS_TFLITE OFF)</code>: Disable the TFLite binding support</li>
 <li><code>set(IREE_ENABLE_THREADING OFF)</code>: Disable multi-thread library support</li>
-<li><code>set(IREE_HAL_DRIVERS_TO_BUILD "Dylib;VMVX")</code>: Build only the dynamic library
-and VMVX runtime HAL drivers</li>
+<li><code>set(IREE_HAL_DRIVERS_TO_BUILD "Dylib_Sync;VMVX_Sync")</code>: Build only the
+dynamic library and VMVX runtime synchronous HAL drivers</li>
 <li><code>set(IREE_BUILD_TESTS OFF)</code>: Disable tests until IREE supports running them on
 bare-metal platforms</li>
 <li><code>set(IREE_BUILD_SAMPLES ON)</code>: Build
