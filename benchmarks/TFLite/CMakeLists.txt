@@ -70,6 +70,7 @@ iree_mlir_benchmark_suite(
     "--iree-flow-inline-constants-max-byte-length=2048"
     #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-llvm-loop-unrolling=true"
+    "--iree-llvm-link-embedded=true"
   DRIVER
     "dylib-sync"
 )
