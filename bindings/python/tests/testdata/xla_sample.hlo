@@ -1,9 +1,0 @@
-HloModule testbuilder.5
-
-ENTRY testbuilder.5 {
-  parameter.1 = f32[1] parameter(0)
-  constant.2 = f32[] constant(1)
-  broadcast.3 = f32[1]{0} broadcast(constant.2), dimensions={}
-  ROOT add.4 = f32[1]{0} add(parameter.1, broadcast.3)
-}
-
