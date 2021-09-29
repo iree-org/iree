@@ -12,11 +12,3 @@ set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 # Namespace packages.
 add_subdirectory(iree/runtime)
 add_subdirectory(iree/jax)
-
-if(IREE_BUILD_COMPILER AND IREE_BUILD_OLD_PYTHON_COMPILER_API)
-add_subdirectory(iree/compiler)
-add_subdirectory(iree/tools/core)
-endif()
-
-# Tests.
-add_subdirectory(tests)

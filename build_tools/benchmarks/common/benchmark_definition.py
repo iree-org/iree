@@ -29,6 +29,7 @@ IREE_DRIVER_NAME_MAP = {
     "iree-dylib": "IREE-Dylib",
     "iree-dylib-sync": "IREE-Dylib-Sync",
     "iree-vmvx": "IREE-VMVX",
+    "iree-vmvx-sync": "IREE-VMVX-Sync",
     "iree-vulkan": "IREE-Vulkan",
 }
 
@@ -190,7 +191,7 @@ class BenchmarkInfo:
       target_arch = "GPU-" + self.device_info.gpu_name
       driver = IREE_DRIVER_NAME_MAP[self.runner]
     elif (self.runner == "iree-dylib" or self.runner == "iree-dylib-sync" or
-          self.runner == "iree-vmvx"):
+          self.runner == "iree-vmvx" or self.runner == "iree-vmvx-sync"):
       target_arch = "CPU-" + self.device_info.get_arm_arch_revision()
       driver = IREE_DRIVER_NAME_MAP[self.runner]
     else:

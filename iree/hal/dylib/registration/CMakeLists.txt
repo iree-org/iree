@@ -10,14 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(NOT ${IREE_HAL_DRIVER_DYLIB})
-  return()
-endif()
-
-# TODO(#4298): Separate HAL driver registration from threading.
-if(NOT ${IREE_ENABLE_THREADING})
-  return()
-endif()
+if(${IREE_HAL_DRIVER_DYLIB})
 
 iree_cc_library(
   NAME
@@ -40,6 +33,10 @@ iree_cc_library(
   PUBLIC
 )
 
+endif()
+
+if(${IREE_HAL_DRIVER_DYLIB_SYNC})
+
 iree_cc_library(
   NAME
     sync
@@ -51,11 +48,13 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::hal::local
-    iree::hal::local::loaders::system_library_loader
+    iree::hal::local::loaders::embedded_library_loader
     iree::hal::local::sync_driver
   DEFINES
     "IREE_HAL_HAVE_DYLIB_SYNC_DRIVER_MODULE=1"
   PUBLIC
 )
+
+endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

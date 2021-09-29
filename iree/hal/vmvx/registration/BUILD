@@ -14,11 +14,6 @@ package(
 
 iree_cmake_extra_content(
     content = """
-# TODO(#4298): Separate HAL driver registration from threading.
-if(NOT ${IREE_ENABLE_THREADING})
-  return()
-endif()
-
 if(${IREE_HAL_DRIVER_VMVX})
 """,
     inline = True,
@@ -38,6 +33,32 @@ cc_library(
         "//iree/hal/local:task_driver",
         "//iree/hal/local/loaders:vmvx_module_loader",
         "//iree/task:api",
+        "//iree/vm",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+
+if(${IREE_HAL_DRIVER_VMVX_SYNC})
+""",
+    inline = True,
+)
+
+cc_library(
+    name = "sync",
+    srcs = ["driver_module_sync.c"],
+    hdrs = ["driver_module_sync.h"],
+    defines = [
+        "IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE=1",
+    ],
+    deps = [
+        "//iree/base",
+        "//iree/hal",
+        "//iree/hal/local",
+        "//iree/hal/local:sync_driver",
+        "//iree/hal/local/loaders:vmvx_module_loader",
         "//iree/vm",
     ],
 )

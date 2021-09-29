@@ -135,7 +135,7 @@ void BM_Uncontended(benchmark::State& state) {
     // To achieve this amount of local work is multiplied by number of threads
     // to keep ratio between local work and critical section approximately
     // equal regardless of number of threads.
-    SpinDelay(100 * state.threads, &local);
+    SpinDelay(100 * state.threads(), &local);
     RaiiLocker<MutexType> locker(&mu);
     SpinDelay(static_cast<int>(state.range(0)), &data);
   }
@@ -179,7 +179,7 @@ void BM_Contended(benchmark::State& state) {
     // To achieve this amount of local work is multiplied by number of threads
     // to keep ratio between local work and critical section approximately
     // equal regardless of number of threads.
-    SpinDelay(100 * state.threads, &local);
+    SpinDelay(100 * state.threads(), &local);
     RaiiLocker<MutexType> locker(&shared->mu);
     SpinDelay(static_cast<int>(state.range(0)), &shared->data);
   }

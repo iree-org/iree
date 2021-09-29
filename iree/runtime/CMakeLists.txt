@@ -10,12 +10,6 @@
 
 iree_add_all_subdirs()
 
-# iree::hal::drivers dependency requires threading
-# TODO(#4298): Separate HAL driver registration from threading.
-if(NOT ${IREE_ENABLE_THREADING})
-  return()
-endif()
-
 iree_cc_library(
   NAME
     runtime
