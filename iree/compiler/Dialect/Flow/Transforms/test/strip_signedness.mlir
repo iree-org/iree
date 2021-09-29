@@ -9,7 +9,7 @@ func @strip_signedness_arg(%arg0 : tensor<4xui8>) -> (tensor<4xui8>) {
     return %arg0 : tensor<4xui8>
 }
 
-// ----
+// -----
 
 // CHECK-LABEL: @strip_signedness_const
 func @strip_signedness_const() -> (tensor<4xi8>) {

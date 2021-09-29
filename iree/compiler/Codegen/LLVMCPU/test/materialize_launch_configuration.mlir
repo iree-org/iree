@@ -826,7 +826,7 @@ hal.executable private @conv_static {
               %21 = affine.min affine_map<(d0)[s0] -> (-d0 + 80, s0)>(%arg1)[%workgroup_size_y]
               %22 = affine.min affine_map<(d0)[s0] -> (-d0 + 96, s0)>(%arg2)[%workgroup_size_x]
               %23 = linalg.init_tensor [1, %20, %21, %22] : tensor<1x?x?x?xf32>
-              %24 = linalg.fill(%cst, %23) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32> 
+              %24 = linalg.fill(%cst, %23) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
               %25 = linalg.depthwise_conv2D_nhw {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%14, %16 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>) outs(%24 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               flow.dispatch.tensor.store %25, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %17, %18, %19], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x80x80x96xf32>
             }
@@ -944,7 +944,7 @@ hal.executable private @matmul_static {
             %9 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [240, 8], strides = [1, 1] : !flow.dispatch.tensor<readonly:240x40xf32> -> tensor<240x8xf32>
             %10 = tensor.cast %9 : tensor<240x8xf32> to tensor<240x?xf32>
             %11 = linalg.init_tensor [%c28, %c8] : tensor<?x?xf32>
-            %12 = linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<?x?xf32> -> tensor<?x?xf32> 
+            %12 = linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
             %13 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x240xf32>, tensor<240x?xf32>) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %13, %2, offsets = [%arg0, %arg1], sizes = [%c28, %c8], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:196x40xf32>
           }
