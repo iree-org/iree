@@ -5,6 +5,7 @@ requires = [
     # There is no fundamental reason to pin this CMake version, beyond
     # build stability.
     "cmake==3.18",
+    "ninja==1.10.2",
     # MLIR build depends.
     "numpy",
     # Version 2.7.0 excluded: https://github.com/pybind/pybind11/issues/3136

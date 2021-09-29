@@ -11,7 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/local/executable_loader.h"
-#include "iree/hal/local/loaders/system_library_loader.h"
+#include "iree/hal/local/loaders/embedded_library_loader.h"
 #include "iree/hal/local/sync_device.h"
 #include "iree/hal/local/sync_driver.h"
 
@@ -28,7 +28,8 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_enumerate(
   static const iree_hal_driver_info_t default_driver_info = {
       .driver_id = IREE_HAL_DYLIB_SYNC_DRIVER_ID,
       .driver_name = iree_string_view_literal("dylib-sync"),
-      .full_name = iree_string_view_literal("AOT compiled dynamic libraries"),
+      .full_name = iree_string_view_literal(
+          "synchronous AOT compiled dynamic embedded libraries"),
   };
   *out_driver_info_count = 1;
   *out_driver_infos = &default_driver_info;
@@ -48,10 +49,12 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
   iree_hal_sync_device_params_t default_params;
   iree_hal_sync_device_params_initialize(&default_params);
 
-  iree_hal_executable_loader_t* dylib_loader = NULL;
-  iree_status_t status = iree_hal_system_library_loader_create(
-      iree_hal_executable_import_provider_null(), allocator, &dylib_loader);
-  iree_hal_executable_loader_t* loaders[1] = {dylib_loader};
+  iree_status_t status = iree_ok_status();
+  iree_hal_executable_loader_t* loaders[1] = {NULL};
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_embedded_library_loader_create(
+        iree_hal_executable_import_provider_null(), allocator, &loaders[0]);
+  }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_driver_create(
@@ -59,7 +62,7 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
         loaders, allocator, out_driver);
   }
 
-  iree_hal_executable_loader_release(dylib_loader);
+  iree_hal_executable_loader_release(loaders[0]);
   return status;
 }
 

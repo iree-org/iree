@@ -26,6 +26,10 @@
 #endif  // __has_include(<span>)
 #endif  // __has_include
 
+#ifndef IREE_HAVE_STD_SPAN
+#include <limits>
+#endif
+
 namespace iree {
 
 #if defined(IREE_HAVE_STD_SPAN)

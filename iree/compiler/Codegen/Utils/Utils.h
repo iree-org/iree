@@ -28,6 +28,10 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
+/// Returns the translation info for the `funcOp` (by looking at the entry
+/// point). Returns `nullptr` on failure.
+IREE::HAL::TranslationInfo getTranslationInfo(FuncOp funcOp);
+
 /// Sets the translation info on the `hal.executable.entry_point` op
 /// corresponding to the `entryPointFn`. Returns failure if a translation info
 /// is already set on the entry point op and is incompatible with what is being
@@ -95,10 +99,18 @@ ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
 /// `scf.for` operations in the function return the linalg operations in the
 /// body of the function if it has a single basic block. Return failure in all
 /// other cases.
+
+struct TiledLoopInfo {
+  Operation *tiledLoop;
+  OpFoldResult lb;
+  OpFoldResult ub;
+  OpFoldResult step;
+  unsigned distributionDim;
+};
 using RootOpFilteringFn = std::function<bool(Operation *)>;
 LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
                              SmallVectorImpl<Operation *> &filteredOps,
-                             SmallVectorImpl<Operation *> &tiledLoops);
+                             SmallVectorImpl<TiledLoopInfo> &tiledLoops);
 
 /// Specialization of `getFilteredOps` for filtering `LinalgOp`s and
 /// `LinagExtOp`s.
@@ -108,17 +120,7 @@ LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
 /// for all.
 LogicalResult getComputeOps(FuncOp funcOp,
                             SmallVectorImpl<Operation *> &computeOps,
-                            SmallVectorImpl<Operation *> &tiledLoops);
-
-/// ***Legacy method to be deprecated***
-/// Specialization of `getFilteredOps` for filtering `LinalgOp`s
-/// TODO(ravishankarm) This methods also adds the "workgroup" marker to all ops
-/// within the loop. The marker is the way to tie into rest of the
-/// codegen. Refactor the downstream passes and get rid of the markers once and
-/// for all.
-LogicalResult getLinalgOps(FuncOp funcOp,
-                           SmallVectorImpl<linalg::LinalgOp> &computeOps,
-                           SmallVectorImpl<Operation *> &tiledLoops);
+                            SmallVectorImpl<TiledLoopInfo> &tiledLoops);
 
 }  // namespace iree_compiler
 }  // namespace mlir

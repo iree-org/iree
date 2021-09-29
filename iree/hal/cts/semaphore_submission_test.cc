@@ -27,6 +27,7 @@ class SemaphoreSubmissionTest : public CtsTestBase {
     SkipUnavailableDriver("cuda");
     // TODO(#4680): command buffer recording so that this can run on sync HAL.
     SkipUnavailableDriver("dylib-sync");
+    SkipUnavailableDriver("vmvx-sync");
   }
 };
 

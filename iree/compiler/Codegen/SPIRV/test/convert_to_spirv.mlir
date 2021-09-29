@@ -16,8 +16,8 @@ hal.executable private @push_constant  {
       // CHECK: spv.GlobalVariable @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
       // CHECK: spv.func @push_constant()
       func @push_constant() {
-        // CHECK: %[[INDEX_0:.+]] = spv.Constant 0 : i32
-        // CHECK: %[[INDEX_1:.+]] = spv.Constant 2 : i32
+        // CHECK-DAG: %[[INDEX_0:.+]] = spv.Constant 0 : i32
+        // CHECK-DAG: %[[INDEX_1:.+]] = spv.Constant 2 : i32
         // CHECK: %[[ADDR:.+]] = spv.mlir.addressof @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
         // CHECK: %[[AC:.+]] = spv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
         // CHECK: spv.Load "PushConstant" %[[AC]] : i32

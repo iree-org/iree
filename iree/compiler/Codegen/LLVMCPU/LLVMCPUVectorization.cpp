@@ -169,9 +169,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
                Operation *operation) -> SmallVector<Value, 4> {
-              return getTileSizes(
-                  builder, operation,
-                  static_cast<unsigned>(TilingLevel::Level1Tiles));
+              return getTileSizes(builder, operation,
+                                  static_cast<unsigned>(TilingLevel::L1Tiles));
             }),
         linalg::LinalgTransformationFilter(
             Identifier::get(enablePromoteWorkgroupToFullTiles
@@ -193,7 +192,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
                Operation *operation) -> SmallVector<Value, 4> {
               return getTileSizes(
                   builder, operation,
-                  static_cast<unsigned>(TilingLevel::Level2Tiles));
+                  static_cast<unsigned>(TilingLevel::VectorTiles));
             }),
         linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupL1TileMarker(), context),

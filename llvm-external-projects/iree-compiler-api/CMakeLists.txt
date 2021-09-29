@@ -36,6 +36,7 @@ else()
   message(STATUS "Building iree-compiler-api standalone")
   set(IREE_COMPILER_API_STANDALONE ON)
   set(IREE_BUILD_TESTS OFF)  # Conflicts with our tests if we are top-level.
+  set(IREE_BUILD_SAMPLES OFF)
   set(LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../iree-dialects")
   set(IREE_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../..")
   set(IREE_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/iree")
@@ -43,6 +44,12 @@ else()
   set(LLVM_MAIN_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/llvm")
   set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
   set(LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/mlir-hlo")
+  # Resources generated on windows must have valid version numbers.
+  # See set_windows_version_resource_properties.
+  set(LLVM_VERSION_MAJOR 0)
+  set(LLVM_VERSION_MINOR 0)
+  set(LLVM_VERSION_PATCH 0)
+  set(PACKAGE_VERSION 0)
   enable_testing()
 endif()
 

@@ -24,6 +24,7 @@ cc_library(
         "//iree/hal/dylib/registration",
         "//iree/hal/dylib/registration:sync",
         "//iree/hal/vmvx/registration",
+        "//iree/hal/vmvx/registration:sync",
         "//iree/hal/vulkan/registration",
     ] + IREE_CUDA_DEPS,
 )

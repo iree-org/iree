@@ -96,6 +96,10 @@ add_mlir_python_modules(IREECompilerPythonModules
   )
 
 
+################################################################################
+# Tools linked against the shared CAPI library
+################################################################################
+
 # Build the ireec tool into _mlir_libs.
 add_executable(
   IREECompilerIREECTool
@@ -106,6 +110,11 @@ set_target_properties(IREECompilerIREECTool
   PROPERTIES
     OUTPUT_NAME "ireec"
     RUNTIME_OUTPUT_DIRECTORY "${IREE_COMPILER_API_BINARY_DIR}/python_package/iree/compiler/_mlir_libs"
-    BUILD_RPATH_USE_ORIGIN ON
 )
+mlir_python_setup_extension_rpath(IREECompilerIREECTool)
 add_dependencies(IREECompilerPythonModules IREECompilerIREECTool)
+
+# Install tools.
+install(TARGETS IREECompilerIREECTool
+  DESTINATION "python_package/iree/compiler/_mlir_libs"
+)

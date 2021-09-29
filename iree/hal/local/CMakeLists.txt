@@ -101,7 +101,8 @@ iree_cc_library(
   PUBLIC
 )
 
-if(NOT ${IREE_ENABLE_THREADING})
+# task_driver is used by asynchronuous drivers.
+if(NOT (${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_VMVX}))
   return()
 endif()
 

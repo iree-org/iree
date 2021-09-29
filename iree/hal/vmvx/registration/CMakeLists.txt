@@ -10,11 +10,6 @@
 
 iree_add_all_subdirs()
 
-# TODO(#4298): Separate HAL driver registration from threading.
-if(NOT ${IREE_ENABLE_THREADING})
-  return()
-endif()
-
 if(${IREE_HAL_DRIVER_VMVX})
 
 iree_cc_library(
@@ -34,6 +29,29 @@ iree_cc_library(
     iree::vm
   DEFINES
     "IREE_HAL_HAVE_VMVX_DRIVER_MODULE=1"
+  PUBLIC
+)
+
+endif()
+
+if(${IREE_HAL_DRIVER_VMVX_SYNC})
+
+iree_cc_library(
+  NAME
+    sync
+  HDRS
+    "driver_module_sync.h"
+  SRCS
+    "driver_module_sync.c"
+  DEPS
+    iree::base
+    iree::hal
+    iree::hal::local
+    iree::hal::local::loaders::vmvx_module_loader
+    iree::hal::local::sync_driver
+    iree::vm
+  DEFINES
+    "IREE_HAL_HAVE_VMVX_SYNC_DRIVER_MODULE=1"
   PUBLIC
 )
 

@@ -81,14 +81,16 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
         (paddingForM > 0 || paddingForK > 0)
             ? linalg::PadTensorOp::createPadScalarOp(
                   lhsPaddedType, lhs, lhsPaddingValue, createPadding({0, 0}),
-                  createPadding({paddingForM, paddingForK}), loc, rewriter)
+                  createPadding({paddingForM, paddingForK}), /*packing=*/false,
+                  loc, rewriter)
             : lhs;
 
     auto paddedrhs =
         (paddingForK > 0 || paddingForN > 0)
             ? linalg::PadTensorOp::createPadScalarOp(
                   rhsPaddedType, rhs, rhsPaddingValue, createPadding({0, 0}),
-                  createPadding({paddingForK, paddingForN}), loc, rewriter)
+                  createPadding({paddingForK, paddingForN}), /*packing=*/false,
+                  loc, rewriter)
             : rhs;
 
     // Padding for K-dim only result doesn't change result size.
@@ -105,7 +107,8 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
           loc, rewriter.getZeroAttr(resultType.getElementType()));
       Value paddedResult = linalg::PadTensorOp::createPadScalarOp(
           newResultType, result, resultPaddingValue, createPadding({0, 0}),
-          createPadding({paddingForM, paddingForN}), loc, rewriter);
+          createPadding({paddingForM, paddingForN}), /*packing=*/false, loc,
+          rewriter);
       auto paddedMatmulOp =
           cast<linalg::LinalgOp>(matmulOp.getOperation())
               .clone(rewriter, loc, {newResultType},

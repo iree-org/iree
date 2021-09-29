@@ -51,16 +51,17 @@ struct FusionOfTensorOpsPass
     // operations. If an operation is used in a named op, it will be computed
     // anyway, so the consumers can just use that value.
     linalg::ControlElementwiseOpsFusionFn controlFn =
-        [](const OpResult &producer, OpOperand &consumer) {
+        [](const OpResult &producerResult, OpOperand &consumerOperand) {
+          Operation *producer = producerResult.getOwner();
+          Operation *consumer = consumerOperand.getOwner();
+
           // TODO(GH-5611): Enable fusion with reduction consumer for all
           // targets. Currently vectorization doesn't handle generic ops with
           // reduction iterators we will disable for now to allow vectorizing
           // producer pointwise ops to avoid performance regressions on CPU.
           if (!clEnableFusionWithReductionOps) {
-            auto consumerOp = consumer.getOwner();
-            if (isa<linalg::GenericOp>(consumerOp) &&
-                dyn_cast<LinalgOp>(consumerOp).getNumReductionLoops()) {
-              return false;
+            if (auto genericOp = dyn_cast<linalg::GenericOp>(consumer)) {
+              if (genericOp.getNumReductionLoops()) return false;
             }
           }
 
@@ -69,27 +70,20 @@ struct FusionOfTensorOpsPass
           // IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT.
           constexpr int64_t kIreeMaxOperandCount = 32;
           DenseSet<Value> operands;
-          operands.insert(producer.getOwner()->operand_begin(),
-                          producer.getOwner()->operand_end());
-          operands.insert(consumer.getOwner()->operand_begin(),
-                          std::next(consumer.getOwner()->operand_begin(),
-                                    consumer.getOperandNumber()));
-          operands.insert(std::next(consumer.getOwner()->operand_begin(),
-                                    consumer.getOperandNumber() + 1),
-                          consumer.getOwner()->operand_end());
+          operands.insert(producer->operand_begin(), producer->operand_end());
+          operands.insert(consumer->operand_begin(),
+                          std::next(consumer->operand_begin(),
+                                    consumerOperand.getOperandNumber()));
+          operands.insert(std::next(consumer->operand_begin(),
+                                    consumerOperand.getOperandNumber() + 1),
+                          consumer->operand_end());
           if (operands.size() >= kIreeMaxOperandCount) return false;
 
           bool isBroadcast = false;
-          if (auto genericOp =
-                  dyn_cast<linalg::GenericOp>(producer.getOwner())) {
-            bool parallelOp =
-                llvm::all_of(genericOp.iterator_types(), [](Attribute attr) {
-                  return attr.cast<StringAttr>().getValue() ==
-                         getParallelIteratorTypeName();
-                });
+          if (auto genericOp = dyn_cast<linalg::GenericOp>(producer)) {
             // Detect op that only broadcast input as fusing them makes the new
             // op cheaper.
-            if (parallelOp &&
+            if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
                 isa<linalg::YieldOp>(genericOp.getBody()->front())) {
               for (OpOperand *opOperand : genericOp.getInputOperands()) {
                 AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
@@ -105,10 +99,10 @@ struct FusionOfTensorOpsPass
           // simplistic heuristic to avoid duplicating ops that may be
           // expensive.
           // TODO: Add a cost model to allow ops to be duplicated.
-          if (!isBroadcast && !isa<ConstantOp>(producer.getOwner()) &&
-              !llvm::hasSingleElement(producer.getUsers()))
+          if (!isBroadcast && !isa<ConstantOp>(producer) &&
+              !llvm::hasSingleElement(producerResult.getUsers()))
             return false;
-          return llvm::all_of(producer.getUsers(), [](Operation *user) {
+          return llvm::all_of(producerResult.getUsers(), [](Operation *user) {
             return isa<linalg::GenericOp>(user);
           });
         };

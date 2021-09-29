@@ -96,7 +96,9 @@ From the `iree-build` directory:
         .
     cmake --build .
 
-    # Add ./bindings/python to PYTHONPATH and use the API.
+    # Add ./bindings/python and compiler-api/python_package to PYTHONPATH and
+    # use the API.
+    source .env && export PYTHONPATH
     export PYTHONPATH="$PWD/bindings/python"
     python -c "import iree.compiler"
     python -c "import iree.runtime"
@@ -108,8 +110,9 @@ From the `iree-build` directory:
     cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_PYTHON_BINDINGS=ON .
     cmake --build .
 
-    # Add bindings\python to PYTHONPATH and use the API.
-    set PYTHONPATH="$pwd\bindings\python;%PYTHONPATH%"
+    # Add bindings\python and compiler-api\python_package to PYTHONPATH and use
+    # the API.
+    set PYTHONPATH="$pwd\compiler-api\python_package;$pwd\bindings\python;%PYTHONPATH%"
     python -c "import iree.compiler"
     python -c "import iree.runtime"
     ```

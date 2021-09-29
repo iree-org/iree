@@ -407,6 +407,35 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// ReverseOp
+//===----------------------------------------------------------------------===//
+
+struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
+  using OpConversionPattern<mhlo::ReverseOp>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mhlo::ReverseOp op, ArrayRef<Value> args,
+      ConversionPatternRewriter &rewriter) const final {
+    auto ty = args[0].getType().dyn_cast<RankedTensorType>();
+    if (!ty) return failure();
+
+    Location loc = op.getLoc();
+    SmallVector<Value> dynSizes;
+    for (auto en : llvm::enumerate(ty.getShape())) {
+      if (en.value() == ShapedType::kDynamicSize) {
+        dynSizes.push_back(
+            rewriter.create<tensor::DimOp>(loc, args[0], en.index()));
+      }
+    }
+    Value initTensor = rewriter.create<linalg::InitTensorOp>(
+        loc, dynSizes, ty.getShape(), ty.getElementType());
+    rewriter.replaceOpWithNewOp<linalg_ext::ReverseOp>(
+        op, op->getResultTypes(), args, initTensor, op.dimensions());
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
 
@@ -423,8 +452,8 @@ struct ConvertMHLOToLinalgExtPass
     MLIRContext *context = &getContext();
 
     MhloToStdTypeConverter typeConverter;
-    patterns.insert<SortOpConversion, ScatterOpConversion, FftOpConversion>(
-        typeConverter, context);
+    patterns.insert<SortOpConversion, ScatterOpConversion, FftOpConversion,
+                    ReverseOpConversion>(typeConverter, context);
     // FIXME: It shouldn't be necessary to list every matching MHLO op here,
     // especially since they're already listed in
     // populateHLOToLinalgConversionPattern and in HloOpToStdScalarOp. These
@@ -477,7 +506,8 @@ struct ConvertMHLOToLinalgExtPass
     target.addLegalDialect<linalg_ext::LinalgExtDialect, linalg::LinalgDialect,
                            IREE::Flow::FlowDialect, StandardOpsDialect,
                            tensor::TensorDialect, complex::ComplexDialect>();
-    target.addIllegalOp<mhlo::SortOp, mhlo::ScatterOp, mhlo::FftOp>();
+    target.addIllegalOp<mhlo::SortOp, mhlo::ScatterOp, mhlo::FftOp,
+                        mhlo::ReverseOp>();
     // FFT conversion creates complex ops which will be converted by the normal
     // MHLO lowering, but these should still be converted if present inside
     // other linalg_ext op regions.
