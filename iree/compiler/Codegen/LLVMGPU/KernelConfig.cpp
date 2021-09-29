@@ -107,12 +107,6 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   // Tile all the reduction dimensions.
   ts.append(op.getNumReductionLoops(), tileK);
   tileSizes.push_back(ts);  // Workgroup level.
-  tileSizes.push_back({});  // Subgroup level.
-  // At the thread level only tile parallel loops.
-  SmallVector<int64_t, 4> invocationLevelTs(op.getNumParallelLoops() - 2, 1);
-  invocationLevelTs.append(
-      {tileX / workgroupSize[1], tileY / workgroupSize[0]});
-  tileSizes.push_back(invocationLevelTs);  // Thread level.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt,
@@ -163,15 +157,13 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
 
   std::array<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
   unsigned vectorSize = 4;
-  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1),
-      threadTileSizes(numLoops, 1);
+  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
   // Set all non-parallel loops to zero tile size.
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
   for (auto depth : llvm::seq<int64_t>(0, numLoops)) {
     if (!partitionedLoopsSet.count(depth)) {
       workgroupTileSizes[depth] = 0;
-      threadTileSizes[depth] = 0;
     }
   }
 
@@ -206,7 +198,6 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   for (int64_t depth = numLoops; depth > 0; depth--) {
     if (partitionedLoopsSet.count(depth - 1)) {
       workgroupTileSizes[depth - 1] = cudaWarpSize * vectorSize;
-      threadTileSizes[depth - 1] = vectorSize;
       break;
     }
   }
@@ -217,8 +208,6 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
     workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 1);
   }
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  tileSizes.push_back({});                                // Subgroup level.
-  tileSizes.emplace_back(std::move(threadTileSizes));     // Thread level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
       IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
