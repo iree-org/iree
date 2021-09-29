@@ -111,7 +111,8 @@ cc_library(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_ENABLE_THREADING})
+# task_driver is used by asynchronuous drivers.
+if(NOT (${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_VMVX}))
   return()
 endif()
 """,

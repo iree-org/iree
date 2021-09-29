@@ -4,23 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-iree_cmake_extra_content(
-    content = """
-# iree::hal::drivers dependency requires threading
-# TODO(#4298): Separate HAL driver registration from threading.
-if(NOT ${IREE_ENABLE_THREADING})
-  return()
-endif()
-""",
-    inline = True,
 )
 
 #===------------------------------------------------------------------------===#

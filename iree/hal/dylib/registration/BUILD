@@ -14,14 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT ${IREE_HAL_DRIVER_DYLIB})
-  return()
-endif()
-
-# TODO(#4298): Separate HAL driver registration from threading.
-if(NOT ${IREE_ENABLE_THREADING})
-  return()
-endif()
+if(${IREE_HAL_DRIVER_DYLIB})
 """,
     inline = True,
 )
@@ -45,6 +38,15 @@ cc_library(
     ],
 )
 
+iree_cmake_extra_content(
+    content = """
+endif()
+
+if(${IREE_HAL_DRIVER_DYLIB_SYNC})
+""",
+    inline = True,
+)
+
 cc_library(
     name = "sync",
     srcs = ["driver_module_sync.c"],
@@ -57,6 +59,13 @@ cc_library(
         "//iree/hal",
         "//iree/hal/local",
         "//iree/hal/local:sync_driver",
-        "//iree/hal/local/loaders:system_library_loader",
+        "//iree/hal/local/loaders:embedded_library_loader",
     ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

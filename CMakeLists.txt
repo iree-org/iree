@@ -104,7 +104,9 @@ option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILE
 set(IREE_ALL_HAL_DRIVERS
   Cuda
   DyLib
+  Dylib_Sync
   VMVX
+  VMVX_Sync
   Vulkan
 )
 
