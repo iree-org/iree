@@ -315,6 +315,10 @@ iree_run_binary_test(
     "--benchmark_min_time=0"
   TEST_BINARY
     ::synchronization_benchmark
+  LABELS
+    "manual"
+    "nobuilder"
+    "notap"
 )
 
 iree_cc_test(

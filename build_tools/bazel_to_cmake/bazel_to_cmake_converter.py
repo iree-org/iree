@@ -645,7 +645,7 @@ class BuildFileFunctions(object):
                             f"{labels_block}"
                             f")\n\n")
 
-  def run_binary_test(self, name, test_binary, args=None, data=None):
+  def run_binary_test(self, name, test_binary, args=None, data=None, tags=None):
     if data is not None:
       self._convert_unimplemented_function("iree_run_binary_test",
                                            name + " has data")
@@ -653,10 +653,13 @@ class BuildFileFunctions(object):
     name_block = _convert_string_arg_block("NAME", name)
     test_binary_block = _convert_single_target_block("TEST_BINARY", test_binary)
     args_block = _convert_string_list_block("ARGS", args)
+    labels_block = _convert_string_list_block("LABELS", tags)
+
     self.converter.body += (f"iree_run_binary_test(\n"
                             f"{name_block}"
                             f"{args_block}"
                             f"{test_binary_block}"
+                            f"{labels_block}"
                             f")\n\n")
 
   def iree_cmake_extra_content(self, content, inline=False):
