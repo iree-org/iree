@@ -69,7 +69,8 @@ static void populateTilingReductionPatterns(
 /// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
-    ArrayRef<int64_t> workgroupSize, ArrayRef<int64_t> workloadPerWorkgroup) {
+    SmallVector<int64_t, 4> &workgroupSize,
+    SmallVector<int64_t, 4> &workloadPerWorkgroup) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
         SmallVector<Value, 4> tileSizesVal;
