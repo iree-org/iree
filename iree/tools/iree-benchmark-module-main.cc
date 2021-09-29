@@ -45,6 +45,9 @@ IREE_FLAG(string, entry_function, "",
 
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
+IREE_FLAG(bool, print_statistics, false,
+          "Prints runtime statistics to stderr on exit.");
+
 static iree_status_t parse_function_input(iree_string_view_t flag_name,
                                           void* storage,
                                           iree_string_view_t value) {
@@ -156,6 +159,10 @@ class IREEBenchmark {
     iree_vm_context_release(context_);
     iree_vm_module_release(hal_module_);
     iree_vm_module_release(input_module_);
+    if (FLAG_print_statistics) {
+      IREE_IGNORE_ERROR(iree_hal_allocator_statistics_fprint(
+          stderr, iree_hal_device_allocator(device_)));
+    }
     iree_hal_device_release(device_);
     iree_vm_instance_release(instance_);
   };
