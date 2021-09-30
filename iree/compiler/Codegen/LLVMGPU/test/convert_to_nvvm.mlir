@@ -106,7 +106,7 @@ hal.interface private @io  {
 }
 
 // CHECK-LABEL: llvm.func @dead_symbol
-//  CHECK-SAME: (%[[ARG0:.+]]: i32,
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32>,
 //  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32},
 //  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32})
 //      CHECK:    llvm.fadd
