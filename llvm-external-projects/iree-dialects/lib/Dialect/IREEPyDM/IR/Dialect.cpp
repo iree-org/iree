@@ -70,8 +70,7 @@ Type IREEPyDMDialect::parseType(DialectAsmParser &parser) const {
   StringRef typeTag;
   if (succeeded(parser.parseKeyword(&typeTag))) {
     Type genType;
-    auto parseResult =
-        generatedTypeParser(getContext(), parser, typeTag, genType);
+    auto parseResult = generatedTypeParser(parser, typeTag, genType);
     if (parseResult.hasValue()) {
       if (*parseResult) {
         return Type();
