@@ -103,13 +103,6 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
-def LLVMCPUPlanConvLoopOrder :
-    Pass<"iree-llvmcpu-plan-conv-loop-order", "FuncOp"> {
-  let summary =
-      "Convert linalg.conv to linalg.generic with a CPU-friendly iterator order";
-  let constructor = "mlir::iree_compiler::createLLVMCPUPlanConvLoopOrderPass()";
-}
-
 def LLVMCPUSynchronizeSymbolVisibility :
     Pass<"iree-llvmcpu-synchronize-symbol-visibility", "ModuleOp"> {
   let summary = "Synchronizes LLVM linkage with MLIR symbol visibility";
