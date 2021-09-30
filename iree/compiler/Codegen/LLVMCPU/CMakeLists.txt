@@ -19,7 +19,6 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
-    "LLVMCPUPlanConvLoopOrder.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"

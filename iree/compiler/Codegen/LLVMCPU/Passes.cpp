@@ -46,8 +46,6 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
-
-  passManager.addNestedPass<FuncOp>(createLLVMCPUPlanConvLoopOrderPass());
 }
 
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
@@ -68,15 +66,12 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
   passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
-
-  passManager.addNestedPass<FuncOp>(createLLVMCPUPlanConvLoopOrderPass());
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   // Use stack allocation on CPU side.
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
-  passManager.addNestedPass<FuncOp>(createLLVMCPUPlanConvLoopOrderPass());
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {

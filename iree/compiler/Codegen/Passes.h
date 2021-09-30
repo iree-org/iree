@@ -116,10 +116,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass(bool lowerToVectors = true);
 
-/// Converts linalg.conv into linalg.generic with a CPU-friendly iteration
-/// order.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUPlanConvLoopOrderPass();
-
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
