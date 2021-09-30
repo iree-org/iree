@@ -76,7 +76,6 @@ iree_check_single_backend_test_suite(
     "equal.mlir"
     "exp.mlir"
     "floor.mlir"
-    "fully_connected.mlir"
     "gather.mlir"
     "greater.mlir"
     "greater_equal.mlir"

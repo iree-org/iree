@@ -88,7 +88,6 @@ VMVX_SRCS = enforce_glob(
         "equal.mlir",
         "exp.mlir",
         "floor.mlir",
-        "fully_connected.mlir",
         "gather.mlir",
         "greater.mlir",
         "greater_equal.mlir",
@@ -116,6 +115,7 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "fully_connected.mlir",  #TODO(GH-7229): Enable the test.
         "matmul.mlir",  # TOSA matmul is being refactored to be batched
         "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],

@@ -47,15 +47,6 @@ static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
     llvm::cl::CommaSeparated);
 
-// TODO(#5040): This works for the most part but the downstream bufferization
-// needs to be sorted out before this can be made the default. Remove after
-// making this default.
-static llvm::cl::opt<bool> clEnableOperandFusion(
-    "iree-flow-dispatch-formation-enable-operand-fusion",
-    llvm::cl::desc(
-        "Enable fusing operand producers during dispatch region formation"),
-    llvm::cl::init(false));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
