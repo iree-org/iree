@@ -167,7 +167,9 @@ class ConvertFunc : public ConvertToLLVMPattern {
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
     llvm::SmallDenseMap<Operation *, size_t> argMapping =
         getKernelArgMapping(funcOp);
-    SmallVector<Type, 8> llvmInputTypes(argMapping.size());
+    // There may be dead symbols, we pick i32 pointer as default argument type.
+    SmallVector<Type, 8> llvmInputTypes(
+        argMapping.size(), LLVM::LLVMPointerType::get(rewriter.getI32Type()));
     funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp input) {
       auto memrefType = input.getType().cast<MemRefType>();
       Type elType = memrefType.getElementType();
