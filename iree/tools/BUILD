@@ -19,7 +19,6 @@ exports_files([
 
 cc_binary(
     name = "iree-benchmark-module",
-    testonly = True,
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
         "//iree/base",

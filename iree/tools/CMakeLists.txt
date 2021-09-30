@@ -73,7 +73,6 @@ iree_cc_binary(
     iree::vm
     iree::vm::bytecode_module
     iree::vm::cc
-  TESTONLY
 )
 
 iree_cc_binary(
@@ -95,7 +94,6 @@ iree_cc_binary(
     iree::tools::utils::yaml_util
     iree::vm
     yaml
-  TESTONLY
 )
 
 iree_cc_binary(
