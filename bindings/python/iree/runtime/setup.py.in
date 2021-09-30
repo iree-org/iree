@@ -39,7 +39,21 @@ setup(
     # Matching the native extension as a data file keeps setuptools from
     # "building" it (i.e. turning it into a static binary).
     package_data={
-        "": [f"*{sysconfig.get_config_var('EXT_SUFFIX')}"],
+        "": [
+            f"*{sysconfig.get_config_var('EXT_SUFFIX')}",
+            "iree-run-trace*",
+            "iree-benchmark-trace*",
+        ],
+    },
+    entry_points={
+        "console_scripts": [
+            "iree-run-trace = iree.runtime.scripts.iree_run_trace.__main__:main",
+            "iree-benchmark-trace = iree.runtime.scripts.iree_benchmark_trace.__main__:main",
+        ],
     },
     zip_safe=False,
+    install_requires=[
+        "numpy",
+        "PyYAML",
+    ],
 )
