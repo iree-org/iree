@@ -100,6 +100,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createFoldTensorExtractOpPass());
 
   // (HAL, IREE, Linalg, STD) -> LLVM
+  passManager.addNestedPass<FuncOp>(createStdExpandOpsPass());
   passManager.addPass(createConvertToLLVMPass());
 
   // We rely on MLIR symbol visibility being correct after this point and need

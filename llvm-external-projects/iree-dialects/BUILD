@@ -1,4 +1,4 @@
-load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "td_library")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", "td_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -7,6 +7,45 @@ package(
 )
 
 exports_files(glob(["include/iree-dialects/Dialect/IREE/*.td"]))
+
+exports_files(glob(["python/*.cpp"]))
+
+################################################################################
+# Package-by-package filegroup exports.
+# Some tools can make use of such non-nested groups.
+################################################################################
+
+filegroup(
+    name = "python_dialects",
+    srcs = glob(["python/iree/compiler/dialects/*.py"]) + [
+        ":python/iree/compiler/_iree_ops_gen.py",
+        ":python/iree/compiler/_iree_pydm_ops_gen.py",
+    ],
+)
+
+filegroup(
+    name = "python_dialects_iree_pydm",
+    srcs = glob(["python/iree/compiler/dialects/iree_pydm/*.py"]),
+)
+
+filegroup(
+    name = "python_dialects_iree_pydm_importer",
+    srcs = glob(["python/iree/compiler/dialects/iree_pydm/importer/*.py"]),
+)
+
+filegroup(
+    name = "python_dialects_iree_pydm_rtl",
+    srcs = glob(["python/iree/compiler/dialects/iree_pydm/rtl/*.py"]),
+)
+
+filegroup(
+    name = "python_dialects_iree_pydm_rtl_modules",
+    srcs = glob(["python/iree/compiler/dialects/iree_pydm/rtl/modules/*.py"]),
+)
+
+################################################################################
+# Tablegen exports
+################################################################################
 
 filegroup(
     name = "TdFilegroup",
@@ -22,7 +61,10 @@ td_library(
     srcs = glob([
         "include/iree-dialects/Dialect/IREE/*.td",
         "include/iree-dialects/Dialect/IREEPyDM/IR/*.td",
-    ]),
+        "python/iree/compiler/dialects/*.td",
+    ]) + [
+        "@llvm-project//mlir:include/mlir/Bindings/Python/Attributes.td",
+    ],
     includes = ["include"],
     deps = [
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -80,6 +122,24 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
+    ],
+)
+
+gentbl_filegroup(
+    name = "IREEDialectPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=iree",
+            ],
+            "python/iree/compiler/_iree_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "python/iree/compiler/dialects/IreeBinding.td",
+    deps = [
+        ":TdFiles",
     ],
 )
 
@@ -170,6 +230,26 @@ gentbl_cc_library(
     ],
 )
 
+gentbl_filegroup(
+    name = "IREEPyDMDialectPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=iree_pydm",
+            ],
+            "python/iree/compiler/_iree_pydm_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "python/iree/compiler/dialects/IreePyDmBinding.td",
+    deps = [
+        ":TdFiles",
+        "@llvm-project//mlir:CallInterfacesTdFiles",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+    ],
+)
+
 cc_library(
     name = "IREEPyDMDialect",
     srcs = glob([
@@ -177,7 +257,6 @@ cc_library(
     ]),
     hdrs = glob([
         "include/iree-dialects/Dialect/IREEPyDM/IR/*.h",
-        "include/iree-dialects/Dialect/IREEPyDM/Transforms/*.h",
     ]),
     includes = ["include"],
     deps = [
@@ -193,22 +272,45 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "IREEPyDMTransforms",
+    srcs = glob([
+        "lib/Dialect/IREEPyDM/Transforms/RTL/*.cpp",
+        "lib/Dialect/IREEPyDM/Transforms/ToIREE/*.cpp",
+    ]),
+    hdrs = glob([
+        "include/iree-dialects/Dialect/IREEPyDM/Transforms/*.h",
+        "include/iree-dialects/Dialect/IREEPyDM/Transforms/**/*.h",
+        "lib/Dialect/IREEPyDM/Transforms/*.h",
+    ]),
+    deps = [
+        ":IREEDialect",
+        ":IREEPyDMDialect",
+        ":IREEPyDMTransformsIncGen",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MathDialect",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)
+
 ################################################################################
 # CAPI
 ################################################################################
 
 cc_library(
     name = "CAPI",
-    srcs = [
-        "lib/CAPI/Dialects.cpp",
-    ],
-    hdrs = [
-        "include/iree-dialects-c/Dialects.h",
-    ],
+    srcs = glob(["lib/CAPI/*.cpp"]),
+    hdrs = glob(["include/iree-dialects-c/*.h"]),
     includes = ["include"],
     deps = [
         ":IREEDialect",
         ":IREEPyDMDialect",
+        ":IREEPyDMTransforms",
         "@llvm-project//mlir:CAPIIR",
+        "@llvm-project//mlir:IR",
     ],
 )

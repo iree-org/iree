@@ -72,6 +72,7 @@ cc_library(
         "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TosaDialect",
