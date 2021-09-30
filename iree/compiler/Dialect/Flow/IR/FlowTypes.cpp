@@ -199,8 +199,7 @@ Attribute FlowDialect::parseAttribute(DialectAsmParser &parser,
   StringRef mnemonic;
   if (failed(parser.parseKeyword(&mnemonic))) return {};
   Attribute attr;
-  auto parseResult =
-      generatedAttributeParser(getContext(), parser, mnemonic, type, attr);
+  auto parseResult = generatedAttributeParser(parser, mnemonic, type, attr);
   if (parseResult.hasValue()) return attr;
   parser.emitError(parser.getCurrentLocation())
       << "unknown Flow attribute: " << mnemonic;
@@ -217,8 +216,7 @@ Type FlowDialect::parseType(DialectAsmParser &parser) const {
   StringRef mnemonic;
   if (failed(parser.parseKeyword(&mnemonic))) return {};
   Type type;
-  OptionalParseResult parseResult =
-      generatedTypeParser(getContext(), parser, mnemonic, type);
+  OptionalParseResult parseResult = generatedTypeParser(parser, mnemonic, type);
   if (parseResult.hasValue()) return type;
   if (mnemonic == "dispatch.tensor") {
     return DispatchTensorType::parse(parser);

@@ -279,8 +279,7 @@ static LogicalResult serializeGenericElementData(
 // Buffer attributes
 //===----------------------------------------------------------------------===//
 
-Attribute ByteRangeAttr::parse(MLIRContext *context, DialectAsmParser &p,
-                               Type type) {
+Attribute ByteRangeAttr::parse(DialectAsmParser &p, Type type) {
   if (failed(p.parseLess())) return {};
 
   // TODO(benvanik): support the range syntax; the dialect asm parser fights
@@ -300,7 +299,7 @@ Attribute ByteRangeAttr::parse(MLIRContext *context, DialectAsmParser &p,
         failed(p.parseInteger(length)) || failed(p.parseGreater())) {
       return {};
     }
-    return get(context, offset, length);
+    return get(p.getContext(), offset, length);
   }
 
   int64_t start;
@@ -327,7 +326,7 @@ Attribute ByteRangeAttr::parse(MLIRContext *context, DialectAsmParser &p,
 
   int64_t offset = start;
   int64_t length = end - start;
-  return get(context, offset, length);
+  return get(p.getContext(), offset, length);
 }
 
 void ByteRangeAttr::print(DialectAsmPrinter &p) const {
@@ -377,8 +376,7 @@ LogicalResult CompositeAttr::verify(
   return success();
 }
 
-Attribute CompositeAttr::parse(MLIRContext *context, DialectAsmParser &parser,
-                               Type type) {
+Attribute CompositeAttr::parse(DialectAsmParser &parser, Type type) {
   SmallVector<int64_t> dims;
   if (failed(parser.parseLess()) ||
       failed(parser.parseDimensionList(dims, /*allowDynamic=*/false)) ||
@@ -417,7 +415,8 @@ Attribute CompositeAttr::parse(MLIRContext *context, DialectAsmParser &parser,
     parser.emitError(parser.getCurrentLocation(), "unterminated value list");
     return {};
   }
-  return get(context, totalLength, ArrayAttr::get(context, valueAttrs));
+  return get(parser.getContext(), totalLength,
+             ArrayAttr::get(parser.getContext(), valueAttrs));
 }
 
 void CompositeAttr::print(DialectAsmPrinter &p) const {
@@ -546,7 +545,7 @@ Attribute UtilDialect::parseAttribute(DialectAsmParser &parser,
   if (failed(parser.parseKeyword(&mnemonic))) return {};
   Attribute genAttr;
   OptionalParseResult parseResult =
-      generatedAttributeParser(getContext(), parser, mnemonic, type, genAttr);
+      generatedAttributeParser(parser, mnemonic, type, genAttr);
   if (parseResult.hasValue()) return genAttr;
   parser.emitError(parser.getNameLoc())
       << "unknown util attribute: " << mnemonic;

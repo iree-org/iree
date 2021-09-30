@@ -567,9 +567,7 @@ DeviceTargetAttr DeviceTargetAttr::get(MLIRContext *context,
 }
 
 // static
-Attribute DeviceTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
-                                  Type type) {
-  auto b = p.getBuilder();
+Attribute DeviceTargetAttr::parse(DialectAsmParser &p, Type type) {
   StringAttr deviceIDAttr;
   DictionaryAttr configAttr;
   // `<"device-id"`
@@ -585,7 +583,7 @@ Attribute DeviceTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(b.getContext(), deviceIDAttr, configAttr);
+  return get(p.getContext(), deviceIDAttr, configAttr);
 }
 
 void DeviceTargetAttr::print(DialectAsmPrinter &p) const {
@@ -711,9 +709,7 @@ ExecutableTargetAttr ExecutableTargetAttr::get(MLIRContext *context,
 }
 
 // static
-Attribute ExecutableTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
-                                      Type type) {
-  auto b = p.getBuilder();
+Attribute ExecutableTargetAttr::parse(DialectAsmParser &p, Type type) {
   StringAttr backendAttr;
   StringAttr formatAttr;
   DictionaryAttr configurationAttr;
@@ -731,7 +727,7 @@ Attribute ExecutableTargetAttr::parse(MLIRContext *context, DialectAsmParser &p,
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(b.getContext(), backendAttr, formatAttr, configurationAttr);
+  return get(p.getContext(), backendAttr, formatAttr, configurationAttr);
 }
 
 void ExecutableTargetAttr::print(DialectAsmPrinter &p) const {
@@ -797,9 +793,8 @@ static void printMultiMatchAttrList(ArrayAttr conditionAttrs,
 }
 
 // static
-Attribute MatchAnyAttr::parse(MLIRContext *context, DialectAsmParser &p,
-                              Type type) {
-  return get(context, parseMultiMatchAttrArray(p));
+Attribute MatchAnyAttr::parse(DialectAsmParser &p, Type type) {
+  return get(p.getContext(), parseMultiMatchAttrArray(p));
 }
 
 void MatchAnyAttr::print(DialectAsmPrinter &p) const {
@@ -828,9 +823,8 @@ Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
 }
 
 // static
-Attribute MatchAllAttr::parse(MLIRContext *context, DialectAsmParser &p,
-                              Type type) {
-  return get(context, parseMultiMatchAttrArray(p));
+Attribute MatchAllAttr::parse(DialectAsmParser &p, Type type) {
+  return get(p.getContext(), parseMultiMatchAttrArray(p));
 }
 
 void MatchAllAttr::print(DialectAsmPrinter &p) const {
@@ -859,14 +853,13 @@ Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
 }
 
 // static
-Attribute DeviceMatchIDAttr::parse(MLIRContext *context, DialectAsmParser &p,
-                                   Type type) {
+Attribute DeviceMatchIDAttr::parse(DialectAsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(context, patternAttr);
+  return get(p.getContext(), patternAttr);
 }
 
 void DeviceMatchIDAttr::print(DialectAsmPrinter &p) const {
@@ -887,14 +880,13 @@ Value DeviceMatchIDAttr::buildConditionExpression(Location loc, Value device,
 }
 
 // static
-Attribute DeviceMatchFeatureAttr::parse(MLIRContext *context,
-                                        DialectAsmParser &p, Type type) {
+Attribute DeviceMatchFeatureAttr::parse(DialectAsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(context, patternAttr);
+  return get(p.getContext(), patternAttr);
 }
 
 void DeviceMatchFeatureAttr::print(DialectAsmPrinter &p) const {
@@ -916,14 +908,13 @@ Value DeviceMatchFeatureAttr::buildConditionExpression(
 }
 
 // static
-Attribute DeviceMatchArchitectureAttr::parse(MLIRContext *context,
-                                             DialectAsmParser &p, Type type) {
+Attribute DeviceMatchArchitectureAttr::parse(DialectAsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(context, patternAttr);
+  return get(p.getContext(), patternAttr);
 }
 
 void DeviceMatchArchitectureAttr::print(DialectAsmPrinter &p) const {
@@ -945,15 +936,14 @@ Value DeviceMatchArchitectureAttr::buildConditionExpression(
 }
 
 // static
-Attribute DeviceMatchExecutableFormatAttr::parse(MLIRContext *context,
-                                                 DialectAsmParser &p,
+Attribute DeviceMatchExecutableFormatAttr::parse(DialectAsmParser &p,
                                                  Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(context, patternAttr);
+  return get(p.getContext(), patternAttr);
 }
 
 void DeviceMatchExecutableFormatAttr::print(DialectAsmPrinter &p) const {
@@ -1106,7 +1096,7 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   if (failed(parser.parseKeyword(&mnemonic))) return {};
   Attribute genAttr;
   OptionalParseResult parseResult =
-      generatedAttributeParser(getContext(), parser, mnemonic, type, genAttr);
+      generatedAttributeParser(parser, mnemonic, type, genAttr);
   if (parseResult.hasValue()) return genAttr;
   if (mnemonic == BufferConstraintsAttr::getKindName()) {
     return BufferConstraintsAttr::parse(parser);
