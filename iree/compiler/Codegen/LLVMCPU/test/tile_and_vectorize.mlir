@@ -48,7 +48,7 @@ module  {
 }
 //      CHECK: #[[MAP1:.+]] = affine_map<(d0) -> (64, -d0 + 383)>
 //      CHECK: #[[MAP2:.+]] = affine_map<(d0) -> (64, -d0 + 513)>
-//      CHECK: #[[MAP5:.+]] = affine_map<(d0, d1) -> (32, d0 - d1)>
+//      CHECK: #[[MAP5:.+]] = affine_map<(d0, d1) -> (32, -d0 + d1)>
 //      CHECK: #[[MAP6:.+]] = affine_map<(d0) -> (32, -d0 + 383)>
 //      CHECK: @dot_383x383x513_dispatch_0
 //  CHECK-DAG: %[[CST:.+]] = constant 0.000000e+00 : f32
@@ -71,9 +71,9 @@ module  {
 //      CHECK: {{.*}} = scf.for %[[L1_I:.+]] = %[[C0]] to %[[LHS_WG_TILE_DIM0]] step %[[C32]] iter_args(%[[DST_WG_TILE_0:.+]] = %[[DST_WG_TILE_INIT_C0]])
 //      CHECK:    {{.*}} = scf.for %[[L1_J:.+]] = %[[C0]] to %[[RHS_WG_TILE_DIM1]] step %[[C32]] iter_args(%[[DST_WG_TILE_1:.+]] = %[[DST_WG_TILE_0]])
 //      CHECK:       {{.*}} = scf.for %[[L1_K:.+]] = %[[C0]] to %[[C383]] step %[[C32]] iter_args(%[[DST_WG_TILE_2:.+]] = %[[DST_WG_TILE_1]])
-//      CHECK:           %[[L2_I_BOUND:.+]] = affine.min #[[MAP5]](%[[LHS_WG_TILE_DIM0]], %[[L1_I]])
+//      CHECK:           %[[L2_I_BOUND:.+]] = affine.min #[[MAP5]](%[[L1_I]], %[[LHS_WG_TILE_DIM0]])
 //      CHECK:           %[[L2_K_BOUND:.+]] = affine.min #[[MAP6]](%[[L1_K]])
-//      CHECK:           %[[L2_J_BOUND:.+]] = affine.min #[[MAP5]](%[[RHS_WG_TILE_DIM1]], %[[L1_J]])
+//      CHECK:           %[[L2_J_BOUND:.+]] = affine.min #[[MAP5]](%[[L1_J]], %[[RHS_WG_TILE_DIM1]])
 //      CHECK:           %[[DST_L1_TILE:.+]] = tensor.extract_slice %[[DST_WG_TILE_2]]
 //      CHECK:           {{.*}} = scf.for {{.*}} = %[[C0]] to %[[L2_I_BOUND]] step %[[C4]] iter_args(%[[DST_VEC_TILE_0:.+]] = %[[DST_L1_TILE]])
 //      CHECK:              {{.*}} = scf.for {{.*}} = %[[C0]] to %[[L2_J_BOUND]] step %[[C4]] iter_args(%[[DST_VEC_TILE_1:.+]] = %[[DST_VEC_TILE_0]])

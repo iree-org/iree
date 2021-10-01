@@ -146,7 +146,7 @@ hal.executable private @matmul_i8_i8_i32  {
             %7 = memref.subview %0[%arg0, 0] [64, 128] [1, 1] : memref<128x128xi8> to memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %8 = memref.subview %1[0, %arg1] [128, 64] [1, 1] : memref<128x128xi8> to memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %9 = memref.subview %2[%arg0, %arg1] [64, 64] [1, 1] : memref<128x128xi32> to memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-            linalg.matmul_i8_i8_i32 {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%7, %8 : memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
+            linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%7, %8 : memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
           }
         }
         return
