@@ -275,8 +275,8 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
 
     if (auto allocOp = dyn_cast<memref::AllocOp>(sourceOp)) {
       getDimValues(sourceType, allocOp.getDynamicSizes());
-    } else if (auto allocOp = dyn_cast<memref::AllocaOp>(sourceOp)) {
-      getDimValues(sourceType, allocOp.getDynamicSizes());
+    } else if (auto allocaOp = dyn_cast<memref::AllocaOp>(sourceOp)) {
+      getDimValues(sourceType, allocaOp.getDynamicSizes());
     } else {
       return nullptr;
     }
@@ -552,7 +552,7 @@ struct FlattenMemRefSubspanPass
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp,
                                  memref::AllocaOp, memref::AllocOp,
                                  memref::GetGlobalOp>([](Operation *op) {
-      return isRankZeroOrOneMemRef(op->getResult(0).getType());
+      return isRankZeroOrOneMemRef(op->getResultTypes().front());
     });
     target.addDynamicallyLegalOp<memref::GlobalOp>(
         [](memref::GlobalOp op) { return isRankZeroOrOneMemRef(op.type()); });
