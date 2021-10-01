@@ -237,7 +237,7 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
       /*length=*/kBufferSize / 2 - 4));
   IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
       command_buffer, device_buffer, /*target_offset=*/8 + kBufferSize / 2 - 4,
-      /*length=*/IREE_WHOLE_BUFFER, &zero_val,
+      /*length=*/kBufferSize - (8 + kBufferSize / 2 - 4), &zero_val,
       /*pattern_length=*/sizeof(zero_val)));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
