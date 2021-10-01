@@ -155,17 +155,44 @@ hal.interface @io attributes {sym_visibility = "private"} {
 
 // -----
 
-func @ignore_load_store_alloc(%value : f32, %i0: index, %i1 : index, %i2: index) -> f32 {
+func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: index) -> f32 {
   %alloc = memref.alloc() : memref<2x3x4xf32, 3>
   memref.store %value, %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>
   %val = memref.load %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>
   return %val: f32
 }
 
-// CHECK-LABEL: func @ignore_load_store_alloc
-//       CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<2x3x4xf32, 3>
-//       CHECK: memref.store %{{[a-z0-9]+}}, %[[ALLOC]]
-//       CHECK: memref.load %[[ALLOC]]
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 12 + s1 * 4 + s2)>
+//      CHECK: func @load_store_alloc_static
+// CHECK-SAME: (%[[VAL:.+]]: f32, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
+//      CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<24xf32, 3>
+//      CHECK:   %[[INDEX0:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
+//      CHECK:   memref.store %[[VAL]], %[[ALLOC]][%[[INDEX0]]] : memref<24xf32, 3>
+//      CHECK:   %[[INDEX1:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
+//      CHECK:   %[[LOAD:.+]] = memref.load %0[%[[INDEX1]]] : memref<24xf32, 3>
+//      CHECK:   return %[[LOAD]]
+
+// -----
+
+func @load_store_alloca_dynamic(%value : f32, %dim0 : index, %dim1: index, %dim2: index, %i0: index, %i1 : index, %i2: index) -> f32 {
+  %alloc = memref.alloca(%dim0, %dim1, %dim2) : memref<?x?x?xf32>
+  memref.store %value, %alloc[%i0, %i1, %i2] : memref<?x?x?xf32>
+  %val = memref.load %alloc[%i0, %i1, %i2] : memref<?x?x?xf32>
+  return %val: f32
+}
+
+
+//      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1, s2] -> ((s0 * s1) * s2)>
+//      CHECK: #[[INDEX_MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> ((s2 * s3 + s4) * s0 + s1)>
+// CHECK: func @load_store_alloca_dynamic
+// CHECK-SAME: (%[[VAL:.+]]: f32, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
+//      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM0]], %[[DIM1]], %[[DIM2]]]
+//      CHECK:   %[[ALLOC:.+]] = memref.alloca(%[[SIZE]]) : memref<?xf32>
+//      CHECK:   %[[INDEX0:.+]] = affine.apply #[[INDEX_MAP]]()[%[[DIM2]], %[[I2]], %[[I0]], %[[DIM1]], %[[I1]]]
+//      CHECK:   memref.store %[[VAL]], %[[ALLOC]][%[[INDEX0]]] : memref<?xf32>
+//      CHECK:   %[[INDEX1:.+]] = affine.apply #[[INDEX_MAP]]()[%[[DIM2]], %[[I2]], %[[I0]], %[[DIM1]], %[[I1]]]
+//      CHECK:   %[[LOAD:.+]] = memref.load %[[ALLOC]][%[[INDEX1]]] : memref<?xf32>
+//      CHECK:   return %[[LOAD]]
 
 // -----
 
