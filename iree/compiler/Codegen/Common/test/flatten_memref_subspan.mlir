@@ -163,7 +163,7 @@ func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: index)
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 12 + s1 * 4 + s2)>
-// 			CHECK: func @load_store_alloc_static
+//      CHECK: func @load_store_alloc_static
 // CHECK-SAME: (%[[VAL:.+]]: f32, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<24xf32, 3>
 //      CHECK:   %[[INDEX0:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
