@@ -185,11 +185,13 @@ static iree_status_t iree_hal_cuda_driver_select_default_device(
     CUdevice* out_device) {
   iree_hal_device_info_t* out_device_infos;
   iree_host_size_t device_count;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_driver_query_available_devices(
-              base_driver, host_allocator, &out_device_infos, &device_count));
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_driver_query_available_devices(
+      base_driver, host_allocator, &out_device_infos, &device_count));
   iree_status_t status = iree_ok_status();
-  if (device_count == 0 || default_device_index >= device_count) {
+  if (device_count == 0) {
+    status = iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "no compatible CUDA devices were found");
+  } else if (default_device_index >= device_count) {
     status = iree_make_status(IREE_STATUS_NOT_FOUND,
                               "default device %d not found (of %ld enumerated)",
                               default_device_index, device_count);
