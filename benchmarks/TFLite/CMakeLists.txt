@@ -68,7 +68,6 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-llvm-loop-unrolling=true"
     "--iree-llvm-link-embedded=true"
   DRIVER
@@ -93,7 +92,6 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
@@ -118,7 +116,6 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=2048"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
     "vulkan"
@@ -141,7 +138,6 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=16"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
     "vulkan"
@@ -164,7 +160,6 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=16"
-    #"--iree-flow-dispatch-formation-enable-operand-fusion"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   DRIVER
