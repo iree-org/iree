@@ -225,12 +225,20 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
   std::vector<uint8_t> reference_buffer(kBufferSize);
   std::memset(reference_buffer.data() + 8, i8_val, kBufferSize / 2 - 4);
 
-  // Copy the host buffer to the device buffer.
+  // Copy the host buffer to the device buffer; zero fill the untouched bytes.
+  uint8_t zero_val = 0x0;
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer, device_buffer, /*target_offset=*/0, /*length=*/8,
+      &zero_val, /*pattern_length=*/sizeof(zero_val)));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
       command_buffer, /*source_buffer=*/host_buffer, /*source_offset=*/4,
       /*target_buffer=*/device_buffer, /*target_offset=*/8,
       /*length=*/kBufferSize / 2 - 4));
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer, device_buffer, /*target_offset=*/8 + kBufferSize / 2 - 4,
+      /*length=*/IREE_WHOLE_BUFFER, &zero_val,
+      /*pattern_length=*/sizeof(zero_val)));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   IREE_ASSERT_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_TRANSFER,
