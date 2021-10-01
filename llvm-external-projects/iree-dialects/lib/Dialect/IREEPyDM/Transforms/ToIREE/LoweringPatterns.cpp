@@ -17,6 +17,7 @@
 using namespace mlir;
 using namespace mlir::iree_pydm;
 
+namespace arith_d = mlir;
 namespace iree_d = mlir::iree;
 namespace builtin_d = mlir;
 namespace std_d = mlir;
@@ -101,6 +102,60 @@ static Value createObjectList(Location loc, OpBuilder &builder, int typeCode,
   return list;
 }
 
+static Value castIntegerValue(Location loc, Value input,
+                              builtin_d::IntegerType resultType,
+                              OpBuilder &builder) {
+  builtin_d::IntegerType inputType =
+      input.getType().cast<builtin_d::IntegerType>();
+  if (inputType.getWidth() == resultType.getWidth()) {
+    return input;
+  } else if (inputType.getWidth() < resultType.getWidth()) {
+    return builder.create<arith_d::SignExtendIOp>(loc, resultType, input);
+  } else {
+    return builder.create<arith_d::TruncateIOp>(loc, resultType, input);
+  }
+}
+
+static Optional<arith_d::CmpIPredicate> convertIntegerComparePredicate(
+    StringAttr dunderName, bool isSigned, Builder &builder) {
+  StringRef v = dunderName.getValue();
+  if (v == "lt") {
+    return isSigned ? arith_d::CmpIPredicate::slt : arith_d::CmpIPredicate::ult;
+  } else if (v == "le") {
+    return isSigned ? arith_d::CmpIPredicate::sle : arith_d::CmpIPredicate::ule;
+  } else if (v == "eq" || v == "is") {
+    return arith_d::CmpIPredicate::eq;
+  } else if (v == "ne" || v == "isnot") {
+    return arith_d::CmpIPredicate::ne;
+  } else if (v == "gt") {
+    return isSigned ? arith_d::CmpIPredicate::sgt : arith_d::CmpIPredicate::ugt;
+  } else if (v == "ge") {
+    return isSigned ? arith_d::CmpIPredicate::sge : arith_d::CmpIPredicate::uge;
+  }
+
+  return {};
+}
+
+static Optional<arith_d::CmpFPredicate> convertFpComparePredicate(
+    StringAttr dunderName, Builder &builder) {
+  StringRef v = dunderName.getValue();
+  if (v == "lt") {
+    return arith_d::CmpFPredicate::OLT;
+  } else if (v == "le") {
+    return arith_d::CmpFPredicate::OLE;
+  } else if (v == "eq" || v == "is") {
+    return arith_d::CmpFPredicate::OEQ;
+  } else if (v == "ne" || v == "isnot") {
+    return arith_d::CmpFPredicate::ONE;
+  } else if (v == "gt") {
+    return arith_d::CmpFPredicate::OGT;
+  } else if (v == "ge") {
+    return arith_d::CmpFPredicate::OGE;
+  }
+
+  return {};
+}
+
 namespace {
 
 class AllocFreeVarOpConversion
@@ -116,6 +171,53 @@ class AllocFreeVarOpConversion
     auto loc = srcOp.getLoc();
     Value list = createUndefObjectList(loc, rewriter);
     rewriter.replaceOp(srcOp, list);
+    return success();
+  }
+};
+
+class ApplyCompareNumericConversion
+    : public OpConversionPattern<pydm_d::ApplyCompareOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::ApplyCompareOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    Type leftType = adaptor.left().getType();
+    Type rightType = adaptor.right().getType();
+    if (leftType != rightType) {
+      return rewriter.notifyMatchFailure(srcOp, "not same type operands");
+    }
+    if (leftType.isa<builtin_d::IntegerType>()) {
+      bool isSigned = true;  // TODO: Unsigned.
+      auto predicate = convertIntegerComparePredicate(adaptor.dunder_name(),
+                                                      isSigned, rewriter);
+      if (!predicate)
+        return rewriter.notifyMatchFailure(srcOp, "unsupported predicate");
+      rewriter.replaceOpWithNewOp<arith_d::CmpIOp>(
+          srcOp, *predicate, adaptor.left(), adaptor.right());
+      return success();
+    } else if (leftType.isa<builtin_d::FloatType>()) {
+      auto predicate =
+          convertFpComparePredicate(adaptor.dunder_name(), rewriter);
+      if (!predicate)
+        return rewriter.notifyMatchFailure(srcOp, "unsupported predicate");
+      rewriter.replaceOpWithNewOp<arith_d::CmpFOp>(
+          srcOp, *predicate, adaptor.left(), adaptor.right());
+      return success();
+    }
+
+    return rewriter.notifyMatchFailure(srcOp, "non numeric type");
+  }
+};
+
+class BoolToPredConversion : public OpConversionPattern<pydm_d::BoolToPredOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::BoolToPredOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    pydm_d::BoolToPredOp::Adaptor adaptor(operands);
+    rewriter.replaceOp(srcOp, adaptor.value());
     return success();
   }
 };
@@ -136,6 +238,95 @@ class BoxOpConversion : public OpConversionPattern<pydm_d::BoxOp> {
     auto list = createObjectList(loc, rewriter, static_cast<int>(typeCode),
                                  operands[0]);
     rewriter.replaceOp(srcOp, list);
+    return success();
+  }
+};
+
+class BranchConversion : public OpConversionPattern<std_d::BranchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      std_d::BranchOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<std_d::BranchOp>(srcOp, srcOp.dest(),
+                                                 adaptor.destOperands());
+    return success();
+  }
+};
+
+class CallOpConversion : public OpConversionPattern<pydm_d::CallOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::CallOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    pydm_d::CallOp::Adaptor adaptor(operands);
+    SmallVector<Type> resultTypes;
+    if (failed(getTypeConverter()->convertTypes(srcOp.getResultTypes(),
+                                                resultTypes))) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "result types could not be converted");
+    }
+    rewriter.replaceOpWithNewOp<std_d::CallOp>(srcOp, srcOp.callee(),
+                                               resultTypes, adaptor.operands());
+    return success();
+  }
+};
+
+class CondBranchConversion : public OpConversionPattern<std_d::CondBranchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      std_d::CondBranchOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<std_d::CondBranchOp>(
+        srcOp, adaptor.condition(), srcOp.trueDest(),
+        adaptor.trueDestOperands(), srcOp.falseDest(),
+        adaptor.falseDestOperands());
+    return success();
+  }
+};
+
+class ConstantOpConversion : public OpConversionPattern<pydm_d::ConstantOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::ConstantOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    Type resultType = typeConverter->convertType(srcOp.getResult().getType());
+    if (!resultType)
+      return rewriter.notifyMatchFailure(
+          srcOp, "constant type could not be converted");
+    Attribute newValue = adaptor.value();
+    // Fixup widths of integer types that may be wider/narrower than the
+    // stored attribute (which tends to be stored in high precision in pydm
+    // constants).
+    TypeSwitch<Type>(resultType)
+        .Case([&](builtin_d::IntegerType t) {
+          APInt intValue =
+              newValue.cast<IntegerAttr>().getValue().sextOrTrunc(t.getWidth());
+          newValue = rewriter.getIntegerAttr(t, intValue);
+        })
+        .Case([&](builtin_d::FloatType t) {
+          APFloat fpValue = newValue.cast<FloatAttr>().getValue();
+          if (APFloat::SemanticsToEnum(fpValue.getSemantics()) !=
+              APFloat::SemanticsToEnum(t.getFloatSemantics())) {
+            // Convert.
+            APFloat newFpValue = fpValue;
+            bool losesInfo;
+            newFpValue.convert(t.getFloatSemantics(),
+                               APFloat::rmNearestTiesToEven, &losesInfo);
+            if (losesInfo) {
+              emitWarning(loc) << "conversion of " << newValue << " to " << t
+                               << " loses information";
+            }
+            newValue = rewriter.getFloatAttr(t, newFpValue);
+          }
+        });
+
+    if (!newValue)
+      return rewriter.notifyMatchFailure(
+          srcOp, "constant cannot be represented as a standard constant");
+    rewriter.replaceOpWithNewOp<std_d::ConstantOp>(srcOp, resultType, newValue);
     return success();
   }
 };
@@ -172,6 +363,7 @@ class FuncOpConversion : public OpConversionPattern<pydm_d::FuncOp> {
         convertedResultTypes);
     auto newFuncOp = rewriter.create<mlir::FuncOp>(
         srcOp.getLoc(), srcOp.getName(), newFuncType);
+    newFuncOp.setVisibility(srcOp.getVisibility());
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
                                 newFuncOp.end());
 
@@ -183,6 +375,33 @@ class FuncOpConversion : public OpConversionPattern<pydm_d::FuncOp> {
     }
 
     rewriter.replaceOp(srcOp, llvm::None);
+    return success();
+  }
+};
+
+class GetTypeCodeConversion
+    : public OpConversionPattern<pydm_d::GetTypeCodeOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::GetTypeCodeOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    // Gets the 0'th element of the object list, optionally casting it to the
+    // converted integer type.
+    Type resultType = typeConverter->convertType(srcOp.getResult().getType());
+    if (!resultType)
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "result type could not be converted");
+    Type i32Type = rewriter.getIntegerType(32);
+    Value index0 =
+        rewriter.create<std_d::ConstantOp>(loc, rewriter.getIndexAttr(0));
+    Value typeCode = rewriter.create<iree_d::ListGetOp>(
+        loc, i32Type, adaptor.value(), index0);
+    rewriter.replaceOp(
+        srcOp,
+        castIntegerValue(loc, typeCode,
+                         resultType.cast<builtin_d::IntegerType>(), rewriter));
     return success();
   }
 };
@@ -237,8 +456,8 @@ class RaiseOnFailureOpConversion
     auto loc = srcOp.getLoc();
 
     Value status = operands[0];
-    // Get the containing function return type so that we can create a suitable
-    // null return value.
+    // Get the containing function return type so that we can create a
+    // suitable null return value.
     auto parentFunc = srcOp->getParentOfType<builtin_d::FuncOp>();
     if (!parentFunc)
       return rewriter.notifyMatchFailure(srcOp, "not contained by a func");
@@ -390,10 +609,13 @@ void mlir::iree_pydm::populatePyDMToIREELoweringPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet &patterns) {
   // Structural.
-  patterns.insert<AllocFreeVarOpConversion, BoxOpConversion, FuncOpConversion,
-                  LoadVarOpConversion, RaiseOnFailureOpConversion,
-                  ReturnOpConversion, StoreVarOpConversion, UnboxOpConversion>(
-      typeConverter, context);
+  patterns.insert<AllocFreeVarOpConversion, ApplyCompareNumericConversion,
+                  BoolToPredConversion, BoxOpConversion, BranchConversion,
+                  CallOpConversion, CondBranchConversion, ConstantOpConversion,
+                  FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
+                  RaiseOnFailureOpConversion, ReturnOpConversion,
+                  StoreVarOpConversion, UnboxOpConversion>(typeConverter,
+                                                           context);
 
   // Constants and constructors.
   patterns.insert<NoneOpConversion>(typeConverter, context);

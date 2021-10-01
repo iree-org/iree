@@ -35,20 +35,36 @@ static StringRef safeModuleName(Operation *op) {
 namespace {
 
 class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
+ public:
+  LinkIREEPyDMRTLPass() = default;
+  LinkIREEPyDMRTLPass(Optional<SourceBundle> linkRtlSourceBundle)
+      : linkRtlSourceBundle(std::move(linkRtlSourceBundle)) {}
+
+ private:
   LogicalResult initialize(MLIRContext *context) override {
-    // Already initialized in some way.
-    if (!rtlModule && rtlFile.empty()) {
+    SourceBundle localSource;
+    if (linkRtlSourceBundle) {
+      localSource = *linkRtlSourceBundle;
+    } else {
+      // Get it from the cli options.
+      localSource.asmFilePath = rtlFile;
+    }
+
+    if (localSource.asmBlob) {
+      // Parse from inline asm.
+      auto owningOp = parseSourceString(*localSource.asmBlob, context);
+      if (!owningOp) return failure();
+      rtlModule = std::make_shared<OwningModuleRef>(std::move(owningOp));
+    } else if (localSource.asmFilePath) {
+      // Parse from a file.
+      auto owningOp = parseSourceFile(*localSource.asmFilePath, context);
+      if (!owningOp) return failure();
+      rtlModule = std::make_shared<OwningModuleRef>(std::move(owningOp));
+    } else {
       return emitError(UnknownLoc::get(context))
              << "pass " << getArgument()
              << "must be initialized with an RTL module (did you mean to "
                 "add an rtl-file option?)";
-    }
-
-    if (!rtlFile.empty()) {
-      // Parse from a file.
-      auto owningOp = parseSourceFile(rtlFile, context);
-      if (!owningOp) return failure();
-      rtlModule = std::make_shared<OwningModuleRef>(std::move(owningOp));
     }
 
     ModuleOp parentModule = rtlModule->get();
@@ -187,11 +203,15 @@ class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
 
   // A SymbolTable for each sub module.
   SmallVector<SymbolTable> importModules;
+
+  // ASM source of RTL modules to link (otherwise will use pass options).
+  Optional<SourceBundle> linkRtlSourceBundle;
 };
 
 }  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
-mlir::iree_pydm::createLinkIREEPyDMRTLPass() {
-  return std::make_unique<LinkIREEPyDMRTLPass>();
+mlir::iree_pydm::createLinkIREEPyDMRTLPass(
+    Optional<SourceBundle> linkRtlSourceBundle) {
+  return std::make_unique<LinkIREEPyDMRTLPass>(std::move(linkRtlSourceBundle));
 }

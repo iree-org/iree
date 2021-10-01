@@ -15,6 +15,36 @@
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
+namespace {
+
+struct PyIREEPyDMSourceBundle {
+  PyIREEPyDMSourceBundle(IREEPyDMSourceBundle wrapped) : wrapped(wrapped) {}
+  PyIREEPyDMSourceBundle(PyIREEPyDMSourceBundle &&other)
+      : wrapped(other.wrapped) {
+    other.wrapped.ptr = nullptr;
+  }
+  PyIREEPyDMSourceBundle(const PyIREEPyDMSourceBundle &) = delete;
+  ~PyIREEPyDMSourceBundle() {
+    if (wrapped.ptr) ireePyDMSourceBundleDestroy(wrapped);
+  }
+  IREEPyDMSourceBundle wrapped;
+};
+
+struct PyIREEPyDMLoweringOptions {
+  PyIREEPyDMLoweringOptions() : wrapped(ireePyDMLoweringOptionsCreate()) {}
+  PyIREEPyDMLoweringOptions(PyIREEPyDMLoweringOptions &&other)
+      : wrapped(other.wrapped) {
+    other.wrapped.ptr = nullptr;
+  }
+  PyIREEPyDMLoweringOptions(const PyIREEPyDMLoweringOptions &) = delete;
+  ~PyIREEPyDMLoweringOptions() {
+    if (wrapped.ptr) ireePyDMLoweringOptionsDestroy(wrapped);
+  }
+  IREEPyDMLoweringOptions wrapped;
+};
+
+}  // namespace
+
 PYBIND11_MODULE(_ireeDialects, m) {
   m.doc() = "iree-dialects main python extension";
 
@@ -63,6 +93,37 @@ PYBIND11_MODULE(_ireeDialects, m) {
   //===--------------------------------------------------------------------===//
   auto iree_pydm_m = m.def_submodule("iree_pydm");
 
+  py::class_<PyIREEPyDMSourceBundle>(
+      iree_pydm_m, "SourceBundle", py::module_local(),
+      "Contains raw assembly source or a reference to a file")
+      .def_static(
+          "from_asm",
+          [](std::string asmBlob) {
+            return PyIREEPyDMSourceBundle(ireePyDMSourceBundleCreateAsm(
+                {asmBlob.data(), asmBlob.size()}));
+          },
+          py::arg("asm_blob"),
+          "Creates a SourceBundle from an ASM blob (string or bytes)")
+      .def_static(
+          "from_file",
+          [](std::string asmFile) {
+            return PyIREEPyDMSourceBundle(ireePyDMSourceBundleCreateFile(
+                {asmFile.data(), asmFile.size()}));
+          },
+          py::arg("asm_file"),
+          "Creates a SourceBundle from a file containing ASM");
+  py::class_<PyIREEPyDMLoweringOptions>(iree_pydm_m, "LoweringOptions",
+                                        py::module_local(),
+                                        "Lowering options to compile to IREE")
+      .def(py::init<>())
+      .def(
+          "link_rtl",
+          [](PyIREEPyDMLoweringOptions &self,
+             PyIREEPyDMSourceBundle &sourceBundle) {
+            ireePyDMLoweringOptionsLinkRtl(self.wrapped, sourceBundle.wrapped);
+          },
+          "Enables linking against a runtime-library module");
+
   iree_pydm_m.def(
       "register_dialect",
       [](MlirContext context, bool load) {
@@ -76,12 +137,13 @@ PYBIND11_MODULE(_ireeDialects, m) {
 
   iree_pydm_m.def(
       "build_lower_to_iree_pass_pipeline",
-      [](MlirPassManager passManager) {
+      [](MlirPassManager passManager, PyIREEPyDMLoweringOptions &options) {
         MlirOpPassManager opPassManager =
             mlirPassManagerGetAsOpPassManager(passManager);
-        mlirIREEPyDMBuildLowerToIREEPassPipeline(opPassManager);
+        mlirIREEPyDMBuildLowerToIREEPassPipeline(opPassManager,
+                                                 options.wrapped);
       },
-      py::arg("pass_manager"));
+      py::arg("pass_manager"), py::arg("link_rtl_asm") = py::none());
 
 #define DEFINE_IREEPYDM_NULLARY_TYPE(Name)                                 \
   mlir_type_subclass(iree_pydm_m, #Name "Type", mlirTypeIsAIREEPyDM##Name, \

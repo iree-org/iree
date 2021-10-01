@@ -37,10 +37,21 @@ LoweringTypeConverter::LoweringTypeConverter() {
     return getVariantListType(b);
   });
 
+  // Bool.
+  addConversion([&](pydm_d::BoolType t) -> Optional<Type> {
+    return builtin_d::IntegerType::get(t.getContext(), 1);
+  });
+
   // Integer type hierarchy.
   addConversion([&](pydm_d::IntegerType t) -> Optional<Type> {
     Builder b(t.getContext());
     return getWeakIntegerType(b);
+  });
+
+  // Real type hierarchy.
+  addConversion([&](pydm_d::RealType t) -> Optional<Type> {
+    Builder b(t.getContext());
+    return getWeakFloatType(b);
   });
 
   // Variable references.
@@ -72,4 +83,16 @@ Type LoweringTypeConverter::getWeakFloatType(Builder b) const {
     case WeakFloatType::F64:
       return b.getF64Type();
   }
+}
+
+bool LoweringTypeConverter::isTypeLegal(Type t) const {
+  return t.isa<builtin_d::IntegerType, builtin_d::FloatType,
+               builtin_d::IndexType, iree_d::ListType>();
+}
+
+bool LoweringTypeConverter::areTypesLegal(TypeRange types) const {
+  for (Type t : types) {
+    if (!isTypeLegal(t)) return false;
+  }
+  return true;
 }

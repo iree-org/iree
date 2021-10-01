@@ -312,5 +312,6 @@ cc_library(
         ":IREEPyDMTransforms",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
     ],
 )

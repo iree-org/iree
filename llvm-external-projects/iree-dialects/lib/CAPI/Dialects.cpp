@@ -15,6 +15,9 @@
 #include "mlir/CAPI/Support.h"
 #include "mlir/CAPI/Utils.h"
 #include "mlir/CAPI/Wrap.h"
+#include "mlir/Support/LLVM.h"
+
+using namespace mlir;
 
 //===----------------------------------------------------------------------===//
 // IREEDialect
@@ -28,6 +31,10 @@ MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREE, iree, mlir::iree::IREEDialect)
 
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREEPyDM, iree_pydm,
                                       mlir::iree_pydm::IREEPyDMDialect)
+
+DEFINE_C_API_PTR_METHODS(IREEPyDMSourceBundle, mlir::iree_pydm::SourceBundle)
+DEFINE_C_API_PTR_METHODS(IREEPyDMLoweringOptions,
+                         mlir::iree_pydm::LowerToIREEOptions)
 
 bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type) {
   return unwrap(type).isa<mlir::iree_pydm::PrimitiveType>();
@@ -66,8 +73,40 @@ MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
   return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), cppType));
 }
 
-void mlirIREEPyDMBuildLowerToIREEPassPipeline(MlirOpPassManager passManager) {
+void mlirIREEPyDMBuildLowerToIREEPassPipeline(MlirOpPassManager passManager,
+                                              IREEPyDMLoweringOptions options) {
   auto *passManagerCpp = unwrap(passManager);
-  // TODO: Should be a pass pipeline, not loose passes in the C impl.
-  passManagerCpp->addPass(mlir::iree_pydm::createConvertIREEPyDMToIREEPass());
+  mlir::iree_pydm::buildLowerToIREEPassPipeline(*passManagerCpp,
+                                                *unwrap(options));
+}
+
+// SourceBundle
+IREEPyDMSourceBundle ireePyDMSourceBundleCreateAsm(MlirStringRef asmString) {
+  auto bundle = std::make_unique<mlir::iree_pydm::SourceBundle>();
+  bundle->asmBlob = std::make_shared<std::string>(unwrap(asmString));
+  return wrap(bundle.release());
+}
+
+IREEPyDMSourceBundle ireePyDMSourceBundleCreateFile(MlirStringRef filePath) {
+  auto bundle = std::make_unique<mlir::iree_pydm::SourceBundle>();
+  bundle->asmFilePath = std::string(unwrap(filePath));
+  return wrap(bundle.release());
+}
+
+void ireePyDMSourceBundleDestroy(IREEPyDMSourceBundle bundle) {
+  delete unwrap(bundle);
+}
+
+// LoweringOptions
+IREEPyDMLoweringOptions ireePyDMLoweringOptionsCreate() {
+  return wrap(new mlir::iree_pydm::LowerToIREEOptions);
+}
+
+void ireePyDMLoweringOptionsLinkRtl(IREEPyDMLoweringOptions options,
+                                    IREEPyDMSourceBundle source) {
+  unwrap(options)->linkRtlSource = *unwrap(source);
+}
+
+void ireePyDMLoweringOptionsDestroy(IREEPyDMLoweringOptions options) {
+  delete unwrap(options);
 }
