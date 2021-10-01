@@ -101,6 +101,8 @@ iree_py_install_package(
   MODULE_PATH iree/runtime
   DEPS
     bindings_python_iree_runtime_PyExtRt
+    iree_tools_iree-benchmark-trace
+    iree_tools_iree-run-trace
   ADDL_PACKAGE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/README.md
 )
