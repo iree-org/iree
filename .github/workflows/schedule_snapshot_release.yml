@@ -2,7 +2,7 @@ name: Schedule snapshot release
 
 on:
   schedule:
-    - cron: '0 10,22 * * *'
+    - cron: '0 6,18 * * *'
 
   workflow_dispatch:
 
