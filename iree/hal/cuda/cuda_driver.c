@@ -121,6 +121,22 @@ static uint8_t* iree_hal_cuda_populate_device_info(
   return buffer_ptr;
 }
 
+// Return true if the device support all the extension required.
+static bool iree_hal_cuda_is_valid_device(iree_hal_cuda_driver_t* driver,
+                                          CUdevice device) {
+  int support_concurrent_managed_access = 0;
+  iree_status_t status = CU_RESULT_TO_STATUS(
+      &driver->syms,
+      cuDeviceGetAttribute(&support_concurrent_managed_access,
+                           CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS,
+                           device),
+      "cuDeviceGetAttribute");
+  if (!iree_status_is_ok(status) || !support_concurrent_managed_access) {
+    return false;
+  }
+  return true;
+}
+
 static iree_status_t iree_hal_cuda_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
     iree_hal_device_info_t** out_device_infos,
@@ -139,6 +155,7 @@ static iree_status_t iree_hal_cuda_driver_query_available_devices(
   }
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&device_infos);
+  int valid_device_count = 0;
   if (iree_status_is_ok(status)) {
     uint8_t* buffer_ptr =
         (uint8_t*)device_infos + device_count * sizeof(iree_hal_device_info_t);
@@ -147,12 +164,14 @@ static iree_status_t iree_hal_cuda_driver_query_available_devices(
       iree_status_t status = CU_RESULT_TO_STATUS(
           &driver->syms, cuDeviceGet(&device, i), "cuDeviceGet");
       if (!iree_status_is_ok(status)) break;
+      if (!iree_hal_cuda_is_valid_device(driver, device)) continue;
       buffer_ptr = iree_hal_cuda_populate_device_info(
-          device, &driver->syms, buffer_ptr, &device_infos[i]);
+          device, &driver->syms, buffer_ptr, &device_infos[valid_device_count]);
+      valid_device_count++;
     }
   }
   if (iree_status_is_ok(status)) {
-    *out_device_info_count = device_count;
+    *out_device_info_count = valid_device_count;
     *out_device_infos = device_infos;
   } else {
     iree_allocator_free(host_allocator, device_infos);
@@ -161,22 +180,25 @@ static iree_status_t iree_hal_cuda_driver_query_available_devices(
 }
 
 static iree_status_t iree_hal_cuda_driver_select_default_device(
-    iree_hal_cuda_dynamic_symbols_t* syms, int default_device_index,
-    iree_allocator_t host_allocator, CUdevice* out_device) {
-  int device_count = 0;
-  CUDA_RETURN_IF_ERROR(syms, cuDeviceGetCount(&device_count),
-                       "cuDeviceGetCount");
+    iree_hal_driver_t* base_driver, iree_hal_cuda_dynamic_symbols_t* syms,
+    int default_device_index, iree_allocator_t host_allocator,
+    CUdevice* out_device) {
+  iree_hal_device_info_t* out_device_infos;
+  iree_host_size_t device_count;
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_driver_query_available_devices(
+      base_driver, host_allocator, &out_device_infos, &device_count));
   iree_status_t status = iree_ok_status();
-  if (device_count == 0 || default_device_index >= device_count) {
+  if (device_count == 0) {
+    status = iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "no compatible CUDA devices were found");
+  } else if (default_device_index >= device_count) {
     status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                              "default device %d not found (of %d enumerated)",
+                              "default device %d not found (of %ld enumerated)",
                               default_device_index, device_count);
   } else {
-    CUdevice device;
-    CUDA_RETURN_IF_ERROR(syms, cuDeviceGet(&device, default_device_index),
-                         "cuDeviceGet");
-    *out_device = device;
+    *out_device = (CUdevice)out_device_infos[default_device_index].device_id;
   }
+  iree_allocator_free(host_allocator, out_device_infos);
   return status;
 }
 
@@ -194,8 +216,8 @@ static iree_status_t iree_hal_cuda_driver_create_device(
   if (device == 0) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_cuda_driver_select_default_device(
-                &driver->syms, driver->default_device_index, host_allocator,
-                &device));
+                base_driver, &driver->syms, driver->default_device_index,
+                host_allocator, &device));
   }
 
   iree_string_view_t device_name = iree_make_cstring_view("cuda");
