@@ -105,11 +105,11 @@ func @fuse_matmul_with_fill(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tenso
 //       CHECK:     %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //       CHECK:     %[[N:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //       CHECK:     flow.dispatch.workgroups[%[[N]], %[[M]], %[[C1]]]
-//  CHECK-SAME:       (%[[M]], %[[N]], %[[ARG0]], %[[ARG1]])
-//  CHECK-NEXT:       (%[[ARG2:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:        %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+//  CHECK-SAME:       (%[[ARG0]], %[[ARG1]], %[[M]], %[[N]])
+//  CHECK-NEXT:       (%[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 //  CHECK-SAME:        %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+//  CHECK-SAME:        %[[ARG2:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:        %[[ARG3:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:        %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>) {
 //       CHECK:        %[[ZERO:.+]] = constant 0.000000e+00 : f32
 //       CHECK:        scf.for
@@ -308,10 +308,10 @@ func @always_fuse_reshape
 //  CHECK-DAG:   %[[M:.+]] = affine.apply #[[MAP]]()[%[[D0]]]
 //  CHECK-DAG:   %[[N1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[N1]], %[[M]], %[[C1]]]
-// CHECK-SAME:     (%[[M]], %[[N1]], %[[ARG0]], %[[RHS1]])
+// CHECK-SAME:     (%[[ARG0]], %[[RHS1]], %[[M]], %[[N1]])
 //      CHECK:   %[[N2:.+]] = tensor.dim %[[RHS2]], %[[C1]]
 //      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[N2]], %[[M]], %[[C1]]]
-// CHECK-SAME:     (%[[M]], %[[N2]], %[[ARG0]], %[[RHS2]])
+// CHECK-SAME:     (%[[ARG0]], %[[RHS2]], %[[M]], %[[N2]])
 //      CHECK:   return %[[RESULT1]], %[[RESULT2]]
 
 // -----
