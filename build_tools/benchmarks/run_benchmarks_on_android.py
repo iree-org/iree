@@ -216,6 +216,7 @@ def compose_benchmark_info_object(device_info: AndroidDeviceInfo,
 def filter_benchmarks_for_category(benchmark_category_dir: str,
                                    cpu_target_arch: str,
                                    gpu_target_arch: str,
+                                   driver_filter: Optional[str],
                                    verbose: bool = False) -> Sequence[str]:
   """Filters benchmarks in a specific category for the given device.
 
@@ -223,6 +224,7 @@ def filter_benchmarks_for_category(benchmark_category_dir: str,
   - benchmark_category_dir: the directory to a specific benchmark category.
   - cpu_target_arch: CPU target architecture.
   - gpu_target_arch: GPU target architecture.
+  - driver_filter: only run benchmarks for the given driver if not None.
 
   Returns:
   - A list containing all matched benchmark cases' directories.
@@ -242,10 +244,16 @@ def filter_benchmarks_for_category(benchmark_category_dir: str,
       continue
 
     iree_driver, target_arch, bench_mode = segments
+    iree_driver = iree_driver[len("iree-"):].lower()
     target_arch = target_arch.lower()
-    # We can choose this benchmark if it matches the CPU/GPU architecture.
-    should_choose = (target_arch == cpu_target_arch or
-                     target_arch == gpu_target_arch)
+
+    # We can choose this benchmark if it matches the driver and CPU/GPU
+    # architecture.
+    matched_driver = (driver_filter is None or
+                      iree_driver == driver_filter.lower())
+    matched_arch = (target_arch == cpu_target_arch or
+                    target_arch == gpu_target_arch)
+    should_choose = matched_driver and matched_arch
     if should_choose:
       matched_benchmarks.append(root)
 
@@ -373,6 +381,7 @@ def run_benchmarks_for_category(
 def filter_and_run_benchmarks(
     device_info: AndroidDeviceInfo,
     root_build_dir: str,
+    driver_filter: Optional[str],
     normal_benchmark_tool: str,
     traced_benchmark_tool: Optional[str],
     trace_capture_tool: Optional[str],
@@ -382,6 +391,7 @@ def filter_and_run_benchmarks(
   Args:
   - device_info: an AndroidDeviceInfo object.
   - root_build_dir: the root build directory.
+  - driver_filter: only run benchmarks for the given driver if not None.
   - normal_benchmark_tool: the path to the normal benchmark tool.
   - traced_benchmark_tool: the path to the tracing-enabled benchmark tool.
   - trace_capture_tool: the path to the tool for collecting captured traces.
@@ -400,6 +410,7 @@ def filter_and_run_benchmarks(
         benchmark_category_dir=benchmark_category_dir,
         cpu_target_arch=cpu_target_arch,
         gpu_target_arch=gpu_target_arch,
+        driver_filter=driver_filter,
         verbose=verbose)
     run_results = run_benchmarks_for_category(
         device_info=device_info,
@@ -454,6 +465,11 @@ def parse_arguments():
                       type=check_exe_path,
                       default=None,
                       help="Path to the tool for collecting captured traces")
+  parser.add_argument(
+      "--driver",
+      type=str,
+      default=None,
+      help="Only run benchmarks for a specific driver, e.g., 'vulkan'")
   parser.add_argument("-o",
                       dest="output",
                       default=None,
@@ -461,12 +477,10 @@ def parse_arguments():
   parser.add_argument("--capture_tarball",
                       default=None,
                       help="Path to the tarball for captures")
-  parser.add_argument(
-      "--no-clean",
-      action="store_true",
-      help=
-      "Do not clean up the temporary directory used for benchmarking on the Android device"
-  )
+  parser.add_argument("--no-clean",
+                      action="store_true",
+                      help="Do not clean up the temporary directory used for "
+                      "benchmarking on the Android device")
   parser.add_argument("--verbose",
                       action="store_true",
                       help="Print internal information during execution")
@@ -499,10 +513,17 @@ def main(args):
           (args.trace_capture_tool is not None):
     execute_cmd_and_get_output(["adb", "forward", "tcp:8086", "tcp:8086"])
 
+    args.traced_benchmark_tool = os.path.realpath(args.traced_benchmark_tool)
+    args.trace_capture_tool = os.path.realpath(args.trace_capture_tool)
+
   results, captures = filter_and_run_benchmarks(
-      device_info, args.build_dir, os.path.realpath(args.normal_benchmark_tool),
-      os.path.realpath(args.traced_benchmark_tool),
-      os.path.realpath(args.trace_capture_tool), args.verbose)
+      device_info=device_info,
+      root_build_dir=args.build_dir,
+      driver_filter=args.driver,
+      normal_benchmark_tool=os.path.realpath(args.normal_benchmark_tool),
+      traced_benchmark_tool=args.traced_benchmark_tool,
+      trace_capture_tool=args.trace_capture_tool,
+      verbose=args.verbose)
 
   if args.output is not None:
     with open(args.output, "w") as f:
