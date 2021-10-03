@@ -89,8 +89,8 @@ static iree_status_t RunFunction(benchmark::State& state,
   std::array<iree_vm_module_t*, 2> modules = {import_module, bytecode_module};
   iree_vm_context_t* context = NULL;
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      instance, modules.data(), modules.size(), iree_allocator_system(),
-      &context));
+      instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+      iree_allocator_system(), &context));
 
   iree_vm_function_t function;
   IREE_CHECK_OK(
@@ -106,8 +106,9 @@ static iree_status_t RunFunction(benchmark::State& state,
       iree_make_byte_span(iree_alloca(result_count * sizeof(int32_t)),
                           result_count * sizeof(int32_t));
 
-  IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, iree_vm_context_state_resolver(context), iree_allocator_system());
+  IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
+                                  iree_vm_context_state_resolver(context),
+                                  iree_allocator_system());
   while (state.KeepRunningBatch(batch_size)) {
     for (iree_host_size_t i = 0; i < i32_args.size(); ++i) {
       reinterpret_cast<int32_t*>(call.arguments.data)[i] = i32_args[i];

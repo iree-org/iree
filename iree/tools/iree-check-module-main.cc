@@ -40,6 +40,8 @@
 #define IREE_FORCE_BINARY_STDIN()
 #endif  // IREE_PLATFORM_WINDOWS
 
+IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
+
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 IREE_FLAG(
@@ -60,15 +62,18 @@ class CheckModuleTest : public ::testing::Test {
       : instance_(instance), modules_(modules), function_(function) {}
   void SetUp() override {
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules_.data(), modules_.size(), iree_allocator_system(),
-        &context_));
+        instance_,
+        FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
+                             : IREE_VM_CONTEXT_FLAG_NONE,
+        modules_.data(), modules_.size(), iree_allocator_system(), &context_));
   }
   void TearDown() override { iree_vm_context_release(context_); }
 
   void TestBody() override {
-    IREE_EXPECT_OK(iree_vm_invoke(context_, function_, /*policy=*/nullptr,
-                                  /*inputs=*/nullptr, /*outputs=*/nullptr,
-                                  iree_allocator_system()));
+    IREE_EXPECT_OK(iree_vm_invoke(
+        context_, function_, IREE_VM_INVOCATION_FLAG_NONE,
+        /*policy=*/nullptr,
+        /*inputs=*/nullptr, /*outputs=*/nullptr, iree_allocator_system()));
   }
 
  private:

@@ -24,6 +24,9 @@ struct iree_vm_context_t {
   // Context storage is statically allocated and need not be freed.
   uint32_t is_static : 1;
 
+  // Configuration flags.
+  iree_vm_context_flags_t flags;
+
   struct {
     iree_host_size_t count;
     iree_host_size_t capacity;
@@ -161,7 +164,11 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
 
   // Run module __deinit functions, if present (in reverse init order).
   IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, iree_vm_context_state_resolver(context), context->allocator);
+      stack,
+      context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
+          ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
+          : IREE_VM_INVOCATION_FLAG_NONE,
+      iree_vm_context_state_resolver(context), context->allocator);
   for (int i = (int)end; i >= (int)start; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     iree_vm_module_state_t* module_state = context->list.module_states[i];
@@ -195,17 +202,17 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t
-iree_vm_context_create(iree_vm_instance_t* instance, iree_allocator_t allocator,
-                       iree_vm_context_t** out_context) {
-  return iree_vm_context_create_with_modules(instance, NULL, 0, allocator,
-                                             out_context);
+IREE_API_EXPORT iree_status_t iree_vm_context_create(
+    iree_vm_instance_t* instance, iree_vm_context_flags_t flags,
+    iree_allocator_t allocator, iree_vm_context_t** out_context) {
+  return iree_vm_context_create_with_modules(instance, flags, NULL, 0,
+                                             allocator, out_context);
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
-    iree_vm_instance_t* instance, iree_vm_module_t** modules,
-    iree_host_size_t module_count, iree_allocator_t allocator,
-    iree_vm_context_t** out_context) {
+    iree_vm_instance_t* instance, iree_vm_context_flags_t flags,
+    iree_vm_module_t** modules, iree_host_size_t module_count,
+    iree_allocator_t allocator, iree_vm_context_t** out_context) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_context);
   *out_context = NULL;
@@ -225,6 +232,11 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
   context->context_id = iree_atomic_fetch_add_int32(&next_context_id, 1,
                                                     iree_memory_order_seq_cst);
 
+  // TODO(benvanik): allow for non-frozen but static contexts.
+  context->is_frozen = module_count > 0;
+  context->is_static = module_count > 0;
+  context->flags = flags;
+
   uint8_t* p = (uint8_t*)context + sizeof(iree_vm_context_t);
   context->list.modules = (iree_vm_module_t**)p;
   p += sizeof(iree_vm_module_t*) * module_count;
@@ -232,9 +244,6 @@ IREE_API_EXPORT iree_status_t iree_vm_context_create_with_modules(
   p += sizeof(iree_vm_module_state_t*) * module_count;
   context->list.count = 0;
   context->list.capacity = module_count;
-  // TODO(benvanik): allow for non-frozen but static contexts.
-  context->is_frozen = module_count > 0;
-  context->is_static = module_count > 0;
 
   iree_status_t register_status =
       iree_vm_context_register_modules(context, modules, module_count);
@@ -292,6 +301,12 @@ IREE_API_EXPORT intptr_t iree_vm_context_id(const iree_vm_context_t* context) {
     return -1;
   }
   return context->context_id;
+}
+
+IREE_API_EXPORT iree_vm_context_flags_t
+iree_vm_context_flags(const iree_vm_context_t* context) {
+  IREE_ASSERT_ARGUMENT(context);
+  return context->flags;
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
@@ -352,7 +367,11 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
 
   // VM stack used to call into module __init methods.
   IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, iree_vm_context_state_resolver(context), context->allocator);
+      stack,
+      context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
+          ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
+          : IREE_VM_INVOCATION_FLAG_NONE,
+      iree_vm_context_state_resolver(context), context->allocator);
 
   // Retain all modules and allocate their state.
   assert(context->list.capacity >= context->list.count + module_count);

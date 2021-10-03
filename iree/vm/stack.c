@@ -173,6 +173,9 @@ struct iree_vm_stack_t {
   iree_host_size_t frame_storage_size;
   void* frame_storage;
 
+  // Flags controlling the behavior of the invocation owning this stack.
+  iree_vm_invocation_flags_t flags;
+
   // True if the stack owns the frame_storage and should free it when it is no
   // longer required. Host stack-allocated stacks don't own their storage but
   // may transition to owning it on dynamic growth.
@@ -192,8 +195,9 @@ struct iree_vm_stack_t {
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
-    iree_byte_span_t storage, iree_vm_state_resolver_t state_resolver,
-    iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
+    iree_byte_span_t storage, iree_vm_invocation_flags_t flags,
+    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
+    iree_vm_stack_t** out_stack) {
   IREE_ASSERT_ARGUMENT(out_stack);
   *out_stack = NULL;
   if (storage.data_length < IREE_VM_STACK_MIN_SIZE) {
@@ -208,6 +212,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
   iree_vm_stack_t* stack = (iree_vm_stack_t*)storage.data;
   memset(stack, 0, sizeof(iree_vm_stack_t));
   stack->owns_frame_storage = false;
+  stack->flags = flags;
   stack->state_resolver = state_resolver;
   stack->allocator = allocator;
 
@@ -240,8 +245,8 @@ IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
-    iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
-    iree_vm_stack_t** out_stack) {
+    iree_vm_invocation_flags_t flags, iree_vm_state_resolver_t state_resolver,
+    iree_allocator_t allocator, iree_vm_stack_t** out_stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   *out_stack = NULL;
@@ -253,8 +258,8 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(
   iree_vm_stack_t* stack = NULL;
   if (iree_status_is_ok(status)) {
     iree_byte_span_t storage_span = iree_make_byte_span(storage, storage_size);
-    status = iree_vm_stack_initialize(storage_span, state_resolver, allocator,
-                                      &stack);
+    status = iree_vm_stack_initialize(storage_span, flags, state_resolver,
+                                      allocator, &stack);
   }
 
   *out_stack = stack;
@@ -271,6 +276,11 @@ IREE_API_EXPORT void iree_vm_stack_free(iree_vm_stack_t* stack) {
   iree_allocator_free(allocator, storage);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+IREE_API_EXPORT iree_vm_invocation_flags_t
+iree_vm_stack_invocation_flags(const iree_vm_stack_t* stack) {
+  return stack->flags;
 }
 
 IREE_API_EXPORT iree_vm_stack_frame_t* iree_vm_stack_current_frame(
@@ -501,7 +511,8 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
     iree_status_t status = iree_vm_module_resolve_source_location(
         module, &frame->frame, &source_location);
     if (iree_status_is_ok(status)) {
-      status = iree_vm_source_location_format(&source_location, builder);
+      status = iree_vm_source_location_format(
+          &source_location, IREE_VM_SOURCE_LOCATION_FORMAT_FLAG_NONE, builder);
     }
     if (iree_status_is_unavailable(status)) {
       // TODO(benvanik): if this is an import/export we can get that name.

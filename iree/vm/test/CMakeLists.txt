@@ -37,6 +37,7 @@ iree_c_embed_data(
     "global_ops_f32.vmfb"
     "global_ops_i64.vmfb"
     "list_ops.vmfb"
+    "list_ops_i64.vmfb"
     "list_variant_ops.vmfb"
     "ref_ops.vmfb"
     "shift_ops.vmfb"
@@ -234,6 +235,16 @@ iree_bytecode_module(
     list_ops
   SRC
     "list_ops.mlir"
+  FLAGS
+    "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    list_ops_i64
+  SRC
+    "list_ops_i64.mlir"
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC

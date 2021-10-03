@@ -78,8 +78,9 @@ VmContext VmContext::Create(VmInstance* instance,
   iree_vm_context_t* context;
   if (!modules) {
     // Simple create with open allowed modules.
-    auto status = iree_vm_context_create(instance->raw_ptr(),
-                                         iree_allocator_system(), &context);
+    auto status =
+        iree_vm_context_create(instance->raw_ptr(), IREE_VM_CONTEXT_FLAG_NONE,
+                               iree_allocator_system(), &context);
     CheckApiStatus(status, "Error creating vm context");
   } else {
     // Closed set of modules.
@@ -89,8 +90,8 @@ VmContext VmContext::Create(VmInstance* instance,
       module_handles[i] = (*modules)[i]->raw_ptr();
     }
     auto status = iree_vm_context_create_with_modules(
-        instance->raw_ptr(), module_handles.data(), module_handles.size(),
-        iree_allocator_system(), &context);
+        instance->raw_ptr(), IREE_VM_CONTEXT_FLAG_NONE, module_handles.data(),
+        module_handles.size(), iree_allocator_system(), &context);
     CheckApiStatus(status, "Error creating vm context with modules");
   }
 
@@ -111,8 +112,9 @@ void VmContext::RegisterModules(std::vector<VmModule*> modules) {
 
 void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
                        VmVariantList& outputs) {
-  CheckApiStatus(iree_vm_invoke(raw_ptr(), f, nullptr, inputs.raw_ptr(),
-                                outputs.raw_ptr(), iree_allocator_system()),
+  CheckApiStatus(iree_vm_invoke(raw_ptr(), f, IREE_VM_INVOCATION_FLAG_NONE,
+                                nullptr, inputs.raw_ptr(), outputs.raw_ptr(),
+                                iree_allocator_system()),
                  "Error invoking function");
 }
 
