@@ -4,6 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+################################################################################
+# Package
+################################################################################
+
 iree_pyext_module(
   NAME
     PyExtRt
@@ -37,9 +41,27 @@ iree_py_library(
     "function.py"
     "system_api.py"
     "tracing.py"
+    "scripts/iree_benchmark_trace/__main__.py"
+    "scripts/iree_run_trace/__main__.py"
   PYEXT_DEPS
     ::PyExtRt
 )
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree_tools_iree-benchmark-trace
+  TO_EXE_NAME iree-benchmark-trace
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree_tools_iree-run-trace
+  TO_EXE_NAME iree-run-trace
+)
+
+################################################################################
+# Tests
+################################################################################
 
 iree_py_test(
   NAME
@@ -69,12 +91,18 @@ iree_py_test(
     "vm_test.py"
 )
 
+################################################################################
+# Install
+################################################################################
+
 iree_py_install_package(
   COMPONENT IreePythonPackage-runtime
   PACKAGE_NAME iree_runtime
   MODULE_PATH iree/runtime
   DEPS
     bindings_python_iree_runtime_PyExtRt
+    iree_tools_iree-benchmark-trace
+    iree_tools_iree-run-trace
   ADDL_PACKAGE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/README.md
 )
@@ -83,4 +111,12 @@ install(
   TARGETS bindings_python_iree_runtime_PyExtRt
   COMPONENT ${PY_INSTALL_COMPONENT}
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
+)
+
+install(
+  TARGETS
+    iree_tools_iree-benchmark-trace
+    iree_tools_iree-run-trace
+  DESTINATION "${PY_INSTALL_MODULE_DIR}"
+  COMPONENT "${PY_INSTALL_COMPONENT}"
 )

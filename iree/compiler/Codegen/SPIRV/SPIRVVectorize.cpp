@@ -226,13 +226,13 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
                                                   vectorizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(vectorizationPatterns));
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "--- After vectorization ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
     }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After vectorization ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
 
     // TODO: This should be a folding of Add into Contract in core but while
     // they live in different dialects, it is not possible without unnatural
@@ -249,15 +249,19 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
                                          std::move(vectorUnrollPatterns));
     }
 
-    {
-      linalg::hoistRedundantVectorTransfers(funcOp);
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After unrolling vector ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
 
-      LLVM_DEBUG({
-        llvm::dbgs() << "--- After hoisting vector transfers ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
-    }
+    linalg::hoistRedundantVectorTransfers(funcOp);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After hoisting vector transfers ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
 
     {
       RewritePatternSet canonicalizationPatterns(funcOp.getContext());
@@ -265,31 +269,37 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
           canonicalizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns));
-
-      if (useCooperativeMatrix(funcOp)) {
-        // When using cooperative matrix we don't want to lower the contract,
-        // instead we want to merge contract and transpose so that they can be
-        // converted to cooperative matrix matmul op.
-        // TODO(thomasraoux): remove that once we support cooperative matrix
-        // lowering in MLIR core.
-        RewritePatternSet combineTransposePatterns(funcOp.getContext());
-        combineTransposePatterns.add<CombineContractTranspose>(
-            funcOp.getContext());
-        (void)applyPatternsAndFoldGreedily(funcOp,
-                                           std::move(combineTransposePatterns));
-      } else {
-        RewritePatternSet contractLoweringPatterns(funcOp.getContext());
-        vector::populateVectorContractLoweringPatterns(
-            contractLoweringPatterns,
-            vector::VectorTransformsOptions().setVectorTransformsOptions(
-                vector::VectorContractLowering::OuterProduct));
-        (void)applyPatternsAndFoldGreedily(funcOp,
-                                           std::move(contractLoweringPatterns));
-      }
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After unrolling vector ---\n";
+      llvm::dbgs() << "--- After canonicalizing vectors ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    if (useCooperativeMatrix(funcOp)) {
+      // When using cooperative matrix we don't want to lower the contract,
+      // instead we want to merge contract and transpose so that they can be
+      // converted to cooperative matrix matmul op.
+      // TODO(thomasraoux): remove that once we support cooperative matrix
+      // lowering in MLIR core.
+      RewritePatternSet combineTransposePatterns(funcOp.getContext());
+      combineTransposePatterns.add<CombineContractTranspose>(
+          funcOp.getContext());
+      (void)applyPatternsAndFoldGreedily(funcOp,
+                                         std::move(combineTransposePatterns));
+    } else {
+      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      vector::populateVectorContractLoweringPatterns(
+          contractLoweringPatterns,
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct));
+      (void)applyPatternsAndFoldGreedily(funcOp,
+                                         std::move(contractLoweringPatterns));
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After handling contraction ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });

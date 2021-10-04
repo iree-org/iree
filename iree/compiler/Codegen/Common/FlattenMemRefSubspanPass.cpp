@@ -99,6 +99,55 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
 // Flattening Patterns
 //===----------------------------------------------------------------------===//
 
+/// Creates a value for the total element count in `shape`, which may have
+/// dynamic dimensions in `dynamicDims`.
+static Value createTotalElementCountValue(ShapedType type,
+                                          ValueRange dynamicDims, Location loc,
+                                          OpBuilder &builder) {
+  MLIRContext *context = builder.getContext();
+
+  if (type.hasStaticShape()) {
+    assert(dynamicDims.empty());
+    return builder.create<ConstantIndexOp>(loc, type.getNumElements());
+  }
+
+  int dynamicDimIndex = 0;
+  SmallVector<Value, 4> dims;
+  auto shape = type.getShape();
+  AffineExpr sizeExpr = getAffineConstantExpr(1, context);
+  for (int i = 0; i < shape.size(); ++i) {
+    sizeExpr = sizeExpr * getAffineSymbolExpr(i, context);
+    if (ShapedType::isDynamic(shape[i])) {
+      dims.push_back(dynamicDims[dynamicDimIndex++]);
+    } else {
+      dims.push_back(builder.create<ConstantIndexOp>(loc, shape[i]));
+    }
+  }
+  return makeComposedAffineApply(builder, loc, sizeExpr, dims);
+}
+
+// Flattens memref allocation ops with more than 1 dimensions to 1 dimension.
+template <typename AllocOpTy>
+struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
+  using OpConversionPattern<AllocOpTy>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      AllocOpTy allocOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto oldType = allocOp.getType().template dyn_cast<MemRefType>();
+    if (!oldType || !oldType.getAffineMaps().empty()) return failure();
+
+    Value dynamicDim = createTotalElementCountValue(
+        oldType, allocOp.getDynamicSizes(), allocOp.getLoc(), rewriter);
+    Type newType = this->getTypeConverter()->convertType(oldType);
+
+    rewriter.replaceOpWithNewOp<AllocOpTy>(allocOp, newType.cast<MemRefType>(),
+                                           ValueRange{dynamicDim});
+
+    return success();
+  }
+};
+
 /// Flattens memref global ops with more than 1 dimensions to 1 dimension.
 struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -170,32 +219,8 @@ struct FlattenBindingSubspan final
     // layout maps.
     if (!oldType || !oldType.getAffineMaps().empty()) return failure();
 
-    Value dynamicDim;
-    if (oldType.hasStaticShape()) {
-      // Because we always convert to 1-D dynamic memref, we still need to
-      // provide a "dynamic" dimension SSA value even if the old type is
-      // fully static.
-      dynamicDim = rewriter.create<ConstantIndexOp>(subspanOp.getLoc(),
-                                                    oldType.getNumElements());
-    } else {
-      ArrayRef<int64_t> oldShape = oldType.getShape();
-      MLIRContext *context = rewriter.getContext();
-      Location loc = subspanOp.getLoc();
-
-      int dynamicDimIndex = 0;
-      SmallVector<Value, 4> dims;
-      AffineExpr sizeExpr = getAffineConstantExpr(1, context);
-      for (int i = 0; i < oldType.getRank(); ++i) {
-        sizeExpr = sizeExpr * getAffineSymbolExpr(i, context);
-        if (ShapedType::isDynamic(oldShape[i])) {
-          dims.push_back(subspanOp.dynamic_dims()[dynamicDimIndex++]);
-        } else {
-          dims.push_back(rewriter.create<ConstantIndexOp>(loc, oldShape[i]));
-        }
-      }
-      dynamicDim = makeComposedAffineApply(rewriter, loc, sizeExpr, dims);
-    }
-
+    Value dynamicDim = createTotalElementCountValue(
+        oldType, subspanOp.dynamic_dims(), subspanOp.getLoc(), rewriter);
     Type newType = getTypeConverter()->convertType(oldType);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
@@ -227,15 +252,34 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   // Then try to see if the source op carries the dynamic dimensions itself.
   // If so we can still get the strides for dimensions to linearize.
   Operation *sourceOp = sourceValue.getDefiningOp();
-  auto shapeCarryOp = dyn_cast<ShapeCarryingInterface>(sourceOp);
-  if (!shapeCarryOp) return nullptr;
-
-  Value shapeOp =
-      shapeCarryOp.buildResultValueRankedShape(sourceValue, builder);
   SmallVector<Value, 4> dims;
   dims.reserve(rank);
-  for (int i = 0; i < rank; ++i) {
-    dims.push_back(builder.create<Shape::RankedDimOp>(loc, shapeOp, i));
+  if (auto shapeCarryOp = dyn_cast<ShapeCarryingInterface>(sourceOp)) {
+    Value shapeOp =
+        shapeCarryOp.buildResultValueRankedShape(sourceValue, builder);
+    for (int i = 0; i < rank; ++i) {
+      dims.push_back(builder.create<Shape::RankedDimOp>(loc, shapeOp, i));
+    }
+  } else {
+    auto getDimValues = [&](MemRefType type, ValueRange dynamicDims) {
+      auto shape = type.getShape();
+      int dynamicDimIndex = 0;
+      for (int i = 0; i < shape.size(); ++i) {
+        if (ShapedType::isDynamic(shape[i])) {
+          dims.push_back(dynamicDims[dynamicDimIndex++]);
+        } else {
+          dims.push_back(builder.create<ConstantIndexOp>(loc, shape[i]));
+        }
+      }
+    };
+
+    if (auto allocOp = dyn_cast<memref::AllocOp>(sourceOp)) {
+      getDimValues(sourceType, allocOp.getDynamicSizes());
+    } else if (auto allocaOp = dyn_cast<memref::AllocaOp>(sourceOp)) {
+      getDimValues(sourceType, allocaOp.getDynamicSizes());
+    } else {
+      return nullptr;
+    }
   }
 
   AffineExpr sym0, sym1, sym2;
@@ -496,36 +540,26 @@ struct FlattenMemRefSubspanPass
     MLIRContext &context = getContext();
     FlattenMemRefTypeConverter typeConverter;
     RewritePatternSet flattenPatterns(&context);
-    flattenPatterns.add<FlattenGlobal, FlattenGetGlobal, FlattenBindingSubspan,
-                        LinearizeLoadIndices, LinearizeStoreIndices,
-                        LinearizeTransferReadIndices,
-                        LinearizeTransferWriteIndices, AdjustConversionCast>(
-        typeConverter, &context);
+    flattenPatterns
+        .add<FlattenAlloc<memref::AllocaOp>, FlattenAlloc<memref::AllocOp>,
+             FlattenGlobal, FlattenGetGlobal, FlattenBindingSubspan,
+             LinearizeLoadIndices, LinearizeStoreIndices,
+             LinearizeTransferReadIndices, LinearizeTransferWriteIndices,
+             AdjustConversionCast>(typeConverter, &context);
 
     ConversionTarget target(context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+    target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp,
+                                 memref::AllocaOp, memref::AllocOp,
+                                 memref::GetGlobalOp>([](Operation *op) {
+      return isRankZeroOrOneMemRef(op->getResultTypes().front());
+    });
     target.addDynamicallyLegalOp<memref::GlobalOp>(
-        [](memref::GlobalOp globalOp) {
-          return isRankZeroOrOneMemRef(globalOp.type());
-        });
-    target.addDynamicallyLegalOp<memref::GetGlobalOp>(
-        [](memref::GetGlobalOp getOp) {
-          return isRankZeroOrOneMemRef(getOp.getType());
-        });
-    target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        [](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-          return isRankZeroOrOneMemRef(subspanOp.getType());
-        });
+        [](memref::GlobalOp op) { return isRankZeroOrOneMemRef(op.type()); });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
-      // TODO: Explicitly allow allocation ops for now. Need to properly
-      // flatten.
-      if (isa<memref::AllocOp>(loadOp.memref().getDefiningOp())) return true;
       return isRankZeroOrOneMemRef(loadOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
-      // TODO: Explicitly allow allocation ops for now. Need to properly
-      // flatten.
-      if (isa<memref::AllocOp>(storeOp.memref().getDefiningOp())) return true;
       return isRankZeroOrOneMemRef(storeOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<vector::TransferReadOp>(

@@ -358,28 +358,6 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
       }
     }
   }
-  for (auto result : llvm::enumerate(outputOperands)) {
-    // If the output tensor is not actually used (for initialization) by this
-    // op, we can reuse the result tensor's buffer for some operands.
-    // TODO(#5040): A better way to handle this case is to allocate a buffer and
-    // then vectorization + load-store forwarding to remove the intermediate
-    // buffer. This requires vectorization to handle all cases downstream. This
-    // is a WAR for current use cases.
-    if (linalgOp.payloadUsesValueFromOperand(result.value())) {
-      continue;
-    }
-    for (auto input : linalgOp.getInputTensorOperands()) {
-      auto producerOp = input->get().getDefiningOp<linalg::LinalgOp>();
-      if (producerOp && input->get().hasOneUse() &&
-          input->get().getType() == result.value()->get().getType() &&
-          linalgOp.getTiedIndexingMap(input) ==
-              linalgOp.getTiedIndexingMap(result.value())) {
-        assert(!tiedOperands[result.index()]);
-        tiedOperands[result.index()] = input->get();
-        break;
-      }
-    }
-  }
   return tiedOperands;
 }
 
@@ -575,6 +553,42 @@ static LogicalResult hasDestructiveUpdateLoopPattern(scf::ForOp forOp,
   return success();
 }
 
+/// Ties together operands for operand fusion as exists today by reusing buffer
+/// for the result for one of the inputs to do in-place update. Ideally we dont
+/// need to do this if the fusion just happens at vector level. To be removed
+/// when that is worked out and can be load-bearing. Conditions checked here are
+/// 1) the result does not use the value of the `outs` buffer.
+/// 2) the input has a single use (this op) and has the same indexing map as the
+///    result.
+/// 3) the input equivalence set does not have an interface binding, i.e. it is
+///    not using a buffer from the dispatch ABI.
+static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
+                                        BufferizationPlan &plan) {
+  for (auto result : enumerate(linalgOp.getOutputOperands())) {
+    if (linalgOp.payloadUsesValueFromOperand(result.value())) {
+      continue;
+    }
+    for (OpOperand *input : linalgOp.getInputTensorOperands()) {
+      Type inputElementType =
+          input->get().getType().cast<RankedTensorType>().getElementType();
+      Type resultElementType = result.value()
+                                   ->get()
+                                   .getType()
+                                   .cast<RankedTensorType>()
+                                   .getElementType();
+      if (input->get().hasOneUse() && (inputElementType == resultElementType) &&
+          linalgOp.getTiedIndexingMap(input) ==
+              linalgOp.getTiedIndexingMap(result.value()) &&
+          !getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
+              input->get(), plan) &&
+          !isFromReadOnlyTensor(input->get(), plan)) {
+        plan.unionSets(linalgOp->getResult(result.index()), input->get());
+        break;
+      }
+    }
+  }
+}
+
 static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
@@ -667,6 +681,19 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
     llvm::dbgs() << "After Destructive update walk ";
     plan.dump();
   });
+
+  // Tie operands to allow for operand fusion support. To be dropped once the
+  // operand fusion is generalized in IREE.
+  funcOp.walk([&](linalg::LinalgOp linalgOp) {
+    return tieOperandsForOperandFusion(linalgOp, plan);
+  });
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs() << "After union for supporting operand fusion";
+    plan.dump();
+  });
+
+  // Finally to support operand fusion as it exists today, reuse buffer that is
+  // used by one of the
   return success();
 }
 

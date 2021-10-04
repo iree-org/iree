@@ -428,6 +428,7 @@ static iree_status_t iree_trace_replay_parse_hal_encoding_type(
     iree_hal_encoding_type_t* out_encoding_type) {
   *out_encoding_type = IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
 
+  if (!encoding_type_node) return iree_ok_status();
   iree_string_view_t encoding_type_str =
       iree_yaml_node_as_string(encoding_type_node);
   if (iree_string_view_is_empty(encoding_type_str)) {
