@@ -457,30 +457,59 @@ func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96x
 
 // -----
 
-// A subsequent pass is expected to convert linalg.fill into DMA ops.
-func @subtensor_insert(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x225x225x3xf32> {
-  %cst = constant 0.000000e+00 : f32
-  %0 = linalg.init_tensor [1, 225, 225, 3] : tensor<1x225x225x3xf32>
-  %1 = linalg.fill(%cst, %0) : f32, tensor<1x225x225x3xf32> -> tensor<1x225x225x3xf32>
-  %2 = tensor.insert_slice %arg0 into %1[0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1] : tensor<1x224x224x3xf32> into tensor<1x225x225x3xf32>
-  return %2 : tensor<1x225x225x3xf32>
+func @subtensor_insert(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>,
+    %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index) -> tensor<?x?xf32> {
+  %0 = tensor.insert_slice %arg0 into
+      %arg1[%arg2, %arg3] [%arg4, %arg5] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
 }
 
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (d0 * s0)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
 //      CHECK: func @subtensor_insert
-// CHECK-SAME: (%[[INPUT:.+]]: tensor<1x224x224x3xf32>)
-//
-//  CHECK-NOT:   flow.dispatch.workgroups
-//      CHECK:   %[[FILL:.+]] =  linalg.fill
-//
-//      CHECK:   %[[PAD:.+]] = flow.dispatch.workgroups[{{.+}}](%[[INPUT]], %[[FILL]]) : (tensor<1x224x224x3xf32>, tensor<1x225x225x3xf32>) -> %[[FILL]] =
-// CHECK-NEXT:       (%[[SRC:.+]]: !flow.dispatch.tensor<readonly:1x224x224x3xf32>, %[[DST:.+]]: !flow.dispatch.tensor<readwrite:1x225x225x3xf32>) {
-// CHECK-NEXT:     %[[SRC_TENSOR:.+]] = flow.dispatch.tensor.load %[[SRC]], {{.*}} : !flow.dispatch.tensor<readonly:1x224x224x3xf32> -> tensor<1x224x224x3xf32>
-// CHECK-NEXT:     %[[DST_TENSOR:.+]] = flow.dispatch.tensor.load %[[DST]], {{.*}} : !flow.dispatch.tensor<readwrite:1x225x225x3xf32> -> tensor<1x225x225x3xf32>
-// CHECK-NEXT:     %[[INSERT:.+]] = tensor.insert_slice %[[SRC_TENSOR]] into %[[DST_TENSOR]][0, 0, 0, 0] [1, 224, 224, 3] [1, 1, 1, 1]
-// CHECK-NEXT:     flow.dispatch.tensor.store %[[INSERT]], %[[DST]], {{.*}} : tensor<1x225x225x3xf32> -> !flow.dispatch.tensor<readwrite:1x225x225x3xf32>
-// CHECK-NEXT:     flow.return
-//
-//      CHECK:   return %[[PAD]] : tensor<1x225x225x3xf32>
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: index
+//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[D3:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[D1]], %[[D0]], %[[C1]]]
+// CHECK-SAME:       (%[[ARG1]], %[[ARG0]], %[[ARG2]], %[[ARG3]])
+// CHECK-SAME:       tensor<?x?xf32>{%[[D2]], %[[D3]]}
+// CHECK-SAME:       tensor<?x?xf32>{%[[D0]], %[[D1]]}
+// CHECK-SAME:       -> %[[ARG1]]{%[[D2]], %[[D3]]}
+// CHECK-NEXT:     %[[ARG6:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
+// CHECK-SAME:     %[[ARG7:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+// CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG9:[a-zA-Z0-9]+]]: index
+//  CHECK-DAG:     %[[WGSIZE_X:.+]] = flow.dispatch.workgroup.size[0]
+//  CHECK-DAG:     %[[WGSIZE_Y:.+]] = flow.dispatch.workgroup.size[1]
+//  CHECK-DAG:     %[[SHAPE:.+]] = flow.dispatch.shape %[[ARG7]]
+//      CHECK:     %[[UB_Y:.+]] = shapex.ranked_dim %[[SHAPE]][0]
+//      CHECK:     %[[UB_X:.+]] = shapex.ranked_dim %[[SHAPE]][1]
+//  CHECK-DAG:     %[[WGID_X:.+]] = flow.dispatch.workgroup.id[0]
+//  CHECK-DAG:     %[[WGCOUNT_X:.+]] = flow.dispatch.workgroup.count[0]
+//  CHECK-DAG:     %[[WGID_Y:.+]] = flow.dispatch.workgroup.id[1]
+//  CHECK-DAG:     %[[WGCOUNT_Y:.+]] = flow.dispatch.workgroup.count[1]
+//  CHECK-DAG:     %[[OFFSET_Y:.+]] = affine.apply #[[MAP0]](%[[WGID_Y]])[%[[WGSIZE_Y]]]
+//  CHECK-DAG:     %[[STEP_Y:.+]] = affine.apply #[[MAP0]](%[[WGCOUNT_Y]])[%[[WGSIZE_Y]]]
+//      CHECK:     scf.for %[[ARG10:.+]] = %[[OFFSET_Y]] to %[[UB_Y]] step %[[STEP_Y]]
+//  CHECK-DAG:       %[[TILESIZE_Y:.+]] = affine.min #[[MAP1]](%[[ARG10]])[%[[WGSIZE_Y]], %[[UB_Y]]]
+//  CHECK-DAG:       %[[OFFSET_X:.+]] = affine.apply #[[MAP0]](%[[WGID_X]])[%[[WGSIZE_X]]]
+//  CHECK-DAG:       %[[STEP_X:.+]] = affine.apply #[[MAP0]](%[[WGCOUNT_X]])[%[[WGSIZE_X]]]
+//      CHECK:       scf.for %[[ARG11:.+]] = %[[OFFSET_X]] to %[[UB_X]] step %[[STEP_X]]
+//      CHECK:         %[[TILESIZE_X:.+]] = affine.min #[[MAP1]](%[[ARG11]])[%[[WGSIZE_X]], %[[UB_X]]]
+//      CHECK:         %[[LOAD_TILE:.+]] = flow.dispatch.tensor.load %[[ARG7]]
+// CHECK-SAME:             offsets = [%[[ARG10]], %[[ARG11]]], sizes = [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
+//  CHECK-DAG:         %[[STORE_OFFSET_Y:.+]] = affine.apply #[[MAP2]](%[[ARG10]])[%[[ARG8]]]
+//  CHECK-DAG:         %[[STORE_OFFSET_Y:.+]] = affine.apply #[[MAP2]](%[[ARG11]])[%[[ARG9]]]
+//      CHECK:         flow.dispatch.tensor.store %[[LOAD_TILE]], %[[ARG6]]
+//      CHECK:   return %[[RESULT]]
 
 // -----
 
@@ -1096,3 +1125,40 @@ func @named_op_outs_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> 
 //       CHECK:     %[[FILL:.+]] = linalg.fill_rng_2d
 //       CHECK:     linalg.matmul
 //  CHECK-SAME:       outs(%[[FILL]] : tensor<?x?xf32>)
+
+// -----
+
+func @dynamic_slice(%arg0 : i32, %arg1 : i32, %arg2 : tensor<?xi32>,
+    %arg3 : tensor<?x?xi32>) -> tensor<?x?xi32>{
+  %c0 = constant 0 : index
+  %c0_i32 = constant 0 : i32
+  %c2_i32 = constant 2 : i32
+  %5 = cmpi slt, %arg0, %c2_i32 : i32
+  %6 = select %5, %arg0, %c2_i32 : i32
+  %7 = cmpi sgt, %6, %c0_i32 : i32
+  %8 = select %7, %6, %c0_i32 : i32
+  %9 = index_cast %8 : i32 to index
+  %11 = cmpi slt, %arg1, %c0_i32 : i32
+  %12 = select %11, %arg1, %c0_i32 : i32
+  %13 = cmpi sgt, %12, %c0_i32 : i32
+  %14 = select %13, %12, %c0_i32 : i32
+  %15 = index_cast %14 : i32 to index
+  %d0 = tensor.dim %arg2, %c0 : tensor<?xi32>
+  %17 = tensor.insert_slice %arg2 into
+      %arg3[%9, %15] [1, %d0] [1, 1] : tensor<?xi32> into tensor<?x?xi32>
+  return %17 : tensor<?x?xi32>
+}
+// CHECK-LABEL: func @dynamic_slice
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: i32
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: i32
+//  CHECK-SAME:     %[[ARG2:.+]]: tensor<?xi32>
+//  CHECK-SAME:     %[[ARG3:.+]]: tensor<?x?xi32>
+//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG3]], %[[C0]]
+//   CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG3]], %[[C1]]
+//       CHECK:   flow.dispatch.workgroups[%[[D0]], %[[C1]], %[[C1]]]
+//  CHECK-SAME:       tensor<?x?xi32>{%[[D1]], %[[D2]]}, tensor<?xi32>{%[[D0]]}
+//  CHECK-NEXT:     %[[ARG4:.+]]: !flow.dispatch.tensor<readwrite:?x?xi32>
+//  CHECK-SAME:     %[[ARG5:.+]]: !flow.dispatch.tensor<readonly:?xi32>
