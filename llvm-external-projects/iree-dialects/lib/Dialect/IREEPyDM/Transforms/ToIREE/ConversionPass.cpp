@@ -43,12 +43,19 @@ struct ConvertIREEPyDMToIREEPass
 
     // Some CFG ops can be present in the original pydm program. Need to
     // verify legality based on types.
-    target.addDynamicallyLegalOp<BranchOp>([&](BranchOp op) -> bool {
+    target.addDynamicallyLegalOp<BranchOp>([&](mlir::BranchOp op) -> bool {
       return typeConverter.areTypesLegal(op.getOperandTypes());
     });
-    target.addDynamicallyLegalOp<CondBranchOp>([&](CondBranchOp op) -> bool {
-      return typeConverter.areTypesLegal(op.getOperandTypes());
-    });
+    target.addDynamicallyLegalOp<CondBranchOp>(
+        [&](mlir::CondBranchOp op) -> bool {
+          return typeConverter.areTypesLegal(op.getOperandTypes());
+        });
+
+    // Standard select can be emitted as part of CFG canonicalization.
+    target.addDynamicallyLegalOp<mlir::SelectOp>(
+        [&](mlir::SelectOp op) -> bool {
+          return typeConverter.areTypesLegal(op.getOperandTypes());
+        });
 
     if (failed(applyPartialConversion(moduleOp, target, std::move(patterns)))) {
       return signalPassFailure();

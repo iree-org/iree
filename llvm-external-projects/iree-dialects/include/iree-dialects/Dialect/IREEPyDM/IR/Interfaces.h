@@ -7,6 +7,7 @@
 #ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_INTERFACES_H
 #define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_INTERFACES_H
 
+#include "iree-dialects/Dialect/IREEPyDM/IR/Constants.h"
 #include "mlir/IR/Types.h"
 
 namespace mlir {

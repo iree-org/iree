@@ -14,13 +14,41 @@ RTL_MODULE = RtlModule("booleans")
 
 @RTL_MODULE.export_pyfunc
 def object_as_bool(v) -> bool:
-  if is_type(v, TYPE_BOOL):
-    return unbox_unchecked_bool(v)
-  elif is_type(v, TYPE_NONE):
+  type_code = get_type_code(v)
+  if unbox_i32(type_code) == TYPE_NONE:
     return False
-  elif is_type(v, TYPE_INTEGER):
-    return raw_compare_ne(unbox_unchecked_integer(v), 0)
-  elif is_type(v, TYPE_REAL):
-    return raw_compare_ne(unbox_unchecked_real(v), 0.0)
+  elif is_numeric_type_code(type_code):
+    numeric_cat = get_type_code_numeric_category(type_code)
+    if unbox_i32(numeric_cat) == TYPE_NUMERIC_CATEGORY_BOOL:
+      return unbox_bool(v)
+    numeric_subtype = get_type_code_numeric_subtype(type_code)
+
+    # Switch based on numeric category and subtype. Generally, we either
+    # promote to the 32bit variant of a category, or if v is the 64bit
+    # variant, then we compare directly with 64bit comparison functions.
+    if unbox_i32(numeric_cat) == TYPE_NUMERIC_CATEGORY_SIGNED:
+      if unbox_i32(numeric_subtype) == TYPE_NUMERIC_SUBTYPE_INTEGER32:
+        # 32bit comparison.
+        return cmpnz_i32(v)
+      if unbox_i32(numeric_subtype) == TYPE_NUMERIC_SUBTYPE_INTEGER64:
+        # Do 64 bit comparison.
+        return cmpnz_i64(v)
+      else:
+        # TODO: Support 8/16 bit promotion.
+        return raise_value_error(False)
+    elif unbox_i32(numeric_cat) == TYPE_NUMERIC_CATEGORY_REAL:
+      if unbox_i32(numeric_subtype) == TYPE_NUMERIC_SUBTYPE_FP32:
+        return True
+      elif unbox_i32(numeric_subtype) == TYPE_NUMERIC_SUBTYPE_FP64:
+        return True
+      elif unbox_i32(numeric_subtype) == TYPE_NUMERIC_SUBTYPE_FP16:
+        return True
+      else:
+        # TODO: BF16?
+        return raise_value_error(False)
+    else:
+      # TODO: Unsigned, apsigned, weak.
+      return raise_value_error(False)
+
   # TODO: List, Str, Bytes, Tuple, user objects, etc.
-  return True
+  return raise_value_error(False)

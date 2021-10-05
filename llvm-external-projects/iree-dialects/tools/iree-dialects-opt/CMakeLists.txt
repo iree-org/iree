@@ -7,8 +7,7 @@ set(LIBS
   MLIRTransforms
   IREEDialectsIREEDialect
   IREEDialectsIREEPyDMDialect
-  IREEDialectsIREEPyDMRTLPasses
-  IREEDialectsIREEPyDMToIREEPasses
+  IREEDialectsIREEPyDMPasses
 )
 
 add_llvm_tool(iree-dialects-opt

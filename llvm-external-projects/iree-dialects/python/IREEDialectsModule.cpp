@@ -159,7 +159,6 @@ PYBIND11_MODULE(_ireeDialects, m) {
   DEFINE_IREEPYDM_NULLARY_TYPE(Bytes)
   DEFINE_IREEPYDM_NULLARY_TYPE(ExceptionResult)
   DEFINE_IREEPYDM_NULLARY_TYPE(FreeVarRef)
-  DEFINE_IREEPYDM_NULLARY_TYPE(Integer)
   DEFINE_IREEPYDM_NULLARY_TYPE(List)
   DEFINE_IREEPYDM_NULLARY_TYPE(None)
   DEFINE_IREEPYDM_NULLARY_TYPE(Real)
@@ -167,6 +166,25 @@ PYBIND11_MODULE(_ireeDialects, m) {
   DEFINE_IREEPYDM_NULLARY_TYPE(Tuple)
   DEFINE_IREEPYDM_NULLARY_TYPE(Type)
 
+  // IntegerType.
+  mlir_type_subclass(iree_pydm_m, "IntegerType", mlirTypeIsAIREEPyDMInteger,
+                     typeClass)
+      .def_classmethod(
+          "get",
+          [](py::object cls, MlirContext context) {
+            return cls(mlirIREEPyDMIntegerTypeGet(context));
+          },
+          py::arg("cls"), py::arg("context") = py::none())
+      .def_classmethod(
+          "get_explicit",
+          [](py::object cls, int bitWidth, bool isSigned, MlirContext context) {
+            return cls(mlirIREEPyDMIntegerTypeGetExplicit(context, bitWidth,
+                                                          isSigned));
+          },
+          py::arg("cls"), py::arg("bit_width"), py::arg("is_signed") = true,
+          py::arg("context") = py::none());
+
+  // ObjectType.
   mlir_type_subclass(iree_pydm_m, "ObjectType", mlirTypeIsAIREEPyDMObject,
                      typeClass)
       .def_classmethod(

@@ -45,13 +45,19 @@ LoweringTypeConverter::LoweringTypeConverter() {
   // Integer type hierarchy.
   addConversion([&](pydm_d::IntegerType t) -> Optional<Type> {
     Builder b(t.getContext());
-    return getWeakIntegerType(b);
+    if (t.isWeak()) {
+      return getWeakIntegerType(b);
+    }
+    return b.getIntegerType(t.getBitWidth());
   });
 
   // Real type hierarchy.
   addConversion([&](pydm_d::RealType t) -> Optional<Type> {
     Builder b(t.getContext());
-    return getWeakFloatType(b);
+    if (t.isWeak()) {
+      return getWeakFloatType(b);
+    }
+    return t.getFloatType();
   });
 
   // Variable references.

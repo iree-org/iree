@@ -175,6 +175,65 @@ class AllocFreeVarOpConversion
   }
 };
 
+class ApplyBinaryNumericConversion
+    : public OpConversionPattern<pydm_d::ApplyBinaryOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::ApplyBinaryOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    Type leftType = adaptor.left().getType();
+    Type rightType = adaptor.right().getType();
+    Type resultType = typeConverter->convertType(srcOp.result().getType());
+    if (!resultType || leftType != rightType || leftType != resultType) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "not same type operands/results");
+    }
+    if (leftType.isa<builtin_d::IntegerType>()) {
+      bool isSigned = true;  // TODO: Unsigned.
+      Value converted =
+          convertIntegerOp(srcOp.getLoc(), adaptor.dunder_name().getValue(),
+                           adaptor.left(), adaptor.right(), isSigned, rewriter);
+      if (!converted)
+        return rewriter.notifyMatchFailure(srcOp, "unsupported operation");
+      rewriter.replaceOp(srcOp, converted);
+      return success();
+    } else if (leftType.isa<builtin_d::FloatType>()) {
+      // TODO: Implement float binary
+      return rewriter.notifyMatchFailure(srcOp, "unsupported operation");
+    }
+
+    return rewriter.notifyMatchFailure(srcOp, "non numeric type");
+  }
+
+  Value convertIntegerOp(Location loc, StringRef dunderName, Value left,
+                         Value right, bool isSigned,
+                         ConversionPatternRewriter &rewriter) const {
+    // TODO: matmul, truediv, floordiv, mod, divmod, pow
+    if (dunderName == "add") {
+      return rewriter.create<arith_d::AddIOp>(loc, left, right);
+    } else if (dunderName == "and") {
+      return rewriter.create<arith_d::AndOp>(loc, left, right);
+    } else if (dunderName == "mul") {
+      return rewriter.create<arith_d::MulIOp>(loc, left, right);
+    } else if (dunderName == "lshift") {
+      return rewriter.create<arith_d::ShiftLeftOp>(loc, left, right);
+    } else if (dunderName == "or") {
+      return rewriter.create<arith_d::OrOp>(loc, left, right);
+    } else if (dunderName == "rshift") {
+      if (isSigned)
+        return rewriter.create<arith_d::SignedShiftRightOp>(loc, left, right);
+      else
+        return rewriter.create<arith_d::UnsignedShiftRightOp>(loc, left, right);
+    } else if (dunderName == "sub") {
+      return rewriter.create<arith_d::SubIOp>(loc, left, right);
+    } else if (dunderName == "xor") {
+      return rewriter.create<arith_d::XOrOp>(loc, left, right);
+    }
+    return nullptr;
+  }
+};
+
 class ApplyCompareNumericConversion
     : public OpConversionPattern<pydm_d::ApplyCompareOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -242,17 +301,6 @@ class BoxOpConversion : public OpConversionPattern<pydm_d::BoxOp> {
   }
 };
 
-class BranchConversion : public OpConversionPattern<std_d::BranchOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      std_d::BranchOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<std_d::BranchOp>(srcOp, srcOp.dest(),
-                                                 adaptor.destOperands());
-    return success();
-  }
-};
-
 class CallOpConversion : public OpConversionPattern<pydm_d::CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -268,19 +316,6 @@ class CallOpConversion : public OpConversionPattern<pydm_d::CallOp> {
     }
     rewriter.replaceOpWithNewOp<std_d::CallOp>(srcOp, srcOp.callee(),
                                                resultTypes, adaptor.operands());
-    return success();
-  }
-};
-
-class CondBranchConversion : public OpConversionPattern<std_d::CondBranchOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      std_d::CondBranchOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<std_d::CondBranchOp>(
-        srcOp, adaptor.condition(), srcOp.trueDest(),
-        adaptor.trueDestOperands(), srcOp.falseDest(),
-        adaptor.falseDestOperands());
     return success();
   }
 };
@@ -327,6 +362,22 @@ class ConstantOpConversion : public OpConversionPattern<pydm_d::ConstantOp> {
       return rewriter.notifyMatchFailure(
           srcOp, "constant cannot be represented as a standard constant");
     rewriter.replaceOpWithNewOp<std_d::ConstantOp>(srcOp, resultType, newValue);
+    return success();
+  }
+};
+
+/// Generates a failure exception code.
+/// This is just temporary to allow some libraries to signal exceptions.
+class FailureOpConversion : public OpConversionPattern<pydm_d::FailureOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::FailureOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    Type i32 = rewriter.getI32Type();
+    // '-3' == RuntimeError
+    rewriter.replaceOpWithNewOp<std_d::ConstantOp>(
+        srcOp, i32, rewriter.getIntegerAttr(i32, -3));
     return success();
   }
 };
@@ -603,19 +654,66 @@ class UnboxOpConversion : public OpConversionPattern<pydm_d::UnboxOp> {
   }
 };
 
+//------------------------------------------------------------------------------
+// Outside pydm op conversions
+// These are largely identity conversions for CFG related standard ops, and
+// those that can be emitted as part of canonicalizations.
+//------------------------------------------------------------------------------
+
+class BuiltinBranchConversion : public OpConversionPattern<std_d::BranchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      std_d::BranchOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<std_d::BranchOp>(srcOp, srcOp.dest(),
+                                                 adaptor.destOperands());
+    return success();
+  }
+};
+
+class BuiltinCondBranchConversion
+    : public OpConversionPattern<std_d::CondBranchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      std_d::CondBranchOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<std_d::CondBranchOp>(
+        srcOp, adaptor.condition(), srcOp.trueDest(),
+        adaptor.trueDestOperands(), srcOp.falseDest(),
+        adaptor.falseDestOperands());
+    return success();
+  }
+};
+
+class BuiltinSelectConversion : public OpConversionPattern<std_d::SelectOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      std_d::SelectOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<std_d::SelectOp>(srcOp, adaptor.condition(),
+                                                 adaptor.true_value(),
+                                                 adaptor.false_value());
+    return success();
+  }
+};
+
 }  // namespace
 
 void mlir::iree_pydm::populatePyDMToIREELoweringPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet &patterns) {
-  // Structural.
-  patterns.insert<AllocFreeVarOpConversion, ApplyCompareNumericConversion,
-                  BoolToPredConversion, BoxOpConversion, BranchConversion,
-                  CallOpConversion, CondBranchConversion, ConstantOpConversion,
-                  FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
-                  RaiseOnFailureOpConversion, ReturnOpConversion,
-                  StoreVarOpConversion, UnboxOpConversion>(typeConverter,
-                                                           context);
+  // PyDM conversions.
+  patterns.insert<AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
+                  ApplyCompareNumericConversion, BoolToPredConversion,
+                  BoxOpConversion, CallOpConversion, ConstantOpConversion,
+                  FailureOpConversion, FuncOpConversion, GetTypeCodeConversion,
+                  LoadVarOpConversion, RaiseOnFailureOpConversion,
+                  ReturnOpConversion, StoreVarOpConversion, UnboxOpConversion>(
+      typeConverter, context);
+
+  // External CFG ops.
+  patterns.insert<BuiltinBranchConversion, BuiltinCondBranchConversion,
+                  BuiltinSelectConversion>(typeConverter, context);
 
   // Constants and constructors.
   patterns.insert<NoneOpConversion>(typeConverter, context);
