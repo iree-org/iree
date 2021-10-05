@@ -263,10 +263,10 @@ Status PrepareModule(std::string target_backend,
 Status EvaluateFunction(iree_vm_context_t* context,
                         iree_hal_allocator_t* allocator,
                         iree_vm_function_t function,
-                        iree_string_view_t export_name) {
+                        iree_string_view_t function_name) {
   IREE_TRACE_SCOPE();
 
-  std::cout << "EXEC @" << std::string(export_name.data, export_name.size)
+  std::cout << "EXEC @" << std::string(function_name.data, function_name.size)
             << std::endl;
 
   // Parse input values from the flags.
@@ -326,14 +326,14 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
     iree_vm_function_t function;
-    iree_string_view_t export_name;
     IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
                              bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                             ordinal, &function, &export_name),
+                             ordinal, &function),
                          "Looking up function export %d", ordinal);
-    if (iree_string_view_starts_with(export_name,
+    iree_string_view_t function_name = iree_vm_function_name(&function);
+    if (iree_string_view_starts_with(function_name,
                                      iree_make_cstring_view("__")) ||
-        iree_string_view_find_char(export_name, '$', 0) !=
+        iree_string_view_find_char(function_name, '$', 0) !=
             IREE_STRING_VIEW_NPOS) {
       // Skip internal or special functions.
       return OkStatus();
@@ -352,7 +352,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     // Invoke the function and print results.
     IREE_RETURN_IF_ERROR(
         EvaluateFunction(context, iree_hal_device_allocator(device), function,
-                         export_name),
+                         function_name),
         "Evaluating export function %d", ordinal);
 
     iree_vm_context_release(context);

@@ -234,23 +234,22 @@ class IREEBenchmark {
 
   iree_status_t RegisterAllExportedFunctions() {
     IREE_TRACE_SCOPE0("IREEBenchmark::RegisterAllExportedFunctions");
-    iree_vm_function_t function;
     iree_vm_module_signature_t signature =
         input_module_->signature(input_module_->self);
     for (iree_host_size_t i = 0; i < signature.export_function_count; ++i) {
-      iree_string_view_t export_name;
-      IREE_CHECK_OK(input_module_->get_function(
-          input_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function,
-          &export_name, nullptr));
+      iree_vm_function_t function;
+      IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
+          input_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
+      iree_string_view_t function_name = iree_vm_function_name(&function);
 
       // We run anything with the 'benchmark' attribute.
       // If the attribute is not present we'll run anything that looks runnable.
       bool known_benchmark = !iree_string_view_is_empty(
           iree_vm_function_reflection_attr(&function, IREE_SV("benchmark")));
       if (!known_benchmark) {
-        if (iree_string_view_starts_with(export_name,
+        if (iree_string_view_starts_with(function_name,
                                          iree_make_cstring_view("__")) ||
-            iree_string_view_find_char(export_name, '$', 0) !=
+            iree_string_view_find_char(function_name, '$', 0) !=
                 IREE_STRING_VIEW_NPOS) {
           // Skip internal or special functions.
           continue;
@@ -270,7 +269,8 @@ class IREEBenchmark {
       }
 
       iree::RegisterModuleBenchmarks(
-          std::string(export_name.data, export_name.size), context_, function,
+          std::string(function_name.data, function_name.size), context_,
+          function,
           /*inputs=*/nullptr);
     }
     return iree_ok_status();

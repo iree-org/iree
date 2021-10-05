@@ -105,7 +105,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
     for (iree_host_size_t i = 0; i < executable->entry_fn_count; ++i) {
       status = iree_vm_module_lookup_function_by_ordinal(
           bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-          &executable->entry_fns[i], NULL);
+          &executable->entry_fns[i]);
       if (!iree_status_is_ok(status)) break;
       status = iree_hal_vmvx_executable_verify_entry_point(
           &executable->entry_fns[i]);
