@@ -105,7 +105,8 @@ struct InsertSliceTiledOpInterface
       unsigned opOffsetIndex = opOffset.index();
       OpFoldResult opOffsetVal = opOffset.value();
       Optional<int64_t> opSizeVal = getConstantIntValue(opSizes[opOffsetIndex]);
-      if (opSizeVal && *opSizeVal == 1 && sourceShape[offsetIndex] != 1) {
+      if (offsetIndex >= sourceShape.size() ||
+          (opSizeVal && *opSizeVal == 1 && sourceShape[offsetIndex] != 1)) {
         resultOffsets[opOffsetIndex] = opOffsetVal;
         resultSizes[opOffsetIndex] = oneAttr;
         continue;
