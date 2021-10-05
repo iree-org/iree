@@ -107,11 +107,13 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createTensorConstantBufferizePass());
   pm.addPass(createFoldTensorExtractOpPass());
 
+  pm.addNestedPass<FuncOp>(createLLVMGPUVectorLoweringPass());
+
   // SCF -> STD
   pm.addNestedPass<FuncOp>(createLowerToCFGPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
-  pm.addNestedPass<FuncOp>(createLLVMGPUVectorLoweringPass());
+
   pm.addNestedPass<FuncOp>(createStdExpandOpsPass());
   pm.addPass(createLowerAffinePass());
 

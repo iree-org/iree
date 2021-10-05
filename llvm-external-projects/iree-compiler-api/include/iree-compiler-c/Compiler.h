@@ -21,6 +21,7 @@ extern "C" {
   typedef struct name name
 
 DEFINE_C_API_STRUCT(IreeCompilerOptions, void);
+#undef DEFINE_C_API_STRUCT
 
 //===----------------------------------------------------------------------===//
 // Registration.

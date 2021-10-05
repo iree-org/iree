@@ -238,13 +238,14 @@ void LLVMCPUVectorizationPass::runOnOperation() {
                                        std::move(vectorizationPatterns));
   }
 
-  // TODO: This should be a folding of Add into Contract in core but while they
-  // live in different dialects, it is not possible without unnatural
-  // dependencies.
-  funcOp.walk([&](Operation *op) {
-    if (auto contract = canonicalizeContractionAdd(op))
-      op->replaceAllUsesWith(contract);
-  });
+  {
+    // Fold consumer add ops into the contraction op itself.
+    RewritePatternSet canonicalizationPatterns(context);
+    vector::ContractionOp::getCanonicalizationPatterns(canonicalizationPatterns,
+                                                       context);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns));
+  }
 
   if (enableVectorContractToAarch64Asm) {
     RewritePatternSet vectorToAArch64AsmPatterns(context);

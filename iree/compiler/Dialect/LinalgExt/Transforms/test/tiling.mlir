@@ -683,3 +683,65 @@ func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK:            scf.yield %[[RES3]]
 // CHECK:          scf.yield %[[RES2]]
 // CHECK:        return %[[RES]]
+
+// -----
+
+func @dynamic_insert_slice(%arg0 : tensor<?xf32>, %arg1 : tensor<?x?xf32>,
+    %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
+  %c0 = constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?xf32>
+  %0 = tensor.insert_slice %arg0 into %arg1[%arg2, %arg3] [1, %d0] [1, 1]
+      {__internal_linalg_transform__ = "tiling_input"} : tensor<?xf32> into tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+//      CHECK: func @dynamic_insert_slice(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?xf32>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<?x?xf32>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: index
+//  CHECK-DAG:  %[[C0:.+]] = constant 0 : index
+//  CHECK-DAG:  %[[C10:.+]] = constant 10 : index
+//      CHECK:  %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?xf32>
+//      CHECK:  %[[RESULT:.+]] = scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]]
+// CHECK-SAME:      step %[[C10]] iter_args(%[[ARG5:.+]] = %[[ARG1]])
+//      CHECK:    %[[TILESIZE:.+]] = affine.min #[[MAP0]](%[[ARG4]])[%[[C10]], %[[D0]]]
+//      CHECK:    %[[EXTRACT:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG4]]] [%[[TILESIZE]]]
+//      CHECK:    %[[OFFSET:.+]] = affine.apply #[[MAP1]](%[[ARG4]])[%[[ARG3]]]
+//      CHECK:    %[[INSERT:.+]] = tensor.insert_slice %[[EXTRACT]] into %[[ARG5]]
+// CHECK-SAME:        [%[[ARG2]], %[[OFFSET]]] [1, %[[TILESIZE]]]
+//      CHECK:    scf.yield %[[INSERT]]
+//      CHECK:  return %[[RESULT]]
+
+
+// -----
+
+func @insert_slice_rank_reduced_inner(%arg0 : tensor<?xf32>,
+    %arg1 : tensor<?x?x?xf32>, %arg2: index, %arg3 : index, %arg4 : index) -> tensor<?x?x?xf32> {
+  %c0 = constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?xf32>
+  %0 = tensor.insert_slice %arg0 into %arg1[%arg2, %arg3, %arg4] [1, %d0, 1] [1, 1, 1]
+      {__internal_linalg_transform__ = "tiling_input"} : tensor<?xf32> into tensor<?x?x?xf32>
+  return %0 : tensor<?x?x?xf32>
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+//      CHECK: func @insert_slice_rank_reduced_inner(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?xf32>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<?x?x?xf32>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: index
+//  CHECK-DAG:   %[[LB:.+]] = constant 0 : index
+//  CHECK-DAG:   %[[STEP:.+]] = constant 10 : index
+//      CHECK:   %[[UB:.+]] = tensor.dim %[[ARG0]]
+//      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:[a-zA-Z0-9_]+]] = %[[LB]]
+// CHECK-SAME:       to %[[D0]] step %[[STEP]] iter_args(%[[ARG6:.+]] = %[[ARG1]])
+//      CHECK:     %[[TILESIZE:.+]] = affine.min #[[MAP0]](%[[ARG5]])[%[[STEP]], %[[UB]]]
+//      CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[IV0]]] [%[[TILESIZE]]]
+//      CHECK:     %[[APPLY:.+]] = affine.apply #[[MAP1]](%[[IV0]])[%[[ARG3]]]
+//      CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SLICE]] into %[[ARG6]]
+// CHECK-SAME:         [%[[ARG2]], %[[APPLY]], %[[ARG4]]] [1, %[[TILESIZE]], 1]
+//      CHECK:     scf.yield %[[YIELD]]
+//      CHECK:   return %[[RESULT]]

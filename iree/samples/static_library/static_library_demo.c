@@ -82,11 +82,6 @@ iree_status_t Run() {
   if (iree_status_is_ok(status)) {
     status = create_device_with_static_loader(&device);
   }
-  iree_vm_module_t* hal_module = NULL;
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_module_create(device, iree_allocator_system(), &hal_module);
-  }
 
   // Session configuration (one per loaded module to hold module state).
   iree_runtime_session_options_t session_options;

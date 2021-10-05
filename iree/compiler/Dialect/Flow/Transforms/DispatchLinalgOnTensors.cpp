@@ -239,11 +239,31 @@ static bool isAlwaysFusedIntoDispatchOp(Operation *op) {
 static std::pair<IREE::Flow::DispatchWorkgroupsOp, Operation *>
 buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
                                         ArrayRef<Value> count, Operation *op) {
+  SmallVector<Value> operands, operandDims;
+  SmallVector<int64_t> tiedOperands;
+  if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(op)) {
+    // Handle tensor.insert_slice in a special manner. This op is actually two
+    // steps:
+    // 1) Copy over the dest tensor to the result,
+    // 2) Update the overwritten part of the result with the destination.
+    // To actually make this work, the dispatch region needs the `dest` and
+    // result to be tied operands. This is somehow special. It might fall out
+    // naturally, but not sure how. For now, just do it by construction.
+    operands.push_back(insertSliceOp.dest());
+    ReifiedRankedShapedTypeDims resultShapes;
+    (void)insertSliceOp.reifyResultShapes(rewriter, resultShapes);
+    auto destType = insertSliceOp.dest().getType().cast<ShapedType>();
+    for (auto shape : enumerate(destType.getShape())) {
+      if (shape.value() != ShapedType::kDynamicSize) {
+        continue;
+      }
+      operandDims.push_back(resultShapes[0][shape.index()]);
+    }
+    tiedOperands.push_back(0);
+  }
   auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-      loc, count, op->getResultTypes(), /*result_dims=*/ValueRange{},
-      /*operands=*/ValueRange{},
-      /*operand_dims=*/ValueRange{},
-      /*tied_operands=*/ArrayRef<int64_t>{});
+      loc, count, op->getResultTypes(), /*result_dims=*/ValueRange{}, operands,
+      operandDims, tiedOperands);
   Region &region = dispatchOp.body();
   Block *block = &region.front();
   Operation *clonedOp;
@@ -423,15 +443,13 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   return orderedOps;
 }
 
-/// Computes the values that will be eventually be used within the dispatch
+/// Computes the values that will eventually be used within the dispatch
 /// workgroup op but defined outside the op after all clonable operations are
-/// cloned into the region. Returns (by reference) the clonable operations too,
-/// in order in which they can be cloned within the region to satisfy use-def
-/// relationships between them.
+/// cloned into the region.
 static void getUsedValuesDefinedAboveAfterCloningOps(
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp,
-    llvm::SetVector<Value> &valuesDefinedAbove,
-    llvm::SmallVector<Operation *> &clonedOps) {
+    OpBuilder &builder, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
+    llvm::SetVector<Value> &valuesDefinedAbove) {
+  llvm::SmallVector<Operation *> clonedOps;
   llvm::SetVector<Value> visited;
   SmallVector<Value, 4> worklist;
   worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
@@ -452,6 +470,21 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
   // The cloned operations form a DAG. Return the cloned operations so the
   // leaves come first, and can be cloned in-order into the dispatch region.
   clonedOps = orderOperations(clonedOps);
+
+  for (auto clonedOp : reverse(clonedOps)) {
+    Operation *clone = builder.clone(*clonedOp);
+    for (auto result : llvm::enumerate(clonedOp->getResults())) {
+      result.value().replaceUsesWithIf(
+          clone->getResult(result.index()), [&](OpOperand &use) {
+            return use.getOwner()
+                       ->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ==
+                   dispatchOp;
+          });
+      valuesDefinedAbove.remove(result.value());
+    }
+    builder.setInsertionPoint(clone);
+  }
+
   // Reverse the values. This is not for correctness, but more for readability
   // of the IR.
   llvm::SetVector<Value> reversedValues;
@@ -459,86 +492,115 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
   std::swap(reversedValues, valuesDefinedAbove);
 }
 
+/// Returns the tied operand for the given `resultArg`. Returns nullptr if error
+/// or not found.
+static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
+  auto resultArgType =
+      resultArg.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+  if (!resultArgType ||
+      resultArgType.getAccess() != IREE::Flow::TensorAccess::WriteOnly) {
+    return nullptr;
+  }
+  // Each output block argument should just have one use.
+  if (!resultArg.hasOneUse()) return nullptr;
+
+  // And that's a flow.dispatch.output.store op.
+  auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(
+      (*resultArg.getUses().begin()).getOwner());
+  if (!storeOp) return nullptr;
+
+  Operation *tieOp = storeOp.value().getDefiningOp();
+  if (!tieOp) return nullptr;
+
+  // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
+  // when it's available in MLIR core in some form.
+  BlockArgument tiedArg =
+      TypeSwitch<Operation *, BlockArgument>(tieOp)
+          .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp insertOp)
+                                           -> BlockArgument {
+            auto loadOp =
+                insertOp.dest()
+                    .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+            if (!loadOp) return nullptr;
+            return loadOp.source().dyn_cast<BlockArgument>();
+          })
+          .Case<IREE::Flow::DispatchTensorLoadOp>(
+              [&](auto loadOp) -> BlockArgument {
+                // Check that there is a single use and that the source is
+                // block argument. Single use can potentially be relaxed.
+                auto loadArg =
+                    loadOp.source().template dyn_cast<BlockArgument>();
+                if (!loadArg || !loadArg.hasOneUse()) {
+                  return nullptr;
+                }
+                return loadArg;
+              })
+          .Case<linalg::LinalgOp,
+                linalg_ext::LinalgExtOp>([&](auto linalgLikeOp)
+                                             -> BlockArgument {
+            unsigned resultIndex =
+                storeOp.value().cast<OpResult>().getResultNumber();
+            auto loadOp =
+                linalgLikeOp.getOutputTensorOperands()[resultIndex]
+                    ->get()
+                    .template getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+            if (!loadOp) return nullptr;
+            return loadOp.source().template dyn_cast<BlockArgument>();
+          })
+          .Default([&](Operation *) -> BlockArgument { return nullptr; });
+
+  if (!tiedArg) {
+    return nullptr;
+  }
+
+  // CHeck that the type of the tied argument candidate and type of the output
+  // match and that the tied argument is readonly.
+  auto type = tiedArg.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+  if (!type || type.getAccess() != IREE::Flow::TensorAccess::ReadOnly ||
+      type.getElementType() != resultArgType.getElementType() ||
+      llvm::any_of(llvm::zip(type.getShape(), resultArgType.getShape()),
+                   [](std::tuple<int64_t, int64_t> sizes) {
+                     return std::get<0>(sizes) !=
+                                IREE::Flow::DispatchTensorType::kDynamicSize &&
+                            std::get<1>(sizes) !=
+                                IREE::Flow::DispatchTensorType::kDynamicSize &&
+                            std::get<0>(sizes) != std::get<1>(sizes);
+                   })) {
+    return nullptr;
+  }
+  return tiedArg;
+}
+
 /// Modifies `dispatchOp` to attach operand-result tie information when
 /// possible.
 static void tryToTieOperandsAndResults(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Block *block = dispatchOp.getBody(0);
-  unsigned numResults = dispatchOp.getNumResults();
-  auto inputs = block->getArguments().drop_back(numResults);
-  auto outputs = block->getArguments().take_back(numResults);
+  unsigned numOperands = dispatchOp.getODSOperandIndexAndLength(1).second;
 
-  // Returns the tied operand for the given `resultArg`. Returns nullptr
-  // if error or not found.
-  auto getTiedOperandBlockArgument =
-      [](BlockArgument resultArg) -> BlockArgument {
-    // Each output block argument should just have one use.
-    if (!llvm::hasSingleElement(resultArg.getUses())) return nullptr;
-
-    // And that's a flow.dispatch.output.store op.
-    auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(
-        (*resultArg.getUses().begin()).getOwner());
-    if (!storeOp) return nullptr;
-
-    Operation *tieOp = storeOp.value().getDefiningOp();
-    if (!tieOp) return nullptr;
-
-    // TODO(antiagainst): use TiedOpInterface here instead of hardcoding ops
-    // when it's available in MLIR core in some form.
-    BlockArgument tiedArg =
-        TypeSwitch<Operation *, BlockArgument>(tieOp)
-            .Case<tensor::InsertSliceOp>(
-                [&](tensor::InsertSliceOp insertOp) -> BlockArgument {
-                  auto loadOp = insertOp.dest()
-                                    .template getDefiningOp<
-                                        IREE::Flow::DispatchTensorLoadOp>();
-                  if (!loadOp) return nullptr;
-                  return loadOp.source().dyn_cast<BlockArgument>();
-                })
-            .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp>(
-                [&](auto linalgLikeOp) -> BlockArgument {
-                  unsigned resultIndex =
-                      storeOp.value().cast<OpResult>().getResultNumber();
-                  auto loadOp =
-                      linalgLikeOp.getOutputTensorOperands()[resultIndex]
-                          ->get()
-                          .template getDefiningOp<
-                              IREE::Flow::DispatchTensorLoadOp>();
-                  if (!loadOp) return nullptr;
-                  return loadOp.source().template dyn_cast<BlockArgument>();
-                })
-            .Default([&](Operation *) -> BlockArgument { return nullptr; });
-
-    return tiedArg;
-  };
-
-  SmallVector<BlockArgument, 4> tiedOperands;
-  tiedOperands.reserve(numResults);
-
-  // Collect all result argument's tied operand arguments.
-  for (BlockArgument &arg : outputs) {
-    tiedOperands.push_back(getTiedOperandBlockArgument(arg));
-  }
-
+  SmallVector<unsigned> eraseArguments;
   // Go over each result to tie operand when possible, by:
   // 1. Update the tied operand argument to take readwrite tensors.
   // 2. Erase the result argument.
   // 3. Attach the tie information to the DispatchWorkgroupsOp.
-  for (int i = outputs.size() - 1; i >= 0; --i) {
-    BlockArgument inputArg = tiedOperands[i];
-    if (!inputArg) continue;
-
-    auto oldType = inputArg.getType().cast<IREE::Flow::DispatchTensorType>();
-    inputArg.setType(IREE::Flow::DispatchTensorType::get(
+  for (auto result : llvm::enumerate(dispatchOp.getResults())) {
+    if (dispatchOp.getTiedResultOperand(result.value())) continue;
+    BlockArgument outputArgument =
+        block->getArgument(numOperands + result.index());
+    BlockArgument tiedOperandArgument =
+        getTiedOperandBlockArgument(outputArgument);
+    if (!tiedOperandArgument) continue;
+    auto oldType =
+        tiedOperandArgument.getType().cast<IREE::Flow::DispatchTensorType>();
+    tiedOperandArgument.setType(IREE::Flow::DispatchTensorType::get(
         IREE::Flow::TensorAccess::ReadWrite, oldType.getShape(),
         oldType.getElementType()));
-
-    BlockArgument outputArg = block->getArgument(inputs.size() + i);
-    outputArg.replaceAllUsesWith(inputArg);
-    block->eraseArgument(inputs.size() + i);
-
-    dispatchOp.setTiedResultOperandIndex(i, inputArg.getArgNumber());
+    outputArgument.replaceAllUsesWith(tiedOperandArgument);
+    eraseArguments.push_back(outputArgument.getArgNumber());
+    dispatchOp.setTiedResultOperandIndex(result.index(),
+                                         tiedOperandArgument.getArgNumber());
   }
+  block->eraseArguments(eraseArguments);
 }
 
 static void replaceAllUsesWithinDispatchOp(
@@ -563,78 +625,92 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   Location loc = dispatchOp.getLoc();
   Region &region = dispatchOp.body();
   Block &block = region.front();
-  unsigned numOldBBArgs = block.getNumArguments();
   OpBuilder b = OpBuilder::atBlockBegin(&block);
 
   llvm::SetVector<Value> valuesDefinedAbove;
-  llvm::SmallVector<Operation *> clonedOps;
   mlir::getUsedValuesDefinedAbove(region, valuesDefinedAbove);
   if (valuesDefinedAbove.empty()) return success();
 
-  getUsedValuesDefinedAboveAfterCloningOps(dispatchOp, valuesDefinedAbove,
-                                           clonedOps);
+  getUsedValuesDefinedAboveAfterCloningOps(b, dispatchOp, valuesDefinedAbove);
+  b.setInsertionPointToStart(&block);
 
-  BlockAndValueMapping map;
-  SmallVector<Value> toReplaceWithinRegion;
-  // Replace valuesDefinedAbove by new BB args (including the op's operands).
-  for (Value operand : valuesDefinedAbove) {
-    if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
-      block.addArgument(IREE::Flow::DispatchTensorType::get(
-          TensorAccess::ReadOnly, rt.getShape(), rt.getElementType()));
-    } else {
-      block.addArgument(operand.getType());
+  // Build a map from current operands to arguments.
+  std::pair<unsigned, unsigned> operandsIndexAndLength =
+      dispatchOp.getODSOperandIndexAndLength(1);
+  std::pair<unsigned, unsigned> operandDimsIndexAndLength =
+      dispatchOp.getODSOperandIndexAndLength(2);
+  llvm::DenseMap<Value, BlockArgument> operandToBBArg;
+  for (auto operand : llvm::enumerate(dispatchOp.operands())) {
+    operandToBBArg[operand.value()] = block.getArgument(operand.index());
+  }
+
+  // Of the values defined above and used in the region, add values that are not
+  // operands to the region already.
+  unsigned numOperands = operandsIndexAndLength.second;
+  unsigned numOperandDims = operandDimsIndexAndLength.second;
+  for (auto value : valuesDefinedAbove) {
+    BlockArgument bbArg = operandToBBArg.lookup(value);
+    auto tensorType = value.getType().dyn_cast<RankedTensorType>();
+    if (!bbArg) {
+      // Create a new basic block argument for this value.
+      Type bbArgType = value.getType();
+      if (tensorType) {
+        bbArgType = IREE::Flow::DispatchTensorType::get(
+            TensorAccess::ReadOnly, tensorType.getShape(),
+            tensorType.getElementType());
+      }
+      bbArg = block.insertArgument(numOperands, bbArgType, value.getLoc());
     }
 
-    Value bbArg = block.getArguments().back();
     Value repl = bbArg;
     if (bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
+      // For arguments of type flow.dispatch.tensor, create a
+      // flow.dispatch.tensor.load to get the replacement values.
       repl = b.create<IREE::Flow::DispatchTensorLoadOp>(
-          loc, operand.getType().cast<RankedTensorType>(), bbArg);
+          loc, value.getType().cast<RankedTensorType>(), bbArg);
     }
-    map.map(operand, repl);
-    toReplaceWithinRegion.push_back(operand);
-  }
 
-  // The only existing arguments are for the outputs. Just need to add a new
-  // argument for the outputs and remap the value to use the new argument.
-  for (unsigned argNum : llvm::seq<unsigned>(0, numOldBBArgs)) {
-    BlockArgument arg = block.getArgument(argNum);
-    assert(arg.getType().isa<IREE::Flow::DispatchTensorType>());
-    arg.replaceAllUsesWith(block.addArgument(arg.getType()));
-  }
-  // Drop old BB args.
-  block.eraseArguments(
-      llvm::to_vector<4>(llvm::seq<unsigned>(0, numOldBBArgs)));
+    value.replaceUsesWithIf(repl, [&](OpOperand &use) {
+      return use.getOwner()
+                 ->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ==
+             dispatchOp;
+    });
 
-  // Clone the marked operations.
-  for (Operation *op : clonedOps) {
-    b.clone(*op, map);
-    toReplaceWithinRegion.append(op->result_begin(), op->result_end());
-  }
-
-  // Make the region isolated from above.
-  for (auto value : toReplaceWithinRegion) {
-    replaceAllUsesWithinDispatchOp(dispatchOp, value, map.lookup(value));
-  }
-
-  // Gather the dynamic dimensions for all operands.
-  SmallVector<Value, 4> operandDynamicDims;
-  OpBuilder builder(dispatchOp);
-  for (Value operand : valuesDefinedAbove) {
-    if (auto rt = operand.getType().dyn_cast<RankedTensorType>()) {
-      for (unsigned i = 0; i < rt.getRank(); ++i) {
-        if (!rt.isDynamicDim(i)) continue;
-        auto dim = builder.createOrFold<tensor::DimOp>(dispatchOp.getLoc(),
-                                                       operand, i);
-        operandDynamicDims.push_back(dim);
+    // Insert the operand if this is not already one. Also need to account for
+    // dynamic dim values for the operands.
+    if (!operandToBBArg.count(value)) {
+      dispatchOp->insertOperands(operandsIndexAndLength.first + numOperands,
+                                 {value});
+      numOperands++;
+      if (tensorType) {
+        // This dims for this operand does not exist. Add those.
+        OpBuilder::InsertionGuard g(b);
+        b.setInsertionPoint(dispatchOp);
+        SmallVector<Value> dynamicDims;
+        for (auto dim : llvm::enumerate(tensorType.getShape())) {
+          if (dim.value() != ShapedType::kDynamicSize) continue;
+          dynamicDims.push_back(b.createOrFold<tensor::DimOp>(
+              dispatchOp.getLoc(), value, dim.index()));
+        }
+        dispatchOp->insertOperands(
+            operandsIndexAndLength.first + numOperands + numOperandDims,
+            dynamicDims);
+        numOperandDims += dynamicDims.size();
       }
     }
   }
 
-  // Set the values captured from above as the new operands.
-  dispatchOp.operandsMutable().assign(llvm::to_vector<4>(valuesDefinedAbove));
-  dispatchOp.operand_dimsMutable().assign(operandDynamicDims);
-
+  // Update the `operand_segment_sizes`.
+  auto operandSegmentSizes = dispatchOp->getAttrOfType<DenseIntElementsAttr>(
+      dispatchOp.operand_segment_sizesAttrName());
+  auto newValues = llvm::to_vector<4>(llvm::map_range(
+      operandSegmentSizes.getValues<APInt>(),
+      [&](APInt val) -> int32_t { return val.getSExtValue(); }));
+  newValues[1] = numOperands;
+  newValues[2] = numOperandDims;
+  auto newAttr =
+      DenseIntElementsAttr::get(operandSegmentSizes.getType(), newValues);
+  dispatchOp->setAttr(dispatchOp.operand_segment_sizesAttrName(), newAttr);
   return success();
 }
 
