@@ -30,7 +30,7 @@ class LinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
   let printer = [{ return print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
   code extraLinalgExtOpClassDeclaration = [{
-    SmallVector<Value> getDestinationOperands() {
+    SmallVector<Value> getDestinationOperands(OpBuilder &b) {
       SmallVector<Value> dest(outputs().begin(), outputs().end());
       return dest;
     }
