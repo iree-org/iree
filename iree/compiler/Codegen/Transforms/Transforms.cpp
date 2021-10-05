@@ -69,50 +69,5 @@ LogicalResult defineWorkgroupCountRegion(
   return success();
 }
 
-/// Return a fused vector::ContractionOp which represents a patterns such as:
-///
-/// ```mlir
-///    %c0 = vector.constant 0: ...
-///    %c = vector.contract %a, %b, %c0: ...
-///    %e = add %c, %d: ...
-/// ```
-///
-/// by:
-///
-/// ```mlir
-///    %e = vector.contract %a, %b, %d: ...
-/// ```
-///
-/// Return null if the canonicalization does not apply.
-// TODO: This should be a folding of Add into Contract in core but while they
-// live in different dialects, it is not possible without unnatural
-// dependencies.
-vector::ContractionOp canonicalizeContractionAdd(Operation *op) {
-  if (!isa<AddIOp, AddFOp>(op)) return nullptr;
-
-  OpBuilder builder(op);
-  auto canonicalize = [](OpBuilder &b, Value maybeContraction,
-                         Value otherOperand) -> vector::ContractionOp {
-    vector::ContractionOp contractionOp =
-        dyn_cast_or_null<vector::ContractionOp>(
-            maybeContraction.getDefiningOp());
-    if (!contractionOp) return nullptr;
-    if (auto maybeZero =
-            dyn_cast_or_null<ConstantOp>(contractionOp.acc().getDefiningOp())) {
-      if (maybeZero.value() == b.getZeroAttr(contractionOp.acc().getType())) {
-        BlockAndValueMapping bvm;
-        bvm.map(contractionOp.acc(), otherOperand);
-        return cast<vector::ContractionOp>(b.clone(*contractionOp, bvm));
-      }
-    }
-    return nullptr;
-  };
-
-  Value a = op->getOperand(0), b = op->getOperand(1);
-  vector::ContractionOp contract = canonicalize(builder, a, b);
-  contract = contract ? contract : canonicalize(builder, b, a);
-  return contract;
-}
-
 }  // namespace iree_compiler
 }  // namespace mlir

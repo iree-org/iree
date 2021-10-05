@@ -226,6 +226,13 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
                                                   vectorizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(vectorizationPatterns));
+
+      // Fold consumer add ops into the contraction op itself.
+      RewritePatternSet canonicalizationPatterns(context);
+      vector::ContractionOp::getCanonicalizationPatterns(
+          canonicalizationPatterns, context);
+      (void)applyPatternsAndFoldGreedily(funcOp,
+                                         std::move(canonicalizationPatterns));
     }
 
     LLVM_DEBUG({
@@ -234,13 +241,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    // TODO: This should be a folding of Add into Contract in core but while
-    // they live in different dialects, it is not possible without unnatural
-    // dependencies.
-    funcOp.walk([&](Operation *op) {
-      if (auto contract = canonicalizeContractionAdd(op))
-        op->replaceAllUsesWith(contract);
-    });
 
     {
       RewritePatternSet vectorUnrollPatterns(funcOp.getContext());
