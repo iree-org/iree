@@ -81,7 +81,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
         (paddingForM > 0 || paddingForK > 0)
             ? linalg::PadTensorOp::createPadScalarOp(
                   lhsPaddedType, lhs, lhsPaddingValue, createPadding({0, 0}),
-                  createPadding({paddingForM, paddingForK}), /*packing=*/false,
+                  createPadding({paddingForM, paddingForK}), /*nofold=*/false,
                   loc, rewriter)
             : lhs;
 
@@ -89,7 +89,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
         (paddingForK > 0 || paddingForN > 0)
             ? linalg::PadTensorOp::createPadScalarOp(
                   rhsPaddedType, rhs, rhsPaddingValue, createPadding({0, 0}),
-                  createPadding({paddingForK, paddingForN}), /*packing=*/false,
+                  createPadding({paddingForK, paddingForN}), /*nofold=*/false,
                   loc, rewriter)
             : rhs;
 
@@ -107,7 +107,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
           loc, rewriter.getZeroAttr(resultType.getElementType()));
       Value paddedResult = linalg::PadTensorOp::createPadScalarOp(
           newResultType, result, resultPaddingValue, createPadding({0, 0}),
-          createPadding({paddingForM, paddingForN}), /*packing=*/false, loc,
+          createPadding({paddingForM, paddingForN}), /*nofold=*/false, loc,
           rewriter);
       auto paddedMatmulOp =
           cast<linalg::LinalgOp>(matmulOp.getOperation())
