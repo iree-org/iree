@@ -52,11 +52,12 @@ std::vector<TestParams> GetModuleTestParams() {
     iree_vm_module_signature_t signature = module->signature(module->self);
     test_params.reserve(test_params.size() + signature.export_function_count);
     for (int i = 0; i < signature.export_function_count; ++i) {
-      iree_string_view_t name;
-      IREE_CHECK_OK(module->get_function(module->self,
-                                         IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-                                         nullptr, &name, nullptr));
-      test_params.push_back({module_file, std::string(name.data, name.size)});
+      iree_vm_function_t function;
+      IREE_CHECK_OK(iree_vm_module_lookup_function_by_ordinal(
+          module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
+      iree_string_view_t function_name = iree_vm_function_name(&function);
+      test_params.push_back(
+          {module_file, std::string(function_name.data, function_name.size)});
     }
     iree_vm_module_release(module);
   }
