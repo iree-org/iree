@@ -19,18 +19,27 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// TODO(ravishankarm): This needs to be put in a common place for the CPU and
-// GPU backends to use.
+/// NOTE: None of these flags are supported in any form long term. This are
+/// temporary hooks added for development purposes. They could be
+/// changed/modified at any time.
+/// TODO: Find a way to plumb this through to not rely on these flags.
+
 static llvm::cl::opt<int> clNativeVectorSizeInBytes(
     "iree-codegen-llvm-vector-size-in-bytes",
     llvm::cl::desc("native vector size to use on the hardware"),
     llvm::cl::init(16));
+
+static llvm::cl::opt<int> clNumberOfRuntimeThreads(
+    "iree-codegen-llvm-number-of-threads",
+    llvm::cl::desc("number of threads that are used at runtime"),
+    llvm::cl::init(8));
 
 static llvm::cl::opt<int> matmulWorkgroupTileSize(
     "iree-codegen-llvm-matmul-workgroup-size",
@@ -134,33 +143,67 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
     maxDim = std::max<unsigned>(tiledLoop.distributionDim, maxDim);
   }
   SmallVector<int64_t> workloadPerWorkgroup(maxDim + 1, 1);
+  SmallVector<int64_t> numWorkgroupsPerDim(maxDim + 1, 1);
+  SmallVector<int64_t> workload(maxDim + 1, 1);
+  auto getStaticValue = [](OpFoldResult ofr) -> Optional<int64_t> {
+    return (ofr ? getConstantIntValue(ofr) : llvm::None);
+  };
+  auto ceilFn = [](int64_t a, int64_t b) { return (a + b - 1) / b; };
 
   for (auto tiledLoop : enumerate(tiledLoops)) {
-    if (!tiledLoop.value().ub || !tiledLoop.value().ub.is<Attribute>() ||
-        !tiledLoop.value().lb || !tiledLoop.value().lb.is<Attribute>()) {
-      workloadPerWorkgroup[tiledLoop.value().distributionDim] =
-          defaultWorkgroupTileSize;
+    Optional<int64_t> lb = getStaticValue(tiledLoop.value().lb);
+    Optional<int64_t> ub = getStaticValue(tiledLoop.value().ub);
+    unsigned dim = tiledLoop.value().distributionDim;
+    if (!lb || !ub) {
+      workloadPerWorkgroup[dim] = defaultWorkgroupTileSize;
+      workload[dim] = ShapedType::kDynamicSize;
       continue;
     }
-    int64_t lb =
-        tiledLoop.value().lb.get<Attribute>().cast<IntegerAttr>().getInt();
-    int64_t ub =
-        tiledLoop.value().ub.get<Attribute>().cast<IntegerAttr>().getInt();
     int64_t candidateTileSize = nativeVectorSizeInElements[tiledLoop.index()];
-    if (ub <= lb) {
+    if (*ub <= *lb) {
       // Should be avoiding tiling this loop, but use tile size of 1.
       candidateTileSize = 1;
     } else {
       // Pick a value that evenly distributes the workload.
       candidateTileSize = std::max<int64_t>(
-          llvm::PowerOf2Floor(static_cast<uint64_t>(ub - lb) / 2),
+          llvm::PowerOf2Floor(static_cast<uint64_t>(*ub - *lb) / 2),
           candidateTileSize);
     }
 
     // Limit the workload per workgroup to the default being the max to keep the
     // work per invocation reasonable.
-    workloadPerWorkgroup[tiledLoop.value().distributionDim] =
+    workloadPerWorkgroup[dim] =
         std::min<int64_t>(candidateTileSize, defaultWorkgroupTileSize);
+    workload[dim] = (*ub <= *lb ? 1 : *ub - *lb);
+    numWorkgroupsPerDim[dim] = ceilFn(workload[dim], workloadPerWorkgroup[dim]);
+  }
+
+  // Reduce the number of workgroups in cases where we are dividing the work too
+  // much. Over-provision the number of workgroups to twice the number of
+  // threads.
+  int64_t numWorkgroupsLimit = 2 * clNumberOfRuntimeThreads;
+  int64_t numWorkgroups = 1;
+  for (auto ng : numWorkgroupsPerDim) {
+    numWorkgroups *= ng;
+  }
+  unsigned currDim = 0;
+  while (numWorkgroups > numWorkgroupsLimit &&
+         currDim < numWorkgroupsPerDim.size()) {
+    if (workloadPerWorkgroup[currDim] >= defaultWorkgroupTileSize ||
+        workload[currDim] == ShapedType::kDynamicSize ||
+        workloadPerWorkgroup[currDim] >= workload[currDim]) {
+      currDim++;
+      continue;
+    }
+    workloadPerWorkgroup[currDim] = std::min<int64_t>(
+        workloadPerWorkgroup[currDim] * 2, defaultWorkgroupTileSize);
+    int64_t nwg = ceilFn(workload[currDim], workloadPerWorkgroup[currDim]);
+    if (nwg < numWorkgroupsPerDim[currDim]) {
+      numWorkgroups /= numWorkgroupsPerDim[currDim];
+      numWorkgroups *= nwg;
+    } else {
+      currDim++;
+    }
   }
   return workloadPerWorkgroup;
 }
