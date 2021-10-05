@@ -6,8 +6,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Deletes all but the input number of tags and corresponding releases, starting
-# with the oldest tags.
+# Deletes all but the input number of snapshot tags and corresponding releases,
+# starting with the oldest tags.
 #
 # Delete all but the 100 newest tags from the repository at the UPSTREAM_REMOTE
 # environment variable:
@@ -35,28 +35,7 @@ if [[ "$KEEP_TAGS_COUNT" -le 0 ]]; then
 fi
 
 git fetch --all --tags
-TOTAL_TAGS_COUNT=$(git tag | wc -l)
-
-if [[ "$KEEP_TAGS_COUNT" -ge "$TOTAL_TAGS_COUNT" ]]; then
-  echo "Only $TOTAL_TAGS_COUNT exist, so nothing to delete"
-  exit 1
-fi
-
-DELETE_TAGS_COUNT=$((TOTAL_TAGS_COUNT-KEEP_TAGS_COUNT))
-TAGS=($(git for-each-ref --sort=creatordate --count="$DELETE_TAGS_COUNT" --format '%(refname:short)' refs/tags))
-
-echo "$TOTAL_TAGS_COUNT tags available"
-echo "$DELETE_TAGS_COUNT tags will be deleted"
-
-if [[ "$DRY_RUN" != "DRY_RUN" ]]; then
-  read -p "Continue? (y/n) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]
-  then
-    echo "Exiting"
-    exit 0
-  fi
-fi
+TAGS=($(git for-each-ref --sort=creatordate --format '%(refname:short)' refs/tags))
 
 # Filter out tags that were not created by snapshot releases.
 for TAG_INDEX in "${!TAGS[@]}"; do
@@ -65,13 +44,33 @@ for TAG_INDEX in "${!TAGS[@]}"; do
   fi
 done
 
+TOTAL_TAGS_COUNT=${#TAGS[@]}
+if [[ "$KEEP_TAGS_COUNT" -ge "$TOTAL_TAGS_COUNT" ]]; then
+  echo "Only $TOTAL_TAGS_COUNT exist, so nothing to delete"
+  exit 1
+fi
+
+DELETE_TAGS_COUNT=$((TOTAL_TAGS_COUNT-KEEP_TAGS_COUNT))
+DELETE_TAGS=${TAGS[@]::$DELETE_TAGS_COUNT}
+
+echo "$TOTAL_TAGS_COUNT snapshot tags available"
+echo "$DELETE_TAGS_COUNT tags will be deleted"
+
 if [[ $DRY_RUN == "DRY_RUN" ]]; then
   echo "Dry run mode, these tags would be deleted:"
-  for TAG in ${TAGS[@]}; do
+  for TAG in ${DELETE_TAGS[@]}; do
     echo $TAG
   done
   exit 0
 fi
 
-git tag -d ${TAGS[@]}
-git push "${UPSTREAM_REMOTE?}" -d ${TAGS[@]}
+read -p "Continue? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]
+then
+  echo "Exiting"
+  exit 0
+fi
+
+git tag -d ${DELETE_TAGS[@]}
+git push "${UPSTREAM_REMOTE?}" -d ${DELETE_TAGS[@]}
