@@ -485,11 +485,14 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
       return rewriter.notifyMatchFailure(op,
                                          "cannot deduce element byte count");
     }
-    // Create a new subspan op with zero byte offset.
+    // Create a new subspan op with zero byte offset at the original location.
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointAfter(subspanOp);
     Value zero = rewriter.create<ConstantIndexOp>(op.memref().getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         op.memref().getLoc(), subspanOp.getType(), subspanOp.binding(), zero,
         subspanOp.byte_length(), subspanOp.dynamic_dims());
+    rewriter.restoreInsertionPoint(ip);
 
     MLIRContext *context = rewriter.getContext();
     AffineExpr sym0, sym1;
