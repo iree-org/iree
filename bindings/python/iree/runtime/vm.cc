@@ -690,6 +690,30 @@ void SetupVmBindings(pybind11::module m) {
       .def_property_readonly(
           "stashed_flatbuffer_blob",
           [](VmModule& self) { return self.get_stashed_flatbuffer_blob(); })
+      .def_property_readonly(
+          "function_names",
+          [](VmModule& self) {
+            py::list names;
+            iree_vm_module_signature_t sig =
+                iree_vm_module_signature(self.raw_ptr());
+            for (size_t ordinal = 0; ordinal < sig.export_function_count;
+                 ++ordinal) {
+              iree_vm_function_t f;
+              iree_string_view_t linkage_name;
+              auto status = iree_vm_module_lookup_function_by_ordinal(
+                  self.raw_ptr(), IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &f,
+                  &linkage_name);
+              if (iree_status_is_not_found(status)) {
+                iree_status_ignore(status);
+                break;
+              }
+              CheckApiStatus(status, "Error enumerating module");
+              iree_string_view_t fname = iree_vm_function_name(&f);
+              py::str name(fname.data, fname.size);
+              names.append(name);
+            }
+            return names;
+          })
       .def("__repr__", [](VmModule& self) {
         std::string repr("<VmModule ");
         iree_string_view_t name = iree_vm_module_name(self.raw_ptr());

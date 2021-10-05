@@ -26,6 +26,10 @@ class LoweringTypeConverter : public mlir::TypeConverter {
   Type getWeakIntegerType(Builder b) const;
   Type getWeakFloatType(Builder b) const;
 
+  // Whether the given type is a valid lowered type.
+  bool isTypeLegal(Type t) const;
+  bool areTypesLegal(TypeRange types) const;
+
  private:
   bool boolBits = 32;
   int weakIntegerBits = 32;

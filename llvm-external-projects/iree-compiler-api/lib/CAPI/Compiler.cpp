@@ -44,7 +44,10 @@ DEFINE_C_API_PTR_METHODS(IreeCompilerOptions, CompilerOptions)
 void ireeCompilerRegisterTargetBackends() { registerHALTargetBackends(); }
 
 IreeCompilerOptions ireeCompilerOptionsCreate() {
-  return wrap(new CompilerOptions);
+  auto options = new CompilerOptions;
+  // TODO: Make configurable.
+  options->vmTargetOptions.f32Extension = true;
+  return wrap(options);
 }
 
 void ireeCompilerOptionsDestroy(IreeCompilerOptions options) {

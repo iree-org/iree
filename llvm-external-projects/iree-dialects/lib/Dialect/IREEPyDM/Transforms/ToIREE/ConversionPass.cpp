@@ -40,6 +40,16 @@ struct ConvertIREEPyDMToIREEPass
     target.addLegalDialect<mlir::iree::IREEDialect>();
     target.addLegalDialect<mlir::math::MathDialect>();
     target.addLegalDialect<StandardOpsDialect>();
+
+    // Some CFG ops can be present in the original pydm program. Need to
+    // verify legality based on types.
+    target.addDynamicallyLegalOp<BranchOp>([&](BranchOp op) -> bool {
+      return typeConverter.areTypesLegal(op.getOperandTypes());
+    });
+    target.addDynamicallyLegalOp<CondBranchOp>([&](CondBranchOp op) -> bool {
+      return typeConverter.areTypesLegal(op.getOperandTypes());
+    });
+
     if (failed(applyPartialConversion(moduleOp, target, std::move(patterns)))) {
       return signalPassFailure();
     }

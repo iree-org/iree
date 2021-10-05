@@ -361,8 +361,10 @@ class DefaultImportHooks(ImportHooks):
              f"implemented for this compiler")
 
 
-def create_context() -> ir.Context:
+def create_context(*, debug: bool = False) -> ir.Context:
   context = ir.Context()
+  if debug:
+    context.enable_multithreading(False)
   d.register_dialect(context)
   return context
 

@@ -1,12 +1,27 @@
 // RUN: iree-dialects-opt -split-input-file -convert-iree-pydm-to-iree %s | FileCheck --enable-var-scope --dump-input-filter=all %s
 
-// CHECK-LABEL: @none_constant
-iree_pydm.func @none_constant() -> (!iree_pydm.exception_result, !iree_pydm.none) {
-  // CHECK: %[[CST0:.*]] = constant 0 : i32
-  // CHECK: %[[CST1:.*]] = constant 0 : i32
-  // CHECK: return %[[CST1]], %[[CST0]]
+// CHECK-LABEL: @bool_to_pred
+// NOTE: Also tests cond_br conversion.
+iree_pydm.func @bool_to_pred(%arg0 : !iree_pydm.bool) -> (!iree_pydm.exception_result, !iree_pydm.none) {
+  %0 = bool_to_pred %arg0
+  %1 = none
+  // CHECK: cond_br %arg0
+  cond_br %0, ^bb1, ^bb2
+^bb1:
+  return %1 : !iree_pydm.none
+^bb2:
+  return %1 : !iree_pydm.none
+}
+
+// -----
+// CHECK-LABEL: @br
+iree_pydm.func @br() -> (!iree_pydm.exception_result, !iree_pydm.none) {
   %0 = none
-  return %0 : !iree_pydm.none
+  // CHECK: br ^bb1({{.*}} : i32)
+  br ^bb1(%0 : !iree_pydm.none)
+  // CHECK: ^bb1(%0: i32):
+^bb1(%1 : !iree_pydm.none):
+  return %1 : !iree_pydm.none
 }
 
 // -----
@@ -108,4 +123,26 @@ iree_pydm.func @raise_on_failure_builtin(%arg0 : !iree_pydm.exception_result, %a
   // CHECK: return %arg0, %[[ZERO]] : i32, i32
   raise_on_failure %arg0 : !iree_pydm.exception_result
   return %arg1 : !iree_pydm.integer
+}
+
+// -----
+// CHECK-LABEL: @call_and_visibility
+iree_pydm.func @call_and_visibility(%arg0 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.integer) {
+  // CHECK: %[[R:.*]]:2 = call @callee(%arg0) : (i32) -> (i32, i32)
+  %0:2 = call @callee(%arg0) : (!iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.integer)
+  return %0#1 : !iree_pydm.integer
+}
+
+// CHECK: func private @callee
+iree_pydm.func private @callee(%arg0 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.integer) {
+  return %arg0 : !iree_pydm.integer
+}
+
+// -----
+// CHECK-LABEL: @get_type_code
+iree_pydm.func @get_type_code(%arg0 : !iree_pydm.object) -> (!iree_pydm.exception_result, !iree_pydm.integer) {
+  // CHECK: %[[c0:.*]] = constant 0 : index
+  // CHECK: %[[R:.*]] = iree.list.get %arg0[%[[c0]]] : !iree.list<!iree.variant> -> i32
+  %0 = get_type_code %arg0 : !iree_pydm.object
+  return %0 : !iree_pydm.integer
 }
