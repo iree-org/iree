@@ -16,20 +16,26 @@
 # List the tags that would be deleted when not performing a dry run:
 #   ./prune_old_tags.sh 100 DRY_RUN
 
-set -e
-set -u
-set -o pipefail
+set -euo pipefail
 
 KEEP_TAGS_COUNT="$1"
 DRY_RUN="${2:-}"
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 
-if [[ -z "$KEEP_TAGS_COUNT" ]]; then
+DRY_RUN="${DRY_RUN//[-_]/}"
+DRY_RUN="${DRY_RUN^^}"
+
+if [[ -n "${DRY_RUN}" ]] && [[ "${DRY_RUN}" != "DRYRUN" ]]; then
+  echo "Unexpected argument '${2}'. Should be DRYRUN (case and punctuation insensitive) if present"
+  exit 1
+fi
+
+if [[ -z "${KEEP_TAGS_COUNT}" ]]; then
   echo "Must specify the number of tags to keep"
   exit 1
 fi
 
-if [[ "$KEEP_TAGS_COUNT" -le 0 ]]; then
+if [[ "${KEEP_TAGS_COUNT}" -le 0 ]]; then
   echo "Cannot delete all remaining tags"
   exit 1
 fi
@@ -45,28 +51,28 @@ for TAG_INDEX in "${!TAGS[@]}"; do
 done
 
 TOTAL_TAGS_COUNT=${#TAGS[@]}
-if [[ "$KEEP_TAGS_COUNT" -ge "$TOTAL_TAGS_COUNT" ]]; then
-  echo "Only $TOTAL_TAGS_COUNT exist, so nothing to delete"
+if [[ "${KEEP_TAGS_COUNT}" -ge "${TOTAL_TAGS_COUNT}" ]]; then
+  echo "Only ${TOTAL_TAGS_COUNT} tags exist, so nothing to delete"
   exit 1
 fi
 
 DELETE_TAGS_COUNT=$((TOTAL_TAGS_COUNT-KEEP_TAGS_COUNT))
 DELETE_TAGS=${TAGS[@]::$DELETE_TAGS_COUNT}
 
-echo "$TOTAL_TAGS_COUNT snapshot tags available"
-echo "$DELETE_TAGS_COUNT tags will be deleted"
+echo "${TOTAL_TAGS_COUNT} snapshot tags available"
+echo "${DELETE_TAGS_COUNT} tags will be deleted"
 
-if [[ $DRY_RUN == "DRY_RUN" ]]; then
+if [[ "${DRY_RUN}" == "DRYRUN" ]]; then
   echo "Dry run mode, these tags would be deleted:"
   for TAG in ${DELETE_TAGS[@]}; do
-    echo $TAG
+    echo "${TAG}"
   done
   exit 0
 fi
 
 read -p "Continue? (y/n) " -n 1 -r
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]
+if [[ ! "${REPLY}" =~ ^[Yy]$ ]]
 then
   echo "Exiting"
   exit 0
