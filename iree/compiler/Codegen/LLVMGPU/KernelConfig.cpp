@@ -307,6 +307,13 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
         rootOperation = op;
         break;
       }
+      if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+        // linalg.generic with `reduction` iterator types are roots as well.
+        if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+          rootOperation = op;
+          break;
+        }
+      }
     }
 
     if (!rootOperation) {

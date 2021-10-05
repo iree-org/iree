@@ -205,29 +205,6 @@ func @keep_separate_dispatches_for_producer(%A : tensor<?x?xf32>, %B : tensor<?x
 
 // -----
 
-func @fuse_reshape_op(%arg0: tensor<?x?xf32>) -> tensor<?xf32>
-{
-  %0 = linalg.tensor_collapse_shape %arg0 [[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
-  return %0 : tensor<?xf32>
-}
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
-//      CHECK: func @fuse_reshape_op
-// CHECK-SAME:   (%[[ARG0:.+]]: tensor<?x?xf32>)
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//      CHECK:   %[[WORKLOAD:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[D1]]]
-//      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
-// CHECK-SAME:     [%[[WORKLOAD]], %[[C1]], %[[C1]]](%[[ARG0]])
-// CHECK-NEXT:     %[[ARG1:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
-// CHECK-SAME:     %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:?xf32>
-//      CHECK:       %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG1]], {{.*}}
-//      CHECK:       %[[RESHAPE:.+]] = linalg.tensor_collapse_shape %[[LOAD]] {{\[}}[0, 1]]
-//      CHECK:       flow.dispatch.tensor.store %[[RESHAPE]], %[[ARG2]], {{.*}}
-
-// -----
-
 func @tile_4d_generic_op_alone
   (%A: tensor<?x?x?x?xf32>, %B: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
   %c0 = constant 0 : index
@@ -804,37 +781,6 @@ func @multi_result(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?xi32>) -> (tensor<?x
 
 // -----
 
-func @multi_result_fallback(%arg0: tensor<?x10xi32>, %arg1: tensor<?x10xi32>)
-    -> (tensor<?x10xi32>, tensor<?x10xi32>) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %0 = tensor.dim %arg0, %c0 : tensor<?x10xi32>
-  %1 = linalg.init_tensor [%0, 10] : tensor<?x10xi32>
-  %2:2 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, 10-d1)>,
-                       affine_map<(d0, d1) -> (d0, 10-d1)>,
-                       affine_map<(d0, d1) -> (d0, d1)>,
-                       affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
-      ins(%arg0, %arg1 : tensor<?x10xi32>, tensor<?x10xi32>)
-      outs(%1, %1 : tensor<?x10xi32>, tensor<?x10xi32>) {
-      ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):
-        linalg.yield %arg2, %arg3 : i32, i32
-      } -> (tensor<?x10xi32>, tensor<?x10xi32>)
-  return %2#0, %2#1 : tensor<?x10xi32>, tensor<?x10xi32>
-}
-// CHECK-LABEL: func @multi_result_fallback
-//       CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroup
-//  CHECK-NEXT:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x10xi32>
-//  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x10xi32>
-//   CHECK-NOT:     scf.for
-//       CHECK:     %[[OP_RESULT:.+]]:2 = linalg.generic
-//   CHECK-DAG:     flow.dispatch.tensor.store %[[OP_RESULT]]#0, %[[ARG5]]
-//   CHECK-DAG:     flow.dispatch.tensor.store %[[OP_RESULT]]#1, %[[ARG6]]
-//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
-
-// -----
-
 func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i32>, %arg3 : index) -> tensor<1x?xi32> {
   %c1_i32 = constant 1 : i32
   %c0_i32 = constant 0 : i32
@@ -861,7 +807,7 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
 //       CHECK:   %[[C1:.+]] = constant 1 : index
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
 //  CHECK-SAME:     [%[[ARG3]], %[[C1]], %[[C1]]]
-//  CHECK-SAME:     (%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]])
+//  CHECK-SAME:     (%[[ARG3]], %[[ARG1]], %[[ARG2]], %[[ARG0]])
 //   CHECK-DAG:     cmpi
 //   CHECK-DAG:     select
 //   CHECK-DAG:     cmpi
@@ -872,7 +818,13 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
 //   CHECK-DAG:     select
 //   CHECK-DAG:     index_cast
 //   CHECK-DAG:     index_cast
-//       CHECK:     tensor.extract_slice
+//   CHECK-NOT:     tensor.extract
+//       CHECK:     scf.for
+//       CHECK:       scf.for
+//   CHECK-NOT:         tensor.extract
+//       CHECK:         flow.dispatch.tensor.load
+//   CHECK-NOT:         tensor.extract
+//       CHECK:         flow.dispatch.tensor.store
 //       CHECK:     flow.return
 //       CHECK:   return %[[RESULT]]
 
