@@ -725,10 +725,8 @@ void SetupVmBindings(pybind11::module m) {
         for (size_t ordinal = 0; ordinal < sig.export_function_count;
              ++ordinal) {
           iree_vm_function_t f;
-          iree_string_view_t linkage_name;
           auto status = iree_vm_module_lookup_function_by_ordinal(
-              self.raw_ptr(), IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &f,
-              &linkage_name);
+              self.raw_ptr(), IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &f);
           if (iree_status_is_not_found(status)) {
             iree_status_ignore(status);
             break;

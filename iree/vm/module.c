@@ -253,10 +253,9 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_name(
 
 IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
     const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
-    iree_host_size_t ordinal, iree_vm_function_t* out_function,
-    iree_string_view_t* linkage_name) {
+    iree_host_size_t ordinal, iree_vm_function_t* out_function) {
   return module->get_function(module->self, linkage, ordinal, out_function,
-                              /*out_name=*/linkage_name,
+                              /*out_name=*/NULL,
                               /*out_signature=*/NULL);
 }
 
