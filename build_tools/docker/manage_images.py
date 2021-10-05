@@ -60,6 +60,7 @@ IMAGES_TO_DEPENDENCIES = {
         'cmake-bazel-frontends-vulkan', 'swiftshader'
     ],
     'cmake-bazel-frontends-nvidia': ['cmake-bazel-frontends-vulkan'],
+    'gradle-android': ['cmake'],
     'rbe-toolchain': ['vulkan'],
     'samples': ['cmake-python-swiftshader'],
     'swiftshader': ['cmake'],

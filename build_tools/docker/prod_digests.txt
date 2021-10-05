@@ -19,3 +19,4 @@ gcr.io/iree-oss/cmake-bazel-frontends-android@sha256:dee6eb6c4c34a29f381bcc97ed1
 gcr.io/iree-oss/samples@sha256:d9ca1dbdcf4fa2b9dd8f032b42b9a74b9b5c5210d823528ea5874dfeec13444a
 gcr.io/iree-oss/cmake-emscripten@sha256:6dd6228cd482f7bbc64bca1ee7618a55eda408148e6d6588c58e98f89780a279
 gcr.io/iree-oss/cmake-gcc@sha256:49bd84535b82012e83de15a8f1ca847076b359a7bd5a8dabda7e76abb43f32e3
+gcr.io/iree-oss/gradle-android@sha256:54cddc42e13d63da5adf495acb4e96c2773b66a1169cf8a9aac26a21f4166e2e
