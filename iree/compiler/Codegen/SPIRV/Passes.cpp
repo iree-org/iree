@@ -118,7 +118,6 @@ static void addLowerToSPIRVPasses(OpPassManager &pm) {
   // subview ops.
   pm.addPass(memref::createFoldSubViewOpsPass());
   pm.addNestedPass<FuncOp>(Shape::createFoldDimOverShapeCarryingOpPass());
-  pm.addNestedPass<FuncOp>(createStdExpandOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
