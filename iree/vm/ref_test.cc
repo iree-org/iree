@@ -176,17 +176,13 @@ TEST(VMRefTest, RetainNull) {
   iree_vm_ref_retain(&null_ref_0, &null_ref_1);
 }
 
-// Tests that retaining into itself only increments the count.
+// Tests that retaining into itself is a no-op.
 TEST(VMRefTest, RetainIntoSelf) {
   iree_vm_ref_t a_ref = MakeRef<A>("AType");
   EXPECT_EQ(1, ReadCounter(&a_ref));
   iree_vm_ref_retain(&a_ref, &a_ref);
-  EXPECT_EQ(2, ReadCounter(&a_ref));
-
-  iree_vm_ref_t last_ref = {0};
-  iree_vm_ref_assign(&a_ref, &last_ref);
+  EXPECT_EQ(1, ReadCounter(&a_ref));
   iree_vm_ref_release(&a_ref);
-  iree_vm_ref_release(&last_ref);
 }
 
 // Tests that retaining into out_ref releases the existing contents.
@@ -250,12 +246,8 @@ TEST(VMRefTest, RetainOrMoveRetainingIntoSelf) {
   iree_vm_ref_t a_ref = MakeRef<A>("AType");
   EXPECT_EQ(1, ReadCounter(&a_ref));
   iree_vm_ref_retain_or_move(/*is_move=*/0, &a_ref, &a_ref);
-  EXPECT_EQ(2, ReadCounter(&a_ref));
-
-  iree_vm_ref_t last_ref = {0};
-  iree_vm_ref_assign(&a_ref, &last_ref);
+  EXPECT_EQ(1, ReadCounter(&a_ref));
   iree_vm_ref_release(&a_ref);
-  iree_vm_ref_release(&last_ref);
 }
 
 // Tests that moving into itself is a no-op.
