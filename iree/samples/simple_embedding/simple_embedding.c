@@ -51,8 +51,8 @@ iree_status_t Run() {
   iree_vm_context_t* context = NULL;
   iree_vm_module_t* modules[] = {hal_module, bytecode_module};
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-      instance, &modules[0], IREE_ARRAYSIZE(modules), iree_allocator_system(),
-      &context));
+      instance, IREE_VM_CONTEXT_FLAG_NONE, &modules[0], IREE_ARRAYSIZE(modules),
+      iree_allocator_system(), &context));
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
 
@@ -124,9 +124,9 @@ iree_status_t Run() {
                        "can't allocate output vm list");
 
   // Synchronously invoke the function.
-  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, main_function,
-                                      /*policy=*/NULL, inputs, outputs,
-                                      iree_allocator_system()));
+  IREE_RETURN_IF_ERROR(iree_vm_invoke(
+      context, main_function, IREE_VM_INVOCATION_FLAG_NONE,
+      /*policy=*/NULL, inputs, outputs, iree_allocator_system()));
 
   // Get the result buffers from the invocation.
   iree_hal_buffer_view_t* ret_buffer_view =

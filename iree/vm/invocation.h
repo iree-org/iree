@@ -36,14 +36,16 @@ typedef struct iree_vm_invocation_policy_t iree_vm_invocation_policy_t;
 // caller.
 IREE_API_EXPORT iree_status_t iree_vm_invoke(
     iree_vm_context_t* context, iree_vm_function_t function,
-    const iree_vm_invocation_policy_t* policy, iree_vm_list_t* inputs,
-    iree_vm_list_t* outputs, iree_allocator_t allocator);
+    iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
+    iree_vm_list_t* inputs, iree_vm_list_t* outputs,
+    iree_allocator_t allocator);
 
 // TODO(benvanik): document and implement.
 IREE_API_EXPORT iree_status_t iree_vm_invocation_create(
     iree_vm_context_t* context, iree_vm_function_t function,
-    const iree_vm_invocation_policy_t* policy, const iree_vm_list_t* inputs,
-    iree_allocator_t allocator, iree_vm_invocation_t** out_invocation);
+    iree_vm_invocation_flags_t flags, const iree_vm_invocation_policy_t* policy,
+    const iree_vm_list_t* inputs, iree_allocator_t allocator,
+    iree_vm_invocation_t** out_invocation);
 
 // Retains the given |invocation| for the caller.
 IREE_API_EXPORT iree_status_t

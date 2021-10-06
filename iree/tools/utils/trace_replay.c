@@ -18,16 +18,17 @@
 #include "iree/modules/hal/module.h"
 #include "iree/vm/bytecode_module.h"
 
-iree_status_t iree_trace_replay_initialize(iree_string_view_t root_path,
-                                           iree_vm_instance_t* instance,
-                                           iree_allocator_t host_allocator,
-                                           iree_trace_replay_t* out_replay) {
+iree_status_t iree_trace_replay_initialize(
+    iree_string_view_t root_path, iree_vm_instance_t* instance,
+    iree_vm_context_flags_t context_flags, iree_allocator_t host_allocator,
+    iree_trace_replay_t* out_replay) {
   memset(out_replay, 0, sizeof(*out_replay));
 
   IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
 
   out_replay->root_path = root_path;
   out_replay->instance = instance;
+  out_replay->context_flags = context_flags;
   out_replay->host_allocator = host_allocator;
   iree_vm_instance_retain(out_replay->instance);
   return iree_ok_status();
@@ -55,8 +56,9 @@ iree_status_t iree_trace_replay_event_context_load(iree_trace_replay_t* replay,
   replay->context = NULL;
 
   // Create new context.
-  return iree_vm_context_create(replay->instance, replay->host_allocator,
-                                &replay->context);
+  // TODO(benvanik): allow setting flags from the trace files.
+  return iree_vm_context_create(replay->instance, replay->context_flags,
+                                replay->host_allocator, &replay->context);
 }
 
 static iree_status_t iree_trace_replay_create_device(
@@ -765,7 +767,8 @@ iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
       iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
                           replay->host_allocator, &output_list);
   if (iree_status_is_ok(status)) {
-    status = iree_vm_invoke(replay->context, function, /*policy=*/NULL,
+    status = iree_vm_invoke(replay->context, function,
+                            IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/NULL,
                             input_list, output_list, replay->host_allocator);
   }
   iree_vm_list_release(input_list);
@@ -801,7 +804,8 @@ static iree_status_t iree_trace_replay_event_call_stdout(
       iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
                           replay->host_allocator, &output_list);
   if (iree_status_is_ok(status)) {
-    status = iree_vm_invoke(replay->context, function, /*policy=*/NULL,
+    status = iree_vm_invoke(replay->context, function,
+                            IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/NULL,
                             input_list, output_list, replay->host_allocator);
   }
   iree_vm_list_release(input_list);

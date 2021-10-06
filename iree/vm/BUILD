@@ -181,6 +181,8 @@ cc_test(
 cc_library(
     name = "bytecode_module",
     srcs = [
+        "bytecode_disasm.c",
+        "bytecode_disasm.h",
         "bytecode_dispatch.c",
         "bytecode_dispatch_util.h",
         "bytecode_module.c",

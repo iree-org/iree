@@ -4,6 +4,28 @@ vm.module @conversion_ops_f32 {
   // Casting and type conversion/emulation
   //===----------------------------------------------------------------------===//
 
+  // 5.5 f32 (0x40b00000 hex) -> 1085276160 int32
+  vm.export @test_bitcast_i32_f32
+  vm.func @test_bitcast_i32_f32() {
+    %c1 = vm.const.i32 1085276160 : i32
+    %c1dno = util.do_not_optimize(%c1) : i32
+    %v = vm.bitcast.i32.f32 %c1dno : i32 -> f32
+    %c2 = vm.const.f32 5.5 : f32
+    vm.check.eq %v, %c2, "bitcast i32 to f32" : f32
+    vm.return
+  }
+
+  // 1085276160 int32 (0x40b00000 hex) -> 5.5 f32
+  vm.export @test_bitcast_f32_i32
+  vm.func @test_bitcast_f32_i32() {
+    %c1 = vm.const.f32 5.5 : f32
+    %c1dno = util.do_not_optimize(%c1) : f32
+    %v = vm.bitcast.f32.i32 %c1dno : f32 -> i32
+    %c2 = vm.const.i32 1085276160 : i32
+    vm.check.eq %v, %c2, "bitcast f32 to i32" : i32
+    vm.return
+  }
+
   vm.export @test_cast_si32_f32_int_max
   vm.func @test_cast_si32_f32_int_max() {
     %c1 = vm.const.i32 2147483647 : i32

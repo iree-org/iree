@@ -261,6 +261,15 @@ typedef struct iree_vm_execution_result_t {
   int reserved;
 } iree_vm_execution_result_t;
 
+// Controls how source locations are formatted into strings.
+enum iree_vm_source_location_format_flag_bits_e {
+  IREE_VM_SOURCE_LOCATION_FORMAT_FLAG_NONE = 0u,
+  // Only formats a single line (excluding \n) for the source location, even
+  // if the full location information (such as a backtrace) is available.
+  IREE_VM_SOURCE_LOCATION_FORMAT_FLAG_SINGLE_LINE = 1u << 0,
+};
+typedef uint32_t iree_vm_source_location_format_flags_t;
+
 // Source location interface.
 typedef struct iree_vm_source_location_t {
   IREE_API_UNSTABLE
@@ -269,13 +278,17 @@ typedef struct iree_vm_source_location_t {
   void* self;
   uint64_t data[2];
 
-  iree_status_t(IREE_API_PTR* format)(void* self, uint64_t data[2],
-                                      iree_string_builder_t* builder);
+  iree_status_t(IREE_API_PTR* format)(
+      void* self, uint64_t data[2],
+      iree_vm_source_location_format_flags_t flags,
+      iree_string_builder_t* builder);
 } iree_vm_source_location_t;
 
 // Formats the |source_location| to its canonical string form.
-IREE_API_EXPORT iree_status_t iree_vm_source_location_format(
-    iree_vm_source_location_t* source_location, iree_string_builder_t* builder);
+IREE_API_EXPORT iree_status_t
+iree_vm_source_location_format(iree_vm_source_location_t* source_location,
+                               iree_vm_source_location_format_flags_t flags,
+                               iree_string_builder_t* builder);
 
 // Defines an interface that can be used to reflect and execute functions on a
 // module.

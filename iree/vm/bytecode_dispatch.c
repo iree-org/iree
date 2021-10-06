@@ -11,6 +11,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/vm/api.h"
+#include "iree/vm/bytecode_disasm.h"
 #include "iree/vm/bytecode_dispatch_util.h"
 #include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/ops.h"
@@ -104,8 +105,6 @@ static iree_status_t iree_vm_bytecode_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t function,
     iree_vm_stack_frame_t** out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
-  IREE_DISPATCH_LOG_CALL(&function);
-
   iree_vm_bytecode_module_t* module =
       (iree_vm_bytecode_module_t*)function.module->self;
   if (IREE_UNLIKELY(function.ordinal >= module->function_descriptor_count)) {
@@ -542,7 +541,6 @@ static iree_status_t iree_vm_bytecode_call_import(
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
   call.function = import->function;
-  IREE_DISPATCH_LOG_CALL(&call.function);
 
   // Marshal inputs from registers to the ABI arguments buffer.
   call.arguments.data_length = import->argument_buffer_size;
@@ -584,7 +582,6 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
   call.function = import->function;
-  IREE_DISPATCH_LOG_CALL(&call.function);
 
   // Allocate ABI argument/result storage taking into account the variadic
   // segments.
@@ -742,7 +739,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalLoadIndirectRef, {
-      uint32_t global = VM_DecGlobalAttr("global");
+      uint32_t global = VM_DecOperandRegI32("global");
       if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
@@ -758,7 +755,7 @@ iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, GlobalStoreIndirectRef, {
-      uint32_t global = VM_DecGlobalAttr("global");
+      uint32_t global = VM_DecOperandRegI32("global");
       if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,

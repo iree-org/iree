@@ -54,6 +54,9 @@ typedef uint64_t iree_runtime_session_builtins_t;
 
 // Options used to configure session creation.
 typedef struct iree_runtime_session_options_t {
+  // Flags controlling the execution environment.
+  iree_vm_context_flags_t context_flags;
+
   // A bitmask identifying which IREE builtin modules should be enabled.
   // Session creation will fail if a requested module is not built into the
   // runtime binary.

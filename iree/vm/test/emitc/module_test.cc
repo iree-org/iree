@@ -119,8 +119,8 @@ class VMCModuleTest : public ::testing::Test,
 
     std::vector<iree_vm_module_t*> modules = {module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), iree_allocator_system(),
-        &context_));
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        iree_allocator_system(), &context_));
 
     iree_vm_module_release(module_);
   }
@@ -138,7 +138,7 @@ class VMCModuleTest : public ::testing::Test,
         iree_string_view_t{qualified_name.data(), qualified_name.size()},
         &function));
 
-    return iree_vm_invoke(context_, function,
+    return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                           /*policy=*/nullptr, /*inputs=*/nullptr,
                           /*outputs=*/nullptr, iree_allocator_system());
   }

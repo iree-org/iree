@@ -98,7 +98,7 @@ static llvm::cl::opt<bool> split_input_file_flag{
     llvm::cl::init(true),
 };
 
-static llvm::cl::opt<bool> verifyPasses(
+static llvm::cl::opt<bool> verify_passes_flag(
     "verify-each",
     llvm::cl::desc("Run the verifier after each transformation pass"),
     llvm::cl::init(true));
@@ -137,6 +137,12 @@ static llvm::cl::list<std::string> run_args_flag{
     "run-arg",
     llvm::cl::desc("Argument passed to the execution flag parser"),
     llvm::cl::ZeroOrMore,
+};
+
+static llvm::cl::opt<bool> trace_execution_flag{
+    "trace-execution",
+    llvm::cl::desc("Traces VM execution to stderr"),
+    llvm::cl::init(false),
 };
 
 namespace iree {
@@ -200,7 +206,7 @@ Status PrepareModule(std::string target_backend,
   IREE_LOG(INFO) << "Compiling for target backend '" << target_backend
                  << "'...";
   mlir::PassManager pass_manager(mlir_module->getContext());
-  pass_manager.enableVerifier(verifyPasses);
+  pass_manager.enableVerifier(verify_passes_flag);
   mlir::applyPassManagerCLOptions(pass_manager);
   mlir::applyDefaultTimingPassManagerCLOptions(pass_manager);
   mlir::iree_compiler::buildDefaultIREEVMTransformPassPipeline(pass_manager);
@@ -283,9 +289,10 @@ Status EvaluateFunction(iree_vm_context_t* context,
                                            iree_allocator_system(), &outputs));
 
   // Synchronously invoke the function.
-  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function, /*policy=*/nullptr,
-                                      inputs.get(), outputs.get(),
-                                      iree_allocator_system()));
+  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function,
+                                      IREE_VM_INVOCATION_FLAG_NONE,
+                                      /*policy=*/nullptr, inputs.get(),
+                                      outputs.get(), iree_allocator_system()));
 
   // Print outputs.
   IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()));
@@ -344,10 +351,13 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     // runner).
     iree_vm_context_t* context = nullptr;
     std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
-    IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-                             instance, modules.data(), modules.size(),
-                             iree_allocator_system(), &context),
-                         "Creating context");
+    IREE_RETURN_IF_ERROR(
+        iree_vm_context_create_with_modules(
+            instance,
+            trace_execution_flag ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
+                                 : IREE_VM_CONTEXT_FLAG_NONE,
+            modules.data(), modules.size(), iree_allocator_system(), &context),
+        "Creating context");
 
     // Invoke the function and print results.
     IREE_RETURN_IF_ERROR(

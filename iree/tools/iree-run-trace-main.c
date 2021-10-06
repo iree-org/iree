@@ -17,6 +17,8 @@
 #include "iree/tools/utils/yaml_util.h"
 #include "iree/vm/api.h"
 
+IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
+
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 // Runs the trace in |file| using |root_path| as the base for any path lookups
@@ -26,7 +28,10 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
                                          iree_vm_instance_t* instance) {
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
-      root_path, instance, iree_allocator_system(), &replay));
+      root_path, instance,
+      FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
+                           : IREE_VM_CONTEXT_FLAG_NONE,
+      iree_allocator_system(), &replay));
   iree_trace_replay_set_hal_driver_override(
       &replay, iree_make_cstring_view(FLAG_driver));
 
