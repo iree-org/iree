@@ -79,8 +79,8 @@ information. This is OS-specific.
 
 ### Desktop Linux
 
-On desktop Linux, the Tracy client must be run as root, e.g. with `sudo`.
-Otherwise, profile data will lack important components.
+On desktop Linux, the profiled application must be run as root, e.g. with
+`sudo`. Otherwise, profile data will lack important components.
 
 ### Android
 
