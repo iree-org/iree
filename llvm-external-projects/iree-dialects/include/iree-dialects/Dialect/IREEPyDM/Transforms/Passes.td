@@ -9,6 +9,17 @@
 
 include "mlir/Pass/PassBase.td"
 
+def FixateWeakNumeric : Pass<"fixate-weak-numeric", ""> {
+  let summary = "Fixates weak numeric (integer/real/complex) to specific types";
+  let description = [{
+    After all type inference is complete, it is necessary to fixate weak numeric
+    types to a concrete type (either an explicit size or arbitrary-precision).
+    This can also be a useful thing to do early in development in order to
+    eliminate these weak types.
+  }];
+  let constructor = "mlir::iree_pydm::createFixateWeakNumericPass()";
+}
+
 def LowerIREEPyDMToRTL : Pass<"lower-iree-pydm-to-rtl", "ModuleOp"> {
   let summary = "Lowers PyDM ops with runtime implementations to calls";
   let description = [{

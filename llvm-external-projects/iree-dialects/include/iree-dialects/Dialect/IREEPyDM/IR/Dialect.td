@@ -48,7 +48,8 @@ def IREEPyDM_AnyPrimitiveType : Type<
     "unboxed primitive type",
     "::mlir::iree_pydm::PrimitiveType">;
 
-def IREEPyDM_BoolType : IREEPyDM_PrimitiveTypeDef<"Bool", ["getNumericPromotionOrder"]> {
+def IREEPyDM_BoolType : IREEPyDM_PrimitiveTypeDef<"Bool", [
+    "getNumericPromotionOrder", "getNumericCategory", "getNumericSubTypeCode"]> {
   let mnemonic = "bool";
 
   let summary = "Type of bool values";
@@ -84,16 +85,116 @@ def IREEPyDM_ExceptionResultType : IREEPyDM_PrimitiveTypeDef<"ExceptionResult"> 
   }];
 }
 
-def IREEPyDM_IntegerType : IREEPyDM_PrimitiveTypeDef<"Integer", ["getNumericPromotionOrder"]> {
+def IREEPyDM_IntegerType : IREEPyDM_PrimitiveTypeDef<"Integer", [
+    "getNumericPromotionOrder", "getNumericCategory", "getNumericSubTypeCode"]> {
   let mnemonic = "integer";
 
   let summary = "Type of integer values";
 
   let description = [{
-    Represents the `numbers.Integral` type in the data model. At this abstract
-    level, it should be considered conformant with the data model (i.e.
-    unbounded). However, compiler flags will generally be used to interpret
-    this type in a more bounded fashion (i32, i64, etc).
+    Represents the `numbers.Integral` type in the data model. Without further
+    qualification, the type is considered weak and open to further inference.
+    It can be further qualified to an explicit type:
+      Signed of a given bitwidth
+      Unsigned of a given bitwidth
+      Arbitrary precision
+
+    Prints as:
+      integer : Weak integer
+      integer<32> : Signed integer of specific bit width
+      integer<unsigned 32> : Unsigned integer of specific bit width
+      integer<*> : Arbitrary precision integer
+  }];
+
+  let parameters = (ins
+    // Encodes:
+    //   None: Weak integer
+    //   0   : Arbitrary precision integer
+    //   >0  : Signed
+    //   <0  : Unsigned
+    "Optional<int>":$bitWidth
+  );
+
+  let skipDefaultBuilders = 1;
+  let genVerifyDecl = 1;
+
+  let builders = [
+    // Builds a weak integer.
+    TypeBuilder<(ins), [{
+      return Base::get($_ctxt, None);
+    }]>,
+    // Builds:
+    //   (None): Arbitrary precision integer
+    //   (32 [, true]): Signed integer of explicit size
+    //   (32, false): Unsigned integer of explicit size
+    TypeBuilder<(ins CArg<"Optional<unsigned>">:$bitWidth,
+                     CArg<"bool", "true">:$isSigned), [{
+      if (bitWidth) {
+        // Explicit size
+        int w = *bitWidth;
+        if (!isSigned) w = -w;
+        return Base::get($_ctxt, w);
+      } else {
+        // AP
+        return Base::get($_ctxt, 0);
+      }
+    }]>,
+  ];
+
+  let genAccessors = 0;
+
+  let extraClassDeclaration = [{
+    bool isWeak() const;
+    bool isExplicit() const { return !isWeak(); }
+    unsigned getBitWidth() const;
+    bool isSigned() const;
+  }];
+
+  let printer = [{
+    auto w = getImpl()->bitWidth;
+    $_printer << "integer";
+    if (w) {
+      $_printer << "<";
+      if (*w == 0) {
+        $_printer << "*";
+      } else if (*w > 0) {
+        $_printer << *w;
+      } else {
+        $_printer << "unsigned " << (-*w);
+      }
+      $_printer << ">";
+    }
+  }];
+
+  let parser = [{
+    auto emitError = [&]() -> InFlightDiagnostic{
+      return $_parser.emitError($_parser.getCurrentLocation());
+    };
+    // Weak
+    if (failed($_parser.parseOptionalLess()))
+      return get($_ctxt);
+    // AP
+    if (succeeded($_parser.parseOptionalStar())) {
+      if (failed($_parser.parseGreater()))
+        return Type();
+      return get($_ctxt, None);
+    }
+
+    // Explicit
+    bool isSigned;
+    if (succeeded($_parser.parseOptionalKeyword("unsigned"))) {
+      isSigned = false;
+    } else {
+      isSigned = true;
+    }
+
+    int width;
+    if (failed($_parser.parseInteger(width)))
+      return Type();
+    if (failed($_parser.parseGreater()))
+      return Type();
+    if (!isSigned) width = -width;
+    return getChecked(emitError, $_ctxt, width);
   }];
 }
 
@@ -117,16 +218,70 @@ def IREEPyDM_NoneType : IREEPyDM_PrimitiveTypeDef<"None"> {
   }];
 }
 
-def IREEPyDM_RealType : IREEPyDM_PrimitiveTypeDef<"Real", ["getNumericPromotionOrder"]> {
+def IREEPyDM_RealType : IREEPyDM_PrimitiveTypeDef<"Real",
+    ["getNumericPromotionOrder", "getNumericCategory", "getNumericSubTypeCode"]> {
   let mnemonic = "real";
 
   let summary = "Type of floating point values";
 
   let description = [{
-    Represents the `numbers.Real` type in the data model. At this abstract
-    level, it should be considered conformant with the data model (i.e.
-    double precision). However, compiler flags will generally be used to
-    interpret this type in a more bounded fashion (f32).
+    Represents the `numbers.Real` type in the data model. Without qualification,
+    the type is considered "weak" and left open to further inference and/or
+    lowering defaults (which may differ from Python norms of treating this as
+    an f64 if so configured).
+
+    Prints as:
+      `real` : Weak real type
+      `real<f32>` : Explicit real type
+  }];
+
+  let parameters = (ins
+    // Encodes:
+    //   nullptr: Weak real
+    //   FloatType: Explicit real of given floating point type
+    "FloatType":$floatType
+  );
+
+  let skipDefaultBuilders = 1;
+  let genVerifyDecl = 1;
+
+  let builders = [
+    // Builds a weak RealType
+    TypeBuilder<(ins), [{
+      return Base::get($_ctxt, nullptr);
+    }]>,
+    // Builds an explicit RealType
+    TypeBuilder<(ins CArg<"FloatType">:$floatType), [{
+      return Base::get($_ctxt, floatType);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    bool isWeak() const;
+    bool isExplicit() const { return !isWeak(); }
+  }];
+
+  let printer = [{
+    auto ft = getImpl()->floatType;
+    $_printer << "real";
+    if (ft)
+      $_printer << "<" << ft << ">";
+  }];
+
+  let parser = [{
+    auto emitError = [&]() -> InFlightDiagnostic{
+      return $_parser.emitError($_parser.getCurrentLocation());
+    };
+    // Weak
+    if (failed($_parser.parseOptionalLess()))
+      return get($_ctxt);
+    // Explicit
+    FloatType subType;
+    if (failed($_parser.parseType(subType)))
+      return Type();
+    if (failed($_parser.parseGreater()))
+      return Type();
+    return getChecked(emitError, $_ctxt, subType);
   }];
 }
 

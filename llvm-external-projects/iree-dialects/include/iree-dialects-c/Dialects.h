@@ -57,6 +57,7 @@ MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type);
 
 IREEPYDM_DECLARE_NULLARY_TYPE(Bool)
 IREEPYDM_DECLARE_NULLARY_TYPE(Bytes)
+// Note: Also has a non-nullary constructor
 IREEPYDM_DECLARE_NULLARY_TYPE(Integer)
 IREEPYDM_DECLARE_NULLARY_TYPE(ExceptionResult)
 IREEPYDM_DECLARE_NULLARY_TYPE(FreeVarRef)
@@ -69,6 +70,12 @@ IREEPYDM_DECLARE_NULLARY_TYPE(Type)
 
 #undef IREEPYDM_DECLARE_NULLARY_TYPE
 
+// Non-nullary Type constructors from the above.
+MLIR_CAPI_EXPORTED MlirType mlirIREEPyDMIntegerTypeGetExplicit(MlirContext ctx,
+                                                               int bitWidth,
+                                                               bool isSigned);
+
+// ObjectType.
 MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDMObject(MlirType type);
 MLIR_CAPI_EXPORTED MlirType mlirIREEPyDMObjectTypeGet(MlirContext context,
                                                       MlirType primitive);

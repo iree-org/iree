@@ -143,6 +143,6 @@ iree_pydm.func private @callee(%arg0 : !iree_pydm.integer) -> (!iree_pydm.except
 iree_pydm.func @get_type_code(%arg0 : !iree_pydm.object) -> (!iree_pydm.exception_result, !iree_pydm.integer) {
   // CHECK: %[[c0:.*]] = constant 0 : index
   // CHECK: %[[R:.*]] = iree.list.get %arg0[%[[c0]]] : !iree.list<!iree.variant> -> i32
-  %0 = get_type_code %arg0 : !iree_pydm.object
+  %0 = get_type_code %arg0 : !iree_pydm.object -> !iree_pydm.integer
   return %0 : !iree_pydm.integer
 }

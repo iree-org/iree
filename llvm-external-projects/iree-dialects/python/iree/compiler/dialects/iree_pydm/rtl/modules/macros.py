@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Macros that can be used freely when building RTL modules."""
 
+from .constants import *
+
 from ...importer import (
     def_ir_macro_intrinsic,
     ImportStage,
@@ -14,99 +16,132 @@ from .... import iree_pydm as d
 from ..... import ir
 
 
+def _constant_i32(value: int):
+  """Emits a constant i32 value."""
+  return d.ConstantOp(
+      d.IntegerType.get_explicit(32),
+      ir.IntegerAttr.get(ir.IntegerType.get_signless(32), value)).result
+
+
+def _constant_i64(value: int):
+  """Emits a constant i64 value."""
+  return d.ConstantOp(
+      d.IntegerType.get_explicit(64),
+      ir.IntegerAttr.get(ir.IntegerType.get_signless(64), value)).result
+
+
+def _unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
+  i32_type = d.IntegerType.get_explicit(32)
+  if d.ObjectType.isinstance(value.type):
+    return d.UnboxOp(d.ExceptionResultType.get(), i32_type, value).primitive
+  else:
+    if value.type != i32_type:
+      stage.ic.abort(
+          f"Type error unbox a non object type -> integer<32>: {value.type}")
+    return value
+
+
+def _unbox_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
+  i64_type = d.IntegerType.get_explicit(64)
+  if d.ObjectType.isinstance(value.type):
+    return d.UnboxOp(d.ExceptionResultType.get(), i64_type, value).primitive
+  else:
+    if value.type != i64_type:
+      stage.ic.abort(
+          f"Type error unbox a non object type -> integer<64>: {value.type}")
+    return value
+
+
+@def_ir_macro_intrinsic
+def unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
+  """Performs an unchecked unbox of an integer<32> value.
+
+  Typically this will be the result of a variable looked. It is important that
+  the variable was stored with an integer<32> or else it is UB.
+
+  If the value is not an ObjectType, it is returned as-is, assuming that it
+  is already an integer<32>.
+
+  This shouldn't be needed in the fullness of time but gets around type
+  inference limitations in contexts where we don't want to (or can't) be
+  on the general path.
+  """
+  return _unbox_i32(stage, value)
+
+
 @def_ir_macro_intrinsic
 def get_type_code(stage: ImportStage, value: ir.Value) -> ir.Value:
-  """Gets the TypeCode (see C++ BuiltinTypeCode) associated with a value."""
-  return d.GetTypeCodeOp(d.IntegerType.get(), value).result
+  """Gets the TypeCode (see C++ BuiltinTypeCode) associated with a value.
 
-
-@def_ir_macro_intrinsic
-def is_type(stage: ImportStage, value: ir.Value,
-            type_code: ir.Value) -> ir.Value:
-  """Efficiently checks whether a value has a given type code."""
-  ic = stage.ic
-  if not d.IntegerType.isinstance(type_code.type):
-    ic.abort(f"is_type() macro must be called with a constant type_code. "
-             f"Got {type_code}")
-  actual_type_code = get_type_code(stage, value)
-  cmp_result = d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("eq"),
-                                type_code, actual_type_code).result
-  return cmp_result
-
-
-@def_ir_macro_intrinsic
-def get_numeric_promotion_order(stage: ImportStage,
-                                value: ir.Value) -> ir.Value:
-  """Gets the numeric promotion order.
-
-  See get_numeric_promotion_order op.
+  This always returns an integer<32>, which is expected by macros which
+  operate on type codes.
   """
-  return d.GetNumericPromotionOrderOp(d.IntegerType.get(), value).result
+  return d.GetTypeCodeOp(d.IntegerType.get_explicit(32), value).result
 
 
 @def_ir_macro_intrinsic
-def promote_numeric_to_integer(stage: ImportStage, value: ir.Value) -> ir.Value:
-  """Promotes the value to IntegerType."""
-  return d.PromoteNumericOp(d.IntegerType.get(), value).result
+def is_numeric_type_code(stage: ImportStage, type_code: ir.Value):
+  """Determines whether the type code is part of the numeric hierarchy."""
+  type_code_i32 = _unbox_i32(stage, type_code)
+  t = type_code_i32.type
+  shifted = d.ApplyBinaryOp(t, ir.StringAttr.get("rshift"), type_code_i32,
+                            _constant_i32(TYPE_NUMERIC_SHIFT)).result
+  return d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("eq"), shifted,
+                          _constant_i32(TYPE_NUMERIC_SHIFTED_VALUE)).result
 
 
 @def_ir_macro_intrinsic
-def promote_numeric_to_real(stage: ImportStage, value: ir.Value) -> ir.Value:
-  """Promotes the value to RealType."""
-  return d.PromoteNumericOp(d.RealType.get(), value).result
+def get_type_code_numeric_category(stage: ImportStage, type_code: ir.Value):
+  type_code_i32 = _unbox_i32(stage, type_code)
+  t = type_code_i32.type
+  masked = d.ApplyBinaryOp(t, ir.StringAttr.get("and"), type_code_i32,
+                           _constant_i32(TYPE_NUMERIC_CATEGORY_MASK)).result
+  shifted = d.ApplyBinaryOp(t, ir.StringAttr.get("rshift"), masked,
+                            _constant_i32(TYPE_NUMERIC_CATEGORY_SHIFT)).result
+  return shifted
 
 
 @def_ir_macro_intrinsic
-def unbox_unchecked_bool(stage: ImportStage, value: ir.Value) -> ir.Value:
+def get_type_code_numeric_subtype(stage: ImportStage, type_code: ir.Value):
+  type_code_i32 = _unbox_i32(stage, type_code)
+  t = type_code_i32.type
+  return d.ApplyBinaryOp(t, ir.StringAttr.get("and"), type_code_i32,
+                         _constant_i32(TYPE_NUMERIC_SUBTYPE_MASK)).result
+
+
+@def_ir_macro_intrinsic
+def unbox_bool(stage: ImportStage, value: ir.Value) -> ir.Value:
   """Unboxes an object value to a bool, not checking for success."""
   return d.UnboxOp(d.ExceptionResultType.get(), d.BoolType.get(),
                    value).primitive
 
 
 @def_ir_macro_intrinsic
-def unbox_unchecked_integer(stage: ImportStage, value: ir.Value) -> ir.Value:
-  """Unboxes an object value to an integer, not checking for success."""
-  return d.UnboxOp(d.ExceptionResultType.get(), d.IntegerType.get(),
-                   value).primitive
+def cmpnz_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
+  """Promotes a numeric value to i32 and compares it to zero.
+
+  Returns True if not zero.
+  This should not be needed in the fullness of time but works around type
+  inference limitations in low level code.
+  """
+  value_i32 = _unbox_i32(stage, value)
+  zero = _constant_i32(0)
+  return d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("ne"), value_i32,
+                          zero).result
 
 
 @def_ir_macro_intrinsic
-def unbox_unchecked_real(stage: ImportStage, value: ir.Value) -> ir.Value:
-  """Unboxes an object value to a real, not checking for success."""
-  return d.UnboxOp(d.ExceptionResultType.get(), d.RealType.get(),
-                   value).primitive
+def cmpnz_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
+  """Promotes a numeric value to i64 and compares it to zero.
 
-
-@def_ir_macro_intrinsic
-def raw_compare_eq(stage: ImportStage, left: ir.Value,
-                   right: ir.Value) -> ir.Value:
-  """Emits an ApplyCompareOp for 'eq'."""
-  return d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("eq"), left,
-                          right).result
-
-
-@def_ir_macro_intrinsic
-def raw_compare_gt(stage: ImportStage, left: ir.Value,
-                   right: ir.Value) -> ir.Value:
-  """Emits an ApplyCompareOp for 'gt'."""
-  return d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("gt"), left,
-                          right).result
-
-
-@def_ir_macro_intrinsic
-def raw_compare_ge(stage: ImportStage, left: ir.Value,
-                   right: ir.Value) -> ir.Value:
-  """Emits an ApplyCompareOp for 'ge'."""
-  return d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("ge"), left,
-                          right).result
-
-
-@def_ir_macro_intrinsic
-def raw_compare_ne(stage: ImportStage, left: ir.Value,
-                   right: ir.Value) -> ir.Value:
-  """Emits an ApplyCompareOp for 'ne'."""
-  return d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("ne"), left,
-                          right).result
+  Returns True if not zero.
+  This should not be needed in the fullness of time but works around type
+  inference limitations in low level code.
+  """
+  value_i64 = _unbox_i64(stage, value)
+  zero = _constant_i64(0)
+  return d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("ne"), value_i64,
+                          zero).result
 
 
 @def_ir_macro_intrinsic

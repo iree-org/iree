@@ -34,9 +34,10 @@ struct LowerToIREEOptions {
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertIREEPyDMToIREEPass();
-std::unique_ptr<OperationPass<ModuleOp>> createLowerIREEPyDMToRTLPass();
+std::unique_ptr<OperationPass<>> createFixateWeakNumericPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLinkIREEPyDMRTLPass(
     Optional<SourceBundle> linkRtlSourceBundle = None);
+std::unique_ptr<OperationPass<ModuleOp>> createLowerIREEPyDMToRTLPass();
 
 void buildLowerToIREEPassPipeline(OpPassManager& passManager,
                                   const LowerToIREEOptions& options);
