@@ -56,6 +56,8 @@ Build and install on your host machine:
 
 ``` shell
 cmake -GNinja -B ../iree-build/ \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
   -DCMAKE_INSTALL_PREFIX=../iree-build/install \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   .

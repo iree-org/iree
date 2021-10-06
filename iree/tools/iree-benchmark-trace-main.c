@@ -197,8 +197,8 @@ static iree_status_t iree_replay_benchmark_run_file(
   // Setup replay state used for this benchmark.
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
-      registration->root_path, registration->instance, iree_allocator_system(),
-      &replay));
+      registration->root_path, registration->instance,
+      IREE_VM_CONTEXT_FLAG_NONE, iree_allocator_system(), &replay));
   iree_trace_replay_set_hal_driver_override(
       &replay, iree_make_cstring_view(FLAG_driver));
 
@@ -214,10 +214,10 @@ static iree_status_t iree_replay_benchmark_run_file(
     for (size_t i = 0; i < call_list.count; ++i) {
       iree_replay_benchmark_call_t* call = &call_list.items[i];
       for (int32_t j = 0; j < FLAG_call_iterations; ++j) {
-        IREE_RETURN_IF_ERROR(iree_vm_invoke(replay.context, call->function,
-                                            /*policy=*/NULL, call->input_list,
-                                            call->output_list,
-                                            replay.host_allocator));
+        IREE_RETURN_IF_ERROR(iree_vm_invoke(
+            replay.context, call->function, IREE_VM_INVOCATION_FLAG_NONE,
+            /*policy=*/NULL, call->input_list, call->output_list,
+            replay.host_allocator));
         IREE_RETURN_IF_ERROR(iree_vm_list_resize(call->output_list, 0));
       }
     }

@@ -162,8 +162,9 @@ Create a VM context and load modules into it:
 iree_vm_context_t* context = NULL;
 iree_vm_module_t* modules[2] = {hal_module, bytecode_module};
 IREE_CHECK_OK(iree_vm_context_create_with_modules(
-    instance, modules, IREE_ARRAYSIZE(modules), iree_allocator_system(),
-    &context));
+    instance, IREE_VM_CONTEXT_FLAG_NONE,
+    modules, IREE_ARRAYSIZE(modules),
+    iree_allocator_system(), &context));
 // References to the modules can be released now.
 iree_vm_module_release(hal_module);
 iree_vm_module_release(bytecode_module);

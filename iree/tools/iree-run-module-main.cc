@@ -33,6 +33,8 @@ IREE_FLAG(string, entry_function, "",
           "Name of a function contained in the module specified by module_file "
           "to run.");
 
+IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
+
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 IREE_FLAG(bool, print_statistics, false,
@@ -110,10 +112,13 @@ iree_status_t Run() {
   iree_vm_context_t* context = nullptr;
   // Order matters. The input module will likely be dependent on the hal module.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
-  IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-                           instance, modules.data(), modules.size(),
-                           iree_allocator_system(), &context),
-                       "creating context");
+  IREE_RETURN_IF_ERROR(
+      iree_vm_context_create_with_modules(
+          instance,
+          FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
+                               : IREE_VM_CONTEXT_FLAG_NONE,
+          modules.data(), modules.size(), iree_allocator_system(), &context),
+      "creating context");
 
   std::string function_name = std::string(FLAG_entry_function);
   iree_vm_function_t function;
@@ -142,8 +147,9 @@ iree_status_t Run() {
 
   std::cout << "EXEC @" << function_name << "\n";
   IREE_RETURN_IF_ERROR(
-      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
-                     outputs.get(), iree_allocator_system()),
+      iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                     /*policy=*/nullptr, inputs.get(), outputs.get(),
+                     iree_allocator_system()),
       "invoking function '%s'", function_name.c_str());
 
   IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()), "printing results");

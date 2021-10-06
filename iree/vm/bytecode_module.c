@@ -230,7 +230,7 @@ static iree_status_t iree_vm_bytecode_map_internal_ordinal(
     uint16_t* out_ordinal,
     iree_vm_FunctionSignatureDef_table_t* out_signature_def) {
   *out_ordinal = 0;
-  *out_signature_def = NULL;
+  if (out_signature_def) *out_signature_def = NULL;
 
   uint16_t ordinal = function.ordinal;
   iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
@@ -262,7 +262,7 @@ static iree_status_t iree_vm_bytecode_map_internal_ordinal(
   }
 
   *out_ordinal = ordinal;
-  *out_signature_def = signature_def;
+  if (out_signature_def) *out_signature_def = signature_def;
   return iree_ok_status();
 }
 
@@ -474,6 +474,7 @@ static iree_status_t iree_vm_bytecode_module_lookup_function(
 static iree_status_t iree_vm_bytecode_location_format(
     int32_t location_ordinal,
     iree_vm_LocationTypeDef_union_vec_t location_table,
+    iree_vm_source_location_format_flags_t flags,
     iree_string_builder_t* builder) {
   iree_vm_LocationTypeDef_union_t location =
       iree_vm_LocationTypeDef_union_vec_at(location_table, location_ordinal);
@@ -488,11 +489,11 @@ static iree_status_t iree_vm_bytecode_location_format(
       iree_vm_CallSiteLocDef_table_t loc =
           (iree_vm_CallSiteLocDef_table_t)location.value;
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_location_format(
-          iree_vm_CallSiteLocDef_callee(loc), location_table, builder));
+          iree_vm_CallSiteLocDef_callee(loc), location_table, flags, builder));
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(builder, "\n      at "));
       return iree_vm_bytecode_location_format(
-          iree_vm_CallSiteLocDef_caller(loc), location_table, builder);
+          iree_vm_CallSiteLocDef_caller(loc), location_table, flags, builder);
     }
     case iree_vm_LocationTypeDef_FileLineColLocDef: {
       iree_vm_FileLineColLocDef_table_t loc =
@@ -523,7 +524,8 @@ static iree_status_t iree_vm_bytecode_location_format(
               iree_string_builder_append_cstring(builder, ",\n    "));
         }
         IREE_RETURN_IF_ERROR(iree_vm_bytecode_location_format(
-            flatbuffers_int32_vec_at(child_locs, i), location_table, builder));
+            flatbuffers_int32_vec_at(child_locs, i), location_table, flags,
+            builder));
       }
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(builder, "\n  ]"));
@@ -538,7 +540,8 @@ static iree_status_t iree_vm_bytecode_location_format(
       if (iree_vm_NameLocDef_child_location_is_present(loc)) {
         IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "("));
         IREE_RETURN_IF_ERROR(iree_vm_bytecode_location_format(
-            iree_vm_NameLocDef_child_location(loc), location_table, builder));
+            iree_vm_NameLocDef_child_location(loc), location_table, flags,
+            builder));
         IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ")"));
       }
       return iree_ok_status();
@@ -547,7 +550,8 @@ static iree_status_t iree_vm_bytecode_location_format(
 }
 
 static iree_status_t iree_vm_bytecode_module_source_location_format(
-    void* self, uint64_t data[2], iree_string_builder_t* builder) {
+    void* self, uint64_t data[2], iree_vm_source_location_format_flags_t flags,
+    iree_string_builder_t* builder) {
   iree_vm_DebugDatabaseDef_table_t debug_database_def =
       (iree_vm_DebugDatabaseDef_table_t)self;
   iree_vm_FunctionSourceMapDef_table_t source_map_def =
@@ -572,7 +576,7 @@ static iree_status_t iree_vm_bytecode_module_source_location_format(
   iree_vm_LocationTypeDef_union_vec_t location_table =
       iree_vm_DebugDatabaseDef_location_table_union(debug_database_def);
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_location_format(
-      location_def->location, location_table, builder));
+      location_def->location, location_table, flags, builder));
 
   return iree_ok_status();
 }
@@ -591,10 +595,13 @@ static iree_status_t iree_vm_bytecode_module_resolve_source_location(
 
   // Map the (potentially) export ordinal into the internal function ordinal in
   // the function descriptor table.
-  uint16_t ordinal = 0;
-  iree_vm_FunctionSignatureDef_table_t signature_def = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_map_internal_ordinal(
-      module, frame->function, &ordinal, &signature_def));
+  uint16_t ordinal;
+  if (frame->function.linkage == IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
+    ordinal = frame->function.ordinal;
+  } else {
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_map_internal_ordinal(
+        module, frame->function, &ordinal, NULL));
+  }
 
   // Lookup the source map for the function, if available.
   iree_vm_FunctionSourceMapDef_vec_t source_maps_vec =

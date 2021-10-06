@@ -41,8 +41,8 @@ class VMNativeModuleTest : public ::testing::Test {
     // will be allocated.
     std::vector<iree_vm_module_t*> modules = {module_a, module_b};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), iree_allocator_system(),
-        &context_));
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        iree_allocator_system(), &context_));
 
     // No longer need the modules as the context retains them.
     iree_vm_module_release(module_a);
@@ -77,10 +77,10 @@ class VMNativeModuleTest : public ::testing::Test {
         /*element_type=*/nullptr, 1, iree_allocator_system(), &output_list));
 
     // Invoke the entry function to do our work. Runs synchronously.
-    IREE_RETURN_IF_ERROR(iree_vm_invoke(context_, function,
-                                        /*policy=*/nullptr, input_list.get(),
-                                        output_list.get(),
-                                        iree_allocator_system()));
+    IREE_RETURN_IF_ERROR(
+        iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
+                       /*policy=*/nullptr, input_list.get(), output_list.get(),
+                       iree_allocator_system()));
 
     // Load the output result.
     iree_vm_value_t ret0_value;

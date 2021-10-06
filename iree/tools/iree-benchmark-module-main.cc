@@ -96,8 +96,9 @@ static void BenchmarkFunction(const std::string& benchmark_name, int batch_size,
     vm::ref<iree_vm_list_t> outputs;
     IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                       iree_allocator_system(), &outputs));
-    IREE_CHECK_OK(iree_vm_invoke(context, function, /*policy=*/nullptr, inputs,
-                                 outputs.get(), iree_allocator_system()));
+    IREE_CHECK_OK(iree_vm_invoke(
+        context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
+        inputs, outputs.get(), iree_allocator_system()));
   }
 }
 
@@ -207,8 +208,8 @@ class IREEBenchmark {
     // module.
     std::array<iree_vm_module_t*, 2> modules = {hal_module_, input_module_};
     IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), iree_allocator_system(),
-        &context_));
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        iree_allocator_system(), &context_));
 
     IREE_TRACE_FRAME_MARK_END_NAMED("init");
     return iree_ok_status();

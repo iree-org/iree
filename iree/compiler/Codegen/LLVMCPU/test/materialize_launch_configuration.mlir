@@ -842,13 +842,14 @@ hal.executable private @conv_static {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //      CHECK: hal.executable.entry_point public @conv_static attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [32, 32, 32]}
+// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64, 32]}
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]
 //  CHECK-DAG:     %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]
-//  CHECK-DAG:     %[[D2:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]]
+//  CHECK-DAG:     %[[D2:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]]
 //      CHECK:     hal.return %[[D0]], %[[D1]], %[[D2]]
 //      CHECK:     linalg.depthwise_conv2D_nhw
 //  CHECK-NOT:       lowering.config
@@ -971,6 +972,76 @@ hal.executable private @matmul_static {
 //       CHECK:     hal.return %[[D0]], %[[D1]], %[[C1]]
 //       CHECK: linalg.matmul
 //  CHECK-SAME:     lowering.config = #[[CONFIG]]
+
+// -----
+
+hal.executable private @restrict_num_workgroups {
+  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+    hal.executable.entry_point public @restrict_num_workgroups attributes {interface = @io, ordinal = 0 : index}
+    builtin.module  {
+      func @restrict_num_workgroups() {
+        %cst = constant 0.000000e+00 : f32
+        %c7 = constant 7 : index
+        %c576 = constant 576 : index
+        %c0 = constant 0 : index
+        %c64 = constant 64 : index
+        %c2 = constant 2 : index
+        %0 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x11x11x576xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:5x5x576xf32>
+        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x7x7x576xf32>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        %workgroup_size_z = hal.interface.workgroup.size[2] : index
+        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_z, %workgroup_size_z]
+        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_z, %workgroup_size_z]
+        scf.for %arg0 = %3 to %c7 step %4 {
+          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+          scf.for %arg1 = %5 to %c7 step %6 {
+            %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+            %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+            scf.for %arg2 = %7 to %c576 step %8 {
+              %9 = affine.min affine_map<(d0) -> (6, -d0 + 12)>(%arg0)
+              %10 = affine.min affine_map<(d0) -> (11, -d0 + 12)>(%arg1)
+              %11 = flow.dispatch.tensor.load %0, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %9, %10, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x11x11x576xf32> -> tensor<1x?x?x64xf32>
+              %12 = tensor.cast %11 : tensor<1x?x?x64xf32> to tensor<1x?x?x?xf32>
+              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, %arg2], sizes = [5, 5, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:5x5x576xf32> -> tensor<5x5x64xf32>
+              %14 = tensor.cast %13 : tensor<5x5x64xf32> to tensor<5x5x?xf32>
+              %15 = affine.min affine_map<(d0) -> (2, -d0 + 7)>(%arg0)
+              %16 = affine.min affine_map<(d0) -> (-d0 + 7, 2)>(%arg0)
+              %17 = linalg.init_tensor [1, %16, %c7, %c64] : tensor<1x?x?x?xf32>
+              %18 = linalg.fill(%cst, %17) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32> 
+              %19 = linalg.depthwise_conv2D_nhw {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%12, %14 : tensor<1x?x?x?xf32>, tensor<5x5x?xf32>) outs(%18 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+              flow.dispatch.tensor.store %19, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %15, %c7, %c64], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x7x7x576xf32>
+            }
+          }
+        }
+        return
+      }
+      hal.interface private @io {
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//       CHECK: hal.executable.entry_point public @restrict_num_workgroups attributes
+//  CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 8, 4]}
+//  CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
+//   CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
+//   CHECK-DAG:     %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
+//   CHECK-DAG:     %[[D2:.+]] = affine.apply #[[MAP2]]()[%[[ARG2]]]
+//       CHECK:     hal.return %[[D0]], %[[D1]], %[[D2]]
 
 // -----
 

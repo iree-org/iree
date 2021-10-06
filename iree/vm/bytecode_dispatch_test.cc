@@ -82,8 +82,8 @@ class VMBytecodeDispatchTest
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), iree_allocator_system(),
-        &context_));
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        iree_allocator_system(), &context_));
   }
 
   virtual void TearDown() {
@@ -98,7 +98,7 @@ class VMBytecodeDispatchTest
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_make_cstring_view(function_name), &function));
 
-    return iree_vm_invoke(context_, function,
+    return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                           /*policy=*/nullptr, /*inputs=*/nullptr,
                           /*outputs=*/nullptr, iree_allocator_system());
   }

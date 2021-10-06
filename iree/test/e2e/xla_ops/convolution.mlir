@@ -10,16 +10,17 @@ func @conv2d_nopadding() {
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
         batch_group_count = 1 : i64,
-        dimension_numbers = {
-          input_batch_dimension = 0 : i64,
-          input_feature_dimension = 3 : i64,
-          input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-          kernel_input_feature_dimension = 2 : i64,
-          kernel_output_feature_dimension = 3 : i64,
-          kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-          output_batch_dimension = 0 : i64,
-          output_feature_dimension = 3 : i64,
-          output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+        dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
         window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
@@ -47,16 +48,17 @@ func @conv2d_nopadding_batch_feature() {
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
         batch_group_count = 1 : i64,
-        dimension_numbers = {
-          input_batch_dimension = 3 : i64,
-          input_feature_dimension = 0 : i64,
-          input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-          kernel_input_feature_dimension = 2 : i64,
-          kernel_output_feature_dimension = 3 : i64,
-          kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-          output_batch_dimension = 0 : i64,
-          output_feature_dimension = 3 : i64,
-          output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+        dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 3,
+          input_feature_dimension = 0,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
         window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x4x1xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
@@ -79,16 +81,17 @@ func @conv2d_reorder_input_spatial() {
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
         batch_group_count = 1 : i64,
-        dimension_numbers = {
-          input_batch_dimension = 0 : i64,
-          input_feature_dimension = 3 : i64,
-          input_spatial_dimensions = dense<[2, 1]> : tensor<2xi64>,
-          kernel_input_feature_dimension = 2 : i64,
-          kernel_output_feature_dimension = 3 : i64,
-          kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-          output_batch_dimension = 0 : i64,
-          output_feature_dimension = 3 : i64,
-          output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+        dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [2, 1],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
         window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
@@ -111,16 +114,17 @@ func @conv2d_reorder_kernel() {
         [[ 9.0, 11.0], [10.0, 12.0]]]]> : tensor<1x3x2x2xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
         batch_group_count = 1 : i64,
-        dimension_numbers = {
-          input_batch_dimension = 0 : i64,
-          input_feature_dimension = 3 : i64,
-          input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-          kernel_input_feature_dimension = 2 : i64,
-          kernel_output_feature_dimension = 0 : i64,
-          kernel_spatial_dimensions = dense<[1, 3]> : tensor<2xi64>,
-          output_batch_dimension = 0 : i64,
-          output_feature_dimension = 3 : i64,
-          output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+        dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 0,
+          kernel_spatial_dimensions = [1, 3],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
         window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<1x3x2x2xf32>) -> tensor<1x2x3x1xf32>
@@ -143,16 +147,17 @@ func @conv2d_reorder_output() {
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
         batch_group_count = 1 : i64,
-        dimension_numbers = {
-          input_batch_dimension = 0 : i64,
-          input_feature_dimension = 3 : i64,
-          input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-          kernel_input_feature_dimension = 2 : i64,
-          kernel_output_feature_dimension = 3 : i64,
-          kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-          output_batch_dimension = 2 : i64,
-          output_feature_dimension = 0 : i64,
-          output_spatial_dimensions = dense<[3, 1]> : tensor<2xi64>},
+        dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 2,
+          output_feature_dimension = 0,
+          output_spatial_dimensions = [3, 1]
+        >,
         feature_group_count = 1 : i64,
         rhs_dilation = dense<1> : tensor<2xi64>,
         window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x3x1x2xf32>
@@ -176,16 +181,17 @@ func @conv2d_1452x3221_same() {
       [[[ 9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
        batch_group_count = 1 : i64,
-       dimension_numbers = {
-         input_batch_dimension = 0 : i64,
-         input_feature_dimension = 3 : i64,
-         input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-         kernel_input_feature_dimension = 2 : i64,
-         kernel_output_feature_dimension = 3 : i64,
-         kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-         output_batch_dimension = 0 : i64,
-         output_feature_dimension = 3 : i64,
-         output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+       dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
        feature_group_count = 1 : i64,
        padding = dense<[[1, 1], [0, 1]]> : tensor<2x2xi64>,
        rhs_dilation = dense<1> : tensor<2xi64>,
@@ -214,16 +220,17 @@ func @conv2d_2451x2311_same() {
       [[[4.0]], [[5.0]], [[6.0]]]]> : tensor <2x3x1x1xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
        batch_group_count = 1 : i64,
-       dimension_numbers = {
-         input_batch_dimension = 0 : i64,
-         input_feature_dimension = 3 : i64,
-         input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-         kernel_input_feature_dimension = 2 : i64,
-         kernel_output_feature_dimension = 3 : i64,
-         kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-         output_batch_dimension = 0 : i64,
-         output_feature_dimension = 3 : i64,
-         output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+       dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
        feature_group_count = 1 : i64,
        padding = dense<[[0, 1], [1, 1]]> : tensor<2x2xi64>,
        rhs_dilation = dense<1> : tensor<2xi64>,
@@ -304,16 +311,17 @@ func @conv2d_no_padding2() {
         [103.0, 104.0, 105.0, 106.0, 107.0, 108.0]]]]> : tensor<2x3x3x6xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
        batch_group_count = 1 : i64,
-       dimension_numbers = {
-         input_batch_dimension = 0 : i64,
-         input_feature_dimension = 3 : i64,
-         input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-         kernel_input_feature_dimension = 2 : i64,
-         kernel_output_feature_dimension = 3 : i64,
-         kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-         output_batch_dimension = 0 : i64,
-         output_feature_dimension = 3 : i64,
-         output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+       dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
        feature_group_count = 1 : i64,
        rhs_dilation = dense<1> : tensor<2xi64>,
        window_strides = dense<1> : tensor<2xi64>} :
@@ -373,17 +381,17 @@ func @conv2d_1452x2223_dilated_valid() {
        [-0.7792497,   0.31265917, -0.7236341 ]]]]> : tensor<2x2x2x3xf32>
   %res = "mhlo.convolution"(%inputs, %weights) {
     batch_group_count = 1 : i64,
-    dimension_numbers = {
-      input_batch_dimension = 0 : i64,
-      input_feature_dimension = 3 : i64,
-      input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-      kernel_input_feature_dimension = 2 : i64,
-      kernel_output_feature_dimension = 3 : i64,
-      kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      output_batch_dimension = 0 : i64,
-      output_feature_dimension = 3 : i64,
-      output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>
-    },
+    dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
     feature_group_count = 1 : i64,
     padding = dense<0> : tensor<2x2xi64>,
     rhs_dilation = dense<[2, 1]> : tensor<2xi64>,
@@ -406,17 +414,17 @@ func @depthwise_conv_non_1_channel_multiplier() {
   %arg1 = util.unfoldable_constant dense<1.0> : tensor<2x2x2x3xf32>
   %res = "mhlo.convolution"(%arg0, %arg1) {
     batch_group_count = 1 : i64,
-    dimension_numbers = {
-      input_batch_dimension = 0 : i64,
-      input_feature_dimension = 3 : i64,
-      input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-      kernel_input_feature_dimension = 2 : i64,
-      kernel_output_feature_dimension = 3 : i64,
-      kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-      output_batch_dimension = 0 : i64,
-      output_feature_dimension = 3 : i64,
-      output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>
-    },
+    dimension_numbers = #mhlo.conv<raw
+          input_batch_dimension = 0,
+          input_feature_dimension = 3,
+          input_spatial_dimensions = [1, 2],
+          kernel_input_feature_dimension = 2,
+          kernel_output_feature_dimension = 3,
+          kernel_spatial_dimensions = [0, 1],
+          output_batch_dimension = 0,
+          output_feature_dimension = 3,
+          output_spatial_dimensions = [1, 2]
+        >,
     feature_group_count = 2 : i64,
     padding = dense<0> : tensor<2x2xi64>,
     rhs_dilation = dense<1> : tensor<2xi64>,

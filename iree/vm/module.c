@@ -275,13 +275,14 @@ IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
 
 IREE_API_EXPORT iree_status_t
 iree_vm_source_location_format(iree_vm_source_location_t* source_location,
+                               iree_vm_source_location_format_flags_t flags,
                                iree_string_builder_t* builder) {
   IREE_ASSERT_ARGUMENT(builder);
   if (!source_location || !source_location->format) {
     return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
   }
   return source_location->format(source_location->self, source_location->data,
-                                 builder);
+                                 flags, builder);
 }
 
 IREE_API_EXPORT iree_string_view_t

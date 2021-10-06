@@ -25,6 +25,7 @@
 IREE_API_EXPORT void iree_runtime_session_options_initialize(
     iree_runtime_session_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
+  out_options->context_flags = IREE_VM_CONTEXT_FLAG_NONE;
   out_options->builtin_modules = IREE_RUNTIME_SESSION_BUILTIN_ALL;
 }
 
@@ -86,7 +87,8 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_create_with_device(
 
   // Create the context empty so that we can add our modules to it.
   iree_status_t status = iree_vm_context_create(
-      /*instance=*/NULL, host_allocator, &session->context);
+      /*instance=*/NULL, options->context_flags, host_allocator,
+      &session->context);
 
   // Add the HAL module; it is always required when using the runtime API.
   // Lower-level usage of the VM can avoid the HAL if it's not required.
@@ -257,6 +259,7 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_call(
 
   iree_status_t status =
       iree_vm_invoke(iree_runtime_session_context(session), *function,
+                     IREE_VM_INVOCATION_FLAG_NONE,
                      /*policy=*/NULL, input_list, output_list,
                      iree_runtime_session_host_allocator(session));
 
@@ -282,7 +285,7 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_call_direct(
 
   // Allocate a VM stack on the host stack and initialize it.
   IREE_VM_INLINE_STACK_INITIALIZE(
-      stack,
+      stack, IREE_VM_INVOCATION_FLAG_NONE,
       iree_vm_context_state_resolver(iree_runtime_session_context(session)),
       iree_runtime_session_host_allocator(session));
 
