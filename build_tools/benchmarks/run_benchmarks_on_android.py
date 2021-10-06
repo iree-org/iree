@@ -249,10 +249,10 @@ def filter_benchmarks_for_category(benchmark_category_dir: str,
 
     # We can choose this benchmark if it matches the driver and CPU/GPU
     # architecture.
-    matched_driver = (
-        driver_filter is None or iree_driver == driver_filter.lower())
-    matched_arch = (
-        target_arch == cpu_target_arch or target_arch == gpu_target_arch)
+    matched_driver = (driver_filter is None or
+                      iree_driver == driver_filter.lower())
+    matched_arch = (target_arch == cpu_target_arch or
+                    target_arch == gpu_target_arch)
     should_choose = matched_driver and matched_arch
     if should_choose:
       matched_benchmarks.append(root)
