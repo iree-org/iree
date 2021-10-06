@@ -38,16 +38,17 @@ func @depth_conv(%arg0: tensor<2x4x5x2xf32>, %arg1: tensor<2x2x2x3xf32>) -> tens
     %0 = "mhlo.reshape"(%arg1) : (tensor<2x2x2x3xf32>) -> tensor<2x2x1x6xf32>
     %1 = "mhlo.convolution"(%arg0, %0) {
       batch_group_count = 1 : i64,
-      dimension_numbers = {
-        input_batch_dimension = 0 : i64,
-        input_feature_dimension = 3 : i64,
-        input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
-        kernel_input_feature_dimension = 2 : i64,
-        kernel_output_feature_dimension = 3 : i64,
-        kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
-        output_batch_dimension = 0 : i64,
-        output_feature_dimension = 3 : i64,
-        output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+      dimension_numbers = #mhlo.conv<raw
+      input_batch_dimension = 0,
+      input_feature_dimension = 3,
+      input_spatial_dimensions = [1, 2],
+      kernel_input_feature_dimension = 2,
+      kernel_output_feature_dimension = 3,
+      kernel_spatial_dimensions = [0, 1],
+      output_batch_dimension = 0,
+      output_feature_dimension = 3,
+      output_spatial_dimensions = [1, 2]
+    >,
      feature_group_count = 2 : i64,
      padding = dense<0> : tensor<2x2xi64>,
      rhs_dilation = dense<1> : tensor<2xi64>,
