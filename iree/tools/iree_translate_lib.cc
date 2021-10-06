@@ -80,24 +80,12 @@ int mlir::iree_compiler::runIreeTranslateMain(int argc, char **argv) {
                      "process each chunk independently"),
       llvm::cl::init(false));
 
-  llvm::cl::opt<bool> printMainAddress(
-      "print-main-address",
-      llvm::cl::desc(
-          "Print the address of main to stderr to aid in symbolizing "
-          "stack traces after the fact"),
-      llvm::cl::init(false));
-
   // Add flags for all the registered translations.
   llvm::cl::opt<const mlir::TranslateFunction *, false, mlir::TranslationParser>
       translationRequested("", llvm::cl::desc("Translation to perform"),
                            llvm::cl::Optional);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "IREE translation driver\n");
-
-  if (printMainAddress) {
-    llvm::errs() << "iree-translate main is at "
-                 << reinterpret_cast<void *>(&runIreeTranslateMain) << "\n";
-  }
 
   std::string errorMessage;
   auto input = mlir::openInputFile(inputFilename, &errorMessage);
