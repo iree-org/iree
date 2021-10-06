@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/EmitCTypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -32,32 +33,72 @@ struct VMAnalysis {
     return registerAllocation.getMaxRefRegisterOrdinal() + 1;
   }
 
-  int getRefRegisterOrdinal(Value ref) {
-    auto originalRef = originalValue(ref);
-    assert(originalRef.getType().isa<IREE::VM::RefType>());
-    return registerAllocation.mapToRegister(originalRef).ordinal();
+  uint16_t getRefRegisterOrdinal(Value ref) {
+    auto originalRef = lookup(ref);
+    if (originalRef.hasValue()) {
+      assert(originalRef.getValue().getType().isa<IREE::VM::RefType>());
+      return registerAllocation.mapToRegister(originalRef.getValue()).ordinal();
+    }
+
+    auto ptr = ordinalMapping.find(ref);
+    assert(ptr != ordinalMapping.end() &&
+           "ref for original block arg not found");
+    return ptr->second;
   }
 
   bool isLastValueUse(Value ref, Operation *op) {
-    auto originalRef = originalValue(ref);
-    assert(originalRef.getType().isa<IREE::VM::RefType>());
-    return valueLiveness.isLastValueUse(originalRef, op);
+    auto originalRef = lookup(ref);
+
+    if (originalRef.hasValue()) {
+      assert(originalRef.getValue().getType().isa<IREE::VM::RefType>());
+      return valueLiveness.isLastValueUse(originalRef.getValue(), op);
+    }
+
+    auto ptr = lastUseMapping.find({ref, op});
+    ref.dump();
+    assert(ptr != lastUseMapping.end() &&
+           "ref for original block arg not found");
+    return ptr->second;
   }
 
-  void remapValue(Value original, Value replacement) {
+  void mapValue(Value original, Value replacement) {
     assert(original.getType().isa<IREE::VM::RefType>());
-    mapping[replacement] = original;
+    mapping.map(replacement, original);
     return;
+  }
+
+  void mapLastUse(Value original, Operation *op, Value replacement) {
+    bool lastUse = isLastValueUse(original, op);
+    lastUseMapping[{replacement, op}] = lastUse;
+  }
+
+  void mapOrdinal(Value original, Value replacement) {
+    uint16_t ordinal = getRefRegisterOrdinal(original);
+    ordinalMapping[replacement] = ordinal;
   }
 
  private:
   RegisterAllocation registerAllocation;
   ValueLiveness valueLiveness;
-  DenseMap<Value, Value> mapping;
+  BlockAndValueMapping mapping;
+  DenseMap<Value, uint16_t> ordinalMapping;
+  DenseMap<std::pair<Value, Operation *>, bool> lastUseMapping;
 
-  Value originalValue(Value ref) {
-    auto ptr = mapping.find(ref);
-    return ptr == mapping.end() ? ref : ptr->second;
+  Optional<Value> lookup(Value ref) {
+    if (ref.getType().isa<IREE::VM::RefType>()) {
+      return ref;
+    }
+
+    if (mapping.contains(ref)) {
+      Value result = mapping.lookup(ref);
+
+      if (!result.getType().isa<IREE::VM::RefType>()) {
+        result.dump();
+      }
+      assert(result.getType().isa<IREE::VM::RefType>());
+      return result;
+    }
+    return {};
   }
 };
 
