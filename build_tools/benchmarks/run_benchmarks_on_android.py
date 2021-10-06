@@ -477,11 +477,10 @@ def parse_arguments():
   parser.add_argument("--capture_tarball",
                       default=None,
                       help="Path to the tarball for captures")
-  parser.add_argument(
-      "--no-clean",
-      action="store_true",
-      help="Do not clean up the temporary directory used for "
-      "benchmarking on the Android device")
+  parser.add_argument("--no-clean",
+                      action="store_true",
+                      help="Do not clean up the temporary directory used for "
+                      "benchmarking on the Android device")
   parser.add_argument("--verbose",
                       action="store_true",
                       help="Print internal information during execution")
