@@ -19,8 +19,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// Traverse `funcOp` and rewrite specific SubTensor / SubTensorInsert ops that
-// match a "destructive tensor update" pattern, by an inplace update.
+// Traverse `funcOp` and rewrite specific tensor.{extract|insert}_slice ops that
+// match a "destructive tensor update" pattern, by an inplace update via
+// flow.dispatch.tensor.{load|store} ops.
+//
 // This serves as a step in jumping the abstraction gap between transformed
 // "linalg on tensors" IR (in which the whole tensor is updated) and dispatch
 // regions (in which each workgroup updates a non-overlapping portion of the
@@ -32,10 +34,10 @@ namespace Flow {
 //
 // Assumptions/Invariants on "Control the Production of Such Patterns"
 // ===================================================================
-// 1. Only output tensors may not be written by a destructive update pattern.
-// 2. SubTensorOp/SubTensorInsertOp are the only ops that can extract/insert
+// 1. Only output tensors may be written by a destructive update pattern.
+// 2. extract_slice/insert_slice ops are the only ops that can extract/insert
 //    from/into tensors.
-// 3. All SubTensorOp/SubTensorInsertOp must have been introduced by Linalg
+// 3. All extract_slice/insert_slice must have been introduced by Linalg
 //    tiling on tensors.
 // 4. Such tilings that result in yielded tensors across loops may only tile
 //    parallel Linalg iterators atm.
@@ -64,20 +66,20 @@ namespace Flow {
 //                            //     offsets = ..., sizes = ..., strides = ... :
 //                            //       tensor<...> ->
 //                            !flow.dispatch.tensor<writeonly:...>
-//   %2 = flow.dispatch.output.load %b
+//   %2 = flow.dispatch.tensor.load %b
 //   ...
 //   use_of(%2) // e.g. flow.dispatch.tensor.store %2, %b :
 //              //        tensor<...> -> !flow.dispatch.tensor<writeonly:...>
 // ```
 //
 // This is a typical pattern that appears after tiling Linalg ops on tensors
-// with operands that come from flow.dispatch.input/output.
+// with operands that come from flow.dispatch.tensor.
 //
 // Other rewrites:
 // ===============
 // Furthermore, when no interleaved aliasing write to %b occurs, the following:
 // ```
-//   %2 = flow.dispatch.output.load %b
+//   %2 = flow.dispatch.tensor.load %b
 //   ...
 //   flow.dispatch.tensor.store %2, %b :
 //     tensor<...> -> !flow.dispatch.tensor<writeonly:...>
