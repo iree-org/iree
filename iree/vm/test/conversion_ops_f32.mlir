@@ -76,6 +76,26 @@ vm.module @conversion_ops_f32 {
     vm.return
   }
 
+  vm.export @test_cast_f32_si32_away_from_zero_pos
+  vm.func @test_cast_f32_si32_away_from_zero_pos() {
+    %c1 = vm.const.f32 2.5 : f32
+    %c1dno = util.do_not_optimize(%c1) : f32
+    %v = vm.cast.f32.si32 %c1dno : f32 -> i32
+    %c2 = vm.const.i32 3 : i32
+    vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i32
+    vm.return
+  }
+
+  vm.export @test_cast_f32_si32_away_from_zero_neg
+  vm.func @test_cast_f32_si32_away_from_zero_neg() {
+    %c1 = vm.const.f32 -2.5 : f32
+    %c1dno = util.do_not_optimize(%c1) : f32
+    %v = vm.cast.f32.si32 %c1dno : f32 -> i32
+    %c2 = vm.const.i32 -3 : i32
+    vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i32
+    vm.return
+  }
+
   vm.export @test_cast_f32_ui32_int_max
   vm.func @test_cast_f32_ui32_int_max() {
     %c1 = vm.const.f32 4294967295.0 : f32
@@ -83,6 +103,16 @@ vm.module @conversion_ops_f32 {
     %v = vm.cast.f32.ui32 %c1dno : f32 -> i32
     %c2 = vm.const.i32 0 : i32
     vm.check.eq %v, %c2, "cast floating-point value to an unsigned integer" : i32
+    vm.return
+  }
+
+  vm.export @test_cast_f32_ui32_away_from_zero
+  vm.func @test_cast_f32_ui32_away_from_zero() {
+    %c1 = vm.const.f32 2.5 : f32
+    %c1dno = util.do_not_optimize(%c1) : f32
+    %v = vm.cast.f32.ui32 %c1dno : f32 -> i32
+    %c2 = vm.const.i32 3 : i32
+    vm.check.eq %v, %c2, "cast floating-point value to a signed integer" : i32
     vm.return
   }
 

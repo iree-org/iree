@@ -450,3 +450,63 @@ vm.module @cmp_nz_ref_folds {
     vm.return %ne : i32
   }
 }
+
+// -----
+
+// CHECK-LABEL: @cast_si32_f32_folds
+vm.module @cast_si32_f32_folds {
+  // CHECK-LABEL: @cast_exact
+  vm.func @cast_exact() -> f32 {
+    // CHECK: %0 = vm.const.f32 -2.000000e+00 : f32
+    // CHECK-NEXT: vm.return %0 : f32
+    %c-2 = vm.const.i32 -2 : i32
+    %1 = vm.cast.si32.f32 %c-2 : i32 -> f32
+    vm.return %1 : f32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_ui32_f32_folds
+vm.module @cast_ui32_f32_folds {
+  // CHECK-LABEL: @cast_exact
+  vm.func @cast_exact() -> f32 {
+    // CHECK: %0 = vm.const.f32 4.000000e+00 : f32
+    // CHECK-NEXT: vm.return %0 : f32
+    %c4 = vm.const.i32 4 : i32
+    %1 = vm.cast.ui32.f32 %c4 : i32 -> f32
+    vm.return %1 : f32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_f32_si32_folds
+vm.module @cast_f32_si32_folds {
+  // CHECK-LABEL: @cast_exact
+  vm.func @cast_exact() -> i32 {
+    // CHECK: %c-2 = vm.const.i32 -2 : i32
+    // CHECK-NEXT: vm.return %c-2 : i32
+    %c-2 = vm.const.f32 -2.0 : f32
+    %1 = vm.cast.f32.si32 %c-2 : f32 -> i32
+    vm.return %1 : i32
+  }
+
+  // CHECK-LABEL: @cast_round_neg
+  vm.func @cast_round_neg() -> i32 {
+    // CHECK: %c-3 = vm.const.i32 -3 : i32
+    // CHECK-NEXT: vm.return %c-3 : i32
+    %0 = vm.const.f32 -2.5 : f32
+    %1 = vm.cast.f32.si32 %0 : f32 -> i32
+    vm.return %1 : i32
+  }
+
+  // CHECK-LABEL: @cast_round_pos
+  vm.func @cast_round_pos() -> i32 {
+    // CHECK: %c3 = vm.const.i32 3 : i32
+    // CHECK-NEXT: vm.return %c3 : i32
+    %0 = vm.const.f32 2.5 : f32
+    %1 = vm.cast.f32.si32 %0 : f32 -> i32
+    vm.return %1 : i32
+  }
+}

@@ -155,3 +155,47 @@ vm.module @my_module {
     vm.return %rnz : i32
   }
 }
+
+// -----
+
+// CHECK-LABEL: @cast_si32_f32
+vm.module @my_module {
+  vm.func @cast_si32_f32(%arg0 : i32) -> f32 {
+    // CHECK: %0 = vm.cast.si32.f32 %arg0 : i32 -> f32
+    %0 = vm.cast.si32.f32 %arg0 : i32 -> f32
+    vm.return %0 : f32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_ui32_f32
+vm.module @my_module {
+  vm.func @cast_ui32_f32(%arg0 : i32) -> f32 {
+    // CHECK: %0 = vm.cast.ui32.f32 %arg0 : i32 -> f32
+    %0 = vm.cast.ui32.f32 %arg0 : i32 -> f32
+    vm.return %0 : f32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_f32_si32
+vm.module @my_module {
+  vm.func @cast_f32_si32(%arg0 : f32) -> i32 {
+    // CHECK: %0 = vm.cast.f32.si32 %arg0 : f32 -> i32
+    %0 = vm.cast.f32.si32 %arg0 : f32 -> i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_f32_ui32
+vm.module @my_module {
+  vm.func @cast_f32_ui32(%arg0 : f32) -> i32 {
+    // CHECK: %0 = vm.cast.f32.ui32 %arg0 : f32 -> i32
+    %0 = vm.cast.f32.ui32 %arg0 : f32 -> i32
+    vm.return %0 : i32
+  }
+}
