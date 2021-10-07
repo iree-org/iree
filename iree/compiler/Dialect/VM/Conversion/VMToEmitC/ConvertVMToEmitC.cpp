@@ -192,98 +192,6 @@ Optional<Value> findRef(OpBuilder builder, Location location,
   return result;
 }
 
-LogicalResult annotateFuncOp(IREE::VM::FuncOp &vmFuncOp, mlir::FuncOp &funcOp,
-                             RegisterAllocation &registerAllocation,
-                             ValueLiveness &valueLiveness) {
-  auto ctx = funcOp.getContext();
-
-  OpBuilder builder(funcOp);
-
-  funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
-
-  // Annotate new function with a calling convention string which gets used in
-  // the CModuleTarget.
-  funcOp.getOperation()->setAttr(
-      "vm.calling_convention",
-      StringAttr::get(ctx, makeCallingConventionString(vmFuncOp).getValue()));
-
-  auto isRef = [](Value value) {
-    return value.getType().isa<IREE::VM::RefType>();
-  };
-
-  auto getOrdinal = [&isRef, &registerAllocation](Value value) -> int64_t {
-    if (isRef(value)) {
-      return registerAllocation.mapToRegister(value).ordinal();
-    }
-    // Return a default value which never gets used.
-    return 0;
-  };
-  auto isLastUse = [&isRef, &valueLiveness](Value value,
-                                            Operation &op) -> bool {
-    if (isRef(value)) {
-      return valueLiveness.isLastValueUse(value, &op);
-    }
-    // Return a default value which never gets used.
-    return false;
-  };
-
-  SmallVector<int64_t> ordinals =
-      llvm::to_vector<1>(llvm::map_range(funcOp.getArguments(), getOrdinal));
-  funcOp.getOperation()->setAttr("argument_ordinal",
-                                 builder.getIndexArrayAttr(ordinals));
-
-  for (Block &block : funcOp.getBlocks()) {
-    // Annotate operations with vm analysis
-    for (Operation &op : block.getOperations()) {
-      if (llvm::any_of(op.getOperands(), isRef)) {
-        SmallVector<int64_t> ordinals =
-            llvm::to_vector<1>(llvm::map_range(op.getOperands(), getOrdinal));
-        SmallVector<bool> lastUse = llvm::to_vector<1>(llvm::map_range(
-            op.getOperands(),
-            [&op, &isLastUse](auto v) { return isLastUse(v, op); }));
-
-        op.setAttr("operand_ordinal", builder.getIndexArrayAttr(ordinals));
-        op.setAttr("operand_is_last_use", builder.getBoolArrayAttr(lastUse));
-      }
-      if (llvm::any_of(op.getResults(), isRef)) {
-        SmallVector<int64_t> ordinals =
-            llvm::to_vector<1>(llvm::map_range(op.getResults(), getOrdinal));
-        SmallVector<bool> lastUse = llvm::to_vector<1>(llvm::map_range(
-            op.getResults(),
-            [&op, &isLastUse](auto v) { return isLastUse(v, op); }));
-
-        op.setAttr("result_ordinal", builder.getIndexArrayAttr(ordinals));
-        op.setAttr("result_is_last_use", builder.getBoolArrayAttr(lastUse));
-      }
-
-      if (auto branchOp = dyn_cast<IREE::VM::BranchOp>(op)) {
-        Block *dest = branchOp.getDest();
-        SmallVector<int64_t> ordinals = llvm::to_vector<1>(
-            llvm::map_range(dest->getArguments(), getOrdinal));
-
-        op.setAttr("dest_ordinal", builder.getIndexArrayAttr(ordinals));
-      }
-      if (auto condBranchOp = dyn_cast<IREE::VM::CondBranchOp>(op)) {
-        Block *trueDest = condBranchOp.getTrueDest();
-        SmallVector<int64_t> trueDestOrdinals = llvm::to_vector<1>(
-            llvm::map_range(trueDest->getArguments(), getOrdinal));
-
-        op.setAttr("true_dest_ordinal",
-                   builder.getIndexArrayAttr(trueDestOrdinals));
-
-        Block *falseDest = condBranchOp.getFalseDest();
-        SmallVector<int64_t> falseDestOrdinals = llvm::to_vector<1>(
-            llvm::map_range(falseDest->getArguments(), getOrdinal));
-
-        op.setAttr("false_dest_ordinal",
-                   builder.getIndexArrayAttr(falseDestOrdinals));
-      }
-    }
-  }
-
-  return success();
-}
-
 LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
                             VMAnalysisCache &vmAnalysisCache) {
   auto ctx = funcOp.getContext();
@@ -649,15 +557,10 @@ emitc::CallOp failableCall(
   }
 
   builder.setInsertionPointToEnd(condBlock);
-  auto branchOp = builder.create<IREE::VM::CondBranchOp>(
+  builder.create<IREE::VM::CondBranchOp>(
       location, conditionI1.getResult(0),
       negateCondition ? failureBlock : continuationBlock,
       negateCondition ? continuationBlock : failureBlock);
-
-  branchOp.getOperation()->setAttr("true_dest_ordinal",
-                                   builder.getIndexArrayAttr({}));
-  branchOp.getOperation()->setAttr("false_dest_ordinal",
-                                   builder.getIndexArrayAttr({}));
 
   builder.setInsertionPointToStart(continuationBlock);
 
@@ -754,15 +657,10 @@ mlir::CallOp failableCall(
   }
 
   builder.setInsertionPointToEnd(condBlock);
-  auto branchOp = builder.create<IREE::VM::CondBranchOp>(
+  builder.create<IREE::VM::CondBranchOp>(
       location, conditionI1.getResult(0),
       negateCondition ? failureBlock : continuationBlock,
       negateCondition ? continuationBlock : failureBlock);
-
-  branchOp.getOperation()->setAttr("true_dest_ordinal",
-                                   builder.getIndexArrayAttr({}));
-  branchOp.getOperation()->setAttr("false_dest_ordinal",
-                                   builder.getIndexArrayAttr({}));
 
   builder.setInsertionPoint(continuationBlock, opPosition);
 
@@ -1350,13 +1248,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp) {
 
     builder.setInsertionPointToEnd(condBlock);
 
-    auto branchOp = builder.create<IREE::VM::CondBranchOp>(
-        loc, vmInitializeIsOk.getResult(0), continuationBlock, failureBlock);
-
-    branchOp.getOperation()->setAttr("true_dest_ordinal",
-                                     builder.getIndexArrayAttr({}));
-    branchOp.getOperation()->setAttr("false_dest_ordinal",
-                                     builder.getIndexArrayAttr({}));
+    builder.create<IREE::VM::CondBranchOp>(loc, vmInitializeIsOk.getResult(0),
+                                           continuationBlock, failureBlock);
 
     builder.setInsertionPointToStart(continuationBlock);
 
@@ -1485,11 +1378,6 @@ class FuncOpConversion : public OpConversionPattern<mlir::FuncOp> {
     }
 
     rewriter.applySignatureConversion(&funcOp.getBody(), signatureConverter);
-
-    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
-    if (ptr == vmAnalysisCache.end()) {
-      return funcOp.emitError() << "parent func op not found in cache.";
-    }
 
     // Creates a new function with the updated signature.
     rewriter.updateRootInPlace(funcOp, [&] {
@@ -1646,12 +1534,10 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
     auto loc = op.getLoc();
 
     auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
-
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
       return op.emitError() << "parent func op not found in cache.";
     }
-
     for (Value operand : operands) {
       assert(!operand.getType().isa<IREE::VM::RefType>());
 
@@ -1702,13 +1588,6 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
         if (!ref.hasValue()) {
           return op.emitError() << "local ref not found";
-        }
-
-        // Keep track of the replaced value in the analysis to keep the value
-        // liveness working.
-        auto ptr = vmAnalysisCache.find(funcOp.getOperation());
-        if (ptr == vmAnalysisCache.end()) {
-          return op.emitError() << "parent func op not found in cache.";
         }
 
         resultOperands.push_back(ref.getValue());
@@ -1772,6 +1651,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
 
     auto funcOp =
         cmpOp.getOperation()->template getParentOfType<mlir::FuncOp>();
+
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
       return cmpOp.emitError() << "parent func op not found in cache.";
@@ -1837,6 +1717,7 @@ class CompareRefNotZeroOpConversion
     auto loc = cmpOp.getLoc();
 
     auto funcOp = cmpOp.getOperation()->getParentOfType<mlir::FuncOp>();
+
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
       return cmpOp.emitError() << "parent func op not found in cache.";
@@ -1923,11 +1804,6 @@ class ConstRefZeroOpConversion
 
     auto funcOp =
         constRefZeroOp.getOperation()->getParentOfType<mlir::FuncOp>();
-
-    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
-    if (ptr == vmAnalysisCache.end()) {
-      return constRefZeroOp.emitError() << "parent func op not found in cache.";
-    }
 
     Optional<Value> ref = findRef(rewriter, loc, funcOp, vmAnalysisCache,
                                   constRefZeroOp.getResult());
@@ -2449,12 +2325,8 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
       rewriter.create<mlir::ReturnOp>(loc, status.getResult(0));
     }
 
-    auto branchOp = rewriter.replaceOpWithNewOp<IREE::VM::CondBranchOp>(
+    rewriter.replaceOpWithNewOp<IREE::VM::CondBranchOp>(
         op, op.status(), failureBlock, passthroughBlock);
-    branchOp.getOperation()->setAttr("true_dest_ordinal",
-                                     rewriter.getIndexArrayAttr({}));
-    branchOp.getOperation()->setAttr("false_dest_ordinal",
-                                     rewriter.getIndexArrayAttr({}));
 
     return success();
   }
@@ -3000,11 +2872,6 @@ class ListGetRefOpConversion
 
     auto funcOp = getOp.getOperation()->getParentOfType<mlir::FuncOp>();
 
-    auto ptr = vmAnalysisCache.find(funcOp.getOperation());
-    if (ptr == vmAnalysisCache.end()) {
-      return getOp.emitError() << "parent func op not found in cache.";
-    }
-
     auto ref =
         findRef(rewriter, loc, funcOp, vmAnalysisCache, getOp.getResult());
 
@@ -3140,13 +3007,8 @@ class ListGetRefOpConversion
     }
 
     rewriter.setInsertionPointToEnd(condBlock);
-    auto branchOp = rewriter.create<IREE::VM::CondBranchOp>(
-        loc, invalidType.getResult(0), failureBlock, continuationBlock);
-
-    branchOp.getOperation()->setAttr("true_dest_ordinal",
-                                     rewriter.getIndexArrayAttr({}));
-    branchOp.getOperation()->setAttr("false_dest_ordinal",
-                                     rewriter.getIndexArrayAttr({}));
+    rewriter.create<IREE::VM::CondBranchOp>(loc, invalidType.getResult(0),
+                                            failureBlock, continuationBlock);
 
     rewriter.replaceOp(getOp, ref.getValue());
 
@@ -3256,6 +3118,7 @@ class ListSetRefOpConversion
         /*operands=*/ArrayRef<Value>{refOp.getResult()});
 
     auto funcOp = setOp.getOperation()->getParentOfType<mlir::FuncOp>();
+
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
       return setOp.emitError() << "parent func op not found in cache.";
