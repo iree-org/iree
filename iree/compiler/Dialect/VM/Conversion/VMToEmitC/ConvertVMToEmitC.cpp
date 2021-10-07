@@ -170,8 +170,6 @@ Optional<Value> findRef(OpBuilder builder, Location location,
                         mlir::FuncOp &parentFuncOp,
                         VMAnalysisCache &vmAnalysisCache, Value refResult,
                         bool remapValue = true) {
-  auto ctx = builder.getContext();
-
   assert(refResult.getType().isa<IREE::VM::RefType>());
 
   auto ptr = vmAnalysisCache.find(parentFuncOp.getOperation());
@@ -187,7 +185,7 @@ Optional<Value> findRef(OpBuilder builder, Location location,
 
   if (remapValue && result.hasValue()) {
     assert(result.getValue().getType() ==
-           emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"));
+           emitc::OpaqueType::get(builder.getContext(), "iree_vm_ref_t*"));
     ptr->second.mapValue(refResult, result.getValue());
   }
 
