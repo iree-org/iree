@@ -260,8 +260,10 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
     llvmBufferBasei8Ptr = rewriter.create<LLVM::GEPOp>(
         loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
         adaptor.byte_offset());
-    Value llvmBufferBasePtr = rewriter.create<LLVM::BitcastOp>(
-        loc, llvmBufferArg.getType(), llvmBufferBasei8Ptr);
+    auto llvmPtrType = LLVM::LLVMPointerType::get(
+        memrefType.getElementType(), memrefType.getMemorySpaceAsInt());
+    Value llvmBufferBasePtr =
+        rewriter.create<LLVM::BitcastOp>(loc, llvmPtrType, llvmBufferBasei8Ptr);
     if (memrefType.hasStaticShape()) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);
