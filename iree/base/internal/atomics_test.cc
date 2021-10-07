@@ -92,8 +92,11 @@ TEST(AtomicPtr, CompareExchange) {
 TEST(AtomicRefCount, IncDec) {
   iree_atomic_ref_count_t count;
   iree_atomic_ref_count_init(&count);
-  EXPECT_EQ(1, iree_atomic_ref_count_inc(&count));
-  EXPECT_EQ(2, iree_atomic_ref_count_inc(&count));
+  EXPECT_EQ(1, count);
+  iree_atomic_ref_count_inc(&count);
+  EXPECT_EQ(2, count);
+  iree_atomic_ref_count_inc(&count);
+  EXPECT_EQ(3, count);
   EXPECT_EQ(3, iree_atomic_ref_count_dec(&count));
   EXPECT_EQ(2, iree_atomic_ref_count_dec(&count));
   EXPECT_EQ(1, iree_atomic_ref_count_dec(&count));
