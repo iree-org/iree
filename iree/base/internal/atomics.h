@@ -135,8 +135,14 @@ extern "C" {
 typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 #define iree_atomic_ref_count_init(count_ptr) \
   iree_atomic_store_int32(count_ptr, 1, iree_memory_order_relaxed)
-#define iree_atomic_ref_count_inc(count_ptr) \
-  iree_atomic_fetch_add_int32(count_ptr, 1, iree_memory_order_relaxed)
+// Callers of iree_atomic_ref_count_inc typically don't need it to return a
+// value (unlike iree_atomic_ref_count_dec), so we make sure that it does not,
+// which allows the implementation to use faster atomic instructions where
+// available, e.g. STADD on ARMv8.1-a.
+#define iree_atomic_ref_count_inc(count_ptr)                              \
+  do {                                                                    \
+    iree_atomic_fetch_add_int32(count_ptr, 1, iree_memory_order_relaxed); \
+  } while (0)
 #define iree_atomic_ref_count_dec(count_ptr) \
   iree_atomic_fetch_sub_int32(count_ptr, 1, iree_memory_order_acq_rel)
 
