@@ -138,7 +138,7 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 #define iree_atomic_ref_count_inc(count_ptr) \
   iree_atomic_fetch_add_int32(count_ptr, 1, iree_memory_order_relaxed)
 #define iree_atomic_ref_count_dec(count_ptr) \
-  iree_atomic_fetch_sub_int32(count_ptr, 1, iree_memory_order_release)
+  iree_atomic_fetch_sub_int32(count_ptr, 1, iree_memory_order_acq_rel)
 
 // Aborts the program if the given reference count value is not 0.
 // This should be avoided in all situations but those where continuing execution
