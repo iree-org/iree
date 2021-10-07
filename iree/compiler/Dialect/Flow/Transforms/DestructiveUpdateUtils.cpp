@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- DestructiveUpdateUtilss.cpp - Utils to rewrite destructive updates--===//
+//===- DestructiveUpdateUtils.cpp - Utils to rewrite destructive updates --===//
 //
 // Implementation to rewrite Linalg on tensors destructive updates into updates
 // through memory.
@@ -47,9 +47,9 @@ namespace Flow {
 //   yield %dk
 struct SpecialTerminatorOpCapture {
   Value initValue;
-  // For now, must be scf::ForOps.
+  // For now, must be scf.for ops.
   SmallVector<Operation *, 4> loops;
-  // For now, must be a SubTensorInsertOp.
+  // For now, must be a tensor.insert_slice op.
   Operation *rootDestructiveUpdate;
   bool readOnly = false;
   bool writeOnly = false;
@@ -79,8 +79,8 @@ static bool hasDestructiveUpdateUses(BlockArgument arg,
         })
         .Default([&](Operation *op) { reads.push_back(op); });
   }
-  // For now, only allow exactly a single SubTensorInsertOp that must be
-  // dominated by all SubTensorOp.
+  // For now, only allow exactly a single tensor.insert_slice op that must be
+  // dominated by all tensor.extract_slice ops.
   if (writes.size() != 1) return false;
   // Small local dominance computation.
   DominanceInfo domInfo(writes.front()->getParentOp());
@@ -143,7 +143,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
     if (regionArg.use_empty()) return nullptr;
 
     // Case 2: multiple uses from an scf::ForOp then this must be used only by
-    // SubTensorOp / SubTensorInsertOp with proper dominance.
+    // tensor.extract_slice / tensor.insert_slice op with proper dominance.
     if (!regionArg.hasOneUse()) {
       if (!hasDestructiveUpdateUses(regionArg, capture)) return nullptr;
       return returnValue;
@@ -154,7 +154,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
     OpOperand *operand = regionArg.getUses().begin().getOperand();
     auto innerForOp = dyn_cast<scf::ForOp>(operand->getOwner());
     // Case 3a: Single use which is not an scf::ForOp, it may still be a
-    // single SubTensor / SubTensorInsertOp.
+    // single tensor.extract_slice / tensor.insert_slice op.
     if (!innerForOp) {
       if (!hasDestructiveUpdateUses(regionArg, capture)) return nullptr;
       return returnValue;
@@ -195,10 +195,10 @@ static Value isADestructiveUpdatePattern(Value tensor,
   return nullptr;
 }
 
-/// Convert `subtensor %t [offsets][sizes][strides] -> %st` to a
-/// flow.dispatch.tensor.load.
-static LogicalResult propagateSubTensorOp(OpBuilder &b,
-                                          tensor::ExtractSliceOp op) {
+/// Flos tensor.extract_slice ops on top of flow.dispatch.tensor.load ops into
+/// new flow.dispatch.tensor.load ops.
+static LogicalResult foldExtractSliceOp(OpBuilder &b,
+                                        tensor::ExtractSliceOp op) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   auto loadOp = op.source().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
@@ -309,100 +309,6 @@ static bool hasNonScfForControlFlow(
       .wasInterrupted();
 }
 
-// Rewrite specific SubTensor / SubTensorInsert ops that match a "destructive
-// tensor update" pattern, by an inplace update at `binding` and `offset1, using
-// hal.interface.*.tensor.tile ops.
-// This serves as a step in jumping the abstraction gap between transformed
-// "linalg on tensors" IR and the buffer world.
-// This is possible because we control the production of such patterns in IREE
-// and can take the necessary shortcuts wrt inplace semantics.
-// In the future it is reasonable to expect special IR constructs to capture
-// some of the destructive update patterns,
-//
-// Assumptions/Invariants on "Control the Production of Such Patterns"
-// ===================================================================
-// 1. Input tensors may not participate in a destructive update pattern.
-// 2. Init and output tensors may participate in a destructive update pattern.
-// 3. No init or output tensor backing storage aliases with any other tensor
-//    storage.
-// 4. SubTensorOp/SubTensorInsertOp are the only ops that can extract/insert
-//    from/into tensors.
-// 5. All SubTensorOp/SubTensorInsertOp must have been introduced by Linalg
-//    tiling on tensors.
-// 6. Such tilings that result in yielded tensors across loops may only tile
-//    parallel Linalg iterators atm.
-// 7. (Future) Allow non-parallel Linalg iterators tiling and ensure first-read
-//    or writeOnly by construction.
-//
-// Note: the assumptions/invariants above are subject to changing ordering of
-// passes. When dispatch region and hal.interfaces are created on the linalg on
-// buffers path, these are all assumptions. In the future, when dispatch regions
-// and hal.interfaces are created post-transformations on the linalg on tensors
-// path some assumptions will become invariants.
-//
-// For now, the following destructive update patterns are rewritten.
-//
-// Coming from an `InterfaceLoadTensorOp`
-// ======================================
-// ```
-//   %0 = hal.interface.load.tensor @x[offsetx]
-//   ...
-//   %1 = destructive_update(%0)
-//   ...
-//   use_of(%1) // e.g. hal.interface.store.tensor %1 @y[offsety]
-// ```
-// is rewritten into:
-// ```
-//   %0 = hal.interface.load.tensor @x[offsetx]
-//   ...
-//   inplace_update @binding[offset]
-//   %2 = hal.interface.load.tensor  @binding[offset]
-//   ...
-//   use_of(%2) // e.g. hal.interface.store.tensor %2 @y[offsety]
-// ```
-//
-// This is a typical pattern that appears after tiling Linalg ops on tensors
-// with operands that come from hal.interface.
-//
-// Coming from a `LinalgOp`
-// =========================
-// ```
-//   %0 = linalg-op
-//   ...
-//   %1 = destructive_update(%0) // only subtensor_inserts into %0
-//   ...
-//   use_of(%1) // e.g. hal.interface.store.tensor %1 @y
-// ```
-// is rewritten into:
-// ```
-//   %0 = linalg-op
-//   ...
-//   inplace_update @binding[offset]
-//   %2 = hal.interface.load.tensor @binding[offset]
-//   ...
-//   hal.interface.store.tensor %2 @y[offsety]
-// ```
-// This is a typical pattern that appears after tileAndFuse ops with operands
-// produced by other linalg ops. In this case, tile and fuse leaves %0 behind
-// because it is the op that materializes the full tensor. This could be
-// replaced by a notional "tensor.undef" and the compute would become a dead
-// value.
-// The rewrite breaks the use-def chain for %0 and may result in the linalg-op
-// being DCE'd.
-//
-// Other rewrites:
-// ===============
-// Furthermore, when `@binding` == `@y` and `offset` == `offsety` and `...`
-// contains no aliasing read/write to either `@binding[offset]` or `@y[offsety]`
-// the following:
-// ```
-//   %2 = hal.interface.load.tensor @binding[offset]
-//   ...
-//   hal.interface.store.tensor %2 @y[offsety]
-// ```
-// is elided.
-// This should probably become a dedicated pass based on core alias analysis,
-// when the latter becomes available.
 static LogicalResult rewriteDestructiveUpdateInPlace(
     OpBuilder &b, SpecialTerminatorOpCapture &capture, Value target) {
   Operation *outermostProducingOp = (capture.loops.empty())
@@ -416,73 +322,42 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
       TypeSwitch<Operation *, LogicalResult>(capture.rootDestructiveUpdate)
           .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp,
                 tensor::InsertSliceOp>([&](auto op) {
-            if (failed(rewriteDestructiveUpdateInPlace(b, op, target))) {
-              return failure();
-            }
-            return success();
+            return rewriteDestructiveUpdateInPlace(b, op, target);
           })
           .Default([&](Operation *) { return failure(); });
   if (failed(status)) return failure();
 
   if (scf::ForOp loopOp = dyn_cast<scf::ForOp>(outermostProducingOp))
     loopOp.walk(
-        [&](tensor::ExtractSliceOp op) { (void)propagateSubTensorOp(b, op); });
+        [&](tensor::ExtractSliceOp op) { (void)foldExtractSliceOp(b, op); });
 
   return success();
-}
-
-// TODO(nicolasvasilache): generalize to more than naive "top of the region
-// consecutive ops". Probably better to wait until core alias analysis is
-// upstreamed.
-// TODO(nicolasvasilache): interfaces.
-static bool hasInterleavedAliases(IREE::Flow::DispatchTensorLoadOp loadOp,
-                                  IREE::Flow::DispatchTensorStoreOp storeOp) {
-  Block *bLoad = loadOp.getOperation()->getBlock();
-  Block *bStore = loadOp.getOperation()->getBlock();
-  if (!isa<IREE::Flow::DispatchWorkgroupsOp>(bLoad->getParentOp()) ||
-      !isa<IREE::Flow::DispatchWorkgroupsOp>(bStore->getParentOp()) ||
-      bLoad->getParentOp() != bStore->getParentOp())
-    return true;
-
-  if (storeOp.getOperation()->getPrevNode() != loadOp) return true;
-
-  return false;
 }
 
 LogicalResult rewriteLinalgDestructiveUpdates(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   // Bail on any control-flow for now.
-  if (hasNonScfForControlFlow(dispatchOp)) {
-    return success();
-  }
+  if (hasNonScfForControlFlow(dispatchOp)) return success();
 
   MLIRContext *context = dispatchOp->getContext();
   OpBuilder b(context);
   SmallVector<IREE::Flow::DispatchTensorStoreOp> processedStores;
   // For each tensor store op, look for destructive updates and replace the
   // destructive pattern by a custom inplace update pattern.
-  bool fail = dispatchOp
-                  .walk([&](IREE::Flow::DispatchTensorStoreOp op) {
-                    SpecialTerminatorOpCapture capture;
-                    capture.initValue = op.value();
-                    Value sourceValue =
-                        isADestructiveUpdatePattern(capture.initValue, capture);
-                    if (!sourceValue) {
-                      return WalkResult::advance();
-                    }
-                    if (failed(rewriteDestructiveUpdateInPlace(b, capture,
-                                                               op.target()))) {
-                      return WalkResult::interrupt();
-                    }
-                    processedStores.push_back(op);
-                    return WalkResult::advance();
-                  })
-                  .wasInterrupted();
-  if (fail) return failure();
+  auto walkResult = dispatchOp.walk([&](IREE::Flow::DispatchTensorStoreOp op) {
+    SpecialTerminatorOpCapture capture;
+    capture.initValue = op.value();
+    Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
+    if (!sourceValue) return WalkResult::advance();
+    if (failed(rewriteDestructiveUpdateInPlace(b, capture, op.target()))) {
+      return WalkResult::interrupt();
+    }
+    processedStores.push_back(op);
+    return WalkResult::advance();
+  });
+  if (walkResult.wasInterrupted()) return failure();
 
-  for (auto op : processedStores) {
-    op.erase();
-  }
+  for (auto op : processedStores) op.erase();
 
   // Non-default canonicalization patterns.
   // TODO(nicolasvasilache): add Linalg tiling canonicalization patterns,
