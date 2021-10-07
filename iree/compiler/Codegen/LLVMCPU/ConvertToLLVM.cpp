@@ -629,7 +629,10 @@ void ConvertToLLVMPass::runOnOperation() {
   {
     OwningRewritePatternList patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+    vector::populateVectorBroadcastLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(patterns);
+    vector::populateVectorMaskOpLoweringPatterns(patterns);
+    vector::populateVectorShapeCastLoweringPatterns(patterns);
     vector::populateVectorTransposeLoweringPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }

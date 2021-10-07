@@ -290,10 +290,13 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
                                          std::move(combineTransposePatterns));
     } else {
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
           contractLoweringPatterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
+      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(contractLoweringPatterns));
     }

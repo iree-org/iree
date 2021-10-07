@@ -54,12 +54,15 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+      vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
           patterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
-      mlir::vector::populateVectorTransposeLoweringPatterns(patterns);
-      mlir::vector::populateVectorTransferLoweringPatterns(patterns);
+      vector::populateVectorMaskOpLoweringPatterns(patterns);
+      vector::populateVectorShapeCastLoweringPatterns(patterns);
+      vector::populateVectorTransposeLoweringPatterns(patterns);
+      vector::populateVectorTransferLoweringPatterns(patterns);
       (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
     }
     {
