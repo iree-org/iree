@@ -146,7 +146,7 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 #define iree_atomic_ref_count_dec(count_ptr) \
   iree_atomic_fetch_sub_int32(count_ptr, 1, iree_memory_order_acq_rel)
 
-// Aborts the program if the given reference count value is not 0.
+// Aborts the program if the given reference count value is not 1.
 // This should be avoided in all situations but those where continuing execution
 // would be invalid. If a reference object is allocated on the stack and the
 // parent function is about to return it *must* have a ref count of 1: anything
