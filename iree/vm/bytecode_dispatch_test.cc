@@ -52,11 +52,12 @@ std::vector<TestParams> GetModuleTestParams() {
     iree_vm_module_signature_t signature = module->signature(module->self);
     test_params.reserve(test_params.size() + signature.export_function_count);
     for (int i = 0; i < signature.export_function_count; ++i) {
-      iree_string_view_t name;
-      IREE_CHECK_OK(module->get_function(module->self,
-                                         IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-                                         nullptr, &name, nullptr));
-      test_params.push_back({module_file, std::string(name.data, name.size)});
+      iree_vm_function_t function;
+      IREE_CHECK_OK(iree_vm_module_lookup_function_by_ordinal(
+          module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
+      iree_string_view_t function_name = iree_vm_function_name(&function);
+      test_params.push_back(
+          {module_file, std::string(function_name.data, function_name.size)});
     }
     iree_vm_module_release(module);
   }
@@ -81,8 +82,8 @@ class VMBytecodeDispatchTest
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), iree_allocator_system(),
-        &context_));
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        iree_allocator_system(), &context_));
   }
 
   virtual void TearDown() {
@@ -97,7 +98,7 @@ class VMBytecodeDispatchTest
         bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_make_cstring_view(function_name), &function));
 
-    return iree_vm_invoke(context_, function,
+    return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                           /*policy=*/nullptr, /*inputs=*/nullptr,
                           /*outputs=*/nullptr, iree_allocator_system());
   }

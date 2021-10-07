@@ -16,9 +16,10 @@ There are two components to Tracy. They communicate over a TCP socket.
 ## The Tracy manual
 
 The primary source of Tracy documentation, including for build instructions, is
-a PDF manual that's part of each numbered release. To find the latest one,
-navigate [here](https://github.com/wolfpld/tracy/releases) and search for
-`tracy.pdf`.
+a PDF manual that's part of each numbered release. You can
+[download the latest](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf)
+or
+[preview it](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf).
 
 ## Building the Tracy UI (the "server")
 
@@ -79,8 +80,8 @@ information. This is OS-specific.
 
 ### Desktop Linux
 
-On desktop Linux, the Tracy client must be run as root, e.g. with `sudo`.
-Otherwise, profile data will lack important components.
+On desktop Linux, the profiled application must be run as root, e.g. with
+`sudo`. Otherwise, profile data will lack important components.
 
 ### Android
 
@@ -125,6 +126,10 @@ adb forward tcp:8086 tcp:8086
 TODO write this (`ssh` stuff...)
 
 ## Running the profiled program
+
+Tracing doesn't work properly on VMs (see section 2.1.6.4 of the
+[manual](#the-tracy-manual)). To get sampling, you should run the profiled
+program on bare metal.
 
 Run your IREE workload as you normally would: now that it's been built with
 Tracy instrumentation enabled, it should do all the right things automatically.
@@ -217,8 +222,8 @@ on a thread that's not visible in the initial view at all. Indeed, the initial
 view tends to be zoomed-in a lot. Either use the mouse directly to zoom out and
 navigate, to look for the 'Frame' control at the top of the Tracy window. Use
 the 'next frame' arrow button until more interesting threads appear. Typically,
-IREE generated code tends to run on a thread named `cpu0`, which is actually a
-thread name and unrelated to `CPU0` from the systrace view.
+IREE generated code tends to run on a thread named `worker[0]` (the screenshot
+here shows old names that were like `cpu0`).
 
 Once you have identified the thread of interest, use its ghost icon to toggle
 between instrumentation and ghost zones, and zoom until you have found the zone

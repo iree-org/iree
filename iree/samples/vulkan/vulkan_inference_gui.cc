@@ -241,11 +241,11 @@ extern "C" int iree_main(int argc, char** argv) {
                  << bytecode_module_signature.export_function_count
                  << "> exported functions:";
   for (int i = 0; i < bytecode_module_signature.export_function_count; ++i) {
-    iree_string_view_t function_name;
-    iree_vm_function_signature_t function_signature;
-    IREE_CHECK_OK(bytecode_module->get_function(
-        bytecode_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-        /*out_function=*/nullptr, &function_name, &function_signature));
+    iree_vm_function_t function;
+    IREE_CHECK_OK(iree_vm_module_lookup_function_by_ordinal(
+        bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
+    auto function_name = iree_vm_function_name(&function);
+    auto function_signature = iree_vm_function_signature(&function);
     IREE_LOG(INFO) << "  " << i << ": '"
                    << std::string(function_name.data, function_name.size)
                    << "' with calling convention '"
@@ -258,8 +258,8 @@ extern "C" int iree_main(int argc, char** argv) {
   iree_vm_context_t* iree_context = nullptr;
   std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      iree_instance, modules.data(), modules.size(), iree_allocator_system(),
-      &iree_context));
+      iree_instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+      iree_allocator_system(), &iree_context));
   IREE_LOG(INFO) << "Context with modules is ready for use";
 
   // Lookup the async entry point function.
@@ -431,6 +431,7 @@ extern "C" int iree_main(int argc, char** argv) {
 
         // Asynchronously invoke the function.
         IREE_CHECK_OK(iree_vm_invoke(iree_context, main_function,
+                                     IREE_VM_INVOCATION_FLAG_NONE,
                                      /*policy=*/nullptr, inputs.get(),
                                      outputs.get(), iree_allocator_system()));
 

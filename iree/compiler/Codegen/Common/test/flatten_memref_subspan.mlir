@@ -155,6 +155,33 @@ hal.interface @io attributes {sym_visibility = "private"} {
 
 // -----
 
+func @store_subspan_with_flow_control(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
+  %dim = hal.interface.load.constant offset = 0 : index
+  %subspan = hal.interface.binding.subspan @io::@s0b0_xw_external[%offset] : memref<?x3x4xf32>{%dim}
+  scf.for %i = %i0 to %i1 step %i2 {
+    memref.store %value, %subspan[%i0, %i1, %i2] : memref<?x3x4xf32>
+  }
+  return
+}
+
+hal.interface private @io  {
+  hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
+}
+
+//      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0] -> (s0 * 12)
+//      CHECK: #[[OFFSET_MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 12 + s1 * 4 + s2 + s3 floordiv 4)>
+//      CHECK: func @store_subspan_with_flow_control
+// CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
+//      CHECK:   %[[C0:.+]] = constant 0 : index
+//      CHECK:   %[[DIM:.+]] = hal.interface.load.constant offset = 0 : index
+//      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM]]]
+//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK: scf.for
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
+//      CHECK:   memref.store %[[VALUE]], %[[DST]][%[[INDEX]]] : memref<?xf32>
+
+// -----
+
 func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: index) -> f32 {
   %alloc = memref.alloc() : memref<2x3x4xf32, 3>
   memref.store %value, %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>

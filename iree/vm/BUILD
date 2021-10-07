@@ -181,6 +181,8 @@ cc_test(
 cc_library(
     name = "bytecode_module",
     srcs = [
+        "bytecode_disasm.c",
+        "bytecode_disasm.h",
         "bytecode_dispatch.c",
         "bytecode_dispatch_util.h",
         "bytecode_module.c",
@@ -235,9 +237,8 @@ cc_test(
         "bytecode_module_test.cc",
     ],
     tags = [
-        # TODO(benvanik): Fix type casting errors for --config=android_arm*.
+        # TODO(benvanik): Fix type casting errors for --config=android_arm.
         "notap",
-        "manual",
     ],
     deps = [
         ":bytecode_module",

@@ -171,6 +171,8 @@ iree_cc_library(
   HDRS
     "bytecode_module.h"
   SRCS
+    "bytecode_disasm.c"
+    "bytecode_disasm.h"
     "bytecode_dispatch.c"
     "bytecode_dispatch_util.h"
     "bytecode_module.c"
@@ -206,7 +208,6 @@ iree_cc_test(
     iree::vm::test::all_bytecode_modules_c
   LABELS
     "notap"
-    "manual"
 )
 
 iree_cc_binary(

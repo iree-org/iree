@@ -111,8 +111,8 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   // Order matters. The input module will likely be dependent on the hal module.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, input_module};
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-                           instance, modules.data(), modules.size(),
-                           iree_allocator_system(), &context),
+                           instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(),
+                           modules.size(), iree_allocator_system(), &context),
                        "creating context");
 
   const std::string& function_name = invocation.entry_function;
@@ -141,8 +141,9 @@ Status RunModule(const IreeModuleInvocation& invocation) {
 
   LOGI("Execute @%s", function_name.c_str());
   IREE_RETURN_IF_ERROR(
-      iree_vm_invoke(context, function, /*policy=*/nullptr, inputs.get(),
-                     outputs.get(), iree_allocator_system()),
+      iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                     /*policy=*/nullptr, inputs.get(), outputs.get(),
+                     iree_allocator_system()),
       "invoking function '%s'", function_name.c_str());
 
   std::ostringstream oss;

@@ -62,8 +62,8 @@ class CheckTest : public ::testing::Test {
   void SetUp() override {
     std::vector<iree_vm_module_t*> modules = {hal_module_, check_module_};
     IREE_ASSERT_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), iree_allocator_system(),
-        &context_));
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        iree_allocator_system(), &context_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 
@@ -172,7 +172,7 @@ class CheckTest : public ::testing::Test {
             iree_make_cstring_view(function_name), &function),
         "exported function '%s' not found", function_name);
     // TODO(#2075): don't directly invoke native functions like this.
-    return iree_vm_invoke(context_, function,
+    return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                           /*policy=*/nullptr, inputs_.get(),
                           /*outputs=*/nullptr, iree_allocator_system());
   }

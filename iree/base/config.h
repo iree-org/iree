@@ -71,6 +71,7 @@
 
 #if !defined(IREE_HOST_SIZE_T)
 #define IREE_HOST_SIZE_T size_t
+#define PRIhsz "zu"
 #endif  // !IREE_HOST_SIZE_T
 
 // Size, in bytes, of a buffer on the local host.
@@ -177,6 +178,36 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Enables backtraces in VM failures when debugging information is available.
 #define IREE_VM_BACKTRACE_ENABLE 1
 #endif  // !IREE_VM_BACKTRACE_ENABLE
+
+#if !defined(IREE_VM_EXECUTION_TRACING_ENABLE)
+// Enables disassembly of vm bytecode functions and stderr dumping of execution.
+// Increases code size quite, lowers VM performance, and is generally unsafe;
+// include only when debugging or running on trusted inputs.
+#ifdef NDEBUG
+#define IREE_VM_EXECUTION_TRACING_ENABLE 0
+#else
+#define IREE_VM_EXECUTION_TRACING_ENABLE 1
+#endif  // NDEBUG
+#endif  // !IREE_VM_EXECUTION_TRACING_ENABLE
+
+#if !defined(IREE_VM_EXECUTION_TRACING_FORCE_ENABLE)
+// Forces tracing of VM execution by default ignoring runtime flags that may
+// otherwise control the behavior. This can be used to enable tracing in tools
+// that do not have flag parsing or plumbing for per-invocation flags.
+#define IREE_VM_EXECUTION_TRACING_FORCE_ENABLE 0
+#endif  // !IREE_VM_EXECUTION_TRACING_FORCE_ENABLE
+#if IREE_VM_EXECUTION_TRACING_FORCE_ENABLE
+#define IREE_VM_EXECUTION_TRACING_ENABLE 1
+#endif  // IREE_VM_EXECUTION_TRACING_FORCE_ENABLE
+
+#if !defined(IREE_VM_EXECUTION_TRACING_SRC_LOC_ENABLE)
+// Enables printing of the source location of an op when tracing its execution.
+// This may be messy depending on the origin of the locations in the program;
+// for example today the python locs are entire stack traces. Improvements to
+// printing of more complex source locations (or a way to prune them in the
+// compiler) would let this be turned on by default.
+#define IREE_VM_EXECUTION_TRACING_SRC_LOC_ENABLE 0
+#endif  // !IREE_VM_EXECUTION_TRACING_SRC_LOC_ENABLE
 
 #if !defined(IREE_VM_EXT_I64_ENABLE)
 // Enables the 64-bit integer instruction extension.

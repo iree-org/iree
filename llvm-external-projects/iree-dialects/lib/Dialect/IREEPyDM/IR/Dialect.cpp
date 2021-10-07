@@ -92,13 +92,20 @@ void IREEPyDMDialect::printType(Type type, DialectAsmPrinter &printer) const {
 //------------------------------------------------------------------------------
 
 BuiltinTypeCode iree_pydm::BoolType::getTypeCode() const {
-  return BuiltinTypeCode::Bool;
+  return static_cast<BuiltinTypeCode>(
+      makeNumericTypeCode(*getNumericCategory(), *getNumericSubTypeCode()));
 }
 
 StringRef iree_pydm::BoolType::getPythonTypeName() const { return "bool"; }
 
+Optional<NumericCategory> iree_pydm::BoolType::getNumericCategory() const {
+  return NumericCategory::Bool;
+}
+
+Optional<int> iree_pydm::BoolType::getNumericSubTypeCode() const { return 0; }
+
 Optional<int> iree_pydm::BoolType::getNumericPromotionOrder() const {
-  return 1;
+  return static_cast<int>(getTypeCode());
 }
 
 BuiltinTypeCode iree_pydm::BytesType::getTypeCode() const {
@@ -115,14 +122,63 @@ StringRef iree_pydm::ExceptionResultType::getPythonTypeName() const {
   return "Exception";
 }
 
+LogicalResult iree_pydm::IntegerType::verify(
+    function_ref<InFlightDiagnostic()> emitError, Optional<int> bitWidth) {
+  if (!bitWidth) return success();
+  int w = abs(*bitWidth);
+  if (w == 0 || w == 8 || w == 16 || w == 32 || w == 64) return success();
+  return emitError() << "unsupported python integer bit width: " << w;
+}
+
 BuiltinTypeCode iree_pydm::IntegerType::getTypeCode() const {
-  return BuiltinTypeCode::Integer;
+  return static_cast<BuiltinTypeCode>(
+      makeNumericTypeCode(*getNumericCategory(), *getNumericSubTypeCode()));
 }
 
 StringRef iree_pydm::IntegerType::getPythonTypeName() const { return "int"; }
 
+Optional<NumericCategory> iree_pydm::IntegerType::getNumericCategory() const {
+  if (isWeak()) return NumericCategory::WeakInteger;
+  if (getBitWidth() == 0) return NumericCategory::APSigned;
+  if (isSigned()) return NumericCategory::Signed;
+  return NumericCategory::Unsigned;
+}
+
+Optional<int> iree_pydm::IntegerType::getNumericSubTypeCode() const {
+  if (isWeak()) return 0;
+  IntegerSubTypeCode stc;
+  switch (getBitWidth()) {
+    case 8:
+      stc = IntegerSubTypeCode::Integer8;
+      break;
+    case 16:
+      stc = IntegerSubTypeCode::Integer16;
+      break;
+    case 32:
+      stc = IntegerSubTypeCode::Integer32;
+      break;
+    case 64:
+      stc = IntegerSubTypeCode::Integer64;
+      break;
+    default: {
+      llvm_unreachable("unsupported numeric bitwidth");
+    }
+  }
+  return static_cast<int>(stc);
+}
+
 Optional<int> iree_pydm::IntegerType::getNumericPromotionOrder() const {
-  return 2;
+  return static_cast<int>(getTypeCode());
+}
+
+bool iree_pydm::IntegerType::isWeak() const { return !getImpl()->bitWidth; }
+
+unsigned iree_pydm::IntegerType::getBitWidth() const {
+  return abs(*getImpl()->bitWidth);
+}
+
+bool iree_pydm::IntegerType::isSigned() const {
+  return *getImpl()->bitWidth >= 0;
 }
 
 BuiltinTypeCode iree_pydm::ListType::getTypeCode() const {
@@ -143,15 +199,48 @@ BuiltinTypeCode iree_pydm::ObjectType::getTypeCode() const {
 
 StringRef iree_pydm::ObjectType::getPythonTypeName() const { return "object"; }
 
+LogicalResult iree_pydm::RealType::verify(
+    function_ref<InFlightDiagnostic()> emitError, FloatType floatType) {
+  if (!floatType) return success();
+  if (!floatType.isa<BFloat16Type, Float16Type, Float32Type, Float64Type>()) {
+    return emitError() << "unsupported Python floating point type: "
+                       << floatType;
+  }
+  return success();
+}
+
 BuiltinTypeCode iree_pydm::RealType::getTypeCode() const {
-  return BuiltinTypeCode::Real;
+  return static_cast<BuiltinTypeCode>(
+      makeNumericTypeCode(*getNumericCategory(), *getNumericSubTypeCode()));
 }
 
 StringRef iree_pydm::RealType::getPythonTypeName() const { return "float"; }
 
-Optional<int> iree_pydm::RealType::getNumericPromotionOrder() const {
-  return 3;
+Optional<NumericCategory> iree_pydm::RealType::getNumericCategory() const {
+  if (isWeak()) return NumericCategory::WeakReal;
+  return NumericCategory::Real;
 }
+
+Optional<int> iree_pydm::RealType::getNumericSubTypeCode() const {
+  if (isWeak()) return 0;
+  RealSubTypeCode stc =
+      TypeSwitch<Type, RealSubTypeCode>(getFloatType())
+          .Case([](BFloat16Type t) { return RealSubTypeCode::BF16; })
+          .Case([](Float16Type t) { return RealSubTypeCode::FP16; })
+          .Case([](Float32Type t) { return RealSubTypeCode::FP32; })
+          .Case([](Float64Type t) { return RealSubTypeCode::FP64; })
+          .Default([](Type t) {
+            llvm_unreachable("unsupported float type");
+            return RealSubTypeCode::FP64;
+          });
+  return static_cast<int>(stc);
+}
+
+Optional<int> iree_pydm::RealType::getNumericPromotionOrder() const {
+  return static_cast<int>(getTypeCode());
+}
+
+bool iree_pydm::RealType::isWeak() const { return !getImpl()->floatType; }
 
 BuiltinTypeCode iree_pydm::StrType::getTypeCode() const {
   return BuiltinTypeCode::Str;

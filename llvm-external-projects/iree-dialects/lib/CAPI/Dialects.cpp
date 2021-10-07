@@ -60,6 +60,14 @@ IREEPYDM_DEFINE_NULLARY_TYPE(Str)
 IREEPYDM_DEFINE_NULLARY_TYPE(Tuple)
 IREEPYDM_DEFINE_NULLARY_TYPE(Type)
 
+// Non-nullary Type constructors from the above.
+MlirType mlirIREEPyDMIntegerTypeGetExplicit(MlirContext ctx, int bitWidth,
+                                            bool isSigned) {
+  return wrap(
+      mlir::iree_pydm::IntegerType::get(unwrap(ctx), bitWidth, isSigned));
+}
+
+// ObjectType.
 bool mlirTypeIsAIREEPyDMObject(MlirType type) {
   return unwrap(type).isa<mlir::iree_pydm::ObjectType>();
 }
@@ -73,6 +81,7 @@ MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
   return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), cppType));
 }
 
+// LowerToIREE Pass Pipeline.
 void mlirIREEPyDMBuildLowerToIREEPassPipeline(MlirOpPassManager passManager,
                                               IREEPyDMLoweringOptions options) {
   auto *passManagerCpp = unwrap(passManager);

@@ -1,0 +1,27 @@
+# Builds the TFLite Java Bindings Android Library using the gradle-android
+# Docker image.
+name: Build TFLite Android Library
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_android_with_docker:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_CONTAINER: "gcr.io/iree-oss/gradle-android@sha256:54cddc42e13d63da5adf495acb4e96c2773b66a1169cf8a9aac26a21f4166e2e"
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Execute Android Build
+        run: |
+          docker run --rm \
+          -w=/work \
+          -v $PWD:/work \
+          "${ANDROID_CONTAINER}" \
+          bash -c build_tools/gradle/build_tflite_android_library.sh
+      - uses: actions/upload-artifact@v2
+        with:
+          path: ./bindings/tflite/java/build/outputs/aar/*.aar
+          retention-days: 1

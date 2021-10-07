@@ -47,15 +47,6 @@ static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
     llvm::cl::CommaSeparated);
 
-// TODO(#5040): This works for the most part but the downstream bufferization
-// needs to be sorted out before this can be made the default. Remove after
-// making this default.
-static llvm::cl::opt<bool> clEnableOperandFusion(
-    "iree-flow-dispatch-formation-enable-operand-fusion",
-    llvm::cl::desc(
-        "Enable fusing operand producers during dispatch region formation"),
-    llvm::cl::init(false));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -1180,45 +1171,43 @@ static unsigned decideFusableLinalgOps(mlir::FuncOp funcOp) {
       }
     }
 
-    if (clEnableOperandFusion) {
-      // To fuse root operations with their consumers, for all root ops chosen.
-      // If, 1) The root op has a single use 2) The consumer is an elementwise
-      // operation 3) The indexing map in the producer and consumer are identity
-      // maps The root operation can be fused with its consumer. To do this,
-      // mark the consumer as the root and add the operation to the fusion
-      // group.
-      for (linalg::LinalgOp linalgOp : block.getOps<linalg::LinalgOp>()) {
-        Operation *op = linalgOp.getOperation();
-        if (!hasRootOpAttribute(op)) continue;
-        if (op->getNumResults() != 1 || !op->hasOneUse()) continue;
-        OpOperand &use = *op->use_begin();
-        Operation *user = use.getOwner();
-        if (hasRootOpAttribute(user) || hasFusionGroupsAttribute(user)) {
-          continue;
-        }
-        linalg::LinalgOp consumer = dyn_cast<linalg::LinalgOp>(use.getOwner());
-        if (!consumer ||
-            consumer.getNumLoops() != consumer.getNumParallelLoops()) {
-          continue;
-        }
-        AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
-        AffineMap producerIndexingMap =
-            linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0));
-        if (!consumerIndexingMap.isIdentity() ||
-            producerIndexingMap.getResults() !=
-                consumerIndexingMap.getResults()) {
-          continue;
-        }
-        if (llvm::any_of(
-                consumer.getOutputOperands(), [&consumer](OpOperand *operand) {
-                  return !consumer.getTiedIndexingMap(operand).isIdentity();
-                }))
-          continue;
-        int64_t rootNumber = getRootNumber(op);
-        setRootAttribute(context, user, rootNumber);
-        removeRootOpAttribute(op);
-        appendToFusionGroup(op, rootNumber);
+    // To fuse root operations with their consumers, for all root ops chosen.
+    // If, 1) The root op has a single use 2) The consumer is an elementwise
+    // operation 3) The indexing map in the producer and consumer are identity
+    // maps The root operation can be fused with its consumer. To do this,
+    // mark the consumer as the root and add the operation to the fusion
+    // group.
+    for (linalg::LinalgOp linalgOp : block.getOps<linalg::LinalgOp>()) {
+      Operation *op = linalgOp.getOperation();
+      if (!hasRootOpAttribute(op)) continue;
+      if (op->getNumResults() != 1 || !op->hasOneUse()) continue;
+      OpOperand &use = *op->use_begin();
+      Operation *user = use.getOwner();
+      if (hasRootOpAttribute(user) || hasFusionGroupsAttribute(user)) {
+        continue;
       }
+      linalg::LinalgOp consumer = dyn_cast<linalg::LinalgOp>(use.getOwner());
+      if (!consumer ||
+          consumer.getNumLoops() != consumer.getNumParallelLoops()) {
+        continue;
+      }
+      AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
+      AffineMap producerIndexingMap =
+          linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0));
+      if (!consumerIndexingMap.isIdentity() ||
+          producerIndexingMap.getResults() !=
+              consumerIndexingMap.getResults()) {
+        continue;
+      }
+      if (llvm::any_of(
+              consumer.getOutputOperands(), [&consumer](OpOperand *operand) {
+                return !consumer.getTiedIndexingMap(operand).isIdentity();
+              }))
+        continue;
+      int64_t rootNumber = getRootNumber(op);
+      setRootAttribute(context, user, rootNumber);
+      removeRootOpAttribute(op);
+      appendToFusionGroup(op, rootNumber);
     }
   }
   return numRootOps;

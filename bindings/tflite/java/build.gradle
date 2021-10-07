@@ -54,6 +54,7 @@ android {
                 exclude('tests/**') // Don't build tests into the library
             }
             jni.srcDirs = ['org/tensorflow/lite/native']
+            jniLibs.srcDirs = ['jniLibs/']
         }
     }
 

@@ -156,6 +156,7 @@ static iree_status_t _TfLiteInterpreterShapeFrameApply(
   iree_vm_value_t index_value = iree_vm_value_make_i32(index);
   IREE_IGNORE_ERROR(iree_vm_list_set_value(frame->arg_list, 0, &index_value));
   return iree_vm_invoke(interpreter->context, apply_fn,
+                        IREE_VM_INVOCATION_FLAG_NONE,
                         /*policy=*/NULL, frame->arg_list, /*outputs=*/NULL,
                         interpreter->allocator);
 }
@@ -369,9 +370,9 @@ static iree_status_t _TfLiteInterpreterCreate(
   // tflite_resolver_module that we would register to resolve tflite ops into
   // IREE functions that will call custom ops through TfLiteRegistrations.
   IREE_RETURN_IF_ERROR(iree_vm_context_create_with_modules(
-      interpreter->instance, interpreter->all_modules,
-      IREE_ARRAYSIZE(interpreter->all_modules), interpreter->allocator,
-      &interpreter->context));
+      interpreter->instance, IREE_VM_CONTEXT_FLAG_NONE,
+      interpreter->all_modules, IREE_ARRAYSIZE(interpreter->all_modules),
+      interpreter->allocator, &interpreter->context));
 
   // Setup all I/O tensors and buffer views.
   IREE_RETURN_IF_ERROR(_TfLiteInterpreterPopulateIO(interpreter));
@@ -444,6 +445,7 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteInterpreterResetVariableTensors(
       interpreter->model->exports._reset_variables;
   if (!iree_vm_function_is_null(reset_variables_fn)) {
     status = iree_vm_invoke(interpreter->context, reset_variables_fn,
+                            IREE_VM_INVOCATION_FLAG_NONE,
                             /*policy=*/NULL, /*inputs=*/NULL, /*outputs=*/NULL,
                             interpreter->allocator);
   }
@@ -572,6 +574,7 @@ static iree_status_t _TfLiteInterpreterInvoke(TfLiteInterpreter* interpreter) {
   // emits it as '_main'.
   IREE_RETURN_IF_ERROR(
       iree_vm_invoke(interpreter->context, interpreter->model->exports._main,
+                     IREE_VM_INVOCATION_FLAG_NONE,
                      /*policy=*/NULL, interpreter->input_list,
                      interpreter->output_list, interpreter->allocator));
 

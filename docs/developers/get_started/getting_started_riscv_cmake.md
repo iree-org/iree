@@ -195,12 +195,13 @@ VLS(Vector Length Specific) style codes.
 $ ../iree-build-host/install/bin/iree-translate \
 -iree-mlir-to-vm-bytecode-module \
 -iree-hal-target-backends=dylib-llvm-aot \
+-iree-input-type=mhlo \
 -iree-llvm-target-triple=riscv64 \
 -iree-llvm-target-cpu=sifive-7-rv64 \
 -iree-llvm-target-abi=lp64d \
 -iree-llvm-target-cpu-features="+m,+a,+d,+experimental-v" \
--riscv-v-vector-bits-min=128 -riscv-v-fixed-length-vector-lmul-max=8 \
-/path/to/input.mlir -o /tmp/output-rvv.vmfb
+-riscv-v-vector-bits-min=256 -riscv-v-fixed-length-vector-lmul-max=8 \
+${PWD}/iree/samples/simple_embedding/simple_embedding_test.mlir -o /tmp/output-rvv.vmfb
 ```
 
 Then run on the RISC-V QEMU:
@@ -210,5 +211,9 @@ $ ${QEMU_BIN} \
   -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/iree/tools/iree-run-module --driver=dylib \
-  --flagfile=/path/to/flagfile
+  --driver=dylib \
+  --module_file=/tmp/output-rvv.vmfb \
+  --entry_function=simple_mul \
+  --function_input="4xf32=[1 2 3 4]" \
+  --function_input="4xf32=[2 4 6 8]"
 ```

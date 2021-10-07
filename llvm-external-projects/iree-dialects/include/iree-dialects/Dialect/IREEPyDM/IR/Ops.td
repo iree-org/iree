@@ -477,7 +477,7 @@ def IREEPyDM_GetTypeCodeOp : IREEPyDM_PureOp<"get_type_code"> {
   let arguments = (ins IREEPyDM_AnyValueType:$value);
   let results = (outs IREEPyDM_IntegerType);
   let assemblyFormat = [{
-    $value `:` type($value) attr-dict
+    $value `:` type($value) `->` type(results) attr-dict
   }];
 }
 
@@ -496,7 +496,7 @@ def IREEPyDM_GetNumericPromotionOrderOp : IREEPyDM_PureOp<"get_numeric_promotion
   let arguments = (ins IREEPyDM_AnyValueType:$value);
   let results = (outs IREEPyDM_IntegerType);
   let assemblyFormat = [{
-    $value `:` type($value) attr-dict
+    $value `:` type($value) `->` type(results) attr-dict
   }];
 }
 
@@ -650,6 +650,7 @@ def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare"> {
   let assemblyFormat = [{
     $dunder_name `,` $left `,` $right `:` type(operands) attr-dict
   }];
+  let hasCanonicalizer = 1;
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_OPS_TD

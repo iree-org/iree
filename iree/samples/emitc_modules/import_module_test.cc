@@ -29,8 +29,8 @@ class VMImportModuleTest : public ::testing::Test {
     // Note: order matters as module_a imports from module_b
     std::vector<iree_vm_module_t*> modules = {module_b, module_a};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules.data(), modules.size(), iree_allocator_system(),
-        &context_));
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
+        iree_allocator_system(), &context_));
 
     iree_vm_module_release(module_a);
     iree_vm_module_release(module_b);
@@ -61,10 +61,10 @@ class VMImportModuleTest : public ::testing::Test {
         /*element_type=*/nullptr, 1, iree_allocator_system(), &output_list));
 
     // Invoke the entry function to do our work. Runs synchronously.
-    IREE_RETURN_IF_ERROR(iree_vm_invoke(context_, function,
-                                        /*policy=*/nullptr, input_list.get(),
-                                        output_list.get(),
-                                        iree_allocator_system()));
+    IREE_RETURN_IF_ERROR(
+        iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
+                       /*policy=*/nullptr, input_list.get(), output_list.get(),
+                       iree_allocator_system()));
 
     // Load the output result.
     iree_vm_value_t ret_value;

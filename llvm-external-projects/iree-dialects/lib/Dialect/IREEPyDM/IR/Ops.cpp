@@ -77,6 +77,39 @@ void AllocFreeVarOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 }
 
 //===----------------------------------------------------------------------===//
+// ApplyCompareOp
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Matches an `apply_compare` op where both operands are defined by
+/// `box` ops that have the same operand type. Replaces the operands with the
+/// operands of the `box`.
+struct UnboxApplyCompareOperands : public OpRewritePattern<ApplyCompareOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ApplyCompareOp op,
+                                PatternRewriter &rewriter) const override {
+    auto boxLeft = op.left().getDefiningOp<BoxOp>();
+    auto boxRight = op.right().getDefiningOp<BoxOp>();
+    if (!boxLeft || !boxRight) return failure();
+    if (boxLeft.primitive().getType() != boxRight.primitive().getType())
+      return failure();
+    rewriter.replaceOpWithNewOp<ApplyCompareOp>(
+        op, rewriter.getType<BoolType>(), op.dunder_nameAttr(),
+        boxLeft.primitive(), boxRight.primitive());
+    return success();
+  }
+};
+
+}  // namespace
+
+void ApplyCompareOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                 MLIRContext *context) {
+  patterns.add<UnboxApplyCompareOperands>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // AsBoolOp
 //===----------------------------------------------------------------------===//
 

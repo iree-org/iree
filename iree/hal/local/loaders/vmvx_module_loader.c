@@ -105,7 +105,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
     for (iree_host_size_t i = 0; i < executable->entry_fn_count; ++i) {
       status = iree_vm_module_lookup_function_by_ordinal(
           bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-          &executable->entry_fns[i], NULL);
+          &executable->entry_fns[i]);
       if (!iree_status_is_ok(status)) break;
       status = iree_hal_vmvx_executable_verify_entry_point(
           &executable->entry_fns[i]);
@@ -300,7 +300,8 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   // On-stack stack. We really do abuse the stack too much here.
   // TODO(benvanik): pass in an iree_arena_t that can be used for this.
   IREE_VM_INLINE_STACK_INITIALIZE(
-      stack, iree_vm_context_state_resolver(executable->context),
+      stack, IREE_VM_INVOCATION_FLAG_NONE,
+      iree_vm_context_state_resolver(executable->context),
       executable->base.host_allocator);
 
   // Direct call interface.
@@ -448,8 +449,8 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
         bytecode_module,
     };
     status = iree_vm_context_create_with_modules(
-        executable_loader->instance, modules, IREE_ARRAYSIZE(modules),
-        executable_loader->host_allocator, &context);
+        executable_loader->instance, IREE_VM_CONTEXT_FLAG_NONE, modules,
+        IREE_ARRAYSIZE(modules), executable_loader->host_allocator, &context);
   }
 
   // Executable takes ownership of the entire context (including the bytecode

@@ -29,6 +29,22 @@ def PythonTypeInterface : TypeInterface<"PythonTypeInterface"> {
     }], "llvm::StringRef", "getPythonTypeName", (ins)>,
 
     InterfaceMethod<[{
+      For numeric types, returns the NumericCategory.
+    }], "llvm::Optional<NumericCategory>", "getNumericCategory", (ins),
+    /*methodBody=*/[{}], /*defaultImplementation=*/[{
+      return {};
+    }]>,
+
+    InterfaceMethod<[{
+      For numeric types, returns an appropriate subtype code, which is an
+      integer from 0-3 representing the specific type with the NumericCategory.
+      Weak types return None if though getNumericCategory() returns a value.
+    }], "llvm::Optional<int>", "getNumericSubTypeCode", (ins),
+    /*methodBody=*/[{}], /*defaultImplementation=*/[{
+      return {};
+    }]>,
+
+    InterfaceMethod<[{
       For numeric types, returns the promotion order.
       Types with a lower promotion order will be promoted to the higher order
       for most binary functions.

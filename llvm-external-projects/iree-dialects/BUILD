@@ -276,6 +276,7 @@ cc_library(
     name = "IREEPyDMTransforms",
     srcs = glob([
         "lib/Dialect/IREEPyDM/Transforms/*.cpp",
+        "lib/Dialect/IREEPyDM/Transforms/Optimize/*.cpp",
         "lib/Dialect/IREEPyDM/Transforms/RTL/*.cpp",
         "lib/Dialect/IREEPyDM/Transforms/ToIREE/*.cpp",
     ]),
@@ -296,6 +297,7 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
     ],
 )
 

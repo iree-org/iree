@@ -54,10 +54,6 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 //  CHECK-NEXT:   module {
 //  CHECK-NEXT:     func @interleavedDot_dispatch_1
 //       CHECK:       %{{.+}} = linalg.matmul
-//       CHECK: flow.executable private @interleavedDot_dispatch_2 {
-//  CHECK-NEXT:   flow.dispatch.entry public @interleavedDot_dispatch_2
-//  CHECK-NEXT:   module {
-//  CHECK-NEXT:     func @interleavedDot_dispatch_2
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = mulf %{{.+}}, %{{.+}} : f32
 //       CHECK: func @interleavedDot(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
@@ -66,9 +62,8 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 //   CHECK-DAG:     %[[C1:.+]] = constant 1 : index
 //   CHECK-DAG:     %[[C4:.+]] = constant 4 : index
 //  CHECK-NEXT:     %1 = flow.dispatch @interleavedDot_dispatch_0::@interleavedDot_dispatch_0[%[[C4]], %[[C4]], %[[C1]]](%arg1) : (tensor<4x4xf32>) -> tensor<4x4xf32>
-//  CHECK-NEXT:     %2 = flow.dispatch @interleavedDot_dispatch_1::@interleavedDot_dispatch_1[%[[C4]], %[[C4]], %[[C1]]](%1, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-//  CHECK-NEXT:     %3 = flow.dispatch @interleavedDot_dispatch_2::@interleavedDot_dispatch_2[%[[C4]], %[[C4]], %[[C1]]](%2, %arg1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-//  CHECK-NEXT:     flow.return %3 : tensor<4x4xf32>
+//  CHECK-NEXT:     %2 = flow.dispatch @interleavedDot_dispatch_1::@interleavedDot_dispatch_1[%[[C4]], %[[C4]], %[[C1]]](%arg1, %1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+//  CHECK-NEXT:     flow.return %2 : tensor<4x4xf32>
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   return %0 : tensor<4x4xf32>
 //  CHECK-NEXT: }

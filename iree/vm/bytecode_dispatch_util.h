@@ -118,20 +118,24 @@ static inline const iree_vm_type_def_t* iree_vm_map_type(
 // Debugging utilities
 //===----------------------------------------------------------------------===//
 
-// Enable to get some verbose logging; better than nothing until we have some
-// better tooling.
-#define IREE_DISPATCH_LOGGING 0
-
-#if IREE_DISPATCH_LOGGING
-#include <stdio.h>
-#define IREE_DISPATCH_LOG_OPCODE(op_name) \
-  fprintf(stderr, "DISPATCH %d %s\n", (int)pc, op_name)
-#define IREE_DISPATCH_LOG_CALL(target_function) \
-  fprintf(stderr, "CALL -> %s\n", iree_vm_function_name(target_function).data);
+#if IREE_VM_EXECUTION_TRACING_FORCE_ENABLE
+#define IREE_IS_DISPATCH_TRACING_ENABLED() true
 #else
-#define IREE_DISPATCH_LOG_OPCODE(...)
-#define IREE_DISPATCH_LOG_CALL(...)
-#endif  // IREE_DISPATCH_LOGGING
+#define IREE_IS_DISPATCH_TRACING_ENABLED()   \
+  !!(iree_vm_stack_invocation_flags(stack) & \
+     IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION)
+#endif  // IREE_VM_EXECUTION_TRACING_FORCE_ENABLE
+
+#if IREE_VM_EXECUTION_TRACING_ENABLE
+#define IREE_DISPATCH_TRACE_INSTRUCTION(pc_offset, op_name) \
+  if (IREE_IS_DISPATCH_TRACING_ENABLED()) {                 \
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_trace_disasm(     \
+        current_frame, (pc - (pc_offset)), &regs, stderr)); \
+  }
+
+#else
+#define IREE_DISPATCH_TRACE_INSTRUCTION(...)
+#endif  // IREE_VM_EXECUTION_TRACING_ENABLE
 
 #if defined(IREE_COMPILER_MSVC) && !defined(IREE_COMPILER_CLANG)
 #define IREE_DISPATCH_MODE_SWITCH 1
@@ -266,6 +270,14 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
 // doesn't support it, though, and there may be other targets (like wasm) that
 // can only handle the switch-based approach.
 
+// Bytecode data -offset used when looking for the start of the currently
+// dispatched instruction: `instruction_start = pc - OFFSET`
+#define VM_PC_OFFSET_CORE 1
+#define VM_PC_OFFSET_EXT_I32 2
+#define VM_PC_OFFSET_EXT_I64 2
+#define VM_PC_OFFSET_EXT_F32 2
+#define VM_PC_OFFSET_EXT_F64 2
+
 #if defined(IREE_DISPATCH_MODE_COMPUTED_GOTO)
 
 // Dispatch table mapping 1:1 with bytecode ops.
@@ -336,9 +348,10 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
                             "unhandled dispatch extension " #ext); \
   }
 
-#define DISPATCH_OP(ext, op_name, body)                             \
-  _dispatch_##ext##_##op_name : IREE_DISPATCH_LOG_OPCODE(#op_name); \
-  body;                                                             \
+#define DISPATCH_OP(ext, op_name, body)                          \
+  _dispatch_##ext##_##op_name:;                                  \
+  IREE_DISPATCH_TRACE_INSTRUCTION(VM_PC_OFFSET_##ext, #op_name); \
+  body;                                                          \
   goto* kDispatchTable_CORE[bytecode_data[pc++]];
 
 #define BEGIN_DISPATCH_PREFIX(op_name, ext)                                   \
@@ -371,10 +384,10 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
                             "unhandled dispatch extension " #ext); \
   }
 
-#define DISPATCH_OP(ext, op_name, body) \
-  case IREE_VM_OP_##ext##_##op_name: {  \
-    IREE_DISPATCH_LOG_OPCODE(#op_name); \
-    body;                               \
+#define DISPATCH_OP(ext, op_name, body)                            \
+  case IREE_VM_OP_##ext##_##op_name: {                             \
+    IREE_DISPATCH_TRACE_INSTRUCTION(VM_PC_OFFSET_##ext, #op_name); \
+    body;                                                          \
   } break;
 
 #define BEGIN_DISPATCH_PREFIX(op_name, ext) \

@@ -40,6 +40,8 @@
 #define IREE_FORCE_BINARY_STDIN()
 #endif  // IREE_PLATFORM_WINDOWS
 
+IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
+
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 IREE_FLAG(
@@ -60,15 +62,18 @@ class CheckModuleTest : public ::testing::Test {
       : instance_(instance), modules_(modules), function_(function) {}
   void SetUp() override {
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_, modules_.data(), modules_.size(), iree_allocator_system(),
-        &context_));
+        instance_,
+        FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
+                             : IREE_VM_CONTEXT_FLAG_NONE,
+        modules_.data(), modules_.size(), iree_allocator_system(), &context_));
   }
   void TearDown() override { iree_vm_context_release(context_); }
 
   void TestBody() override {
-    IREE_EXPECT_OK(iree_vm_invoke(context_, function_, /*policy=*/nullptr,
-                                  /*inputs=*/nullptr, /*outputs=*/nullptr,
-                                  iree_allocator_system()));
+    IREE_EXPECT_OK(iree_vm_invoke(
+        context_, function_, IREE_VM_INVOCATION_FLAG_NONE,
+        /*policy=*/nullptr,
+        /*inputs=*/nullptr, /*outputs=*/nullptr, iree_allocator_system()));
   }
 
  private:
@@ -119,16 +124,15 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
   for (iree_host_size_t ordinal = 0;
        ordinal < module_signature.export_function_count; ++ordinal) {
     iree_vm_function_t function;
-    iree_string_view_t export_name;
-    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
-                             input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                             ordinal, &function, &export_name),
-                         "looking up function export %zu", ordinal);
+    IREE_RETURN_IF_ERROR(
+        iree_vm_module_lookup_function_by_ordinal(
+            input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function),
+        "looking up function export %zu", ordinal);
+    iree_string_view_t function_name = iree_vm_function_name(&function);
 
-    iree_string_view_t module_name = iree_vm_module_name(input_module);
-    if (iree_string_view_starts_with(export_name,
+    if (iree_string_view_starts_with(function_name,
                                      iree_make_cstring_view("__")) ||
-        iree_string_view_find_char(export_name, '$', 0) !=
+        iree_string_view_find_char(function_name, '$', 0) !=
             IREE_STRING_VIEW_NPOS) {
       // Skip internal or special functions.
       continue;
@@ -144,13 +148,14 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "expected function with no inputs or outputs, "
                               "but export '%.*s' has signature '%.*s'",
-                              (int)export_name.size, export_name.data,
+                              (int)function_name.size, function_name.data,
                               (int)signature.calling_convention.size,
                               signature.calling_convention.data);
     }
 
+    iree_string_view_t module_name = iree_vm_module_name(input_module);
     ::testing::RegisterTest(
-        module_name.data, export_name.data, nullptr,
+        module_name.data, function_name.data, nullptr,
         std::to_string(ordinal).c_str(), __FILE__, __LINE__,
         [&instance, modules, function]() -> CheckModuleTest* {
           return new CheckModuleTest(instance, modules, function);

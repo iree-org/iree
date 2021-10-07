@@ -23,7 +23,8 @@ extern "C" int main(int argc, char** argv) {
       iree_allocator_null(), iree_allocator_system(), &module);
 
   iree_vm_context_t* context = nullptr;
-  iree_vm_context_create_with_modules(instance, &module, /*module_count=*/1,
+  iree_vm_context_create_with_modules(instance, IREE_VM_CONTEXT_FLAG_NONE,
+                                      &module, /*module_count=*/1,
                                       iree_allocator_system(), &context);
 
   iree_vm_function_t function;
@@ -31,7 +32,8 @@ extern "C" int main(int argc, char** argv) {
       module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
       iree_make_cstring_view("empty_func"), &function);
 
-  iree_vm_invoke(context, function, /*policy=*/nullptr, /*inputs=*/nullptr,
+  iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                 /*policy=*/nullptr, /*inputs=*/nullptr,
                  /*outputs=*/nullptr, iree_allocator_system());
 
   iree_vm_module_release(module);
