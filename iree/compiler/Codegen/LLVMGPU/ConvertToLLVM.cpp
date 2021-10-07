@@ -84,7 +84,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
         /*sym_visibility=*/rewriter.getStringAttr("private"),
         /*type=*/allocType,
         /*initial_value=*/ElementsAttr(),
-        /*constant=*/false);
+        /*constant=*/false, /*alignment=*/IntegerAttr());
     symbolTable.insert(global);
 
     rewriter.setInsertionPointToStart(&(*funcOp.getBody().begin()));

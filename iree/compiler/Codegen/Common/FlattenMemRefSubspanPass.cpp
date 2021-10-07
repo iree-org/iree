@@ -177,7 +177,8 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
         flattenAttribute(globalOp.initial_valueAttr(), tensorType);
     rewriter.replaceOpWithNewOp<memref::GlobalOp>(
         globalOp, globalOp.sym_name(), globalOp.sym_visibilityAttr(),
-        memRefType, newInitialValue, globalOp.constant());
+        memRefType, newInitialValue, globalOp.constant(),
+        /*alignment=*/IntegerAttr());
     return success();
   }
 };

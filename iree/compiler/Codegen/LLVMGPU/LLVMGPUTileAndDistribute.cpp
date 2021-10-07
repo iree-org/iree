@@ -167,12 +167,12 @@ static Optional<Value> allocateWorkgroupMemory(
       MemRefType::get(shape, subview.getType().getElementType(), {},
                       gpu::GPUDialect::getWorkgroupAddressSpace());
   b.setInsertionPoint(&moduleOp.front());
-  auto global =
-      b.create<memref::GlobalOp>(funcOp.getLoc(), "__shared_memory__",
-                                 /*sym_visibility=*/b.getStringAttr("private"),
-                                 /*type=*/allocType,
-                                 /*initial_value=*/ElementsAttr(),
-                                 /*constant=*/false);
+  auto global = b.create<memref::GlobalOp>(
+      funcOp.getLoc(), "__shared_memory__",
+      /*sym_visibility=*/b.getStringAttr("private"),
+      /*type=*/allocType,
+      /*initial_value=*/ElementsAttr(),
+      /*constant=*/false, /*alignment=*/IntegerAttr());
   symbolTable.insert(global);
 
   b.setInsertionPointToStart(&(*funcOp.getBody().begin()));

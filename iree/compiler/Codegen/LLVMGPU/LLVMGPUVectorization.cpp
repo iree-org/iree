@@ -126,10 +126,13 @@ struct LLVMGPUVectorizationPass
     {
       // Step 3. Lower contract op to outer product.
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
           contractLoweringPatterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
+      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMultiReductionLoweringPatterns(
           contractLoweringPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
