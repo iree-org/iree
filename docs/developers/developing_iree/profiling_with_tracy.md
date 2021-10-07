@@ -222,8 +222,8 @@ on a thread that's not visible in the initial view at all. Indeed, the initial
 view tends to be zoomed-in a lot. Either use the mouse directly to zoom out and
 navigate, to look for the 'Frame' control at the top of the Tracy window. Use
 the 'next frame' arrow button until more interesting threads appear. Typically,
-IREE generated code tends to run on a thread named `cpu0`, which is actually a
-thread name and unrelated to `CPU0` from the systrace view.
+IREE generated code tends to run on a thread named `worker[0]` (the screenshot
+here shows old names that were like `cpu0`).
 
 Once you have identified the thread of interest, use its ghost icon to toggle
 between instrumentation and ghost zones, and zoom until you have found the zone
