@@ -16,9 +16,10 @@ There are two components to Tracy. They communicate over a TCP socket.
 ## The Tracy manual
 
 The primary source of Tracy documentation, including for build instructions, is
-a PDF manual that's part of each numbered release. To find the latest one,
-navigate [here](https://github.com/wolfpld/tracy/releases) and search for
-`tracy.pdf`.
+a PDF manual that's part of each numbered release. You can
+[download the latest](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf)
+or
+[preview it](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf).
 
 ## Building the Tracy UI (the "server")
 
@@ -125,6 +126,10 @@ adb forward tcp:8086 tcp:8086
 TODO write this (`ssh` stuff...)
 
 ## Running the profiled program
+
+Tracing doesn't work properly on VMs (see section 2.1.6.4 of the
+[manual](#the-tracy-manual)). To get sampling, you should run the profiled
+program on bare metal.
 
 Run your IREE workload as you normally would: now that it's been built with
 Tracy instrumentation enabled, it should do all the right things automatically.
