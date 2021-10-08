@@ -10,11 +10,10 @@ NVIDIA, and Qualcomm.
 
 ## Support matrix
 
-In IREE, right now we are still developing generic compiler transformations to
-benefit generating performant code for all hardware architectures. We are not
-at the stage of performing a lot of target specific optimizations. So in
-general, we expect all GPUs to see reasonable performance, but might not
-in the best shape.
+As IREE and the compiler ecosystem it operates within matures, more
+target specific optimizations will be implemented. At this stage, expect
+reasonable performance across all GPUs and for improvements to be
+made over time for specific vendors and architectures.
 
 GPU Vendor | Category | Performance | Focus Architecture
 :--------: | :------: | :---------: | :----------------:
