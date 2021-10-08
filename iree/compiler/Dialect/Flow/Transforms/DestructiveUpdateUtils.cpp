@@ -13,7 +13,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -49,7 +49,7 @@ struct SpecialTerminatorOpCapture {
   Value initValue;
   // For now, must be scf.for ops.
   SmallVector<Operation *, 4> loops;
-  // For now, must be a tensor.insert_slice op.
+  // For now, must be a tensor.insert_slice or a linalg_ext.scatter op.
   Operation *rootDestructiveUpdate;
   bool readOnly = false;
   bool writeOnly = false;
@@ -62,14 +62,13 @@ static bool hasDestructiveUpdateUses(BlockArgument arg,
   SmallVector<Operation *> writes;
   for (OpOperand &u : arg.getUses()) {
     TypeSwitch<Operation *, void>(u.getOwner())
-        .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp>(
-            [&](auto linalgLikeOp) {
-              if (linalgLikeOp.isOutputTensor(&u)) {
-                writes.push_back(linalgLikeOp);
-              } else {
-                reads.push_back(linalgLikeOp);
-              }
-            })
+        .Case<linalg_ext::ScatterOp>([&](linalg_ext::ScatterOp scatterOp) {
+          if (scatterOp.isOutputTensor(&u)) {
+            writes.push_back(scatterOp);
+          } else {
+            reads.push_back(scatterOp);
+          }
+        })
         .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp sliceOp) {
           if (sliceOp.dest() == u.get()) {
             writes.push_back(sliceOp);
@@ -226,32 +225,33 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
   return success();
 }
 
-template <typename OpTy>
-static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b,
-                                                     OpTy linalgLikeOp,
-                                                     Value target) {
-  LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
-                          << *linalgLikeOp.getOperation() << "\n");
-  if (!linalgLikeOp->hasOneUse()) {
-    return linalgLikeOp.emitError("not a single use operation");
+static LogicalResult rewriteDestructiveUpdateInPlace(
+    OpBuilder &b, linalg_ext::ScatterOp scatterOp, Value target) {
+  LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: " << scatterOp
+                          << "\n");
+  if (!scatterOp->hasOneUse()) {
+    return scatterOp.emitError("not a single use operation");
   }
 
-  OpOperand &use = *(linalgLikeOp->use_begin());
+  OpOperand &use = *(scatterOp->use_begin());
   if (isa<scf::YieldOp>(use.getOwner())) {
     OpResult usedResult = use.get().cast<OpResult>();
     Value dest =
-        linalgLikeOp.getOutputOperand(usedResult.getResultNumber())->get();
+        scatterOp.getOutputOperand(usedResult.getResultNumber())->get();
     if (!dest || !dest.isa<BlockArgument>()) {
-      return linalgLikeOp.emitError("dest is not a argument to the loop");
+      return scatterOp.emitError("dest is not a argument to the loop");
     }
     OpBuilder::InsertionGuard g(b);
-    b.setInsertionPointAfter(linalgLikeOp);
+    b.setInsertionPointAfter(scatterOp);
 
     // Kills the SSA use-def chain.
     usedResult.replaceAllUsesWith(dest);
 
-    b.create<IREE::Flow::DispatchTensorStoreOp>(linalgLikeOp.getLoc(),
-                                                usedResult, target);
+    // For scatter we can write to any output location. That means we cannot
+    // tile the output. Therefore each tile must still work on the full output
+    // and we can create store op with the default offsets/sizes/strides.
+    b.create<IREE::Flow::DispatchTensorStoreOp>(scatterOp.getLoc(), usedResult,
+                                                target);
 
     return success();
   }
@@ -260,8 +260,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b,
 
 /// Rewrites destructive in-place updates with the update operation being
 /// tensor.insert_slice.
-template <>
-LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
+LogicalResult rewriteDestructiveUpdateInPlace(
     OpBuilder &b, tensor::InsertSliceOp insertSliceOp, Value target) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
                           << *insertSliceOp.getOperation() << "\n");
@@ -320,8 +319,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
   // Try to rewrite inplace.
   auto status =
       TypeSwitch<Operation *, LogicalResult>(capture.rootDestructiveUpdate)
-          .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp,
-                tensor::InsertSliceOp>([&](auto op) {
+          .Case<linalg_ext::ScatterOp, tensor::InsertSliceOp>([&](auto op) {
             return rewriteDestructiveUpdateInPlace(b, op, target);
           })
           .Default([&](Operation *) { return failure(); });
