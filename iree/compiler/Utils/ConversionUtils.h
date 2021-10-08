@@ -17,7 +17,7 @@ namespace iree_compiler {
 /// Report whether the given operation, and all nested operations, are legal as
 /// specified by the give ConversionTarget. Returns failure and emits error
 /// diagnostics if any operations are not legal as well as a summary of the
-/// illegal operations.
+/// illegal operations. Does not alter the IR.
 LogicalResult verifyAllOperationsAreLegal(Operation *op,
                                           const ConversionTarget &target);
 

@@ -37,6 +37,9 @@ static void emitLegalizationErrors(Location loc,
 
 LogicalResult verifyAllOperationsAreLegal(Operation *op,
                                           const ConversionTarget &target) {
+  // We don't just use applyPartialConversion with no patterns because this pass
+  // shouldn't alter the IR at all (including via folding or canonicalizations
+  // that dialect conversion does automatically).
   DenseSet<Operation *> illegalOps;
   op->walk([&](Operation *op) {
     if (!target.isLegal(op)) {
