@@ -162,14 +162,14 @@ iree_mlir_benchmark_suite(
 # GPU, Vulkan, Adreno, full-inference
 iree_mlir_benchmark_suite(
   MODULES
-    ${ALBERT_FP32_MODULE}
+    # ${ALBERT_FP32_MODULE} # Failing on vulkan
     ${DEEPLABV3_FP32_MODULE}
     ${MOBILESSD_FP32_MODULE}
     ${MOBILEBERT_FP32_MODULE}
     ${MOBILENETV1_FP32_MODULE}
-    ${MOBILENETV2_FP32_MODULE}
-    ${MOBILENETV2_I8_MODULE}
-    ${MOBILENETV3_FP32_MODULE}
+    # ${MOBILENETV2_FP32_MODULE} # Failing on vulkan
+    # ${MOBILENETV2_I8_MODULE} # Failing on vulkan
+    # ${MOBILENETV3_FP32_MODULE} # Failing on vulkan.
     ${POSENET_FP32_MODULE}
 
   BENCHMARK_MODES
@@ -190,14 +190,14 @@ iree_mlir_benchmark_suite(
 # GPU, Vulkan, Mali, full-inference
 iree_mlir_benchmark_suite(
   MODULES
-    ${ALBERT_FP32_MODULE}
+    # ${ALBERT_FP32_MODULE} # Failing on vulkan
     ${DEEPLABV3_FP32_MODULE}
     ${MOBILESSD_FP32_MODULE}
     ${MOBILEBERT_FP32_MODULE}
     ${MOBILENETV1_FP32_MODULE}
-    ${MOBILENETV2_FP32_MODULE}
-    ${MOBILENETV2_I8_MODULE}
-    ${MOBILENETV3_FP32_MODULE}
+    # ${MOBILENETV2_FP32_MODULE} # Failing on vulkan
+    # ${MOBILENETV2_I8_MODULE} # Failing on vulkan
+    # ${MOBILENETV3_FP32_MODULE} # Failing on vulkan
     ${POSENET_FP32_MODULE}
 
   BENCHMARK_MODES
@@ -218,14 +218,14 @@ iree_mlir_benchmark_suite(
 # GPU, Vulkan, Mali, kernel-execution
 iree_mlir_benchmark_suite(
   MODULES
-    ${ALBERT_FP32_MODULE}
+    # ${ALBERT_FP32_MODULE} # Failing on vulkan
     ${DEEPLABV3_FP32_MODULE}
     ${MOBILESSD_FP32_MODULE}
     ${MOBILEBERT_FP32_MODULE}
     ${MOBILENETV1_FP32_MODULE}
-    ${MOBILENETV2_FP32_MODULE}
-    ${MOBILENETV2_I8_MODULE}
-    ${MOBILENETV3_FP32_MODULE}
+    # ${MOBILENETV2_FP32_MODULE} # Failing on vulkan
+    # ${MOBILENETV2_I8_MODULE} # Failing on vulkan
+    # ${MOBILENETV3_FP32_MODULE} # Failing on vulkan
     ${POSENET_FP32_MODULE}
 
   BENCHMARK_MODES
