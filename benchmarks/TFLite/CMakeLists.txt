@@ -59,7 +59,7 @@ set(MOBILENETV2_FP32_MODULE
 set(MOBILENETV2_I8_MODULE
   "MobileNetV2Quant"              # MODULE_NAME
   "i8"                            # MODULE_TAGS
-  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2Tosa-5f984ec.tar.gz" # MLIR_SOURCE
+  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2QuantTosa-5f984ec.tar.gz" # MLIR_SOURCE
   "main"                          # ENTRY_FUNCTION
   "1x224x224x3xi8"                # FUNCTION_INPUTS
 )
