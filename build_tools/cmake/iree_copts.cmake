@@ -190,20 +190,17 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wunused-comparison"
     "-Wvla"
 
-  # Disable some warnings to get GCC to build. Until we have a CI for this, we
-  # just need it for releases and extra diagnostics (or Werror) only bring pain.
-  # TODO(#6959): Trim these down and add -Werror -Wall once we have a CI.
+  # TODO(#6959): Enable -Werror once we have a presubmit CI.
   GCC
-    "-Wno-unused-but-set-parameter"
+    "-Wall"
+    "-Wno-address-of-packed-member"
     "-Wno-comment"
-    "-Wno-attributes"
-    "-Wno-strict-prototypes"
-    "-Wno-shadow-uncaptured-local"
-    "-Wno-gnu-zero-variadic-macro-arguments"
-    "-Wno-shadow-field-in-constructor"
-    "-Wno-unreachable-code-return"
-    "-Wno-missing-variable-declarations"
-    "-Wno-gnu-label-as-value"
+    "-Wno-format-zero-length"
+    # Technically UB but needed for intrusive ptrs
+    $<$<COMPILE_LANGUAGE:CXX>:-Wno-invalid-offsetof>
+    $<$<COMPILE_LANGUAGE:C>:-Wno-pointer-sign>
+    "-Wno-sign-compare"
+    "-Wno-unused-function"
 
   MSVC_OR_CLANG_CL
     # Default warning level (severe + significant + production quality).
