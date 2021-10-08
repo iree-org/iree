@@ -31,27 +31,6 @@ class VerifyInputLegalityPass
     if (failed(
             iree_compiler::verifyAllOperationsAreLegal(getOperation(), target)))
       return signalPassFailure();
-
-    // auto funcOp = getOperation();
-    // auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
-    //   StringRef opDialectName = op->getDialect()->getNamespace();
-
-    //   // Exception: tosa::ApplyScaleOp is lowered through flow for now.
-    //   if (dyn_cast<tosa::ApplyScaleOp>(op)) {
-    //     return WalkResult::advance();
-    //   }
-
-    //   if (opDialectName == "mhlo" || opDialectName == "tosa") {
-    //     return op->emitOpError(
-    //                "illegal operation in input to iree core compiler. Use "
-    //                "-iree-input-type=")
-    //            << opDialectName << " to legalize this operation";
-    //   }
-    //   return WalkResult::advance();
-    // });
-    // if (walkResult.wasInterrupted()) {
-    //   return signalPassFailure();
-    // }
   }
 };
 }  // namespace
