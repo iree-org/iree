@@ -200,7 +200,7 @@ class ROCMTargetBackend final : public TargetBackend {
 
     iree_ROCMBlockSizeDef_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
-    for (auto shader : entryPointNames) {
+    for (int i = 0, e = entryPointNames.size(); i < e; ++i) {
       iree_ROCMBlockSizeDef_vec_push_create(builder, (*blockSizes)[0],
                                             (*blockSizes)[1], (*blockSizes)[2]);
       ++blockSizes;
