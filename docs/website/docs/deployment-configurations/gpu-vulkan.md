@@ -200,7 +200,7 @@ concrete values.
 
 [^1]: It's also impossible to capture all details of a Vulkan implementation
 with a target triple, given the allowed variances on extensions, properties,
-limits, etc. So the target triple is just a proximation for usage.
+limits, etc. So the target triple is just an approximation for usage.
 
 
 [android-cc]: ../building-from-source/android.md
