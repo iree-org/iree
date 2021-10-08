@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Pass/Pass.h"
@@ -25,8 +24,10 @@ class VerifyInputLegalityPass
     ConversionTarget target(getContext());
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addLegalOp<tosa::ApplyScaleOp>();
+    // We're already depending on the Tosa Dialect
     target.addIllegalDialect<tosa::TosaDialect>();
-    target.addIllegalDialect<mhlo::MhloDialect>();
+    // Avoid MHLO dependency
+    target.addIllegalDialect("mhlo");
 
     if (failed(
             iree_compiler::verifyAllOperationsAreLegal(getOperation(), target)))
