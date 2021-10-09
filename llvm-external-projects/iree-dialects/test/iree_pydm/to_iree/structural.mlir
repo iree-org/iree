@@ -108,7 +108,7 @@ iree_pydm.func @raise_on_failure_object_return(%arg0 : !iree_pydm.exception_resu
   // CHECK: return %[[c0_i32_0]], %arg1 : i32, !iree.list<!iree.variant>
   // bb2: failure
   // CHECK: ^bb2:
-  // CHECK: %[[NULL:.*]] = iree.null : !iree.list<!iree.variant>
+  // CHECK: %[[NULL:.*]] = iree.list.create : !iree.list<!iree.variant>
   // CHECK: return %arg0, %[[NULL]] : i32, !iree.list<!iree.variant>
   raise_on_failure %arg0 : !iree_pydm.exception_result
   return %arg1 : !iree_pydm.object

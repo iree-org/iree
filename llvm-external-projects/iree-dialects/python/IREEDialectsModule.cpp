@@ -8,6 +8,7 @@
 #include "iree-dialects-c/Utils.h"
 #include "mlir-c/Bindings/Python/Interop.h"
 #include "mlir-c/BuiltinAttributes.h"
+#include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/Diagnostics.h"
 #include "mlir-c/Registration.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
@@ -161,7 +162,6 @@ PYBIND11_MODULE(_ireeDialects, m) {
   DEFINE_IREEPYDM_NULLARY_TYPE(FreeVarRef)
   DEFINE_IREEPYDM_NULLARY_TYPE(List)
   DEFINE_IREEPYDM_NULLARY_TYPE(None)
-  DEFINE_IREEPYDM_NULLARY_TYPE(Real)
   DEFINE_IREEPYDM_NULLARY_TYPE(Str)
   DEFINE_IREEPYDM_NULLARY_TYPE(Tuple)
   DEFINE_IREEPYDM_NULLARY_TYPE(Type)
@@ -183,6 +183,27 @@ PYBIND11_MODULE(_ireeDialects, m) {
           },
           py::arg("cls"), py::arg("bit_width"), py::arg("is_signed") = true,
           py::arg("context") = py::none());
+
+  // RealType.
+  mlir_type_subclass(iree_pydm_m, "RealType", mlirTypeIsAIREEPyDMReal,
+                     typeClass)
+      .def_classmethod(
+          "get",
+          [](py::object cls, MlirContext context) {
+            return cls(mlirIREEPyDMRealTypeGet(context));
+          },
+          py::arg("cls"), py::arg("context") = py::none())
+      .def_classmethod(
+          "get_explicit",
+          [](py::object cls, MlirType fpType) {
+            // TODO: Add a C-API for generically checking for FloatType.
+            if (!mlirTypeIsAF32(fpType) && !mlirTypeIsAF64(fpType) &&
+                !mlirTypeIsAF16(fpType) && !mlirTypeIsABF16(fpType)) {
+              throw std::invalid_argument("expected a floating point type");
+            }
+            return cls(mlirIREEPyDMRealTypeGetExplicit(fpType));
+          },
+          py::arg("cls"), py::arg("fp_type"));
 
   // ObjectType.
   mlir_type_subclass(iree_pydm_m, "ObjectType", mlirTypeIsAIREEPyDMObject,

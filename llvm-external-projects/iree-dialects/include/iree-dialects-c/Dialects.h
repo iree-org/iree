@@ -63,6 +63,7 @@ IREEPYDM_DECLARE_NULLARY_TYPE(ExceptionResult)
 IREEPYDM_DECLARE_NULLARY_TYPE(FreeVarRef)
 IREEPYDM_DECLARE_NULLARY_TYPE(List)
 IREEPYDM_DECLARE_NULLARY_TYPE(None)
+// Note: Also has a non-nullary constructor
 IREEPYDM_DECLARE_NULLARY_TYPE(Real)
 IREEPYDM_DECLARE_NULLARY_TYPE(Str)
 IREEPYDM_DECLARE_NULLARY_TYPE(Tuple)
@@ -74,6 +75,8 @@ IREEPYDM_DECLARE_NULLARY_TYPE(Type)
 MLIR_CAPI_EXPORTED MlirType mlirIREEPyDMIntegerTypeGetExplicit(MlirContext ctx,
                                                                int bitWidth,
                                                                bool isSigned);
+
+MLIR_CAPI_EXPORTED MlirType mlirIREEPyDMRealTypeGetExplicit(MlirType fpType);
 
 // ObjectType.
 MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDMObject(MlirType type);

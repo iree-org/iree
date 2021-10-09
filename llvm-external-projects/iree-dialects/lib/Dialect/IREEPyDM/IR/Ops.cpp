@@ -77,6 +77,45 @@ void AllocFreeVarOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 }
 
 //===----------------------------------------------------------------------===//
+// ApplyBinaryOp
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Matches an `apply_compare` op where both operands are defined by
+/// `box` ops that have the same operand type. Replaces the operands with the
+/// operands of the `box`.
+struct UnboxApplyBinaryOperands : public OpRewritePattern<ApplyBinaryOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ApplyBinaryOp op,
+                                PatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    auto boxLeft = op.left().getDefiningOp<BoxOp>();
+    auto boxRight = op.right().getDefiningOp<BoxOp>();
+    if (!boxLeft || !boxRight) return failure();
+    if (boxLeft.primitive().getType() != boxRight.primitive().getType())
+      return failure();
+    Type applyType = boxLeft.primitive().getType();
+    Type originalType = op.getResult().getType();
+
+    Value unboxedResult = rewriter.create<ApplyBinaryOp>(
+        loc, applyType, op.dunder_nameAttr(), boxLeft.primitive(),
+        boxRight.primitive());
+    // Canonicalizations should not alter result types, so box the result.
+    rewriter.replaceOpWithNewOp<BoxOp>(op, originalType, unboxedResult);
+    return success();
+  }
+};
+
+}  // namespace
+
+void ApplyBinaryOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                MLIRContext *context) {
+  patterns.add<UnboxApplyBinaryOperands>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // ApplyCompareOp
 //===----------------------------------------------------------------------===//
 

@@ -18,7 +18,6 @@ struct FixateWeakNumericPass
   void runOnOperation() override {
     Operation *rootOp = getOperation();
     rootOp->walk([&](Operation *op) {
-      op->dump();
       convertOperation(op);
       return WalkResult::advance();
     });

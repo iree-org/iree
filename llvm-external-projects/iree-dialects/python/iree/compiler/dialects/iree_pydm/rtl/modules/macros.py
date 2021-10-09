@@ -41,6 +41,11 @@ def _unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
     return value
 
 
+@def_ir_macro_intrinsic
+def unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
+  return _unbox_i32(stage, value)
+
+
 def _unbox_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
   i64_type = d.IntegerType.get_explicit(64)
   if d.ObjectType.isinstance(value.type):
@@ -51,22 +56,15 @@ def _unbox_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
           f"Type error unbox a non object type -> integer<64>: {value.type}")
     return value
 
+@def_ir_macro_intrinsic
+def unbox_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
+  return _unbox_i64(stage, value)
+
 
 @def_ir_macro_intrinsic
-def unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
-  """Performs an unchecked unbox of an integer<32> value.
-
-  Typically this will be the result of a variable looked. It is important that
-  the variable was stored with an integer<32> or else it is UB.
-
-  If the value is not an ObjectType, it is returned as-is, assuming that it
-  is already an integer<32>.
-
-  This shouldn't be needed in the fullness of time but gets around type
-  inference limitations in contexts where we don't want to (or can't) be
-  on the general path.
-  """
-  return _unbox_i32(stage, value)
+def unbox_f32(stage: ImportStage, value: ir.Value) -> ir.Value:
+  t = d.RealType.get_explicit(ir.F32Type.get())
+  return d.UnboxOp(d.ExceptionResultType.get(), t, value).primitive
 
 
 @def_ir_macro_intrinsic

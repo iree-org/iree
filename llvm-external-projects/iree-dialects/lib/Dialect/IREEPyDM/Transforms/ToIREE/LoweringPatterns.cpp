@@ -12,8 +12,10 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+using llvm::enumerate;
 using namespace mlir;
 using namespace mlir::iree_pydm;
 
@@ -41,10 +43,18 @@ enum class ExceptionCode : int {
 
 }  // namespace
 
+static Type getVariantListType(Builder &builder) {
+  return builder.getType<iree_d::ListType>(
+      builder.getType<iree_d::VariantType>());
+}
+
 static Value getNullValue(Location loc, OpBuilder &builder, Type t) {
   return TypeSwitch<Type, Value>(t)
       .Case<iree_d::ListType>([&](auto t) -> Value {
-        return builder.create<iree_d::NullOp>(loc, t);
+        // TODO: If it becomes important to optimize this, come up with a way
+        // to return an empty list without creating one.
+        return builder.create<iree_d::ListCreateOp>(
+            loc, getVariantListType(builder), /*capacity=*/nullptr);
       })
       .Default([&](Type t) -> Value {
         auto attr = builder.getZeroAttr(t);
@@ -58,11 +68,6 @@ static Value getNullValue(Location loc, OpBuilder &builder, Type t) {
 static Block *createSlowPathBlock(OpBuilder &builder) {
   Region *parentRegion = builder.getInsertionBlock()->getParent();
   return builder.createBlock(parentRegion, parentRegion->end());
-}
-
-static Type getVariantListType(Builder &builder) {
-  return builder.getType<iree_d::ListType>(
-      builder.getType<iree_d::VariantType>());
 }
 
 static Value getSuccessStatusValue(Location loc, OpBuilder &builder) {
@@ -201,8 +206,13 @@ class ApplyBinaryNumericConversion
       rewriter.replaceOp(srcOp, converted);
       return success();
     } else if (leftType.isa<builtin_d::FloatType>()) {
-      // TODO: Implement float binary
-      return rewriter.notifyMatchFailure(srcOp, "unsupported operation");
+      Value converted =
+          convertFloatOp(srcOp.getLoc(), adaptor.dunder_name().getValue(),
+                         adaptor.left(), adaptor.right(), rewriter);
+      if (!converted)
+        return rewriter.notifyMatchFailure(srcOp, "unsupported operation");
+      rewriter.replaceOp(srcOp, converted);
+      return success();
     }
 
     return rewriter.notifyMatchFailure(srcOp, "non numeric type");
@@ -231,6 +241,19 @@ class ApplyBinaryNumericConversion
       return rewriter.create<arith_d::SubIOp>(loc, left, right);
     } else if (dunderName == "xor") {
       return rewriter.create<arith_d::XOrIOp>(loc, left, right);
+    }
+    return nullptr;
+  }
+
+  Value convertFloatOp(Location loc, StringRef dunderName, Value left,
+                       Value right, ConversionPatternRewriter &rewriter) const {
+    // TODO: matmul, truediv, floordiv, mod, divmod, pow
+    if (dunderName == "add") {
+      return rewriter.create<arith_d::AddFOp>(loc, left, right);
+    } else if (dunderName == "mul") {
+      return rewriter.create<arith_d::MulFOp>(loc, left, right);
+    } else if (dunderName == "sub") {
+      return rewriter.create<arith_d::SubFOp>(loc, left, right);
     }
     return nullptr;
   }
@@ -367,6 +390,88 @@ class ConstantOpConversion : public OpConversionPattern<pydm_d::ConstantOp> {
   }
 };
 
+/// Expands dynamic unpacking of a tuple or list by taking advantage that they
+/// both are just variant lists. A size check is emitted, with a branch to
+/// a failure block. The success block will just get each element.
+class DynamicUnpackOpConversion
+    : public OpConversionPattern<pydm_d::DynamicUnpackOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::DynamicUnpackOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    // Convert types.
+    Type excResultType =
+        getTypeConverter()->convertType(srcOp.exc_result().getType());
+    if (!excResultType)
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "could not convert exc_result type");
+    int arity = srcOp.slots().size();
+    SmallVector<Type> slotTypes;
+    slotTypes.reserve(arity);
+    for (auto slot : srcOp.slots()) {
+      Type slotType = getTypeConverter()->convertType(slot.getType());
+      if (!slotType)
+        return rewriter.notifyMatchFailure(
+            srcOp, "could not convert result slot type");
+      slotTypes.push_back(slotType);
+    }
+
+    // Split the entry block.
+    Block *entryBlock = rewriter.getInsertionBlock();
+    Block *continuationBlock = rewriter.splitBlock(
+        rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
+    Block *arityMatchBlock = rewriter.createBlock(continuationBlock);
+    Block *errorBlock = createSlowPathBlock(rewriter);
+    continuationBlock->addArguments(excResultType);
+    continuationBlock->addArguments(slotTypes);
+    rewriter.replaceOp(srcOp, continuationBlock->getArguments());
+
+    // Entry block - check arity.
+    {
+      rewriter.setInsertionPointToEnd(entryBlock);
+      auto arityValue = rewriter.create<arith_d::ConstantOp>(
+          loc, rewriter.getIndexAttr(arity));
+      Value listSize = rewriter.create<iree_d::ListSizeOp>(
+          loc, rewriter.getIndexType(), adaptor.sequence());
+      Value arityMatch = rewriter.create<arith_d::CmpIOp>(
+          loc, arith_d::CmpIPredicate::eq, arityValue, listSize);
+      rewriter.create<std_d::CondBranchOp>(loc, arityMatch, arityMatchBlock,
+                                           errorBlock);
+    }
+
+    // Arity match.
+    {
+      rewriter.setInsertionPointToEnd(arityMatchBlock);
+      SmallVector<Value> branchArgs;
+      branchArgs.push_back(getSuccessStatusValue(loc, rewriter));
+      for (auto it : enumerate(slotTypes)) {
+        Value index = rewriter.create<arith_d::ConstantOp>(
+            loc, rewriter.getIndexAttr(it.index()));
+        Value slotValue = rewriter.create<iree_d::ListGetOp>(
+            loc, it.value(), adaptor.sequence(), index);
+        branchArgs.push_back(slotValue);
+      }
+      rewriter.create<std_d::BranchOp>(loc, continuationBlock, branchArgs);
+    }
+
+    // Error block.
+    {
+      rewriter.setInsertionPointToEnd(errorBlock);
+      SmallVector<Value> branchArgs;
+      branchArgs.push_back(
+          getFailureStatusValue(loc, rewriter, ExceptionCode::ValueError));
+      for (Type slotType : slotTypes) {
+        branchArgs.push_back(getNullValue(loc, rewriter, slotType));
+      }
+      rewriter.create<std_d::BranchOp>(loc, continuationBlock, branchArgs);
+    }
+
+    return success();
+  }
+};
+
 /// Generates a failure exception code.
 /// This is just temporary to allow some libraries to signal exceptions.
 class FailureOpConversion : public OpConversionPattern<pydm_d::FailureOp> {
@@ -479,6 +584,35 @@ class LoadVarOpConversion : public OpConversionPattern<pydm_d::LoadVarOp> {
   }
 };
 
+class MakeTupleOpConversion : public OpConversionPattern<pydm_d::MakeTupleOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::MakeTupleOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    auto resultType = getTypeConverter()->convertType(srcOp.tuple().getType());
+    if (!resultType)
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "could not convert result type");
+
+    auto size = rewriter.create<arith_d::ConstantOp>(
+        loc, rewriter.getIndexAttr(adaptor.slots().size()));
+    auto list =
+        rewriter.create<iree_d::ListCreateOp>(loc, getVariantListType(rewriter),
+                                              /*capacity=*/size);
+    rewriter.create<iree_d::ListResizeOp>(loc, list, size);
+    for (auto it : enumerate(adaptor.slots())) {
+      auto index = rewriter.create<arith_d::ConstantOp>(
+          loc, rewriter.getIndexAttr(it.index()));
+      rewriter.create<iree_d::ListSetOp>(loc, list, index, it.value());
+    }
+
+    rewriter.replaceOp(srcOp, ValueRange{list});
+    return success();
+  }
+};
+
 /// Converts a `none` operation to a `constant 0 : i32`.
 /// See also the type conversion rule for `NoneType` which must align.
 /// TODO: What we are really reaching for is a zero width type.
@@ -587,7 +721,8 @@ class UnboxOpConversion : public OpConversionPattern<pydm_d::UnboxOp> {
     auto list = adaptor.getOperands()[0];
 
     // Target exception result type.
-    Type statusType = getTypeConverter()->convertType(srcOp.status().getType());
+    Type statusType =
+        getTypeConverter()->convertType(srcOp.exc_result().getType());
     // Target unboxed type.
     Type targetUnboxedType =
         getTypeConverter()->convertType(srcOp.primitive().getType());
@@ -707,8 +842,9 @@ void mlir::iree_pydm::populatePyDMToIREELoweringPatterns(
   patterns.insert<AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
                   ApplyCompareNumericConversion, BoolToPredConversion,
                   BoxOpConversion, CallOpConversion, ConstantOpConversion,
-                  FailureOpConversion, FuncOpConversion, GetTypeCodeConversion,
-                  LoadVarOpConversion, RaiseOnFailureOpConversion,
+                  DynamicUnpackOpConversion, FailureOpConversion,
+                  FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
+                  MakeTupleOpConversion, RaiseOnFailureOpConversion,
                   ReturnOpConversion, StoreVarOpConversion, UnboxOpConversion>(
       typeConverter, context);
 

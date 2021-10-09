@@ -60,6 +60,16 @@ LoweringTypeConverter::LoweringTypeConverter() {
     return t.getFloatType();
   });
 
+  // Tuple, List.
+  addConversion([&](pydm_d::ListType t) -> Optional<Type> {
+    Builder b(t.getContext());
+    return getVariantListType(b);
+  });
+  addConversion([&](pydm_d::TupleType t) -> Optional<Type> {
+    Builder b(t.getContext());
+    return getVariantListType(b);
+  });
+
   // Variable references.
   addConversion([](pydm_d::FreeVarRefType t) -> Optional<Type> {
     // Just an object record.
@@ -69,9 +79,11 @@ LoweringTypeConverter::LoweringTypeConverter() {
 
   // Explicit conversions for allowed built-in types (avoids default conversion
   // which can mask issues).
+  addConversion([](builtin_d::IndexType t) -> Optional<Type> { return t; });
   addConversion([](builtin_d::IntegerType t) -> Optional<Type> { return t; });
   addConversion([](builtin_d::FloatType t) -> Optional<Type> { return t; });
   addConversion([](builtin_d::IndexType t) -> Optional<Type> { return t; });
+  addConversion([](iree_d::ListType t) -> Optional<Type> { return t; });
 }
 
 Type LoweringTypeConverter::getBoolType(Builder b) const {

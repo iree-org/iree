@@ -213,17 +213,23 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
   """
   IMPORTER_TYPE = "statement"
   __slots__ = [
+      "break_block",
+      "continue_block",
       "successor_block",
-      "_last_was_return",
+      "terminated",
   ]
 
   def __init__(self,
                fctx: FunctionContext,
                *,
-               successor_block: Optional[ir.Block] = None):
+               successor_block: Optional[ir.Block] = None,
+               break_block: Optional[ir.Block] = None,
+               continue_block: Optional[ir.Block] = None):
     super().__init__(fctx)
     self.successor_block = successor_block
-    self._last_was_return = False
+    self.break_block = break_block
+    self.continue_block = continue_block
+    self.terminated = False
 
   def declare_variables(self):
     fctx = self.fctx
@@ -242,10 +248,10 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
   def import_block(self, stmts: Sequence[ast.AST]):
     ic = self.fctx.ic
     for ast_stmt in stmts:
-      self._last_was_return = False
+      self.terminated = False
       logging.debug("STMT: %s", ast.dump(ast_stmt, include_attributes=True))
       self.visit(ast_stmt)
-    if not self._last_was_return:
+    if not self.terminated:
       with ic.ip, ic.loc:
         # Add a default terminator.
         if self.successor_block:
@@ -265,18 +271,9 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     with ic.loc, ic.ip:
       d.StoreVarOp(fctx.find_variable(name), arg_value)
 
-  def visit_Pass(self, ast_node):
-    pass
-
-  def visit_Return(self, ast_node):
-    ic = self.fctx.ic
-    with ic.loc, ic.ip:
-      expr = ExpressionImporter(self.fctx)
-      expr.visit(ast_node.value)
-      d.ReturnOp(self.fctx.cast_to_return_type(expr.get_immediate()))
-      self._last_was_return = True
-
   def visit_Assign(self, node: ast.Assign):
+    if self.terminated:
+      return
     fctx = self.fctx
     ic = fctx.ic
     expr = ExpressionImporter(fctx)
@@ -296,7 +293,31 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
         target_id = target.id  # pytype: disable=attribute-error
         d.StoreVarOp(fctx.find_variable(target_id), boxed)
 
+  def visit_Break(self, node: ast.Break):
+    if self.terminated:
+      return
+    fctx = self.fctx
+    ic = fctx.ic
+    if not self.break_block:
+      ic.abort(f"cannot 'break' outside of a loop")
+    with ic.ip, ic.loc:
+      std_d.BranchOp([], self.break_block)
+    self.terminated = True
+
+  def visit_Continue(self, node: ast.Continue):
+    if self.terminated:
+      return
+    fctx = self.fctx
+    ic = fctx.ic
+    if not self.continue_block:
+      ic.abort(f"cannot 'continue' outside of a loop")
+    with ic.ip, ic.loc:
+      std_d.BranchOp([], self.continue_block)
+    self.terminated = True
+
   def visit_Expr(self, node: ast.Expr):
+    if self.terminated:
+      return
     fctx = self.fctx
     ic = fctx.ic
 
@@ -306,6 +327,8 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
       d.ExprStatementDiscardOp(expr.get_immediate())
 
   def visit_If(self, node: ast.If):
+    if self.terminated:
+      return
     fctx = self.fctx
     ic = fctx.ic
     # Emit the test.
@@ -329,14 +352,20 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
       # Emit the false body.
       false_block = predecessor_block.create_after()
       with ic.scoped_ip(ir.InsertionPoint(false_block)):
-        else_importer = FunctionDefBodyImporter(fctx,
-                                                successor_block=successor_block)
+        else_importer = FunctionDefBodyImporter(
+            fctx,
+            successor_block=successor_block,
+            break_block=self.break_block,
+            continue_block=self.continue_block)
         else_importer.import_block(node.orelse)
     # Emit the true body.
     true_block = predecessor_block.create_after()
     with ic.scoped_ip(ir.InsertionPoint(true_block)):
-      body_importer = FunctionDefBodyImporter(fctx,
-                                              successor_block=successor_block)
+      body_importer = FunctionDefBodyImporter(
+          fctx,
+          successor_block=successor_block,
+          break_block=self.break_block,
+          continue_block=self.continue_block)
       body_importer.import_block(node.body)
 
     # Now that we have true/false blocks, emit the cond_br in the original
@@ -350,6 +379,80 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
                          falseDest=false_block)
 
     # And emission continues here.
+    ic.reset_ip(ir.InsertionPoint(successor_block))
+
+  def visit_Pass(self, ast_node):
+    if self.terminated:
+      return
+    pass
+
+  def visit_Return(self, ast_node):
+    if self.terminated:
+      return
+    ic = self.fctx.ic
+    with ic.loc, ic.ip:
+      expr = ExpressionImporter(self.fctx)
+      expr.visit(ast_node.value)
+      d.ReturnOp(self.fctx.cast_to_return_type(expr.get_immediate()))
+    self.terminated = True
+
+  def visit_While(self, node: ast.While):
+    if self.terminated:
+      return
+    fctx = self.fctx
+    ic = fctx.ic
+
+    # Blocks:
+    #   entry: branch to condition
+    #   condition: evalute the test expression and branch to body or orelse
+    #   body: main body of the loop
+    #   orelse: optional block to execute when condition is no longer true
+    #   successor: statements following the loop
+    predecessor_block = ic.ip.block
+    condition_block = predecessor_block.create_after()
+    body_block = condition_block.create_after()
+    if node.orelse:
+      orelse_block = body_block.create_after()
+      successor_block = orelse_block.create_after()
+    else:
+      successor_block = body_block.create_after()
+
+    # Unconditional branch to the condition block.
+    with ic.ip, ic.loc:
+      std_d.BranchOp([], condition_block)
+
+    # Emit test.
+    with ic.scoped_ip(ir.InsertionPoint(condition_block)):
+      test_expr = ExpressionImporter(fctx)
+      test_expr.visit(node.test)
+      with ic.ip, ic.loc:
+        test_bool = d.AsBoolOp(d.BoolType.get(),
+                               test_expr.get_immediate()).result
+        test_pred = d.BoolToPredOp(ir.IntegerType.get_signless(1),
+                                   test_bool).result
+        std_d.CondBranchOp(
+            condition=test_pred,
+            trueDestOperands=[],
+            falseDestOperands=[],
+            trueDest=body_block,
+            falseDest=orelse_block if node.orelse else successor_block)
+
+    # Emit body.
+    with ic.scoped_ip(ir.InsertionPoint(body_block)):
+      body_importer = FunctionDefBodyImporter(fctx,
+                                              successor_block=condition_block,
+                                              break_block=successor_block,
+                                              continue_block=condition_block)
+      body_importer.import_block(node.body)
+
+    # Emit orelse.
+    if node.orelse:
+      with ic.scoped_ip(ir.InsertionPoint(orelse_block)):
+        orelse_importer = FunctionDefBodyImporter(
+            fctx, successor_block=successor_block)
+        orelse_importer.import_block(node.orelse)
+
+    # Done.
     ic.reset_ip(ir.InsertionPoint(successor_block))
 
 

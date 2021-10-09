@@ -337,7 +337,7 @@ def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox"> {
     IREEPyDM_ObjectType:$object
   );
   let results = (outs
-    IREEPyDM_ExceptionResultType:$status,
+    IREEPyDM_ExceptionResultType:$exc_result,
     IREEPyDM_AnyPrimitiveType:$primitive
   );
 
@@ -444,7 +444,7 @@ def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
   let arguments = (ins Variadic<IREEPyDM_AnyValueType>:$slots);
   let results = (outs IREEPyDM_TupleType:$tuple);
   let assemblyFormat = [{
-    $slots `:` type($slots) `->` type(results) attr-dict
+    ($slots^ `:` type($slots))? `->` type(results) attr-dict
   }];
 }
 
@@ -456,8 +456,10 @@ def IREEPyDM_DynamicUnpackOp : IREEPyDM_PureOp<"dynamic_unpack"> {
     known, this op will generally decay into a more statically verifiable
     form or be elided entirely.
 
-    This op includes dynamic result casting so as to keep everything related
-    to the unpack local to a single op until/if more information is known.
+    This operation allows a tuple to be unpacked to slots of arbitrary type,
+    but no type checking is done. Typically, slot types will be of `ObjectType`
+    at the outset of program capture, and they may only be narrowed by
+    optimizations which have adequately proven correctness.
   }];
   let arguments = (ins IREEPyDM_AnyValueType:$sequence);
   let results = (outs
@@ -627,6 +629,7 @@ def IREEPyDM_ApplyBinaryOp : IREEPyDM_PureOp<"apply_binary"> {
   let assemblyFormat = [{
     $dunder_name `,` $left `,` $right `:` type(operands) `->` type(results) attr-dict
   }];
+  let hasCanonicalizer = 1;
 }
 
 def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare"> {

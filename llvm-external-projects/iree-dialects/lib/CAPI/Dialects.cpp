@@ -67,6 +67,12 @@ MlirType mlirIREEPyDMIntegerTypeGetExplicit(MlirContext ctx, int bitWidth,
       mlir::iree_pydm::IntegerType::get(unwrap(ctx), bitWidth, isSigned));
 }
 
+MlirType mlirIREEPyDMRealTypeGetExplicit(MlirType fpType) {
+  auto fpTypeCpp = unwrap(fpType).cast<FloatType>();
+  return wrap(
+      mlir::iree_pydm::RealType::get(fpTypeCpp.getContext(), fpTypeCpp));
+}
+
 // ObjectType.
 bool mlirTypeIsAIREEPyDMObject(MlirType type) {
   return unwrap(type).isa<mlir::iree_pydm::ObjectType>();
