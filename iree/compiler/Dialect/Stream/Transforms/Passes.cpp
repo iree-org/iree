@@ -147,6 +147,17 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       IREE::Stream::createScheduleConcurrencyPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Stream::createScheduleConcurrencyPass());
+
+  // Materialize timepoints across the entire module. This simplifies scheduling
+  // of the timeline as we can shake the IR and see what timepoints we still
+  // have left.
+  passManager.addPass(IREE::Stream::createPropagateTimepointsPass());
+  addCleanupPatterns(passManager);
+
+  // TODO(benvanik): remove covered timepoints in awaits (dominance).
+
+  // Everything must now be in stream.async.* form.
+  passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncPass());
 }
 
 //===----------------------------------------------------------------------===//
