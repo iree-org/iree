@@ -16,6 +16,7 @@ cc_library(
         "AssignTargetDevices.cpp",
         "BenchmarkBatchDispatches.cpp",
         "ConvertToHAL.cpp",
+        "ElideRedundantCommands.cpp",
         "IdentifyConstantPools.cpp",
         "InlineDeviceSwitches.cpp",
         "LinkExecutables.cpp",
