@@ -39,9 +39,8 @@ namespace {
 // util.null
 //===----------------------------------------------------------------------===//
 
-class NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
+struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       IREE::Util::NullOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -52,13 +51,32 @@ class NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// util.cmp.eq
+//===----------------------------------------------------------------------===//
+
+struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Util::CmpEQOp op, ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    IREE::Util::CmpEQOp::Adaptor operands(rawOperands);
+    auto operandType = operands.lhs().getType();
+    if (operandType.isa<IREE::VM::RefType>()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpEQRefOp>(
+          op, rewriter.getI32Type(), operands.lhs(), operands.rhs());
+      return success();
+    }
+    return failure();  // not used for non-ref types currently
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // util.byte_buffer.*
 //===----------------------------------------------------------------------===//
 
-class ByteBufferConstantOpConversion
+struct ByteBufferConstantOpConversion
     : public OpConversionPattern<IREE::Util::ByteBufferConstantOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       IREE::Util::ByteBufferConstantOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -66,7 +84,7 @@ class ByteBufferConstantOpConversion
         op,
         IREE::VM::RefType::get(
             IREE::VM::BufferType::get(rewriter.getContext())),
-        op.value());
+        /*name=*/nullptr, op.value(), op.alignmentAttr());
     return success();
   }
 };
@@ -75,10 +93,9 @@ class ByteBufferConstantOpConversion
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
-class UnreachableOpConversion
+struct UnreachableOpConversion
     : public OpConversionPattern<IREE::Util::UnreachableOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       IREE::Util::UnreachableOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -99,6 +116,7 @@ void populateUtilToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               OwningRewritePatternList &patterns) {
   patterns.insert<NullOpConversion>(typeConverter, context);
+  patterns.insert<CmpEQOpConversion>(typeConverter, context);
   patterns.insert<ByteBufferConstantOpConversion>(typeConverter, context);
   patterns.insert<UnreachableOpConversion>(typeConverter, context);
 

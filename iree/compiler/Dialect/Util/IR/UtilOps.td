@@ -32,7 +32,7 @@ class Util_PureOp<string mnemonic, list<OpTrait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def Util_NullOp : Util_PureOp<"null"> {
-  let summary = "a null type value";
+  let summary = [{returns a null type value}];
   let description = [{
     Defines an SSA value that is lowered into dialects supporting
     null/undefined/optional/etc values.
@@ -45,6 +45,31 @@ def Util_NullOp : Util_PureOp<"null"> {
   let assemblyFormat = [{
     attr-dict `:` type($result)
   }];
+}
+
+def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
+  AllTypesMatch<["lhs", "rhs"]>,
+  Commutative,
+]> {
+  let summary = [{compares two values for equality}];
+  let description = [{
+    Compares two operands for equality. This is intended for comparing IREE
+    reference types (like !util.byte_buffer) that cannot be used with std.cmpi.
+  }];
+
+  let arguments = (ins
+    AnyType:$lhs,
+    AnyType:$rhs
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($lhs)
+  }];
+
+  let hasFolder = 1;
 }
 
 def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {

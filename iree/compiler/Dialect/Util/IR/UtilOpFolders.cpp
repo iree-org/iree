@@ -23,6 +23,26 @@ namespace IREE {
 namespace Util {
 
 //===----------------------------------------------------------------------===//
+// util.cmp.eq
+//===----------------------------------------------------------------------===//
+
+OpFoldResult CmpEQOp::fold(ArrayRef<Attribute> operands) {
+  auto makeBool = [&](bool value) {
+    return IntegerAttr::get(IntegerType::get(getContext(), 1), value ? 1 : 0);
+  };
+  if (lhs() == rhs()) {
+    // SSA values are exactly the same.
+    return makeBool(true);
+  } else if (operands[0] && operands[1] && operands[0] == operands[1]) {
+    // Folded attributes are equal but may come from separate ops.
+    return makeBool(true);
+  }
+  // TODO(benvanik): we could add some interfaces for comparing, but this is
+  // likely good enough for now.
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
 
