@@ -348,6 +348,15 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan,  //
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_length,  //
+                   iree_hal_module_state_t,        //
+                   r, i) {
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
+  rets->i0 = iree_hal_buffer_byte_length(buffer);
+  return iree_ok_status();
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_load,  //
                    iree_hal_module_state_t,      //
                    rii, i) {

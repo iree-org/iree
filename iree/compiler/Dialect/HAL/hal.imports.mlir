@@ -47,6 +47,7 @@ vm.import @allocator.wrap.byte_buffer(
 vm.import @buffer.allocator(
   %buffer : !vm.ref<!hal.buffer>
 ) -> !vm.ref<!hal.allocator>
+attributes {nosideeffects}
 
 // Returns a reference to a subspan of the buffer.
 vm.import @buffer.subspan(
@@ -54,6 +55,13 @@ vm.import @buffer.subspan(
   %source_offset : i32,
   %length : i32
 ) -> !vm.ref<!hal.buffer>
+attributes {nosideeffects}
+
+// Returns the byte length of the buffer (may be less than total allocation).
+vm.import @buffer.length(
+  %buffer : !vm.ref<!hal.buffer>
+) -> i32
+attributes {nosideeffects}
 
 // Loads a value from a buffer by mapping it.
 vm.import @buffer.load(
