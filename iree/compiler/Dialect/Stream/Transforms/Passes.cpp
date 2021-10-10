@@ -219,7 +219,31 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 void buildStreamOptimizationPassPipeline(
-    OpPassManager &passManager, const TransformOptions &transformOptions) {}
+    OpPassManager &passManager, const TransformOptions &transformOptions) {
+  //----------------------------------------------------------------------------
+  // Binding optimization
+  //----------------------------------------------------------------------------
+
+  if (transformOptions.optimizeBindings) {
+    // Canonicalizer needs to run so that we have predictable inputs for fusion.
+    passManager.addPass(mlir::createCanonicalizerPass());
+    passManager.addPass(IREE::Stream::createFuseDispatchBindingsPass());
+
+    // Folding operands requires that CSE folds the inputs that we check for.
+    passManager.addPass(mlir::createCSEPass());
+    passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
+
+    // Only want to specialize after we've added all the operands we need above.
+    passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
+
+    // TODO(benvanik): canonicalize bindings: we should sort the bindings by
+    // the block argument order of the parent stream.cmd.execute. This will get
+    // us more regular descriptor set layouts. We could also use some other
+    // heuristics (all constant bindings -> transients -> external etc) to
+    // make partitioning the bindings easier. Note we need to update both the
+    // dispatches and the dispatch function argument order.
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // -iree-stream-transformation-pipeline

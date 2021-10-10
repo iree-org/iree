@@ -17,6 +17,8 @@ iree_lit_test_suite(
     "convert_to_stream.mlir"
     "elide_async_copies.mlir"
     "encode_tensors.mlir"
+    "fold_uniform_operands.mlir"
+    "fuse_dispatch_bindings.mlir"
     "layout_slices.mlir"
     "materialize_copy_on_write.mlir"
     "outline_constants.mlir"
@@ -28,6 +30,7 @@ iree_lit_test_suite(
     "schedule_allocation.mlir"
     "schedule_concurrency.mlir"
     "schedule_execution.mlir"
+    "specialize_dispatches.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

@@ -18,6 +18,8 @@ cc_library(
         "ConvertToStream.cpp",
         "ElideAsyncCopies.cpp",
         "EncodeTensors.cpp",
+        "FoldUniformOperands.cpp",
+        "FuseDispatchBindings.cpp",
         "LayoutSlices.cpp",
         "MaterializeCopyOnWrite.cpp",
         "OutlineConstants.cpp",
@@ -31,6 +33,7 @@ cc_library(
         "ScheduleAllocation.cpp",
         "ScheduleConcurrency.cpp",
         "ScheduleExecution.cpp",
+        "SpecializeDispatches.cpp",
         "VerifyLowerings.cpp",
     ],
     hdrs = [
