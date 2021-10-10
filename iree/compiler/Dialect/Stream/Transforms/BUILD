@@ -23,6 +23,8 @@ cc_library(
         "PassDetail.h",
         "Passes.cpp",
         "RefineUsage.cpp",
+        "ScheduleConcurrency.cpp",
+        "ScheduleExecution.cpp",
         "VerifyLowerings.cpp",
     ],
     hdrs = [

@@ -14,8 +14,11 @@ iree_cc_library(
   NAME
     Analysis
   HDRS
+    "Partitioning.h"
     "ResourceUsage.h"
   SRCS
+    "Partitioning.cpp"
+    "Partitioning/ReferencePartitioning.cpp"
     "ResourceUsage.cpp"
   DEPS
     LLVMSupport
