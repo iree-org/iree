@@ -177,7 +177,7 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
 }
 
 //===----------------------------------------------------------------------===//
-// Alignment Arithmetic
+// Address/offset Arithmetic
 //===----------------------------------------------------------------------===//
 
 def Util_AlignOp : Util_PureOp<"align", [
@@ -212,9 +212,7 @@ def Util_AlignOp : Util_PureOp<"align", [
     }]>,
   ];
 
-  //TODO(#5405): add canonicalizers/folders to simplify cases with constnat
-  // alignment values with in a certain range (not zero) as well as duplicate
-  // alignments (EX: util.align 16 -> util.align 4)
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
