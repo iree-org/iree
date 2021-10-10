@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
@@ -34,11 +35,12 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   registry.insert<IREE::Flow::FlowDialect,
                   IREE::HAL::HALDialect,
                   ShapeDialect,
+                  IREE::Stream::StreamDialect,
                   IREE::Util::UtilDialect,
-                  linalg_ext::LinalgExtDialect,
                   IREE::VM::VMDialect,
                   IREE::VMVX::VMVXDialect,
                   IREE::Vulkan::VulkanDialect,
+                  linalg_ext::LinalgExtDialect,
                   mlir::iree::IREEDialect,
                   mlir::iree_pydm::IREEPyDMDialect>();
   // clang-format on
