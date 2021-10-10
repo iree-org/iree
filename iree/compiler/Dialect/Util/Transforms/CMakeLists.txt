@@ -21,6 +21,7 @@ iree_cc_library(
     "CombineInitializers.cpp"
     "DropCompilerHints.cpp"
     "FoldGlobals.cpp"
+    "FuseGlobals.cpp"
     "Patterns.cpp"
     "SimplifyGlobalAccesses.cpp"
   DEPS
