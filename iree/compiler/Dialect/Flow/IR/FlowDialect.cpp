@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -71,6 +72,7 @@ FlowDialect::FlowDialect(MLIRContext *context)
 
   context->getOrLoadDialect("shapex");
   context->getOrLoadDialect<tensor::TensorDialect>();
+  context->getOrLoadDialect<IREE::Util::UtilDialect>();
 }
 
 Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,

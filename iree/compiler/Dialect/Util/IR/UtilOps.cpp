@@ -589,26 +589,6 @@ void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
   if (constOp.value().isa<SymbolRefAttr>()) p << " : " << constOp.getType();
 }
 
-namespace {
-
-struct ExpandUnfoldableConstantOp
-    : public OpRewritePattern<UnfoldableConstantOp> {
-  using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(UnfoldableConstantOp op,
-                                PatternRewriter &rewriter) const override {
-    auto stdConst = rewriter.create<arith::ConstantOp>(op.getLoc(), op.value());
-    rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, stdConst.getResult());
-    return success();
-  }
-};
-
-}  // namespace
-
-void UnfoldableConstantOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandUnfoldableConstantOp>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//

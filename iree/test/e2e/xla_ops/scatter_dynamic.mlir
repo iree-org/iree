@@ -1,7 +1,7 @@
 func @scatter_add_slice_2D_dynamic_num_updates() {
   %arg0 = util.unfoldable_constant dense<1> : tensor<6x3xi32>
-  %arg1 = util.dynamic_shape_constant dense<[[2], [4]]> : tensor<2x1xi32> -> tensor<?x1xi32>
-  %arg2 = util.dynamic_shape_constant dense<[[1, 2, 3],
+  %arg1 = flow.tensor.constant dense<[[2], [4]]> : tensor<2x1xi32> -> tensor<?x1xi32>
+  %arg2 = flow.tensor.constant dense<[[1, 2, 3],
                                              [4, 5, 6]]> : tensor<2x3xi32> -> tensor<?x3xi32>
   %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ( {
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors

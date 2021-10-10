@@ -31,15 +31,3 @@ func @parse_print_unfoldable_constant(%arg0 : tensor<i32>, %arg1 : tensor<i32>) 
 
   return
 }
-
-// -----
-
-// CHECK-LABEL: @parse_print_dynamic_shape_constant
-func @parse_print_dynamic_shape_constant() {
-  // CHECK-NEXT: util.dynamic_shape_constant dense<2> : tensor<2xi32> -> tensor<?xi32>
-  %c = util.dynamic_shape_constant dense<2> : tensor<2xi32> -> tensor<?xi32>
-
-  // CHECK-NEXT: util.dynamic_shape_constant dense<2> : tensor<2xi32> {attr = "foo"} -> tensor<?xi32>
-  %has_attr = util.dynamic_shape_constant dense<2> : tensor<2xi32> {attr = "foo"} -> tensor<?xi32>
-  return
-}

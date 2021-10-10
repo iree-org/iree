@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/HAL/Conversion/HALToHAL/ConvertHALToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
-#include "iree/compiler/Dialect/HAL/Conversion/UtilToHAL/ConvertUtilToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -70,9 +69,6 @@ class ConvertToHALPass
     HALConversionTarget conversionTarget(context, typeConverter);
 
     OwningRewritePatternList patterns(&getContext());
-
-    populateUtilToHALPatterns(context, conversionTarget, typeConverter,
-                              patterns);
 
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);

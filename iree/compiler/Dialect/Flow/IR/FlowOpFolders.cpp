@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
@@ -552,6 +553,47 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
     }
   }
   return true;
+}
+
+OpFoldResult TensorConstantOp::fold(ArrayRef<Attribute> operands) {
+  auto dynamicType = getType();
+  if (dynamicType.getNumDynamicDims() == 0) {
+    return value();
+  }
+  return {};
+}
+
+namespace {
+
+struct ExpandDynamicShapeConstant : public OpRewritePattern<TensorConstantOp> {
+  using OpRewritePattern<TensorConstantOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorConstantOp op,
+                                PatternRewriter &rewriter) const override {
+    auto constantOp =
+        rewriter.create<arith::ConstantOp>(op.getLoc(), op.value());
+    auto dynamicType = op.getType();
+    auto staticType = constantOp.getType().cast<ShapedType>();
+    SmallVector<Value> dynamicDims;
+    for (int64_t i = 0; i < dynamicType.getNumDynamicDims(); ++i) {
+      auto dimValue = rewriter
+                          .create<arith::ConstantIndexOp>(
+                              op.getLoc(), staticType.getDimSize(i))
+                          .getResult();
+      dynamicDims.push_back(
+          rewriter.create<IREE::Util::DoNotOptimizeOp>(op.getLoc(), dimValue)
+              .getResult(0));
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, dynamicType, constantOp.getResult(), dynamicDims);
+    return success();
+  }
+};
+
+}  // namespace
+
+void TensorConstantOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandDynamicShapeConstant>(context);
 }
 
 OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {

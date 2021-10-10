@@ -118,27 +118,6 @@ def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize", [
   ];
 }
 
-// TODO(gcmn): It shouldn't be necessary to have both of these ops. Unify the
-// approach here.
-
-def Util_DynamicShapeConstantOp : Util_Op<"dynamic_shape_constant"> {
-  let summary = "A tensor constant that can have dynamic dimensions";
-  let description = [{
-    Allows specifying a constant where the return value can erase shape
-    information. This operation is declared as having side effects and has no
-    folder, so will not be optimized away by the compiler. The underlying shape
-    information should be hidden from the compiler and resolved at runtime.
-
-    ```mlir
-    %c = util.dynamic_shape_constant tensor<2x2xf32> -> tensor<?x?xf32>
-    %res = "mhlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
-    ```
-  }];
-  let arguments = (ins ElementsAttr:$value);
-  let results = (outs AnyTensor:$result);
-  let assemblyFormat = "$value attr-dict `->` type($result)";
-}
-
 def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
   let summary = "A constant that cannot be folded by the compiler.";
   let description = [{

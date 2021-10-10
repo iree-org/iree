@@ -622,6 +622,30 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 // Tensor ops
 //===----------------------------------------------------------------------===//
 
+// TODO(benvanik): make this behave like std.constant if not dynamic.
+def FLOW_TensorConstantOp : FLOW_Op<"tensor.constant"> {
+  let summary = [{tensor constant that can have dynamic dimensions}];
+  let description = [{
+    Allows specifying a constant where the return value can erase shape
+    information. This operation is declared as having side effects and has no
+    folder, so will not be optimized away by the compiler. The underlying shape
+    information should be hidden from the compiler and resolved at runtime.
+
+    ```mlir
+    %c = flow.tensor.constant tensor<2x2xf32> -> tensor<?x?xf32>
+    %res = "mhlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+    ```
+  }];
+  let arguments = (ins ElementsAttr:$value);
+  let results = (outs AnyTensor:$result);
+  let assemblyFormat = [{
+    $value attr-dict `->` type($result)
+  }];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   FLOW_StreamableOp,
   AllElementTypesMatch<["source", "result"]>,
