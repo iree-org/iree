@@ -94,6 +94,89 @@ def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Range arithmetic
+//===----------------------------------------------------------------------===//
+
+def Util_RangeMinOp : Util_PureOp<"range.min", [
+  SameOperandsAndResultType,
+  SameVariadicOperandSize,
+]> {
+  let summary = [{returns the min of all values}];
+  let description = [{
+    Computes the min of a variadic list of operands. Though it's possible to
+    express this with standard arithmetic this op enables more semantically
+    meaningful folding/optimizations.
+  }];
+
+  let arguments = (ins
+    Variadic<Util_Offset>:$operands
+  );
+  let results = (outs
+    Util_Offset:$result
+  );
+
+  let assemblyFormat = [{
+    $operands attr-dict `:` type($result)
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Util_RangeMaxOp : Util_PureOp<"range.max", [
+  SameOperandsAndResultType,
+  SameVariadicOperandSize,
+]> {
+  let summary = [{returns the max of all values}];
+  let description = [{
+    Computes the max of a variadic list of operands. Though it's possible to
+    express this with standard arithmetic this op enables more semantically
+    meaningful folding/optimizations.
+  }];
+
+  let arguments = (ins
+    Variadic<Util_Offset>:$operands
+  );
+  let results = (outs
+    Util_Offset:$result
+  );
+
+  let assemblyFormat = [{
+    $operands attr-dict `:` type($result)
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
+  SameOperandsAndResultType,
+  SameVariadicOperandSize,
+]> {
+  let summary = [{returns the min/max of a union of a set of ranges}];
+  let description = [{
+    Computes min(offsets) and max(offsets + lengths). Though it's possible to
+    express this with standard arithmetic this op enables more semantically
+    meaningful folding/optimizations.
+  }];
+
+  let arguments = (ins
+    Variadic<Util_Offset>:$offsets,
+    Variadic<Util_Offset>:$lengths
+  );
+  let results = (outs
+    Util_Offset:$min,
+    Util_Offset:$max
+  );
+
+  let assemblyFormat = [{
+    custom<RangeList>($offsets, $lengths) attr-dict `:` type($min)
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 

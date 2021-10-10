@@ -120,6 +120,41 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<RangeList>($offsets, $lengths)
+//===----------------------------------------------------------------------===//
+// [%offset for %length], [%offset for %length], ...
+
+ParseResult parseRangeList(OpAsmParser &parser,
+                           SmallVectorImpl<OpAsmParser::OperandType> &offsets,
+                           SmallVectorImpl<OpAsmParser::OperandType> &lengths) {
+  do {
+    OpAsmParser::OperandType offset;
+    OpAsmParser::OperandType length;
+    if (failed(parser.parseLSquare()) || failed(parser.parseOperand(offset)) ||
+        failed(parser.parseKeyword("for")) ||
+        failed(parser.parseOperand(length)) || failed(parser.parseRSquare())) {
+      return failure();
+    }
+    offsets.push_back(offset);
+    lengths.push_back(length);
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+void printRangeList(OpAsmPrinter &p, Operation *op, OperandRange offsets,
+                    OperandRange lengths) {
+  llvm::interleaveComma(llvm::zip(offsets, lengths), p, [&](auto it) {
+    auto offset = std::get<0>(it);
+    auto length = std::get<1>(it);
+    p << "[";
+    p.printOperand(offset);
+    p << " for ";
+    p.printOperand(length);
+    p << "]";
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // custom<SizeAwareType>
 //===----------------------------------------------------------------------===//
 // type{%size}
