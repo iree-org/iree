@@ -275,6 +275,94 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_module_map_data_ctl(
+    void* self, iree_allocator_command_t command, const void* params,
+    void** inout_ptr) {
+  IREE_ASSERT_EQ(command, IREE_ALLOCATOR_COMMAND_FREE);
+  if (IREE_UNLIKELY(command != IREE_ALLOCATOR_COMMAND_FREE)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
+  }
+  iree_vm_buffer_t* buffer = (iree_vm_buffer_t*)self;
+  iree_vm_buffer_release(buffer);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
+                   iree_hal_module_state_t,                    //
+                   riiirii, r) {
+  iree_hal_allocator_t* allocator = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
+  bool is_try = args->i1 != 0;
+  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i2;
+  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i3;
+  iree_vm_buffer_t* source = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r4, &source));
+  iree_vm_size_t offset = (iree_vm_size_t)args->i5;
+  iree_vm_size_t length = (iree_vm_size_t)args->i6;
+
+  iree_host_size_t buffer_length = source->data.data_length;
+  if (length == -1) {
+    length = buffer_length;
+  }
+  if (length < 0 || offset < 0 || offset > buffer_length ||
+      offset + length > buffer_length) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "byte range out of bounds (requested %d-%d of available %zu)", offset,
+        (offset + length - 1), buffer_length);
+  }
+
+  iree_hal_memory_access_t allowed_access = IREE_HAL_MEMORY_ACCESS_READ;
+  if (!iree_all_bits_set(source->access, IREE_VM_BUFFER_ACCESS_MUTABLE)) {
+    // Source buffer is read-only; require that the access request matches.
+    if (!iree_all_bits_set(buffer_usage, IREE_HAL_BUFFER_USAGE_CONSTANT)) {
+      return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
+                              "source buffer is immutable and can only be "
+                              "mapped for constant usage");
+    }
+
+    // NOTE: if we wanted to lock things down for when there's no MMU to ensure
+    // that the loaded program doesn't touch the memory then we could just fail
+    // the request - the program will then perform an alloc+copy and can do
+    // whatever it wants with the memory.
+  } else {
+    // Source buffer is mutable; allow in-place writes.
+    if (!iree_all_bits_set(buffer_usage, IREE_HAL_BUFFER_USAGE_CONSTANT)) {
+      allowed_access |= IREE_HAL_MEMORY_ACCESS_WRITE;
+    }
+  }
+
+  // Try mapping - note that this may fail if the target device cannot map the
+  // memory into the given type (for example, mapping a host buffer into
+  // device-local memory is only going to work on unified memory systems).
+  iree_allocator_t buffer_deref_allocator = {
+      .self = source,
+      .ctl = iree_hal_module_map_data_ctl,
+  };
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_allocator_wrap_buffer(
+      allocator, memory_types, allowed_access, buffer_usage,
+      iree_make_byte_span(source->data.data + offset, length),
+      buffer_deref_allocator, &buffer);
+  if (iree_status_is_ok(status)) {
+    // Mapping succeeded - retain the source buffer that'll be released by
+    // iree_hal_module_map_data_ctl when the mapping is no longer used.
+    iree_vm_buffer_retain(source);
+    rets->r0 = iree_hal_buffer_move_ref(buffer);
+    return iree_ok_status();
+  }
+
+  // Failed to map - if this was a try then don't fail and just rely on the
+  // result being nullptr to indicate to the caller that things failed.
+  memset(&rets->r0, 0, sizeof(rets->r0));
+  if (is_try) {
+    iree_status_ignore(status);
+    return iree_ok_status();
+  }
+  return status;
+}
+
+// TODO(#7277): drop this method (use map instead) with streams.
 IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
                    iree_hal_module_state_t,                     //
                    riirii, r) {
@@ -286,8 +374,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &source));
   iree_vm_size_t offset = (iree_vm_size_t)args->i4;
   iree_vm_size_t length = (iree_vm_size_t)args->i5;
-
-  // TODO(benvanik): wrap when supported.
 
   iree_host_size_t buffer_length = source->data.data_length;
   if (length == -1) {

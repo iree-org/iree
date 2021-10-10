@@ -382,6 +382,20 @@ Value AllocatorMapOp::getOperandSize(unsigned idx) { return {}; }
 Value AllocatorMapOp::getResultSize(unsigned idx) { return length(); }
 
 //===----------------------------------------------------------------------===//
+// hal.allocator.try_map
+//===----------------------------------------------------------------------===//
+
+void AllocatorTryMapOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(did_map(), "did_map");
+  setNameFn(result(), "mapped");
+}
+
+Value AllocatorTryMapOp::getOperandSize(unsigned idx) { return {}; }
+
+Value AllocatorTryMapOp::getResultSize(unsigned idx) { return length(); }
+
+//===----------------------------------------------------------------------===//
 // hal.allocator.pack
 //===----------------------------------------------------------------------===//
 

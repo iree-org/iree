@@ -25,6 +25,7 @@
 // clang-format off
 
 EXPORT_FN("allocator.allocate", iree_hal_module_allocator_allocate, riii, r)
+EXPORT_FN("allocator.map.byte_buffer", iree_hal_module_allocator_map_byte_buffer, riiirii, r)
 EXPORT_FN("allocator.wrap.byte_buffer", iree_hal_module_allocator_wrap_byte_buffer, riirii, r)
 
 EXPORT_FN("buffer.allocator", iree_hal_module_buffer_allocator, r, r)
