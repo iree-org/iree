@@ -35,7 +35,7 @@ namespace IREE {
 namespace HAL {
 namespace {
 
-// A pass converting the IREE flow dialect into the IREE HAL dialect.
+// TODO(#7277): remove when switched to streams (use ConvertToHAL2).
 class ConvertToHALPass
     : public PassWrapper<ConvertToHALPass, OperationPass<ModuleOp>> {
  public:
@@ -65,7 +65,7 @@ class ConvertToHALPass
       }
     }
 
-    HALTypeConverter typeConverter(conversionInterfaces);
+    HALTypeConverter typeConverter(conversionInterfaces, false);
     HALConversionTarget conversionTarget(context, typeConverter);
 
     OwningRewritePatternList patterns(&getContext());

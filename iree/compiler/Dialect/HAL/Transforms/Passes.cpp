@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+// TODO(#7277): remove shape dependency.
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -39,6 +40,7 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::init(true)};
 };
 
+// TODO(#7277): move this to stream dialect (and add options for concurrency).
 static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
     "iree-hal-benchmark-dispatch-repeat-count",
     llvm::cl::desc(

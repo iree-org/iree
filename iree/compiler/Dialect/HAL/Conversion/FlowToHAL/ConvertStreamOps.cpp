@@ -697,10 +697,13 @@ static void recordInterfaceBindings(
     auto bufferRange = schedulingState.lookupTensorBufferRange(tensorValue);
     assert(bufferRange.buffer && "buffer not preallocated");
     assert(bufferRange.length && "buffer has no precomputed size");
-    bindings.push_back(
-        std::make_tuple(schedulingState.lookupOrCreateIndex(
-                            bindingOp.binding().getSExtValue(), rewriter),
-                        bufferRange.buffer, zeroOffset, bufferRange.length));
+    bindings.push_back({
+        schedulingState.lookupOrCreateIndex(bindingOp.binding().getSExtValue(),
+                                            rewriter),
+        bufferRange.buffer,
+        zeroOffset,
+        bufferRange.length,
+    });
   };
 
   for (auto bindingAttr : bindingsAttr) {
@@ -713,14 +716,15 @@ static void recordInterfaceBindings(
       auto storageBuffer = schedulingState.loadGlobal(
           IREE::HAL::BufferType::get(builder.getContext()),
           constantStorageAttr.storage(), rewriter);
-      bindings.push_back(std::make_tuple(
+      bindings.push_back({
           schedulingState.lookupOrCreateIndex(
               bindingOp.binding().getSExtValue(), rewriter),
           storageBuffer,
           schedulingState.lookupOrCreateIndex(
               constantStorageAttr.offset().getSExtValue(), rewriter),
           schedulingState.lookupOrCreateIndex(
-              constantStorageAttr.length().getSExtValue(), rewriter)));
+              constantStorageAttr.length().getSExtValue(), rewriter),
+      });
     } else if (auto pushConstantAttr =
                    bindingAttr.dyn_cast<IREE::HAL::ExPushConstantAttr>()) {
       auto inputValue =

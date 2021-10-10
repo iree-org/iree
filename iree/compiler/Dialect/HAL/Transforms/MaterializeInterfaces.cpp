@@ -1130,6 +1130,7 @@ class ConverterDispatchWorkgroupInfoPattern final
 
 }  // namespace
 
+// TODO(#7277): remove when switched to streams (happens there now).
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
