@@ -198,6 +198,20 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
       IREE::Stream::createLayoutSlicesPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Stream::createLayoutSlicesPass());
+
+  // Propagate subviews throughout the program to unify resource storage access.
+  // After propagation many resource SSA values can be deduped or folded by the
+  // cleanup patterns.
+  passManager.addPass(IREE::Stream::createPropagateSubviewsPass());
+  addCleanupPatterns(passManager);
+
+  // TODO(benvanik): outline streams (ala dispatch regions). Note that we may
+  // want to do this earlier to enable better deduplication but that makes the
+  // above passes trickier. Outlining may be more like "find chunks of streams
+  // useful to move into secondary command buffers."
+
+  // Everything must now be in explicit stream.cmd.* form.
+  passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());
 }
 
 //===----------------------------------------------------------------------===//

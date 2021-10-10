@@ -101,6 +101,8 @@ std::unique_ptr<OperationPass<>> createPackConstantsPass();
 std::unique_ptr<OperationPass<>> createPackAllocationsPass();
 std::unique_ptr<OperationPass<>> createLayoutSlicesPass();
 
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubviewsPass();
+
 //===----------------------------------------------------------------------===//
 // Allocation and command issuing
 //===----------------------------------------------------------------------===//

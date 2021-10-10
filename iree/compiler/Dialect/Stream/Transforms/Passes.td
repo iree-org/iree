@@ -97,6 +97,18 @@ def PropagateTimepoints :
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Allocation and command issuing
+//===----------------------------------------------------------------------===//
+
+def ScheduleAllocation :
+    Pass<"iree-stream-schedule-allocation", ""> {
+  let summary = "Allocates resources and converts to explicit stream commands.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createScheduleAllocationPass()
+  }];
+}
+
 def PackConstants :
     Pass<"iree-stream-pack-constants", ""> {
   let summary = "Packs and allocate backing storage for fused constant resources.";
@@ -121,17 +133,20 @@ def LayoutSlices :
   }];
 }
 
-//===----------------------------------------------------------------------===//
-// Allocation and command issuing
-//===----------------------------------------------------------------------===//
-
-def ScheduleAllocation :
-    Pass<"iree-stream-schedule-allocation", ""> {
-  let summary = "Allocates resources and converts to explicit stream commands.";
+def PropagateSubviews :
+    Pass<"iree-stream-propagate-subviews", "mlir::ModuleOp"> {
+  let summary = "Propagates resource subviews throughout the whole program.";
   let constructor = [{
-    mlir::iree_compiler::IREE::Stream::createScheduleAllocationPass()
+    mlir::iree_compiler::IREE::Stream::createPropagateSubviewsPass()
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// Stream memoization
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): outline streams (ala dispatch regions).
+// TODO(benvanik): deduplicate outlined streams.
 
 //===----------------------------------------------------------------------===//
 // Diagnostics
