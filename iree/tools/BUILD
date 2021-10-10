@@ -112,6 +112,7 @@ cc_library(
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/Stream/IR",
+        "//iree/compiler/Dialect/Stream/Transforms",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/Util/Transforms",
         "//iree/compiler/Dialect/VM/Analysis",
