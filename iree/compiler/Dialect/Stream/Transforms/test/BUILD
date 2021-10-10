@@ -18,6 +18,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "convert_to_stream.mlir",
+            "encode_tensors.mlir",
             "outline_constants.mlir",
         ],
         include = ["*.mlir"],

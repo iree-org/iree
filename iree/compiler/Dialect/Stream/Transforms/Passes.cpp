@@ -101,7 +101,19 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 void buildStreamAsyncPassPipeline(OpPassManager &passManager,
-                                  const TransformOptions &transformOptions) {}
+                                  const TransformOptions &transformOptions) {
+  //----------------------------------------------------------------------------
+  // Tensor lowering
+  //----------------------------------------------------------------------------
+
+  // Lower stream.tensor.* ops to stream.async.* ops based on
+  // affinity/configuration assigned during placement.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createEncodeTensorsPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createEncodeTensorsPass());
+  addCleanupPatterns(passManager);
+}
 
 //===----------------------------------------------------------------------===//
 // -iree-stream-cmd-transformation-pipeline
