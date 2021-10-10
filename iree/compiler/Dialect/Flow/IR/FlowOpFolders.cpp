@@ -627,11 +627,55 @@ struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
   }
 };
 
+struct ResolveShapedRank : public OpRewritePattern<RankOp> {
+  using OpRewritePattern<RankOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(RankOp op,
+                                PatternRewriter &rewriter) const override {
+    auto shapedType = op.memrefOrTensor().getType().cast<ShapedType>();
+    rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op,
+                                                        shapedType.getRank());
+    return success();
+  }
+};
+
+struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
+  using OpRewritePattern<tensor::DimOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::DimOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.getConstantIndex().hasValue()) {
+      return rewriter.notifyMatchFailure(
+          op, "non-constant index dim ops are unsupported");
+    }
+    auto idx = op.getConstantIndex().getValue();
+
+    auto shapedType = op.source().getType().cast<ShapedType>();
+    if (!shapedType.isDynamicDim(idx)) {
+      rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(
+          op, shapedType.getDimSize(idx));
+      return success();
+    }
+
+    auto dynamicDims = IREE::Util::findDynamicDims(op.source(), op);
+    if (!dynamicDims.hasValue()) {
+      return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");
+    }
+    unsigned dimOffset = 0;
+    for (unsigned i = 0; i < idx; ++i) {
+      if (shapedType.isDynamicDim(i)) ++dimOffset;
+    }
+    rewriter.replaceOp(op, dynamicDims.getValue()[dimOffset]);
+
+    return success();
+  }
+};
+
 }  // namespace
 
 void TensorReshapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<FlattenTensorReshapeChain>(context);
+  results.insert<ResolveShapedRank>(context);
+  results.insert<ResolveShapedDim>(context);
 }
 
 void TensorLoadOp::getCanonicalizationPatterns(

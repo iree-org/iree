@@ -22,6 +22,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+// TODO(#7277): remove when switched to streams (happens there now).
 class PackConstantPoolStoragePass
     : public PassWrapper<PackConstantPoolStoragePass,
                          OperationPass<ConstantPoolOp>> {
@@ -209,12 +210,13 @@ class PackConstantPoolStoragePass
     storageBuffers.push_back({});
     StorageBuffer *currentBuffer = &storageBuffers.back();
     for (auto valueOp : valueOps) {
-      uint64_t offset = align(currentBuffer->totalSize,
-                              bufferConstraints.min_buffer_offset_alignment());
+      uint64_t offset =
+          IREE::Util::align(currentBuffer->totalSize,
+                            bufferConstraints.min_buffer_offset_alignment());
       uint64_t unpaddedLength =
           valueOp.value().cast<DenseElementsAttr>().getRawData().size();
-      uint64_t paddedLength =
-          align(unpaddedLength, bufferConstraints.min_buffer_range_alignment());
+      uint64_t paddedLength = IREE::Util::align(
+          unpaddedLength, bufferConstraints.min_buffer_range_alignment());
       if (offset + unpaddedLength >
           bufferConstraints.max_allocation_size().getZExtValue()) {
         // Spilling buffer; make a new one.

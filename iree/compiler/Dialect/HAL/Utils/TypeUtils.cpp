@@ -25,16 +25,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder) {
-  // (value + (alignment - 1)) & ~(alignment - 1)
-  return builder.createOrFold<arith::AndIOp>(
-      loc,
-      builder.createOrFold<arith::AddIOp>(
-          loc, value,
-          builder.createOrFold<arith::ConstantIndexOp>(loc, alignment - 1)),
-      builder.createOrFold<arith::ConstantIndexOp>(loc, ~(alignment - 1)));
-}
-
 int32_t getRoundedElementByteWidth(Type type) {
   return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
 }

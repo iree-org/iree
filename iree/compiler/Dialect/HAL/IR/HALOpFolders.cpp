@@ -233,11 +233,9 @@ struct ExpandAllocatorConstantOp
 
     auto hostBuffer = rewriter.createOrFold<IREE::Util::ByteBufferConstantOp>(
         op.getLoc(), IREE::Util::ByteBufferType::get(rewriter.getContext()),
-        op.value());
-    auto zero =
-        rewriter.createOrFold<mlir::arith::ConstantIndexOp>(op.getLoc(), 0);
-    auto neg1 =
-        rewriter.createOrFold<mlir::arith::ConstantIndexOp>(op.getLoc(), -1);
+        op.value(), /*alignment=*/nullptr);
+    auto zero = rewriter.createOrFold<arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto neg1 = rewriter.createOrFold<arith::ConstantIndexOp>(op.getLoc(), -1);
     auto deviceBuffer = rewriter.createOrFold<AllocatorMapOp>(
         op.getLoc(), bufferType, op.allocator(), memoryTypes, bufferUsage,
         hostBuffer, zero, neg1);

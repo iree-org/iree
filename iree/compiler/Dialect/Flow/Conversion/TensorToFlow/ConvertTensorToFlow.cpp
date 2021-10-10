@@ -123,7 +123,6 @@ static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
 struct ConvertTensorInsertSlicePattern
     : public OpRewritePattern<tensor::InsertSliceOp> {
   using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
     if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
@@ -169,7 +168,6 @@ struct ConvertTensorInsertSlicePattern
 struct ConvertTensorExtractSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     if (sliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
@@ -234,7 +232,6 @@ struct ConvertTensorExtractPattern
 
 struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
   using OpRewritePattern<tensor::CastOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::CastOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
@@ -302,7 +299,6 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
 struct ConvertTensorFromElementsPattern
     : public OpRewritePattern<tensor::FromElementsOp> {
   using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: This pattern was mainly added to iron out some kinks specific to

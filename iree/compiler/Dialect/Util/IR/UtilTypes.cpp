@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/BitVector.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -386,6 +387,84 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
     return inferSizeType.inferSizeFromValue(loc, resourceValue, builder);
   }
   return {};
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::ShapeAware*
+//===----------------------------------------------------------------------===//
+
+ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
+                                   ValueRange dynamicDims) {
+  auto value = values[idx];
+  auto shapedType = value.getType().dyn_cast<ShapedType>();
+  if (!shapedType) return ValueRange{};
+
+  // Bail immediately if the shape is static.
+  if (shapedType.hasStaticShape()) return ValueRange{};
+
+  // Find where the dynamic dims start in the flattened list.
+  unsigned offset = 0;
+  for (unsigned i = 0; i < idx; ++i) {
+    if (auto type = values[i].getType().dyn_cast<ShapedType>()) {
+      offset += type.getNumDynamicDims();
+    }
+  }
+
+  // Return the subrange of dynamic dims for the value being queried.
+  return dynamicDims.slice(offset, shapedType.getNumDynamicDims());
+}
+
+Optional<ValueRange> findDynamicDims(Value shapedValue, Operation *forOp) {
+  // Look up the use-def chain: always safe, as any value we reach dominates
+  // |forOp| implicitly.
+  SmallVector<Value> worklist;
+  worklist.push_back(shapedValue);
+  while (!worklist.empty()) {
+    auto workValue = worklist.pop_back_val();
+    if (auto shapeAwareOp = dyn_cast_or_null<ShapeAwareOpInterface>(
+            workValue.getDefiningOp())) {
+      return shapeAwareOp.getResultDynamicDimsFromValue(workValue);
+    }
+    if (auto tiedOp =
+            dyn_cast_or_null<TiedOpInterface>(workValue.getDefiningOp())) {
+      auto tiedValue = tiedOp.getTiedResultOperand(workValue);
+      if (tiedValue) worklist.push_back(tiedValue);
+    }
+  }
+
+  // Look down the use-def chain: not safe at some point because we'll move
+  // past where |forOp| is dominated. This is often fine for a bit, though, as
+  // |forOp| may be a user of |shapedValue| and be able to provide the shape
+  // itself.
+  for (auto &use : shapedValue.getUses()) {
+    if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(use.getOwner())) {
+      auto dynamicDims =
+          shapeAwareOp.getOperandDynamicDims(use.getOperandNumber());
+      if (llvm::all_of(dynamicDims, [&](Value dim) {
+            return isValueUsableForOp(dim, forOp);
+          })) {
+        return dynamicDims;
+      }
+    }
+  }
+
+  return None;
+}
+
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): emit a util.align op that we can use to carry the semantics
+// of the alignment and elide redundant aligns.
+Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder) {
+  // (value + (alignment - 1)) & ~(alignment - 1)
+  return builder.createOrFold<arith::AndIOp>(
+      loc,
+      builder.createOrFold<arith::AddIOp>(
+          loc, value,
+          builder.createOrFold<arith::ConstantIndexOp>(loc, alignment - 1)),
+      builder.createOrFold<arith::ConstantIndexOp>(loc, ~(alignment - 1)));
 }
 
 //===----------------------------------------------------------------------===//

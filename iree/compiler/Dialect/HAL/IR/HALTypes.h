@@ -162,9 +162,13 @@ class BufferConstraintsAdaptor {
   BufferConstraintsAttr bufferConstraints_;
 };
 
-// A tuple containing runtime values for a descriptor set binding:
-// <binding ordinal, hal.buffer, buffer byte offset, buffer byte length>
-using DescriptorSetBindingValue = std::tuple<Value, Value, Value, Value>;
+// A tuple containing runtime values for a descriptor set binding.
+struct DescriptorSetBindingValue {
+  Value ordinal;
+  Value buffer;
+  Value byteOffset;
+  Value byteLength;
+};
 
 }  // namespace HAL
 }  // namespace IREE

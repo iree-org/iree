@@ -81,7 +81,8 @@ def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
   }];
 
   let arguments = (ins
-    ElementsAttr:$value
+    AnyAttr:$value,
+    OptionalAttr<I64Attr>:$alignment
   );
   let results = (outs
     ByteBufferType:$result

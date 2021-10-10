@@ -77,6 +77,12 @@ ParseResult parseSizeAwareTypeList(
     SmallVectorImpl<OpAsmParser::OperandType> &sizes);
 void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
                             OperandRange sizes);
+ParseResult parseSizeAwareTypeList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types0,
+    SmallVectorImpl<Type> &types1,
+    SmallVectorImpl<OpAsmParser::OperandType> &sizes);
+void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
+                            TypeRange types1, OperandRange sizes);
 
 //===----------------------------------------------------------------------===//
 // custom<ShapedTiedResult>

@@ -150,6 +150,7 @@ class MutableByteBufferType
 };
 
 namespace detail {
+
 llvm::Optional<unsigned> getTiedResultOperandIndex(Operation *op,
                                                    unsigned resultIndex);
 void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
@@ -158,6 +159,7 @@ SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op);
 bool isOperandTied(Operation *tiedOp, unsigned operandIndex);
 SmallVector<Value> getOperandTiedResults(Operation *op, unsigned operandIndex);
 LogicalResult verifyTiedOp(TiedOpInterface tiedOp);
+
 }  // namespace detail
 
 // Resets or removes the indices in |tiedOperandIndices| based on the given
@@ -166,6 +168,26 @@ void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedOperandIndices,
     ArrayRef<unsigned> excludedResultIndices,
     SmallVector<int64_t, 4> &tiedOperandIndices);
+
+// Walks the SSA use-def chain to find the dynamic dimensions of the value.
+// Returns None if the shape cannot be found or if it is defined after
+// |forOp|.
+Optional<ValueRange> findDynamicDims(Value shapedValue, Operation *forOp);
+
+// Returns the dynamic dimensions for the value at |idx|.
+ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
+                                   ValueRange dynamicDims);
+
+// Aligns |value| to |alignment|, rounding up if needed.
+static inline uint64_t align(uint64_t value, uint64_t alignment) {
+  return (value + (alignment - 1)) & ~(alignment - 1);
+}
+static inline uint64_t align(uint64_t value, const APInt &alignment) {
+  return align(value, alignment.getZExtValue());
+}
+
+// Aligns |value| to |alignment|, rounding up if needed.
+Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder);
 
 }  // namespace Util
 }  // namespace IREE

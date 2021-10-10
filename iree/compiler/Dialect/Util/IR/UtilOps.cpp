@@ -143,7 +143,7 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
 //===----------------------------------------------------------------------===//
 // custom<SizeAwareTypeList>
 //===----------------------------------------------------------------------===//
-// (type{%size0}, type, type{%size1})
+// type{%size0}, type, type{%size1}
 
 ParseResult parseSizeAwareTypeList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types,
@@ -175,6 +175,20 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
       p << "}";
     }
   });
+}
+
+ParseResult parseSizeAwareTypeList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types0,
+    SmallVectorImpl<Type> &types1,
+    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
+  if (failed(parseSizeAwareTypeList(parser, types0, sizes))) return failure();
+  types1 = types0;
+  return success();
+}
+
+void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
+                            TypeRange types1, OperandRange sizes) {
+  printSizeAwareTypeList(p, op, types0, sizes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -295,7 +309,8 @@ static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
                                ArrayRef<OpAsmParser::OperandType> operands) {
   int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
-    if (operands[i].name == tiedResult.name) {
+    if (operands[i].name == tiedResult.name &&
+        operands[i].number == tiedResult.number) {
       operandIndex = i;
       break;
     }

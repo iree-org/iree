@@ -300,6 +300,42 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::ShapeAware* interfaces
+//===----------------------------------------------------------------------===//
+
+def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    An operation that is able to provide dynamic shape dimensions for all
+    shaped operands and results.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      [{Returns dynamic dimensions for the given shaped operand index.}],
+      "ValueRange", "getOperandDynamicDims", (ins "unsigned":$idx)
+    >,
+    InterfaceMethod<
+      [{Returns dynamic dimensions for the given shaped result index.}],
+      "ValueRange", "getResultDynamicDims", (ins "unsigned":$idx)
+    >,
+    InterfaceMethod<
+      [{Returns dynamic dimensions for the given shaped result value.}],
+      "ValueRange", "getResultDynamicDimsFromValue", (ins "Value":$value),
+      /*defaultImplementation=*/[{
+        for (unsigned i = 0; i < $_self->getNumResults(); ++i) {
+          if ($_self->getResult(i) == value) {
+            return $_self.getResultDynamicDims(i);
+          }
+        }
+        return {};
+      }]
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::SizeAware* interfaces
 //===----------------------------------------------------------------------===//
 
@@ -307,8 +343,7 @@ def Util_InferTypeSize : TypeInterface<"InferTypeSizeInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
-    Allows types to be queried for their size by inserting the required logic
-    when required.
+    Allows types to be queried for their size by inserting the required logic.
   }];
 
   let methods = [
