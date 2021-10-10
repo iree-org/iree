@@ -29,6 +29,7 @@ iree_cc_library(
     "StreamOpInterfaces.cpp.inc"
     "StreamOps.cpp"
     "StreamOps.cpp.inc"
+    "StreamTraits.h"
     "StreamTypeInterfaces.cpp.inc"
     "StreamTypes.cpp"
     "StreamTypes.cpp.inc"

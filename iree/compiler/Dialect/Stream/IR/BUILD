@@ -55,6 +55,7 @@ cc_library(
         "StreamOpInterfaces.h.inc",
         "StreamOps.h",
         "StreamOps.h.inc",
+        "StreamTraits.h",
         "StreamTypeInterfaces.h.inc",
         "StreamTypes.h",
         "StreamTypes.h.inc",

@@ -691,6 +691,7 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
 
 def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
   Stream_AffinityOp,
+  Stream_TensorPhaseOp,
 ]> {
   let summary = [{calculates the storage size of a given high-level type}];
   let description = [{
@@ -722,6 +723,7 @@ def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
 def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
   Stream_AffinityOp,
   Stream_StreamableOp,
+  Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
@@ -764,6 +766,7 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
 def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
   Stream_AffinityOp,
   Stream_StreamableOp,
+  Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
@@ -810,6 +813,7 @@ def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
   Stream_StreamableOp,
+  Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
@@ -863,6 +867,7 @@ def Stream_TensorSliceOp : Stream_PureOp<"tensor.slice", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
   Stream_StreamableOp,
+  Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
@@ -919,6 +924,7 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
   AllTypesMatch<["target", "result"]>,
   Stream_AffinityOp,
   Stream_StreamableOp,
+  Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -978,6 +984,7 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
   AllTypesMatch<["target", "result"]>,
   Stream_AffinityOp,
   Stream_StreamableOp,
+  Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1041,6 +1048,7 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
 
 def Stream_TensorLoadOp : Stream_PureOp<"tensor.load", [
   AttrSizedOperandSegments,
+  Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
 ]> {
@@ -1085,6 +1093,7 @@ def Stream_TensorLoadOp : Stream_PureOp<"tensor.load", [
 def Stream_TensorStoreOp : Stream_Op<"tensor.store", [
   AttrSizedOperandSegments,
   AllTypesMatch<["target", "result"]>,
+  Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1143,6 +1152,7 @@ def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
     "getAffinity",
     "setAffinity",
   ]>,
+  Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
     "preferCloneToConsumers",
@@ -1180,6 +1190,7 @@ def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
 
 def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
@@ -1221,6 +1232,7 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
 
 def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "preferCloneToConsumers",
   ]>,
@@ -1259,6 +1271,7 @@ def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
 
 def Stream_AsyncCloneOp : Stream_Op<"async.clone", [
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "preferCloneToConsumers",
   ]>,
@@ -1302,6 +1315,7 @@ def Stream_AsyncCloneOp : Stream_Op<"async.clone", [
 def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
   AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
@@ -1347,6 +1361,7 @@ def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
 def Stream_AsyncFillOp : Stream_Op<"async.fill", [
   AllTypesMatch<["target", "result"]>,
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1399,6 +1414,7 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
 def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
   AllTypesMatch<["target", "result"]>,
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
@@ -1455,6 +1471,7 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
 def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
   AllTypesMatch<["target", "result"]>,
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1514,6 +1531,7 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
 
 def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   Util_SizeAwareOp,
 ]> {
@@ -1565,6 +1583,7 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
 def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1634,6 +1653,7 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1720,6 +1740,7 @@ def Stream_AsyncWaveOp : Stream_Op<"async.wave", [
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
@@ -1820,6 +1841,7 @@ def Stream_AsyncWaveOp : Stream_Op<"async.wave", [
 //===----------------------------------------------------------------------===//
 
 def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
+  Stream_CmdPhaseOp,
   Stream_StreamableOp,
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
@@ -1858,6 +1880,7 @@ def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
 }
 
 def Stream_CmdInvalidateOp : Stream_Op<"cmd.invalidate", [
+  Stream_CmdPhaseOp,
   Stream_StreamableOp,
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
@@ -1896,6 +1919,7 @@ def Stream_CmdInvalidateOp : Stream_Op<"cmd.invalidate", [
 }
 
 def Stream_CmdDiscardOp : Stream_Op<"cmd.discard", [
+  Stream_CmdPhaseOp,
   Stream_StreamableOp,
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
@@ -1932,6 +1956,7 @@ def Stream_CmdDiscardOp : Stream_Op<"cmd.discard", [
 }
 
 def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
+  Stream_CmdPhaseOp,
   Stream_StreamableOp,
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
@@ -1970,6 +1995,7 @@ def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
 }
 
 def Stream_CmdCopyOp : Stream_Op<"cmd.copy", [
+  Stream_CmdPhaseOp,
   Stream_StreamableOp,
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
@@ -2015,6 +2041,7 @@ def Stream_CmdCopyOp : Stream_Op<"cmd.copy", [
 
 def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   AttrSizedOperandSegments,
+  Stream_CmdPhaseOp,
   Stream_StreamableOp,
   Stream_SubviewEffectOp,
   Util_SizeAwareOp,
@@ -2073,6 +2100,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
+  Stream_CmdPhaseOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
 ]> {
@@ -2145,6 +2173,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
   RecursiveSideEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
+  Stream_CmdPhaseOp,
   Stream_StreamableOp,
 ]> {
   let summary = [{executes all ops serially (in-order)}];
@@ -2210,6 +2239,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   RecursiveSideEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
+  Stream_CmdPhaseOp,
   Stream_StreamableOp,
 ]> {
   let summary = [{executes all ops concurrently}];
