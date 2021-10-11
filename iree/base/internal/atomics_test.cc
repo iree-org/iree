@@ -59,7 +59,7 @@ TEST(AtomicPtr, CompareExchange) {
   intptr_t ptr_1 = 0x1;
   intptr_t ptr_2 = 0x2;
   iree_atomic_intptr_t value = IREE_ATOMIC_VAR_INIT(ptr_0);
-  intptr_t ptr_expected = NULL;
+  intptr_t ptr_expected = 0;
 
   // OK: value == ptr_0, CAS(ptr_0 -> ptr_1)
   iree_atomic_store_intptr(&value, ptr_0, iree_memory_order_seq_cst);
@@ -92,8 +92,11 @@ TEST(AtomicPtr, CompareExchange) {
 TEST(AtomicRefCount, IncDec) {
   iree_atomic_ref_count_t count;
   iree_atomic_ref_count_init(&count);
-  EXPECT_EQ(1, iree_atomic_ref_count_inc(&count));
-  EXPECT_EQ(2, iree_atomic_ref_count_inc(&count));
+  EXPECT_EQ(1, count);
+  iree_atomic_ref_count_inc(&count);
+  EXPECT_EQ(2, count);
+  iree_atomic_ref_count_inc(&count);
+  EXPECT_EQ(3, count);
   EXPECT_EQ(3, iree_atomic_ref_count_dec(&count));
   EXPECT_EQ(2, iree_atomic_ref_count_dec(&count));
   EXPECT_EQ(1, iree_atomic_ref_count_dec(&count));

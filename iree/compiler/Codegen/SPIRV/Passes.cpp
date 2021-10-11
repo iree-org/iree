@@ -60,59 +60,22 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
 }
 
-void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  pm.addNestedPass<FuncOp>(createSPIRVRemoveOneTripTiledLoopPass());
-  //  Tile and distribute to GPU subgroups/invocations and vectorize.
-  pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
-  pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
-  pm.addPass(createCanonicalizerPass());
-
-  pm.addNestedPass<FuncOp>(createSPIRVCopyToWorkgroupMemoryPass());
+/// Adds passes to materialize structured ops as loops. This replaces structured
+/// ops with loop nests containing payloads, so it should be invoked after
+/// tiling and vectorization and before buffer transformations.
+static void addLoopMaterializationPasses(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(linalg_ext::createLinalgExtToLoopsPass());
   pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
-  pm.addPass(createLowerAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  // Perform various vector-level cross-op optimizations like load-store
-  // forwarding, shape casting and casting op cancelling.
-  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
 
-void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
+/// Adds passes to lowering MemRefs. This folds MemRef subviews, flattens n-D
+/// MemRef into 1-D ones, vectorizes load/store when possible, and performs
+/// cross loop nest optimizations. This should be invoked after structured op
+/// lowering and before final SPIR-V conversion.
+static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // Tile and distribute to GPU subgroups/invocations.
-  pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
-  pm.addPass(createCanonicalizerPass());
-
-  pm.addNestedPass<FuncOp>(linalg_ext::createLinalgExtToLoopsPass());
-  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
-  pm.addPass(createLowerAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  // Perform various vector-level cross-op optimizations like load-store
-  // forwarding, shape casting and casting op cancelling.
-  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
-}
-
-void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createSPIRVDistributeToGlobalIDPass());
-  pm.addPass(createLowerAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  // Perform various vector-level cross-op optimizations like load-store
-  // forwarding, shape casting and casting op cancelling.
-  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
-}
-
-static void addLowerToSPIRVPasses(OpPassManager &pm) {
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
@@ -138,31 +101,66 @@ static void addLowerToSPIRVPasses(OpPassManager &pm) {
   // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
   // because we don't use upstream memref descriptors.
   pm.addPass(createFlattenMemRefSubspanPass());
+}
+
+/// Adds passes to perform the final SPIR-V conversion.
+static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
   pm.addPass(createLowerAffinePass());
 
-  // Finally convert everything to SPIR-V.
   pm.addPass(createConvertToSPIRVPass());
 
-  OpPassManager &spirvModulePM = pm.nest<spirv::ModuleOp>();
-  spirvModulePM.addPass(spirv::createLowerABIAttributesPass());
-  spirvModulePM.addPass(createCanonicalizerPass());
-  spirvModulePM.addPass(createCSEPass());
-  spirvModulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
+  OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();
+  spirvPM.addPass(spirv::createLowerABIAttributesPass());
+  spirvPM.addPass(createCanonicalizerPass());
+  spirvPM.addPass(createCSEPass());
+  spirvPM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
+}
+
+void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addNestedPass<FuncOp>(createSPIRVRemoveOneTripTiledLoopPass());
+  //  Tile and distribute to GPU subgroups/invocations and vectorize.
+  pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Perform various vector-level cross-op optimizations like load-store
+  // forwarding, shape casting and casting op cancelling.
+  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+
+  addLoopMaterializationPasses(pm);
+}
+
+void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Tile and distribute to GPU subgroups/invocations.
+  pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  addLoopMaterializationPasses(pm);
+}
+
+void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createSPIRVDistributeToGlobalIDPass());
 }
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
-  {
-    OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
-    addLinalgBufferizePasses(nestedModulePM, gpuAllocationFunction);
-  }
+  addLinalgBufferizePasses(pm.nest<ModuleOp>(), gpuAllocationFunction);
   pm.addPass(createSPIRVLowerExecutableTargetPass());
-  OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
-  addLowerToSPIRVPasses(nestedModulePM);
+  addMemRefLoweringPasses(pm.nest<ModuleOp>());
+  addSPIRVLoweringPasses(pm.nest<ModuleOp>());
 
   LLVM_DEBUG({
-    llvm::dbgs() << "Using SPIRV Pass pipeline :\n";
+    llvm::dbgs() << "Using SPIRV Pass pipeline:\n";
     pm.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
