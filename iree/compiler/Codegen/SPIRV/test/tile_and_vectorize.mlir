@@ -8,7 +8,7 @@
 #map5 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-#config = {tileSizes = [[8, 16, 0], [], [1, 1, 1]]}
+#config = {tileSizes = [[8, 16], [], [1, 1], [0, 0, 1]]}
 
 hal.executable private @matmul  {
   hal.interface @io {
@@ -165,7 +165,7 @@ hal.executable private @conv_1d  {
 #map6 = affine_map<(d0)[s0] -> (4, -d0 + s0)>
 #map7 = affine_map<(d0)[s0] -> (32, -d0 + s0)>
 
-#config = {tileSizes = [[0, 1, 4, 32], [], [0, 1, 1, 1]]}
+#config = {tileSizes = [[0, 1, 4, 32], [], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]]}
 
 hal.executable private @conv_no_padding  {
   hal.interface @io {

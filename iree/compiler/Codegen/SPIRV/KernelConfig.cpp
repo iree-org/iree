@@ -186,6 +186,14 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.emplace_back();  // Subgroup level
   tileSizes.push_back(invocationTileSizes);
+  // Tiling along reduction dimensions
+  if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+    tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});
+  } else if (isa<linalg::DepthwiseConv2DNhwOp>(linalgOp)) {
+    tileSizes.push_back({0, 0, 0, 0, 1, 1});
+  } else {
+    return success();
+  }
 
   auto funcOp = linalgOp->getParentOfType<FuncOp>();
   if (failed(setOpConfigAndEntryPointFnTranslation(
@@ -238,8 +246,9 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   int64_t residualTilingFactor = (bestThreadM + bestThreadK) * bestThreadN;
 
   SmallVector<int64_t, 3> workgroupSize(3, 1);               // (X, Y, Z)
-  SmallVector<int64_t, 4> workgroupTileSizes(3 + isBM, 0);   // (B, M, N, K)
-  SmallVector<int64_t, 4> invocationTileSizes(3 + isBM, 0);  // (B, M, N, K)
+  SmallVector<int64_t, 4> workgroupTileSizes(2 + isBM, 0);   // (B, M, N)
+  SmallVector<int64_t, 4> invocationTileSizes(2 + isBM, 0);  // (B, M, N)
+  SmallVector<int64_t, 4> reductionTileSizes(3 + isBM, 0);   // (B, M, N, K)
 
   if (isBM) workgroupTileSizes[0] = invocationTileSizes[0] = 1;
 
@@ -288,17 +297,18 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   // here so that we can do vector load.
   for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 2; t >>= 1) {
     if (dimK % t == 0) {
-      workgroupTileSizes[2 + isBM] = invocationTileSizes[2 + isBM] = t;
+      reductionTileSizes[2 + isBM] = t;
       break;
     }
   }
-  if (workgroupTileSizes[2 + isBM] == 0) return success();
+  if (reductionTileSizes[2 + isBM] == 0) return success();
 
   auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.emplace_back();
   tileSizes.push_back(invocationTileSizes);
+  tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
                                                op, tileSizes, {}, pipeline,
                                                workgroupSize);

@@ -181,14 +181,12 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
   SmallVector<StringRef, 2> matchMarkers = {getWorkgroupMemoryMarker(),
                                             getWorkgroupMarker()};
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::CopyOp>,
+  patterns.insert<linalg::LinalgTilingPattern<linalg::CopyOp>,
                   linalg::LinalgTilingPattern<linalg::Conv1DNwcWcfOp>,
                   linalg::LinalgTilingPattern<linalg::Conv3DNdhwcDhwcfOp>,
                   linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
                   linalg::LinalgTilingPattern<linalg::FillOp>,
                   linalg::LinalgTilingPattern<linalg::GenericOp>,
-                  linalg::LinalgTilingPattern<linalg::MatmulOp>,
                   linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
                   linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
                   linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
@@ -196,10 +194,12 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
       getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
                                      context));
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>>(
+  patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::MatmulOp>>(
       context, tilingOptions,
-      getLinalgMatchAndReplaceMarker(matchMarkers, getConvFilterTileMarker(),
+      getLinalgMatchAndReplaceMarker(matchMarkers, getTileReductionMarker(),
                                      context));
 
   patterns.insert<linalg_ext::TiledOpInterfaceTilingPattern>(
@@ -229,34 +229,28 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getThreadRange(
 }
 
 //====---------------------------------------------------------------------===//
-// Convolution filter tiling patterns
+// Reduction tiling patterns
 //====---------------------------------------------------------------------===//
 
-static void populateTilingConvFilterPatterns(
+static void populateTilingReductionPatterns(
     MLIRContext *context, RewritePatternSet &patterns,
     linalg::LinalgTransformationFilter marker) {
   auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    SmallVector<int64_t, 4> sizes;
-    if (isa<linalg::Conv2DNhwcHwcfOp>(op)) {
-      sizes.assign({0, 0, 0, 0, 1, 1, 4});
-    } else if (isa<linalg::DepthwiseConv2DNhwOp>(op)) {
-      sizes.assign({0, 0, 0, 0, 1, 1});
-    }
-
-    Location loc = op->getLoc();
-    SmallVector<Value, 4> tileSizes;
-    for (int64_t size : sizes) {
-      tileSizes.push_back(builder.create<ConstantIndexOp>(loc, size));
-    }
-    return tileSizes;
+    SmallVector<int64_t> tileSizes = getTileSizes(op, 3);
+    return llvm::to_vector<4>(
+        llvm::map_range(tileSizes, [&](int64_t v) -> Value {
+          return builder.create<ConstantIndexOp>(op->getLoc(), v);
+        }));
   };
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getTileSizeFn);
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>>(
+  patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::MatmulOp>>(
       context, tilingOptions, marker);
 }
 
@@ -293,7 +287,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   auto entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp) return;
 
-  {
+  {  // Tile and distribute to subgroups.
     RewritePatternSet subgroupTilingPatterns(&getContext());
     populateTilingToSubgroupPatterns(context, subgroupTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
@@ -313,7 +307,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     });
   }
 
-  {
+  {  // Tile and distribute to invocations.
     RewritePatternSet invocationTilingPatterns(&getContext());
     populateTilingToInvocationPatterns(context, invocationTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
@@ -353,15 +347,15 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     });
   }
 
-  {
-    RewritePatternSet convFilterTilingPatterns(&getContext());
-    auto marker = getLinalgMatchAndReplaceMarker(getConvFilterTileMarker(),
+  {  // Tile reduction dimensions.
+    RewritePatternSet reductionTilingPatterns(&getContext());
+    auto marker = getLinalgMatchAndReplaceMarker(getTileReductionMarker(),
                                                  getVectorizeMarker(), context);
-    populateTilingConvFilterPatterns(context, convFilterTilingPatterns, marker);
-    populateFoldGPUProcessorIDUsesPatterns(context, convFilterTilingPatterns);
-    scf::populateSCFForLoopCanonicalizationPatterns(convFilterTilingPatterns);
+    populateTilingReductionPatterns(context, reductionTilingPatterns, marker);
+    populateFoldGPUProcessorIDUsesPatterns(context, reductionTilingPatterns);
+    scf::populateSCFForLoopCanonicalizationPatterns(reductionTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(convFilterTilingPatterns));
+                                       std::move(reductionTilingPatterns));
 
     RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
@@ -370,7 +364,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
                                        std::move(canonicalizationPatterns));
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After tiling convolution filter  ---\n";
+      llvm::dbgs() << "--- After tiling reduction dimensions  ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });

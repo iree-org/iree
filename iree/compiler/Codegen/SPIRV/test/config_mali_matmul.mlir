@@ -73,7 +73,7 @@ hal.executable @matmul_1024x2048x512 {
 
 //                CHECK: func @matmul_1024x2048x512()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[8, 32, 4], [], [4, 4, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[8, 32], [], [4, 4], [0, 0, 4]]}
 
 // -----
 
@@ -150,7 +150,7 @@ hal.executable @matmul_3136x24x96 {
 
 //                CHECK: func @matmul_3136x24x96()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[32, 8, 4], [], [4, 4, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[32, 8], [], [4, 4], [0, 0, 4]]}
 
 // -----
 
@@ -227,7 +227,7 @@ hal.executable @matmul_196x64x192 {
 
 //                CHECK: func @matmul_196x64x192()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:      lowering.config = {tileSizes = [[4, 32, 8], [], [2, 4, 8]]}
+//  CHECK-SAME{LITERAL}:      lowering.config = {tileSizes = [[4, 32], [], [2, 4], [0, 0, 8]]}
 
 // -----
 
@@ -299,7 +299,7 @@ hal.executable @matmul_12544x96x16 {
 
 //                CHECK: func @matmul_12544x96x16()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config =  {tileSizes = [[8, 32, 4], [], [4, 4, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config =  {tileSizes = [[8, 32], [], [4, 4], [0, 0, 4]]}
 
 // -----
 
@@ -375,7 +375,7 @@ hal.executable @matmul_49x160x576 {
 
 //                CHECK: func @matmul_49x160x576()
 //                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 32, 8], [], [1, 4, 8]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 32], [], [1, 4], [0, 0, 8]]}
 
 // -----
 
@@ -462,7 +462,7 @@ hal.executable @batch_matmul_4x384x384 {
 
 //                CHECK: func @batch_matmul_4x384x384()
 //                CHECK:   linalg.batch_matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 12, 32, 4], [], [1, 6, 4, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 12, 32], [], [1, 6, 4], [0, 0, 0, 4]]}
 
 // -----
 
@@ -550,4 +550,4 @@ hal.executable @batch_matmul_4x2x8 {
 
 //                CHECK: func @batch_matmul_4x2x8()
 //                CHECK:   linalg.batch_matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 2, 8, 8], [], [1, 1, 4, 8]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 2, 8], [], [1, 1, 4], [0, 0, 0, 8]]}

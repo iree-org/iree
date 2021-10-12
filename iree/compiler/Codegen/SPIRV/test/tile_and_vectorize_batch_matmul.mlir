@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[1, 8, 64, 4], [], [1, 8, 4, 4]]}
+#config = {tileSizes = [[1, 8, 64], [], [1, 8, 4], [0, 0, 0, 4]]}
 
 hal.executable private @batch_matmul_static_shape  {
   hal.interface private @io  {
@@ -102,6 +102,8 @@ hal.executable private @batch_matmul_static_shape  {
 // CHECK-SAME:      [%[[IVZ]], 0, %[[IVX]]] [1, 1024, 64]
 //      CHECK:  %[[SUBVIEW_RESULT:.+]] = memref.subview %[[RET0]]
 // CHECK-SAME:      [%[[IVZ]], %[[IVY]], %[[IVX]]] [1, 8, 64]
+//      CHECK:  %[[SUBVIEW_ARG1_2:.+]] = memref.subview %[[SUBVIEW_ARG1]]
+// CHECK-SAME:      [%[[IIDZ]], 0, %[[IOFFSET_X]]] [1, 1024, 4]
 //      CHECK:  %[[SUBVIEW_RESULT_2:.+]] = memref.subview %[[SUBVIEW_RESULT]]
 // CHECK-SAME:      [%[[IIDZ]], %[[IOFFSET_Y]], %[[IOFFSET_X]]] [1, 8, 4]
 //  CHECK-DAG:  %[[READ_INIT_0:.+]] = vector.transfer_read
@@ -131,9 +133,9 @@ hal.executable private @batch_matmul_static_shape  {
 // CHECK-SAME:  %[[ACC_6:.+]] = %[[READ_INIT_6]],
 // CHECK-SAME:  %[[ACC_7:.+]] = %[[READ_INIT_7]])
 //  CHECK-DAG:    %[[SUBVIEW_LHS:.+]] = memref.subview %[[SUBVIEW_ARG0]]
-// CHECK-SAME:      [%[[IIDZ]], %[[IOFFSET_Y]], %[[IV3]]] [1, 8, 4]
-//  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[SUBVIEW_ARG1]]
-// CHECK-SAME:      [%[[IIDZ]], %[[IV3]], %[[IOFFSET_X]]] [1, 4, 4] [1, 1, 1]
+// CHECK-SAME:      [0, 0, %[[IV3]]] [1, 8, 4]
+//  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[SUBVIEW_ARG1_2]]
+// CHECK-SAME:      [0, %[[IV3]], 0] [1, 4, 4] [1, 1, 1]
 
 //  CHECK-DAG:    %[[READ_LHS_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C0]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_LHS_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C1]], %[[C0]]]
@@ -368,7 +370,7 @@ hal.executable private @batch_matmul_static_shape  {
 
 // -----
 
-#config = {tileSizes = [[1, 8, 64, 4], [], [1, 8, 4, 4]]}
+#config = {tileSizes = [[1, 8, 64], [], [1, 8, 4], [0, 0, 0, 4]]}
 
 hal.executable private @fused_fill_batch_matmul  {
   hal.interface private @io  {
