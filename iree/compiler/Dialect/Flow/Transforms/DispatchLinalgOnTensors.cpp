@@ -406,7 +406,7 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
     if (visited.count(outsideValue)) continue;
     visited.insert(outsideValue);
     Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !(isClonableIntoDispatchOp(definingOp))) {
+    if (!definingOp || !isClonableIntoDispatchOp(definingOp)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }
@@ -682,7 +682,7 @@ static bool hasOnlyDimUses(Operation *op) {
 /// the dynamic dimensions.
 static void appendDynamicDims(OpBuilder &builder, Location loc, Value v,
                               SmallVectorImpl<Value> &dynamicDims) {
-  auto shapedType = v.getType().dyn_cast<RankedTensorType>();
+  auto shapedType = v.getType().dyn_cast<ShapedType>();
   if (!shapedType) return;
   for (auto shape : enumerate(shapedType.getShape())) {
     if (shape.value() != ShapedType::kDynamicSize) continue;
@@ -996,8 +996,8 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
                std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 
   // Tile size selection function. Sets the tile size now to
-  // flow.dispatch.workgroup.size op, with 0 for the innermost parallel loop
-  // partitioned, 1 for the next outermost loop partitioned and so on.  Use the
+  // flow.dispatch.workgroup.size op, with [0] for the innermost parallel loop
+  // partitioned, [1] for the next outermost loop partitioned and so on.  Use the
   // workgroup size as a proxy for tile size here. At the flow level this
   // represents the "workload" per processors and is not necessarily tied to the
   // workgroup size specified by the backend.
@@ -1132,8 +1132,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  /// Iterate over the remaining ops and pick up whatever needs to go into
-  /// dispatch regions and mark them as root ops.
+  /// Iterate over the remaining ops and pick up remaining LinalgOps that need
+  /// to go into dispatch regions and mark them as root ops.
   for (Block &block : funcOp) {
     for (Operation &op : block) {
       // Ignore ops that
@@ -1166,8 +1166,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  /// Iterate over the remaining ops and pick up whatever needs to go into
-  /// dispatch regions and mark them as root ops.
+  /// Iterate over the remaining ops and pick up remaining ops that implement
+  /// the `TiledOpInterface` that need to go into dispatch regions and mark them
+  /// as root ops.
   for (Block &block : funcOp) {
     for (Operation &op : block) {
       // Ignore ops that do not implement the `TiledOpInterface` interface.

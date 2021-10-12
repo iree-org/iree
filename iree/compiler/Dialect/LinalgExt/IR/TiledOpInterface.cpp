@@ -84,7 +84,7 @@ struct ExtractSliceTiledOpInterface
                                     ArrayRef<OpFoldResult> sizes,
                                     SmallVectorImpl<Value> &results) const {
     auto extractOp = cast<tensor::ExtractSliceOp>(op);
-    // Check that strides are 1. For now abort if they arent
+    // Check that strides are 1. For now abort if they arent.
     auto opStrides = extractOp.getMixedStrides();
     if (!llvm::all_of(opStrides, [&](OpFoldResult valueOrAttr) {
           Optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
@@ -94,7 +94,6 @@ struct ExtractSliceTiledOpInterface
       return nullptr;
     }
     Location loc = extractOp.getLoc();
-    auto oneAttr = b.getI64IntegerAttr(1);
 
     // Compute the offset and sizes for the tiled `tensor.extract_slice`
     // operation.
@@ -122,6 +121,7 @@ struct ExtractSliceTiledOpInterface
         resultDimPos++;
       }
     }
+    auto oneAttr = b.getI64IntegerAttr(1);
     SmallVector<OpFoldResult> newStrides(opOffsets.size(), oneAttr);
 
     // Generate the tiled `tensor.extract_slice` operation.
