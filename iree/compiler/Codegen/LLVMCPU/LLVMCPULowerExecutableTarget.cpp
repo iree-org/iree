@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -30,8 +30,9 @@ class LLVMCPULowerExecutableTargetPass
           LLVMCPULowerExecutableTargetPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect, linalg::LinalgDialect,
-                    LLVM::LLVMDialect, vector::VectorDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect,
+                    linalg::LinalgDialect, LLVM::LLVMDialect,
+                    vector::VectorDialect>();
   }
 
   LLVMCPULowerExecutableTargetPass(bool vectorize = true)
@@ -123,16 +124,15 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     // is fine.
     llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
         getAllEntryPoints(moduleOp);
-    Optional<IREE::HAL::DispatchLoweringPassPipeline> passPipeline;
+    Optional<IREE::Codegen::DispatchLoweringPassPipeline> passPipeline;
     for (auto &it : entryPoints) {
       auto entryPointOp = it.second;
-      if (IREE::HAL::TranslationInfo translationInfo =
+      if (IREE::Codegen::TranslationInfoAttr translationInfo =
               getTranslationInfo(entryPointOp)) {
-        Optional<IREE::HAL::DispatchLoweringPassPipeline> currPipeline =
-            getLoweringPassPipeline(translationInfo);
-        if (!currPipeline) continue;
+        IREE::Codegen::DispatchLoweringPassPipeline currPipeline =
+            translationInfo.getDispatchLoweringPassPipeline();
         if (passPipeline) {
-          if (currPipeline.getValue() != passPipeline.getValue()) {
+          if (currPipeline != passPipeline.getValue()) {
             moduleOp.emitError(
                 "unhandled compilation of entry point function with different "
                 "pass pipelines within a module");
@@ -150,14 +150,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       OpPassManager &nestedModulePM =
           executableLoweringPipeline.nest<ModuleOp>();
       switch (passPipeline.getValue()) {
-        case IREE::HAL::DispatchLoweringPassPipeline::CPUDefault:
-        case IREE::HAL::DispatchLoweringPassPipeline::None:
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
+        case IREE::Codegen::DispatchLoweringPassPipeline::None:
           addCPUDefaultPassPipeline(nestedModulePM);
           break;
-        case IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization:
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUVectorization:
           addCPUVectorizationPassPipeline(nestedModulePM, lowerToVectors);
           break;
-        case IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors:
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
           addTensorToVectorsPassPipeline(nestedModulePM, lowerToVectors);
           break;
         default:

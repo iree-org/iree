@@ -33,11 +33,11 @@ hal.executable @add_dispatch_0 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[256]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[256]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 256)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = [256]>
 //      CHECK: hal.executable.entry_point public @add_dispatch_0
-// CHECK-SAME:     passPipeline = "LLVMGPUVectorize"
-// CHECK-SAME:     workloadPerWorkgroup = [256]
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [64 : index, 1 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index,
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -92,12 +92,12 @@ hal.executable private @dot_dispatch_1  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[4, 2, 4]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[4, 2, 4]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [2, 4]>
 //      CHECK: hal.executable.entry_point public @dot_dispatch_1
-// CHECK-SAME:     passPipeline = "LLVMGPUMatmulSimt"
-// CHECK-SAME:     workloadPerWorkgroup = [2, 4]
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [2 : index, 4 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index,
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -143,18 +143,18 @@ hal.executable @reduction_dispatch {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG0:.+]] = {passPipeline = "LLVMGPUDistribute"}
-//  CHECK-DAG: #[[CONFIG1:.+]] = {tileSizes = {{\[}}[]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @predict_dispatch_153
-// CHECK-SAME:     translation.info = #[[CONFIG0]]
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [1 : index, 1 : index, 1 : index]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index,
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:     hal.return %[[C1]], %[[C1]], %[[C1]]
 //      CHECK: linalg.fill
-// CHECK-SAME:   lowering.config = #[[CONFIG1]]
+// CHECK-SAME:   lowering.config = #[[CONFIG]]
 //      CHECK: linalg.generic
-// CHECK-SAME:   lowering.config = #[[CONFIG1]]
+// CHECK-SAME:   lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -199,9 +199,10 @@ hal.executable @tensor_insert {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [128, 1]>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUDistribute", workloadPerWorkgroup = [128, 1]}
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -246,10 +247,11 @@ hal.executable @tensor_insert {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 256]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 256]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 256)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = [256, 1]>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUVectorize", workloadPerWorkgroup = [256, 1]}
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -286,11 +288,11 @@ hal.executable private @static_1d_fft_stage2  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[4]]}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[4]{{\]}}, native_vector_size = []>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [4]>
 //       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
-//  CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUDistribute"
-//  CHECK-SAME:   workloadPerWorkgroup = [4]}
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %{{.+}}: index, %{{.+}}: index):
 //  CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
@@ -351,11 +353,11 @@ hal.executable private @static_3d_fft_stage3  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 1, 8]]}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 1, 8]{{\]}}, native_vector_size = []>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [8, 1, 1]>
 //       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
-//  CHECK-SAME:   translation.info = {passPipeline = "LLVMGPUDistribute"
-//  CHECK-SAME:   workloadPerWorkgroup = [8, 1, 1]}
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index):
 //  CHECK-NEXT:   %[[T:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
@@ -367,6 +369,10 @@ hal.executable private @static_3d_fft_stage3  {
 
 // -----
 
+#compilation = #iree_codegen.compilation.info<
+    #iree_codegen.lowering.config<tile_sizes = [[32, 256, 64]], native_vector_size = []>,
+    #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [256, 32]>,
+    workgroup_size = [16, 8, 1]>
 hal.executable @user_config {
 hal.executable.variant public @cuda_nvptx_fb, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point public @_lowering_config_test_dispatch_1 attributes {interface = @io, ordinal = 0 : index}
@@ -401,7 +407,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = #hal.executable.target<"c
           %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg1)[%workgroup_size_x]
           %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
           %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-          %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {passPipeline = "LLVMGPUMatmulSimt", tileSizes = [[32, 256, 64]], workgroupSize = [16, 8, 1]}} ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+          %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", compilation.info = #compilation} ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
           flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:128x1024xf32>
         }
       }
@@ -416,10 +422,10 @@ hal.executable.variant public @cuda_nvptx_fb, target = #hal.executable.target<"c
 }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = {{{.*}}tileSizes = {{\[}}[32, 256, 64]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[32, 256, 64]{{\]}}
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [256, 32]>
 //      CHECK: hal.executable.entry_point public @_lowering_config_test_dispatch_1
-// CHECK-SAME:     passPipeline = "LLVMGPUMatmulSimt"
-// CHECK-SAME:     workloadPerWorkgroup = [256, 32]
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [16 : index, 8 : index, 1 : index]
 //      CHECK: func @_lowering_config_test_dispatch_1
 //      CHECK:   linalg.fill

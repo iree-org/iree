@@ -14,6 +14,7 @@
 
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -32,7 +33,8 @@ namespace iree_compiler {
 // Add all the IREE dialects to the provided registry.
 inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format off
-  registry.insert<IREE::Flow::FlowDialect,
+  registry.insert<IREE::Codegen::IREECodegenDialect,
+                  IREE::Flow::FlowDialect,
                   IREE::HAL::HALDialect,
                   ShapeDialect,
                   IREE::Stream::StreamDialect,

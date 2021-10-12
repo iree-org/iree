@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
@@ -43,9 +42,6 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
       return AliasResult::OverridableAlias;
     } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
       os << "executable_target_" << targetAttr.getSymbolNameFragment();
-      return AliasResult::OverridableAlias;
-    } else if (attr.isa<LoweringConfig>()) {
-      os << "config";
       return AliasResult::OverridableAlias;
     }
     return AliasResult::NoAlias;

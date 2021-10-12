@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | IreeFileCheck %s
 
-#config = {tileSizes = [[8, 64], [8, 4], [0, 0, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @fuse_and_vectorize_fill_matmul  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -13,7 +13,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
     hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
+      translation.info = #translation
     }
     builtin.module {
       func @fuse_and_vectorize_fill_matmul() {
@@ -70,8 +70,8 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
 
 // -----
 
-#config = {tileSizes = [[8, 64], [8, 4], [0, 0, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @fuse_and_vectorize_matmul_add  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -83,7 +83,7 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
     hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
+      translation.info = #translation
     }
     builtin.module {
       func @fuse_and_vectorize_matmul_add() {

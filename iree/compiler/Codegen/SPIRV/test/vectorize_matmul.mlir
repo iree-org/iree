@@ -1,5 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-spirv-vectorize %s | IreeFileCheck %s
 
+#config = #iree_codegen.lowering.config<tile_sizes = [[2, 128], [], [1, 4], [0, 0, 4]], native_vector_size = []>
 func @matmul_2x128x4() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
@@ -25,10 +26,10 @@ func @matmul_2x128x4() {
       %11 = "gpu.thread_id"() {dimension = "y"} : () -> index
       %12 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%10]
       %13 = memref.subview %9[%11, %12] [1, 4] [1, 1] : memref<2x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>> to memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-      linalg.fill(%cst, %13) {__internal_linalg_transform__ = "vectorize", lowering.config = {tileSizes = [[2, 128], [], [1, 4], [0, 0, 4]]}} : f32, memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
+      linalg.fill(%cst, %13) {__internal_linalg_transform__ = "vectorize", lowering.config = #config} : f32, memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
       %17 = memref.subview %7[%11, 0] [1, 4] [1, 1] : memref<2x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>> to memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
       %18 = memref.subview %8[0, %12] [4, 4] [1, 1] : memref<4x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-      linalg.matmul {__internal_linalg_transform__ = "vectorize", lowering.config = {tileSizes = [[2, 128], [], [1, 4], [0, 0, 4]]}}
+      linalg.matmul {__internal_linalg_transform__ = "vectorize", lowering.config = #config}
         ins(%17, %18 : memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
         outs(%13 : memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
     }
