@@ -21,7 +21,7 @@ set(ALBERT_FP32_MODULE
   "fp32"                          # MODULE_TAGS
   "https://storage.googleapis.com/iree-model-artifacts/AlbertTosa-5f984ec.tar.gz" # MLIR_SOURCE
   "main"                          # ENTRY_FUNCTION
-  "1x384xi32"                     # FUNCTION_INPUTS
+  "1x384xi32,1x384xi32,1x384xi32" # FUNCTION_INPUTS
 )
 
 set(DEEPLABV3_FP32_MODULE
@@ -37,7 +37,7 @@ set(MOBILEBERT_FP32_MODULE
   "fp32"                          # MODULE_TAGS
   "https://storage.googleapis.com/iree-model-artifacts/MobileBertTosa-5f984ec.tar.gz" # MLIR_SOURCE
   "main"                          # ENTRY_FUNCTION
-  "1x384xi32"                     # FUNCTION_INPUTS
+  "1x384xi32,1x384xi32,1x384xi32" # FUNCTION_INPUTS
 )
 
 set(MOBILENETV1_FP32_MODULE
