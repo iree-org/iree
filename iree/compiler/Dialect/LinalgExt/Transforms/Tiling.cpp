@@ -183,7 +183,7 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
 
 FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options) {
-  SmallVector<Value> dest = tilableOp.getDestinationOperands();
+  SmallVector<Value> dest = tilableOp.getDestinationOperands(b);
   if (dest.empty()) {
     return static_cast<LogicalResult>(tilableOp.emitOpError(
         "cannot tile operation without destination operands"));

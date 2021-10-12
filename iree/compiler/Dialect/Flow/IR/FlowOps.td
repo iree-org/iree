@@ -350,8 +350,8 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     /// Return the expected rank of each of the`static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned resultRank = getResult().getType().cast<ShapedType>().getRank();
-      return {resultRank, resultRank, resultRank};
+      unsigned sourceRank = source().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      return {sourceRank, sourceRank, sourceRank};
     }
 
     /// Return the number of leading operands before the `offsets`, `sizes` and
