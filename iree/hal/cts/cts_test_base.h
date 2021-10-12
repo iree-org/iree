@@ -26,8 +26,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
   virtual void SetUp() {
     const std::string& driver_name = GetParam();
     if (driver_block_list_.find(driver_name) != driver_block_list_.end()) {
-      IREE_LOG(WARNING)
-          << "Skipping test as driver is explicitly disabled for this test";
+      IREE_LOG(WARNING) << "Skipping test as '" << driver_name
+                        << "' driver is explicitly disabled for this test";
       GTEST_SKIP();
       return;
     }
@@ -38,7 +38,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     iree_status_t status = TryGetDriver(driver_name, &driver);
     if (iree_status_is_unavailable(status)) {
       iree_status_free(status);
-      IREE_LOG(WARNING) << "Skipping test as driver is unavailable";
+      IREE_LOG(WARNING) << "Skipping test as << '" << driver_name
+                        << "' driver is unavailable";
       GTEST_SKIP();
       return;
     }
@@ -49,7 +50,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
         driver_, iree_allocator_system(), &device);
     if (iree_status_is_unavailable(status)) {
       iree_status_free(status);
-      IREE_LOG(WARNING) << "Skipping test as driver is unavailable";
+      IREE_LOG(WARNING) << "Skipping test as default device for '"
+                        << driver_name << "' driver is unavailable";
       GTEST_SKIP();
       return;
     }
