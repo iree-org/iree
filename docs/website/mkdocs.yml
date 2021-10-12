@@ -119,3 +119,4 @@ nav:
   - 'Blog':
       - Work in progress on Matrix Multiplication on CPU: 'blog/2021-10-13-mmt4d.md'
       - TFLite Support via TOSA: 'blog/2021-07-19-tflite-tosa.md'
+      - Cuda backend: 'blog/2021-10-cuda-backend.md'

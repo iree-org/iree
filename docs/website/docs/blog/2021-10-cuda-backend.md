@@ -1,4 +1,7 @@
 
+ Tuesday, October 12, 2021<br>
+ By Thomas Raoux
+
 # CUDA Backend in IREE
 
 IREE is being designed with re-targetability as a core goal: it should be
@@ -30,7 +33,7 @@ create CUDA kernels yet we can test a large portion of the CUDA driver using
 [CTS tests](https://github.com/google/iree/blob/main/iree/hal/cts/README.md).
 Those can be run to make sure a system has the required CUDA support.
 
-<img align="left" src="2021-10-cuda-compiler-flow.png">
+ ![Compilation flow](./2021-10-cuda-compiler-flow.png){ align=left }
 
 ### Compiler support
 
@@ -104,7 +107,7 @@ We will then have a pass tiling the ops in the dispatch region a second time to
 distribute the work onto threads within the block.
 
 At this stage the IR looks like the following:
-```mlir
+```
     %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
     %9 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref<128xf32, affine_map<(d0)[s0] -> (d0 + s0)>> to memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
@@ -135,7 +138,7 @@ load4/store4. This helps significantly improve the memory access pattern of the
 code generated.
 
 This convert the previous IR to:
-```mlir
+```
     %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
     %9 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref<128xf32, affine_map<(d0)[s0] -> (d0 + s0)>> to memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
