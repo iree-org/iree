@@ -997,8 +997,8 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
 
   // Tile size selection function. Sets the tile size now to
   // flow.dispatch.workgroup.size op, with [0] for the innermost parallel loop
-  // partitioned, [1] for the next outermost loop partitioned and so on.  Use the
-  // workgroup size as a proxy for tile size here. At the flow level this
+  // partitioned, [1] for the next outermost loop partitioned and so on.  Use
+  // the workgroup size as a proxy for tile size here. At the flow level this
   // represents the "workload" per processors and is not necessarily tied to the
   // workgroup size specified by the backend.
   auto tileSizeFn = [&](OpBuilder &builder,
