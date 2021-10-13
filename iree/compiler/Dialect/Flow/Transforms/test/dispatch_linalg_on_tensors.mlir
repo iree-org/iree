@@ -285,10 +285,10 @@ func @always_fuse_reshape
 //  CHECK-DAG:   %[[M:.+]] = affine.apply #[[MAP]]()[%[[D0]]]
 //  CHECK-DAG:   %[[N1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[N1]], %[[M]], %[[C1]]]
-// CHECK-SAME:     (%[[ARG0]], %[[RHS1]], %[[M]], %[[N1]])
+// CHECK-SAME:     (%[[RHS1]], %[[ARG0]], %[[M]], %[[N1]])
 //      CHECK:   %[[N2:.+]] = tensor.dim %[[RHS2]], %[[C1]]
 //      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[N2]], %[[M]], %[[C1]]]
-// CHECK-SAME:     (%[[ARG0]], %[[RHS2]], %[[M]], %[[N2]])
+// CHECK-SAME:     (%[[RHS2]], %[[ARG0]], %[[M]], %[[N2]])
 //      CHECK:   return %[[RESULT1]], %[[RESULT2]]
 
 // -----
