@@ -22,13 +22,9 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = enforce_glob(
-        [
-            "tensor_cast.mlir",
-        ],
-        include =
-            ["*.mlir"],
-    ),
+    srcs = [
+        "tensor_cast.mlir",
+    ],
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-benchmark-module",
@@ -47,6 +43,9 @@ iree_check_single_backend_test_suite(
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "tensor_cast.mlir",
+        ],
     ),
     compiler_flags = [
         "-iree-llvm-link-embedded=true",
@@ -64,6 +63,9 @@ iree_check_single_backend_test_suite(
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "tensor_cast.mlir",
+        ],
     ),
     compiler_flags = [
         "-iree-llvm-link-embedded=true",
@@ -81,6 +83,9 @@ iree_check_single_backend_test_suite(
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "tensor_cast.mlir",
+        ],
     ),
     compiler_flags = [
         "-iree-llvm-link-embedded=true",
