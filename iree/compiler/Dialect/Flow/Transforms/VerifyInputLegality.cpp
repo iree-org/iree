@@ -28,6 +28,7 @@ class VerifyInputLegalityPass
     target.addIllegalDialect<tosa::TosaDialect>();
     // Avoid MHLO dependency
     target.addIllegalDialect("mhlo");
+    target.addIllegalOp<UnrealizedConversionCastOp>();
 
     if (failed(
             iree_compiler::verifyAllOperationsAreLegal(getOperation(), target)))
