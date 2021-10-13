@@ -16,6 +16,7 @@
 #                                                                              #
 ################################################################################
 
+# TFHub model: https://tfhub.dev/tensorflow/lite-model/albert_lite_base/squadv1/1
 set(ALBERT_FP32_MODULE
   "Albert"                        # MODULE_NAME
   "fp32"                          # MODULE_TAGS
@@ -24,6 +25,7 @@ set(ALBERT_FP32_MODULE
   "1x384xi32,1x384xi32,1x384xi32" # FUNCTION_INPUTS
 )
 
+# TFHub model: https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/metadata/2
 set(DEEPLABV3_FP32_MODULE
   "DeepLabV3"                     # MODULE_NAME
   "fp32"                          # MODULE_TAGS
@@ -32,6 +34,7 @@ set(DEEPLABV3_FP32_MODULE
   "1x257x257x3xf32"               # FUNCTION_INPUTS
 )
 
+#TFHub model: https://tfhub.dev/tensorflow/lite-model/mobilebert/1/default/1
 set(MOBILEBERT_FP32_MODULE
   "MobileBert"                    # MODULE_NAME
   "fp32"                          # MODULE_TAGS
@@ -40,6 +43,7 @@ set(MOBILEBERT_FP32_MODULE
   "1x384xi32,1x384xi32,1x384xi32" # FUNCTION_INPUTS
 )
 
+# TFHub model: https://tfhub.dev/tensorflow/lite-model/mobilenet_v1_1.0_160/1/default/1
 set(MOBILENETV1_FP32_MODULE
   "MobileNetV1"                   # MODULE_NAME
   "fp32"                          # MODULE_TAGS
@@ -48,6 +52,7 @@ set(MOBILENETV1_FP32_MODULE
   "1x160x160x3xf32"               # FUNCTION_INPUTS
 )
 
+# TFHub model: https://tfhub.dev/svampeatlas/lite-model/vision/classifier/fungi_mobile_V1/1/default/1
 set(MOBILENETV2_FP32_MODULE
   "MobileNetV2"                   # MODULE_NAME
   "fp32"                          # MODULE_TAGS
@@ -56,6 +61,7 @@ set(MOBILENETV2_FP32_MODULE
   "1x299x299x3xi8"                # FUNCTION_INPUTS
 )
 
+# TFHub model: https://tfhub.dev/tensorflow/lite-model/mobilenet_v2_1.0_224_quantized/1/default/1
 set(MOBILENETV2_I8_MODULE
   "MobileNetV2Quant"              # MODULE_NAME
   "i8"                            # MODULE_TAGS
@@ -64,6 +70,7 @@ set(MOBILENETV2_I8_MODULE
   "1x224x224x3xi8"                # FUNCTION_INPUTS
 )
 
+# TFHub Model: https://tfhub.dev/bohemian-visual-recognition-alliance/lite-model/models/mushroom-identification_v1/1?
 set(MOBILENETV3_FP32_MODULE
   "MobileNetV3"                   # MODULE_NAME
   "fp32"                          # MODULE_TAGS
