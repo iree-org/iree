@@ -6,6 +6,12 @@
 
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
 c_embed_data(
     name = "fill_unaligned_spv",
     srcs = ["fill_unaligned.spv"],
