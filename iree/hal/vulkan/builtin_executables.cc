@@ -34,17 +34,17 @@ BuiltinExecutables::BuiltinExecutables(VkDeviceHandle* logical_device)
     : logical_device_(logical_device) {}
 
 BuiltinExecutables::~BuiltinExecutables() {
-  for (int i = 0; i < descriptor_set_layouts_.size(); ++i) {
-    iree_hal_descriptor_set_layout_destroy(descriptor_set_layouts_[i]);
-  }
-  descriptor_set_layouts_.clear();
-
   if (pipeline_ != VK_NULL_HANDLE) {
     logical_device_->syms()->vkDestroyPipeline(*logical_device_, pipeline_,
                                                logical_device_->allocator());
   }
+
   if (executable_layout_) {
     iree_hal_executable_layout_destroy(executable_layout_);
+  }
+
+  for (int i = 0; i < descriptor_set_layouts_.size(); ++i) {
+    iree_hal_descriptor_set_layout_release(descriptor_set_layouts_[i]);
   }
 }
 
