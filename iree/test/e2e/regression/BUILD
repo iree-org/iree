@@ -29,7 +29,6 @@ BACKEND_TESTS = [
     "dynamic_torch_index_select_vector.mlir",
     "linalg_ops.mlir",
     "linalg_ext_ops.mlir",
-    "tensor_insert_slice.mlir",
 ]
 
 iree_lit_test_suite(
@@ -38,7 +37,6 @@ iree_lit_test_suite(
         [
             "globals.mlir",
             "scalar.mlir",
-            "tensor_cast.mlir",
             "trace_dispatch_tensors.mlir",
             "unused_args.mlir",
         ],
