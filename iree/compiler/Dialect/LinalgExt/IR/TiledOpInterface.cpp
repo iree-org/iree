@@ -85,14 +85,6 @@ struct ExtractSliceTiledOpInterface
                                     SmallVectorImpl<Value> &results) const {
     auto extractOp = cast<tensor::ExtractSliceOp>(op);
     // Check that strides are 1. For now abort if they arent
-    auto opStrides = extractOp.getMixedStrides();
-    if (!llvm::all_of(opStrides, [&](OpFoldResult valueOrAttr) {
-          Optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
-          return intVal && *intVal == 1;
-        })) {
-      op->emitOpError("unable to tile operation with non-unit stride");
-      return nullptr;
-    }
     Location loc = extractOp.getLoc();
     auto oneAttr = b.getI64IntegerAttr(1);
 
@@ -102,27 +94,30 @@ struct ExtractSliceTiledOpInterface
     unsigned resultDimPos = 0;
     auto opOffsets = extractOp.getMixedOffsets();
     auto opSizes = extractOp.getMixedSizes();
+    auto opStrides = extractOp.getMixedStrides();
     MLIRContext *context = b.getContext();
-    SmallVector<OpFoldResult> newOffset, newSizes;
+    SmallVector<OpFoldResult> newOffset, newSizes, newStrides;
     for (auto opOffset : enumerate(opOffsets)) {
       // If the dimension is dropped, use the same offset.
       if (droppedDims.count(opOffset.index())) {
         newOffset.push_back(opOffset.value());
         newSizes.push_back(opSizes[opOffset.index()]);
       } else {
-        AffineExpr d0, s0;
+        AffineExpr d0, s0, s1;
         bindDims(context, d0);
-        bindSymbols(context, s0);
-        AffineMap map = AffineMap::get(1, 1, d0 + s0);
-        SmallVector<Value> operands = {getValue(b, loc, offsets[resultDimPos]),
-                                       getValue(b, loc, opOffset.value())};
+        bindSymbols(context, s0, s1);
+        AffineMap map = AffineMap::get(1, 2, d0 * s0 + s1);
+        SmallVector<Value> operands = {
+            getValue(b, loc, offsets[resultDimPos]),
+            getValue(b, loc, opStrides[opOffset.index()]),
+            getValue(b, loc, opOffset.value())};
         Value offset = b.create<AffineApplyOp>(loc, map, operands);
         newOffset.push_back(offset);
         newSizes.push_back(sizes[resultDimPos]);
         resultDimPos++;
       }
+      newStrides.push_back(opStrides[opOffset.index()]);
     }
-    SmallVector<OpFoldResult> newStrides(opOffsets.size(), oneAttr);
 
     // Generate the tiled `tensor.extract_slice` operation.
     Type resultType = tensor::ExtractSliceOp::inferRankReducedResultType(
