@@ -40,8 +40,8 @@ void buildMHLOImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createFlattenTuplesInCFGPass());
   pm.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
-  // Mostly delicate to the IREE side MHLO legalization pipeline, now that
-  // we have handled the weird that comes from legacy HLO clients.
+  // Mostly delegate to the IREE side MHLO legalization pipeline, now that we
+  // have handled the weird that comes from legacy HLO clients.
   mlir::iree_compiler::buildMHLOInputConversionPassPipeline(pm);
 
   // Import pipelines should end with canonicalization because they may have
