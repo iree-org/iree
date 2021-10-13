@@ -100,7 +100,6 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRIR
-    MLIRLinalg
     MLIRStandard
     MLIRSupport
     MLIRTensor
