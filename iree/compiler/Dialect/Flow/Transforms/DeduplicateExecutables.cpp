@@ -48,12 +48,12 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
 //
 // Example:
 //   func @lhs(%arg0 : index) -> index {
-//     %c1 = constant 1 : index
+//     %c1 = arith.constant 1 : index
 //     %0 = add %arg0, %c1 : index
 //     return %0 : index
 //   }
 //   func @rhs(%arg0 : index) -> index {
-//     %c1 = constant 1 : index
+//     %c1 = arith.constant 1 : index
 //     %0 = add %arg0, %c1 : index
 //     return %0 : index
 //   }

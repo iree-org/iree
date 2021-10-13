@@ -9,9 +9,9 @@ attributes {iree.dispatch_fn_name = ""} {
 //      CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //      CHECK: func @dynamic_shape
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32>
-//      CHECK:   %[[C0:.+]] = constant 0 : index
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[T0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//      CHECK:   %[[C1:.+]] = constant 1 : index
+//      CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //      CHECK:   %[[T1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[T2:.+]] = linalg.init_tensor [%[[T0]], %[[T1]]]
 //      CHECK:   %[[T3:.+]] = linalg.generic

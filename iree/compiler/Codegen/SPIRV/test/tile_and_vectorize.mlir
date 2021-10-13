@@ -24,15 +24,15 @@ hal.executable private @matmul  {
     }
     builtin.module {
       func @matmul() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %M = hal.interface.load.constant offset = 0 : index
         %N = hal.interface.load.constant offset = 1 : index
         %K = hal.interface.load.constant offset = 2 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>{%M, %K}
         %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?xf32>{%K, %N}
         %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>{%M, %N}
-        %c4 = constant 4 : index
-        %c1 = constant 1 : index
+        %c4 = arith.constant 4 : index
+        %c1 = arith.constant 1 : index
         %0 = memref.dim %arg0, %c1 : memref<?x?xf32>
         %1 = "gpu.block_id"() {dimension = "x"} : () -> index
         %2 = "gpu.block_id"() {dimension = "y"} : () -> index
@@ -68,8 +68,8 @@ hal.executable private @matmul  {
   }
 }
 // CHECK-LABEL: func @matmul
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //   CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //   CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
@@ -98,8 +98,8 @@ hal.executable private @conv_1d  {
     }
     builtin.module {
       func @conv_1d() {
-        %cst = constant 0.000000e+00 : f32
-        %c0 = constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<3x6x1xf32>
         %1 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<3x8x1xf32>
         %2 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x1x1xf32>
@@ -131,7 +131,7 @@ hal.executable private @conv_1d  {
 }
 
 // CHECK-LABEL: func @conv_1d
-//       CHECK: %[[C0:.+]] = constant 0 : index
+//       CHECK: %[[C0:.+]] = arith.constant 0 : index
 //       CHECK: %[[RET:.+]] = hal.interface.binding.subspan @io::@ret0
 //       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
@@ -181,7 +181,7 @@ hal.executable private @conv_no_padding  {
     }
     builtin.module {
       func @conv_no_padding() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %n = hal.interface.load.constant offset = 0 : index
         %oh = hal.interface.load.constant offset = 1 : index
         %ow = hal.interface.load.constant offset = 2 : index
@@ -194,9 +194,9 @@ hal.executable private @conv_no_padding  {
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?x?x?xf32>{%n, %ih, %iw, %ic}
         %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?x?x?xf32>{%fh, %fw, %ic, %oc}
         %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?x?x?xf32>{%n, %oh, %ow, %oc}
-        %c2 = constant 2 : index
-        %c3 = constant 3 : index
-        %c1 = constant 1 : index
+        %c2 = arith.constant 2 : index
+        %c3 = arith.constant 3 : index
+        %c1 = arith.constant 1 : index
         %0 = memref.dim %arg0, %c0 : memref<?x?x?x?xf32>
         %1 = memref.dim %arg0, %c1 : memref<?x?x?x?xf32>
         %2 = memref.dim %arg1, %c0 : memref<?x?x?x?xf32>
@@ -256,8 +256,8 @@ hal.executable private @conv_no_padding  {
 //     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 //     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//     CHECK-DAG:   %[[C1:.+]] = constant 1
-//     CHECK-DAG:   %[[C2:.+]] = constant 2
+//     CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//     CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //     CHECK-DAG:   %[[N:.+]] = memref.dim %[[ARG1]], %[[C0]]
 //     CHECK-DAG:   %[[P:.+]] = memref.dim %[[RET0]], %[[C1]]
 //     CHECK-DAG:   %[[Q:.+]] = memref.dim %[[RET0]], %[[C2]]
@@ -308,8 +308,8 @@ hal.executable private @conv_3d  {
     }
     builtin.module {
       func @conv_3d() {
-        %cst = constant 0.000000e+00 : f32
-        %c0 = constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<2x7x7x7x2xf32>
         %1 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<2x8x8x8x3xf32>
         %2 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<2x2x2x3x2xf32>
@@ -382,7 +382,7 @@ module  {
       }
       builtin.module {
         func @pooling_nhwc_max() {
-          %c0 = constant 0 : index
+          %c0 = arith.constant 0 : index
           %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<2x16x16x6xf32>
           %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x4xf32>
           %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<2x14x13x6xf32>

@@ -78,8 +78,8 @@ class TensorCastPattern : public OpConversionPattern<IREE::HAL::TensorCastOp> {
       if (sourceType.isDynamicDim(i)) {
         shapeDims[i] = sourceDims[sourceDimsIndex++];
       } else {
-        shapeDims[i] =
-            builder.create<ConstantIndexOp>(loc, sourceType.getDimSize(i));
+        shapeDims[i] = builder.create<arith::ConstantIndexOp>(
+            loc, sourceType.getDimSize(i));
       }
     }
     return shapeDims;

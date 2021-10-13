@@ -50,7 +50,7 @@ static LogicalResult setTranslationUsingDistributeToGlobalId(
     expr = expr.ceilDiv(workgroupSizeX);
     Value numWorkgroupsX = linalg::applyMapToValues(
         b, loc, AffineMap::get(0, 3, expr), workload)[0];
-    Value one = b.create<ConstantIndexOp>(loc, 1);
+    Value one = b.create<arith::ConstantIndexOp>(loc, 1);
     return std::array<Value, 3>{numWorkgroupsX, one, one};
   };
   return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
@@ -73,7 +73,7 @@ static LogicalResult defineConvWorkgroupCountRegion(
       int64_t count = outputShape[i] / workgroupTileSizes[i];
       // This is meant for perfectly tilable cases. Double check that.
       assert(outputShape[i] % workgroupTileSizes[i] == 0 && count != 0);
-      xyz[2 - i] = b.create<ConstantIndexOp>(loc, count);
+      xyz[2 - i] = b.create<arith::ConstantIndexOp>(loc, count);
     }
     return xyz;
   };

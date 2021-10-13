@@ -188,11 +188,12 @@ class ConvertHALInterfaceLoadConstantOp
 
     auto resultType = getTypeConverter()->convertType(op.result().getType());
 
-    auto constantOrdinal = rewriter.createOrFold<ConstantIndexOp>(
+    auto constantOrdinal = rewriter.createOrFold<arith::ConstantIndexOp>(
         op.getLoc(), op.offset().getZExtValue());
     auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
         op.getLoc(), constantType, constantsArg, ValueRange{constantOrdinal});
-    rewriter.replaceOpWithNewOp<IndexCastOp>(op, loadedValue, resultType);
+    rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, loadedValue,
+                                                    resultType);
     return success();
   }
 };
@@ -232,7 +233,7 @@ class ConvertHALInterfaceBindingSubspanOp
         bindingsArg.getType().cast<IREE::Util::ListType>().getElementType();
     auto getOp = rewriter.create<IREE::Util::ListGetOp>(
         op.getLoc(), bindingType, bindingsArg,
-        rewriter.createOrFold<ConstantIndexOp>(
+        rewriter.createOrFold<arith::ConstantIndexOp>(
             op.getLoc(), interfaceBindingOp.binding().getZExtValue()));
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         op,

@@ -3244,7 +3244,8 @@ class ConvertVMToEmitCPass
                          OperationPass<IREE::VM::ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::emitc::EmitCDialect, mlir::BuiltinDialect,
-                    mlir::StandardOpsDialect, IREE::Util::UtilDialect>();
+                    mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                    mlir::math::MathDialect, IREE::Util::UtilDialect>();
   }
 
   StringRef getArgument() const override { return "iree-convert-vm-to-emitc"; }
@@ -3291,8 +3292,9 @@ class ConvertVMToEmitCPass
     populateVMToEmitCPatterns(&getContext(), target, typeConverter, patterns,
                               vmAnalysisCache);
 
-    target.addLegalDialect<emitc::EmitCDialect, mlir::BuiltinDialect,
-                           mlir::StandardOpsDialect>();
+    target.addLegalDialect<
+        emitc::EmitCDialect, mlir::BuiltinDialect, mlir::StandardOpsDialect,
+        mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
 
     target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
       return typeConverter.isSignatureLegal(op.getType());

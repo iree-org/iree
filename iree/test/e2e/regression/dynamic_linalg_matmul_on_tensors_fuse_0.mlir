@@ -15,8 +15,8 @@ func @main(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
       // TODO(nicolasvasilache): The constant ends up being hoisted and turns
       // into a pushconstant. But pushconstants must be integers, so we use
       // sitofp to temporarily circumvent the problem.
-      %im1 = constant -1 : i32
-      %fm1 = sitofp %im1: i32 to f32
+      %im1 = arith.constant -1 : i32
+      %fm1 = arith.sitofp %im1: i32 to f32
       linalg.yield %fm1 : f32
     } -> tensor<?x?xf32>
   %D = linalg.matmul ins(%AA, %B: tensor<?x?xf32>, tensor<?x?xf32>)

@@ -17,9 +17,9 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
     }
     builtin.module {
       func @fuse_and_vectorize_fill_matmul() {
-        %c0 = constant 0 : index
-        %cst = constant 0.000000e+00 : f32
-        %c4096 = constant 4096 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c4096 = arith.constant 4096 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4096x4096xf32>
@@ -87,10 +87,10 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
     }
     builtin.module {
       func @fuse_and_vectorize_matmul_add() {
-        %c0 = constant 0 : index
-        %cst = constant 0.000000e+00 : f32
-        %c1024 = constant 1024 : index
-        %c256 = constant 256 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c1024 = arith.constant 1024 : index
+        %c256 = arith.constant 256 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x256xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x512xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x256xf32>
@@ -124,7 +124,7 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
             %22 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%15, %17 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%21 : tensor<?x?xf32>) -> tensor<?x?xf32>
             %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%13 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = #config} {
             ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
-              %24 = addf %arg2, %arg3 : f32
+              %24 = arith.addf %arg2, %arg3 : f32
               linalg.yield %24 : f32
             } -> tensor<?x?xf32>
             flow.dispatch.tensor.store %23, %3, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x256xf32>

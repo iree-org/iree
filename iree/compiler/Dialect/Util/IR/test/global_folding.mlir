@@ -4,7 +4,7 @@
 util.global private @v_initialized : tensor<4xi32>
 // CHECK-NOT: util.initializer
 util.initializer {
-  %0 = constant dense<4> : tensor<4xi32>
+  %0 = arith.constant dense<4> : tensor<4xi32>
   util.global.store %0, @v_initialized : tensor<4xi32>
   util.initializer.return
 }
@@ -24,7 +24,7 @@ func @unused_load() {
 util.global private @v_const = dense<1.0> : tensor<8xf32>
 // CHECK-LABEL: @fold_immutable_const
 func @fold_immutable_const() -> tensor<8xf32> {
-  // CHECK-NEXT: %[[CONST:.+]] = constant dense<1.{{.+}}> : tensor<8xf32>
+  // CHECK-NEXT: %[[CONST:.+]] = arith.constant dense<1.{{.+}}> : tensor<8xf32>
   %0 = util.global.load @v_const : tensor<8xf32>
   // CHECK-NEXT: return %[[CONST]] : tensor<8xf32>
   return %0 : tensor<8xf32>

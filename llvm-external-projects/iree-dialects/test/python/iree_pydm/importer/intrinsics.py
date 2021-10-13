@@ -41,8 +41,8 @@ def test_intrinsic_function_double_call():
 
 
 # CHECK-LABEL: @test_intrinsic_function_args
-# CHECK: %[[ZERO:.*]] = constant 0 : i64 -> !iree_pydm.integer
-# CHECK: %[[ONE:.*]] = constant 1 : i64 -> !iree_pydm.integer
+# CHECK: %[[ZERO:.*]] = arith.constant 0 : i64 -> !iree_pydm.integer
+# CHECK: %[[ONE:.*]] = arith.constant 1 : i64 -> !iree_pydm.integer
 # CHECK: dynamic_call @__return_first_true(%[[ZERO]], %[[ONE]]) : (!iree_pydm.integer, !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.object)
 # CHECK: func @__return_first_true
 @test_import_global
@@ -68,7 +68,7 @@ def macro_box_arg(stage: ImportStage, arg: ir.Value) -> ir.Value:
 
 
 # CHECK-LABEL: @test_intrinsic_macro_no_args
-# CHECK: %[[ONE:.*]] = constant 1
+# CHECK: %[[ONE:.*]] = arith.constant 1
 # CHECK: box %[[ONE]] : !iree_pydm.integer -> !iree_pydm.object<!iree_pydm.integer>
 @test_import_global
 def test_intrinsic_macro_no_args() -> int:
@@ -95,7 +95,7 @@ logical_not = def_pattern_call_intrinsic(match_generic=[logical_not_generic],
 
 
 # CHECK-LABEL: @test_pattern_call
-# CHECK: %[[TRUE:.*]] = constant true
+# CHECK: %[[TRUE:.*]] = arith.constant true
 # CHECK: pattern_match_call(%[[TRUE]]) : (!iree_pydm.bool) -> (!iree_pydm.exception_result, !iree_pydm.object)
 # CHECK-SAME:   matching generic [@__logical_not_generic] specific [@__logical_not_bool]
 # CHECK-DAG: func @__logical_not_generic

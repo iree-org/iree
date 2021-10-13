@@ -33,12 +33,13 @@ namespace TF {
 // the IREE requires.
 class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::linalg::LinalgDialect, mlir::TF::TensorFlowDialect,
-                    mlir::tf_executor::TensorFlowExecutorDialect,
-                    mlir::tf_device::TensorFlowDeviceDialect,
-                    mlir::tf_saved_model::TensorFlowSavedModelDialect,
-                    chlo::HloClientDialect, mhlo::MhloDialect,
-                    shape::ShapeDialect, StandardOpsDialect>();
+    registry
+        .insert<mlir::linalg::LinalgDialect, mlir::TF::TensorFlowDialect,
+                mlir::tf_executor::TensorFlowExecutorDialect,
+                mlir::tf_device::TensorFlowDeviceDialect,
+                mlir::tf_saved_model::TensorFlowSavedModelDialect,
+                chlo::HloClientDialect, mhlo::MhloDialect, shape::ShapeDialect,
+                mlir::arith::ArithmeticDialect, StandardOpsDialect>();
   }
 
   StringRef getArgument() const override { return "iree-tf-convert-to-mhlo"; }
@@ -89,7 +90,8 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     target.addLegalDialect<chlo::HloClientDialect>();
     target.addLegalDialect<linalg::LinalgDialect>();
     target.addLegalDialect<mhlo::MhloDialect>();
-    target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<mlir::StandardOpsDialect,
+                           mlir::arith::ArithmeticDialect>();
     target.addLegalDialect<shape::ShapeDialect>();
     target.addLegalDialect<tensor::TensorDialect>();
     target.addLegalOp<mlir::CallOp>();

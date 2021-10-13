@@ -73,7 +73,7 @@ static SmallVector<Value, 4> refreshDimsOnTypeChange(
         // Dimension has changed to be dynamic; insert a constant to use.
         // This sometimes happens during folding of casts and usually is cleaned
         // up pretty quickly.
-        newDims.push_back(rewriter.createOrFold<ConstantIndexOp>(
+        newDims.push_back(rewriter.createOrFold<arith::ConstantIndexOp>(
             op->getLoc(), oldShapedType.getDimSize(i)));
       }
     }
@@ -287,7 +287,7 @@ struct ConvertDimOfDispatchInputLoadToDispatchShape
                                                       *constantIndex);
     } else {  // Tensor tile :
       if (loadOp.getMixedSizes()[*constantIndex].is<Attribute>()) {
-        rewriter.replaceOpWithNewOp<ConstantOp>(
+        rewriter.replaceOpWithNewOp<arith::ConstantOp>(
             op, loadOp.getMixedSizes()[*constantIndex]
                     .get<Attribute>()
                     .dyn_cast<IntegerAttr>());

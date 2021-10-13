@@ -26,7 +26,7 @@ struct ConstOpLowering : public OpRewritePattern<mhlo::ConstOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mhlo::ConstOp op,
                                 PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<ConstantOp>(op, op.value());
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, op.value());
     return success();
   }
 };

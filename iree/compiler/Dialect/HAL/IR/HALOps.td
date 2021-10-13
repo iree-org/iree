@@ -1681,9 +1681,9 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [
     return the same types.
 
     ```mlir
-    %c0 = constant 0 : i32
-    %c1 = constant 1 : i32
-    %c2 = constant 2 : i32
+    %c0 = arith.constant 0 : i32
+    %c1 = arith.constant 1 : i32
+    %c2 = arith.constant 2 : i32
     %device = ... : !hal.device
     %0 = hal.device.switch<%device : !hal.device> -> i32
       #hal.device.match.id<"vulkan-v1.?-*"> {

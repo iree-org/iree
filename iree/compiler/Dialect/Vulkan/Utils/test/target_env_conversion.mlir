@@ -18,9 +18,9 @@ flow.executable @simpleMath_dispatch_0 {
   flow.dispatch.entry @simpleMath_dispatch_0 attributes {workgroup_rank = 3 : index}
   builtin.module {
     func @simpleMath_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4xf32>) {
-      %c4 = constant 4 : index
-      %c1 = constant 1 : index
-      %c0 = constant 0 : index
+      %c4 = arith.constant 4 : index
+      %c1 = arith.constant 1 : index
+      %c0 = arith.constant 0 : index
       %0 = flow.dispatch.tensor.load %arg0, offsets = [%c0], sizes = [%c4], strides = [%c1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
       %1 = linalg.init_tensor [4] : tensor<4xf32>
       %2 = linalg.generic {
@@ -29,7 +29,7 @@ flow.executable @simpleMath_dispatch_0 {
         ins(%0 : tensor<4xf32>)
         outs(%1 : tensor<4xf32>)  {
       ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
-        %3 = addf %arg3, %arg3 : f32
+        %3 = arith.addf %arg3, %arg3 : f32
         linalg.yield %3 : f32
       } -> tensor<4xf32>
       flow.dispatch.tensor.store %2, %arg1, offsets = [%c0], sizes = [%c4], strides = [%c1] : tensor<4xf32> -> !flow.dispatch.tensor<writeonly:4xf32>

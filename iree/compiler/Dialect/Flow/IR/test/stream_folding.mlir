@@ -2,11 +2,11 @@
 
 // CHECK-LABEL: func @inlineConstant
 func @inlineConstant() -> index {
-  %cst = constant 4 : index
+  %cst = arith.constant 4 : index
   // CHECK: flow.ex.stream.fragment()
   %0 = flow.ex.stream.fragment(%cst) : (index) -> index =
       (%arg0: index) -> index {
-    // CHECK: %[[C:.+]] = constant 4 : index
+    // CHECK: %[[C:.+]] = arith.constant 4 : index
     // CHECK-NEXT: return %[[C]]
     flow.return %arg0 : index
   }
@@ -18,13 +18,13 @@ func @inlineConstant() -> index {
 // CHECK-LABEL: func @removeUnusedCapture
 // CHECK-SAME: (%[[ARG:.+]]: index)
 func @removeUnusedCapture(%arg: index) -> index {
-  %unused = constant 5 : index
+  %unused = arith.constant 5 : index
   // CHECK: flow.ex.stream.fragment(%[[ARG]])
   %0 = flow.ex.stream.fragment(%arg, %unused) : (index, index) -> index =
       // CHECK-NEXT: (%[[INNER_ARG:.+]]: index) -> index {
       (%arg0: index, %arg1: index) -> index {
-    // CHECK-NEXT: %[[T:.+]] = addi %[[INNER_ARG]], %[[INNER_ARG]]
-    %t = addi %arg0, %arg0 : index
+    // CHECK-NEXT: %[[T:.+]] = arith.addi %[[INNER_ARG]], %[[INNER_ARG]]
+    %t = arith.addi %arg0, %arg0 : index
     // CHECK-NEXT: flow.return %[[T]]
     flow.return %t : index
   }
@@ -39,7 +39,7 @@ func @removeUnusedDupCapture(%arg: index) -> index {
   // CHECK: flow.ex.stream.fragment(%[[ARG]])
   %0 = flow.ex.stream.fragment(%arg, %arg) : (index, index) -> index =
       (%arg0: index, %arg1: index) -> index {
-    %t = addi %arg0, %arg0 : index
+    %t = arith.addi %arg0, %arg0 : index
     flow.return %t : index
   }
   return %0 : index
@@ -53,9 +53,9 @@ func @removeUnusedProducedResult(%arg0: index) -> index {
   // CHECK: flow.ex.stream.fragment(%[[ARG0]]) : (index) -> index =
   %0:2 = flow.ex.stream.fragment(%arg0) : (index) -> (index, index) =
       (%arg0_in: index) -> (index, index) {
-    // CHECK: %[[T:.+]] = addi
-    %t = addi %arg0_in, %arg0_in : index
-    %unused = muli %arg0_in, %arg0_in : index
+    // CHECK: %[[T:.+]] = arith.addi
+    %t = arith.addi %arg0_in, %arg0_in : index
+    %unused = arith.muli %arg0_in, %arg0_in : index
     // CHECK: flow.return %[[T]] : index
     flow.return %t, %unused : index, index
   }
@@ -70,8 +70,8 @@ func @removeUnusedPassThroughResult(%arg0: index, %arg1: index) -> index {
   // CHECK: flow.ex.stream.fragment(%[[ARG1]])
   %0:2 = flow.ex.stream.fragment(%arg0, %arg1) : (index, index) -> (index, index) =
       (%unused: index, %arg1_in: index) -> (index, index) {
-    // CHECK: %[[T:.+]] = addi
-    %t = addi %arg1_in, %arg1_in : index
+    // CHECK: %[[T:.+]] = arith.addi
+    %t = arith.addi %arg1_in, %arg1_in : index
     // CHECK: flow.return %[[T]] : index
     flow.return %t, %unused : index, index
   }
@@ -110,9 +110,9 @@ func @dynamicUpdateSliceImmutability(
       (tensor<2x4xi32>, tensor<1x1xi32>) -> tensor<2x4xi32> =
       // CHECK-NEXT: (%[[TARGET:.+]]: tensor<2x4xi32>, %[[UPDATE:.+]]: tensor<1x1xi32>)
       (%stream_target: tensor<2x4xi32>, %stream_update: tensor<1x1xi32>) -> tensor<2x4xi32> {
-    %start0 = constant 0 : index
-    %start1 = constant 1 : index
-    %workload = constant 8 : index
+    %start0 = arith.constant 0 : index
+    %start1 = arith.constant 1 : index
+    %workload = arith.constant 8 : index
     //      CHECK: %[[TARGET_CLONE:.+]] = flow.tensor.clone %[[TARGET]] : tensor<2x4xi32>
     //      CHECK: %[[UPDATED:.+]] = flow.tensor.update %[[UPDATE]], %[[TARGET]]
     %t0 = flow.tensor.update %stream_update, %stream_target[%start0, %start1] : tensor<1x1xi32> -> %stream_target as tensor<2x4xi32>
@@ -137,11 +137,11 @@ func @dynamicUpdateSliceImmutability(
 func @dagImmutability(%arg0: tensor<1xi32>) -> (tensor<i32>, tensor<1xi32>, tensor<3xi32>) {
   %0:3 = flow.ex.stream.fragment(%arg0) : (tensor<1xi32>) -> (tensor<i32>, tensor<1xi32>, tensor<3xi32>) =
       (%arg1: tensor<1xi32>) -> (tensor<i32>, tensor<1xi32>, tensor<3xi32>) {
-    %c9 = constant 9 : index
-    %c1 = constant 1 : index
-    %c18 = constant 18 : index
-    %c0 = constant 0 : index
-    %c3 = constant 3 : index
+    %c9 = arith.constant 9 : index
+    %c1 = arith.constant 1 : index
+    %c18 = arith.constant 18 : index
+    %c0 = arith.constant 0 : index
+    %c3 = arith.constant 3 : index
     %1 = flow.dispatch @_run_dispatch_1::@_run_dispatch_1[%c1, %c1, %c1]() : () -> tensor<i32>
     %2 = flow.dispatch @_run_dispatch_2::@_run_dispatch_2[%c9, %c1, %c1](%1) : (tensor<i32>) -> tensor<9xi32>
     %3 = flow.tensor.reshape %1 : tensor<i32> -> tensor<1xi32>
@@ -159,8 +159,8 @@ func @dagImmutability(%arg0: tensor<1xi32>) -> (tensor<i32>, tensor<1xi32>, tens
 func @insertCloneForUpdatedConstant(%input: tensor<2x2xi32>) -> tensor<4x4xi32> {
   %4 = flow.ex.stream.fragment(%input) : (tensor<2x2xi32>) -> tensor<4x4xi32> =
       (%arg0: tensor<2x2xi32>) -> tensor<4x4xi32> {
-    %c4 = constant 4 : index
-    %c1 = constant 1 : index
+    %c4 = arith.constant 4 : index
+    %c1 = arith.constant 1 : index
     // CHECK: %[[LOAD:.+]] = util.global.load @_large_const
     %5 = util.global.load @_large_const : tensor<4x4xi32>
     // CHECK: %[[CLONE:.+]] = flow.tensor.clone %[[LOAD]]
@@ -179,7 +179,7 @@ util.global private @_large_const {noinline} = dense<0> : tensor<4x4xi32>
 func @insertCloneForUpdatedConstant(%input: tensor<2xi32>) -> tensor<7xi32> {
   %4 = flow.ex.stream.fragment(%input) : (tensor<2xi32>) -> tensor<7xi32> =
       (%arg0: tensor<2xi32>) -> tensor<7xi32> {
-    %c3 = constant 3 : index
+    %c3 = arith.constant 3 : index
     // CHECK: %[[LOAD:.+]] = util.global.load @_large_const
     %5 = util.global.load @_large_const : tensor<7xi32>
     // CHECK: %[[CLONE:.+]] = flow.tensor.clone %[[LOAD]]

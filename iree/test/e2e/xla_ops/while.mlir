@@ -2,7 +2,7 @@
 func @while() {
   %start = util.unfoldable_constant dense<1> : tensor<i32>
   %bound = util.unfoldable_constant dense<3> : tensor<i32>
-  %cst_1 = constant dense<4> : tensor<i32>
+  %cst_1 = arith.constant dense<4> : tensor<i32>
   br ^bb1(%start : tensor<i32>)
 ^bb1(%2: tensor<i32>):
   %3 = "mhlo.compare"(%2, %bound) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>

@@ -104,8 +104,8 @@ Optional<SmallVector<Value, 4>> buildOrFindDimsForValue(Location loc,
       if (rsType.isDimDynamic(i)) {
         result.push_back(builder.createOrFold<Shape::RankedDimOp>(loc, rs, i));
       } else {
-        result.push_back(
-            builder.create<ConstantIndexOp>(loc, rsType.getStaticDim(i)));
+        result.push_back(builder.create<arith::ConstantIndexOp>(
+            loc, rsType.getStaticDim(i)));
       }
     }
   } else {
@@ -116,7 +116,7 @@ Optional<SmallVector<Value, 4>> buildOrFindDimsForValue(Location loc,
         result.push_back(builder.createOrFold<tensor::DimOp>(loc, value, i));
       } else {
         result.push_back(
-            builder.create<ConstantIndexOp>(loc, valueSt.getDimSize(i)));
+            builder.create<arith::ConstantIndexOp>(loc, valueSt.getDimSize(i)));
       }
     }
   }

@@ -32,7 +32,7 @@ class IdentifyConstantPoolsPass
   IdentifyConstantPoolsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<IREE::HAL::HALDialect>();
     registry.insert<IREE::Util::UtilDialect>();

@@ -3,10 +3,10 @@
 // CHECK-LABEL: func @skip_buffer_view_buffer
 // CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer
 func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
-  %c1 = constant 1 : i32
-  %c10 = constant 10 : index
-  %c11 = constant 11 : index
-  %c32 = constant 32 : i32
+  %c1 = arith.constant 1 : i32
+  %c10 = arith.constant 10 : index
+  %c11 = arith.constant 11 : index
+  %c32 = arith.constant 32 : i32
   %view = hal.buffer_view.create buffer(%buffer : !hal.buffer)
                                  shape([%c10, %c11])
                                  type(%c32)

@@ -86,8 +86,8 @@ vm.module @cond_fail_folds {
   // CHECK-LABEL: @cond_fail_to_cond_br_fail
   // CHECK-SAME: %[[COND:.+]]:
   vm.func @cond_fail_to_cond_br_fail(%cond : i32) {
-    // CHECK-DAG: %[[CODE2:.+]] = constant 2
-    %code2 = constant 2 : i32
+    // CHECK-DAG: %[[CODE2:.+]] = arith.constant 2
+    %code2 = arith.constant 2 : i32
     // CHECK: vm.cond_br %[[COND]], ^bb2(%[[CODE2]] : i32), ^bb1
     vm.cond_fail %cond, %code2, "message"
     // CHECK-NEXT: ^bb1:

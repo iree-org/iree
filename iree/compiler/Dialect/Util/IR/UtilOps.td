@@ -136,7 +136,7 @@ def Util_UnreachableOp : Util_Op<"unreachable", [NoSideEffect, Terminator]> {
 
     ```mlir
     ^bb0:
-      %true = constant true
+      %true = arith.constant true
       cond_br %true, ^bb2, ^bb1
     ^bb1:
       // Indicates that this branch should never be taken.

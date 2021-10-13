@@ -161,15 +161,15 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: @fail
   vm.func @fail() {
-    // CHECK-DAG: %[[CODE1:.+]] = constant 1
-    %code1 = constant 1 : i32
+    // CHECK-DAG: %[[CODE1:.+]] = arith.constant 1
+    %code1 = arith.constant 1 : i32
     // CHECK: vm.fail %[[CODE1]]
     vm.fail %code1
   }
   // CHECK-LABEL: @fail_message
   vm.func @fail_message() {
-    // CHECK-DAG: %[[CODE2:.+]] = constant 2
-    %code2 = constant 2 : i32
+    // CHECK-DAG: %[[CODE2:.+]] = arith.constant 2
+    %code2 = arith.constant 2 : i32
     // CHECK: vm.fail %[[CODE2]], "message"
     vm.fail %code2, "message"
   }
@@ -181,8 +181,8 @@ vm.module @my_module {
   // CHECK-LABEL: @cond_fail
   // CHECK-SAME: %[[COND:.+]]:
   vm.func @cond_fail(%cond : i32) {
-    // CHECK-DAG: %[[CODE1:.+]] = constant 1
-    %code1 = constant 1 : i32
+    // CHECK-DAG: %[[CODE1:.+]] = arith.constant 1
+    %code1 = arith.constant 1 : i32
     // CHECK: vm.cond_fail %[[COND]], %[[CODE1]]
     vm.cond_fail %cond, %code1
     vm.return
@@ -190,24 +190,24 @@ vm.module @my_module {
   // CHECK-LABEL: @cond_fail_message
   // CHECK-SAME: %[[COND:.+]]:
   vm.func @cond_fail_message(%cond : i32) {
-    // CHECK-DAG: %[[CODE2:.+]] = constant 2
-    %code2 = constant 2 : i32
+    // CHECK-DAG: %[[CODE2:.+]] = arith.constant 2
+    %code2 = arith.constant 2 : i32
     // CHECK: vm.cond_fail %[[COND]], %[[CODE2]], "message"
     vm.cond_fail %cond, %code2, "message"
     vm.return
   }
   // CHECK-LABEL: @cond_fail_no_condition
   vm.func @cond_fail_no_condition() {
-    // CHECK-DAG: %[[CODE3:.+]] = constant 3
-    %code3 = constant 3 : i32
+    // CHECK-DAG: %[[CODE3:.+]] = arith.constant 3
+    %code3 = arith.constant 3 : i32
     // CHECK: vm.cond_fail %[[CODE3]]
     vm.cond_fail %code3
     vm.return
   }
   // CHECK-LABEL: @cond_fail_no_condition_with_message
   vm.func @cond_fail_no_condition_with_message() {
-    // CHECK-DAG: %[[CODE4:.+]] = constant 4
-    %code4 = constant 4 : i32
+    // CHECK-DAG: %[[CODE4:.+]] = arith.constant 4
+    %code4 = arith.constant 4 : i32
     // CHECK: vm.cond_fail %[[CODE4]]
     vm.cond_fail %code4, "message"
     vm.return

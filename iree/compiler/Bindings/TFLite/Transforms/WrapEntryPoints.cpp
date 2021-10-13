@@ -27,7 +27,7 @@ class WrapEntryPointsPass
     : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<StandardOpsDialect>();
+    registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect>();
   }
 
   StringRef getArgument() const override {

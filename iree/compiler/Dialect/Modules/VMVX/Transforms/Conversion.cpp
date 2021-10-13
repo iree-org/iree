@@ -67,7 +67,8 @@ class ConversionPass
     conversionTarget.addIllegalDialect<tensor::TensorDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
     conversionTarget.addLegalDialect<IREE::VMVX::VMVXDialect>();
-    conversionTarget.addLegalDialect<mlir::StandardOpsDialect>();
+    conversionTarget.addLegalDialect<mlir::StandardOpsDialect,
+                                     mlir::arith::ArithmeticDialect>();
     conversionTarget.addLegalDialect<mlir::AffineDialect>();
     conversionTarget.addLegalDialect<memref::MemRefDialect>();
     conversionTarget.addLegalOp<mlir::UnrealizedConversionCastOp>();

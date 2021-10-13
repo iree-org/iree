@@ -41,7 +41,7 @@ class PropagateConstantWorkgroupInfoPass
           funcOp.getOps<IREE::HAL::InterfaceWorkgroupSizeOp>());
       for (auto workgroupSizeOp : workgroupSizeOps) {
         OpBuilder builder(workgroupSizeOp);
-        auto dimValue = builder.createOrFold<ConstantIndexOp>(
+        auto dimValue = builder.createOrFold<arith::ConstantIndexOp>(
             workgroupSizeOp.getLoc(),
             workgroupSizeAttr[workgroupSizeOp.dimension().getZExtValue()]
                 .cast<IntegerAttr>()

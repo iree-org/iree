@@ -12,8 +12,8 @@ module attributes {
 // CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
 func @packStatic(%allocator: !hal.allocator) ->
     (index, index, index, index, index, index, index) {
-  %c100 = constant 100 : index
-  %c200 = constant 200 : index
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
   %t:7 = hal.allocator.pack<%allocator : !hal.allocator> slices({
     [0, 1] = %c100,  // +0
     [1, 2] = %c100,  // +112 (100 align 16)
@@ -56,20 +56,20 @@ func @packDynamic(%allocator: !hal.allocator, %size_a: index, %size_b: index) ->
   // Right now this is too verbose to really test against with anything but
   // a change detector like this.
 
-  // CHECK-DAG: %c0 = constant 0 : index
-  // CHECK-DAG: %c-16 = constant -16 : index
-  // CHECK-DAG: %c15 = constant 15 : index
-  // CHECK-DAG: %0 = addi %arg1, %c15 : index
-  // CHECK-DAG: %1 = and %0, %c-16 : index
-  // CHECK-DAG: %2 = addi %1, %c15 : index
-  // CHECK-DAG: %3 = and %2, %c-16 : index
-  // CHECK-DAG: %4 = addi %arg2, %c15 : index
-  // CHECK-DAG: %5 = and %4, %c-16 : index
-  // CHECK-DAG: %6 = addi %3, %5 : index
-  // CHECK-DAG: %7 = addi %6, %c15 : index
-  // CHECK-DAG: %8 = and %7, %c-16 : index
-  // CHECK-DAG: %9 = addi %8, %c15 : index
-  // CHECK-DAG: %10 = and %9, %c-16 : index
+  // CHECK-DAG: %c0 = arith.constant 0 : index
+  // CHECK-DAG: %c-16 = arith.constant -16 : index
+  // CHECK-DAG: %c15 = arith.constant 15 : index
+  // CHECK-DAG: %0 = arith.addi %arg1, %c15 : index
+  // CHECK-DAG: %1 = arith.andi %0, %c-16 : index
+  // CHECK-DAG: %2 = arith.addi %1, %c15 : index
+  // CHECK-DAG: %3 = arith.andi %2, %c-16 : index
+  // CHECK-DAG: %4 = arith.addi %arg2, %c15 : index
+  // CHECK-DAG: %5 = arith.andi %4, %c-16 : index
+  // CHECK-DAG: %6 = arith.addi %3, %5 : index
+  // CHECK-DAG: %7 = arith.addi %6, %c15 : index
+  // CHECK-DAG: %8 = arith.andi %7, %c-16 : index
+  // CHECK-DAG: %9 = arith.addi %8, %c15 : index
+  // CHECK-DAG: %10 = arith.andi %9, %c-16 : index
 
   // CHECK-DAG: return %10, %c0, %3, %c0
   return %t#0, %t#1, %t#2, %t#3 : index, index, index, index
@@ -92,8 +92,8 @@ module attributes {
 // CHECK-SAME: %[[SIZE_A:.+]]: index, %[[SIZE_B:.+]]: index
 func @packMixedStaticDynamic(%allocator: !hal.allocator, %size_a: index, %size_b: index) ->
     (index, index, index, index, index) {
-  %c100 = constant 100 : index
-  %c200 = constant 200 : index
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
   %t:5 = hal.allocator.pack<%allocator : !hal.allocator> slices({
     [0, 1] = %c100,
     [1, 2] = %size_a,
@@ -106,21 +106,21 @@ func @packMixedStaticDynamic(%allocator: !hal.allocator, %size_a: index, %size_b
   // Right now this is too verbose to really test against with anything but
   // a change detector like this.
 
-  // CHECK-DAG: %c0 = constant 0 : index
-  // CHECK-DAG: %c208 = constant 208 : index
-  // CHECK-DAG: %c-16 = constant -16 : index
-  // CHECK-DAG: %c15 = constant 15 : index
-  // CHECK-DAG: %0 = addi %arg1, %c15 : index
-  // CHECK-DAG: %1 = and %0, %c-16 : index
-  // CHECK-DAG: %2 = addi %1, %c223 : index
-  // CHECK-DAG: %3 = and %2, %c-16 : index
-  // CHECK-DAG: %4 = addi %arg2, %c15 : index
-  // CHECK-DAG: %5 = and %4, %c-16 : index
-  // CHECK-DAG: %6 = addi %3, %5 : index
-  // CHECK-DAG: %7 = addi %6, %c15 : index
-  // CHECK-DAG: %8 = and %7, %c-16 : index
-  // CHECK-DAG: %9 = addi %8, %c15 : index
-  // CHECK-DAG: %10 = and %9, %c-16 : index
+  // CHECK-DAG: %c0 = arith.constant 0 : index
+  // CHECK-DAG: %c208 = arith.constant 208 : index
+  // CHECK-DAG: %c-16 = arith.constant -16 : index
+  // CHECK-DAG: %c15 = arith.constant 15 : index
+  // CHECK-DAG: %0 = arith.addi %arg1, %c15 : index
+  // CHECK-DAG: %1 = arith.andi %0, %c-16 : index
+  // CHECK-DAG: %2 = arith.addi %1, %c223 : index
+  // CHECK-DAG: %3 = arith.andi %2, %c-16 : index
+  // CHECK-DAG: %4 = arith.addi %arg2, %c15 : index
+  // CHECK-DAG: %5 = arith.andi %4, %c-16 : index
+  // CHECK-DAG: %6 = arith.addi %3, %5 : index
+  // CHECK-DAG: %7 = arith.addi %6, %c15 : index
+  // CHECK-DAG: %8 = arith.andi %7, %c-16 : index
+  // CHECK-DAG: %9 = arith.addi %8, %c15 : index
+  // CHECK-DAG: %10 = arith.andi %9, %c-16 : index
 
   // CHECK-DAG: return %10, %c0, %c208, %3, %c0
   return %t#0, %t#1, %t#2, %t#3, %t#4 : index, index, index, index, index

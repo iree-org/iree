@@ -85,7 +85,7 @@ class CooperativeMatrixAnalysis {
       auto contract = dyn_cast<vector::ContractionOp>(op);
       if (contract == nullptr) return;
       auto hasVectorDest = [](Operation *op) {
-        if (isa<ConstantOp, memref::AllocOp>(op)) return false;
+        if (isa<arith::ConstantOp, memref::AllocOp>(op)) return false;
         for (auto resultType : op->getResultTypes()) {
           if (resultType.isa<VectorType>()) return true;
         }

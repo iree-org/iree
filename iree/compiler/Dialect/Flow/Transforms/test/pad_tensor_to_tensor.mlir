@@ -2,9 +2,9 @@
 
 module  {
   func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
-    %c0 = constant 0 : index
-    %c4 = constant 4 : index
-    %c3 = constant 3 : index
+    %c0 = arith.constant 0 : index
+    %c4 = arith.constant 4 : index
+    %c3 = arith.constant 3 : index
     %0 = tensor.extract %arg1[] : tensor<f32>
     %1 = linalg.pad_tensor %arg0 low[%c4, %arg2] high[%arg3, %c3]  {
     ^bb0(%arg4: index, %arg5: index):  // no predecessors
@@ -20,8 +20,8 @@ module  {
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<f32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0
-//   CHECK-DAG:   %[[C1:.+]] = constant 1
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
@@ -36,10 +36,10 @@ module  {
 
 module  {
   func @pad_tensor_static(%arg0: tensor<12x4xf32>, %arg1: tensor<f32>) -> tensor<18x12xf32> {
-    %c4 = constant 4 : index
-    %c2 = constant 2 : index
-    %c5 = constant 5 : index
-    %c3 = constant 3 : index
+    %c4 = arith.constant 4 : index
+    %c2 = arith.constant 2 : index
+    %c5 = arith.constant 5 : index
+    %c3 = arith.constant 3 : index
     %0 = tensor.extract %arg1[] : tensor<f32>
     %1 = linalg.pad_tensor %arg0 low[%c4, %c5] high[%c2, %c3]  {
     ^bb0(%arg2: index, %arg3: index):  // no predecessors

@@ -2,8 +2,8 @@
 
 // CHECK-LABEL: @buffer_subspan
 func @buffer_subspan(%arg0 : !hal.buffer) -> !hal.buffer {
-  %c42 = constant 42 : index
-  %c43 = constant 43 : index
+  %c42 = arith.constant 42 : index
+  %c43 = arith.constant 43 : index
   // CHECK: %ref = vm.call @hal.buffer.subspan(%arg0, %c42, %c43) : (!vm.ref<!hal.buffer>, i32, i32) -> !vm.ref<!hal.buffer>
   %buffer = hal.buffer.subspan<%arg0 : !hal.buffer>[%c42, %c43] : !hal.buffer
   return %buffer : !hal.buffer
@@ -13,11 +13,11 @@ func @buffer_subspan(%arg0 : !hal.buffer) -> !hal.buffer {
 
 // CHECK-LABEL: @buffer_load
 func @buffer_load(%arg0 : !hal.buffer) -> (i8, i16, i32, f16, f32) {
-  %c42 = constant 42 : index
-  %c43 = constant 43 : index
-  %c44 = constant 44 : index
-  %c45 = constant 45 : index
-  %c46 = constant 46 : index
+  %c42 = arith.constant 42 : index
+  %c43 = arith.constant 43 : index
+  %c44 = arith.constant 44 : index
+  %c45 = arith.constant 45 : index
+  %c46 = arith.constant 46 : index
   // CHECK: %0 = vm.call @hal.buffer.load(%arg0, %c42, %c1) : (!vm.ref<!hal.buffer>, i32, i32) -> i32
   %0 = hal.buffer.load<%arg0 : !hal.buffer>[%c42] : i8
   // CHECK: %1 = vm.call @hal.buffer.load(%arg0, %c43, %c2) : (!vm.ref<!hal.buffer>, i32, i32) -> i32
@@ -35,11 +35,11 @@ func @buffer_load(%arg0 : !hal.buffer) -> (i8, i16, i32, f16, f32) {
 
 // CHECK-LABEL: @buffer_store
 func @buffer_store(%arg0 : !hal.buffer, %arg1 : i8, %arg2 : i16, %arg3 : i32, %arg4 : f16, %arg5 : f32) {
-  %c42 = constant 42 : index
-  %c43 = constant 43 : index
-  %c44 = constant 44 : index
-  %c45 = constant 45 : index
-  %c46 = constant 46 : index
+  %c42 = arith.constant 42 : index
+  %c43 = arith.constant 43 : index
+  %c44 = arith.constant 44 : index
+  %c45 = arith.constant 45 : index
+  %c46 = arith.constant 46 : index
   // CHECK: vm.call @hal.buffer.store(%arg1, %arg0, %c42, %c1) : (i32, !vm.ref<!hal.buffer>, i32, i32) -> ()
   hal.buffer.store<%arg0 : !hal.buffer>[%c42] value(%arg1 : i8)
   // CHECK: vm.call @hal.buffer.store(%arg2, %arg0, %c43, %c2) : (i32, !vm.ref<!hal.buffer>, i32, i32) -> ()

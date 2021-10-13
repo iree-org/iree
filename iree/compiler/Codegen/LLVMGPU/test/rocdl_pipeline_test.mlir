@@ -12,7 +12,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<writeonly:16xf32>) -> ()}
   builtin.module  {
     func @add_dispatch_0() {
-      %c0 = constant 0 : index
+      %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
       %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:16xf32>
       %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:16xf32>
@@ -21,7 +21,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
       %5 = flow.dispatch.tensor.load %1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xf32>, tensor<16xf32>) outs(%3 : tensor<16xf32>) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
-          %7 = addf %arg0, %arg1 : f32
+          %7 = arith.addf %arg0, %arg1 : f32
           linalg.yield %7 : f32
         } -> tensor<16xf32>
         flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
@@ -55,10 +55,10 @@ hal.executable @dot_dispatch_0 {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<writeonly:1024x1024xf32>) -> ()}
     builtin.module  {
       func @dot_dispatch_0() {
-        %cst = constant 0.000000e+00 : f32
-        %c0 = constant 0 : index
-        %c1024 = constant 1024 : index
-        %c1 = constant 1 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c1024 = arith.constant 1024 : index
+        %c1 = arith.constant 1 : index
         %0 = hal.interface.binding.subspan @io::@ro0[%c0] : !flow.dispatch.tensor<readonly:1024x1024xf32>
         %1 = hal.interface.binding.subspan @io::@ro1[%c0] : !flow.dispatch.tensor<readonly:1024x1024xf32>
         %2 = hal.interface.binding.subspan @io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:1024x1024xf32>

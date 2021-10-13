@@ -44,7 +44,7 @@ func @allocator_constant_buffer_view(%allocator: !hal.allocator) -> !hal.buffer_
 // CHECK-LABEL: @allocator_pack_zero_offset
 func @allocator_pack_zero_offset(%allocator: !hal.allocator, %size : index) -> index {
   // CHECK-NOT: constant 0
-  %base_offset = constant 0 : index
+  %base_offset = arith.constant 0 : index
   // CHECK: hal.allocator.pack<{{.+}}> slices({
   %total_length, %offset_0, %offset_1 =
       hal.allocator.pack<%allocator : !hal.allocator>
@@ -62,7 +62,7 @@ func @allocator_pack_zero_offset(%allocator: !hal.allocator, %size : index) -> i
 
 // CHECK-LABEL: @allocator_pack_no_slices
 func @allocator_pack_no_slices(%allocator: !hal.allocator) -> index {
-  // CHECK-NEXT: %[[ZERO_LENGTH:.+]] = constant 0
+  // CHECK-NEXT: %[[ZERO_LENGTH:.+]] = arith.constant 0
   %total_length =
       hal.allocator.pack<%allocator : !hal.allocator> slices({}) : index
   // CHECK-NEXT: return %[[ZERO_LENGTH]]
@@ -96,7 +96,7 @@ func @allocator_pack_one_slice(%allocator: !hal.allocator, %offset: index, %size
 // CHECK-LABEL: @allocator_pack_drop_zero_offset
 func @allocator_pack_drop_zero_offset(%allocator: !hal.allocator, %size : index) -> (index, index, index) {
   // CHECK-NEXT: = hal.allocator.pack<{{.+}}> slices({
-  %base_offset = constant 0 : index
+  %base_offset = arith.constant 0 : index
   %total_length, %offset_0, %offset_1 =
       hal.allocator.pack<%allocator : !hal.allocator>
         offset(%base_offset)
@@ -125,8 +125,8 @@ func @allocator_pack_propagate_base_offset(%allocator: !hal.allocator, %base_off
           [0, 4] = %size,
           [1, 2] = %size,
         }) : index
-  //      CHECK: %[[ADJUSTED_0:.+]] = addi %[[BASE_OFFSET]], %[[PACKED]]#1
-  // CHECK-NEXT: %[[ADJUSTED_1:.+]] = addi %[[BASE_OFFSET]], %[[PACKED]]#2
+  //      CHECK: %[[ADJUSTED_0:.+]] = arith.addi %[[BASE_OFFSET]], %[[PACKED]]#1
+  // CHECK-NEXT: %[[ADJUSTED_1:.+]] = arith.addi %[[BASE_OFFSET]], %[[PACKED]]#2
   // CHECK-NEXT: return %[[PACKED]]#0, %[[ADJUSTED_0]], %[[ADJUSTED_1]]
   return %total_length, %offset_0, %offset_1 : index, index, index
 }

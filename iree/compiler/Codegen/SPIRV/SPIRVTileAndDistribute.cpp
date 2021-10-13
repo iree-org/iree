@@ -85,13 +85,13 @@ static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
   // subgroupID
   //   = id.z * nsubgroups.y * nsubgroups.x + id.y * nsubgroups.x + id.x
   for (size_t i = 0, e = numSubgroups.size(); i != e; ++i) {
-    Value nprocs = builder.create<ConstantIndexOp>(loc, numSubgroups[i]);
+    Value nprocs = builder.create<arith::ConstantIndexOp>(loc, numSubgroups[i]);
     AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
     AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
     Value procId =
         makeComposedAffineApply(builder, loc, d0 % s0, {subgroupId, nprocs});
     procInfo[e - i - 1] = linalg::ProcInfo{procId, nprocs};
-    subgroupId = builder.create<SignedDivIOp>(loc, subgroupId, nprocs);
+    subgroupId = builder.create<arith::DivSIOp>(loc, subgroupId, nprocs);
   }
   return procInfo;
 }
@@ -117,7 +117,7 @@ static void populateTilingToSubgroupPatterns(MLIRContext *context,
     SmallVector<int64_t> tileSizes = getTileSizes(operation, 1);
     return llvm::to_vector<4>(
         llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-          return builder.create<ConstantIndexOp>(operation->getLoc(), v);
+          return builder.create<arith::ConstantIndexOp>(operation->getLoc(), v);
         }));
   };
 
@@ -157,7 +157,8 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
         SmallVector<int64_t> tileSizes = getTileSizes(operation, 2);
         return llvm::to_vector<4>(
             llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-              return builder.create<ConstantIndexOp>(operation->getLoc(), v);
+              return builder.create<arith::ConstantIndexOp>(operation->getLoc(),
+                                                            v);
             }));
       };
 
@@ -246,7 +247,7 @@ static void populateTilingConvFilterPatterns(
     Location loc = op->getLoc();
     SmallVector<Value, 4> tileSizes;
     for (int64_t size : sizes) {
-      tileSizes.push_back(builder.create<ConstantIndexOp>(loc, size));
+      tileSizes.push_back(builder.create<arith::ConstantIndexOp>(loc, size));
     }
     return tileSizes;
   };

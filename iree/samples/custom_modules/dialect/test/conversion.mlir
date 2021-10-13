@@ -22,7 +22,7 @@ func @tensorToMessage(%tensor : tensor<2x4xf32>) {
   // CHECK-SAME:     ])
   // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) {nosideeffects} : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !custom.message
-  %c1 = constant 1 : i32
+  %c1 = arith.constant 1 : i32
   // CHECK: vm.call @custom.print([[MSG]]
   "custom.print"(%0, %c1) : (!custom.message, i32) -> ()
   return
@@ -40,7 +40,7 @@ func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : ind
   %shape = shapex.make_ranked_shape %arg1, %arg2 : (index, index) -> !shapex.ranked_shape<[?, ?]>
   %shaped_tensor = shapex.tie_shape %arg0, %shape : tensor<?x?xf32>, !shapex.ranked_shape<[?, ?]>
   %0 = "custom.tensor_to_message"(%shaped_tensor) : (tensor<?x?xf32>) -> !custom.message
-  %c1 = constant 1 : i32
+  %c1 = arith.constant 1 : i32
   // CHECK: vm.call @custom.print([[MSG]]
   "custom.print"(%0, %c1) : (!custom.message, i32) -> ()
   return
@@ -57,7 +57,7 @@ func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>, %arg1: !shapex.ranked_sha
   // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) {nosideeffects} : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %shaped_tensor = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?, ?]>
   %0 = "custom.tensor_to_message"(%shaped_tensor) : (tensor<?x?xf32>) -> !custom.message
-  %c1 = constant 1 : i32
+  %c1 = arith.constant 1 : i32
   // CHECK: vm.call @custom.print([[MSG]]
   "custom.print"(%0, %c1) : (!custom.message, i32) -> ()
   return
@@ -79,7 +79,7 @@ func @messageToTensor(%arg0 : !custom.message) -> tensor<2x4xf32> {
 // CHECK-LABEL: @messageToTensorReturnDim
 func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<?x4xf32>
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %1 = tensor.dim %0, %c0 : tensor<?x4xf32>
   // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
   // CHECK: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]])
@@ -107,7 +107,7 @@ func @messageToTensorReturnRank(%arg0 : !custom.message) -> index {
 
 // CHECK-LABEL: @printOp
 func @printOp(%arg0 : !custom.message) {
-  %c1_i32 = constant 1 : i32
+  %c1_i32 = arith.constant 1 : i32
   // CHECK: vm.call @custom.print(%arg0, %c1) : (!vm.ref<!custom.message>, i32) -> ()
   "custom.print"(%arg0, %c1_i32) : (!custom.message, i32) -> ()
   return

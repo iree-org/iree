@@ -22,10 +22,10 @@ memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2
 //  CHECK-SAME:   %[[WORKGROUP_COUNT_Y:[a-z0-9]+]]: index,
 //  CHECK-SAME:   %[[WORKGROUP_COUNT_Z:[a-z0-9]+]]: index) {
 func @entry() {
-  %cst = constant 0.000000e+00 : f32
-  %c5 = constant 5 : index
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c5 = arith.constant 5 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %0 = memref.get_global @__constant_5xi32 : memref<5xi32>
   //      CHECK: %[[BINDING0_RAW:.+]] = util.list.get %[[BINDINGS]][%c0] : !util.list<memref<?xi8>>
   // CHECK-NEXT: %[[BINDING0:.+]] = builtin.unrealized_conversion_cast %[[BINDING0_RAW]] : memref<?xi8> to memref<5xf32>
@@ -46,9 +46,9 @@ func @entry() {
       %6 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%arg1)[%arg0]
       %7 = memref.load %1[%6] : memref<5xf32>
       %8 = memref.load %0[%6] : memref<5xi32>
-      %9 = cmpf oeq, %7, %cst : f32
-      %10 = zexti %9 : i1 to i32
-      %11 = muli %10, %8 : i32
+      %9 = arith.cmpf oeq, %7, %cst : f32
+      %10 = arith.extui %9 : i1 to i32
+      %11 = arith.muli %10, %8 : i32
       memref.store %11, %2[%6] : memref<5xi32>
     }
   }

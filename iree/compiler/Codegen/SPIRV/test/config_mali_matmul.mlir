@@ -18,10 +18,10 @@ hal.executable @matmul_1024x2048x512 {
     hal.executable.entry_point @matmul_1024x2048x512 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_1024x2048x512() {
-        %c0 = constant 0 : index
-        %c2048 = constant 2048 : index
-        %c1024 = constant 1024 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c2048 = arith.constant 2048 : index
+        %c1024 = arith.constant 1024 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x512xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x2048xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1024x2048xf32>
@@ -66,7 +66,7 @@ hal.executable @matmul_1024x2048x512 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 8]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
 //           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
@@ -95,10 +95,10 @@ hal.executable @matmul_3136x24x96 {
     hal.executable.entry_point @matmul_3136x24x96 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_3136x24x96() {
-        %c0 = constant 0 : index
-        %c24 = constant 24 : index
-        %c3136 = constant 3136 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c24 = arith.constant 24 : index
+        %c3136 = arith.constant 3136 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:3136x96xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:96x24xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:3136x24xf32>
@@ -143,7 +143,7 @@ hal.executable @matmul_3136x24x96 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 32]}
 //           CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[X]]]
 //           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
@@ -172,10 +172,10 @@ hal.executable @matmul_196x64x192 {
     hal.executable.entry_point @matmul_196x64x192 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_196x64x192() {
-        %c0 = constant 0 : index
-        %c64 = constant 64 : index
-        %c196 = constant 196 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c64 = arith.constant 64 : index
+        %c196 = arith.constant 196 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:196x192xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:192x64xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:196x64xf32>
@@ -220,7 +220,7 @@ hal.executable @matmul_196x64x192 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 4]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
 //           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
@@ -249,10 +249,10 @@ hal.executable @matmul_12544x96x16 {
     hal.executable.entry_point @matmul_12544x96x16 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_12544x96x16() {
-        %c0 = constant 0 : index
-        %c96 = constant 96 : index
-        %c12544 = constant 12544 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c96 = arith.constant 96 : index
+        %c12544 = arith.constant 12544 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<12544x16xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<16x96xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<12544x96xf32>
@@ -292,7 +292,7 @@ hal.executable @matmul_12544x96x16 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 8]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
 //           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
@@ -321,10 +321,10 @@ hal.executable @matmul_49x160x576 {
     hal.executable.entry_point @matmul_49x160x576 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_49x160x576() {
-        %c0 = constant 0 : index
-        %c160 = constant 160 : index
-        %c49 = constant 49 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c160 = arith.constant 160 : index
+        %c49 = arith.constant 49 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:49x576xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:576x160xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:49x160xf32>
@@ -369,7 +369,7 @@ hal.executable @matmul_49x160x576 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 1]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[ONE]]
 
@@ -397,10 +397,10 @@ hal.executable @batch_matmul_4x384x384 {
     hal.executable.entry_point @batch_matmul_4x384x384 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @batch_matmul_4x384x384() {
-        %c0 = constant 0 : index
-        %c384 = constant 384 : index
-        %c4 = constant 4 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c384 = arith.constant 384 : index
+        %c4 = arith.constant 4 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x384x32xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x32x384xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4x384x384xf32>
@@ -484,11 +484,11 @@ hal.executable @batch_matmul_4x2x8 {
     hal.executable.entry_point @batch_matmul_4x2x8 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @batch_matmul_4x2x8() {
-        %c0 = constant 0 : index
-        %c8 = constant 8 : index
-        %c2 = constant 2 : index
-        %c4 = constant 4 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c8 = arith.constant 8 : index
+        %c2 = arith.constant 2 : index
+        %c4 = arith.constant 4 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x2x32xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x32x8xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4x2x8xf32>

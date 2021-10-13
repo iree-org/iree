@@ -293,7 +293,8 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
       values.push_back(b.getI32IntegerAttr(r));
     }
     auto type = RankedTensorType::get({fftLength}, b.getI32Type());
-    return b.create<ConstantOp>(type, DenseIntElementsAttr::get(type, values));
+    return b.create<arith::ConstantOp>(type,
+                                       DenseIntElementsAttr::get(type, values));
   }
 
   static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
@@ -324,13 +325,14 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
           for (auto i : llvm::seq<unsigned>(0, rank - 1)) {
             ivs.push_back(b.create<linalg::IndexOp>(loc, i));
           }
-          ivs.push_back(b.create<IndexCastOp>(loc, args[0], b.getIndexType()));
+          ivs.push_back(
+              b.create<arith::IndexCastOp>(loc, args[0], b.getIndexType()));
           b.create<linalg::YieldOp>(
               loc, b.create<tensor::ExtractOp>(loc, real, ivs).getResult());
         });
     return {
         genericOp.getResult(0),
-        b.create<ConstantOp>(
+        b.create<arith::ConstantOp>(
             realType, DenseFPElementsAttr::get(
                           realType, b.getF32FloatAttr(0.0).cast<Attribute>()))};
   }
@@ -347,8 +349,10 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
       imag.push_back(b.getF32FloatAttr(v.imag()));
     }
     auto type = RankedTensorType::get({mh}, b.getF32Type());
-    return {b.create<ConstantOp>(type, DenseFPElementsAttr::get(type, real)),
-            b.create<ConstantOp>(type, DenseFPElementsAttr::get(type, imag))};
+    return {
+        b.create<arith::ConstantOp>(type, DenseFPElementsAttr::get(type, real)),
+        b.create<arith::ConstantOp>(type,
+                                    DenseFPElementsAttr::get(type, imag))};
   }
 
   LogicalResult matchAndRewrite(
@@ -373,7 +377,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     int lognPlus1 = std::log(fftLength) / std::log(2) + 1;
     for (auto s : llvm::seq<unsigned>(1, lognPlus1)) {
       SmallVector<Value> inputs;
-      inputs.push_back(b.create<ConstantIndexOp>(s));
+      inputs.push_back(b.create<arith::ConstantIndexOp>(s));
       inputs.append(getCoeffConstants(b, s));
       auto fft = b.create<linalg_ext::FftOp>(
           TypeRange{results[0].getType(), results[1].getType()}, inputs,
@@ -444,6 +448,7 @@ struct ConvertMHLOToLinalgExtPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg_ext::LinalgExtDialect, linalg::LinalgDialect,
                     IREE::Flow::FlowDialect, StandardOpsDialect,
+                    mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
                     complex::ComplexDialect, tensor::TensorDialect>();
   }
 
@@ -505,6 +510,8 @@ struct ConvertMHLOToLinalgExtPass
     ConversionTarget target(getContext());
     target.addLegalDialect<linalg_ext::LinalgExtDialect, linalg::LinalgDialect,
                            IREE::Flow::FlowDialect, StandardOpsDialect,
+                           mlir::math::MathDialect,
+                           mlir::arith::ArithmeticDialect,
                            tensor::TensorDialect, complex::ComplexDialect>();
     target.addIllegalOp<mhlo::SortOp, mhlo::ScatterOp, mhlo::FftOp,
                         mhlo::ReverseOp>();

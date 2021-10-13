@@ -11,7 +11,7 @@ hal.executable @tensor_insert {
     hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       builtin.func @tensor_insert_slice() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
         %1 = hal.interface.load.constant offset = 0 : index
         %2 = hal.interface.load.constant offset = 1 : index
@@ -52,7 +52,7 @@ hal.executable @tensor_insert {
 // CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [64, 1]}
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-//  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[NWGSX:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
 //      CHECK:   hal.return %[[NWGSX]], %[[ARG1]], %[[C1]]
 
@@ -69,7 +69,7 @@ hal.executable @tensor_insert {
     hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       builtin.func @tensor_insert_slice() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %d0 = hal.interface.load.constant offset = 0 : index
         %d1 = hal.interface.load.constant offset = 1 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<?x?xi32>{%d0, %d1}
@@ -106,7 +106,7 @@ hal.executable @tensor_insert {
 // CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [16, 1]}
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-//  CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[NWGSX:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
 //      CHECK:   hal.return %[[NWGSX]], %[[ARG1]], %[[C1]]
 //      CHECK:   linalg.copy

@@ -63,10 +63,10 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
     auto rhsPaddedType =
         RankedTensorType::get({newKSize, newNSize}, rhsType.getElementType());
 
-    Value lhsPaddingValue = rewriter.create<ConstantOp>(
+    Value lhsPaddingValue = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(lhsType.getElementType()));
 
-    Value rhsPaddingValue = rewriter.create<ConstantOp>(
+    Value rhsPaddingValue = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(rhsType.getElementType()));
 
     auto createPadding = [&](ArrayRef<int64_t> padding) {
@@ -103,7 +103,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
     } else {
       auto newResultType = RankedTensorType::get({newMSize, newNSize},
                                                  resultType.getElementType());
-      auto resultPaddingValue = rewriter.create<ConstantOp>(
+      auto resultPaddingValue = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getZeroAttr(resultType.getElementType()));
       Value paddedResult = linalg::PadTensorOp::createPadScalarOp(
           newResultType, result, resultPaddingValue, createPadding({0, 0}),

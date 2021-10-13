@@ -22,7 +22,7 @@ struct ExpandAttributeToConst : public OpRewritePattern<SrcOp> {
   using OpRewritePattern<SrcOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(SrcOp op,
                                 PatternRewriter &rewriter) const override {
-    auto rhs = rewriter.create<ConstantOp>(op.getLoc(), op.value());
+    auto rhs = rewriter.create<arith::ConstantOp>(op.getLoc(), op.value());
     rewriter.replaceOpWithNewOp<DstOp>(op, op.lhs(), rhs);
     return success();
   }

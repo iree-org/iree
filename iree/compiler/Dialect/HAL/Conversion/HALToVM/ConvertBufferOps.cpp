@@ -27,7 +27,7 @@ class BufferLoadOpConversion
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::BufferLoadOp::Adaptor adaptor(operands);
     auto importType = importOp.getType();
-    auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
+    auto sizeConst = rewriter.createOrFold<mlir::arith::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
             IREE::HAL::getRoundedElementByteWidth(op.getResult().getType())));
@@ -44,7 +44,8 @@ class BufferLoadOpConversion
     if (newResultType == callResult.getType()) {
       rewriter.replaceOp(op, {callResult});
     } else {
-      rewriter.replaceOpWithNewOp<BitcastOp>(op, newResultType, callResult);
+      rewriter.replaceOpWithNewOp<arith::BitcastOp>(op, newResultType,
+                                                    callResult);
     }
 
     return success();
@@ -69,7 +70,7 @@ class BufferStoreOpConversion
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::BufferStoreOp::Adaptor adaptor(operands);
     auto importType = importOp.getType();
-    auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
+    auto sizeConst = rewriter.createOrFold<mlir::arith::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
             IREE::HAL::getRoundedElementByteWidth(op.value().getType())));
