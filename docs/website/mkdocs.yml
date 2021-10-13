@@ -118,3 +118,4 @@ nav:
       - Projects: 'community/projects.md'
   - 'Blog':
       - TFLite Support via TOSA: 'blog/2021-07-19-tflite-tosa.md'
+      - Towards High Performance Matrix Multiplication Code Generation: 'blog/2021-10-13-mmt4d.md'
