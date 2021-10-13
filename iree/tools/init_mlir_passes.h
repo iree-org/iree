@@ -49,6 +49,9 @@ inline void registerMlirPasses() {
   registerStripDebugInfoPass();
   registerSymbolDCEPass();
 
+  // Generic conversions
+  registerReconcileUnrealizedCastsPass();
+
   // Affine
   registerAffinePasses();
   registerAffineLoopFusionPass();
