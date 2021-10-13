@@ -1,4 +1,6 @@
-// RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-ext %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-ext %s | IreeFileCheck %s
+// Also ensure that full lowering to linalg doesn't error.
+// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-ext --iree-mhlo-to-linalg-on-tensors --reconcile-unrealized-casts %s
 
 func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
   %0 = "mhlo.sort"(%arg0) ( {
@@ -21,7 +23,7 @@ func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 
 // -----
 
-func @sort_with_cst(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
+func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
   %0 = mhlo.constant dense<0> : tensor<i32>
   %1 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg1: tensor<i32>, %arg3: tensor<i32>):  // no predecessors
@@ -31,14 +33,36 @@ func @sort_with_cst(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
   return %1 : tensor<1x10xi32>
 }
 
-// CHECK-LABEL: func @sort_with_cst(
+// CHECK-LABEL: func @sort_cst_capture(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
-// CHECK:         %[[CST:.+]] = mhlo.constant dense<0> : tensor<i32>
 // CHECK:         %[[SORT:.+]] = linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
 // CHECK:         ^bb0(%[[ARG1:.+]]: i32, %{{.*}}: i32)
-// CHECK:           %[[SCALAR:.+]] = builtin.unrealized_conversion_cast %[[CST]] : tensor<i32> to i32
+// CHECK:           %[[SCALAR:.+]] = constant 0 : i32
 // CHECK:           %[[RES:.+]] = cmpi slt, %[[ARG1]], %[[SCALAR]] : i32
+// CHECK:           linalg_ext.yield %[[RES]] : i1
+// CHECK:         } -> tensor<1x10xi32>
+// CHECK:         return %[[SORT]]
+
+// -----
+
+func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -> tensor<1x10xi32> {
+  %1 = "mhlo.sort"(%arg0) ( {
+  ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):  // no predecessors
+    %2 = "mhlo.compare"(%arg2, %arg1) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    "mhlo.return"(%2) : (tensor<i1>) -> ()
+  }) {dimension = 1 : i64, is_stable = true} : (tensor<1x10xi32>) -> tensor<1x10xi32>
+  return %1 : tensor<1x10xi32>
+}
+
+// CHECK-LABEL: func @sort_argument_capture(
+// CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:  )
+// CHECK:         %[[SORT:.+]] = linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
+// CHECK:         ^bb0(%[[ARG2:.+]]: i32, %{{.*}}: i32)
+// CHECK:           %[[SCALAR:.+]] = tensor.extract %[[ARG1]][] : tensor<i32>
+// CHECK:           %[[RES:.+]] = cmpi slt, %[[ARG2]], %[[SCALAR]] : i32
 // CHECK:           linalg_ext.yield %[[RES]] : i1
 // CHECK:         } -> tensor<1x10xi32>
 // CHECK:         return %[[SORT]]
@@ -92,7 +116,7 @@ func @sort_unsigned(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
 
 // -----
 
-func @sort_unsigned_external_cst(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
+func @sort_unsigned_cst_capture(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
   %ui32 = mhlo.constant dense<2> : tensor<ui32>
   %1 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):  // no predecessors
@@ -103,7 +127,7 @@ func @sort_unsigned_external_cst(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
   return %1 : tensor<1x5xf32>
 }
 
-// CHECK-LABEL: func @sort_unsigned_external_cst(
+// CHECK-LABEL: func @sort_unsigned_cst_capture(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[UI32:.+]] = mhlo.constant dense<2> : tensor<ui32>
@@ -112,15 +136,16 @@ func @sort_unsigned_external_cst(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<1x5xf32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK:             %[[CAST1:.+]] = bitcast %[[ARG1]] : f32 to i32
-// CHECK:             %[[CONVERSION_CAST_CST:.+]] = builtin.unrealized_conversion_cast %[[UI32]] : tensor<ui32> to i32
-// CHECK:             %[[CMP:.+]] = cmpi ult, %[[CAST1]], %[[CONVERSION_CAST_CST]] : i32
+// CHECK:             %[[CONVERSION_CAST_CST:.+]] = builtin.unrealized_conversion_cast %[[UI32]] : tensor<ui32> to tensor<i32>
+// CHECK:             %[[EXTRACT_CST:.+]] = tensor.extract %[[CONVERSION_CAST_CST]][] : tensor<i32>
+// CHECK:             %[[CMP:.+]] = cmpi ult, %[[CAST1]], %[[EXTRACT_CST]] : i32
 // CHECK:             linalg_ext.yield %[[CMP]]
 // CHECK:         return %[[SORT]]
 
 // -----
 
 // For testing that complex within an linalg_ext op gets lowered
-func @sort_with_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) -> tensor<1x5xf32> {
+func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) -> tensor<1x5xf32> {
   %ui32 = mhlo.constant dense<2> : tensor<ui32>
   %1 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):  // no predecessors
@@ -134,7 +159,7 @@ func @sort_with_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) ->
   return %1 : tensor<1x5xf32>
 }
 
-// CHECK-LABEL: func @sort_with_complex(
+// CHECK-LABEL: func @sort_complex(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
