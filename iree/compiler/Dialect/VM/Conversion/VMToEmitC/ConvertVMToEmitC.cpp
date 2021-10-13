@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinDialect.h"
