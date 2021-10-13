@@ -29,7 +29,7 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
         }],
         /*retType=*/"SmallVector<Value>",
         /*methodName=*/"getDestinationOperands",
-        /*args=*/(ins "OpBuilder &":$b),
+        /*args=*/(ins),
         /*methodBody=*/"",
         /*defaultImplementation=*/"return ValueRange{};"
       >,
