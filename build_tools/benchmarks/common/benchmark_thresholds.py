@@ -45,13 +45,15 @@ BENCHMARK_THRESHOLDS = [
                        ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Mali"), 30,
                        ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileSSD.*GPU-Mali"), 30,
+    BenchmarkThreshold(re.compile(r"^MobileSSD.*GPU-Mali"), 50,
                        ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(re.compile(r"^PoseNet.*GPU-Mali"), 30,
                        ThresholdUnit.PERCENTAGE),
 
     # Fast GPU benchmarks that complete around 10ms; using percentage is
     # not suitable.
+    BenchmarkThreshold(re.compile(r"^MobileNetV2.*kernel-execution.*GPU-Mali"),
+                       1, ThresholdUnit.VALUE_MS),
     BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Adreno"), 1,
                        ThresholdUnit.VALUE_MS),
 
