@@ -69,7 +69,6 @@ func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -> ten
 
 // -----
 
-
 func @sort_2d(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
   %0 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):  // no predecessors
