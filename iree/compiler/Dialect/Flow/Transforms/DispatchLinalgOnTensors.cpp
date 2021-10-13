@@ -1073,16 +1073,6 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
     llvm::dbgs() << "\n\n";
   });
 
-  // After outlining in dispatch region we can rewrite the dispatch ops with
-  // proper captures to make it isolated from above.
-  if (funcOp
-          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) -> WalkResult {
-            return legalizeDispatchWorkgroupOperands(op);
-          })
-          .wasInterrupted()) {
-    return failure();
-  }
-
   // Run necessary canonicalization patterns before rewrite destructive updates.
   {
     OwningRewritePatternList patterns(context);
@@ -1097,6 +1087,16 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
     // store ops.
     tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
+
+  // After outlining in dispatch region we can rewrite the dispatch ops with
+  // proper captures to make it isolated from above.
+  if (funcOp
+          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) -> WalkResult {
+            return legalizeDispatchWorkgroupOperands(op);
+          })
+          .wasInterrupted()) {
+    return failure();
   }
 
   LLVM_DEBUG({
