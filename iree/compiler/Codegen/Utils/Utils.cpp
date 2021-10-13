@@ -517,8 +517,8 @@ LogicalResult getComputeOps(FuncOp funcOp,
   Optional<StringRef> marker = llvm::None;
   for (auto op : computeOps) {
     if (hasMarker(op)) {
-      assert(!marker || marker.getValue() == getMarkerOrNull(op) &&
-                            "expected all markers within op to be the same");
+      assert((!marker || marker.getValue() == getMarkerOrNull(op)) &&
+             "expected all markers within op to be the same");
       marker = getMarkerOrNull(op);
     }
   }

@@ -27,7 +27,7 @@ extern "C" {
 
 // Returns the number of elements in an array as a compile-time constant, which
 // can be used in defining new arrays. Fails at compile-time if |arr| is not a
-// static array (such as if used on a pointer type).
+// static array (such as if used on a pointer type). Similar to `countof()`.
 //
 // Example:
 //  uint8_t kConstantArray[512];
