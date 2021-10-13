@@ -173,15 +173,17 @@ static bool GenerateImpl(const std::string& impl_file,
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "  {\n";
     f << "    \"" << CEscape(toc_files[i]) << "\",\n";
-    f << "    file_" << i << ",\n";
+    f << "    (char *)file_" << i << ",\n";
     f << "    sizeof(file_" << i << ") - 1\n";
     f << "  },\n";
   }
   f << "  {NULL, NULL, 0},\n";
   f << "};\n";
+  GenerateExternCOpen(f);
   f << "const struct iree_file_toc_t* " << FLAG_identifier << "_create() {\n";
   f << "  return &toc[0];\n";
   f << "}\n";
+  GenerateExternCClose(f);
   f.close();
   return f.good();
 }
