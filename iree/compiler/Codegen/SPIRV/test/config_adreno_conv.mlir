@@ -85,7 +85,7 @@ hal.executable @conv_112x112x512 {
 
 //                CHECK: func @conv_112x112x512()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 8, 256], [], [0, 1, 8, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 8, 256], [], [0, 1, 8, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
 // -----
 
@@ -174,7 +174,7 @@ hal.executable @conv_112x112x32 {
 
 //                CHECK: func @conv_112x112x32()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 16, 32], [], [0, 4, 2, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 16, 32], [], [0, 4, 2, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
 // -----
 
@@ -261,7 +261,7 @@ hal.executable @conv_16x16x16 {
 
 //                CHECK: func @conv_16x16x16()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 8, 8, 16], [], [0, 2, 2, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 8, 8, 16], [], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
 // -----
 
@@ -350,7 +350,7 @@ hal.executable @dwconv_28x28x144 {
 
 //                CHECK: func @dwconv_28x28x144()
 //                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 1, 1, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
 
 // -----
 
@@ -438,4 +438,4 @@ hal.executable @dwconv_4x4x8 {
 
 //                CHECK: func @dwconv_4x4x8()
 //                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 8], [], [0, 1, 1, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 8], [], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
