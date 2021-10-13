@@ -188,9 +188,10 @@ func @selectv2_broadcast_dyn_pred(%arg0: tensor<?x1x1xi1>, %arg1: tensor<1x8x1xi
   // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x8xi32>) outs(%[[INIT_ELSE]] : tensor<?x8x8xi32>)
+  // CHECK: %[[SHAPE_BCAST_THEN:.*]] = shape.shape_of %[[BCAST_THEN]]
   // CHECK: %[[C0_1:.*]] = arith.constant 0 : index
-  // CHECK: %[[DIM_BCAST_PRED_0:.*]] = tensor.dim %[[BCAST_PRED]], %[[C0_1]]
-  // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [%[[DIM_BCAST_PRED_0]], 8, 8]
+  // CHECK: %[[DIM_BCAST_THEN_0:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C0_1]]]
+  // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [%[[DIM_BCAST_THEN_0]], 8, 8]
   // CHECK: linalg.generic
   //     CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %[[BCAST_ELSE]] : tensor<?x8x8xi1>, tensor<?x8x8xi32>, tensor<?x8x8xi32>) outs(%[[INIT_RESULT]] : tensor<?x8x8xi32>)
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<?x1x1xi1>, tensor<1x8x1xi32>, tensor<1x1x8xi32>) -> tensor<?x8x8xi32>
@@ -214,11 +215,12 @@ func @selectv2_broadcast_dyn_then(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x?x1xi
   // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x8xi32>) outs(%[[INIT_ELSE]] : tensor<8x?x8xi32>)
+  // CHECK: %[[SHAPE_BCAST_THEN:.*]] = shape.shape_of %[[BCAST_THEN]]
   // CHECK: %[[C1_1:.*]] = arith.constant 1 : index
-  // CHECK: %[[DIM_BCAST_PRED_1:.*]] = tensor.dim %[[BCAST_PRED]], %[[C1_1]]
-  // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [8, %[[DIM_BCAST_PRED_1]], 8]
+  // CHECK: %[[DIM_BCAST_THEN_1:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C1_1]]]
+  // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [8, %[[DIM_BCAST_THEN_1]], 8]
   // CHECK: linalg.generic
-  //     CHECK-SAME: ins(%2, %4, %6 : tensor<8x?x8xi1>, tensor<8x?x8xi32>, tensor<8x?x8xi32>) outs(%8 : tensor<8x?x8xi32>)
+  //     CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %[[BCAST_ELSE]] : tensor<8x?x8xi1>, tensor<8x?x8xi32>, tensor<8x?x8xi32>) outs(%[[INIT_RESULT]] : tensor<8x?x8xi32>)
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<8x1x1xi1>, tensor<1x?x1xi32>, tensor<1x1x8xi32>) -> tensor<8x?x8xi32>
   return %0: tensor<8x?x8xi32>
 }
@@ -241,11 +243,12 @@ func @selectv2_broadcast_dyn_else(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi
   // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic
   //     CHECK-SAME: indexing_maps = [#map3, #map1]
   //     CHECK-SAME: ins(%arg2 : tensor<1x1x?xi32>) outs(%[[INIT_ELSE]] : tensor<8x8x?xi32>)
+  // CHECK: %[[SHAPE_BCAST_THEN:.*]] = shape.shape_of %[[BCAST_THEN]]
   // CHECK: %[[C2_1:.*]] = arith.constant 2 : index
-  // CHECK: %[[DIM_BCAST_PRED_1:.*]] = tensor.dim %[[BCAST_PRED]], %[[C2_1]]
-  // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [8, 8, %[[DIM_BCAST_PRED_1]]]
+  // CHECK: %[[DIM_BCAST_THEN_1:.*]] = tensor.extract %[[SHAPE_BCAST_THEN]][%[[C2_1]]]
+  // CHECK: %[[INIT_RESULT:.*]] = linalg.init_tensor [8, 8, %[[DIM_BCAST_THEN_1]]]
   // CHECK: linalg.generic
-  //     CHECK-SAME: ins(%2, %4, %6 : tensor<8x8x?xi1>, tensor<8x8x?xi32>, tensor<8x8x?xi32>) outs(%8 : tensor<8x8x?xi32>)
+  //     CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %[[BCAST_ELSE]] : tensor<8x8x?xi1>, tensor<8x8x?xi32>, tensor<8x8x?xi32>) outs(%[[INIT_RESULT]] : tensor<8x8x?xi32>)
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<8x1x1xi1>, tensor<1x8x1xi32>, tensor<1x1x?xi32>) -> tensor<8x8x?xi32>
   return %0: tensor<8x8x?xi32>
 }

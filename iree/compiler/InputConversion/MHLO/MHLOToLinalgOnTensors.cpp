@@ -214,8 +214,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
           ConvertMHLOToLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    mhlo::MhloDialect, ShapeDialect, math::MathDialect,
-                    memref::MemRefDialect, complex::ComplexDialect>();
+                    mhlo::MhloDialect, shape::ShapeDialect, ShapeDialect,
+                    math::MathDialect, memref::MemRefDialect,
+                    complex::ComplexDialect>();
   }
 
   void runOnOperation() override {
