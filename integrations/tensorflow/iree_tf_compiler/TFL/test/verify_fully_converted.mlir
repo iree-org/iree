@@ -9,11 +9,11 @@ func @main(%arg0: tensor<2xf32>) -> (tensor<2xf32>) {
 
 // -----
 
-// expected-error@+4 {{'tfl.add' op : unlegalized TFLite op still exists}}
-// expected-error@+4 {{'tfl.sub' op : unlegalized TFLite op still exists}}
-// expected-error@below {{The following TFLite operations still remain}}
+// expected-error@below {{The following illegal operations still remain}}
 func @main(%arg0: tensor<1x8x8x3xf32>) -> tensor<1x8x8x3xf32> attributes {tf.entry_function = {inputs = "input", outputs = "output"}} {
+  // expected-error@+1 {{'tfl.add' op : illegal op still exists}}
   %0 = tfl.add %arg0, %arg0 {fused_activation_function = "NONE"} : tensor<1x8x8x3xf32>
+  // expected-error@+1 {{'tfl.sub' op : illegal op still exists}}
   %1 = tfl.sub %0, %arg0 {fused_activation_function = "NONE"} : tensor<1x8x8x3xf32>
   return %1 : tensor<1x8x8x3xf32>
 }
