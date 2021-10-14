@@ -29,6 +29,7 @@ LLVM_SRCS = enforce_glob(
         "bitwise_xor.mlir",
         "ceil.mlir",
         "clamp.mlir",
+        "clz.mlir",
         "const.mlir",
         "equal.mlir",
         "exp.mlir",
@@ -84,6 +85,7 @@ VMVX_SRCS = enforce_glob(
         "bitwise_xor.mlir",
         "ceil.mlir",
         "clamp.mlir",
+        "clz.mlir",
         "const.mlir",
         "equal.mlir",
         "exp.mlir",
@@ -181,6 +183,7 @@ VULKAN_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "matmul.mlir",  # TOSA matmul is being refactored to be batched
+        "clz.mlir",  # Currently failing on vulkan.
     ],
 )
 
