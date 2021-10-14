@@ -297,12 +297,13 @@ mark_as_advanced(
 include(iree_setup_toolchain)
 
 #-------------------------------------------------------------------------------
-# Configure python early if there are any features that need it.
-# Note that doing this early ensures that dependencies that make incidental
-# use of Python (such as LLVM) resolve the same version.
+# Python
+# If building features that require Python development, find them early in
+# one invocation (some CMake versions are sensitive to resolving out of order).
+# Otherwise, for features that just require the interpreter, find that alone.
 #-------------------------------------------------------------------------------
 
-if(IREE_BUILD_COMPILER OR IREE_BUILD_PYTHON_BINDINGS)
+if(IREE_BUILD_PYTHON_BINDINGS)
   # After CMake 3.18, we are able to limit the scope of the search to just
   # Development.Module. Searching for Development will fail in situations where
   # the Python libraries are not available. When possible, limit to just
@@ -319,6 +320,8 @@ if(IREE_BUILD_COMPILER OR IREE_BUILD_PYTHON_BINDINGS)
   else()
     find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
   endif()
+elseif(IREE_BUILD_COMPILER)
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
 endif()
 
 #-------------------------------------------------------------------------------
