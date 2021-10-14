@@ -40,6 +40,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineToStandard
     MLIRAnalysis
+    MLIRArithmetic
     MLIRArithmeticToSPIRV
     MLIRGPUOps
     MLIRGPUToSPIRV
