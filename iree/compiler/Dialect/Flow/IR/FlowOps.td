@@ -362,7 +362,12 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     static RankedTensorType inferResultType
         (IREE::Flow::DispatchTensorType sourceType,
          ArrayRef<OpFoldResult> mixedSizes);
-  }];
+
+    /// Returns the type of the result based on the sizes.
+    static RankedTensorType inferRankReducedResultType
+        (unsigned resultRank, IREE::Flow::DispatchTensorType sourceType,
+         ArrayRef<OpFoldResult> mixedSizes);
+}];
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;

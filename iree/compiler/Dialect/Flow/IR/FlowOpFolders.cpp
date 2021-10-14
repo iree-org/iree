@@ -338,7 +338,8 @@ struct DispatchTensorLoadReturnTypeCanonicalizer {
                               ArrayRef<OpFoldResult> mixedOffsets,
                               ArrayRef<OpFoldResult> mixedSizes,
                               ArrayRef<OpFoldResult> mixedStrides) {
-    return DispatchTensorLoadOp::inferResultType(
+    return DispatchTensorLoadOp::inferRankReducedResultType(
+        loadOp.result().getType().cast<RankedTensorType>().getRank(),
         loadOp.source().getType().cast<DispatchTensorType>(), mixedSizes);
   }
 };
