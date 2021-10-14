@@ -350,8 +350,8 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     /// Return the expected rank of each of the`static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned resultRank = getResult().getType().cast<ShapedType>().getRank();
-      return {resultRank, resultRank, resultRank};
+      unsigned sourceRank = source().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      return {sourceRank, sourceRank, sourceRank};
     }
 
     /// Return the number of leading operands before the `offsets`, `sizes` and
@@ -362,7 +362,12 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     static RankedTensorType inferResultType
         (IREE::Flow::DispatchTensorType sourceType,
          ArrayRef<OpFoldResult> mixedSizes);
-  }];
+
+    /// Returns the type of the result based on the sizes.
+    static RankedTensorType inferRankReducedResultType
+        (unsigned resultRank, IREE::Flow::DispatchTensorType sourceType,
+         ArrayRef<OpFoldResult> mixedSizes);
+}];
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
