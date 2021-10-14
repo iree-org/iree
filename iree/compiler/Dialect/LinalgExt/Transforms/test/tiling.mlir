@@ -8,7 +8,7 @@ func @scatter_tiling(
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
-      %1 = addf %arg1, %arg2 : f32
+      %1 = arith.addf %arg1, %arg2 : f32
       linalg_ext.yield %1 : f32
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
@@ -19,10 +19,10 @@ func @scatter_tiling(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 //  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
-//   CHECK-DAG:   %[[TILESIZEY:.+]] = constant 10 : index
-//   CHECK-DAG:   %[[TILESIZEX:.+]] = constant 20 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[TILESIZEY:.+]] = arith.constant 10 : index
+//   CHECK-DAG:   %[[TILESIZEX:.+]] = arith.constant 20 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[UPDATES]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZEY]]
@@ -58,7 +58,7 @@ func @scatter_tiling_memref(
     ins(%update, %indices : memref<?x?xf32>, memref<?x1xi32>)
     outs(%original : memref<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
-      %1 = addf %arg1, %arg2 : f32
+      %1 = arith.addf %arg1, %arg2 : f32
       linalg_ext.yield %1 : f32
     }
   return
@@ -69,10 +69,10 @@ func @scatter_tiling_memref(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: memref<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: memref<?x1xi32>
 //  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: memref<?x?xf32>
-//   CHECK-DAG:   %[[TILESIZEY:.+]] = constant 10 : index
-//   CHECK-DAG:   %[[TILESIZEX:.+]] = constant 20 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[TILESIZEY:.+]] = arith.constant 10 : index
+//   CHECK-DAG:   %[[TILESIZEX:.+]] = arith.constant 20 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[UPDATES]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[UPDATES]], %[[C1]]
 //       CHECK:   scf.for %[[IV0:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZEY]]
@@ -101,7 +101,7 @@ func @scatter_tiling_distribution(
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
-      %1 = addf %arg1, %arg2 : f32
+      %1 = arith.addf %arg1, %arg2 : f32
       linalg_ext.yield %1 : f32
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
@@ -112,9 +112,9 @@ func @scatter_tiling_distribution(
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 //  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[TILESIZE:.+]] = constant 10 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[TILESIZE:.+]] = arith.constant 10 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[UPDATES]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
 //   CHECK-DAG:   %[[ID:.+]] = flow.dispatch.workgroup.id[0]
@@ -149,7 +149,7 @@ func @scatter_no_tiling(
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
-      %1 = addf %arg1, %arg2 : f32
+      %1 = arith.addf %arg1, %arg2 : f32
       linalg_ext.yield %1 : f32
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
@@ -171,7 +171,7 @@ func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
        {__internal_linalg_transform__ = "outer_reduce_input"}
        outs(%arg0 : tensor<?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
-         %0 = cmpi sgt, %arg2, %arg3 : i32
+         %0 = arith.cmpi sgt, %arg2, %arg3 : i32
          linalg_ext.yield %0 : i1
        } -> tensor<?xi32>
   return %0 : tensor<?xi32>
@@ -190,7 +190,7 @@ func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
        {__internal_linalg_transform__ = "inner_reduce_input"}
        outs(%arg0 : tensor<?x?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
-         %0 = cmpi sgt, %arg2, %arg3 : i32
+         %0 = arith.cmpi sgt, %arg2, %arg3 : i32
          linalg_ext.yield %0 : i1
        } -> tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
@@ -198,9 +198,9 @@ func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
 //       CHECK: func @sort_2d(
 //  CHECK-SAME:   %[[OPERAND:.+]]: tensor<?x?xi32>
-//   CHECK-DAG:   %[[TILESIZE:.+]] = constant 10 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[TILESIZE:.+]] = arith.constant 10 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OPERAND]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[OPERAND]], %[[C1]]
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZE]]
@@ -223,7 +223,7 @@ func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
        {__internal_linalg_transform__ = "outer_reduce_input"}
        outs(%arg0 : tensor<?x?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
-         %0 = cmpi sgt, %arg2, %arg3 : i32
+         %0 = arith.cmpi sgt, %arg2, %arg3 : i32
          linalg_ext.yield %0 : i1
        } -> tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
@@ -231,9 +231,9 @@ func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
 //       CHECK: func @sort_2d_inner_parallel(
 //  CHECK-SAME:   %[[OPERAND:.+]]: tensor<?x?xi32>
-//   CHECK-DAG:   %[[TILESIZE:.+]] = constant 20 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[TILESIZE:.+]] = arith.constant 20 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OPERAND]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[OPERAND]], %[[C1]]
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZE]]
@@ -258,7 +258,7 @@ func @sort_2d_multi_result(
        {__internal_linalg_transform__ = "inner_reduce_input"}
        outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
        ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-         %1 = cmpf ogt, %arg4, %arg5 : f32
+         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
          linalg_ext.yield %1 : i1
        } -> tensor<?x?xi32>, tensor<?x?xf32>
   return %0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xf32>
@@ -267,9 +267,9 @@ func @sort_2d_multi_result(
 //       CHECK: func @sort_2d_multi_result(
 //  CHECK-SAME:   %[[OPERAND1:.+]]: tensor<?x?xi32>
 //  CHECK-SAME:   %[[OPERAND2:.+]]: tensor<?x?xf32>
-//   CHECK-DAG:   %[[TILESIZE:.+]] = constant 10 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[TILESIZE:.+]] = arith.constant 10 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OPERAND1]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[OPERAND1]], %[[C1]]
 //       CHECK:   %[[RESULT:.+]]:2 = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZE]]
@@ -297,7 +297,7 @@ func @sort_2d_multi_result_memref(
      {__internal_linalg_transform__ = "outer_reduce_input"}
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-       %0 = cmpf ogt, %arg4, %arg5 : f32
+       %0 = arith.cmpf ogt, %arg4, %arg5 : f32
        linalg_ext.yield %0 : i1
      }
   return
@@ -306,9 +306,9 @@ func @sort_2d_multi_result_memref(
 //       CHECK: func @sort_2d_multi_result_memref(
 //  CHECK-SAME:   %[[OPERAND1:.+]]: memref<?x?xi32>
 //  CHECK-SAME:   %[[OPERAND2:.+]]: memref<?x?xf32>
-//   CHECK-DAG:   %[[TILESIZE:.+]] = constant 20 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[TILESIZE:.+]] = arith.constant 20 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[OPERAND1]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[OPERAND1]], %[[C1]]
 //       CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZE]]
@@ -330,7 +330,7 @@ func @sort_3d_multi_result_distribute(
       {__internal_linalg_transform__ = "distribute_input"}
       outs(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-        %2 = cmpf ogt, %arg4, %arg5 : f32
+        %2 = arith.cmpf ogt, %arg4, %arg5 : f32
         linalg_ext.yield %2 : i1
       } -> tensor<?x?x?xi32>, tensor<?x?x?xf32>
   return %0, %1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>
@@ -342,11 +342,11 @@ func @sort_3d_multi_result_distribute(
 //       CHECK: func @sort_3d_multi_result_distribute(
 //  CHECK-SAME:   %[[OPERAND1:[a-zA-Z0-9_]+]]: tensor<?x?x?xi32>
 //  CHECK-SAME:   %[[OPERAND2:[a-zA-Z0-9_]+]]: tensor<?x?x?xf32>
-//   CHECK-DAG:   %[[TILESIZE1:.+]] = constant 10 : index
-//   CHECK-DAG:   %[[TILESIZE2:.+]] = constant 30 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//   CHECK-DAG:   %[[TILESIZE1:.+]] = arith.constant 10 : index
+//   CHECK-DAG:   %[[TILESIZE2:.+]] = arith.constant 30 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OPERAND1]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[OPERAND1]], %[[C1]]
 //   CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[OPERAND1]], %[[C2]]
@@ -387,7 +387,7 @@ func @sort_3d_multi_result_distribute_memref(
       {__internal_linalg_transform__ = "distribute_input"}
       outs(%arg0, %arg1 : memref<?x?x?xi32>, memref<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
-        %0 = cmpf ogt, %arg4, %arg5 : f32
+        %0 = arith.cmpf ogt, %arg4, %arg5 : f32
         linalg_ext.yield %0 : i1
       }
   return
@@ -399,11 +399,11 @@ func @sort_3d_multi_result_distribute_memref(
 //       CHECK: func @sort_3d_multi_result_distribute_memref(
 //  CHECK-SAME:   %[[OPERAND1:[a-zA-Z0-9_]+]]: memref<?x?x?xi32>
 //  CHECK-SAME:   %[[OPERAND2:[a-zA-Z0-9_]+]]: memref<?x?x?xf32>
-//   CHECK-DAG:   %[[TILESIZE1:.+]] = constant 10 : index
-//   CHECK-DAG:   %[[TILESIZE2:.+]] = constant 30 : index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
-//   CHECK-DAG:   %[[C2:.+]] = constant 2 : index
+//   CHECK-DAG:   %[[TILESIZE1:.+]] = arith.constant 10 : index
+//   CHECK-DAG:   %[[TILESIZE2:.+]] = arith.constant 30 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[OPERAND1]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[OPERAND1]], %[[C1]]
 //   CHECK-DAG:   %[[D2:.+]] = memref.dim %[[OPERAND1]], %[[C2]]
@@ -431,8 +431,8 @@ func @sort_3d_multi_result_distribute_memref(
 
 func @slice_insert(%source :tensor<?x?xf32>, %dest: tensor<?x?xf32>,
                    %idx0 : index, %idx1 : index) -> tensor<?x?xf32> {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %0 = tensor.dim %source, %c0 : tensor<?x?xf32>
   %1 = tensor.dim %source, %c1 : tensor<?x?xf32>
   %2 = tensor.insert_slice %source into %dest[%idx0, %idx1] [%0, %1] [1, 1]
@@ -462,8 +462,8 @@ func @slice_insert(%source :tensor<?x?xf32>, %dest: tensor<?x?xf32>,
 
 func @slice_insert_rank_reduce(%source :tensor<?x?xf32>, %dest: tensor<?x?x?xf32>,
                    %idx0 : index, %idx1 : index) -> tensor<?x?x?xf32> {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %0 = tensor.dim %source, %c0 : tensor<?x?xf32>
   %1 = tensor.dim %source, %c1 : tensor<?x?xf32>
   %2 = tensor.insert_slice %source into %dest[%idx0, 0, %idx1] [%0, 1, %1] [1, 1, 1]
@@ -493,7 +493,7 @@ func @slice_insert_rank_reduce(%source :tensor<?x?xf32>, %dest: tensor<?x?x?xf32
 
 func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
     %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<1024xf32>, tensor<1024xf32>) {
-  %cst1 = constant 5 : index
+  %cst1 = arith.constant 5 : index
   %0:2 = linalg_ext.fft
   {__internal_linalg_transform__ = "tiling_1d_stage5_fft_input"}
     ins(%cst1, %arg2, %arg3: index, tensor<16xf32>, tensor<16xf32>)
@@ -507,10 +507,10 @@ func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
-// CHECK-DAG:    %[[C0:.+]] = constant 0 : index
-// CHECK-DAG:    %[[C5:.+]] = constant 5 : index
-// CHECK-DAG:    %[[C32:.+]] = constant 32 : index
-// CHECK-DAG:    %[[C1024:.+]] = constant 1024 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C5:.+]] = arith.constant 5 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 // CHECK:        %[[RES:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C1024]] step %[[C32]]
 // CHECK-SAME:       iter_args(%[[ARG5:.+]] = %[[ARG0]], %[[ARG6:.+]] = %[[ARG1]])
 // CHECK-SAME:       -> (tensor<1024xf32>, tensor<1024xf32>) {
@@ -530,7 +530,7 @@ func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 
 func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
     %arg2: tensor<16xf32>, %arg3: tensor<16xf32>) -> (tensor<3x1024xf32>, tensor<3x1024xf32>) {
-  %cst1 = constant 5 : index
+  %cst1 = arith.constant 5 : index
   %0:2 = linalg_ext.fft
   {__internal_linalg_transform__ = "tiling_2d_stage5_fft_input"}
     ins(%cst1, %arg2, %arg3: index, tensor<16xf32>, tensor<16xf32>)
@@ -545,12 +545,12 @@ func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
-// CHECK-DAG:    %[[C0:.+]] = constant 0 : index
-// CHECK-DAG:    %[[C3:.+]] = constant 3 : index
-// CHECK-DAG:    %[[C5:.+]] = constant 5 : index
-// CHECK-DAG:    %[[C10:.+]] = constant 10 : index
-// CHECK-DAG:    %[[C32:.+]] = constant 32 : index
-// CHECK-DAG:    %[[C1024:.+]] = constant 1024 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG:    %[[C5:.+]] = arith.constant 5 : index
+// CHECK-DAG:    %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 // CHECK:        %[[RES:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C10]]
 // CHECK-SAME:       iter_args(%[[ARG5:.+]] = %[[ARG0]], %[[ARG6:.+]] = %[[ARG1]])
 // CHECK-SAME:       -> (tensor<3x1024xf32>, tensor<3x1024xf32>) {
@@ -572,7 +572,7 @@ func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
 
 func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
     %arg2: memref<16xf32>, %arg3: memref<16xf32>) {
-  %cst1 = constant 5 : index
+  %cst1 = arith.constant 5 : index
   linalg_ext.fft
   {__internal_linalg_transform__ = "tiling_1d_stage5_fft_input"}
     ins(%cst1, %arg2, %arg3: index, memref<16xf32>, memref<16xf32>)
@@ -586,10 +586,10 @@ func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[COEF_REAL:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[COEF_IMAG:[a-zA-Z0-9_]+]]
-// CHECK-DAG:    %[[C0:.+]] = constant 0 : index
-// CHECK-DAG:    %[[C5:.+]] = constant 5 : index
-// CHECK-DAG:    %[[C32:.+]] = constant 32 : index
-// CHECK-DAG:    %[[C1024:.+]] = constant 1024 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C5:.+]] = arith.constant 5 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 // CHECK:        scf.for %[[I:.+]] = %[[C0]] to %[[C1024]] step %[[C32]] {
 // CHECK:          %[[SZ:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C32]], %[[C1024]]]
 // CHECK:          %[[SUB1:.+]] = memref.subview %[[ARG0]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, #[[MAP1]]>
@@ -615,8 +615,8 @@ func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
 // CHECK:      func @reverse_memref(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
-// CHECK-DAG:    %[[C0:.+]] = constant 0 : index
-// CHECK-DAG:    %[[C10:.+]] = constant 10 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C10:.+]] = arith.constant 10 : index
 // CHECK-DAG:    %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]] : memref<?xi32>
 // CHECK:        scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C10]] {
 // CHECK:          %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C10]], %[[D0]]]
@@ -633,8 +633,8 @@ func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
 // -----
 
 func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
   %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
   %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xi32>
@@ -650,10 +650,10 @@ func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 - s1 - s2)>
 // CHECK:      func @reverse_tensor_multi_dim(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
-// CHECK-DAG:    %[[C0:.+]] = constant 0 : index
-// CHECK-DAG:    %[[C1:.+]] = constant 1 : index
-// CHECK-DAG:    %[[C10:.+]] = constant 10 : index
-// CHECK-DAG:    %[[C20:.+]] = constant 20 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:    %[[C20:.+]] = arith.constant 20 : index
 // CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?xi32>
 // CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xi32>
 // CHECK:        %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]]] : tensor<?x?xi32>
@@ -688,7 +688,7 @@ func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 
 func @dynamic_insert_slice(%arg0 : tensor<?xf32>, %arg1 : tensor<?x?xf32>,
     %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?xf32>
   %0 = tensor.insert_slice %arg0 into %arg1[%arg2, %arg3] [1, %d0] [1, 1]
       {__internal_linalg_transform__ = "tiling_input"} : tensor<?xf32> into tensor<?x?xf32>
@@ -701,8 +701,8 @@ func @dynamic_insert_slice(%arg0 : tensor<?xf32>, %arg1 : tensor<?x?xf32>,
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: index
-//  CHECK-DAG:  %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:  %[[C10:.+]] = constant 10 : index
+//  CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:  %[[C10:.+]] = arith.constant 10 : index
 //      CHECK:  %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?xf32>
 //      CHECK:  %[[RESULT:.+]] = scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]]
 // CHECK-SAME:      step %[[C10]] iter_args(%[[ARG5:.+]] = %[[ARG1]])
@@ -719,7 +719,7 @@ func @dynamic_insert_slice(%arg0 : tensor<?xf32>, %arg1 : tensor<?x?xf32>,
 
 func @insert_slice_rank_reduced_inner(%arg0 : tensor<?xf32>,
     %arg1 : tensor<?x?x?xf32>, %arg2: index, %arg3 : index, %arg4 : index) -> tensor<?x?x?xf32> {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?xf32>
   %0 = tensor.insert_slice %arg0 into %arg1[%arg2, %arg3, %arg4] [1, %d0, 1] [1, 1, 1]
       {__internal_linalg_transform__ = "tiling_input"} : tensor<?xf32> into tensor<?x?x?xf32>
@@ -733,8 +733,8 @@ func @insert_slice_rank_reduced_inner(%arg0 : tensor<?xf32>,
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: index
-//  CHECK-DAG:   %[[LB:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[STEP:.+]] = constant 10 : index
+//  CHECK-DAG:   %[[LB:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[STEP:.+]] = arith.constant 10 : index
 //      CHECK:   %[[UB:.+]] = tensor.dim %[[ARG0]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:[a-zA-Z0-9_]+]] = %[[LB]]
 // CHECK-SAME:       to %[[D0]] step %[[STEP]] iter_args(%[[ARG6:.+]] = %[[ARG1]])

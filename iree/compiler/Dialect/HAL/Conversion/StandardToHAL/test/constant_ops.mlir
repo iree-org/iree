@@ -8,7 +8,7 @@ func @constantTensor() {
   // CHECK-SAME:   usage("Constant|Transfer|Mapping|Dispatch")
   // CHECK-SAME:   : !hal.buffer
   // CHECK-SAME:   = dense<[1, 2]> : tensor<2xi32>
-  %0 = constant dense<[1, 2]> : tensor<2xi32>
+  %0 = arith.constant dense<[1, 2]> : tensor<2xi32>
   return
 }
 
@@ -22,6 +22,6 @@ func @constantTensor1() {
   // CHECK-SAME:   usage("Constant|Transfer|Mapping|Dispatch")
   // CHECK-SAME:   : !hal.buffer
   // CHECK-SAME:   = dense<[1, 0]> : tensor<2xi8>
-  %0 = constant dense<[1, 0]> : tensor<2xi1>
+  %0 = arith.constant dense<[1, 0]> : tensor<2xi1>
   return
 }

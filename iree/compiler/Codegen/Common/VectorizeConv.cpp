@@ -117,7 +117,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
         VectorType::get({numInputChannels, numOutputChannels}, elementType);
     auto vector1x4Type = VectorType::get({1, 4}, elementType);
     auto inputVectorType = VectorType::get({1, numInputChannels}, elementType);
-    Value zero = rewriter.createOrFold<ConstantIndexOp>(loc, 0);
+    Value zero = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
 
     // Load the entire filter subview.
     SmallVector<Value, 4> filterIndices(4, zero);
@@ -165,20 +165,22 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
         // input vector are used for computing all output channels so data can
         // be reused.
         SmallVector<Value, 4> inputIndices(4, zero);
-        inputIndices[1] =
-            rewriter.createOrFold<ConstantIndexOp>(loc, oh * heightStride);
-        inputIndices[2] =
-            rewriter.createOrFold<ConstantIndexOp>(loc, ow * widthStride);
+        inputIndices[1] = rewriter.createOrFold<arith::ConstantIndexOp>(
+            loc, oh * heightStride);
+        inputIndices[2] = rewriter.createOrFold<arith::ConstantIndexOp>(
+            loc, ow * widthStride);
         Value inputVector = rewriter.create<vector::TransferReadOp>(
             loc, inputVectorType, inputViewOp, inputIndices);
 
         for (int oc = 0; oc < numOutputChannels / 4; ++oc) {
           // Read in the initial value for this output vector.
           SmallVector<Value, 4> outputIndices(4, zero);
-          outputIndices[1] = rewriter.createOrFold<ConstantIndexOp>(loc, oh);
-          outputIndices[2] = rewriter.createOrFold<ConstantIndexOp>(loc, ow);
+          outputIndices[1] =
+              rewriter.createOrFold<arith::ConstantIndexOp>(loc, oh);
+          outputIndices[2] =
+              rewriter.createOrFold<arith::ConstantIndexOp>(loc, ow);
           outputIndices[3] =
-              rewriter.createOrFold<ConstantIndexOp>(loc, oc * 4);
+              rewriter.createOrFold<arith::ConstantIndexOp>(loc, oc * 4);
           Value outputVector = rewriter.create<vector::TransferReadOp>(
               loc, vector1x4Type, outputViewOp, outputIndices);
 
@@ -282,7 +284,7 @@ struct VectorizeLinalgDepthwiseConv
     Type elementType = filterViewOp.getType().getElementType();
     auto vector4Type = VectorType::get(4, elementType);
     auto filterVectorType = VectorType::get({numChannels}, elementType);
-    Value zero = rewriter.createOrFold<ConstantIndexOp>(loc, 0);
+    Value zero = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
 
     // Load the entire filter subview.
     SmallVector<Value, 4> filterIndices(3, zero);
@@ -300,20 +302,23 @@ struct VectorizeLinalgDepthwiseConv
         for (int ow = 0; ow < numOutputWidths; ++ow) {
           // Read in the initial value for this output vector.
           SmallVector<Value, 4> outputIndices(4, zero);
-          outputIndices[1] = rewriter.createOrFold<ConstantIndexOp>(loc, oh);
-          outputIndices[2] = rewriter.createOrFold<ConstantIndexOp>(loc, ow);
+          outputIndices[1] =
+              rewriter.createOrFold<arith::ConstantIndexOp>(loc, oh);
+          outputIndices[2] =
+              rewriter.createOrFold<arith::ConstantIndexOp>(loc, ow);
           outputIndices[3] =
-              rewriter.createOrFold<ConstantIndexOp>(loc, oc * 4);
+              rewriter.createOrFold<arith::ConstantIndexOp>(loc, oc * 4);
           Value outputVector = rewriter.create<vector::TransferReadOp>(
               loc, vector4Type, outputViewOp, outputIndices);
 
           // Read in the input vector for these 4 input channels a a batch.
           SmallVector<Value, 4> inputIndices(4, zero);
-          inputIndices[1] =
-              rewriter.createOrFold<ConstantIndexOp>(loc, oh * heightStride);
-          inputIndices[2] =
-              rewriter.createOrFold<ConstantIndexOp>(loc, ow * widthStride);
-          inputIndices[3] = rewriter.createOrFold<ConstantIndexOp>(loc, oc * 4);
+          inputIndices[1] = rewriter.createOrFold<arith::ConstantIndexOp>(
+              loc, oh * heightStride);
+          inputIndices[2] = rewriter.createOrFold<arith::ConstantIndexOp>(
+              loc, ow * widthStride);
+          inputIndices[3] =
+              rewriter.createOrFold<arith::ConstantIndexOp>(loc, oc * 4);
           Value inputVector = rewriter.create<vector::TransferReadOp>(
               loc, vector4Type, inputViewOp, inputIndices);
 

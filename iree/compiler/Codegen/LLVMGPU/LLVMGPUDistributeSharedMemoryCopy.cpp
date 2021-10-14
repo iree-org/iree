@@ -45,10 +45,10 @@ static void populateTilingCopyToWorkgroupMemPatterns(
         for (unsigned i = 0; i < rank - 1; i++) {
           int64_t t = (rank - i) <= kNumGPUDims ? 1 : 0;
           tileSizesVal.push_back(
-              builder.create<ConstantIndexOp>(operation->getLoc(), t));
+              builder.create<arith::ConstantIndexOp>(operation->getLoc(), t));
         }
-        tileSizesVal.push_back(
-            builder.create<ConstantIndexOp>(operation->getLoc(), copyTileSize));
+        tileSizesVal.push_back(builder.create<arith::ConstantIndexOp>(
+            operation->getLoc(), copyTileSize));
         return tileSizesVal;
       };
   auto getCopyThreadProcInfoFn = [workgroupSize](

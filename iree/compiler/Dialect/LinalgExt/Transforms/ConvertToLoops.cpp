@@ -91,9 +91,9 @@ namespace {
 struct LinalgExtToLoopsPass
     : public LinalgExtToLoopsBase<LinalgExtToLoopsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, StandardOpsDialect, math::MathDialect,
-                memref::MemRefDialect, scf::SCFDialect>();
+    registry.insert<linalg::LinalgDialect, StandardOpsDialect,
+                    mlir::arith::ArithmeticDialect, math::MathDialect,
+                    memref::MemRefDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {

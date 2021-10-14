@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
   registry.insert<mlir::TFL::TensorFlowLiteDialect>();
   registry.insert<mlir::tosa::TosaDialect>();
   registry.insert<quant::QuantizationDialect>();
-  registry.insert<StandardOpsDialect>();
+  registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect>();
 
   // Convert the Module proto into MLIR.
   MLIRContext context(registry);

@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
+#config = {tileSizes = [[8, 64], [], [8, 4], [0, 0, 4]]}
 
 hal.executable private @matmul_static_shape_f16  {
   hal.interface private @io  {
@@ -16,9 +16,9 @@ hal.executable private @matmul_static_shape_f16  {
     }
     builtin.module {
       func @matmul_static_shape_f16() {
-        %cst = constant 0.000000e+00 : f16
-        %c0 = constant 0 : index
-        %c4096 = constant 4096 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %c0 = arith.constant 0 : index
+        %c4096 = arith.constant 4096 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4096x4096xf16>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
@@ -66,7 +66,7 @@ hal.executable private @matmul_static_shape_f16  {
 
 // -----
 
-#config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
+#config = {tileSizes = [[8, 64], [], [8, 4], [0, 0, 4]]}
 
 hal.executable private @matmul_static_shape_f32  {
   hal.interface private @io  {
@@ -82,9 +82,9 @@ hal.executable private @matmul_static_shape_f32  {
     }
     builtin.module {
       func @matmul_static_shape_f32() {
-        %c0 = constant 0 : index
-        %cst = constant 0.000000e+00 : f32
-        %c4096 = constant 4096 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c4096 = arith.constant 4096 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<4096x4096xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4096x4096xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<4096x4096xf32>

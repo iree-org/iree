@@ -75,8 +75,8 @@ static SmallVector<Value, 4> getAsValues(
   SmallVector<Value, 4> values;
   for (auto valueOrAttr : valueOrAttrList) {
     if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-      values.push_back(
-          b.create<ConstantIndexOp>(loc, attr.cast<IntegerAttr>().getInt()));
+      values.push_back(b.create<arith::ConstantIndexOp>(
+          loc, attr.cast<IntegerAttr>().getInt()));
     } else {
       values.push_back(valueOrAttr.get<Value>());
     }
@@ -267,7 +267,8 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
           int64_t dimSize = !inputType.isDynamicDim(position)
                                 ? inputType.getDimSize(position)
                                 : resultType.getDimSize(position);
-          dimSizes[position] = rewriter.create<ConstantIndexOp>(loc, dimSize);
+          dimSizes[position] =
+              rewriter.create<arith::ConstantIndexOp>(loc, dimSize);
         } else {
           // Dynamic dim.
           dimSizes[position] =
@@ -314,7 +315,7 @@ struct ConvertTensorFromElementsPattern
 
     auto loc = op.getLoc();
     SmallVector<Value> dimSizes(1);
-    dimSizes[0] = rewriter.create<ConstantIndexOp>(loc, 1);
+    dimSizes[0] = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
         op, op.getType(), op.getOperand(0), dimSizes);
     return success();

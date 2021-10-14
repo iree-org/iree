@@ -40,7 +40,7 @@ func @check_linalg_ok(%conv : tensor<1x112x112x16xf32>, %bias : tensor<16xf32>, 
       ins(%conv, %bias : tensor<1x112x112x16xf32>, tensor<16xf32>)
       outs(%init : tensor<1x112x112x16xf32>) {
       ^bb0(%arg0 : f32, %arg1 : f32, %arg2 : f32):
-        %0 = addf %arg0, %arg1 : f32
+        %0 = arith.addf %arg0, %arg1 : f32
         linalg.yield %0 : f32
       } -> tensor<1x112x112x16xf32>
   return %result : tensor<1x112x112x16xf32>

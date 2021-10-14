@@ -129,7 +129,7 @@ Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
   if (type.isa<IndexType>()) {
     // Some folders materialize raw index types, which just become std
     // constants.
-    return builder.create<mlir::ConstantIndexOp>(
+    return builder.create<mlir::arith::ConstantIndexOp>(
         loc, value.cast<IntegerAttr>().getValue().getSExtValue());
   }
   return nullptr;

@@ -25,8 +25,8 @@ namespace linalg_ext {
 static Value getValue(OpBuilder &builder, Location loc,
                       OpFoldResult valueOrAttr) {
   if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-    return builder.create<ConstantIndexOp>(loc,
-                                           attr.cast<IntegerAttr>().getInt());
+    return builder.create<arith::ConstantIndexOp>(
+        loc, attr.cast<IntegerAttr>().getInt());
   }
   return valueOrAttr.get<Value>();
 }
@@ -56,8 +56,8 @@ struct InsertSliceTiledOpInterface
     Value source = insertSliceOp.source();
     RankedTensorType sourceType = insertSliceOp.getSourceType();
     Location loc = op->getLoc();
-    Value zero = b.create<ConstantIndexOp>(loc, 0);
-    Value one = b.create<ConstantIndexOp>(loc, 1);
+    Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
+    Value one = b.create<arith::ConstantIndexOp>(loc, 1);
     SmallVector<Range> loopBounds(sourceType.getRank(),
                                   Range{zero, nullptr, one});
     for (auto dim :

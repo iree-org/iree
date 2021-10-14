@@ -17,8 +17,8 @@ func @multi_result() {
       ins(%input1, %input2 : tensor<3x4xi32>, tensor<3x4xi32>)
       outs(%init, %init : tensor<3x4xi32>, tensor<3x4xi32>) {
       ^bb0(%arg0: i32, %arg1: i32, %arg2: i32, %arg3: i32) :
-          %1 = addi %arg0, %arg1 : i32
-          %2 = muli %arg0, %arg1 : i32
+          %1 = arith.addi %arg0, %arg1 : i32
+          %2 = arith.muli %arg0, %arg1 : i32
           linalg.yield %1, %2 : i32, i32
       } -> (tensor<3x4xi32>, tensor<3x4xi32>)
   check.expect_eq_const(%0#0, dense<[
@@ -37,7 +37,7 @@ func @operand_fusion() {
   %filter = util.unfoldable_constant dense<1.0> : tensor<3x3x3x16xf32>
   %bias = util.unfoldable_constant dense<1.0> : tensor<16xf32>
   %init = linalg.init_tensor [1, 112, 112, 16] : tensor<1x112x112x16xf32>
-  %cst = constant 0.0 : f32
+  %cst = arith.constant 0.0 : f32
   %fill = linalg.fill(%cst, %init) : f32, tensor<1x112x112x16xf32> -> tensor<1x112x112x16xf32>
   %conv = linalg.conv_2d_nhwc_hwcf
       {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
@@ -51,7 +51,7 @@ func @operand_fusion() {
       ins(%conv, %bias : tensor<1x112x112x16xf32>, tensor<16xf32>)
       outs(%init : tensor<1x112x112x16xf32>) {
       ^bb0(%arg0 : f32, %arg1 : f32, %arg2 : f32):
-        %0 = addf %arg0, %arg1 : f32
+        %0 = arith.addf %arg0, %arg1 : f32
         linalg.yield %0 : f32
       } -> tensor<1x112x112x16xf32>
   check.expect_eq_const(%result, dense<28.0> : tensor<1x112x112x16xf32>) : tensor<1x112x112x16xf32>

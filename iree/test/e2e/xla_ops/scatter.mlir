@@ -105,7 +105,7 @@ func @scatter_1D_large() {
       outs(%init : tensor<1400xi32>) {
       ^bb0(%arg0: i32):
         %0 = linalg.index 0 : index
-     %1 = index_cast %0 : index to i32
+     %1 = arith.index_cast %0 : index to i32
      linalg.yield %1 : i32
       } -> tensor<1400xi32>
   %indices_reshaped = linalg.tensor_expand_shape %indices [[0, 1]] :
@@ -136,7 +136,7 @@ func @scatter_2D_large() {
       outs(%init : tensor<200xi32>) {
       ^bb0(%arg0: i32):
         %0 = linalg.index 0 : index
-        %1 = index_cast %0 : index to i32
+        %1 = arith.index_cast %0 : index to i32
         linalg.yield %1 : i32
       } -> tensor<200xi32>
   %indices_reshaped = linalg.tensor_expand_shape %indices [[0, 1]] :

@@ -43,19 +43,19 @@ class DeviceQueryIntCastOpConversion
     // Truncate or extend based on the target type.
     if (targetType.isIndex()) {
       // i32 -> index cast.
-      value =
-          rewriter.createOrFold<IndexCastOp>(op.getLoc(), targetType, value);
+      value = rewriter.createOrFold<arith::IndexCastOp>(op.getLoc(), targetType,
+                                                        value);
     } else if (targetType.isa<IntegerType>()) {
       // i32 -> {integer} cast.
       if (targetType.getIntOrFloatBitWidth() <
           value.getType().getIntOrFloatBitWidth()) {
         // i32 -> narrowing cast.
-        value =
-            rewriter.createOrFold<TruncateIOp>(op.getLoc(), targetType, value);
+        value = rewriter.createOrFold<arith::TruncIOp>(op.getLoc(), targetType,
+                                                       value);
       } else {
         // i32 -> widening cast.
-        value = rewriter.createOrFold<ZeroExtendIOp>(op.getLoc(), targetType,
-                                                     value);
+        value = rewriter.createOrFold<arith::ExtUIOp>(op.getLoc(), targetType,
+                                                      value);
       }
     }
 
@@ -65,8 +65,8 @@ class DeviceQueryIntCastOpConversion
       // already handled the error case.
       value = rewriter.createOrFold<SelectOp>(
           op.getLoc(), ok, value,
-          rewriter.createOrFold<ConstantOp>(op.getLoc(),
-                                            op.default_valueAttr()));
+          rewriter.createOrFold<arith::ConstantOp>(op.getLoc(),
+                                                   op.default_valueAttr()));
       ok = rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1);
     }
 

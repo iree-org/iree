@@ -108,7 +108,7 @@ static Value createTotalElementCountValue(ShapedType type,
 
   if (type.hasStaticShape()) {
     assert(dynamicDims.empty());
-    return builder.create<ConstantIndexOp>(loc, type.getNumElements());
+    return builder.create<arith::ConstantIndexOp>(loc, type.getNumElements());
   }
 
   int dynamicDimIndex = 0;
@@ -120,7 +120,7 @@ static Value createTotalElementCountValue(ShapedType type,
     if (ShapedType::isDynamic(shape[i])) {
       dims.push_back(dynamicDims[dynamicDimIndex++]);
     } else {
-      dims.push_back(builder.create<ConstantIndexOp>(loc, shape[i]));
+      dims.push_back(builder.create<arith::ConstantIndexOp>(loc, shape[i]));
     }
   }
   return makeComposedAffineApply(builder, loc, sizeExpr, dims);
@@ -269,7 +269,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
         if (ShapedType::isDynamic(shape[i])) {
           dims.push_back(dynamicDims[dynamicDimIndex++]);
         } else {
-          dims.push_back(builder.create<ConstantIndexOp>(loc, shape[i]));
+          dims.push_back(builder.create<arith::ConstantIndexOp>(loc, shape[i]));
         }
       }
     };
@@ -489,7 +489,8 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     // Create a new subspan op with zero byte offset at the original location.
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointAfter(subspanOp);
-    Value zero = rewriter.create<ConstantIndexOp>(op.memref().getLoc(), 0);
+    Value zero =
+        rewriter.create<arith::ConstantIndexOp>(op.memref().getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         op.memref().getLoc(), subspanOp.getType(), subspanOp.binding(), zero,
         subspanOp.byte_length(), subspanOp.dynamic_dims());
@@ -501,8 +502,8 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
     auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
 
-    Value byteValue = rewriter.create<ConstantIndexOp>(op.memref().getLoc(),
-                                                       numBytes.getValue());
+    Value byteValue = rewriter.create<arith::ConstantIndexOp>(
+        op.memref().getLoc(), numBytes.getValue());
     // We assume that upper layers guarantee the byte offset is perfectly
     // divisible by the element byte count so the content is well aligned.
     Value offset = rewriter.create<AffineApplyOp>(

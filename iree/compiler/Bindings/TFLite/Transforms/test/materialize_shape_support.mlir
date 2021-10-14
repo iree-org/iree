@@ -9,7 +9,7 @@
 // CHECK-DAG: util.global private mutable @_tflite_dynamicEntry_shapes_dirty = true
 
 // CHECK-LABEL: func private @_tflite_dynamicEntry_calculate_shapes() {
-//  CHECK-NEXT:   %false = constant false
+//  CHECK-NEXT:   %false = arith.constant false
 //  CHECK-NEXT:   %[[IS_DIRTY:.+]] = util.global.load @_tflite_dynamicEntry_shapes_dirty : i1
 //  CHECK-NEXT:   cond_br %[[IS_DIRTY]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
@@ -32,7 +32,7 @@
 
 // CHECK-LABEL: func @_tflite_dynamicEntry_query_input_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
-//       CHECK:   %[[IS_0:.+]] = cmpi eq, %[[INDEX]], %c0 : index
+//       CHECK:   %[[IS_0:.+]] = arith.cmpi eq, %[[INDEX]], %c0 : index
 //  CHECK-NEXT:   cond_br %[[IS_0]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
 //  CHECK-NEXT:   %[[IN0_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
@@ -44,7 +44,7 @@
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c3], %c3 : !util.list<index>
 //  CHECK-NEXT:   br ^bb4
 //  CHECK-NEXT: ^bb2:
-//  CHECK-NEXT:   %[[IS_1:.+]] = cmpi eq, %[[INDEX]], %c1 : index
+//  CHECK-NEXT:   %[[IS_1:.+]] = arith.cmpi eq, %[[INDEX]], %c1 : index
 //  CHECK-NEXT:   cond_br %[[IS_1]], ^bb3, ^bb4
 //  CHECK-NEXT: ^bb3:
 //  CHECK-NEXT:   %[[IN1_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_input1_shape : !shapex.ranked_shape<[?,8,8,3]>
@@ -61,7 +61,7 @@
 
 // CHECK-LABEL: func @_tflite_dynamicEntry_resize_input_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
-//       CHECK:   %[[IS_0:.+]] = cmpi eq, %[[INDEX]], %c0 : index
+//       CHECK:   %[[IS_0:.+]] = arith.cmpi eq, %[[INDEX]], %c0 : index
 //  CHECK-NEXT:   cond_br %[[IS_0]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
 //  CHECK-NEXT:   %[[IN0_D0:.+]] = util.list.get %[[LIST]][%c0] : !util.list<index>
@@ -69,7 +69,7 @@
 //  CHECK-NEXT:   util.global.store %[[IN0_SHAPE]], @_tflite_dynamicEntry_input0_shape : !shapex.ranked_shape<[?,8,8,3]>
 //  CHECK-NEXT:   br ^bb4
 //  CHECK-NEXT: ^bb2:
-//  CHECK-NEXT:   %[[IS_1:.+]] = cmpi eq, %[[INDEX]], %c1 : index
+//  CHECK-NEXT:   %[[IS_1:.+]] = arith.cmpi eq, %[[INDEX]], %c1 : index
 //  CHECK-NEXT:   cond_br %[[IS_1]], ^bb3, ^bb4
 //  CHECK-NEXT: ^bb3:
 //  CHECK-NEXT:   %[[IN1_D0:.+]] = util.list.get %[[LIST]][%c0] : !util.list<index>
@@ -84,7 +84,7 @@
 // CHECK-LABEL: func @_tflite_dynamicEntry_query_output_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
 //       CHECK:   call @_tflite_dynamicEntry_calculate_shapes() : () -> ()
-//  CHECK-NEXT:   %[[IS_0:.+]] = cmpi eq, %[[INDEX]], %c0 : index
+//  CHECK-NEXT:   %[[IS_0:.+]] = arith.cmpi eq, %[[INDEX]], %c0 : index
 //  CHECK-NEXT:   cond_br %[[IS_0]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
 //  CHECK-NEXT:   %[[OUT0_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_output0_shape : !shapex.ranked_shape<[?,8,8,3]>
@@ -96,7 +96,7 @@
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c3], %c3 : !util.list<index>
 //  CHECK-NEXT:   br ^bb4
 //  CHECK-NEXT: ^bb2:
-//  CHECK-NEXT:   %[[IS_1:.+]] = cmpi eq, %[[INDEX]], %c1 : index
+//  CHECK-NEXT:   %[[IS_1:.+]] = arith.cmpi eq, %[[INDEX]], %c1 : index
 //  CHECK-NEXT:   cond_br %[[IS_1]], ^bb3, ^bb4
 //  CHECK-NEXT: ^bb3:
 //  CHECK-NEXT:   %[[OUT1_SHAPE:.+]] = util.global.load @_tflite_dynamicEntry_output1_shape : !shapex.ranked_shape<[?,8,8,3]>

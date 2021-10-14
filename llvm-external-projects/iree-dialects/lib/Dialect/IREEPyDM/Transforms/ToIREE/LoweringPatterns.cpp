@@ -17,10 +17,10 @@
 using namespace mlir;
 using namespace mlir::iree_pydm;
 
-namespace arith_d = mlir;
 namespace iree_d = mlir::iree;
 namespace builtin_d = mlir;
 namespace std_d = mlir;
+namespace arith_d = mlir::arith;
 namespace pydm_d = mlir::iree_pydm;
 
 namespace {
@@ -49,7 +49,7 @@ static Value getNullValue(Location loc, OpBuilder &builder, Type t) {
       .Default([&](Type t) -> Value {
         auto attr = builder.getZeroAttr(t);
         assert(attr && "could not get zero attr for builtin type");
-        return builder.create<std_d::ConstantOp>(loc, t, attr);
+        return builder.create<arith_d::ConstantOp>(loc, t, attr);
       });
 }
 
@@ -66,12 +66,12 @@ static Type getVariantListType(Builder &builder) {
 }
 
 static Value getSuccessStatusValue(Location loc, OpBuilder &builder) {
-  return builder.create<std_d::ConstantOp>(loc, builder.getI32IntegerAttr(0));
+  return builder.create<arith_d::ConstantOp>(loc, builder.getI32IntegerAttr(0));
 }
 
 static Value getFailureStatusValue(Location loc, OpBuilder &builder,
                                    ExceptionCode code) {
-  return builder.create<std_d::ConstantOp>(
+  return builder.create<arith_d::ConstantOp>(
       loc, builder.getI32IntegerAttr(static_cast<int>(code)));
 }
 
@@ -85,13 +85,15 @@ void resetObjectList(Location loc, OpBuilder &builder, Value list, int typeCode,
   // Note: The list can record optional runtime state at positions > 1, so
   // to truly reset, we have to resize. Low level optimizations should be able
   // to elide this if it turns out to be unnecessary.
-  auto size = builder.create<std_d::ConstantOp>(loc, builder.getIndexAttr(2));
+  auto size = builder.create<arith_d::ConstantOp>(loc, builder.getIndexAttr(2));
   builder.create<iree_d::ListResizeOp>(loc, list, size);
-  auto index0 = builder.create<std_d::ConstantOp>(loc, builder.getIndexAttr(0));
-  Value typeCodeValue = builder.create<std_d::ConstantOp>(
+  auto index0 =
+      builder.create<arith_d::ConstantOp>(loc, builder.getIndexAttr(0));
+  Value typeCodeValue = builder.create<arith_d::ConstantOp>(
       loc, builder.getI32IntegerAttr(typeCode));
   builder.create<iree_d::ListSetOp>(loc, list, index0, typeCodeValue);
-  auto index1 = builder.create<std_d::ConstantOp>(loc, builder.getIndexAttr(1));
+  auto index1 =
+      builder.create<arith_d::ConstantOp>(loc, builder.getIndexAttr(1));
   builder.create<iree_d::ListSetOp>(loc, list, index1, data);
 }
 
@@ -110,9 +112,9 @@ static Value castIntegerValue(Location loc, Value input,
   if (inputType.getWidth() == resultType.getWidth()) {
     return input;
   } else if (inputType.getWidth() < resultType.getWidth()) {
-    return builder.create<arith_d::SignExtendIOp>(loc, resultType, input);
+    return builder.create<arith_d::ExtSIOp>(loc, resultType, input);
   } else {
-    return builder.create<arith_d::TruncateIOp>(loc, resultType, input);
+    return builder.create<arith_d::TruncIOp>(loc, resultType, input);
   }
 }
 
@@ -213,22 +215,22 @@ class ApplyBinaryNumericConversion
     if (dunderName == "add") {
       return rewriter.create<arith_d::AddIOp>(loc, left, right);
     } else if (dunderName == "and") {
-      return rewriter.create<arith_d::AndOp>(loc, left, right);
+      return rewriter.create<arith_d::AndIOp>(loc, left, right);
     } else if (dunderName == "mul") {
       return rewriter.create<arith_d::MulIOp>(loc, left, right);
     } else if (dunderName == "lshift") {
-      return rewriter.create<arith_d::ShiftLeftOp>(loc, left, right);
+      return rewriter.create<arith_d::ShLIOp>(loc, left, right);
     } else if (dunderName == "or") {
-      return rewriter.create<arith_d::OrOp>(loc, left, right);
+      return rewriter.create<arith_d::OrIOp>(loc, left, right);
     } else if (dunderName == "rshift") {
       if (isSigned)
-        return rewriter.create<arith_d::SignedShiftRightOp>(loc, left, right);
+        return rewriter.create<arith_d::ShRSIOp>(loc, left, right);
       else
-        return rewriter.create<arith_d::UnsignedShiftRightOp>(loc, left, right);
+        return rewriter.create<arith_d::ShRUIOp>(loc, left, right);
     } else if (dunderName == "sub") {
       return rewriter.create<arith_d::SubIOp>(loc, left, right);
     } else if (dunderName == "xor") {
-      return rewriter.create<arith_d::XOrOp>(loc, left, right);
+      return rewriter.create<arith_d::XOrIOp>(loc, left, right);
     }
     return nullptr;
   }
@@ -361,7 +363,8 @@ class ConstantOpConversion : public OpConversionPattern<pydm_d::ConstantOp> {
     if (!newValue)
       return rewriter.notifyMatchFailure(
           srcOp, "constant cannot be represented as a standard constant");
-    rewriter.replaceOpWithNewOp<std_d::ConstantOp>(srcOp, resultType, newValue);
+    rewriter.replaceOpWithNewOp<arith_d::ConstantOp>(srcOp, resultType,
+                                                     newValue);
     return success();
   }
 };
@@ -376,7 +379,7 @@ class FailureOpConversion : public OpConversionPattern<pydm_d::FailureOp> {
       ConversionPatternRewriter &rewriter) const override {
     Type i32 = rewriter.getI32Type();
     // '-3' == RuntimeError
-    rewriter.replaceOpWithNewOp<std_d::ConstantOp>(
+    rewriter.replaceOpWithNewOp<arith_d::ConstantOp>(
         srcOp, i32, rewriter.getIntegerAttr(i32, -3));
     return success();
   }
@@ -446,7 +449,7 @@ class GetTypeCodeConversion
                                          "result type could not be converted");
     Type i32Type = rewriter.getIntegerType(32);
     Value index0 =
-        rewriter.create<std_d::ConstantOp>(loc, rewriter.getIndexAttr(0));
+        rewriter.create<arith_d::ConstantOp>(loc, rewriter.getIndexAttr(0));
     Value typeCode = rewriter.create<iree_d::ListGetOp>(
         loc, i32Type, adaptor.value(), index0);
     rewriter.replaceOp(
@@ -471,7 +474,7 @@ class LoadVarOpConversion : public OpConversionPattern<pydm_d::LoadVarOp> {
           srcOp, "could not convert load_var result type");
     auto list = operands[0];
     auto index1 =
-        rewriter.create<std_d::ConstantOp>(loc, rewriter.getIndexAttr(1));
+        rewriter.create<arith_d::ConstantOp>(loc, rewriter.getIndexAttr(1));
     rewriter.replaceOpWithNewOp<iree_d::ListGetOp>(srcOp, resultType, list,
                                                    index1);
     return success();
@@ -488,7 +491,7 @@ class NoneOpConversion : public OpConversionPattern<pydm_d::NoneOp> {
       pydm_d::NoneOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     Type i32 = rewriter.getI32Type();
-    rewriter.replaceOpWithNewOp<std_d::ConstantOp>(
+    rewriter.replaceOpWithNewOp<arith_d::ConstantOp>(
         srcOp, i32, rewriter.getIntegerAttr(i32, 0));
     return success();
   }
@@ -523,8 +526,8 @@ class RaiseOnFailureOpConversion
     // Branch on success conditional.
     rewriter.setInsertionPointToEnd(entryBlock);
     Value successValue = getSuccessStatusValue(loc, rewriter);
-    Value isSuccess = rewriter.create<std_d::CmpIOp>(
-        loc, std_d::CmpIPredicate::eq, successValue, status);
+    Value isSuccess = rewriter.create<arith_d::CmpIOp>(
+        loc, arith_d::CmpIPredicate::eq, successValue, status);
     rewriter.create<std_d::CondBranchOp>(loc, isSuccess, continuationBlock,
                                          raiseAndReturnBlock);
     rewriter.eraseOp(srcOp);
@@ -545,8 +548,8 @@ class ReturnOpConversion : public OpConversionPattern<pydm_d::ReturnOp> {
       pydm_d::ReturnOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
-    auto zeroResult =
-        rewriter.create<std_d::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
+    auto zeroResult = rewriter.create<arith_d::ConstantOp>(
+        loc, rewriter.getI32IntegerAttr(0));
     rewriter.replaceOpWithNewOp<std_d::ReturnOp>(
         srcOp, ValueRange{zeroResult, operands[0]});
     return success();
@@ -615,13 +618,13 @@ class UnboxOpConversion : public OpConversionPattern<pydm_d::UnboxOp> {
     {
       rewriter.setInsertionPointToEnd(entryBlock);
       auto index0 =
-          rewriter.create<std_d::ConstantOp>(loc, rewriter.getIndexAttr(0));
-      Value requiredTypeCodeValue = rewriter.create<std_d::ConstantOp>(
+          rewriter.create<arith_d::ConstantOp>(loc, rewriter.getIndexAttr(0));
+      Value requiredTypeCodeValue = rewriter.create<arith_d::ConstantOp>(
           loc, rewriter.getI32IntegerAttr(typeCode));
       Value actualTypeCodeValue = rewriter.create<iree_d::ListGetOp>(
           loc, rewriter.getI32Type(), list, index0);
-      Value typeCodeEqual = rewriter.create<std_d::CmpIOp>(
-          loc, std_d::CmpIPredicate::eq, requiredTypeCodeValue,
+      Value typeCodeEqual = rewriter.create<arith_d::CmpIOp>(
+          loc, arith_d::CmpIPredicate::eq, requiredTypeCodeValue,
           actualTypeCodeValue);
       rewriter.create<std_d::CondBranchOp>(loc, typeCodeEqual, typesMatchBlock,
                                            slowPathMismatchBlock);
@@ -631,7 +634,7 @@ class UnboxOpConversion : public OpConversionPattern<pydm_d::UnboxOp> {
     {
       rewriter.setInsertionPointToEnd(typesMatchBlock);
       auto index1 =
-          rewriter.create<std_d::ConstantOp>(loc, rewriter.getIndexAttr(1));
+          rewriter.create<arith_d::ConstantOp>(loc, rewriter.getIndexAttr(1));
       Value successResult = getSuccessStatusValue(loc, rewriter);
       Value unboxedValue = rewriter.create<iree_d::ListGetOp>(
           loc, targetUnboxedType, list, index1);

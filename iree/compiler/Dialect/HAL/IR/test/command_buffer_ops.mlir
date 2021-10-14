@@ -112,8 +112,8 @@ func @command_buffer_bind_descriptor_set(
     %set: !hal.descriptor_set,
     %offset: index
   ) {
-  // CHECK: %[[SET_IDX:.+]] = constant 0
-  %c0 = constant 0 : index
+  // CHECK: %[[SET_IDX:.+]] = arith.constant 0
+  %c0 = arith.constant 0 : index
   //      CHECK: hal.command_buffer.bind_descriptor_set<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   layout(%[[LAYOUT]] : !hal.executable_layout)[%[[SET_IDX]]]
   // CHECK-SAME:   set(%[[SET]] : !hal.descriptor_set)

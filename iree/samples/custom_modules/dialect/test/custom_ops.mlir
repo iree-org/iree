@@ -12,7 +12,7 @@
 
 // CHECK-LABEL: @printOp
 func @printOp(%arg0 : !custom.message) {
-  %c1_i32 = constant 1 : i32
+  %c1_i32 = arith.constant 1 : i32
   // CHECK: "custom.print"(%arg0, %c1_i32) : (!custom.message, i32) -> ()
   "custom.print"(%arg0, %c1_i32) : (!custom.message, i32) -> ()
   return

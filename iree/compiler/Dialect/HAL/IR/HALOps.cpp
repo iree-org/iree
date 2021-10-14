@@ -257,8 +257,10 @@ void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
                                    Value allocator, ValueRange shape,
                                    int32_t elementType, int32_t encodingType) {
   build(builder, state, allocator, shape,
-        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
-        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32));
+        builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
+                                                   32),
+        builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
+                                                   32));
 }
 
 void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
@@ -285,8 +287,10 @@ void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
                                      int32_t elementType, int32_t encodingType,
                                      ValueRange indices) {
   build(builder, state, allocator, shape,
-        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
-        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
+        builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
+                                                   32),
+        builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
+                                                   32),
         indices);
 }
 
@@ -316,8 +320,10 @@ void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
                                     int32_t elementType, int32_t encodingType,
                                     ValueRange indices, ValueRange lengths) {
   build(builder, state, allocator, shape,
-        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
-        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
+        builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
+                                                   32),
+        builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
+                                                   32),
         indices, lengths);
 }
 
@@ -455,8 +461,10 @@ void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
                                Value buffer, int32_t elementType,
                                int32_t encodingType, ValueRange shape) {
   build(builder, state, buffer,
-        builder.createOrFold<ConstantIntOp>(state.location, elementType, 32),
-        builder.createOrFold<ConstantIntOp>(state.location, encodingType, 32),
+        builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
+                                                   32),
+        builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
+                                                   32),
         shape);
 }
 
@@ -562,7 +570,8 @@ void CommandBufferPushDescriptorSetOp::build(
     Value executableLayout, int64_t set,
     ArrayRef<DescriptorSetBindingValue> bindings) {
   build(builder, state, commandBuffer, executableLayout,
-        builder.createOrFold<ConstantIndexOp>(state.location, set), bindings);
+        builder.createOrFold<arith::ConstantIndexOp>(state.location, set),
+        bindings);
 }
 
 void CommandBufferPushDescriptorSetOp::build(

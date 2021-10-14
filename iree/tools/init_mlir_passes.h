@@ -83,6 +83,7 @@ inline void registerMlirPasses() {
 
   // TOSA.
   registerTosaToLinalgOnTensorsPass();
+  registerTosaToStandardPass();
 }
 
 }  // namespace mlir

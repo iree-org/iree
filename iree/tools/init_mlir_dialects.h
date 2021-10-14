@@ -47,6 +47,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   quant::QuantizationDialect,
                   spirv::SPIRVDialect,
                   StandardOpsDialect,
+                  mlir::arith::ArithmeticDialect,
                   vector::VectorDialect,
                   tensor::TensorDialect,
                   tosa::TosaDialect,

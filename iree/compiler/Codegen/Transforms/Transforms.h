@@ -40,7 +40,7 @@ LogicalResult defineWorkgroupCountRegion(
 ///   %affine.min affine_map<(d0, d1) -> (N, d0 - d1)>(%ub, %iv)
 /// ```
 /// With N a compile time constant. This operations can be replace by
-/// `%cN = constant N : index` if we can prove that %lb, %step and %ub are
+/// `%cN = arith.constant N : index` if we can prove that %lb, %step and %ub are
 /// divisible by N.
 void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns);
 

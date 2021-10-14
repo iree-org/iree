@@ -436,7 +436,7 @@ class StepExprVisitor
 /// Checks if the `forOp` is a tiled + distributed op. Looks for the op of this
 /// form
 /// ```
-///   %dim = constant ... : index
+///   %dim = arith.constant ... : index
 ///   %id = flow.dispatch.workgroup.id[%dim]
 ///   %count = flow.dispatch.workgroup.count[%dim]
 ///   %size = flow.dispatch.workgroup.size[%dim]

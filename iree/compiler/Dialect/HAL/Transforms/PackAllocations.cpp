@@ -33,7 +33,7 @@ class PackAllocationsPass
   PackAllocationsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
     registry.insert<IREE::HAL::HALDialect>();
   }
 
@@ -64,7 +64,8 @@ class PackAllocationsPass
       staticSlices.reserve(allSlices.size());
       dynamicSlices.reserve(allSlices.size());
       for (auto &slice : allSlices) {
-        if (isa_and_nonnull<ConstantOp>(slice.dynamicSize.getDefiningOp())) {
+        if (isa_and_nonnull<arith::ConstantOp>(
+                slice.dynamicSize.getDefiningOp())) {
           staticSlices.push_back(slice);
         } else {
           dynamicSlices.push_back(slice);
@@ -75,9 +76,10 @@ class PackAllocationsPass
 
       // First pack all static slices as these are entirely knowable here at
       // compile time.
-      auto offset = packOp.offset() ? packOp.offset()
-                                    : builder.createOrFold<ConstantIndexOp>(
-                                          packOp.getLoc(), 0);
+      auto offset = packOp.offset()
+                        ? packOp.offset()
+                        : builder.createOrFold<arith::ConstantIndexOp>(
+                              packOp.getLoc(), 0);
       if (!staticSlices.empty()) {
         offset = packStaticSlicesGreedily(packOp, offset, staticSlices,
                                           bufferConstraints, builder);
@@ -125,8 +127,9 @@ class PackAllocationsPass
     for (auto &slice : slices) {
       auto sliceSize = align(loc, slice.dynamicSize, rangeAlignment, builder);
       slice.packedOffset.replaceAllUsesWith(offset);
-      offset = align(loc, builder.createOrFold<AddIOp>(loc, offset, sliceSize),
-                     offsetAlignment, builder);
+      offset = align(
+          loc, builder.createOrFold<arith::AddIOp>(loc, offset, sliceSize),
+          offsetAlignment, builder);
     }
 
     return align(loc, offset, rangeAlignment, builder);
@@ -172,8 +175,8 @@ class PackAllocationsPass
       int64_t bestOffset = UNASSIGNED;
       int64_t bestOffsetFit = UNASSIGNED;
       int64_t staticSize =
-          dyn_cast<ConstantIndexOp>(slice.dynamicSize.getDefiningOp())
-              .getValue();
+          dyn_cast<arith::ConstantIndexOp>(slice.dynamicSize.getDefiningOp())
+              .value();
       int64_t alignedSize = align(staticSize, rangeAlignment);
 
       // Iterate through reservations (sorted by ascending offset) and identify
@@ -213,9 +216,10 @@ class PackAllocationsPass
         ++insertionIt;
       }
       reservations.insert(insertionIt, reservation);
-      slice.packedOffset.replaceAllUsesWith(builder.createOrFold<AddIOp>(
+      slice.packedOffset.replaceAllUsesWith(builder.createOrFold<arith::AddIOp>(
           packOp.getLoc(), baseOffset,
-          builder.createOrFold<ConstantIndexOp>(packOp.getLoc(), bestOffset)));
+          builder.createOrFold<arith::ConstantIndexOp>(packOp.getLoc(),
+                                                       bestOffset)));
 
       // Update highwater mark indicating how much memory needs to be allocated
       // for the entire slab.
@@ -223,9 +227,10 @@ class PackAllocationsPass
     }
 
     highwaterMark = align(highwaterMark, rangeAlignment);
-    return builder.createOrFold<AddIOp>(
+    return builder.createOrFold<arith::AddIOp>(
         packOp.getLoc(), baseOffset,
-        builder.createOrFold<ConstantIndexOp>(packOp.getLoc(), highwaterMark));
+        builder.createOrFold<arith::ConstantIndexOp>(packOp.getLoc(),
+                                                     highwaterMark));
   }
 
   // Packs a set of dynamically-sized slices based on the structural information
@@ -303,9 +308,9 @@ class PackAllocationsPass
           // Allocate a new bin for this slice.
           bins.push_back({offset, {}});
           targetBin = &bins.back();
-          offset =
-              align(loc, builder.createOrFold<AddIOp>(loc, offset, sliceSize),
-                    offsetAlignment, builder);
+          offset = align(
+              loc, builder.createOrFold<arith::AddIOp>(loc, offset, sliceSize),
+              offsetAlignment, builder);
         }
         targetBin->slices.push_back(slice);
         slice->packedOffset.replaceAllUsesWith(targetBin->offset);

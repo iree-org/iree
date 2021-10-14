@@ -14,6 +14,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -92,7 +93,7 @@ class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
     auto type = op.operand().getType().cast<TensorType>();
     DenseElementsAttr attr =
         DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
-    auto one = rewriter.create<ConstantOp>(loc, attr);
+    auto one = rewriter.create<arith::ConstantOp>(loc, attr);
     auto x = rewriter.create<mhlo::AddOp>(loc, op.operand(), one);
     rewriter.replaceOpWithNewOp<mhlo::LogOp>(op, x);
     return success();
@@ -109,7 +110,7 @@ class DecomposeExpM1Pattern : public OpRewritePattern<mhlo::Expm1Op> {
     auto type = op.operand().getType().cast<TensorType>();
     DenseElementsAttr attr =
         DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
-    auto one = rewriter.create<ConstantOp>(loc, attr);
+    auto one = rewriter.create<arith::ConstantOp>(loc, attr);
     auto x = rewriter.create<mhlo::ExpOp>(loc, op.operand());
     rewriter.replaceOpWithNewOp<mhlo::SubOp>(op, x, one);
     return success();
@@ -165,7 +166,7 @@ class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
         RankedTensorType::get(shape, inputType.getElementType());
     Attribute zeroAttr = rewriter.getZeroAttr(
         RankedTensorType::get({}, inputType.getElementType()));
-    auto zero = rewriter.create<ConstantOp>(loc, zeroAttr);
+    auto zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
     auto padOp = rewriter.create<mhlo::PadOp>(
         loc, padResultType, op.lhs(), zero, toDenseAttr(paddingLow),
         toDenseAttr(paddingHigh), toDenseAttr(interiorPadding));
@@ -894,7 +895,8 @@ struct MHLOToMHLOPreprocessingPass
     // chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
     conversionTarget.addLegalDialect<
         shape::ShapeDialect, chlo::HloClientDialect, mhlo::MhloDialect,
-        mlir::StandardOpsDialect, mlir::tensor::TensorDialect>();
+        math::MathDialect, mlir::StandardOpsDialect,
+        mlir::arith::ArithmeticDialect, mlir::tensor::TensorDialect>();
     // conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {

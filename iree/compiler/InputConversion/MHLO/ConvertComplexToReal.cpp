@@ -400,7 +400,8 @@ struct TestMHLOConvertComplexToRealPass
 
     target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<chlo::HloClientDialect>();
-    target.addLegalDialect<StandardOpsDialect>();
+    target
+        .addLegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect>();
 
     // For the test, require that casts fully convert.
     target.addIllegalOp<mhlo::ComplexOp>();

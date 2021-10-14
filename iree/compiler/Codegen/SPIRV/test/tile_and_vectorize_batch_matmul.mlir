@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[1, 8, 64, 4], [], [1, 8, 4, 4]]}
+#config = {tileSizes = [[1, 8, 64], [], [1, 8, 4], [0, 0, 0, 4]]}
 
 hal.executable private @batch_matmul_static_shape  {
   hal.interface private @io  {
@@ -16,9 +16,9 @@ hal.executable private @batch_matmul_static_shape  {
     }
     builtin.module {
       func @batch_matmul_static_shape() {
-        %c0 = constant 0 : index
-        %c4 = constant 4 : index
-        %c1024 = constant 1024 : index
+        %c0 = arith.constant 0 : index
+        %c4 = arith.constant 4 : index
+        %c1024 = arith.constant 1024 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<4x1024x1024xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4x1024x1024xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<4x1024x1024xf32>
@@ -70,14 +70,14 @@ hal.executable private @batch_matmul_static_shape  {
 //  CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0]
 //  CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0]
 //  CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0]
-//  CHECK-DAG:  %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:  %[[C1:.+]] = constant 1 : index
-//  CHECK-DAG:  %[[C2:.+]] = constant 2 : index
-//  CHECK-DAG:  %[[C3:.+]] = constant 3 : index
-//  CHECK-DAG:  %[[C4:.+]] = constant 4 : index
-//  CHECK-DAG:  %[[C5:.+]] = constant 5 : index
-//  CHECK-DAG:  %[[C6:.+]] = constant 6 : index
-//  CHECK-DAG:  %[[C7:.+]] = constant 7 : index
+//  CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:  %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:  %[[C2:.+]] = arith.constant 2 : index
+//  CHECK-DAG:  %[[C3:.+]] = arith.constant 3 : index
+//  CHECK-DAG:  %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG:  %[[C5:.+]] = arith.constant 5 : index
+//  CHECK-DAG:  %[[C6:.+]] = arith.constant 6 : index
+//  CHECK-DAG:  %[[C7:.+]] = arith.constant 7 : index
 //      CHECK:  %[[BIDX:.+]] = hal.interface.workgroup.id[0]
 //      CHECK:  %[[BCNTX:.+]] = hal.interface.workgroup.count[0]
 //      CHECK:  %[[BIDY:.+]] = hal.interface.workgroup.id[1]
@@ -102,6 +102,8 @@ hal.executable private @batch_matmul_static_shape  {
 // CHECK-SAME:      [%[[IVZ]], 0, %[[IVX]]] [1, 1024, 64]
 //      CHECK:  %[[SUBVIEW_RESULT:.+]] = memref.subview %[[RET0]]
 // CHECK-SAME:      [%[[IVZ]], %[[IVY]], %[[IVX]]] [1, 8, 64]
+//      CHECK:  %[[SUBVIEW_ARG1_2:.+]] = memref.subview %[[SUBVIEW_ARG1]]
+// CHECK-SAME:      [%[[IIDZ]], 0, %[[IOFFSET_X]]] [1, 1024, 4]
 //      CHECK:  %[[SUBVIEW_RESULT_2:.+]] = memref.subview %[[SUBVIEW_RESULT]]
 // CHECK-SAME:      [%[[IIDZ]], %[[IOFFSET_Y]], %[[IOFFSET_X]]] [1, 8, 4]
 //  CHECK-DAG:  %[[READ_INIT_0:.+]] = vector.transfer_read
@@ -131,9 +133,9 @@ hal.executable private @batch_matmul_static_shape  {
 // CHECK-SAME:  %[[ACC_6:.+]] = %[[READ_INIT_6]],
 // CHECK-SAME:  %[[ACC_7:.+]] = %[[READ_INIT_7]])
 //  CHECK-DAG:    %[[SUBVIEW_LHS:.+]] = memref.subview %[[SUBVIEW_ARG0]]
-// CHECK-SAME:      [%[[IIDZ]], %[[IOFFSET_Y]], %[[IV3]]] [1, 8, 4]
-//  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[SUBVIEW_ARG1]]
-// CHECK-SAME:      [%[[IIDZ]], %[[IV3]], %[[IOFFSET_X]]] [1, 4, 4] [1, 1, 1]
+// CHECK-SAME:      [0, 0, %[[IV3]]] [1, 8, 4]
+//  CHECK-DAG:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[SUBVIEW_ARG1_2]]
+// CHECK-SAME:      [0, %[[IV3]], 0] [1, 4, 4] [1, 1, 1]
 
 //  CHECK-DAG:    %[[READ_LHS_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C0]], %[[C0]]]
 //  CHECK-DAG:    %[[READ_LHS_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C1]], %[[C0]]]
@@ -368,7 +370,7 @@ hal.executable private @batch_matmul_static_shape  {
 
 // -----
 
-#config = {tileSizes = [[1, 8, 64, 4], [], [1, 8, 4, 4]]}
+#config = {tileSizes = [[1, 8, 64], [], [1, 8, 4], [0, 0, 0, 4]]}
 
 hal.executable private @fused_fill_batch_matmul  {
   hal.interface private @io  {
@@ -384,10 +386,10 @@ hal.executable private @fused_fill_batch_matmul  {
     }
     builtin.module {
       func @fused_fill_batch_matmul() {
-        %zero = constant 0.0 : f32
-        %c0 = constant 0 : index
-        %c4 = constant 4 : index
-        %c1024 = constant 1024 : index
+        %zero = arith.constant 0.0 : f32
+        %c0 = arith.constant 0 : index
+        %c4 = arith.constant 4 : index
+        %c1024 = arith.constant 1024 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<4x1024x1024xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4x1024x1024xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<4x1024x1024xf32>

@@ -41,8 +41,8 @@ StringRef getWorkgroupL1TileMarker();
 /// Workgroup memory.
 StringRef getCopyToWorkgroupMemoryMarker();
 
-/// Marker for tiling along convolution filter dimensions.
-StringRef getConvFilterTileMarker();
+/// Marker for tiling linalg reduction dimensions.
+StringRef getTileReductionMarker();
 
 /// Marker for operations that are going to be vectorized.
 StringRef getVectorizeMarker();

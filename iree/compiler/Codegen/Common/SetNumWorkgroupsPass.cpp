@@ -45,8 +45,8 @@ class SetWorkgroupSizePattern
     if (dim >= workloadPerWorkgroup.size()) {
       return failure();
     }
-    rewriter.replaceOpWithNewOp<ConstantIndexOp>(workgroupSizeOp,
-                                                 workloadPerWorkgroup[dim]);
+    rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(
+        workgroupSizeOp, workloadPerWorkgroup[dim]);
     return success();
   }
 
@@ -120,7 +120,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
       // set the number of workgroups to be 1, 1, 1 to have a single invocation.
       regionBuilder = [](OpBuilder &b, Location loc,
                          std::array<Value, 3> workload) {
-        Value one = b.create<ConstantIndexOp>(loc, 1);
+        Value one = b.create<arith::ConstantIndexOp>(loc, 1);
         return std::array<Value, 3>{one, one, one};
       };
     } else {
@@ -129,7 +129,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
       regionBuilder = [&currWorkloadPerWorkgroup](
                           OpBuilder &b, Location loc,
                           std::array<Value, 3> workload) {
-        Value one = b.create<ConstantIndexOp>(loc, 1);
+        Value one = b.create<arith::ConstantIndexOp>(loc, 1);
         std::array<Value, 3> returnValues = {one, one, one};
         for (auto ts : llvm::enumerate(currWorkloadPerWorkgroup)) {
           returnValues[ts.index()] = linalg::applyMapToValues(

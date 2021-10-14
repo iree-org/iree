@@ -10,9 +10,9 @@ func @rfft_1d(%input: tensor<32xf32>) -> (tensor<17xf32>, tensor<17xf32>) {
 }
 // CHECK:     func @rfft_1d
 // CHECK-SAME:  %[[Arg0:[a-zA-Z0-9_]*]]
-// CHECK-DAG:   %[[RealMatrix:.+]] = constant dense<"0x0000803F{{.*}}"> : tensor<32x17xf32>
-// CHECK-DAG:   %[[ImagMatrix:.+]] = constant dense<"0x00000080{{.*}}"> : tensor<32x17xf32>
-// CHECK-DAG:   %[[Zero:.+]] = constant 0.000000e+00 : f32
+// CHECK-DAG:   %[[RealMatrix:.+]] = arith.constant dense<"0x0000803F{{.*}}"> : tensor<32x17xf32>
+// CHECK-DAG:   %[[ImagMatrix:.+]] = arith.constant dense<"0x00000080{{.*}}"> : tensor<32x17xf32>
+// CHECK-DAG:   %[[Zero:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:       %[[RealInit:.+]] = linalg.init_tensor [17] : tensor<17xf32>
 // CHECK:       %[[RealFill:.+]] = linalg.fill(%[[Zero]], %[[RealInit]])
 // CHECK:       %[[RealRes:.+]] = linalg.vecmat
@@ -37,9 +37,9 @@ func @rfft_2d(%input: tensor<1x32xf32>) -> (tensor<1x17xf32>, tensor<1x17xf32>) 
 }
 // CHECK:     func @rfft_2d
 // CHECK-SAME:  %[[Arg0:[a-zA-Z0-9_]*]]
-// CHECK-DAG:   %[[RealMatrix:.+]] = constant dense<"0x0000803F{{.*}}"> : tensor<32x17xf32>
-// CHECK-DAG:   %[[ImagMatrix:.+]] = constant dense<"0x00000080{{.*}}"> : tensor<32x17xf32>
-// CHECK-DAG:   %[[Zero:.+]] = constant 0.000000e+00 : f32
+// CHECK-DAG:   %[[RealMatrix:.+]] = arith.constant dense<"0x0000803F{{.*}}"> : tensor<32x17xf32>
+// CHECK-DAG:   %[[ImagMatrix:.+]] = arith.constant dense<"0x00000080{{.*}}"> : tensor<32x17xf32>
+// CHECK-DAG:   %[[Zero:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:        %[[RealInit:.+]] = linalg.init_tensor [1, 17] : tensor<1x17xf32>
 // CHECK:        %[[RealFill:.+]] = linalg.fill(%[[Zero]], %[[RealInit]])
 // CHECK:        %[[RealRes:.+]] = linalg.matmul

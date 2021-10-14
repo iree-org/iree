@@ -16,6 +16,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir-hlo/Dialect/mhlo/IR/register.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -144,7 +145,8 @@ int main(int argc, char **argv) {
 
   DialectRegistry registry;
   mlir::mhlo::registerAllMhloDialects(registry);
-  registry.insert<mlir::StandardOpsDialect>();
+  registry.insert<mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                  mlir::math::MathDialect>();
   MLIRContext context;
   OwningModuleRef module = ModuleOp::create(mlir::UnknownLoc::get(&context));
   context.appendDialectRegistry(registry);

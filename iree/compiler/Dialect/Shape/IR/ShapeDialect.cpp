@@ -79,8 +79,10 @@ Operation* ShapeDialect::materializeConstant(OpBuilder& builder,
     auto rankedShape = typeAttr.getValue().cast<Shape::RankedShapeType>();
     return builder.create<Shape::ConstRankedShapeOp>(loc, rankedShape);
   }
-  if (ConstantOp::isBuildableWith(value, type))
-    return builder.create<ConstantOp>(loc, type, value);
+  if (arith::ConstantOp::isBuildableWith(value, type))
+    return builder.create<arith::ConstantOp>(loc, type, value);
+  if (mlir::ConstantOp::isBuildableWith(value, type))
+    return builder.create<mlir::ConstantOp>(loc, type, value);
   return nullptr;
 }
 

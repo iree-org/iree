@@ -3,16 +3,16 @@
 // CHECK-LABEL: scf_for_distributed
 func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
                       %id2 : index, %count2 : index) {
-  %c1020 = constant 1020 : index
-  %c1024 = constant 1024 : index
+  %c1020 = arith.constant 1020 : index
+  %c1024 = arith.constant 1024 : index
   %0 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%id1]
   %1 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%count1]
 
   //      CHECK: scf.for
-  //      CHECK:   %[[C32:.*]] = constant 32 : index
+  //      CHECK:   %[[C32:.*]] = arith.constant 32 : index
   //      CHECK:   scf.for %{{.*}} = %{{.*}} to %[[C32]]
-  // CHECK-NEXT:     %[[C4:.*]] = constant 4 : index
-  // CHECK-NEXT:     %[[C4I64:.*]] = index_cast %[[C4:.*]]
+  // CHECK-NEXT:     %[[C4:.*]] = arith.constant 4 : index
+  // CHECK-NEXT:     %[[C4I64:.*]] = arith.index_cast %[[C4:.*]]
   // CHECK-NEXT:     memref.store %[[C4I64]], %{{.*}}[] : memref<i64>
   scf.for %arg0 = %0 to %c1024 step %1 {
     %2 = affine.min affine_map<(d0) -> (32, -d0 + 1024)>(%arg0)
@@ -20,7 +20,7 @@ func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
     %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%count2]
     scf.for %arg1 = %3 to %2 step %4 {
       %5 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%2, %arg1)
-      %6 = index_cast %5: index to i64
+      %6 = arith.index_cast %5: index to i64
       memref.store %6, %A[]: memref<i64>
     }
   }
@@ -31,8 +31,8 @@ func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
   //      CHECK: scf.for
   //      CHECK:   %[[MIN:.*]] = affine.min
   //      CHECK:   scf.for %{{.*}} = %{{.*}} to %[[MIN]]
-  // CHECK-NEXT:     %[[C4:.*]] = constant 4 : index
-  // CHECK-NEXT:     %[[C4I64:.*]] = index_cast %[[C4:.*]]
+  // CHECK-NEXT:     %[[C4:.*]] = arith.constant 4 : index
+  // CHECK-NEXT:     %[[C4I64:.*]] = arith.index_cast %[[C4:.*]]
   // CHECK-NEXT:     memref.store %[[C4I64]], %{{.*}}[] : memref<i64>
   scf.for %arg0 = %0 to %c1020 step %1 {
     %2 = affine.min affine_map<(d0) -> (32, -d0 + 1020)>(%arg0)
@@ -40,7 +40,7 @@ func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
     %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%count2]
     scf.for %arg1 = %3 to %2 step %4 {
       %5 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%2, %arg1)
-      %6 = index_cast %5: index to i64
+      %6 = arith.index_cast %5: index to i64
       memref.store %6, %A[]: memref<i64>
     }
   }
@@ -49,8 +49,8 @@ func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
   //      CHECK: scf.for
   //      CHECK:   %[[MIN:.*]] = affine.min
   //      CHECK:   scf.parallel {{.*}} to (%[[MIN]])
-  // CHECK-NEXT:     %[[C4:.*]] = constant 4 : index
-  // CHECK-NEXT:     %[[C4I64:.*]] = index_cast %[[C4:.*]]
+  // CHECK-NEXT:     %[[C4:.*]] = arith.constant 4 : index
+  // CHECK-NEXT:     %[[C4I64:.*]] = arith.index_cast %[[C4:.*]]
   // CHECK-NEXT:     memref.store %[[C4I64]], %{{.*}}[] : memref<i64>
   scf.for %arg0 = %0 to %c1020 step %1 {
     %2 = affine.min affine_map<(d0) -> (32, -d0 + 1020)>(%arg0)
@@ -58,7 +58,7 @@ func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
     %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%count2]
     scf.parallel (%arg1) = (%3) to (%2) step (%4) {
       %5 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%2, %arg1)
-      %6 = index_cast %5: index to i64
+      %6 = arith.index_cast %5: index to i64
       memref.store %6, %A[]: memref<i64>
     }
   }

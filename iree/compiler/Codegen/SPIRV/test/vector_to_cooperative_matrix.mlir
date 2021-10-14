@@ -14,9 +14,9 @@ hal.executable private @kernel_matmul  {
     builtin.module {
       // CHECK-LABEL: func @kernel_matmul
       func @kernel_matmul(%arg0: memref<8x32xi8>, %arg1: memref<32x8xi8>, %arg2: memref<8x8xi32>) {
-        %c0 = constant 0 : index
-        %cst = constant 0 : i32
-        %cst_i8 = constant 0 : i8
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0 : i32
+        %cst_i8 = arith.constant 0 : i8
         %0 = vector.transfer_read %arg0[%c0, %c0], %cst_i8 : memref<8x32xi8>, vector<8x32xi8>
         %1 = vector.transfer_read %arg1[%c0, %c0], %cst_i8 : memref<32x8xi8>, vector<32x8xi8>
         %2 = vector.transfer_read %arg2[%c0, %c0], %cst : memref<8x8xi32>, vector<8x8xi32>
@@ -49,11 +49,11 @@ hal.executable private @kernel_matmul  {
     builtin.module {
       // CHECK-LABEL: func @kernel_matmul_licm
       func @kernel_matmul_licm(%arg0: memref<4096x4096xi8>, %arg1: memref<4096x4096xi8>, %arg2: memref<4096x4096xi32>) {
-        %c32 = constant 32 : index
-        %c4096 = constant 4096 : index
-        %c0 = constant 0 : index
-        %c0_i32 = constant 0 : i32
-        %c0_i8 = constant 0 : i8
+        %c32 = arith.constant 32 : index
+        %c4096 = arith.constant 4096 : index
+        %c0 = arith.constant 0 : index
+        %c0_i32 = arith.constant 0 : i32
+        %c0_i8 = arith.constant 0 : i8
         // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV
         %4 = vector.transfer_read %arg2[%c0, %c0], %c0_i32 {in_bounds = [true, true]} : memref<4096x4096xi32>, vector<16x16xi32>
         // CHECK: %[[INIT:.+]] = builtin.unrealized_conversion_cast %[[C]] : !spv.coopmatrix<16x16xi32, Subgroup> to vector<16x16xi32>
@@ -95,10 +95,10 @@ hal.executable private @kernel_matmul  {
     builtin.module {
       // CHECK-LABEL: func @kernel_matmul_vector_memref
       func @kernel_matmul_vector_memref(%arg0: memref<4096x256xvector<4xi32>>, %arg1: memref<4096x256xvector<4xi32>>, %arg2: memref<4096x1024xvector<4xi32>>) {
-        %c32 = constant 32 : index
-        %c4096 = constant 4096 : index
-        %c0 = constant 0 : index
-        %cst = constant dense<0> : vector<4xi32>
+        %c32 = arith.constant 32 : index
+        %c4096 = arith.constant 4096 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant dense<0> : vector<4xi32>
         // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV
         %4 = vector.transfer_read %arg2[%c0, %c0], %cst : memref<4096x1024xvector<4xi32>>, vector<16x16xi32>
         // CHECK: scf.for

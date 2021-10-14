@@ -23,13 +23,13 @@ namespace iree_compiler {
 namespace {
 
 class ConstantTensorOpConversion
-    : public OpConversionPattern<mlir::ConstantOp> {
+    : public OpConversionPattern<mlir::arith::ConstantOp> {
  public:
   ConstantTensorOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx) {}
 
   LogicalResult matchAndRewrite(
-      mlir::ConstantOp constantOp, llvm::ArrayRef<Value> newOperands,
+      mlir::arith::ConstantOp constantOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     if (!constantOp.getType().isa<TensorType>()) return failure();
 
@@ -46,7 +46,7 @@ class ConstantTensorOpConversion
         IREE::HAL::BufferUsageBitfield::All |
         IREE::HAL::BufferUsageBitfield::Constant;
 
-    auto elementsAttr = constantOp.getValue().cast<ElementsAttr>();
+    auto elementsAttr = constantOp.value().cast<ElementsAttr>();
     auto elementsTy = elementsAttr.getType().cast<ShapedType>();
 
     // Expand boolean elements to the minimum bit widht supported by the HAL

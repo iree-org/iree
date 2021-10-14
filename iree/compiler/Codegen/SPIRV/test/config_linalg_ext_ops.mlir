@@ -14,12 +14,12 @@ hal.executable private @static_1d_sort  {
     hal.executable.entry_point @static_1d_sort attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @static_1d_sort() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:1000xi32>
         %1 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:1000xi32> -> tensor<1000xi32>
         %2 = linalg_ext.sort dimension(0) {__internal_linalg_transform__ = "workgroup"} outs(%1 : tensor<1000xi32>)  {
         ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
-          %3 = cmpi slt, %arg0, %arg1 : i32
+          %3 = arith.cmpi slt, %arg0, %arg1 : i32
           linalg_ext.yield %3 : i1
         } -> tensor<1000xi32>
         flow.dispatch.tensor.store %2, %0, offsets = [], sizes = [], strides = [] : tensor<1000xi32> -> !flow.dispatch.tensor<readwrite:1000xi32>
@@ -38,7 +38,7 @@ hal.executable private @static_1d_sort  {
 //  CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize"}
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
-//  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//  CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //  CHECK-NEXT:   hal.return %[[ONE]], %[[ONE]], %[[ONE]]
 
 //       CHECK: func @static_1d_sort()
@@ -62,9 +62,9 @@ hal.executable private @static_3d_sort  {
     hal.executable.entry_point @static_3d_sort attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @static_3d_sort() {
-        %c64 = constant 64 : index
-        %c128 = constant 128 : index
-        %c0 = constant 0 : index
+        %c64 = arith.constant 64 : index
+        %c128 = arith.constant 128 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<64x32x128xi32>
         %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<64x32x128xi32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -87,7 +87,7 @@ hal.executable private @static_3d_sort  {
             linalg.copy(%9, %10) : memref<?x?x?xi32>, memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
             linalg_ext.sort dimension(1) {__internal_linalg_transform__ = "workgroup"} outs(%10 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
-              %11 = cmpi slt, %arg2, %arg3 : i32
+              %11 = arith.cmpi slt, %arg2, %arg3 : i32
               linalg_ext.yield %11 : i1
             }
           }
@@ -102,7 +102,7 @@ hal.executable private @static_3d_sort  {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [16, 1]}
 //           CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   %[[DIV:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[X]]]
 //           CHECK-NEXT:   hal.return %[[DIV]], %[[Y]], %[[ONE]]
 
@@ -127,10 +127,10 @@ hal.executable private @static_1d_fft_stage2  {
     hal.executable.entry_point @static_1d_fft_stage2 attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @static_1d_fft_stage2() {
-        %c0 = constant 0 : index
-        %c2 = constant 2 : index
-        %cst = constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
-        %cst_0 = constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
+        %c0 = arith.constant 0 : index
+        %c2 = arith.constant 2 : index
+        %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
+        %cst_0 = arith.constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
         %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
         %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
@@ -149,7 +149,7 @@ hal.executable private @static_1d_fft_stage2  {
 //  CHECK-SAME:   workloadPerWorkgroup = [4]}
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %{{.+}}: index, %{{.+}}: index):
-//  CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//  CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //  CHECK-NEXT:   %[[T:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%[[ARG0]]]
 //  CHECK-NEXT:   hal.return %[[T]], %[[ONE]], %[[ONE]]
 
@@ -175,13 +175,13 @@ hal.executable private @static_3d_fft_stage3  {
     hal.executable.entry_point @static_3d_fft_stage3 attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @static_3d_fft_stage3() {
-        %c0 = constant 0 : index
-        %c3 = constant 3 : index
-        %c64 = constant 64 : index
-        %c128 = constant 128 : index
-        %c32 = constant 32 : index
-        %cst = constant dense<[1.000000e+00, 0.707106769, 6.12323426E-17, -0.707106769]> : tensor<4xf32>
-        %cst_0 = constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
+        %c0 = arith.constant 0 : index
+        %c3 = arith.constant 3 : index
+        %c64 = arith.constant 64 : index
+        %c128 = arith.constant 128 : index
+        %c32 = arith.constant 32 : index
+        %cst = arith.constant dense<[1.000000e+00, 0.707106769, 6.12323426E-17, -0.707106769]> : tensor<4xf32>
+        %cst_0 = arith.constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
         %0 = memref.buffer_cast %cst_0 : memref<4xf32>
         %1 = memref.buffer_cast %cst : memref<4xf32>
         %2 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : memref<64x128x32xf32>
