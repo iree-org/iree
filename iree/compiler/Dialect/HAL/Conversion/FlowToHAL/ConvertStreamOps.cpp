@@ -993,9 +993,11 @@ static LogicalResult recordTensorSplat(Value device, Value commandBuffer,
   }
 
   auto zeroOffset = schedulingState.lookupOrCreateIndex(0, rewriter);
+  auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
+      splatOp.getLoc(), sizeof(uint32_t), 32);
   rewriter.create<IREE::HAL::CommandBufferFillBufferOp>(
       splatOp.getLoc(), commandBuffer, resultBuffer.buffer, zeroOffset,
-      resultBuffer.length, pattern);
+      resultBuffer.length, pattern, patternLength);
 
   // Full barriers for now as we aren't scheduling things.
   recordFullExecutionBarrier(commandBuffer, splatOp.getLoc(), rewriter);

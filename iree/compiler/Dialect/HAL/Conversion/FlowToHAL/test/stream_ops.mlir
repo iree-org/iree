@@ -589,7 +589,7 @@ func @tensorSplat(%value: i32) -> tensor<2x128xi32> {
   // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c1024}
   %0 = flow.ex.stream.fragment(%value) : (i32) -> tensor<2x128xi32> =
       (%arg0: i32) -> tensor<2x128xi32> {
-    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c1024] pattern(%[[VALUE]] : i32)
+    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c1024] pattern(%[[VALUE]] : i32, %c4_i32)
     %1 = flow.tensor.splat %arg0 : tensor<2x128xi32>
     flow.return %1 : tensor<2x128xi32>
   }
@@ -616,7 +616,7 @@ func @tensorSplatDynamic(%value: i8, %dim: index) -> tensor<?x128xi8> {
     //  CHECK-DAG: %[[ORA:.+]] = arith.ori %[[B2]], %[[B3]]
     //  CHECK-DAG: %[[ORB:.+]] = arith.ori %[[B1]], %[[ORA]]
     //  CHECK-DAG: %[[PATTERN:.+]] = arith.ori %[[B0]], %[[ORB]]
-    // CHECK-NEXT: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %[[SIZE]]] pattern(%[[PATTERN]] : i32)
+    // CHECK-NEXT: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %[[SIZE]]] pattern(%[[PATTERN]] : i32, %c4_i32)
     %1 = flow.tensor.splat %arg0 : tensor<?x128xi8>{%arg1}
     flow.return %1 : tensor<?x128xi8>
   }
@@ -636,7 +636,7 @@ func @tensorSplatF32(%value: f32) -> tensor<2x128xf32> {
   %0 = flow.ex.stream.fragment(%value) : (f32) -> tensor<2x128xf32> =
       (%arg0: f32) -> tensor<2x128xf32> {
     //  CHECK-DAG: %[[PATTERN:.+]] = arith.bitcast %[[VALUE]] : f32 to i32
-    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c1024] pattern(%[[PATTERN]] : i32)
+    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c1024] pattern(%[[PATTERN]] : i32, %c4_i32)
     %1 = flow.tensor.splat %arg0 : tensor<2x128xf32>
     flow.return %1 : tensor<2x128xf32>
   }
@@ -659,7 +659,7 @@ func @tensorSplatF16(%value: f16) -> tensor<2x128xf16> {
     //  CHECK-DAG: %[[B0:.+]] = arith.extui %[[BITCAST]] : i16 to i32
     //  CHECK-DAG: %[[B1:.+]] = arith.shli %[[B0]], %c16
     //  CHECK-DAG: %[[PATTERN:.+]] = arith.ori %[[B0]], %[[B1]]
-    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c512] pattern(%[[PATTERN]] : i32)
+    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c512] pattern(%[[PATTERN]] : i32, %c4_i32)
     %1 = flow.tensor.splat %arg0 : tensor<2x128xf16>
     flow.return %1 : tensor<2x128xf16>
   }

@@ -197,7 +197,8 @@ vm.import @command_buffer.fill_buffer(
   %target_buffer : !vm.ref<!hal.buffer>,
   %target_offset : i32,
   %length : i32,
-  %pattern : i32
+  %pattern : i32,
+  %pattern_length: i32
 )
 
 // Copies a range of one buffer to another.

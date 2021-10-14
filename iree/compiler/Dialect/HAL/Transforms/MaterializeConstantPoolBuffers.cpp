@@ -268,9 +268,11 @@ class MaterializeConstantPoolBuffersPass
           splatOp.value().cast<SplatElementsAttr>().getSplatValue());
       auto patternValue = builder.createOrFold<mlir::arith::ConstantIntOp>(
           loc, static_cast<int64_t>(pattern), 32);
+      auto patternLength = builder.createOrFold<mlir::arith::ConstantIntOp>(
+          loc, sizeof(pattern), 32);
       builder.create<IREE::HAL::CommandBufferFillBufferOp>(
           splatOp.getLoc(), commandBufferValue, bufferValue, offsetValue,
-          lengthValue, patternValue);
+          lengthValue, patternValue, patternLength);
     }
     builder.create<IREE::HAL::CommandBufferEndOp>(loc, commandBufferValue);
     builder.create<IREE::HAL::ExSubmitAndWaitOp>(loc, deviceValue,
