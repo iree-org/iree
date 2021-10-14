@@ -499,6 +499,14 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
             // If unsuccessful, try to tile and distribute.
             return setDefaultOpConfig(limits, op);
           })
+      .Case<linalg::GenericOp>([limits](auto op) {
+        // If generic op has reduction iterator types, it is a root as
+        // well. Just set the default configuration, which marks it as a root.
+        if (op.getNumLoops() != op.getNumParallelLoops()) {
+          return setDefaultOpConfig(limits, op);
+        }
+        return success();
+      })
       .Default([](Operation *) { return success(); });
 };
 
@@ -529,8 +537,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
-    int64_t subgroupSize =
-        targetEnv.getResourceLimits().subgroup_size().getValue().getSExtValue();
+    int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
 
     // If the dispatch region does not contain tiled and distributed Linalg ops,
     // invoke the pipeline to distribute to global invocations.
@@ -571,8 +578,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
         // Check if the op configuration was set.
         if (!getLoweringConfig(computeOp)) {
           return computeOp->emitOpError(
-              "without known roots, the last operation in the tiled loop body "
-              "is expected to be set as root");
+              "without known roots, the last compute operation in the tiled "
+              "loop body is expected to be set as root");
         }
         rootOperation = computeOp;
         break;
