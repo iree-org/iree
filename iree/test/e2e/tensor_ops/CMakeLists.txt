@@ -50,6 +50,12 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "-iree-llvm-link-embedded=true"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
 )
 
 iree_check_single_backend_test_suite(

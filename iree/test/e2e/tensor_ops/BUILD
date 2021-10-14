@@ -71,6 +71,13 @@ iree_check_single_backend_test_suite(
         "-iree-llvm-link-embedded=true",
     ],
     driver = "cuda",
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
     target_backend = "cuda",
 )
 
