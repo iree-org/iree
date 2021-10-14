@@ -96,14 +96,16 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
                                              RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
 
-  auto getSubgroupProcInfoFn = [&](OpBuilder &builder, Location loc,
+  auto getSubgroupProcInfoFn = [subgroupCounts](
+                                   OpBuilder &builder, Location loc,
                                    ArrayRef<Range> parallelLoopRanges) {
     auto counts = llvm::to_vector<3>(subgroupCounts);
     // Only consider parallel dimensions given that we haven't supported
     // workgroup memory yet. We'll use vector unroll later to "tile" along
     // reduction dimensions.
-    counts.resize(std::min(parallelLoopRanges.size(), 3ul), 1);
-    return getSubgroupIdsAndCounts(builder, loc, subgroupCounts);
+    unsigned size = std::min(parallelLoopRanges.size(), 3ul);
+    counts.resize(size, 1);
+    return getSubgroupIdsAndCounts(builder, loc, counts);
   };
 
   linalg::LinalgLoopDistributionOptions distributionOptions;
@@ -113,7 +115,7 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters};
 
-  auto setTileSizesFn = [&](OpBuilder &builder, Operation *op) {
+  auto setTileSizesFn = [](OpBuilder &builder, Operation *op) {
     SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
     // Only consider parallel dimensions given that we haven't supported
     // workgroup memory yet. We'll use vector unroll later to "tile" along
@@ -198,9 +200,8 @@ Optional<SmallVector<int64_t, 4>> getCooperativeOpVectorShape(
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.
 void populateVectorUnrollPatterns(ArrayRef<int64_t> cooperativeOpSize,
                                   RewritePatternSet &patterns) {
-  auto getShapeFn = [&](Operation *op) {
-    auto size = llvm::to_vector<4>(cooperativeOpSize);
-    return getCooperativeOpVectorShape(op, size);
+  auto getShapeFn = [cooperativeOpSize](Operation *op) {
+    return getCooperativeOpVectorShape(op, cooperativeOpSize);
   };
   auto options = vector::UnrollVectorOptions().setNativeShapeFn(getShapeFn);
   vector::populateVectorUnrollPatterns(patterns, options);
