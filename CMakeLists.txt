@@ -302,9 +302,23 @@ include(iree_setup_toolchain)
 # use of Python (such as LLVM) resolve the same version.
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_COMPILER} OR
-   ${IREE_BUILD_PYTHON_BINDINGS})
-  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+if(IREE_BUILD_COMPILER OR IREE_BUILD_PYTHON_BINDINGS)
+  # After CMake 3.18, we are able to limit the scope of the search to just
+  # Development.Module. Searching for Development will fail in situations where
+  # the Python libraries are not available. When possible, limit to just
+  # Development.Module.
+  # See https://pybind11.readthedocs.io/en/stable/compiling.html#findpython-mode
+  if(CMAKE_VERSION VERSION_LESS "3.18.0")
+    message(WARNING
+      "This version of CMake is not compatible with statically built Python "
+      "installations. If Python fails to detect below this may apply to you. "
+      "Recommend upgrading to at least CMake 3.18. "
+      "Detected current version: ${CMAKE_VERSION}"
+    )
+    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+  else()
+    find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
+  endif()
 endif()
 
 #-------------------------------------------------------------------------------
@@ -388,15 +402,6 @@ else()
     target_include_directories(MLIRSupport PUBLIC ${_common_include_dirs})
   endfunction()
   _hack_llvm_include_paths()
-endif()
-
-#-------------------------------------------------------------------------------
-# Python bindings.
-#-------------------------------------------------------------------------------
-
-if(IREE_BUILD_PYTHON_BINDINGS)
-  # Note: Optional because python libs can be manually specified.
-  find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 endif()
 
 #-------------------------------------------------------------------------------
