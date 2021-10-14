@@ -766,9 +766,9 @@ func @extract_slice(%arg0 : tensor<?x?xf32>, %arg1: index,
 // CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG5:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG3]], %[[ARG4]]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[ARG3]] step %[[C10]]
@@ -802,14 +802,14 @@ func @extract_slice_static(%arg0 : tensor<50x60xf32>) -> tensor<20x30xf32> {
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (d0 * s0 + s1)>
 //      CHECK: func @extract_slice_static
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<50x60xf32>
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C2:.+]] = constant 2 : index
-//  CHECK-DAG:   %[[C3:.+]] = constant 3 : index
-//  CHECK-DAG:   %[[C5:.+]] = constant 5 : index
-//  CHECK-DAG:   %[[C6:.+]] = constant 6 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
-//  CHECK-DAG:   %[[C30:.+]] = constant 30 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//  CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//  CHECK-DAG:   %[[C5:.+]] = arith.constant 5 : index
+//  CHECK-DAG:   %[[C6:.+]] = arith.constant 6 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
+//  CHECK-DAG:   %[[C30:.+]] = arith.constant 30 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [20, 30]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[C20]] step %[[C10]]
@@ -853,9 +853,9 @@ func @extract_slice_reduced_rank_outer(%arg0 : tensor<?x?x?xf32>, %arg1 : index,
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG7:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG4]], %[[ARG5]]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[ARG4]] step %[[C10]]
@@ -900,9 +900,9 @@ func @extract_slice_reduced_rank_middle(%arg0 : tensor<?x?x?xf32>, %arg1 : index
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG7:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG4]], %[[ARG5]]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[ARG4]] step %[[C10]]
@@ -947,9 +947,9 @@ func @extract_slice_reduced_rank_inner(%arg0 : tensor<?x?x?xf32>, %arg1 : index,
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG7:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG4]], %[[ARG5]]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[ARG4]] step %[[C10]]
@@ -996,9 +996,9 @@ func @extract_slice_reduced_rank_two_dims_1(%arg0 : tensor<?x?x?x?xf32>, %arg1 :
 // CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG9:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG10:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG5]], %[[ARG6]]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[ARG5]] step %[[C10]]
@@ -1042,9 +1042,9 @@ func @extract_slice_reduced_rank_two_dims_2(%arg0 : tensor<?x?x?x?xf32>, %arg1 :
 // CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG5:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG5]], %[[ARG6]]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[ARG5]] step %[[C10]]
@@ -1092,9 +1092,9 @@ func @extract_slice_reduced_rank_two_dims_3(%arg0 : tensor<?x?x?x?xf32>, %arg1 :
 // CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG9:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG10:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG5]], %[[ARG6]]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[ARG5]] step %[[C10]]
@@ -1142,9 +1142,9 @@ func @extract_slice_reduced_rank_two_dims_4(%arg0 : tensor<?x?x?x?xf32>, %arg1 :
 // CHECK-SAME:     %[[ARG8:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG9:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG10:[a-zA-Z0-9]+]]: index
-//  CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:   %[[C10:.+]] = constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = constant 20 : index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG5]], %[[ARG6]]]
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]]
 // CHECK-SAME:       to %[[ARG5]] step %[[C10]]
