@@ -37,14 +37,13 @@ import json
 import os
 import requests
 
-import urllib.parse
 import markdown_strings as md
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
-from common.benchmark_definition import BenchmarkResults, execute_cmd_and_get_output
-from common.benchmark_thresholds import BENCHMARK_THRESHOLDS, ThresholdUnit
+from common.benchmark_definition import execute_cmd_and_get_output
+from common.benchmark_presentation import *
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"
@@ -54,7 +53,6 @@ GITHUB_USER = "iree-github-actions-bot"
 IREE_PROJECT_ID = 'IREE'
 # The maximal numbers of trials when querying base commit benchmark results.
 MAX_BASE_COMMIT_QUERY_COUNT = 10
-PERFBOARD_SERIES_PREFIX = "https://perf.iree.dev/serie?IREE?"
 # The max number of rows to show per table.
 TABLE_SIZE_CUT = 3
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
@@ -115,59 +113,6 @@ def get_from_dashboard(url: str,
   return data
 
 
-@dataclass
-class AggregateBenchmarkLatency:
-  """An object for describing aggregate latency numbers for a benchmark."""
-  mean_time: int
-  median_time: int
-  stddev_time: int
-  # The average latency time for the base commit to compare against.
-  base_mean_time: Optional[int] = None
-
-
-def aggregate_all_benchmarks(
-    benchmark_files: Sequence[str],
-    verbose: bool = False) -> Dict[str, AggregateBenchmarkLatency]:
-  """Aggregates all benchmarks in the given files.
-
-  Args:
-  - benchmark_files: A list of JSON files, each can be decoded as a
-    BenchmarkResults.
-
-  Returns:
-  - A dict of benchmark names to AggregateBenchmarkLatency numbers.
-  """
-
-  pr_commit = get_required_env_var("BUILDKITE_COMMIT")
-  aggregate_results = {}
-
-  for benchmark_file in benchmark_files:
-    with open(benchmark_file) as f:
-      content = f.read()
-    file_results = BenchmarkResults.from_json_str(content)
-
-    if file_results.commit != pr_commit:
-      raise ValueError("Inconsistent pull request commit")
-
-    for benchmark_index in range(len(file_results.benchmarks)):
-      benchmark_case = file_results.benchmarks[benchmark_index]
-
-      # Make sure each benchmark has a unique name.
-      name = str(benchmark_case["benchmark"])
-      if name in aggregate_results:
-        raise ValueError(f"Duplicated benchmarks: {name}")
-
-      # Now scan all benchmark iterations and find the aggregate results.
-      mean_time = file_results.get_aggregate_time(benchmark_index, "mean")
-      median_time = file_results.get_aggregate_time(benchmark_index, "median")
-      stddev_time = file_results.get_aggregate_time(benchmark_index, "stddev")
-
-      aggregate_results[name] = AggregateBenchmarkLatency(
-          mean_time, median_time, stddev_time)
-
-  return aggregate_results
-
-
 def query_base_benchmark_results(commit,
                                  verbose: bool = False) -> Dict[str, int]:
   """Queries the benchmark results for the given commit."""
@@ -178,149 +123,17 @@ def query_base_benchmark_results(commit,
   return get_from_dashboard(f'{url}/apis/getBuild', payload, verbose=verbose)
 
 
-def make_benchmark_clickable(name: str) -> str:
-  """Add link to the given benchmark name."""
-  url = PERFBOARD_SERIES_PREFIX + urllib.parse.quote(name, safe="()[]@,")
-  return md.link(name, url)
-
-
-def add_header_and_get_markdown_table(names: Tuple[str],
-                                      means: Tuple[Any],
-                                      medians: Tuple[int],
-                                      stddevs: Tuple[int],
-                                      size_cut: Optional[int] = None) -> str:
-  """Generates a markdown table with proper headers for benchmarks.
-
-  Args:
-  - size_cut: If not None, only show the top N results for each table.
-  """
-  total_size = len(names)
-  if size_cut is not None:
-    names = names[0:size_cut]
-    means = means[0:size_cut]
-    medians = medians[0:size_cut]
-    stddevs = stddevs[0:size_cut]
-
-  names = tuple([make_benchmark_clickable(name) for name in names])
-  names = ("Benchmark Name",) + names
-  means = ("Average Latency (ms)",) + means
-  medians = ("Median Latency (ms)",) + medians
-  stddevs = ("Latency Standard Deviation (ms)",) + stddevs
-
-  table_str = md.table([names, means, medians, stddevs])
-  if size_cut is not None and size_cut < total_size:
-    table_str += "\n\n"
-    table_str += md.italics(
-        f"[Top {size_cut} out of {total_size} benchmark results showed]")
-  return table_str
-
-
-def sort_benchmarks_and_get_table(benchmarks: Dict[str,
-                                                   AggregateBenchmarkLatency],
-                                  size_cut: Optional[int] = None):
-  """Sorts all benchmarks according to the improvement/regression ratio and
-  returns a markdown table for it.
-
-  Args:
-  - size_cut: If not None, only show the top N results for each table.
-  """
-  sorted_benchmarks = []
-  for k, v in benchmarks.items():
-    ratio = abs(v.mean_time - v.base_mean_time) / v.base_mean_time
-    sorted_benchmarks.append((k, (v.mean_time, v.base_mean_time, ratio),
-                              v.median_time, v.stddev_time))
-  # Sort according to ratio in the reverse order.
-  sorted_benchmarks.sort(key=lambda benchmark: benchmark[1][2], reverse=True)
-
-  # Split each field into its own tuple in prepration for markdown table.
-  names, means, medians, stddevs = zip(*sorted_benchmarks)
-
-  # Turn the tuple about means into a string representation.
-  str_means = []
-  for pr, base, ratio in means:
-    direction = "↑" if pr > base else ("↓" if pr < base else "")
-    str_means.append(f"{pr} (vs. {base}, {ratio:.2%}{direction})")
-  str_means = tuple(str_means)
-
-  return add_header_and_get_markdown_table(names, str_means, medians, stddevs,
-                                           size_cut)
-
-
-def categorize_benchmarks_into_tables(benchmarks: Dict[
-    str, AggregateBenchmarkLatency],
-                                      size_cut: Optional[int] = None) -> str:
-  """Splits benchmarks into regressed/improved/similar/raw categories and
-  returns their markdown tables.
-
-    Args:
-    - benchmarks: A dictionary of benchmark names to its aggregate info.
-    - size_cut: If not None, only show the top N results for each table.
-    """
-  regressed, improved, similar, raw = {}, {}, {}, {}
-
-  for name, results in benchmarks.items():
-    # If no informatio about the base result. Then we cannot analyze.
-    if results.base_mean_time is None:
-      raw[name] = results
-      continue
-
-    similar_threshold = None
-    for threshold in BENCHMARK_THRESHOLDS:
-      if threshold.regex.match(name):
-        similar_threshold = threshold
-        break
-    if similar_threshold is None:
-      raise ValueError(f"no matched threshold setting for benchmark: {name}")
-
-    current = results.mean_time
-    base = results.base_mean_time
-    if similar_threshold.unit == ThresholdUnit.PERCENTAGE:
-      ratio = abs(current - base) / base * 100
-    else:
-      ratio = abs(current - base)
-
-    if ratio <= similar_threshold.threshold:
-      similar[name] = results
-    elif current > base:
-      regressed[name] = results
-    else:
-      improved[name] = results
-
-  tables = []
-  if regressed:
-    tables.append(md.header("Regressed Benchmarks 🚩", 3))
-    tables.append(sort_benchmarks_and_get_table(regressed, size_cut))
-  if improved:
-    tables.append(md.header("Improved Benchmarks 🎉", 3))
-    tables.append(sort_benchmarks_and_get_table(improved, size_cut))
-  # If we want to abbreviate, similar results won't be interesting.
-  if similar and size_cut is None:
-    tables.append(md.header("Similar Benchmarks", 3))
-    tables.append(sort_benchmarks_and_get_table(similar, size_cut))
-  if raw:
-    tables.append(md.header("Raw Benchmarks", 3))
-    raw_list = [
-        (k, v.mean_time, v.median_time, v.stddev_time) for k, v in raw.items()
-    ]
-    names, means, medians, stddevs = zip(*raw_list)
-    tables.append(
-        add_header_and_get_markdown_table(names=names,
-                                          means=means,
-                                          medians=medians,
-                                          stddevs=stddevs,
-                                          size_cut=size_cut))
-  return "\n\n".join(tables)
-
-
 def get_benchmark_result_markdown(benchmark_files: Sequence[str],
                                   query_base: bool,
                                   verbose: bool = False) -> Tuple[str, str]:
   """Gets the full/abbreviated markdown summary of all benchmarks in files."""
-  all_benchmarks = aggregate_all_benchmarks(benchmark_files, verbose=verbose)
+  pr_commit = get_required_env_var("BUILDKITE_COMMIT")
+  all_benchmarks = aggregate_all_benchmarks(benchmark_files,
+                                            pr_commit,
+                                            verbose=verbose)
 
   build_url = get_required_env_var("BUILDKITE_BUILD_URL")
   pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
-  pr_commit = get_required_env_var("BUILDKITE_COMMIT")
   pr_commit = md.link(pr_commit,
                       f"{GITHUB_IREE_REPO_PREFIX}/commit/{pr_commit}")
 
