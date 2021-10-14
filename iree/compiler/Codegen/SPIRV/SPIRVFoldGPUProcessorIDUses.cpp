@@ -240,8 +240,8 @@ struct FoldAffineMinOverProcessorID : OpRewritePattern<AffineMinOp> {
       LLVM_DEBUG(llvm::dbgs() << "map by subtracting expr '" << candidate
                               << "': " << subMap << "\n");
       if (llvm::all_of(subMap.getResults(), isNonNegativeCstExpr)) {
-        rewriter.replaceOpWithNewOp<ConstantIndexOp>(minOp,
-                                                     candidate.getValue());
+        rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(
+            minOp, candidate.getValue());
         return success();
       }
     }

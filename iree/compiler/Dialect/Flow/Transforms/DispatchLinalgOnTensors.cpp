@@ -134,7 +134,7 @@ static SmallVector<Value, 4> convertToWorkload(OpBuilder &b, Location loc,
   assert(shape.size() <= kNumMaxParallelDims &&
          "workload cannot be more than 3D for now");
   SmallVector<Value, 4> workload = llvm::to_vector<4>(llvm::reverse(shape));
-  Value one = b.create<ConstantIndexOp>(loc, 1);
+  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
   workload.resize(kNumMaxParallelDims, one);
   return workload;
 }
@@ -179,10 +179,10 @@ static bool isRootOp(Operation *op) {
 }
 
 static bool isAlwaysClonedIntoDispatchOp(Operation *op) {
-  if (isa<IndexCastOp, linalg::InitTensorOp, tensor::ExtractOp>(op)) {
+  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::ExtractOp>(op)) {
     return true;
   }
-  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
+  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
     return constantOp.getResult().getType().isIntOrIndexOrFloat();
   }
   if (llvm::all_of(op->getOperands(),
@@ -749,7 +749,7 @@ static Optional<SmallVector<SmallVector<Value, 4>, 1>> computeOutputShape(
       if (!shapedType.hasStaticShape()) return llvm::None;
       outputShapes.push_back(llvm::to_vector<4>(
           llvm::map_range(shapedType.getShape(), [&](int64_t dim) -> Value {
-            return builder.create<ConstantIndexOp>(op->getLoc(), dim);
+            return builder.create<arith::ConstantIndexOp>(op->getLoc(), dim);
           })));
       continue;
     }
@@ -1281,13 +1281,13 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
           ArrayRef<int64_t>(tileSizes).take_front(
               std::min<size_t>(tileSizes.size(), maxDepth)),
           [&](int64_t t) -> Value {
-            return builder.create<ConstantIndexOp>(op->getLoc(), t);
+            return builder.create<arith::ConstantIndexOp>(op->getLoc(), t);
           }));
     }
 
     // Set all loops not partitioned to tile size 0. and those partitioned to
     // `flow.workgroup.size`.
-    auto zero = builder.create<ConstantIndexOp>(op->getLoc(), 0);
+    auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
     SmallVector<Value, 4> useTileSizes(maxDepth, zero);
     llvm::DenseSet<unsigned> partitionedLoopsSet;
     partitionedLoopsSet.insert(partitionedLoops.begin(),

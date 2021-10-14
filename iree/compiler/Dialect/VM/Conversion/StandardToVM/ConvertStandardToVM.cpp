@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -144,14 +145,14 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   }
 };
 
-struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
+struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
   ConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   TypeConverter &typeConverter;
 
   LogicalResult matchAndRewrite(
-      ConstantOp srcOp, ArrayRef<Value> operands,
+      arith::ConstantOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto targetType = typeConverter.convertType(srcOp.getType());
     if (!targetType) {
@@ -159,7 +160,7 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
                                << " (check -iree-vm-target-* options)";
     }
     if (targetType.isa<IntegerType>()) {
-      auto integerAttr = srcOp.getValue().dyn_cast<IntegerAttr>();
+      auto integerAttr = srcOp.value().dyn_cast<IntegerAttr>();
       if (!integerAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -187,7 +188,7 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
                  << "unsupported const integer bit width for dialect";
       }
     } else if (targetType.isa<FloatType>()) {
-      auto floatAttr = srcOp.getValue().dyn_cast<FloatAttr>();
+      auto floatAttr = srcOp.value().dyn_cast<FloatAttr>();
       if (!floatAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -217,52 +218,52 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   }
 };
 
-class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
+class CmpIOpConversion : public OpConversionPattern<arith::CmpIOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      CmpIOp srcOp, ArrayRef<Value> operands,
+      arith::CmpIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    CmpIOp::Adaptor srcAdaptor(operands);
+    arith::CmpIOp::Adaptor srcAdaptor(operands);
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
-      case CmpIPredicate::eq:
+      case arith::CmpIPredicate::eq:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpEQI32Op>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::ne:
+      case arith::CmpIPredicate::ne:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpNEI32Op>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::slt:
+      case arith::CmpIPredicate::slt:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32SOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::sle:
+      case arith::CmpIPredicate::sle:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32SOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::sgt:
+      case arith::CmpIPredicate::sgt:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32SOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::sge:
+      case arith::CmpIPredicate::sge:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32SOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::ult:
+      case arith::CmpIPredicate::ult:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::ule:
+      case arith::CmpIPredicate::ule:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::ugt:
+      case arith::CmpIPredicate::ugt:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
-      case CmpIPredicate::uge:
+      case arith::CmpIPredicate::uge:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         return success();
@@ -272,22 +273,22 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
   }
 };
 
-class CmpFOpConversion : public OpConversionPattern<CmpFOp> {
+class CmpFOpConversion : public OpConversionPattern<arith::CmpFOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      CmpFOp srcOp, ArrayRef<Value> operands,
+      arith::CmpFOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    CmpFOp::Adaptor srcAdaptor(operands);
+    arith::CmpFOp::Adaptor srcAdaptor(operands);
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
-      case CmpFPredicate::AlwaysFalse:  // 0
+      case arith::CmpFPredicate::AlwaysFalse:  // 0
         rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
         break;
-      case CmpFPredicate::AlwaysTrue:  // 1
+      case arith::CmpFPredicate::AlwaysTrue:  // 1
         rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(srcOp, 1);
         break;
-      case CmpFPredicate::UNO:  // isnan(lhs) || isnan(rhs)
+      case arith::CmpFPredicate::UNO:  // isnan(lhs) || isnan(rhs)
         rewriter.replaceOpWithNewOp<IREE::VM::OrI32Op>(
             srcOp, returnType,
             rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
@@ -295,7 +296,7 @@ class CmpFOpConversion : public OpConversionPattern<CmpFOp> {
             rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
                 srcOp.getLoc(), returnType, srcAdaptor.rhs()));
         break;
-      case CmpFPredicate::ORD:  // !(isnan(lhs) || isnan(rhs))
+      case arith::CmpFPredicate::ORD:  // !(isnan(lhs) || isnan(rhs))
         rewriter.replaceOpWithNewOp<IREE::VM::XorI32Op>(
             srcOp, returnType,
             rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1),
@@ -306,56 +307,57 @@ class CmpFOpConversion : public OpConversionPattern<CmpFOp> {
                 rewriter.createOrFold<IREE::VM::CmpNaNF32Op>(
                     srcOp.getLoc(), returnType, srcAdaptor.rhs())));
         break;
-      case CmpFPredicate::OEQ:  // ordered and equal
+      case arith::CmpFPredicate::OEQ:  // ordered and equal
         rewriter.replaceOpWithNewOp<IREE::VM::CmpEQF32OOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::OGT:  // ordered and greater than
+      case arith::CmpFPredicate::OGT:  // ordered and greater than
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTF32OOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::OGE:  // ordered and greater than or equal
+      case arith::CmpFPredicate::OGE:  // ordered and greater than or equal
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEF32OOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::OLT:  // ordered and less than
+      case arith::CmpFPredicate::OLT:  // ordered and less than
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTF32OOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::OLE:  // ordered and less than or equal
+      case arith::CmpFPredicate::OLE:  // ordered and less than or equal
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEF32OOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::ONE:  // ordered and not equal
+      case arith::CmpFPredicate::ONE:  // ordered and not equal
         rewriter.replaceOpWithNewOp<IREE::VM::CmpNEF32OOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::UEQ:  // unordered or equal
+      case arith::CmpFPredicate::UEQ:  // unordered or equal
         rewriter.replaceOpWithNewOp<IREE::VM::CmpEQF32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::UGT:  // unordered or greater than
+      case arith::CmpFPredicate::UGT:  // unordered or greater than
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTF32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::UGE:  // unordered or greater than or equal
+      case arith::CmpFPredicate::UGE:  // unordered or greater than or equal
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEF32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::ULT:  // unordered or less than
+      case arith::CmpFPredicate::ULT:  // unordered or less than
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTF32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::ULE:  // unordered or less than or equal
+      case arith::CmpFPredicate::ULE:  // unordered or less than or equal
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEF32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
-      case CmpFPredicate::UNE:  // unordered or not equal
+      case arith::CmpFPredicate::UNE:  // unordered or not equal
         rewriter.replaceOpWithNewOp<IREE::VM::CmpNEF32UOp>(
             srcOp, returnType, srcAdaptor.lhs(), srcAdaptor.rhs());
         break;
       default:
-        return rewriter.notifyMatchFailure(srcOp, "unhandled CmpFPredicate");
+        return rewriter.notifyMatchFailure(srcOp,
+                                           "unhandled arith::CmpFPredicate");
     }
     return success();
   }
@@ -422,7 +424,7 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
     Value amount = srcAdaptor.rhs();
     if (amount.getType().getIntOrFloatBitWidth() > 32) {
       // Shift amounts are always 32-bit in the VM.
-      amount = rewriter.createOrFold<TruncateIOp>(
+      amount = rewriter.createOrFold<arith::TruncIOp>(
           srcOp.getLoc(), rewriter.getI32Type(), amount);
     }
     switch (srcAdaptor.lhs().getType().getIntOrFloatBitWidth()) {
@@ -453,35 +455,37 @@ class CastingOpConversion : public OpConversionPattern<StdOp> {
   }
 };
 
-class IndexCastOpConversion : public OpConversionPattern<IndexCastOp> {
+class IndexCastOpConversion : public OpConversionPattern<arith::IndexCastOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IndexCastOp srcOp, ArrayRef<Value> rawOperands,
+      arith::IndexCastOp srcOp, ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    IndexCastOpAdaptor operands(rawOperands);
+    arith::IndexCastOpAdaptor operands(rawOperands);
     auto srcType = operands.in().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType == dstType) {
       rewriter.replaceOp(srcOp, rawOperands);
     } else if (srcType.getIntOrFloatBitWidth() <
                dstType.getIntOrFloatBitWidth()) {
-      rewriter.replaceOpWithNewOp<ZeroExtendIOp>(srcOp, dstType, operands.in());
+      rewriter.replaceOpWithNewOp<arith::ExtUIOp>(srcOp, dstType,
+                                                  operands.in());
     } else {
-      rewriter.replaceOpWithNewOp<TruncateIOp>(srcOp, dstType, operands.in());
+      rewriter.replaceOpWithNewOp<arith::TruncIOp>(srcOp, dstType,
+                                                   operands.in());
     }
     return success();
   }
 };
 
-class ZeroExtendIOpConversion : public OpConversionPattern<ZeroExtendIOp> {
+class ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      ZeroExtendIOp srcOp, ArrayRef<Value> rawOperands,
+      arith::ExtUIOp srcOp, ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    ZeroExtendIOpAdaptor operands(rawOperands);
-    auto srcType = srcOp.value().getType();
+    arith::ExtUIOpAdaptor operands(rawOperands);
+    auto srcType = srcOp.in().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isInteger(1) && dstType.isInteger(32)) {
       // This may not be needed but ensures that the input was treated as a
@@ -489,17 +493,17 @@ class ZeroExtendIOpConversion : public OpConversionPattern<ZeroExtendIOp> {
       // NOTE: this may not be required - if we know that the i1 is never able
       // to have more than bit 0 manipulated then this is wasted work.
       rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
-          srcOp, dstType, operands.value(),
+          srcOp, dstType, operands.in(),
           rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
     } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32UOp>(srcOp, dstType,
-                                                         operands.value());
+                                                         operands.in());
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32UOp>(srcOp, dstType,
-                                                          operands.value());
+                                                          operands.in());
     } else if (srcType.isInteger(32) && dstType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64UOp>(srcOp, dstType,
-                                                          operands.value());
+                                                          operands.in());
     } else {
       // TODO(benvanik): we should be building a sequence of extensions for
       // things like i8 -> i64.
@@ -509,24 +513,24 @@ class ZeroExtendIOpConversion : public OpConversionPattern<ZeroExtendIOp> {
   }
 };
 
-class SignExtendIOpConversion : public OpConversionPattern<SignExtendIOp> {
+class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      SignExtendIOp srcOp, ArrayRef<Value> rawOperands,
+      arith::ExtSIOp srcOp, ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    SignExtendIOpAdaptor operands(rawOperands);
-    auto srcType = srcOp.value().getType();
+    arith::ExtSIOpAdaptor operands(rawOperands);
+    auto srcType = srcOp.in().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32SOp>(srcOp, dstType,
-                                                         operands.value());
+                                                         operands.in());
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32SOp>(srcOp, dstType,
-                                                          operands.value());
+                                                          operands.in());
     } else if (srcType.isInteger(32) && dstType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64SOp>(srcOp, dstType,
-                                                          operands.value());
+                                                          operands.in());
     } else {
       // TODO(benvanik): we should be building a sequence of extensions for
       // things like i8 -> i64.
@@ -536,21 +540,21 @@ class SignExtendIOpConversion : public OpConversionPattern<SignExtendIOp> {
   }
 };
 
-class TruncateIOpConversion : public OpConversionPattern<TruncateIOp> {
+class TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      TruncateIOp srcOp, ArrayRef<Value> rawOperands,
+      arith::TruncIOp srcOp, ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
-    TruncateIOpAdaptor operands(rawOperands);
-    auto srcType = srcOp.value().getType();
+    arith::TruncIOpAdaptor operands(rawOperands);
+    auto srcType = srcOp.in().getType();
     auto resultType = srcOp.getResult().getType();
     auto dstType = getTypeConverter()->convertType(resultType);
     if (resultType.isInteger(1)) {
       // i1 is represented as i32, so just mask off the bit and truncate as
       // normal. Note that if we started as i64 we need to first get that into
       // an i32 that we can work with.
-      auto value = operands.value();
+      auto value = operands.in();
       if (srcType.isInteger(64)) {
         value = rewriter.createOrFold<IREE::VM::TruncI64I32Op>(srcOp.getLoc(),
                                                                dstType, value);
@@ -560,19 +564,19 @@ class TruncateIOpConversion : public OpConversionPattern<TruncateIOp> {
           rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
     } else if (srcType.isInteger(32) && resultType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI32I8Op>(srcOp, dstType,
-                                                          operands.value());
+                                                          operands.in());
     } else if (srcType.isInteger(32) && resultType.isInteger(16)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI32I16Op>(srcOp, dstType,
-                                                           operands.value());
+                                                           operands.in());
     } else if (srcType.isInteger(64) && resultType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI64I8Op>(srcOp, dstType,
-                                                          operands.value());
+                                                          operands.in());
     } else if (srcType.isInteger(64) && resultType.isInteger(16)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI64I16Op>(srcOp, dstType,
-                                                           operands.value());
+                                                           operands.in());
     } else if (srcType.isInteger(64) && resultType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI64I32Op>(srcOp, dstType,
-                                                           operands.value());
+                                                           operands.in());
     } else {
       return rewriter.notifyMatchFailure(srcOp, "unsupported truncation");
     }
@@ -580,13 +584,13 @@ class TruncateIOpConversion : public OpConversionPattern<TruncateIOp> {
   }
 };
 
-class SIToFPOpConversion : public OpConversionPattern<SIToFPOp> {
+class SIToFPOpConversion : public OpConversionPattern<arith::SIToFPOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      SIToFPOp srcOp, ArrayRef<Value> operands,
+      arith::SIToFPOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SIToFPOpAdaptor srcAdaptor(operands);
+    arith::SIToFPOpAdaptor srcAdaptor(operands);
     auto srcType = operands[0].getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isSignlessInteger(32) || srcType.isSignedInteger(32)) {
@@ -600,13 +604,13 @@ class SIToFPOpConversion : public OpConversionPattern<SIToFPOp> {
   }
 };
 
-class UIToFPOpConversion : public OpConversionPattern<UIToFPOp> {
+class UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      UIToFPOp srcOp, ArrayRef<Value> operands,
+      arith::UIToFPOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    UIToFPOpAdaptor srcAdaptor(operands);
+    arith::UIToFPOpAdaptor srcAdaptor(operands);
     auto srcType = operands[0].getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isUnsignedInteger(32)) {
@@ -620,13 +624,13 @@ class UIToFPOpConversion : public OpConversionPattern<UIToFPOp> {
   }
 };
 
-class FPToSIOpConversion : public OpConversionPattern<FPToSIOp> {
+class FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      FPToSIOp srcOp, ArrayRef<Value> operands,
+      arith::FPToSIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    FPToSIOpAdaptor srcAdaptor(operands);
+    arith::FPToSIOpAdaptor srcAdaptor(operands);
     auto srcType = operands[0].getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isF32()) {
@@ -640,13 +644,13 @@ class FPToSIOpConversion : public OpConversionPattern<FPToSIOp> {
   }
 };
 
-class FPToUIOpConversion : public OpConversionPattern<FPToUIOp> {
+class FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      FPToUIOp srcOp, ArrayRef<Value> operands,
+      arith::FPToUIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    FPToUIOpAdaptor srcAdaptor(operands);
+    arith::FPToUIOpAdaptor srcAdaptor(operands);
     auto srcType = operands[0].getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType.isF32()) {
@@ -660,11 +664,11 @@ class FPToUIOpConversion : public OpConversionPattern<FPToUIOp> {
   }
 };
 
-class BitcastOpConversion : public OpConversionPattern<BitcastOp> {
+class BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      BitcastOp srcOp, ArrayRef<Value> operands,
+      arith::BitcastOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto srcType = operands[0].getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
@@ -819,47 +823,50 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                                                   context);
 
   // Integer arithmetic ops.
-  patterns.insert<
-      BinaryArithmeticOpConversion<AddIOp, IREE::VM::AddI32Op,
-                                   IREE::VM::AddI64Op>,
-      BinaryArithmeticOpConversion<SignedDivIOp, IREE::VM::DivI32SOp,
-                                   IREE::VM::DivI64SOp>,
-      BinaryArithmeticOpConversion<UnsignedDivIOp, IREE::VM::DivI32UOp,
-                                   IREE::VM::DivI64UOp>,
-      BinaryArithmeticOpConversion<MulIOp, IREE::VM::MulI32Op,
-                                   IREE::VM::MulI64Op>,
-      BinaryArithmeticOpConversion<SignedRemIOp, IREE::VM::RemI32SOp,
-                                   IREE::VM::RemI64SOp>,
-      BinaryArithmeticOpConversion<UnsignedRemIOp, IREE::VM::RemI32UOp,
-                                   IREE::VM::RemI64UOp>,
-      BinaryArithmeticOpConversion<SubIOp, IREE::VM::SubI32Op,
-                                   IREE::VM::SubI64Op>,
-      BinaryArithmeticOpConversion<AndOp, IREE::VM::AndI32Op,
-                                   IREE::VM::AndI64Op>,
-      BinaryArithmeticOpConversion<OrOp, IREE::VM::OrI32Op, IREE::VM::OrI64Op>,
-      BinaryArithmeticOpConversion<XOrOp, IREE::VM::XorI32Op,
-                                   IREE::VM::XorI64Op>>(typeConverter, context);
+  patterns
+      .insert<BinaryArithmeticOpConversion<arith::AddIOp, IREE::VM::AddI32Op,
+                                           IREE::VM::AddI64Op>,
+              BinaryArithmeticOpConversion<arith::DivSIOp, IREE::VM::DivI32SOp,
+                                           IREE::VM::DivI64SOp>,
+              BinaryArithmeticOpConversion<arith::DivUIOp, IREE::VM::DivI32UOp,
+                                           IREE::VM::DivI64UOp>,
+              BinaryArithmeticOpConversion<arith::MulIOp, IREE::VM::MulI32Op,
+                                           IREE::VM::MulI64Op>,
+              BinaryArithmeticOpConversion<arith::RemSIOp, IREE::VM::RemI32SOp,
+                                           IREE::VM::RemI64SOp>,
+              BinaryArithmeticOpConversion<arith::RemUIOp, IREE::VM::RemI32UOp,
+                                           IREE::VM::RemI64UOp>,
+              BinaryArithmeticOpConversion<arith::SubIOp, IREE::VM::SubI32Op,
+                                           IREE::VM::SubI64Op>,
+              BinaryArithmeticOpConversion<arith::AndIOp, IREE::VM::AndI32Op,
+                                           IREE::VM::AndI64Op>,
+              BinaryArithmeticOpConversion<arith::OrIOp, IREE::VM::OrI32Op,
+                                           IREE::VM::OrI64Op>,
+              BinaryArithmeticOpConversion<arith::XOrIOp, IREE::VM::XorI32Op,
+                                           IREE::VM::XorI64Op>>(typeConverter,
+                                                                context);
 
   // Floating-point arithmetic ops.
-  patterns.insert<UnaryArithmeticOpConversion<AbsFOp, IREE::VM::AbsF32Op,
-                                              IREE::VM::AbsF64Op>,
-                  BinaryArithmeticOpConversion<AddFOp, IREE::VM::AddF32Op,
-                                               IREE::VM::AddF64Op>,
-                  UnaryArithmeticOpConversion<CeilFOp, IREE::VM::CeilF32Op,
-                                              IREE::VM::CeilF64Op>,
-                  UnaryArithmeticOpConversion<FloorFOp, IREE::VM::FloorF32Op,
-                                              IREE::VM::FloorF64Op>,
-                  BinaryArithmeticOpConversion<DivFOp, IREE::VM::DivF32Op,
-                                               IREE::VM::DivF64Op>,
-                  BinaryArithmeticOpConversion<MulFOp, IREE::VM::MulF32Op,
-                                               IREE::VM::MulF64Op>,
-                  UnaryArithmeticOpConversion<NegFOp, IREE::VM::NegF32Op,
-                                              IREE::VM::NegF64Op>,
-                  BinaryArithmeticOpConversion<RemFOp, IREE::VM::RemF32Op,
-                                               IREE::VM::RemF64Op>,
-                  BinaryArithmeticOpConversion<SubFOp, IREE::VM::SubF32Op,
-                                               IREE::VM::SubF64Op>>(
-      typeConverter, context);
+  patterns
+      .insert<UnaryArithmeticOpConversion<math::AbsOp, IREE::VM::AbsF32Op,
+                                          IREE::VM::AbsF64Op>,
+              BinaryArithmeticOpConversion<arith::AddFOp, IREE::VM::AddF32Op,
+                                           IREE::VM::AddF64Op>,
+              UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
+                                          IREE::VM::CeilF64Op>,
+              UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
+                                          IREE::VM::FloorF64Op>,
+              BinaryArithmeticOpConversion<arith::DivFOp, IREE::VM::DivF32Op,
+                                           IREE::VM::DivF64Op>,
+              BinaryArithmeticOpConversion<arith::MulFOp, IREE::VM::MulF32Op,
+                                           IREE::VM::MulF64Op>,
+              UnaryArithmeticOpConversion<arith::NegFOp, IREE::VM::NegF32Op,
+                                          IREE::VM::NegF64Op>,
+              BinaryArithmeticOpConversion<arith::RemFOp, IREE::VM::RemF32Op,
+                                           IREE::VM::RemF64Op>,
+              BinaryArithmeticOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
+                                           IREE::VM::SubF64Op>>(typeConverter,
+                                                                context);
 
   // Floating-point conversion ops.
   patterns.insert<SIToFPOpConversion, UIToFPOpConversion, FPToSIOpConversion,
@@ -867,13 +874,14 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                                            context);
 
   // Shift ops.
-  patterns.insert<
-      ShiftArithmeticOpConversion<ShiftLeftOp, IREE::VM::ShlI32Op,
-                                  IREE::VM::ShlI64Op>,
-      ShiftArithmeticOpConversion<SignedShiftRightOp, IREE::VM::ShrI32SOp,
-                                  IREE::VM::ShrI64SOp>,
-      ShiftArithmeticOpConversion<UnsignedShiftRightOp, IREE::VM::ShrI32UOp,
-                                  IREE::VM::ShrI64UOp>>(typeConverter, context);
+  patterns
+      .insert<ShiftArithmeticOpConversion<arith::ShLIOp, IREE::VM::ShlI32Op,
+                                          IREE::VM::ShlI64Op>,
+              ShiftArithmeticOpConversion<arith::ShRSIOp, IREE::VM::ShrI32SOp,
+                                          IREE::VM::ShrI64SOp>,
+              ShiftArithmeticOpConversion<arith::ShRUIOp, IREE::VM::ShrI32UOp,
+                                          IREE::VM::ShrI64UOp>>(typeConverter,
+                                                                context);
 }
 
 }  // namespace iree_compiler

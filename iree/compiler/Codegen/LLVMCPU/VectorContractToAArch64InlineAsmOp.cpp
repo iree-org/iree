@@ -52,12 +52,12 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
     }
 
     auto getI8Value = [&](Value v) -> Value {
-      if (auto parentOp = v.getDefiningOp<SignExtendIOp>()) {
-        if (parentOp.value().getType().cast<VectorType>().getElementType() !=
+      if (auto parentOp = v.getDefiningOp<arith::ExtSIOp>()) {
+        if (parentOp.in().getType().cast<VectorType>().getElementType() !=
             I8Type) {
           return nullptr;
         } else {
-          return parentOp.value();
+          return parentOp.in();
         }
       }
       return nullptr;
@@ -123,7 +123,7 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
     auto int32x4x4xVType = VectorType::get({4, 4}, I32Type);
 
     Value result;
-    result = rewriter.create<ConstantOp>(
+    result = rewriter.create<arith::ConstantOp>(
         loc, int32x4x4xVType, DenseIntElementsAttr::get(int32x4x4xVType, 0));
     for (int i = 0; i < 4; ++i) {
       result = rewriter.create<vector::InsertOp>(loc, resVec[i], result,

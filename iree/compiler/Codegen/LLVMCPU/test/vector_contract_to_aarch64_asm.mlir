@@ -1,14 +1,14 @@
 // RUN: iree-opt -iree-llvmcpu-vector-to-aarch64-inline-asm %s | IreeFileCheck %s
 
 func @vector_matmul_to_aarch64_asm_vec_dot(%lhs: memref<4x4xi8>, %rhs: memref<4x4xi8>, %dst: memref<4x4xi32>) {
-    %c0 = constant 0 : index
-    %cst_i8_0 = constant 0 : i8
-    %cst_i32_0 = constant 0 : i32
+    %c0 = arith.constant 0 : index
+    %cst_i8_0 = arith.constant 0 : i8
+    %cst_i32_0 = arith.constant 0 : i32
     %0 = vector.transfer_read %lhs[%c0, %c0] , %cst_i8_0 {in_bounds = [false, false]} : memref<4x4xi8>, vector<4x4xi8>
     %1 = vector.transfer_read %rhs[%c0, %c0] , %cst_i8_0 {in_bounds = [false, false]} : memref<4x4xi8>, vector<4x4xi8>
     %2 = vector.transfer_read %dst[%c0, %c0], %cst_i32_0 {in_bounds = [false, false]} : memref<4x4xi32>, vector<4x4xi32>
-    %3 = sexti %0 : vector<4x4xi8> to vector<4x4xi32>
-    %4 = sexti %1 : vector<4x4xi8> to vector<4x4xi32>
+    %3 = arith.extsi %0 : vector<4x4xi8> to vector<4x4xi32>
+    %4 = arith.extsi %1 : vector<4x4xi8> to vector<4x4xi32>
     %5 = vector.contract {
         indexing_maps = [
             affine_map<(d0, d1, d2) -> (d0, d2)>,
@@ -20,7 +20,7 @@ func @vector_matmul_to_aarch64_asm_vec_dot(%lhs: memref<4x4xi8>, %rhs: memref<4x
     return
 }
 // CHEC-LABEL: @vector_matmul_to_aarch64_asm_vec_dot
-//  CHECK-DAG: %[[RES_2D:.+]] = constant dense<0> : vector<4x4xi32>
+//  CHECK-DAG: %[[RES_2D:.+]] = arith.constant dense<0> : vector<4x4xi32>
 //  CHECK-DAG: %[[LHS_2D:.+]] = vector.transfer_read
 //  CHECK-DAG: %[[RHS_2d:.+]] = vector.transfer_read
 //  CHECK-DAG: %[[DST:.+]] = vector.transfer_read

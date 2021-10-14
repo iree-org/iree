@@ -287,11 +287,6 @@ cc_binary(
     name = "synchronization_benchmark",
     testonly = True,
     srcs = ["synchronization_benchmark.cc"],
-    tags = [
-        "manual",
-        "nobuilder",
-        "notap",
-    ],
     deps = [
         ":synchronization",
         "//iree/testing:benchmark_main",
@@ -302,11 +297,6 @@ cc_binary(
 run_binary_test(
     name = "synchronization_benchmark_test",
     args = ["--benchmark_min_time=0"],
-    tags = [
-        "manual",
-        "nobuilder",
-        "notap",
-    ],
     test_binary = ":synchronization_benchmark",
 )
 

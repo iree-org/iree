@@ -94,7 +94,8 @@ static LogicalResult convertOperation(Operation *oldOp,
     }
   }
 
-  if (llvm::isa<mlir::ConstantOp>(oldOp) || llvm::isa<mhlo::ConstOp>(oldOp) ||
+  if (llvm::isa<mlir::arith::ConstantOp>(oldOp) ||
+      llvm::isa<mhlo::ConstOp>(oldOp) ||
       llvm::isa<IREE::Util::GlobalOp>(oldOp)) {
     for (auto attr : oldOp->getAttrs()) {
       auto newAttr =

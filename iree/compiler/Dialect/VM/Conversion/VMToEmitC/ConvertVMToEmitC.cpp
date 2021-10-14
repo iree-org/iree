@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -3244,7 +3245,8 @@ class ConvertVMToEmitCPass
                          OperationPass<IREE::VM::ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::emitc::EmitCDialect, mlir::BuiltinDialect,
-                    mlir::StandardOpsDialect, IREE::Util::UtilDialect>();
+                    mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                    mlir::math::MathDialect, IREE::Util::UtilDialect>();
   }
 
   StringRef getArgument() const override { return "iree-convert-vm-to-emitc"; }
@@ -3291,8 +3293,9 @@ class ConvertVMToEmitCPass
     populateVMToEmitCPatterns(&getContext(), target, typeConverter, patterns,
                               vmAnalysisCache);
 
-    target.addLegalDialect<emitc::EmitCDialect, mlir::BuiltinDialect,
-                           mlir::StandardOpsDialect>();
+    target.addLegalDialect<
+        emitc::EmitCDialect, mlir::BuiltinDialect, mlir::StandardOpsDialect,
+        mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
 
     target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
       return typeConverter.isSignatureLegal(op.getType());

@@ -8,7 +8,7 @@ func @constants() {
   // CHECK-NEXT: %[[VAR_A:.+]] = util.global.load @varA : tensor<2xi32>
   // CHECK-NEXT: %[[VAR_B:.+]] = util.global.load @varB : tensor<2x4xi32>
   // CHECK-NEXT: constant 10
-  %w = constant 10 : index
+  %w = arith.constant 10 : index
   %varA = util.global.load @varA : tensor<2xi32>
   // CHECK-NEXT: %[[T:.+]] = flow.dispatch @ex::@dispatch0{{.+}}(%[[VAR_A]])
   %d0 = flow.dispatch @ex::@dispatch0[%w](%varA) : (tensor<2xi32>) -> tensor<2xi32>
@@ -31,22 +31,22 @@ func @constants_in_cfg(%start: i32, %bound: i32) -> i32 {
   br ^bb1(%start : i32)
 // CHECK: ^bb1(%[[BB1_ARG:.+]]: i32):
 ^bb1(%2: i32):
-  %cmp = cmpi slt, %2, %bound : i32
+  %cmp = arith.cmpi slt, %2, %bound : i32
   cond_br %cmp, ^bb2(%2 : i32), ^bb3(%2 : i32)
 // CHECK: ^bb2(%[[BB2_ARG:.+]]: i32):
 ^bb2(%5: i32):
   %6 = util.global.load @varA : i32
-  // CHECK-NEXT: = addi %[[BB2_ARG]], %[[VAR_A]] : i32
-  %7 = addi %5, %6 : i32
+  // CHECK-NEXT: = arith.addi %[[BB2_ARG]], %[[VAR_A]] : i32
+  %7 = arith.addi %5, %6 : i32
   br ^bb1(%7 : i32)
 // CHECK: ^bb3(%[[BB3_ARG:.+]]: i32):
 ^bb3(%8: i32):
   %9 = util.global.load @varA : i32
-  // CHECK-NEXT: %[[T0:.+]] = muli %[[BB3_ARG]], %[[VAR_A]] : i32
-  %10 = muli %8, %9 : i32
+  // CHECK-NEXT: %[[T0:.+]] = arith.muli %[[BB3_ARG]], %[[VAR_A]] : i32
+  %10 = arith.muli %8, %9 : i32
   %11 = util.global.load @varB : i32
-  // CHECK-NEXT: %[[T1:.+]] = subi %[[T0]], %[[VAR_B]]
-  %12 = subi %10, %11 : i32
+  // CHECK-NEXT: %[[T1:.+]] = arith.subi %[[T0]], %[[VAR_B]]
+  %12 = arith.subi %10, %11 : i32
   // CHECK-NEXT: return %[[T1]]
   return %12 : i32
 }
@@ -61,7 +61,7 @@ func @mixed_mutability() {
   // CHECK-DAG: %[[VAR_A:.+]] = util.global.load @varA : tensor<2xi32>
   // CHECK-DAG: %[[VAR_B:.+]] = util.global.load @varB : tensor<2x4xi32>
   // CHECK-NEXT: constant 10
-  %w = constant 10 : index
+  %w = arith.constant 10 : index
   %varA = util.global.load @varA : tensor<2xi32>
   // CHECK-NEXT: %[[T0:.+]] = flow.dispatch @ex::@dispatch0{{.+}}(%[[VAR_A]])
   %d0 = flow.dispatch @ex::@dispatch0[%w](%varA) : (tensor<2xi32>) -> tensor<2xi32>

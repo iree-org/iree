@@ -3,7 +3,7 @@
 // CHECK-LABEL: @skip_buffer_allocator
 //  CHECK-SAME: (%[[ALLOCATOR:.+]]: !hal.allocator)
 func @skip_buffer_allocator(%allocator: !hal.allocator) -> !hal.allocator {
-  %sz = constant 4 : index
+  %sz = arith.constant 4 : index
   %buffer = hal.allocator.allocate<%allocator : !hal.allocator>
                 type("HostVisible|HostCoherent")
                 usage(Transfer) : !hal.buffer{%sz}
@@ -17,9 +17,9 @@ func @skip_buffer_allocator(%allocator: !hal.allocator) -> !hal.allocator {
 // CHECK-LABEL: @skip_subspan_buffer_allocator
 //  CHECK-SAME: (%[[ALLOCATOR:.+]]: !hal.allocator)
 func @skip_subspan_buffer_allocator(%allocator: !hal.allocator) -> !hal.allocator {
-  %c0 = constant 0 : index
-  %c184 = constant 184 : index
-  %c384 = constant 384 : index
+  %c0 = arith.constant 0 : index
+  %c184 = arith.constant 184 : index
+  %c384 = arith.constant 384 : index
   %source_buffer = hal.allocator.allocate<%allocator : !hal.allocator>
                      type("HostVisible|HostCoherent")
                      usage(Transfer) : !hal.buffer{%c384}

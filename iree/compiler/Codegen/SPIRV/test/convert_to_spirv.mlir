@@ -55,7 +55,7 @@ hal.executable private @resource_bindings_in_same_func  {
       // CHECK: spv.GlobalVariable @[[RET0:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spv.func @resource_bindings_in_same_entry_func()
       func @resource_bindings_in_same_entry_func() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
 
         // Same type
         // CHECK: spv.mlir.addressof @[[ARG0]]
@@ -120,7 +120,7 @@ hal.executable private @resource_bindings_in_multi_entry_func  {
       func @resource_bindings_in_entry_func1() {
         // CHECK: spv.mlir.addressof @[[FUNC1_ARG]]
         // CHECK: spv.mlir.addressof @[[FUNC1_RET]]
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32>
         %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4xvector<4xf32>>
 
@@ -134,7 +134,7 @@ hal.executable private @resource_bindings_in_multi_entry_func  {
       func @resource_bindings_in_entry_func2() {
         // CHECK: spv.mlir.addressof @[[FUNC2_ARG]]
         // CHECK: spv.mlir.addressof @[[FUNC2_RET]]
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32> // Same type as previous function
         %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4x4xf32> // Different type as previous function
 
@@ -168,7 +168,7 @@ hal.executable private @interface_binding  {
     }
     builtin.module {
       func @interface_binding() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<8x5xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<5xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<8x5xf32>

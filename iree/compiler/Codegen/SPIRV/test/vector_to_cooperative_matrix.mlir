@@ -15,9 +15,9 @@ hal.executable private @matmul_contract  {
       // CHECK-LABEL: func @matmul_contract
       //  CHECK-SAME: %[[ARG0:.+]]: memref<8x32xi8>, %[[ARG1:.+]]: memref<32x8xi8>, %[[ARG2:.+]]: memref<8x8xi32>
       func @matmul_contract(%arg0: memref<8x32xi8>, %arg1: memref<32x8xi8>, %arg2: memref<8x8xi32>) {
-        %c0 = constant 0 : index
-        %cst = constant 0 : i32
-        %cst_i8 = constant 0 : i8
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0 : i32
+        %cst_i8 = arith.constant 0 : i8
         // CHECK: %[[ARG0_CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : memref<8x32xi8> to !spv.ptr<!spv.struct<(!spv.rtarray<i8, stride=1> [0])>, StorageBuffer>
         // CHECK: %[[C32:.+]] = spv.Constant 32 : i32
         // CHECK: %[[COL_MAJOR:.+]] = spv.Constant false
@@ -59,11 +59,11 @@ hal.executable private @matmul_contract_licm  {
     builtin.module {
       // CHECK-LABEL: func @matmul_contract_licm
       func @matmul_contract_licm(%arg0: memref<4096x4096xi8>, %arg1: memref<4096x4096xi8>, %arg2: memref<4096x4096xi32>) {
-        %c32 = constant 32 : index
-        %c4096 = constant 4096 : index
-        %c0 = constant 0 : index
-        %c0_i32 = constant 0 : i32
-        %c0_i8 = constant 0 : i8
+        %c32 = arith.constant 32 : index
+        %c4096 = arith.constant 4096 : index
+        %c0 = arith.constant 0 : index
+        %c0_i32 = arith.constant 0 : i32
+        %c0_i8 = arith.constant 0 : i8
         // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV
         %4 = vector.transfer_read %arg2[%c0, %c0], %c0_i32 {in_bounds = [true, true]} : memref<4096x4096xi32>, vector<16x16xi32>
         // CHECK: %[[INIT:.+]] = builtin.unrealized_conversion_cast %[[C]] : !spv.coopmatrix<16x16xi32, Subgroup> to vector<16x16xi32>
@@ -105,10 +105,10 @@ hal.executable private @matmul_contract_vector_memref  {
     builtin.module {
       // CHECK-LABEL: func @matmul_contract_vector_memref
       func @matmul_contract_vector_memref(%arg0: memref<4096x256xvector<4xi32>>, %arg1: memref<4096x256xvector<4xi32>>, %arg2: memref<4096x1024xvector<4xi32>>) {
-        %c32 = constant 32 : index
-        %c4096 = constant 4096 : index
-        %c0 = constant 0 : index
-        %cst = constant dense<0> : vector<4xi32>
+        %c32 = arith.constant 32 : index
+        %c4096 = arith.constant 4096 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant dense<0> : vector<4xi32>
         // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV
         %4 = vector.transfer_read %arg2[%c0, %c0], %cst : memref<4096x1024xvector<4xi32>>, vector<16x16xi32>
         // CHECK: scf.for
@@ -142,13 +142,13 @@ hal.executable private @const_elementwise_ops  {
       func @const_elementwise_ops(%add_val: vector<16x16xf16>, %sub_val: vector<16x16xf16>, %div_val: vector<16x16xf16>) -> vector<16x16xf16> {
         // CHECK: %[[SPLAT:.+]] = spv.Constant 8.000000e+00 : f16
         // CHECK: %[[CST:.+]] = spv.CompositeConstruct %[[SPLAT]] : !spv.coopmatrix<16x16xf16, Subgroup>
-        %eight = constant dense<8.0> : vector<16x16xf16>
+        %eight = arith.constant dense<8.0> : vector<16x16xf16>
         // CHECK: %{{.+}} = spv.FAdd %[[CST]], %{{.+}} : !spv.coopmatrix<16x16xf16, Subgroup>
-        %add = addf %eight, %add_val: vector<16x16xf16>
+        %add = arith.addf %eight, %add_val: vector<16x16xf16>
         // CHECK: %{{.+}} = spv.FSub %{{.+}}, %{{.+}} !spv.coopmatrix<16x16xf16, Subgroup>
-        %sub = subf %add, %sub_val : vector<16x16xf16>
+        %sub = arith.subf %add, %sub_val : vector<16x16xf16>
         // CHECK: %{{.+}} = spv.FDiv %{{.+}}, %{{.+}} !spv.coopmatrix<16x16xf16, Subgroup>
-        %div = divf %sub, %div_val : vector<16x16xf16>
+        %div = arith.divf %sub, %div_val : vector<16x16xf16>
         return %div: vector<16x16xf16>
       }
     }

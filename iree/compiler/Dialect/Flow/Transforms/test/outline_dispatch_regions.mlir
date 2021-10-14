@@ -17,10 +17,10 @@
 // CHECK-LABEL: func @staticShapeDispatch(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x4xf32>)
 func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
-  // CHECK-DAG: %[[X:.+]] = constant 100
-  %x = constant 100 : index
-  // CHECK-DAG: %[[Y:.+]] = constant 50
-  %y = constant 50 : index
+  // CHECK-DAG: %[[X:.+]] = arith.constant 100
+  %x = arith.constant 100 : index
+  // CHECK-DAG: %[[Y:.+]] = arith.constant 50
+  %y = arith.constant 50 : index
   // CHECK: %[[RET:.+]] = flow.dispatch @staticShapeDispatch_dispatch_0::@staticShapeDispatch_dispatch_0[
   // CHECK-SAME: %[[X]], %[[Y]]
   // CHECK-SAME: ](%[[ARG0]]) : (tensor<8x4xf32>) -> tensor<4x8xf32>
@@ -53,10 +53,10 @@ func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 // CHECK-LABEL: func @dispatchFnMuli(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x4xf32>)
 func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
-  // CHECK-DAG: %[[X:.+]] = constant 100
-  %x = constant 100 : index
-  // CHECK-DAG: %[[Y:.+]] = constant 50
-  %y = constant 50 : index
+  // CHECK-DAG: %[[X:.+]] = arith.constant 100
+  %x = arith.constant 100 : index
+  // CHECK-DAG: %[[Y:.+]] = arith.constant 50
+  %y = arith.constant 50 : index
   // CHECK: %[[RET0:.+]] = flow.dispatch @dispatchFnMuli_dispatch_0::@dispatchFnMuli_dispatch_0[
   // CHECK-SAME: %[[X]], %[[Y]]
   // CHECK-SAME: ](%[[ARG0]]) : (tensor<8x4xf32>) -> tensor<4x8xf32>
@@ -93,8 +93,8 @@ func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
 
 // CHECK-LABEL: func @dispatchFn1
 func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
-  %x = constant 100 : index
-  %y = constant 50 : index
+  %x = arith.constant 100 : index
+  %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn1_dispatch_0::@dispatchFn1_dispatch_0
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) = (
     %arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>
@@ -108,8 +108,8 @@ func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 
 // CHECK-LABEL: func @dispatchFn2
 func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
-  %x = constant 100 : index
-  %y = constant 50 : index
+  %x = arith.constant 100 : index
+  %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn2_dispatch_0::@dispatchFn2_dispatch_0
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) = (
     %arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>
@@ -154,16 +154,16 @@ func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 // CHECK-LABEL: func @dynamicShapeDispatch(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<7x?x24x?xf32>)
 func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   // CHECK-DAG: %[[ARG0_DIM1:.+]] = tensor.dim %[[ARG0]], %c1
   %dim1 = tensor.dim %arg0, %c1 : tensor<7x?x24x?xf32>
   // CHECK-DAG: %[[ARG0_DIM3:.+]] = tensor.dim %[[ARG0]], %c3
   %dim3 = tensor.dim %arg0, %c3 : tensor<7x?x24x?xf32>
-  // CHECK-DAG: %[[X:.+]] = constant 1024
-  %x = constant 1024 : index
-  // CHECK-DAG: %[[Y:.+]] = constant 512
-  %y = constant 512 : index
+  // CHECK-DAG: %[[X:.+]] = arith.constant 1024
+  %x = arith.constant 1024 : index
+  // CHECK-DAG: %[[Y:.+]] = arith.constant 512
+  %y = arith.constant 512 : index
   // CHECK-NEXT: %[[ARG0_SHAPE:.+]] = shapex.make_ranked_shape %[[ARG0_DIM1]], %[[ARG0_DIM3]]
   //  CHECK-DAG: %[[IN_ARG0_DIM1:.+]] = shapex.ranked_dim %[[ARG0_SHAPE]][1]
   //  CHECK-DAG: %[[IN_ARG0_DIM3:.+]] = shapex.ranked_dim %[[ARG0_SHAPE]][3]

@@ -140,7 +140,7 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
     if (inputs.size() != 1 || !inputs.front().getType().isa<IntegerType>()) {
       return nullptr;
     }
-    return builder.create<IndexCastOp>(loc, type, inputs.front());
+    return builder.create<arith::IndexCastOp>(loc, type, inputs.front());
   });
 
   addTargetMaterialization(

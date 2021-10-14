@@ -9,13 +9,13 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -140,11 +140,12 @@ struct ConvertVectorContractOp final
 };
 
 /// Converts splat vector constants to constant SPIR-V cooperative matrix ops.
-struct ConvertConstantMatrix final : public OpConversionPattern<ConstantOp> {
+struct ConvertConstantMatrix final
+    : public OpConversionPattern<arith::ConstantOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      ConstantOp op, OpAdaptor operands,
+      arith::ConstantOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
     // Only convert 2-D vector constants.
     auto vectorType = op.getType().dyn_cast<VectorType>();
@@ -166,7 +167,7 @@ struct ConvertConstantMatrix final : public OpConversionPattern<ConstantOp> {
   }
 };
 
-/// Converts elementwise ops to SPIR-V cooperative matrix multiple-add ops.
+/// Converts elementwise ops to SPIR-V cooperative matrix elementwise ops.
 template <typename SrcOpType, typename DstOpType>
 struct ConvertElementwiseOp final : public OpConversionPattern<SrcOpType> {
   using OpConversionPattern<SrcOpType>::OpConversionPattern;
@@ -252,14 +253,15 @@ struct SPIRVVectorToCooperativeOpsPass final
     patterns.add<
         ConvertConstantMatrix, ConvertVectorContractOp, ConvertVectorTransferOp,
         // See SPV_NV_cooperative_matrix for supported element wise ops.
-        ConvertElementwiseOp<AddFOp, spirv::FAddOp>,
-        ConvertElementwiseOp<AddIOp, spirv::IAddOp>,
-        ConvertElementwiseOp<SubFOp, spirv::FSubOp>,
-        ConvertElementwiseOp<SubIOp, spirv::ISubOp>,
-        ConvertElementwiseOp<DivFOp, spirv::FDivOp>,
-        ConvertElementwiseOp<SignedDivIOp, spirv::SDivOp>,
-        ConvertElementwiseOp<UnsignedDivIOp, spirv::UDivOp>,
-        ConvertElementwiseOp<NegFOp, spirv::FNegateOp>>(typeConverter, context);
+        ConvertElementwiseOp<arith::AddFOp, spirv::FAddOp>,
+        ConvertElementwiseOp<arith::AddIOp, spirv::IAddOp>,
+        ConvertElementwiseOp<arith::SubFOp, spirv::FSubOp>,
+        ConvertElementwiseOp<arith::SubIOp, spirv::ISubOp>,
+        ConvertElementwiseOp<arith::DivFOp, spirv::FDivOp>,
+        ConvertElementwiseOp<arith::DivSIOp, spirv::SDivOp>,
+        ConvertElementwiseOp<arith::DivUIOp, spirv::UDivOp>,
+        ConvertElementwiseOp<arith::NegFOp, spirv::FNegateOp>>(typeConverter,
+                                                               context);
 
     std::unique_ptr<ConversionTarget> target =
         SPIRVConversionTarget::get(targetAttr);

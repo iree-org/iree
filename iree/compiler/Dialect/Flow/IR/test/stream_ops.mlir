@@ -12,8 +12,8 @@ flow.executable @dispatch_0 {
 
 // CHECK-LABEL: func @fragment
 func @fragment(%arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
-  // CHECK: %[[WORKLOAD:.+]] = constant
-  %cst = constant 4 : index
+  // CHECK: %[[WORKLOAD:.+]] = arith.constant
+  %cst = arith.constant 4 : index
   //      CHECK: %0:2 = flow.ex.stream.fragment(%[[WORKLOAD]], %arg0) : (index, tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) =
   // CHECK-NEXT: (%arg1: index, %arg2: tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
   %0:2 = flow.ex.stream.fragment(%cst, %arg0) : (index, tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) =

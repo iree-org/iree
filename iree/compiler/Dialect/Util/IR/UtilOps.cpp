@@ -554,7 +554,7 @@ struct ExpandUnfoldableConstantOp
   using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto stdConst = rewriter.create<ConstantOp>(op.getLoc(), op.value());
+    auto stdConst = rewriter.create<arith::ConstantOp>(op.getLoc(), op.value());
     rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, stdConst.getResult());
     return success();
   }

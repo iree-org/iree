@@ -32,17 +32,17 @@ hal.executable public @matmul_256x1024x128_div_sub {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     } {
     ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-      %c1 = constant 1 : index
+      %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%arg0]
       %1 = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%arg1]
       hal.return %0, %1, %c1 : index, index, index
     }
     builtin.module  {
       func @matmul_256x1024x128_div_sub() {
-        %c0 = constant 0 : index
-        %c1024 = constant 1024 : index
-        %c256 = constant 256 : index
-        %cst = constant 0.000000e+00 : f16
+        %c0 = arith.constant 0 : index
+        %c1024 = arith.constant 1024 : index
+        %c256 = arith.constant 256 : index
+        %cst = arith.constant 0.000000e+00 : f16
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<256x1024xf16>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<256x1024xf16>
         %2 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : memref<256x128xf16>
@@ -72,8 +72,8 @@ hal.executable public @matmul_256x1024x128_div_sub {
               outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
               attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[16, 16, 16], [16, 16, 16]]}} {
             ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
-              %14 = divf %arg2, %arg3 : f16
-              %15 = subf %14, %arg4 : f16
+              %14 = arith.divf %arg2, %arg3 : f16
+              %15 = arith.subf %14, %arg4 : f16
               linalg.yield %15 : f16
             }
           }
@@ -90,16 +90,16 @@ hal.executable public @matmul_256x1024x128_div_sub {
 
 // CHECK: func @matmul_256x1024x128_div_sub
 
-// CHECK-DAG: %[[INIT:.+]] = constant dense<0.000000e+00> : vector<16x16xf16>
-// CHECK-DAG: %[[PAD:.+]] = constant 0.000000e+00 : f16
-// CHECK-DAG: %[[C0:.+]] = constant 0 : index
-// CHECK-DAG: %[[C16:.+]] = constant 16 : index
-// CHECK-DAG: %[[C32:.+]] = constant 32 : index
-// CHECK-DAG: %[[C48:.+]] = constant 48 : index
-// CHECK-DAG: %[[C64:.+]] = constant 64 : index
-// CHECK-DAG: %[[C80:.+]] = constant 80 : index
-// CHECK-DAG: %[[C96:.+]] = constant 96 : index
-// CHECK-DAG: %[[C112:.+]] = constant 112 : index
+// CHECK-DAG: %[[INIT:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf16>
+// CHECK-DAG: %[[PAD:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C48:.+]] = arith.constant 48 : index
+// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG: %[[C80:.+]] = arith.constant 80 : index
+// CHECK-DAG: %[[C96:.+]] = arith.constant 96 : index
+// CHECK-DAG: %[[C112:.+]] = arith.constant 112 : index
 
 // CHECK: %[[DIV_BUFFER:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%[[C0]]] : memref<256x1024xf16>
 // CHECK: %[[SUB_BUFFER:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%[[C0]]] : memref<256x1024xf16>
@@ -144,6 +144,6 @@ hal.executable public @matmul_256x1024x128_div_sub {
 // CHECK:     %[[MAT_VEC:.+]] = vector.transfer_read %[[ACC_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
 // CHECK:     %[[DIV_VEC:.+]] = vector.transfer_read %[[DIV_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
 // CHECK:     %[[SUB_VEC:.+]] = vector.transfer_read %[[SUB_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
-// CHECK:     %[[DIV:.+]] = divf %[[MAT_VEC]], %[[DIV_VEC]] : vector<16x16xf16>
-// CHECK:     %[[SUB:.+]] = subf %[[DIV]], %[[SUB_VEC]] : vector<16x16xf16>
+// CHECK:     %[[DIV:.+]] = arith.divf %[[MAT_VEC]], %[[DIV_VEC]] : vector<16x16xf16>
+// CHECK:     %[[SUB:.+]] = arith.subf %[[DIV]], %[[SUB_VEC]] : vector<16x16xf16>
 // CHECK:     vector.transfer_write %[[SUB]], %[[ACC_TILE]][%[[C0]], %[[C0]]]

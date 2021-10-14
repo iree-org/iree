@@ -4,7 +4,7 @@
 // CHECK-SAME: () -> i32
 func @constantI64() -> i64 {
   // CHECK-NEXT: constant 123 : i32
-  %c123 = constant 123 : i64
+  %c123 = arith.constant 123 : i64
   return %c123 : i64
 }
 
@@ -36,7 +36,7 @@ func @hloConstantUI64() -> tensor<1xui64> {
 // CHECK-SAME: () -> f32
 func @constantF64() -> f64 {
   // CHECK-NEXT: constant 1.234000e+02 : f32
-  %c1234 = constant 123.4 : f64
+  %c1234 = arith.constant 123.4 : f64
   return %c1234 : f64
 }
 
@@ -46,7 +46,7 @@ func @constantF64() -> f64 {
 // CHECK-SAME: () -> tensor<4xi32>
 func @constantSplatTensorI64() -> tensor<4xi64> {
   // CHECK-NEXT: constant dense<123> : tensor<4xi32>
-  %c123 = constant dense<123> : tensor<4xi64>
+  %c123 = arith.constant dense<123> : tensor<4xi64>
   return %c123 : tensor<4xi64>
 }
 
@@ -56,7 +56,7 @@ func @constantSplatTensorI64() -> tensor<4xi64> {
 // CHECK-SAME: () -> tensor<4xi32>
 func @constantDenseTensorI64() -> tensor<4xi64> {
   // CHECK-NEXT: constant dense<[0, 1, 2, 3]> : tensor<4xi32>
-  %c123 = constant dense<[0, 1, 2, 3]> : tensor<4xi64>
+  %c123 = arith.constant dense<[0, 1, 2, 3]> : tensor<4xi64>
   return %c123 : tensor<4xi64>
 }
 

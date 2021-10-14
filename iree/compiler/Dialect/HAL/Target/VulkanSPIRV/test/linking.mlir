@@ -82,9 +82,9 @@ hal.executable private @call_dispatch_3  {
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
     hal.executable.entry_point @call_dispatch_3 attributes {interface = @io, ordinal = 0 : index} {
     ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-      %c1 = constant 1 : index
-      %c56 = constant 56 : index
-      %c56_0 = constant 56 : index
+      %c1 = arith.constant 1 : index
+      %c56 = arith.constant 56 : index
+      %c56_0 = arith.constant 56 : index
       hal.return %c1, %c56, %c56_0 : index, index, index
     }
     builtin.module {

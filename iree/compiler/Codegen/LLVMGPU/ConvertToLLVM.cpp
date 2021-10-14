@@ -37,7 +37,7 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
     auto vecType = mathOp.getType().template dyn_cast<VectorType>();
     if (!vecType) return failure();
     Location loc = mathOp.getLoc();
-    Value newVector = rewriter.create<ConstantOp>(
+    Value newVector = rewriter.create<arith::ConstantOp>(
         loc, vecType, rewriter.getZeroAttr(vecType));
 
     for (int64_t element : llvm::seq(int64_t(0), vecType.getNumElements())) {
@@ -402,11 +402,11 @@ void populateLLVMConversionPatterns(MLIRContext *context,
 }
 
 void populateScalarizeMathOps(RewritePatternSet &patterns) {
-  patterns.add<ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<AbsFOp>,
+  patterns.add<ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<math::AbsOp>,
                ScalarizeMathOp<math::AtanOp>, ScalarizeMathOp<math::Atan2Op>,
-               ScalarizeMathOp<CeilFOp>, ScalarizeMathOp<math::CosOp>,
+               ScalarizeMathOp<math::CeilOp>, ScalarizeMathOp<math::CosOp>,
                ScalarizeMathOp<math::ExpOp>, ScalarizeMathOp<math::ExpM1Op>,
-               ScalarizeMathOp<FloorFOp>, ScalarizeMathOp<math::LogOp>,
+               ScalarizeMathOp<math::FloorOp>, ScalarizeMathOp<math::LogOp>,
                ScalarizeMathOp<math::Log1pOp>, ScalarizeMathOp<math::Log10Op>,
                ScalarizeMathOp<math::Log2Op>, ScalarizeMathOp<math::PowFOp>,
                ScalarizeMathOp<math::RsqrtOp>, ScalarizeMathOp<math::SinOp>,

@@ -27,11 +27,11 @@ func @fold_buffer_subspan_into_fill_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer
   ) {
-  %c0 = constant 0 : index
-  %c8192 = constant 8192 : index
-  %c100000 = constant 100000 : index
-  %c262144 = constant 262144 : index
-  %c1234_i32 = constant 1234 : i32
+  %c0 = arith.constant 0 : index
+  %c8192 = arith.constant 8192 : index
+  %c100000 = arith.constant 100000 : index
+  %c262144 = arith.constant 262144 : index
+  %c1234_i32 = arith.constant 1234 : i32
   %target_subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c8192, %c262144] : !hal.buffer
   // CHECK: hal.command_buffer.fill_buffer
   hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
@@ -50,11 +50,11 @@ func @fold_buffer_subspan_into_copy_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer
   ) {
-  %c0 = constant 0 : index
-  %c4096 = constant 4096 : index
-  %c8192 = constant 8192 : index
-  %c100000 = constant 100000 : index
-  %c262144 = constant 262144 : index
+  %c0 = arith.constant 0 : index
+  %c4096 = arith.constant 4096 : index
+  %c8192 = arith.constant 8192 : index
+  %c100000 = arith.constant 100000 : index
+  %c262144 = arith.constant 262144 : index
   %source_subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c4096, %c262144] : !hal.buffer
   %target_subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c8192, %c262144] : !hal.buffer
   // CHECK: hal.command_buffer.copy_buffer
@@ -78,14 +78,14 @@ func @fold_buffer_subspan_into_push_descriptor_set(
     %layout: !hal.executable_layout,
     %buffer: !hal.buffer
   ) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c4096 = constant 4096 : index
-  %c8000 = constant 8000 : index
-  %c262140 = constant 262140 : index
-  %c262144 = constant 262144 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c4096 = arith.constant 4096 : index
+  %c8000 = arith.constant 8000 : index
+  %c262140 = arith.constant 262140 : index
+  %c262144 = arith.constant 262144 : index
   %subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c4096, %c262144] : !hal.buffer
   //      CHECK: hal.command_buffer.push_descriptor_set
   // CHECK-SAME:   bindings([

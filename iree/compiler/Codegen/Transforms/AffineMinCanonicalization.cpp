@@ -37,21 +37,21 @@ static void substitute(scf::ForOp forOp, SmallVectorImpl<AffineExpr> &exprs,
                        SmallVectorImpl<Value> &dims,
                        SmallVectorImpl<Value> &symbols) {
   MLIRContext *ctx = forOp.getContext();
-  auto lbConstant = forOp.lowerBound().getDefiningOp<ConstantIndexOp>();
-  AffineExpr lb = lbConstant ? getAffineConstantExpr(lbConstant.getValue(), ctx)
+  auto lbConstant = forOp.lowerBound().getDefiningOp<arith::ConstantIndexOp>();
+  AffineExpr lb = lbConstant ? getAffineConstantExpr(lbConstant.value(), ctx)
                              : getAffineDimExpr(dims.size(), ctx);
 
-  auto stepConstant = forOp.step().getDefiningOp<ConstantIndexOp>();
+  auto stepConstant = forOp.step().getDefiningOp<arith::ConstantIndexOp>();
   AffineExpr step = stepConstant
-                        ? getAffineConstantExpr(stepConstant.getValue(), ctx)
+                        ? getAffineConstantExpr(stepConstant.value(), ctx)
                         : getAffineSymbolExpr(symbols.size(), ctx);
 
   if (!lbConstant) dims.push_back(forOp.lowerBound());
   if (!stepConstant) symbols.push_back(forOp.step());
   exprs.push_back(lb + step * getAffineDimExpr(dims.size(), ctx));
 
-  auto ubConstant = forOp.upperBound().getDefiningOp<ConstantIndexOp>();
-  AffineExpr ub = ubConstant ? getAffineConstantExpr(ubConstant.getValue(), ctx)
+  auto ubConstant = forOp.upperBound().getDefiningOp<arith::ConstantIndexOp>();
+  AffineExpr ub = ubConstant ? getAffineConstantExpr(ubConstant.value(), ctx)
                              : getAffineDimExpr(dims.size(), ctx);
   if (!ubConstant) dims.push_back(forOp.upperBound());
   exprs.push_back(ub);
@@ -136,7 +136,7 @@ LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
       }))
     return failure();
 
-  rewriter.replaceOpWithNewOp<ConstantIndexOp>(minOp, min);
+  rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(minOp, min);
   return success();
 }
 

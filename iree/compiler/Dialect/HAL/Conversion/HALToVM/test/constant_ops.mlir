@@ -15,8 +15,8 @@ hal.constant_pool @pool attributes {buffer_constraints = #hal.buffer_constraints
 util.global private @pool_storage0_buffer : !hal.buffer
 // CHECK-NEXT: vm.initializer {
 util.initializer {
-  %c0 = constant 0 : index
-  %c16 = constant 16 : index
+  %c0 = arith.constant 0 : index
+  %c16 = arith.constant 16 : index
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%dev : !hal.device> : !hal.allocator
   // CHECK: %[[STORAGE_REF:.+]] = vm.const.ref.rodata @pool_storage0 : !vm.buffer
@@ -38,12 +38,12 @@ util.global private @pool_storage1_buffer : !hal.buffer
 util.global private @pool_splats : !hal.buffer
 // CHECK: vm.initializer {
 util.initializer {
-  %c64 = constant 64 : index
-  %c0 = constant 0 : index
-  %c4 = constant 4 : index
-  %c1065353216_i32 = constant 1065353216 : i32
-  %c32 = constant 32 : index
-  %c1234567890_i32 = constant 1234567890 : i32
+  %c64 = arith.constant 64 : index
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c1065353216_i32 = arith.constant 1065353216 : i32
+  %c32 = arith.constant 32 : index
+  %c1234567890_i32 = arith.constant 1234567890 : i32
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator<%dev : !hal.device> : !hal.allocator
   // CHECK: [[BUFFER:%.+]] = vm.call @hal.allocator.allocate({{.+}}, %c50, %c15, %c64)

@@ -22,6 +22,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -79,13 +80,13 @@ static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
 
   // subgroupID = id.z * count.y * count.x + id.y * count.x + id.x
   for (size_t i = 0, e = numSubgroups.size(); i != e; ++i) {
-    Value nprocs = builder.create<ConstantIndexOp>(loc, numSubgroups[i]);
+    Value nprocs = builder.create<arith::ConstantIndexOp>(loc, numSubgroups[i]);
     AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
     AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
     Value procId =
         makeComposedAffineApply(builder, loc, d0 % s0, {subgroupId, nprocs});
     procInfo[e - i - 1] = linalg::ProcInfo{procId, nprocs};
-    subgroupId = builder.create<SignedDivIOp>(loc, subgroupId, nprocs);
+    subgroupId = builder.create<arith::DivSIOp>(loc, subgroupId, nprocs);
   }
   return procInfo;
 }
@@ -121,7 +122,7 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
         std::min(cast<linalg::LinalgOp>(op).getNumParallelLoops(), 3u));
     return llvm::to_vector<4>(
         llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-          return builder.create<ConstantIndexOp>(op->getLoc(), v);
+          return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
         }));
   };
   auto tilingOptions =

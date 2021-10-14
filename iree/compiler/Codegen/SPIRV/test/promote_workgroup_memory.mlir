@@ -14,9 +14,9 @@ hal.executable private @matmul_promote_workgroup_memory  {
     }
     builtin.module {
       func @matmul_promote_workgroup_memory() {
-        %c32 = constant 32 : index
-        %c50 = constant 50 : index
-        %c0 = constant 0 : index
+        %c32 = arith.constant 32 : index
+        %c50 = arith.constant 50 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<25x50xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<50x75xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<25x75xf32>
@@ -88,7 +88,7 @@ hal.executable private @conv_promote_workgroup_memory  {
     }
     builtin.module {
       func @conv_promote_workgroup_memory() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<3x4x6x14xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<2x15x14x6xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<2x13x11x14xf32>

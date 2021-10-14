@@ -36,10 +36,10 @@ hal.executable public @matmul_256x1024x128_div_sub {
     hal.executable.entry_point public @matmul_256x1024x128_div_sub attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_256x1024x128_div_sub() {
-        %c0 = constant 0 : index
-        %c1024 = constant 1024 : index
-        %c256 = constant 256 : index
-        %cst = constant 0.000000e+00 : f16
+        %c0 = arith.constant 0 : index
+        %c1024 = arith.constant 1024 : index
+        %c256 = arith.constant 256 : index
+        %cst = arith.constant 0.000000e+00 : f16
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x1024xf16>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x1024xf16>
         %2 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x128xf16>
@@ -80,8 +80,8 @@ hal.executable public @matmul_256x1024x128_div_sub {
               outs(%17 : tensor<?x?xf16>)
               attrs =  {__internal_linalg_transform__ = "workgroup"} {
             ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
-              %28 = divf %arg2, %arg3 : f16
-              %29 = subf %28, %arg4 : f16
+              %28 = arith.divf %arg2, %arg3 : f16
+              %29 = arith.subf %28, %arg4 : f16
               linalg.yield %29 : f16
             } -> tensor<?x?xf16>
             flow.dispatch.tensor.store %27, %4, offsets = [%arg0, %arg1], sizes = [%15, %16], strides = [1, 1] : tensor<?x?xf16> -> !flow.dispatch.tensor<writeonly:256x1024xf16>
@@ -104,7 +104,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorizeToCooperativeOps", workloadPerWorkgroup = [16, 16]}
 //           CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[X]]]
 //           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[Y]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[C1]]
@@ -150,10 +150,10 @@ hal.executable public @matmul_256x1024x8 {
     hal.executable.entry_point public @matmul_256x1024x8 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_256x1024x8() {
-        %c0 = constant 0 : index
-        %c1024 = constant 1024 : index
-        %c256 = constant 256 : index
-        %cst = constant 0.000000e+00 : f16
+        %c0 = arith.constant 0 : index
+        %c1024 = arith.constant 1024 : index
+        %c256 = arith.constant 256 : index
+        %cst = arith.constant 0.000000e+00 : f16
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x8xf16>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:8x1024xf16>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:256x1024xf16>

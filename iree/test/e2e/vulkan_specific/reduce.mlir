@@ -14,7 +14,7 @@ func @reduce_dim_1() {
 // make sure this works as expected.
 func @reduce_dim_1_const() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]> : tensor<2x5xi32>
-  %1 = constant dense<10> : tensor<i32>
+  %1 = arith.constant dense<10> : tensor<i32>
   %2 = "mhlo.reduce"(%0, %1) ( {
   ^bb0(%arg0 : tensor<i32>, %arg1 : tensor<i32>):
     %3 = "mhlo.add"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>

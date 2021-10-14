@@ -13,10 +13,10 @@ func @buffer_allocator(%arg0: !hal.buffer) -> !hal.allocator {
 
 // CHECK-LABEL: @buffer_subspan
 func @buffer_subspan(%arg0: !hal.buffer) -> !hal.buffer {
-  // CHECK-DAG: %[[OFFSET:.+]] = constant 100
-  %offset = constant 100 : index
-  // CHECK-DAG: %[[LENGTH:.+]] = constant 200
-  %length = constant 200 : index
+  // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 100
+  %offset = arith.constant 100 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 200
+  %length = arith.constant 200 : index
   // CHECK: %buffer = hal.buffer.subspan<%arg0 : !hal.buffer>[%[[OFFSET]], %[[LENGTH]]] : !hal.buffer
   %buffer = hal.buffer.subspan<%arg0 : !hal.buffer>[%offset, %length] : !hal.buffer
   return %buffer : !hal.buffer
@@ -35,8 +35,8 @@ func @buffer_length(%arg0: !hal.buffer) -> index {
 
 // CHECK-LABEL: @buffer_load
 func @buffer_load(%arg0: !hal.buffer) -> i32 {
-  // CHECK-DAG: %[[SRC_OFFSET:.+]] = constant 100
-  %src_offset = constant 100 : index
+  // CHECK-DAG: %[[SRC_OFFSET:.+]] = arith.constant 100
+  %src_offset = arith.constant 100 : index
   // CHECK: %[[VAL:.+]] = hal.buffer.load<%arg0 : !hal.buffer>[%[[SRC_OFFSET]]] : i32
   %1 = hal.buffer.load<%arg0 : !hal.buffer>[%src_offset] : i32
   // CHECK-NEXT: return %[[VAL]]
@@ -47,8 +47,8 @@ func @buffer_load(%arg0: !hal.buffer) -> i32 {
 
 // CHECK-LABEL: @buffer_store
 func @buffer_store(%arg0: !hal.buffer, %arg1: i32) {
-  // CHECK-DAG: %[[DST_OFFSET:.+]] = constant 100
-  %dst_offset = constant 100 : index
+  // CHECK-DAG: %[[DST_OFFSET:.+]] = arith.constant 100
+  %dst_offset = arith.constant 100 : index
   // CHECK: hal.buffer.store<%arg0 : !hal.buffer>[%[[DST_OFFSET]]] value(%arg1 : i32)
   hal.buffer.store<%arg0 : !hal.buffer>[%dst_offset] value(%arg1 : i32)
   return

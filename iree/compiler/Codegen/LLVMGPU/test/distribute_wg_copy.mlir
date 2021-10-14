@@ -24,9 +24,9 @@ hal.executable private @shared_mem_cpy  {
         %sm1 = memref.get_global @__shared_memory___0 : memref<256x4xf32, 3>
         %sm2 = memref.get_global @__shared_memory___1 : memref<3x512xf32, 3>
         gpu.barrier
-    // CHECK-DAG: %[[C2:.*]] = constant 2 : index
-    // CHECK-DAG: %[[C1:.*]] = constant 1 : index
-    // CHECK-DAG: %[[C0:.*]] = constant 0 : index
+    // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
+    // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+    // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
     // CHECK-DAG: %[[TX:.*]] = "gpu.thread_id"() {dimension = "x"} : () -> index
     // CHECK-DAG: %[[TY:.*]] = "gpu.thread_id"() {dimension = "y"} : () -> index
     // CHECK-DAG: %[[TZ:.*]] = "gpu.thread_id"() {dimension = "z"} : () -> index

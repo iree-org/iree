@@ -19,9 +19,9 @@ hal.executable @ex0 {
 // CHECK-LABEL: func @multipleDispatches
 // CHECK-SAME: %[[INPUT_BUF:.+]]: !hal.buffer
 func @multipleDispatches(%input: tensor<128xf32>) -> tensor<128xf32> {
-  // CHECK-DAG: %[[C0:.+]] = constant 0
-  // CHECK-DAG: %[[C128:.+]] = constant 128
-  %cst = constant 128 : index
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0
+  // CHECK-DAG: %[[C128:.+]] = arith.constant 128
+  %cst = arith.constant 128 : index
   //      CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate
   // CHECK-SAME:   type("HostVisible|DeviceVisible|DeviceLocal")
   // CHECK-SAME:   usage("Transfer|Mapping|Dispatch")
@@ -184,7 +184,7 @@ func @tensorReshapeToDispatch(%arg0 : tensor<4x4x2xf32>) -> tensor<4x4x1x2xf32> 
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %0 = flow.ex.stream.fragment(%arg0) : (tensor<4x4x2xf32>) -> (tensor<4x4x1x2xf32>) =
       (%source: tensor<4x4x2xf32>) -> (tensor<4x4x1x2xf32>) {
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     %r = flow.tensor.reshape %source : tensor<4x4x2xf32> -> tensor<4x4x1x2xf32>
     // CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]]
     // CHECK:   %c0 = (%[[SRC_BUF]] : !hal.buffer)[%c0, %c128],
@@ -218,7 +218,7 @@ func @tensorReshapeWithTiedConstant(%arg0: !hal.buffer_view) -> !hal.buffer_view
   %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?xf32>{%0}
   %2 = flow.ex.stream.fragment(%1) : (tensor<?xf32>{%0}) -> tensor<4xf32> =
       (%arg1: tensor<?xf32>) -> tensor<4xf32> {
-    %c4 = constant 4 : index
+    %c4 = arith.constant 4 : index
     %4 = flow.tensor.reshape %arg1 : tensor<?xf32>{%c4} -> tensor<4xf32>
     flow.return %4 : tensor<4xf32>
   }
@@ -235,11 +235,11 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 // CHECK-LABEL: @tensorSlice
 // CHECK-SAME: (%[[SBUF:.+]]:{{.+}})
 func @tensorSlice(%arg0 : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
-  %c24 = constant 24 : index
-  %c48 = constant 48 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c24 = arith.constant 24 : index
+  %c48 = arith.constant 48 : index
   // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
@@ -267,8 +267,8 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 // CHECK-LABEL: @tensorUpdate
 // CHECK-SAME: (%[[UBUF:.+]]:{{.+}}, %[[TBUF:.+]]:{{.+}})
 func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> tensor<5x1x10xf32> {
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
   // CHECK: %[[RET_BUF:.+]] = hal.allocator.allocate
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
@@ -315,12 +315,12 @@ hal.executable @ex0 {
 // CHECK-LABEL: func @dispatchWithShapeTies
 // CHECK-SAME: (%[[T:.+]]:{{.+}}, %[[BS:.+]]:{{.+}})
 func @dispatchWithShapeTies(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x128xf32> {
-  %cst = constant 128 : index
+  %cst = arith.constant 128 : index
   // Verify that size computation derives from the passed dynamic index.
-  // CHECK-DAG: %[[BS4:.+]] = muli %[[BS]], %c4 : index
-  // CHECK-DAG: = muli %[[BS4]], %c128 : index
+  // CHECK-DAG: %[[BS4:.+]] = arith.muli %[[BS]], %c4 : index
+  // CHECK-DAG: = arith.muli %[[BS4]], %c128 : index
   // Verify that an i32 is pushed.
-  // CHECK: %[[CAST_BS:.+]] = index_cast %[[BS]] : index to i32
+  // CHECK: %[[CAST_BS:.+]] = arith.index_cast %[[BS]] : index to i32
   // CHECK: hal.command_buffer.push_constants
   // CHECK-SAME:   layout({{.+}} : !hal.executable_layout)
   // CHECK-SAME:   offset(0)
@@ -378,8 +378,8 @@ hal.executable private @ex  {
 // CHECK-LABEL: func @staticTiledDispatch
 // CHECK-SAME: %[[INPUT:.+]]: !hal.buffer
 func @staticTiledDispatch(%input: tensor<7x4x24xf32>) -> tensor<4x7x1024xf32> {
-  %c1024 = constant 1024 : index
-  %c512 = constant 512 : index
+  %c1024 = arith.constant 1024 : index
+  %c512 = arith.constant 512 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %1 = flow.ex.stream.fragment(%input, %c1024, %c512) : (tensor<7x4x24xf32>, index, index) -> tensor<4x7x1024xf32> =
@@ -426,8 +426,8 @@ hal.executable private @ex  {
 // CHECK-LABEL: func @dynamicTiledDispatch
 // CHECK-SAME: %[[INPUT:.+]]: !hal.buffer
 func @dynamicTiledDispatch(%arg0: tensor<7x?x24x?xf32>, %arg1: index, %arg2: index) -> tensor<?x?x1024xf32> {
-  %c1024 = constant 1024 : index
-  %c512 = constant 512 : index
+  %c1024 = arith.constant 1024 : index
+  %c512 = arith.constant 512 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin<%[[CMD]]
   %2 = flow.ex.stream.fragment(%arg0, %arg1, %arg2, %c1024, %c512) : (tensor<7x?x24x?xf32>{%arg1, %arg2}, index, index, index, index) -> tensor<?x?x1024xf32>{%arg2, %arg1} =
@@ -505,9 +505,9 @@ func @dispatchTiedBuffer(%fill: tensor<i32>, %input: tensor<2x3xi32>) -> tensor<
   // CHECK-SAME:   usage("Transfer|Mapping|Dispatch")
   %0 = flow.ex.stream.fragment(%fill, %input) : (tensor<i32>, tensor<2x3xi32>) -> tensor<3x9xi32> =
       (%arg0: tensor<i32>, %arg1: tensor<2x3xi32>) -> tensor<3x9xi32> {
-    %c9 = constant 9 : index
-    %c3 = constant 3 : index
-    %c1 = constant 1 : index
+    %c9 = arith.constant 9 : index
+    %c3 = arith.constant 3 : index
+    %c1 = arith.constant 1 : index
 
     //      CHECK: %[[LAYOUT0:.+]] = hal.executable_layout.lookup
     // CHECK-SAME:   layouts([
@@ -563,10 +563,10 @@ util.global private @_const_pool_splats : !hal.buffer
 func @cloneFromLargeBufferToSmallBuffer(%input: tensor<2xi32>) -> tensor<7xi32> {
   %1 = flow.ex.stream.fragment(%input) : (tensor<2xi32>) -> tensor<7xi32> =
       (%arg0: tensor<2xi32>) -> tensor<7xi32> {
-    %c3 = constant 3 : index
+    %c3 = arith.constant 3 : index
     %const_span = hal.constant.subspan @_const_pool_splats[#util.byte_range<0, 32>] : tensor<7xi32>
-    // CHECK-DAG: %[[C0:.+]] = constant 0 : index
-    // CHECK-DAG: %[[C28:.+]] = constant 28 : index
+    // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK-DAG: %[[C28:.+]] = arith.constant 28 : index
     // CHECK: %[[DSTBUF:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[C28]]}
     // CHECK: %[[CSTBUF:.+]] = util.global.load @_const_pool_splats : !hal.buffer
     // CHECK: hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer> source(%[[CSTBUF]] : !hal.buffer)[%[[C0]]] target(%[[DSTBUF]] : !hal.buffer)[%[[C0]]] length(%[[C28]])
@@ -605,17 +605,17 @@ module attributes {hal.device.targets = [#hal.device.target<"vmvx">]} {
 // CHECK-LABEL: func @tensorSplatDynamic
 // CHECK-SAME: (%[[VALUE:.+]]: i8, %[[DIM:.+]]: index)
 func @tensorSplatDynamic(%value: i8, %dim: index) -> tensor<?x128xi8> {
-  // CHECK: %[[SIZE:.+]] = muli %[[DIM]], %c128 : index
+  // CHECK: %[[SIZE:.+]] = arith.muli %[[DIM]], %c128 : index
   // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[SIZE]]}
   %0 = flow.ex.stream.fragment(%value, %dim) : (i8, index) -> tensor<?x128xi8>{%dim} =
       (%arg0: i8, %arg1: index) -> tensor<?x128xi8> {
-    //  CHECK-DAG: %[[B0:.+]] = zexti %[[VALUE]] : i8 to i32
-    //  CHECK-DAG: %[[B1:.+]] = shift_left %[[B0]], %c8
-    //  CHECK-DAG: %[[B2:.+]] = shift_left %[[B0]], %c16
-    //  CHECK-DAG: %[[B3:.+]] = shift_left %[[B0]], %c24
-    //  CHECK-DAG: %[[ORA:.+]] = or %[[B2]], %[[B3]]
-    //  CHECK-DAG: %[[ORB:.+]] = or %[[B1]], %[[ORA]]
-    //  CHECK-DAG: %[[PATTERN:.+]] = or %[[B0]], %[[ORB]]
+    //  CHECK-DAG: %[[B0:.+]] = arith.extui %[[VALUE]] : i8 to i32
+    //  CHECK-DAG: %[[B1:.+]] = arith.shli %[[B0]], %c8
+    //  CHECK-DAG: %[[B2:.+]] = arith.shli %[[B0]], %c16
+    //  CHECK-DAG: %[[B3:.+]] = arith.shli %[[B0]], %c24
+    //  CHECK-DAG: %[[ORA:.+]] = arith.ori %[[B2]], %[[B3]]
+    //  CHECK-DAG: %[[ORB:.+]] = arith.ori %[[B1]], %[[ORA]]
+    //  CHECK-DAG: %[[PATTERN:.+]] = arith.ori %[[B0]], %[[ORB]]
     // CHECK-NEXT: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %[[SIZE]]] pattern(%[[PATTERN]] : i32)
     %1 = flow.tensor.splat %arg0 : tensor<?x128xi8>{%arg1}
     flow.return %1 : tensor<?x128xi8>
@@ -635,7 +635,7 @@ func @tensorSplatF32(%value: f32) -> tensor<2x128xf32> {
   // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c1024}
   %0 = flow.ex.stream.fragment(%value) : (f32) -> tensor<2x128xf32> =
       (%arg0: f32) -> tensor<2x128xf32> {
-    //  CHECK-DAG: %[[PATTERN:.+]] = bitcast %[[VALUE]] : f32 to i32
+    //  CHECK-DAG: %[[PATTERN:.+]] = arith.bitcast %[[VALUE]] : f32 to i32
     // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c1024] pattern(%[[PATTERN]] : i32)
     %1 = flow.tensor.splat %arg0 : tensor<2x128xf32>
     flow.return %1 : tensor<2x128xf32>
@@ -655,10 +655,10 @@ func @tensorSplatF16(%value: f16) -> tensor<2x128xf16> {
   // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%c512}
   %0 = flow.ex.stream.fragment(%value) : (f16) -> tensor<2x128xf16> =
       (%arg0: f16) -> tensor<2x128xf16> {
-    //  CHECK-DAG: %[[BITCAST:.+]] = bitcast %[[VALUE]] : f16 to i16
-    //  CHECK-DAG: %[[B0:.+]] = zexti %[[BITCAST]] : i16 to i32
-    //  CHECK-DAG: %[[B1:.+]] = shift_left %[[B0]], %c16
-    //  CHECK-DAG: %[[PATTERN:.+]] = or %[[B0]], %[[B1]]
+    //  CHECK-DAG: %[[BITCAST:.+]] = arith.bitcast %[[VALUE]] : f16 to i16
+    //  CHECK-DAG: %[[B0:.+]] = arith.extui %[[BITCAST]] : i16 to i32
+    //  CHECK-DAG: %[[B1:.+]] = arith.shli %[[B0]], %c16
+    //  CHECK-DAG: %[[PATTERN:.+]] = arith.ori %[[B0]], %[[B1]]
     // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c512] pattern(%[[PATTERN]] : i32)
     %1 = flow.tensor.splat %arg0 : tensor<2x128xf16>
     flow.return %1 : tensor<2x128xf16>

@@ -5,8 +5,8 @@
 
 // CHECK-LABEL: @constant
 func @constant() -> i32 {
-  // CHECK-NEXT: %[[C1:.+]] = constant 1
-  %c1 = constant 1 : i32
+  // CHECK-NEXT: %[[C1:.+]] = arith.constant 1
+  %c1 = arith.constant 1 : i32
   %0 = util.do_not_optimize(%c1) : i32
   // CHECK-NEXT: return %[[C1]]
   return %0 : i32
@@ -16,12 +16,12 @@ func @constant() -> i32 {
 
 // CHECK-LABEL: @multiple
 func @multiple() -> (i32, i32) {
-  // CHECK-NEXT: %[[C1:.+]] = constant 1
-  %c1 = constant 1 : i32
+  // CHECK-NEXT: %[[C1:.+]] = arith.constant 1
+  %c1 = arith.constant 1 : i32
   %0 = util.do_not_optimize(%c1) : i32
   %1 = util.do_not_optimize(%0) : i32
-  // CHECK-NEXT: %[[C2:.+]] = constant 2
-  %c2 = constant 2 : i32
+  // CHECK-NEXT: %[[C2:.+]] = arith.constant 2
+  %c2 = arith.constant 2 : i32
   %2 = util.do_not_optimize(%1) : i32
   %3 = util.do_not_optimize(%c2) : i32
   // CHECK-NEXT: return %[[C1]], %[[C2]]
@@ -32,10 +32,10 @@ func @multiple() -> (i32, i32) {
 
 // CHECK-LABEL: @multiple_operands
 func @multiple_operands() -> (i32, i32) {
-  // CHECK-NEXT: %[[C1:.+]] = constant 1
-  %c1 = constant 1 : i32
-  // CHECK-NEXT: %[[C2:.+]] = constant 2
-  %c2 = constant 2 : i32
+  // CHECK-NEXT: %[[C1:.+]] = arith.constant 1
+  %c1 = arith.constant 1 : i32
+  // CHECK-NEXT: %[[C2:.+]] = arith.constant 2
+  %c2 = arith.constant 2 : i32
   %0, %1 = util.do_not_optimize(%c1, %c2) : i32, i32
   // CHECK-NEXT: return %[[C1]], %[[C2]]
   return %0, %1 : i32, i32

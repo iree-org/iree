@@ -17,23 +17,23 @@ func private @ForwardLoopCond_gFAnjWGSoLs__.167(%arg0: tensor<i64>, %arg1: tenso
   return %0 : tensor<i1>
 }
 func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0: tensor<1x10xf32>, %arg1: tensor<1x10xf32>, %arg2: tensor<5x1x64xf32>, %arg3: tensor<5x1x1xf32>, %arg4: tensor<5x1x1xf32>) -> (tensor<i64>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>) {
-  %cst = constant dense<0x7F800000> : tensor<f32>
+  %cst = arith.constant dense<0x7F800000> : tensor<f32>
   %0 = mhlo.constant dense<0.000000e+00> : tensor<5xf32>
-  %cst_0 = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
-  %cst_1 = constant dense<-2147483648> : tensor<i32>
-  %cst_2 = constant dense<5> : tensor<i32>
+  %cst_0 = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  %cst_1 = arith.constant dense<-2147483648> : tensor<i32>
+  %cst_2 = arith.constant dense<5> : tensor<i32>
   %1 = mhlo.constant dense<0.000000e+00> : tensor<40xf32>
-  %cst_3 = constant dense<4.200000e-01> : tensor<74x40xf32>
-  %cst_4 = constant dense<0> : tensor<i64>
+  %cst_3 = arith.constant dense<4.200000e-01> : tensor<74x40xf32>
+  %cst_4 = arith.constant dense<0> : tensor<i64>
   %2 = mhlo.constant dense<0> : tensor<5xi64>
   %3 = mhlo.constant dense<0.000000e+00> : tensor<5x1x10xf32>
-  %cst_5 = constant dense<1> : tensor<i64>
+  %cst_5 = arith.constant dense<1> : tensor<i64>
   %4 = mhlo.constant dense<1.000000e+01> : tensor<1x10xf32>
   %5 = mhlo.constant dense<-1.000000e+01> : tensor<1x10xf32>
   %6 = mhlo.constant dense<1.000000e+00> : tensor<1x10xf32>
   %7 = mhlo.constant dense<0.000000e+00> : tensor<1x10xf32>
   %8 = mhlo.constant dense<5.000000e-01> : tensor<1x10xf32>
-  %cst_6 = constant dense<0> : tensor<i32>
+  %cst_6 = arith.constant dense<0> : tensor<i32>
   %9 = "mhlo.reduce"(%arg3, %cst) ( {
   ^bb0(%arg5: tensor<f32>, %arg6: tensor<f32>):  // no predecessors
     %115 = mhlo.minimum %arg5, %arg6 : tensor<f32>
@@ -143,7 +143,7 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
 }
 func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x2x2xf32>) -> tensor<5x1x10xf32> {
   %0 = mhlo.constant dense<0.000000e+00> : tensor<1x10xf32>
-  %cst = constant dense<0.000000e+00> : tensor<f32>
+  %cst = arith.constant dense<0.000000e+00> : tensor<f32>
   %1 = mhlo.constant dense<0.000000e+00> : tensor<5x1x1xf32>
   %2 = "mhlo.reshape"(%arg1) : (tensor<1x5x2x2xf32>) -> tensor<1x5x4xf32>
   %3 = "mhlo.pad"(%2, %cst) {edge_padding_high = dense<[0, 0, 60]> : tensor<3xi64>, edge_padding_low = dense<0> : tensor<3xi64>, interior_padding = dense<0> : tensor<3xi64>} : (tensor<1x5x4xf32>, tensor<f32>) -> tensor<1x5x64xf32>

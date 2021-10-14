@@ -298,8 +298,8 @@ Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
 // Inline operations that the dispatch region can handle natively.
 static bool canDispatchRegionContainOp(Operation *op) {
   // Inline constant operations that are splat or small constants.
-  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.getValue();
+  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
+    auto constantValueAttr = constantOp.value();
     auto constantType = constantOp.getType();
     if (constantValueAttr.isa<SplatElementsAttr>()) {
       return true;
@@ -916,7 +916,7 @@ Operation::result_range ExStreamFragmentOp::getClosureResults() {
 bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
   // NOTE: we widen support on new stream ops only - the legacy path isn't worth
   // upgrading to support more.
-  if (auto constantOp = dyn_cast<ConstantOp>(op)) {
+  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
     return constantOp.getType().isIntOrIndexOrFloat();
   }
   if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {

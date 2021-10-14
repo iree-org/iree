@@ -15,8 +15,8 @@ hal.executable private @dynamic_matmul  {
     }
     builtin.module {
       func @matmul_128x128x128() {
-        %c0 = constant 0 : index
-        %c128 = constant 128 : index
+        %c0 = arith.constant 0 : index
+        %c128 = arith.constant 128 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128x128xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<128x128xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128x128xf32>
@@ -45,11 +45,11 @@ hal.executable private @dynamic_matmul  {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//   CHECK-DAG:   %[[START:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[WORGKROUP_SIZE:.+]] = constant 64
-//   CHECK-DAG:   %[[VECTOR_SIZE:.+]] = constant 4
-//   CHECK-DAG:   %[[L1_SIZE:.+]] = constant 32
-//   CHECK-DAG:   %[[KDIM_SIZE:.+]] = constant 128
+//   CHECK-DAG:   %[[START:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[WORGKROUP_SIZE:.+]] = arith.constant 64
+//   CHECK-DAG:   %[[VECTOR_SIZE:.+]] = arith.constant 4
+//   CHECK-DAG:   %[[L1_SIZE:.+]] = arith.constant 32
+//   CHECK-DAG:   %[[KDIM_SIZE:.+]] = arith.constant 128
 //       CHECK:   scf.for
 //       CHECK:     scf.for
 //       CHECK:       scf.for {{.*}} = %[[START]] to %[[WORGKROUP_SIZE]] step %[[L1_SIZE]] {
@@ -74,14 +74,14 @@ hal.executable private @dynamic_matmul  {
 //     CHECK-PROMOTED: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //     CHECK-PROMOTED: #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>
 //     CHECK-PROMOTED: func @matmul_128x128x128
-// CHECK-PROMOTED-DAG:   %[[KDIM_SIZE:.+]] = constant 128 : index
-// CHECK-PROMOTED-DAG:   %[[WORGKROUP_SIZE:.+]] = constant 64 : index
-// CHECK-PROMOTED-DAG:   %[[VECTOR_SIZE:.+]] = constant 4 : index
-// CHECK-PROMOTED-DAG:   %[[L1_SIZE:.+]] = constant 32 : index
-// CHECK-PROMOTED-DAG:   %[[START:.+]] = constant 0 : index
-// CHECK-PROMOTED-DAG:   %[[C1:.+]] = constant 1 : index
-// CHECK-PROMOTED-DAG:   %[[C1:.+]] = constant 2 : index
-// CHECK-PROMOTED-DAG:   %[[C1:.+]] = constant 3 : index
+// CHECK-PROMOTED-DAG:   %[[KDIM_SIZE:.+]] = arith.constant 128 : index
+// CHECK-PROMOTED-DAG:   %[[WORGKROUP_SIZE:.+]] = arith.constant 64 : index
+// CHECK-PROMOTED-DAG:   %[[VECTOR_SIZE:.+]] = arith.constant 4 : index
+// CHECK-PROMOTED-DAG:   %[[L1_SIZE:.+]] = arith.constant 32 : index
+// CHECK-PROMOTED-DAG:   %[[START:.+]] = arith.constant 0 : index
+// CHECK-PROMOTED-DAG:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-PROMOTED-DAG:   %[[C1:.+]] = arith.constant 2 : index
+// CHECK-PROMOTED-DAG:   %[[C1:.+]] = arith.constant 3 : index
 // CHECK-PROMOTED-DAG:   %[[C_PROMOTED_TILE:.+]] = memref.alloca() : memref<64x64xf32>
 // CHECK-PROMOTED-DAG:   %[[B_PROMOTED_TILE:.+]] = memref.alloca() : memref<128x64xf32>
 // CHECK-PROMOTED-DAG:   %[[A_PROMOTED_TILE:.+]] = memref.alloca() : memref<64x128xf32>
@@ -128,8 +128,8 @@ hal.executable private @matmul_i8_i8_i32  {
     }
     builtin.module {
       func @matmul_i8_i8_i32_128x128x128() {
-        %c0 = constant 0 : index
-        %c128 = constant 128 : index
+        %c0 = arith.constant 0 : index
+        %c128 = arith.constant 128 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128x128xi8>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<128x128xi8>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128x128xi32>
@@ -158,11 +158,11 @@ hal.executable private @matmul_i8_i8_i32  {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//   CHECK-DAG:   %[[START:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[WORGKROUP_SIZE:.+]] = constant 64
-//   CHECK-DAG:   %[[VECTOR_SIZE:.+]] = constant 4
-//   CHECK-DAG:   %[[L1_SIZE:.+]] = constant 32
-//   CHECK-DAG:   %[[KDIM_SIZE:.+]] = constant 128
+//   CHECK-DAG:   %[[START:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[WORGKROUP_SIZE:.+]] = arith.constant 64
+//   CHECK-DAG:   %[[VECTOR_SIZE:.+]] = arith.constant 4
+//   CHECK-DAG:   %[[L1_SIZE:.+]] = arith.constant 32
+//   CHECK-DAG:   %[[KDIM_SIZE:.+]] = arith.constant 128
 //       CHECK:   scf.for
 //       CHECK:     scf.for
 //       CHECK:       scf.for {{.*}} = %[[START]] to %[[WORGKROUP_SIZE]] step %[[L1_SIZE]] {

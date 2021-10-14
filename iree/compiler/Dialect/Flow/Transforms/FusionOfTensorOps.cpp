@@ -99,7 +99,7 @@ struct FusionOfTensorOpsPass
           // simplistic heuristic to avoid duplicating ops that may be
           // expensive.
           // TODO: Add a cost model to allow ops to be duplicated.
-          if (!isBroadcast && !isa<ConstantOp>(producer) &&
+          if (!isBroadcast && !isa<arith::ConstantOp>(producer) &&
               !llvm::hasSingleElement(producerResult.getUsers()))
             return false;
           return llvm::all_of(producerResult.getUsers(), [](Operation *user) {

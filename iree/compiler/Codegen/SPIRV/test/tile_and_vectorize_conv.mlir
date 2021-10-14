@@ -16,17 +16,17 @@ hal.executable private @conv_static_shape_f32  {
       translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
-      %x = constant 2: index
-      %y = constant 28: index
-      %z = constant 28: index
+      %x = arith.constant 2: index
+      %y = arith.constant 28: index
+      %z = arith.constant 28: index
       hal.return %x, %y, %z: index, index, index
     }
     builtin.module {
       func @conv_static_shape_f32() {
-        %cst = constant 0.000000e+00 : f32
-        %c32 = constant 32 : index
-        %c112 = constant 112 : index
-        %c0 = constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c32 = arith.constant 32 : index
+        %c112 = arith.constant 112 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<1x225x225x16xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x3x16x32xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<1x112x112x32xf32>
@@ -115,17 +115,17 @@ hal.executable private @depthwise_conv_static_shape_f32  {
       translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
-      %x = constant 6: index
-      %y = constant 14: index
-      %z = constant 14: index
+      %x = arith.constant 6: index
+      %y = arith.constant 14: index
+      %z = arith.constant 14: index
       hal.return %x, %y, %z: index, index, index
     }
     builtin.module {
       func @depthwise_conv_static_shape_f32() {
-        %cst = constant 0.000000e+00 : f32
-        %c96 = constant 96 : index
-        %c56 = constant 56 : index
-        %c0 = constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c96 = arith.constant 96 : index
+        %c56 = arith.constant 56 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<1x113x113x96xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x3x1x96xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<1x56x56x96xf32>

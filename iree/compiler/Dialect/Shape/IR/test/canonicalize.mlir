@@ -31,7 +31,7 @@ func @staticGetRankedShapeToConst(%arg0: tensor<1x2xf32>) -> (!shapex.ranked_sha
 // CHECK-LABEL: @foldStaticRankedDim
 // CHECK-SAME: %[[SHAPE:[^:[:space:]]+]]: !shapex.ranked_shape<[1,?,2,?]>
 func @foldStaticRankedDim(%arg0: !shapex.ranked_shape<[1,?,2,?]>) -> (i32, i32) {
-  // CHECK-DAG: %[[D2:.+]] = constant 2 : i32
+  // CHECK-DAG: %[[D2:.+]] = arith.constant 2 : i32
   %0 = shapex.ranked_dim %arg0[2] : !shapex.ranked_shape<[1,?,2,?]> -> i32
   // CHECK-DAG: %[[D1:.+]] = shapex.ranked_dim %[[SHAPE]][1]
   %1 = shapex.ranked_dim %arg0[1] : !shapex.ranked_shape<[1,?,2,?]> -> i32
@@ -65,8 +65,8 @@ func @dynamicMakeRankedShapeDim(%arg0: index, %arg1 : index) -> (index, index, i
   %d1 = shapex.ranked_dim %rs[1] : !shapex.ranked_shape<[?,8,?,16]> -> index
   %d2 = shapex.ranked_dim %rs[2] : !shapex.ranked_shape<[?,8,?,16]> -> index
   %d3 = shapex.ranked_dim %rs[3] : !shapex.ranked_shape<[?,8,?,16]> -> index
-  // CHECK-DAG: %[[C8:.+]] = constant 8 : index
-  // CHECK-DAG: %[[C16:.+]] = constant 16 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
   // CHECK-DAG: return %[[DD0]], %[[C8]], %[[DD1]], %[[C16]]
   return %d0, %d1, %d2, %d3 : index, index, index, index
 }

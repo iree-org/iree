@@ -37,12 +37,12 @@ struct ExtractElementOpLowering
     if (tensorType.getElementType().isInteger(1)) {
       auto i1Type = rewriter.getI1Type();
       auto i8Type = rewriter.getIntegerType(8);
-      auto convertedOperand = rewriter.createOrFold<ZeroExtendIOp>(
+      auto convertedOperand = rewriter.createOrFold<arith::ExtUIOp>(
           op.getLoc(), args[0],
           RankedTensorType::get(tensorType.getShape(), i8Type));
       auto i8Value = rewriter.createOrFold<IREE::Flow::TensorLoadOp>(
           op.getLoc(), i8Type, convertedOperand, op.indices());
-      rewriter.replaceOpWithNewOp<TruncateIOp>(op, i1Type, i8Value);
+      rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, i1Type, i8Value);
     } else {
       rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
           op, tensorType.getElementType(), op.tensor(), op.indices());
@@ -67,7 +67,9 @@ class PromoteTensorLoadsPass
     : public PromoteTensorLoadsBase<PromoteTensorLoadsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<FlowDialect, StandardOpsDialect, tensor::TensorDialect>();
+    registry
+        .insert<FlowDialect, StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                mlir::math::MathDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
@@ -76,7 +78,9 @@ class PromoteTensorLoadsPass
     OwningRewritePatternList conversionPatterns(&getContext());
 
     conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
-    conversionTarget.addLegalDialect<StandardOpsDialect>();
+    conversionTarget
+        .addLegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                         mlir::math::MathDialect>();
     setupStandardToFlowTensorLoadLegality(context, conversionTarget);
     populateStandardToFlowTensorLoadPatterns(context, conversionPatterns);
 
