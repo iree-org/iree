@@ -66,7 +66,7 @@ class Extent {
 
   Value convertToValue(OpBuilder &builder, Location loc) {
     if (!isStatic()) return getValue();
-    return builder.create<ConstantIndexOp>(loc, getStatic());
+    return builder.create<arith::ConstantIndexOp>(loc, getStatic());
   }
 
  private:
@@ -192,8 +192,8 @@ Optional<Extent> computeBinaryResultExtent(OpBuilder &builder, Location loc,
   Value lhsExtentValue = lhsDim.convertToValue(builder, loc);
   Value rhsExtentValue = rhsDim.convertToValue(builder, loc);
 
-  Value isEqual = builder.create<CmpIOp>(loc, CmpIPredicate::eq, lhsExtentValue,
-                                         rhsExtentValue);
+  Value isEqual = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                lhsExtentValue, rhsExtentValue);
   builder.create<AssertOp>(
       loc, isEqual,
       builder.getStringAttr("mismatched dynamic broadcast extents"));
@@ -269,8 +269,8 @@ Optional<Extent> computeTernaryResultExtent(OpBuilder &builder, Location loc,
     // Dynamic check.
     Value cmpLhsValue = cmpLhs.convertToValue(builder, loc);
     Value cmpRhsValue = cmpRhs.convertToValue(builder, loc);
-    Value isEqual = builder.create<CmpIOp>(loc, CmpIPredicate::eq, cmpLhsValue,
-                                           cmpRhsValue);
+    Value isEqual = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                  cmpLhsValue, cmpRhsValue);
     builder.create<AssertOp>(
         loc, isEqual,
         builder.getStringAttr("mismatched dynamic broadcast extents"));
@@ -730,7 +730,7 @@ struct ConvertDynamicReshapeOp
            "mismatched rank");
     for (int i = 0, e = resultType.getRank(); i < e; ++i) {
       if (resultType.isDynamicDim(i)) {
-        Value index = rewriter.create<ConstantIndexOp>(loc, i);
+        Value index = rewriter.create<arith::ConstantIndexOp>(loc, i);
         targetDims.push_back(
             rewriter.create<tensor::ExtractOp>(loc, outputShape, index));
       }

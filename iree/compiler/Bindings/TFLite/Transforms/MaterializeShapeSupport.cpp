@@ -42,7 +42,7 @@ class MaterializeShapeSupportPass
     registry.insert<iree_compiler::IREE::Flow::FlowDialect>();
     registry.insert<iree_compiler::IREE::Util::UtilDialect>();
     registry.insert<iree_compiler::ShapeDialect>();
-    registry.insert<StandardOpsDialect>();
+    registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect>();
   }
 
   StringRef getArgument() const override {
@@ -249,7 +249,8 @@ class MaterializeShapeSupportPass
       }
 
       // Clear the dirty flag now that the shapes have been updated.
-      auto falseValue = exitBuilder.createOrFold<ConstantIntOp>(exitLoc, 0, 1);
+      auto falseValue =
+          exitBuilder.createOrFold<arith::ConstantIntOp>(exitLoc, 0, 1);
       exitBuilder.create<IREE::Util::GlobalStoreOp>(exitLoc, falseValue,
                                                     dirtyGlobalOp.getName());
       exitBuilder.create<ReturnOp>(exitLoc);
@@ -285,9 +286,10 @@ class MaterializeShapeSupportPass
     builder.create<BranchOp>(loc, compareBlocks[0]);
     for (size_t i = 0; i < caseCount; ++i) {
       auto compareBuilder = OpBuilder::atBlockBegin(compareBlocks[i]);
-      auto caseValue = compareBuilder.createOrFold<ConstantIndexOp>(loc, i);
-      auto eqValue = compareBuilder.createOrFold<CmpIOp>(loc, CmpIPredicate::eq,
-                                                         indexValue, caseValue);
+      auto caseValue =
+          compareBuilder.createOrFold<arith::ConstantIndexOp>(loc, i);
+      auto eqValue = compareBuilder.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::eq, indexValue, caseValue);
       compareBuilder.create<CondBranchOp>(
           loc, eqValue, caseBlocks[i],
           i < caseCount - 1 ? compareBlocks[i + 1] : exitBlock);
@@ -305,12 +307,12 @@ class MaterializeShapeSupportPass
                  Value shapeValue, Value listValue, OpBuilder &builder) {
     builder.create<IREE::Util::ListResizeOp>(
         loc, listValue,
-        builder.createOrFold<ConstantIndexOp>(loc, shapeType.getRank()));
+        builder.createOrFold<arith::ConstantIndexOp>(loc, shapeType.getRank()));
     for (int i = 0; i < shapeType.getRank(); ++i) {
       auto dimValue =
           builder.createOrFold<Shape::RankedDimOp>(loc, shapeValue, i);
       builder.create<IREE::Util::ListSetOp>(
-          loc, listValue, builder.createOrFold<ConstantIndexOp>(loc, i),
+          loc, listValue, builder.createOrFold<arith::ConstantIndexOp>(loc, i),
           dimValue);
     }
   }
@@ -323,7 +325,7 @@ class MaterializeShapeSupportPass
       if (!shapeType.isDimDynamic(i)) continue;
       dynamicDims.push_back(builder.createOrFold<IREE::Util::ListGetOp>(
           loc, builder.getIndexType(), listValue,
-          builder.createOrFold<ConstantIndexOp>(loc, i)));
+          builder.createOrFold<arith::ConstantIndexOp>(loc, i)));
     }
     return builder.createOrFold<Shape::MakeRankedShapeOp>(loc, shapeType,
                                                           dynamicDims);
@@ -400,7 +402,7 @@ class MaterializeShapeSupportPass
 
     // Set the dirty flag so that shapes get recalculated as needed.
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
-    auto trueValue = exitBuilder.createOrFold<ConstantIntOp>(loc, 1, 1);
+    auto trueValue = exitBuilder.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
     exitBuilder.create<IREE::Util::GlobalStoreOp>(loc, trueValue,
                                                   dirtyGlobalOp.getName());
     exitBuilder.create<ReturnOp>(loc);

@@ -6,11 +6,11 @@ func @complexWorkgroupsUsage(
     %arg0 : tensor<?x4xf32>,
     // CHECK-SAME: %[[ARG1:.+]]: index
     %arg1 : index) -> tensor<4x?xf32> {
-  %c128 = constant 128 : index
-  // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = constant 100
-  %x = constant 100 : index
-  // CHECK-DAG: %[[WORKGROUP_COUNT_Y:.+]] = constant 50
-  %y = constant 50 : index
+  %c128 = arith.constant 128 : index
+  // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = arith.constant 100
+  %x = arith.constant 100 : index
+  // CHECK-DAG: %[[WORKGROUP_COUNT_Y:.+]] = arith.constant 50
+  %y = arith.constant 50 : index
   // CHECK: %[[OUTER_RET0:.+]] = flow.dispatch.workgroups[
   // CHECK-SAME: %[[WORKGROUP_COUNT_X]], %[[WORKGROUP_COUNT_Y]]
   // CHECK-SAME: ](%[[ARG0]], %[[ARG1]])
@@ -91,11 +91,11 @@ func @inplaceDispatch(
     %arg0: tensor<?x4xf32>,
     // CHECK-SAME: %[[ARG1:.+]]: index
     %arg1: index) -> tensor<?x4xf32> {
-  %c128 = constant 128 : index
-  // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = constant 100
-  %x = constant 100 : index
-  // CHECK-DAG: %[[WORKGROUP_COUNT_Y:.+]] = constant 50
-  %y = constant 50 : index
+  %c128 = arith.constant 128 : index
+  // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = arith.constant 100
+  %x = arith.constant 100 : index
+  // CHECK-DAG: %[[WORKGROUP_COUNT_Y:.+]] = arith.constant 50
+  %y = arith.constant 50 : index
   // CHECK: %[[OUTER_RET0:.+]] = flow.dispatch.workgroups[
   // CHECK-SAME: %[[WORKGROUP_COUNT_X]], %[[WORKGROUP_COUNT_Y]]
   // CHECK-SAME: ](%[[ARG0]], %[[ARG1]])

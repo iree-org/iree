@@ -60,7 +60,7 @@ hal.executable private @dispatch_2 {
 func @basic_linking() -> () {
   %device = hal.ex.shared_device : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
-  %c1 = constant 1 : index
+  %c1 = arith.constant 1 : index
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@vmvx::@dispatch_0) workgroups([%c1, %c1, %c1])
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@vmvx::@dispatch_1) workgroups([%c1, %c1, %c1])
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_2::@vmvx::@dispatch_2) workgroups([%c1, %c1, %c1])
@@ -167,13 +167,13 @@ func @other_targets() -> () {
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   hal.device.switch<%device : !hal.device>
   #hal.device.match.executable.format<"vmvx-bytecode-fb"> {
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@vmvx::@dispatch_0) workgroups([%c1, %c1, %c1])
     hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@vmvx::@dispatch_1) workgroups([%c1, %c1, %c1])
     hal.return
   },
   #hal.device.match.executable.format<"cuda-nvptx-fb"> {
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@otherdispatch::@dispatch_0) workgroups([%c1, %c1, %c1])
     hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@otherdispatch::@dispatch_1) workgroups([%c1, %c1, %c1])
     hal.return
@@ -222,13 +222,13 @@ func @other_targets() -> () {
 // CHECK:       func @other_targets() {
 // CHECK:         hal.device.switch<%device : !hal.device>
 // CHECK-NEXT:    #hal.device.match.executable.format<"vmvx-bytecode-fb"> {
-// CHECK-NEXT:      %c1 = constant 1 : index
+// CHECK-NEXT:      %c1 = arith.constant 1 : index
 // CHECK-NEXT:      hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:      hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:      hal.return
 // CHECK-NEXT:    },
 // CHECK-NEXT:    #hal.device.match.executable.format<"cuda-nvptx-fb"> {
-// CHECK-NEXT:      %c1 = constant 1 : index
+// CHECK-NEXT:      %c1 = arith.constant 1 : index
 // CHECK-NEXT:      hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@otherdispatch::@dispatch_0) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:      hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@otherdispatch::@dispatch_1) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:      hal.return

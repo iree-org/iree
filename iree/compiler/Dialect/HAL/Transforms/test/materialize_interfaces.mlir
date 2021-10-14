@@ -22,7 +22,7 @@ flow.executable @static_tiled_dispatch {
   builtin.module  {
     // CHECK-NEXT: func @entry() {
     func @entry(%arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
-      // CHECK-NEXT: %c0 = constant 0 : index
+      // CHECK-NEXT: %c0 = arith.constant 0 : index
       // CHECK-NEXT: %[[ARG:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B0]][%c0] : !flow.dispatch.tensor<readonly:8x4xf32>
       // CHECK-NEXT: %[[RET:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B1]][%c0] : !flow.dispatch.tensor<writeonly:4x8xf32>
 
@@ -39,7 +39,7 @@ flow.executable @static_tiled_dispatch {
 func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
   %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
       (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     // CHECK: = flow.dispatch @static_tiled_dispatch::@entry
     // CHECK-SAME: hal.bindings = [
     // CHECK-SAME:   #hal.ex.operand_buffer<"[[S0B0]]", 0 : index>,
@@ -82,7 +82,7 @@ flow.executable @multi_target_ex {
   builtin.module  {
     // CHECK-NEXT: func @entry() {
     func @entry(%arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
-      // CHECK-NEXT: %c0 = constant 0 : index
+      // CHECK-NEXT: %c0 = arith.constant 0 : index
       // CHECK-NEXT: %[[ARG:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B0]][%c0] : !flow.dispatch.tensor<readonly:8x4xf32>
       // CHECK-NEXT: %[[RET:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B1]][%c0] : !flow.dispatch.tensor<writeonly:4x8xf32>
 
@@ -104,7 +104,7 @@ flow.executable @multi_target_ex {
 func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
   %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
       (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     // CHECK: = flow.dispatch @multi_target_ex::@entry
     // CHECK-SAME: hal.bindings = [
     // CHECK-SAME:   #hal.ex.operand_buffer<"[[S0B0]]", 0 : index>,
@@ -141,7 +141,7 @@ flow.executable @dynamic_tiled_dispatch {
   builtin.module  {
     // CHECK-NEXT: func @entry() {
     func @entry(
-        // CHECK-NEXT: %c0 = constant 0 : index
+        // CHECK-NEXT: %c0 = arith.constant 0 : index
         %arg: !flow.dispatch.tensor<readonly:7x?x24x?xf32>,
         %ret: !flow.dispatch.tensor<writeonly:?x?x1024xf32>,
         // CHECK-DAG: %[[ARG_DIM1:.+]] = hal.interface.load.constant offset = 0 : index
@@ -171,11 +171,11 @@ flow.executable @dynamic_tiled_dispatch {
   }
 }
 func @usage(%func_arg: tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
-  %d0 = constant 100 : index
-  %d1 = constant 200 : index
+  %d0 = arith.constant 100 : index
+  %d1 = arith.constant 200 : index
   %0 = flow.ex.stream.fragment(%func_arg, %d0, %d1) : (tensor<7x?x24x?xf32>{%d0, %d1}, index, index) -> tensor<?x?x1024xf32>{%d1, %d0} =
       (%stream_arg: tensor<7x?x24x?xf32>, %stream_d0: index, %stream_d1: index) -> tensor<?x?x1024xf32> {
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     // CHECK: = flow.dispatch @dynamic_tiled_dispatch::@entry
     // CHECK-SAME: hal.bindings = [
     // CHECK-SAME:   #hal.ex.push_constant<0 : index, 1 : index>,
@@ -258,7 +258,7 @@ flow.executable @static_tied_result {
   builtin.module  {
     // CHECK: func @entry() {
     func @entry(%arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<readwrite:4x8xf32>) {
-      // CHECK-NEXT: %c0 = constant 0 : index
+      // CHECK-NEXT: %c0 = arith.constant 0 : index
       // CHECK-NEXT: %[[ARG:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B0]][%c0] : !flow.dispatch.tensor<readonly:8x4xf32>
       // CHECK-NEXT: %[[RET:.+]] = hal.interface.binding.subspan @[[IO]]::@[[S0B1]][%c0] : !flow.dispatch.tensor<readwrite:4x8xf32>
       // CHECK-NEXT: %[[ARG0_TILE:.+]] = flow.dispatch.tensor.load %[[ARG]]
@@ -276,7 +276,7 @@ flow.executable @static_tied_result {
 func @usage(%func_arg: tensor<8x4xf32>, %func_ret: tensor<4x8xf32>) -> tensor<4x8xf32> {
   %0 = flow.ex.stream.fragment(%func_arg, %func_ret) : (tensor<8x4xf32>, tensor<4x8xf32>) -> %func_ret =
       (%stream_arg: tensor<8x4xf32>, %stream_ret: tensor<4x8xf32>) -> tensor<4x8xf32> {
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     // CHECK: = flow.dispatch @static_tied_result::@entry
     // CHECK-SAME: hal.bindings = [
     // CHECK-SAME:   #hal.ex.operand_buffer<"[[S0B0]]", 0 : index>,
@@ -355,7 +355,7 @@ func @usage(%func_arg: tensor<8x4xf32>) -> (tensor<4x8xf32>, tensor<4x8xf32>) {
     %const_span_0b = hal.constant.subspan @storage0[#util.byte_range<128, 128>] : tensor<8x4xf32>
     %const_span_0c = hal.constant.subspan @storage0[#util.byte_range<256, 128>] : tensor<8x4xf32>
     %const_span_1a = hal.constant.subspan @storage1[#util.byte_range<0, 128>] : tensor<8x4xf32>
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     // CHECK: = flow.dispatch @constant_dispatch::@entry
     // CHECK-SAME: hal.bindings = [
     // CHECK-SAME:   #hal.ex.constant_storage<"[[S0B0]]", "storage0", 0 : index, 256 : index>,
@@ -399,7 +399,7 @@ flow.executable @unsued_arg {
   flow.dispatch.entry @entry attributes {workgroup_rank = 2 : index}
   builtin.module  {
     func @entry(%unused_arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>) {
-      %val = constant dense<4.2> : tensor<4x8xf32>
+      %val = arith.constant dense<4.2> : tensor<4x8xf32>
       // CHECK-NOT: hal.interface.binding.subspan @[[IO]]::@[[S0B0]]
       //     CHECK: hal.interface.binding.subspan @[[IO]]::@[[S0B1]]
       flow.dispatch.tensor.store %val, %ret, offsets=[], sizes=[], strides=[] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:4x8xf32>
@@ -410,7 +410,7 @@ flow.executable @unsued_arg {
 func @usage(%func_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
   %0 = flow.ex.stream.fragment(%func_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32> =
       (%stream_arg: tensor<8x4xf32>) -> tensor<4x8xf32> {
-    %c1 = constant 1 : index
+    %c1 = arith.constant 1 : index
     %1 = flow.dispatch @unsued_arg::@entry[%c1, %c1, %c1](%stream_arg) : (tensor<8x4xf32>) -> tensor<4x8xf32>
     flow.return %1 : tensor<4x8xf32>
   }

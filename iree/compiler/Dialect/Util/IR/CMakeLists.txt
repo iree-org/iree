@@ -42,6 +42,7 @@ iree_cc_library(
     ::UtilInterfacesGen
     ::UtilOpsGen
     LLVMSupport
+    MLIRArithmetic
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRParser

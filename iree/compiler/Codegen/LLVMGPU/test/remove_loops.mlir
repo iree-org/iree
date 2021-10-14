@@ -9,10 +9,10 @@ hal.executable private @dispatch_0  {
       workgroup_size = [64: index, 1: index, 1:index]}
     builtin.module {
       builtin.func @dispatch_0() {
-        %c2 = constant 2 : index
-        %c256 = constant 256 : index
-        //     CHECK: %[[C250:.+]] = constant 250 : index
-        %c250 = constant 250 : index
+        %c2 = arith.constant 2 : index
+        %c256 = arith.constant 256 : index
+        //     CHECK: %[[C250:.+]] = arith.constant 250 : index
+        %c250 = arith.constant 250 : index
         %tidx = "gpu.thread_id"() {dimension = "x"} : () -> index
         %tidy = "gpu.thread_id"() {dimension = "y"} : () -> index
         // CHECK-NOT: scf.for

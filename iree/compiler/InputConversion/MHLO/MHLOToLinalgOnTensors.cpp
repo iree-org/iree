@@ -72,30 +72,30 @@ struct ConcatenateOpConversion
     int rank = resultType.getRank();
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0; i < rank; ++i) {
-      offsets.push_back(rewriter.create<ConstantIndexOp>(loc, 0));
+      offsets.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
       sizes.push_back(rewriter.create<tensor::DimOp>(loc, args[0], i));
-      strides.push_back(rewriter.create<ConstantIndexOp>(loc, 1));
+      strides.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
     }
-    Value resultDimSize = rewriter.create<ConstantIndexOp>(loc, 0);
+    Value resultDimSize = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
       auto size = rewriter.create<tensor::DimOp>(loc, arg, dim);
-      resultDimSize = rewriter.create<AddIOp>(loc, resultDimSize, size);
+      resultDimSize = rewriter.create<arith::AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
     auto initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, resultType.getShape(), resultType.getElementType());
     auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
-    Value zero = rewriter.create<ConstantOp>(loc, zeroAttr);
+    Value zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
     Value result =
         rewriter.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
-    Value accBound = rewriter.create<ConstantIndexOp>(loc, 0);
+    Value accBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     for (auto arg : args) {
       offsets[dim] = accBound;
       sizes[dim] = rewriter.create<tensor::DimOp>(loc, arg, dim);
       result = rewriter.create<tensor::InsertSliceOp>(loc, arg, result, offsets,
                                                       sizes, strides);
-      accBound = rewriter.create<AddIOp>(loc, accBound, sizes[dim]);
+      accBound = rewriter.create<arith::AddIOp>(loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);
     return success();
@@ -129,15 +129,15 @@ Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
       values.push_back(b.getF32FloatAttr(v));
     }
   }
-  return b.create<ConstantOp>(loc, matrixType,
-                              DenseFPElementsAttr::get(matrixType, values));
+  return b.create<arith::ConstantOp>(
+      loc, matrixType, DenseFPElementsAttr::get(matrixType, values));
 }
 
 Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                   RankedTensorType resultType, Value lhs,
                                   Value rhs) {
-  Value zero =
-      b.create<ConstantOp>(loc, b.getZeroAttr(resultType.getElementType()));
+  Value zero = b.create<arith::ConstantOp>(
+      loc, b.getZeroAttr(resultType.getElementType()));
   auto initTensor = b.create<linalg::InitTensorOp>(
       loc, /*dyn_size=*/ValueRange{}, resultType.getShape(),
       resultType.getElementType());
@@ -214,8 +214,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
           ConvertMHLOToLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    mhlo::MhloDialect, ShapeDialect, math::MathDialect,
-                    memref::MemRefDialect, complex::ComplexDialect>();
+                    mhlo::MhloDialect, shape::ShapeDialect, ShapeDialect,
+                    math::MathDialect, memref::MemRefDialect,
+                    complex::ComplexDialect>();
   }
 
   void runOnOperation() override {
@@ -263,7 +264,7 @@ struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
       newValueAttr = valueAttr.cast<DenseIntOrFPElementsAttr>().mapValues(
           newElType, [](const APInt &oldEl) { return oldEl; });
     }
-    rewriter.replaceOpWithNewOp<ConstantOp>(op, newValueAttr);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, newValueAttr);
     return success();
   }
 };

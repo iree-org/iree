@@ -20,7 +20,7 @@ func @vectorize_conv(%filter: memref<2x1x3x4xf32>, %input: memref<2x2x2x3xf32>, 
 // CHECK-SAME: %[[INPUT_ARG:.+]]: memref<2x2x2x3xf32>,
 // CHECK-SAME: %[[OUTPUT_ARG:.+]]: memref<2x2x2x4xf32>
 
-// CHECK: %[[FLOAT_ZERO:.+]] = constant 0.000000e+00 : f32
+// CHECK: %[[FLOAT_ZERO:.+]] = arith.constant 0.000000e+00 : f32
 
 // CHECK-DAG: %[[FILTER_SUBVIEW:.+]] = memref.subview %[[FILTER_ARG]]{{.*}} to memref<1x1x3x4xf32>
 // CHECK-DAG: %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT_ARG]]{{.*}} to memref<1x2x2x3xf32>
@@ -152,7 +152,7 @@ func @vectorize_depthwise_conv(%input: memref<2x3x3x8xf32>, %filter: memref<2x1x
 // CHECK-SAME: %[[FILTER_ARG:.+]]: memref<2x1x8xf32>,
 // CHECK-SAME: %[[OUTPUT_ARG:.+]]: memref<2x2x2x8xf32>
 
-// CHECK: %[[FLOAT_ZERO:.+]] = constant 0.000000e+00 : f32
+// CHECK: %[[FLOAT_ZERO:.+]] = arith.constant 0.000000e+00 : f32
 
 // CHECK-DAG: %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT_ARG]]{{.*}} to memref<1x3x3x8xf32>
 // CHECK-DAG: %[[FILTER_SUBVIEW:.+]] = memref.subview %[[FILTER_ARG]]{{.*}} to memref<1x1x8xf32>

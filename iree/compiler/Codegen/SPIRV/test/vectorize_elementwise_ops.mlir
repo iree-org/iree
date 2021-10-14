@@ -18,7 +18,7 @@ hal.executable private @elementwise_static_shape  {
     }
     builtin.module {
       func @elementwise_static_shape() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128xf32>
         %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<128xf32>
         %ret0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128xf32>
@@ -32,7 +32,7 @@ hal.executable private @elementwise_static_shape  {
         } ins(%arg0, %arg1 : memref<128xf32>, memref<128xf32>)
           outs(%ret0 : memref<128xf32>) {
               ^bb0(%a : f32, %b : f32, %c : f32):
-              %add = addf %a, %b : f32
+              %add = arith.addf %a, %b : f32
               linalg.yield %add : f32
         }
         return
@@ -67,7 +67,7 @@ hal.executable private @elementwise_transpose  {
     }
     builtin.module {
       func @elementwise_transpose() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<128x8xf32>
         %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<128xf32>
         %ret0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128x8xf32>
@@ -81,7 +81,7 @@ hal.executable private @elementwise_transpose  {
         } ins(%arg0, %arg1 : memref<128x8xf32>, memref<128xf32>)
           outs(%ret0 : memref<128x8xf32>) {
               ^bb0(%a : f32, %b : f32, %c : f32):
-              %add = addf %a, %b : f32
+              %add = arith.addf %a, %b : f32
               linalg.yield %add : f32
         }
         return

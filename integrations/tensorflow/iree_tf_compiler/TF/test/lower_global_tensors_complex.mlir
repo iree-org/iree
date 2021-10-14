@@ -33,7 +33,7 @@ module attributes {tf_saved_model.semantics} {
 // CHECK:      func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}) -> (tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
 // CHECK-NEXT:   [[PTR0:%.+]] = util.global.address [[V]] : !util.ptr<tensor<?xf32>>
 // CHECK-NEXT:   [[PTR1:%.+]] = util.global.address [[V1]] : !util.ptr<tensor<?xf32>>
-// CHECK-NEXT:   %[[FALSE:.+]] = constant false
+// CHECK-NEXT:   %[[FALSE:.+]] = arith.constant false
 // CHECK-NEXT:   cond_br %[[FALSE]], ^bb1([[PTR0]] : !util.ptr<tensor<?xf32>>), ^bb1([[PTR1]] : !util.ptr<tensor<?xf32>>)
 // CHECK-NEXT: ^bb1([[PTR:%.+]]: !util.ptr<tensor<?xf32>>):   // 2 preds: ^bb0, ^bb0
 // CHECK-NEXT:   [[T:%.+]] = util.global.load.indirect [[PTR]] : !util.ptr<tensor<?xf32>> -> tensor<?xf32>
@@ -42,7 +42,7 @@ module attributes {tf_saved_model.semantics} {
   "tf_saved_model.global_tensor"() { is_mutable, sym_name = "v", type = tensor<?xf32>, value = dense<1.> : tensor<1xf32> } : () -> ()
   "tf_saved_model.global_tensor"() { is_mutable, sym_name = "v1", type = tensor<?xf32>, value = dense<1.> : tensor<1xf32> } : () -> ()
   func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}, %v: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v}, %v1: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v1}) -> (tensor<?xf32> {tf_saved_model.index_path = [0]}) attributes {tf_saved_model.exported_names = ["f"]} {
-    %pred = constant false
+    %pred = arith.constant false
     cond_br %pred, ^bb1(%v : tensor<!tf_type.resource<tensor<?xf32>>>), ^bb1(%v1 : tensor<!tf_type.resource<tensor<?xf32>>>)
   ^bb1(%either: tensor<!tf_type.resource<tensor<?xf32>>>):
     %ret = "tf.ReadVariableOp"(%either) : (tensor<!tf_type.resource<tensor<?xf32>>>) -> tensor<?xf32>

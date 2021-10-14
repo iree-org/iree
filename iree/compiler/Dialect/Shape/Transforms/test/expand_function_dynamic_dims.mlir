@@ -26,7 +26,7 @@ func @dynamicFunctionArgs(%arg0 : tensor<1x?x2x?xf32>) -> tensor<1x?x2x?xf32> {
 // CHECK-SAME: -> (tensor<?x3xf32>, !shapex.ranked_shape<[?,3]>)
 // Should insert function shape argument and result.
 func @dynamicReturnInBlock(%arg0 : tensor<2x3xf32>) -> (tensor<?x3xf32>) {
-  %0 = addf %arg0, %arg0 : tensor<2x3xf32>
+  %0 = arith.addf %arg0, %arg0 : tensor<2x3xf32>
   br ^bb1
   // CHECK: ^bb1
   ^bb1:

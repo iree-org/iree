@@ -24,7 +24,7 @@ static llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
     mlir::StringAttr attr = builder.getStringAttr(dimAttr[i]);
     procInfo[numDims - 1 - i] = {
         builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, attr),
-        builder.create<mlir::ConstantOp>(
+        builder.create<mlir::arith::ConstantOp>(
             loc, builder.getIndexAttr(workgroupSize[i]))};
   }
   return procInfo;

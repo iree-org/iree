@@ -32,12 +32,12 @@ func @tensor_cast_does_not_alias_metadata_update(%arg0: !hal.buffer_view) -> !ha
 
     // Just anchor on the end of the function that creates a new buffer view.
     //     CHECK: hal.ex.submit_and_wait
-    // CHECK-DAG: %[[C3:.*]] = constant 3 : index
-    // CHECK-DAG: %[[C2:.*]] = constant 2 : index
-    // CHECK-DAG: %[[C1_1:.*]] = constant 1 : index
-    // CHECK-DAG: %[[C4:.*]] = constant 4 : index
-    // CHECK-DAG: %[[C1_2:.*]] = constant 1 : index
-    // CHECK-DAG: %[[ET:.*]] = constant 50331680 : i32
+    // CHECK-DAG: %[[C3:.*]] = arith.constant 3 : index
+    // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
+    // CHECK-DAG: %[[C1_1:.*]] = arith.constant 1 : index
+    // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
+    // CHECK-DAG: %[[C1_2:.*]] = arith.constant 1 : index
+    // CHECK-DAG: %[[ET:.*]] = arith.constant 50331680 : i32
     //     CHECK: %[[VIEW:.*]] = hal.buffer_view.create
     //       CHECK-SAME: shape([%[[C3]], %[[C2]], %[[C1_1]], %[[C4]], %[[C1_2]]])
     //       CHECK-SAME: type(%[[ET]])

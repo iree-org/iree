@@ -32,7 +32,7 @@ static void createInitializerFromImmediate(
   rewriter.setInsertionPointToStart(initializerOp.addEntryBlock());
 
   // Create const and store ops.
-  auto constValue = rewriter.create<ConstantOp>(loc, immediateElements);
+  auto constValue = rewriter.create<arith::ConstantOp>(loc, immediateElements);
   rewriter.create<IREE::Util::GlobalStoreOp>(loc, constValue.getResult(),
                                              globalOp.getName());
 

@@ -61,7 +61,7 @@ class DynamicShapeConstantOpConversion
     SmallVector<Value, 4> shape;
     if (shapedType.getRank() >= 1) {
       for (auto dim : shapedType.getShape()) {
-        shape.push_back(rewriter.createOrFold<mlir::ConstantIndexOp>(
+        shape.push_back(rewriter.createOrFold<mlir::arith::ConstantIndexOp>(
             constantOp.getLoc(), dim));
       }
     }

@@ -28,7 +28,7 @@ class MaterializeConstantPoolBuffersPass
                          OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
     registry.insert<IREE::Util::UtilDialect>();
     registry.insert<IREE::HAL::HALDialect>();
   }
@@ -136,14 +136,15 @@ class MaterializeConstantPoolBuffersPass
             builder.getContext(),
             storageOp->getParentOfType<ConstantPoolOp>().getName(),
             {SymbolRefAttr::get(storageOp)}));
-    auto offsetValue = builder.createOrFold<mlir::ConstantIndexOp>(loc, 0);
+    auto offsetValue =
+        builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, 0);
     auto storageValueAttr =
         storageOp.value().cast<IREE::Util::SerializableAttrInterface>();
     uint64_t runtimeLength =
         align(storageValueAttr.getStorageSize(),
               bufferConstraints.min_buffer_range_alignment());
     auto lengthValue =
-        builder.createOrFold<mlir::ConstantIndexOp>(loc, runtimeLength);
+        builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, runtimeLength);
     auto memoryType = IREE::HAL::MemoryTypeBitfield::DeviceLocal |
                       IREE::HAL::MemoryTypeBitfield::HostVisible;
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::Constant |
@@ -241,7 +242,7 @@ class MaterializeConstantPoolBuffersPass
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::Constant |
                        IREE::HAL::BufferUsageBitfield::All;
     auto allocationSizeValue =
-        builder.createOrFold<mlir::ConstantIndexOp>(loc, bufferLength);
+        builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, bufferLength);
     auto bufferValue = builder.createOrFold<IREE::HAL::AllocatorAllocateOp>(
         loc, IREE::HAL::BufferType::get(context), allocatorValue, memoryType,
         bufferUsage, allocationSizeValue);
@@ -258,13 +259,13 @@ class MaterializeConstantPoolBuffersPass
     builder.create<IREE::HAL::CommandBufferBeginOp>(loc, commandBufferValue);
     for (auto splatOp : splatOps) {
       auto runtimeRange = splatOp.runtime_range().getValue();
-      auto offsetValue = builder.createOrFold<mlir::ConstantIndexOp>(
+      auto offsetValue = builder.createOrFold<mlir::arith::ConstantIndexOp>(
           splatOp.getLoc(), runtimeRange.getOffset());
-      auto lengthValue = builder.createOrFold<mlir::ConstantIndexOp>(
+      auto lengthValue = builder.createOrFold<mlir::arith::ConstantIndexOp>(
           splatOp.getLoc(), runtimeRange.getLength());
       uint32_t pattern = makePatternFromSplatValue(
           splatOp.value().cast<SplatElementsAttr>().getSplatValue());
-      auto patternValue = builder.createOrFold<mlir::ConstantIntOp>(
+      auto patternValue = builder.createOrFold<mlir::arith::ConstantIntOp>(
           loc, static_cast<int64_t>(pattern), 32);
       builder.create<IREE::HAL::CommandBufferFillBufferOp>(
           splatOp.getLoc(), commandBufferValue, bufferValue, offsetValue,

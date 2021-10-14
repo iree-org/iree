@@ -7,6 +7,7 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -64,6 +65,8 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
       mlir::iree_compiler::createConvertMHLOToLinalgExtPass());
   passManager.addNestedPass<FuncOp>(
       mlir::iree_compiler::createMHLOToLinalgOnTensorsPass());
+  // Ensure conversion completed.
+  passManager.addPass(createReconcileUnrealizedCastsPass());
 
   // Note that some MHLO ops are left by the above and must resolve via
   // canonicalization. See comments in the above pass and find a better way.

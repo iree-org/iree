@@ -18,7 +18,7 @@ def create_add_scalar_module():
   binary = iree.compiler.compile_str(
       """
       func @add_scalar(%arg0: i32, %arg1: i32) -> i32 {
-        %0 = addi %arg0, %arg1 : i32
+        %0 = arith.addi %arg0, %arg1 : i32
         return %0 : i32
       }
       """,

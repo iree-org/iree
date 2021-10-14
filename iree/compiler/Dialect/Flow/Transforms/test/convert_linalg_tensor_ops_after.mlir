@@ -1,8 +1,8 @@
 // RUN: iree-opt -iree-flow-convert-to-flow-after-dispatch-formation -canonicalize -cse -split-input-file %s | IreeFileCheck %s
 
 func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %0 = tensor.extract %arg1[] : tensor<f32>
   %1 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %2 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
@@ -22,8 +22,8 @@ func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: in
 //  CHECK-SAME:   %[[ARG3:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:   %[[ARG4:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:   %[[ARG5:[a-zA-Z0-9]+]]: index
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = constant 1 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:   %[[VAL:.+]] = flow.tensor.load %[[ARG1]] : tensor<f32>
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]

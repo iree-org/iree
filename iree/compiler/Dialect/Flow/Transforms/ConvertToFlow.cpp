@@ -96,7 +96,8 @@ struct ConvertToFlowBeforeDispatchFormation
           ConvertToFlowBeforeDispatchFormation> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
-                    linalg::LinalgDialect, mlir::StandardOpsDialect>();
+                    linalg::LinalgDialect, mlir::StandardOpsDialect,
+                    mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
@@ -122,7 +123,8 @@ struct ConvertToFlowAfterDispatchFormation
           ConvertToFlowAfterDispatchFormation> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
-                    linalg::LinalgDialect, mlir::StandardOpsDialect>();
+                    linalg::LinalgDialect, mlir::StandardOpsDialect,
+                    mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();

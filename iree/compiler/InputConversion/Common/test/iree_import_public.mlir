@@ -212,8 +212,8 @@ builtin.module @global_load {
 builtin.module @global_store {
   iree.global private mutable @v_stored : tensor<4xi32>
   func @stored() {
-    // CHECK: %[[CST:.*]] = constant
-    %cst = constant dense<5> : tensor<4xi32>
+    // CHECK: %[[CST:.*]] = arith.constant
+    %cst = arith.constant dense<5> : tensor<4xi32>
     // CHECK: util.global.store %[[CST]], @v_stored : tensor<4xi32>
     iree.global.store %cst, @v_stored : tensor<4xi32>
     return

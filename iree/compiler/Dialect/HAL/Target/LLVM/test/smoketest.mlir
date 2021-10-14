@@ -23,7 +23,7 @@ flow.executable @add_dispatch_0 {
       %2 = flow.dispatch.tensor.load %arg1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
       %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]} ins(%1, %2 : tensor<16xf32>, tensor<16xf32>) outs(%0 : tensor<16xf32>) {
       ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
-        %4 = addf %arg3, %arg4 : f32
+        %4 = arith.addf %arg3, %arg4 : f32
         linalg.yield %4 : f32
       } -> tensor<16xf32>
       flow.dispatch.tensor.store %3, %arg2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>

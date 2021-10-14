@@ -127,9 +127,9 @@ expected behavior of the program.
 
 ```mlir
 func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
-  %cst = constant dense<[4, 1, 1]> : tensor<3xi32>
+  %cst = arith.constant dense<[4, 1, 1]> : tensor<3xi32>
   %0 = iree.dispatch_region[%cst : tensor<3xi32>](%arg2 = %arg0 : tensor<4xf32>, %arg3 = %arg1 : tensor<4xf32>) : tensor<4xf32> {
-    %1 = mulf %arg2, %arg3 : tensor<4xf32>
+    %1 = arith.mulf %arg2, %arg3 : tensor<4xf32>
     iree.return %1 : tensor<4xf32>
   }
   return %0 : tensor<4xf32>
@@ -169,7 +169,7 @@ module {
   attributes  {iree.executable.export} {
           %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
           %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
-          %2 = mulf %0, %1 : tensor<4xf32>
+          %2 = arith.mulf %0, %1 : tensor<4xf32>
           iree.store_output(%2 : tensor<4xf32>, %arg2 : memref<4xf32>)
           iree.return
         }
@@ -215,7 +215,7 @@ module {
         attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
           %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
           %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
-          %2 = mulf %0, %1 : tensor<4xf32>
+          %2 = arith.mulf %0, %1 : tensor<4xf32>
           iree.store_output(%2 : tensor<4xf32>, %arg2 : memref<4xf32>)
           iree.return
         }

@@ -2,20 +2,20 @@
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 func @abs_ex_dispatch_0() {
-  %c0 = constant 0 : index
-  %c128 = constant 128 : index
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c128] : memref<16xf32>
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<16xi32>
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
-  %6 = muli %3, %4 : index
-  %7 = addi %6, %5 : index
+  %6 = arith.muli %3, %4 : index
+  %7 = arith.addi %6, %5 : index
   %9 = memref.load %0[%7] : memref<16xf32>
   %10 = memref.load %1[%7] : memref<16xi32>
-  %11 = sitofp %10 : i32 to f32
-  %12 = addf %9, %11 : f32
+  %11 = arith.sitofp %10 : i32 to f32
+  %12 = arith.addf %9, %11 : f32
   memref.store %12, %2[%7] : memref<16xf32>
   return
 }
@@ -41,8 +41,8 @@ hal.interface private @io  {
 // -----
 
 func @abs_dynamic() {
-  %c0 = constant 0 : index
-  %c128 = constant 128 : index
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
   %s = hal.interface.load.constant offset = 1 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c128] : memref<?xf32>{%s}
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<16xi32>
@@ -50,12 +50,12 @@ func @abs_dynamic() {
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
-  %6 = muli %3, %4 : index
-  %7 = addi %6, %5 : index
+  %6 = arith.muli %3, %4 : index
+  %7 = arith.addi %6, %5 : index
   %9 = memref.load %0[%7] : memref<?xf32>
   %10 = memref.load %1[%7] : memref<16xi32>
-  %11 = sitofp %10 : i32 to f32
-  %12 = addf %9, %11 : f32
+  %11 = arith.sitofp %10 : i32 to f32
+  %12 = arith.addf %9, %11 : f32
   memref.store %12, %2[%7] : memref<16xf32>
   return
 }
@@ -83,18 +83,18 @@ hal.interface @io attributes {sym_visibility = "private"} {
 
 // Test that we handle correctly the case where a symbol is dead.
 func @dead_symbol() {
-  %c0 = constant 0 : index
-  %c128 = constant 128 : index
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<16xi32>
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
-  %6 = muli %3, %4 : index
-  %7 = addi %6, %5 : index
+  %6 = arith.muli %3, %4 : index
+  %7 = arith.addi %6, %5 : index
   %10 = memref.load %1[%7] : memref<16xi32>
-  %11 = sitofp %10 : i32 to f32
-  %12 = addf %11, %11 : f32
+  %11 = arith.sitofp %10 : i32 to f32
+  %12 = arith.addf %11, %11 : f32
   memref.store %12, %2[%7] : memref<16xf32>
   return
 }
@@ -116,20 +116,20 @@ hal.interface private @io  {
 // A single binding may contain different data types.
 // Test that we cast pointers correctly.
 func @mixed_type() {
-  %c0 = constant 0 : index
-  %c128 = constant 128 : index
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c128] : memref<16xf32>
   %1 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<16xi32>
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
-  %6 = muli %3, %4 : index
-  %7 = addi %6, %5 : index
+  %6 = arith.muli %3, %4 : index
+  %7 = arith.addi %6, %5 : index
   %9 = memref.load %0[%7] : memref<16xf32>
   %10 = memref.load %1[%7] : memref<16xi32>
-  %11 = sitofp %10 : i32 to f32
-  %12 = addf %9, %11 : f32
+  %11 = arith.sitofp %10 : i32 to f32
+  %12 = arith.addf %9, %11 : f32
   memref.store %12, %2[%7] : memref<16xf32>
   return
 }

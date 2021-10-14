@@ -110,7 +110,7 @@ def binary_not_in_():
 
 
 # CHECK-LABEL: @short_circuit
-# CHECK-DAG: %[[FALSE:.*]] = constant false
+# CHECK-DAG: %[[FALSE:.*]] = arith.constant false
 # CHECK-DAG: %[[X:.*]] = load_var %x
 # CHECK-DAG: %[[Y:.*]] = load_var %y
 # CHECK: %[[XP:.*]], %[[YP:.*]] = dynamic_binary_promote %[[X]], %[[Y]]

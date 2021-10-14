@@ -196,7 +196,8 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
         .Default([&](Operation *op) { return false; });
   }
   return TypeSwitch<Operation *, bool>(definingOp)
-      .Case<ConstantOp>([&](ConstantOp constantOp) { return true; })
+      .Case<arith::ConstantOp>(
+          [&](arith::ConstantOp constantOp) { return true; })
       .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
           [&](auto op) { return isFromReadOnlyTensor(op.src(), plan); })
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
@@ -214,7 +215,7 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
 
 /// Adds the result of `std.constant` to its set (there is nothing to tie to
 /// here).
-static LogicalResult analyseConstantOp(ConstantOp constantOp,
+static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
                                        BufferizationPlan &plan) {
   if (!constantOp.getResult().getType().isa<ShapedType>()) return success();
   plan.insert(constantOp.getResult());
@@ -285,7 +286,8 @@ static bool canSetStoreValueAndTargetAsEquivalent(
   auto targetInterfaceOp =
       getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target, plan);
   assert(targetInterfaceOp);
-  if (auto valueConstantOp = getEquivalentOpOfType<ConstantOp>(value, plan)) {
+  if (auto valueConstantOp =
+          getEquivalentOpOfType<arith::ConstantOp>(value, plan)) {
     return false;
   }
   if (auto valueInterfaceOp =
@@ -592,7 +594,7 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
 static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<ConstantOp>([&](ConstantOp constantOp) {
+        .Case<arith::ConstantOp>([&](arith::ConstantOp constantOp) {
           return analyseConstantOp(constantOp, plan);
         })
         .Case<IREE::Flow::DispatchTensorLoadOp>(
@@ -1249,7 +1251,8 @@ static LogicalResult convertAnyLinalgOp(
 /// Constants that return tensor types can be handled natively by the
 /// backends. Here just provide a cast to memref to bridge the gap from tensors
 /// to memrefs.
-static LogicalResult convertConstantOp(OpBuilder &b, ConstantOp constantOp,
+static LogicalResult convertConstantOp(OpBuilder &b,
+                                       arith::ConstantOp constantOp,
                                        BlockAndValueMapping &bvm) {
   Value result = constantOp.getResult();
   assert(!bvm.lookupOrNull(result));
@@ -1472,12 +1475,12 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
       *padTensorOp.region().getOps<linalg::YieldOp>().begin();
   Value paddingValue = yeildOp.values()[0];
 
-  auto constOp = paddingValue.getDefiningOp<ConstantOp>();
+  auto constOp = paddingValue.getDefiningOp<arith::ConstantOp>();
   if (!constOp) {
     return padTensorOp.emitError(
         "Converting linalg.pad_tensor with non-constant padding value");
   }
-  if (constOp.getValue().isa<DenseElementsAttr>()) {
+  if (constOp.value().isa<DenseElementsAttr>()) {
     return padTensorOp.emitError(
         "Converting linalg.pad_tensor with non-scalar constant padding "
         "value");
@@ -1506,9 +1509,9 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
  public:
   LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Util::UtilDialect, linalg::LinalgDialect,
-                memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect>();
+    registry.insert<IREE::Util::UtilDialect, linalg::LinalgDialect,
+                    memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect,
+                    mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
   void runOnOperation() override;
 
@@ -1559,7 +1562,7 @@ void LinalgBufferizePass::runOnOperation() {
   // `memref`s.
   auto convertTensorProducingOps = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<ConstantOp>([&](ConstantOp constantOp) {
+        .Case<arith::ConstantOp>([&](arith::ConstantOp constantOp) {
           return convertConstantOp(b, constantOp, bvm);
         })
         .Case<IREE::Flow::DispatchTensorStoreOp>(

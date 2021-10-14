@@ -9,10 +9,10 @@
 #map4 = affine_map<(d0) -> (-d0 + 513, 64)>
 module  {
   func @dot_383x383x513_dispatch_0() {
-    %c0 = constant 0 : index
-    %c513 = constant 513 : index
-    %c383 = constant 383 : index
-    %cst = constant 0.000000e+00 : f32
+    %c0 = arith.constant 0 : index
+    %c513 = arith.constant 513 : index
+    %c383 = arith.constant 383 : index
+    %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x383xf32>
     %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x513xf32>
     %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>
@@ -51,12 +51,12 @@ module  {
 //      CHECK: #[[MAP5:.+]] = affine_map<(d0, d1) -> (32, -d0 + d1)>
 //      CHECK: #[[MAP6:.+]] = affine_map<(d0) -> (32, -d0 + 383)>
 //      CHECK: @dot_383x383x513_dispatch_0
-//  CHECK-DAG: %[[CST:.+]] = constant 0.000000e+00 : f32
-//  CHECK-DAG: %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG: %[[C4:.+]] = constant 4 : index
-//  CHECK-DAG: %[[C383:.+]] = constant 383 : index
-//  CHECK-DAG: %[[C513:.+]] = constant 513 : index
-//  CHECK-DAG: %[[C32:.+]] = constant 32 : index
+//  CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG: %[[C383:.+]] = arith.constant 383 : index
+//  CHECK-DAG: %[[C513:.+]] = arith.constant 513 : index
+//  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 //      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x383xf32>
 //      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x513xf32>
 //      CHECK: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>

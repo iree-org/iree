@@ -14,10 +14,10 @@ hal.executable private @static_shaped_conv  {
     }
     builtin.module {
       builtin.func @static_shaped_conv() {
-        %cst = constant 0.000000e+00 : f32
-        %c112 = constant 112 : index
-        %c32 = constant 32 : index
-        %c0 = constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c112 = arith.constant 112 : index
+        %c32 = arith.constant 32 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<1x225x225x3xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<3x3x3x32xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<1x112x112x32xf32>

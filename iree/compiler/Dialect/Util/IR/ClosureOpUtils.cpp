@@ -117,7 +117,7 @@ void eraseRegionResults(Region &region,
 // This is also still at a fairly high level (flow dialect): once the closures
 // are expanded out in lower dialects things like CSE have a chance to once
 // again get at the constants and dedupe them if they survive.
-static bool isConstantSmall(ConstantOp constantOp) {
+static bool isConstantSmall(arith::ConstantOp constantOp) {
   // We could tune this/take it as a configuration setting.
   // The current value is chosen based on what is known to be reasonable to
   // inline into command buffers way down in the HAL, which is not great but at
@@ -125,7 +125,7 @@ static bool isConstantSmall(ConstantOp constantOp) {
   // constants or inlining megabytes.
   static constexpr int kMaxInlinedConstantBytes = 256;
 
-  auto constantValueAttr = constantOp.getValue();
+  auto constantValueAttr = constantOp.value();
   auto constantType = constantOp.getType();
   if (constantValueAttr.isa<SplatElementsAttr>()) {
     // Splats are always small and can often have special handling when we
@@ -154,7 +154,7 @@ static bool isConstantSmall(ConstantOp constantOp) {
 // returns true for.
 static bool shouldInlineIntoClosure(Value value) {
   auto definingOp = value.getDefiningOp();
-  if (auto constantOp = dyn_cast<ConstantOp>(definingOp)) {
+  if (auto constantOp = dyn_cast<arith::ConstantOp>(definingOp)) {
     // Constants are perfect!
     return isConstantSmall(constantOp);
   } else if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(definingOp)) {

@@ -18,11 +18,11 @@ hal.executable @batch_matmul_1x3x32 {
     hal.executable.entry_point public @batch_matmul_1x3x32 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @batch_matmul_1x3x32() {
-        %c0 = constant 0 : index
-        %c32 = constant 32 : index
-        %c3 = constant 3 : index
-        %c1 = constant 1 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c32 = arith.constant 32 : index
+        %c3 = arith.constant 3 : index
+        %c1 = arith.constant 1 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x3x3xf32>
         %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:1x3x32xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x3x32xf32>
@@ -105,10 +105,10 @@ hal.executable private @matmul_64x16 {
     hal.executable.entry_point public @matmul_64x16 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_64x16() {
-        %c0 = constant 0 : index
-        %c16 = constant 16 : index
-        %c64 = constant 64 : index
-        %c0_i32 = constant 0 : i32
+        %c0 = arith.constant 0 : index
+        %c16 = arith.constant 16 : index
+        %c64 = arith.constant 64 : index
+        %c0_i32 = arith.constant 0 : i32
         %0 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:64x32xi8>
         %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:32x16xi8>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:64x16xi32>
@@ -153,7 +153,7 @@ hal.executable private @matmul_64x16 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [4, 1]}
 //           CHECK-SAME:   workgroup_size = [4 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%[[X]]]
 //           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[ONE]]
 

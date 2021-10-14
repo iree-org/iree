@@ -27,12 +27,12 @@ namespace HAL {
 
 Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder) {
   // (value + (alignment - 1)) & ~(alignment - 1)
-  return builder.createOrFold<AndOp>(
+  return builder.createOrFold<arith::AndIOp>(
       loc,
-      builder.createOrFold<AddIOp>(
+      builder.createOrFold<arith::AddIOp>(
           loc, value,
-          builder.createOrFold<ConstantIndexOp>(loc, alignment - 1)),
-      builder.createOrFold<ConstantIndexOp>(loc, ~(alignment - 1)));
+          builder.createOrFold<arith::ConstantIndexOp>(loc, alignment - 1)),
+      builder.createOrFold<arith::ConstantIndexOp>(loc, ~(alignment - 1)));
 }
 
 int32_t getRoundedElementByteWidth(Type type) {
@@ -46,7 +46,8 @@ static SmallVector<Value, 4> getStaticShapeDims(Location loc,
   SmallVector<Value, 4> shape;
   if (shapedType.getRank() >= 1) {
     for (auto dim : shapedType.getShape()) {
-      shape.push_back(builder.createOrFold<mlir::ConstantIndexOp>(loc, dim));
+      shape.push_back(
+          builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, dim));
     }
   }
   return shape;

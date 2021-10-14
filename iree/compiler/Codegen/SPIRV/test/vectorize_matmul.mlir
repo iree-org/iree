@@ -30,9 +30,9 @@ hal.executable private @matmul_static_shape  {
     }
     builtin.module {
       func @matmul_static_shape() {
-        %c32 = constant 32 : index
-        %c4096 = constant 4096 : index
-        %c0 = constant 0 : index
+        %c32 = arith.constant 32 : index
+        %c4096 = arith.constant 4096 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4096x4096xf16>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
@@ -63,11 +63,11 @@ hal.executable private @matmul_static_shape  {
 
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //      CHECK: func @matmul_static_shape
-//  CHECK-DAG:  %[[CST:.+]] = constant 0.0
-//  CHECK-DAG:  %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG:  %[[C16:.+]] = constant 16 : index
-//  CHECK-DAG:  %[[C32:.+]] = constant 32 : index
-//  CHECK-DAG:  %[[C48:.+]] = constant 48 : index
+//  CHECK-DAG:  %[[CST:.+]] = arith.constant 0.0
+//  CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:  %[[C16:.+]] = arith.constant 16 : index
+//  CHECK-DAG:  %[[C32:.+]] = arith.constant 32 : index
+//  CHECK-DAG:  %[[C48:.+]] = arith.constant 48 : index
 //  CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]]
 //  CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1[%[[C0]]]
 //  CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]]
@@ -283,9 +283,9 @@ hal.executable private @matmul_static_shape  {
     }
     builtin.module {
       func @matmul_static_shape() {
-        %c32 = constant 32 : index
-        %c4096 = constant 4096 : index
-        %c0 = constant 0 : index
+        %c32 = arith.constant 32 : index
+        %c4096 = arith.constant 4096 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4096x4096xf16>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
@@ -316,11 +316,11 @@ hal.executable private @matmul_static_shape  {
 
 //  PROMOTE-DAG: #[[MAP4:.+]] = affine_map<()[s0] -> (s0 * 64 - (s0 floordiv 2) * 128)>
 //      PROMOTE: func @matmul_static_shape
-//  PROMOTE-DAG:  %[[C0:.+]] = constant 0 : index
-//  PROMOTE-DAG:  %[[C2:.+]] = constant 2
-//  PROMOTE-DAG:  %[[C16:.+]] = constant 16
-//  PROMOTE-DAG:  %[[C32:.+]] = constant 32
-//  PROMOTE-DAG:  %[[C48:.+]] = constant 48
+//  PROMOTE-DAG:  %[[C0:.+]] = arith.constant 0 : index
+//  PROMOTE-DAG:  %[[C2:.+]] = arith.constant 2
+//  PROMOTE-DAG:  %[[C16:.+]] = arith.constant 16
+//  PROMOTE-DAG:  %[[C32:.+]] = arith.constant 32
+//  PROMOTE-DAG:  %[[C48:.+]] = arith.constant 48
 //  PROMOTE-DAG:  %[[ALLOC1:.+]] = memref.alloc() : memref<128x32xf16, 3>
 //  PROMOTE-DAG:  %[[ALLOC2:.+]] = memref.alloc() : memref<32x128xf16, 3>
 //  PROMOTE-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]]
@@ -331,7 +331,7 @@ hal.executable private @matmul_static_shape  {
 //      PROMOTE:  %[[WGMEM_LHS_SUBVIEW:.+]] = memref.subview %[[ALLOC1]][0, 0] [128, 32] [1, 1]
 //      PROMOTE:  %[[WGMEM_RHS_SUBVIEW:.+]] = memref.subview %[[ALLOC2]][0, 0] [32, 128] [1, 1]
 //      PROMOTE:  %[[SG_X:.+]] = gpu.subgroup_id
-//      PROMOTE:  %[[SG_Y:.+]] = divi_signed %[[SG_X]], %[[C2]]
+//      PROMOTE:  %[[SG_Y:.+]] = arith.divsi %[[SG_X]], %[[C2]]
 //      PROMOTE:  %[[SGOFFSET_Y:.+]] = affine.apply #[[MAP4]]()[%[[SG_Y]]]
 //      PROMOTE:  %[[SG_LHS_SUBVIEW:.+]] = memref.subview %[[WGMEM_LHS_SUBVIEW]][%[[SGOFFSET_Y]], 0]
 //      PROMOTE:  %[[SGOFFSET_X:.+]] = affine.apply #[[MAP4]]()[%[[SG_X]]]

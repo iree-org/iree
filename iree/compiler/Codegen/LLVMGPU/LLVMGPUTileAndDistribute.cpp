@@ -42,9 +42,9 @@ static void populateTilingReductionPatterns(
     Location loc = op->getLoc();
     auto tileSizesVal =
         llvm::to_vector<4>(llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-          return builder.create<ConstantIndexOp>(loc, v);
+          return builder.create<arith::ConstantIndexOp>(loc, v);
         }));
-    auto zero = builder.create<ConstantIndexOp>(loc, 0);
+    auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
     for (unsigned depth : partitionedLoops) {
       if (depth < tileSizesVal.size()) {
         tileSizesVal[depth] = zero;
@@ -88,7 +88,7 @@ static void populateTilingToInvocationPatterns(
         for (auto val : llvm::enumerate(tileSizes)) {
           int64_t useTileSize =
               partitionedLoopsSet.count(val.index()) ? val.value() : 0;
-          tileSizesVal.push_back(builder.create<ConstantIndexOp>(
+          tileSizesVal.push_back(builder.create<arith::ConstantIndexOp>(
               operation->getLoc(), useTileSize));
         }
         return tileSizesVal;

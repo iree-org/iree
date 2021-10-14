@@ -3,7 +3,7 @@
 // CHECK-LABEL: @no_fold_constant
 func @no_fold_constant() -> (i32) {
   // CHECK: constant 1 : i32
-  %0 = constant 1 : i32
+  %0 = arith.constant 1 : i32
   // CHECK: util.do_not_optimize
   %1 = "util.do_not_optimize"(%0) : (i32) -> i32
   return %1 : i32
@@ -55,7 +55,7 @@ func @result_operand_type_mismatch(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
 
 // CHECK-LABEL: @canonicalize_unfoldable_constant
 func @canonicalize_unfoldable_constant() -> i32 {
-  // CHECK-NEXT: %[[C:.+]] = constant 42 : i32
+  // CHECK-NEXT: %[[C:.+]] = arith.constant 42 : i32
   // CHECK-NEXT: %[[R:.+]] = util.do_not_optimize(%[[C]]) : i32
   %c42 = util.unfoldable_constant 42 : i32
   // CHECK-NEXT: return %[[R]]

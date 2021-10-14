@@ -18,10 +18,10 @@ hal.executable @conv_112x112x512 {
     hal.executable.entry_point public @conv_112x112x512 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @conv_112x112x512() {
-        %c0 = constant 0 : index
-        %c512 = constant 512 : index
-        %c112 = constant 112 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c512 = arith.constant 512 : index
+        %c112 = arith.constant 112 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x225x225x3xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x3x3x512xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x512xf32>
@@ -78,14 +78,14 @@ hal.executable @conv_112x112x512 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 4, 1]}
 //           CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C8:.+]] = constant 8 : index
-//           CHECK-NEXT:   %[[C28:.+]] = constant 28 : index
-//           CHECK-NEXT:   %[[C112:.+]] = constant 112 : index
+//           CHECK-NEXT:   %[[C8:.+]] = arith.constant 8 : index
+//           CHECK-NEXT:   %[[C28:.+]] = arith.constant 28 : index
+//           CHECK-NEXT:   %[[C112:.+]] = arith.constant 112 : index
 //           CHECK-NEXT:   hal.return %[[C8]], %[[C28]], %[[C112]]
 
 //                CHECK: func @conv_112x112x512()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 4, 64], [], [0, 1, 4, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 4, 64], [], [0, 1, 4, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
 // -----
 
@@ -107,10 +107,10 @@ hal.executable @conv_112x112x32 {
     hal.executable.entry_point public @conv_112x112x32 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @conv_112x112x32() {
-        %c0 = constant 0 : index
-        %c32 = constant 32 : index
-        %c112 = constant 112 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c32 = arith.constant 32 : index
+        %c112 = arith.constant 112 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x225x225x3xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x3x3x32xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
@@ -167,14 +167,14 @@ hal.executable @conv_112x112x32 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 8, 1]}
 //           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
-//           CHECK-NEXT:   %[[C14:.+]] = constant 14 : index
-//           CHECK-NEXT:   %[[C112:.+]] = constant 112 : index
+//           CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
+//           CHECK-NEXT:   %[[C14:.+]] = arith.constant 14 : index
+//           CHECK-NEXT:   %[[C112:.+]] = arith.constant 112 : index
 //           CHECK-NEXT:   hal.return %[[C1]], %[[C14]], %[[C112]]
 
 //                CHECK: func @conv_112x112x32()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 8, 32], [], [0, 1, 4, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 8, 32], [], [0, 1, 4, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
 // -----
 
@@ -196,9 +196,9 @@ hal.executable @conv_16x16x16 {
     hal.executable.entry_point public @conv_16x16x16 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @conv_16x16x16() {
-        %c0 = constant 0 : index
-        %c16 = constant 16 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c16 = arith.constant 16 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x33x33x3xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x3x3x16xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x16x16x16xf32>
@@ -255,13 +255,13 @@ hal.executable @conv_16x16x16 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
 //           CHECK-SAME:   workgroup_size = [4 : index, 2 : index, 2 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
-//           CHECK-NEXT:   %[[C4:.+]] = constant 4 : index
+//           CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
+//           CHECK-NEXT:   %[[C4:.+]] = arith.constant 4 : index
 //           CHECK-NEXT:   hal.return %[[C1]], %[[C4]], %[[C4]]
 
 //                CHECK: func @conv_16x16x16()
 //                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 2, 2, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
 // -----
 
@@ -283,10 +283,10 @@ hal.executable @dwconv_28x28x144 {
     hal.executable.entry_point public @dwconv_28x28x144 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @dwconv_28x28x144() {
-        %c0 = constant 0 : index
-        %c144 = constant 144 : index
-        %c28 = constant 28 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c144 = arith.constant 144 : index
+        %c28 = arith.constant 28 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x57x57x144xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x3x144xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x28x28x144xf32>
@@ -344,13 +344,13 @@ hal.executable @dwconv_28x28x144 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
 //           CHECK-SAME:   workgroup_size = [4 : index, 2 : index, 2 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C9:.+]] = constant 9 : index
-//           CHECK-NEXT:   %[[C7:.+]] = constant 7 : index
+//           CHECK-NEXT:   %[[C9:.+]] = arith.constant 9 : index
+//           CHECK-NEXT:   %[[C7:.+]] = arith.constant 7 : index
 //           CHECK-NEXT:   hal.return %[[C9]], %[[C7]], %[[C7]]
 
 //                CHECK: func @dwconv_28x28x144()
 //                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 2, 2, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1]]}
 
 // -----
 
@@ -372,11 +372,11 @@ hal.executable @dwconv_1x2x8 {
     hal.executable.entry_point public @dwconv_1x2x8 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @dwconv_1x2x8() {
-        %c0 = constant 0 : index
-        %c8 = constant 8 : index
-        %c2 = constant 2 : index
-        %c1 = constant 1 : index
-        %cst = constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c8 = arith.constant 8 : index
+        %c2 = arith.constant 2 : index
+        %c1 = arith.constant 1 : index
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x3x5x8xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x3x8xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x1x2x8xf32>
@@ -434,10 +434,10 @@ hal.executable @dwconv_1x2x8 {
 //           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 2, 1]}
 //           CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
 //           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C1:.+]] = constant 1 : index
+//           CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
 //           CHECK-NEXT:   hal.return %[[C1]], %[[C1]], %[[C1]]
 
 //                CHECK: func @dwconv_1x2x8()
 //                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 2, 8], [], [0, 1, 1, 4]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 2, 8], [], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
 

@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
@@ -71,6 +72,13 @@ UtilDialect::UtilDialect(MLIRContext *context)
   addOperations<
 #include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"
       >();
+}
+
+Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
+                                            Type type, Location loc) {
+  if (arith::ConstantOp::isBuildableWith(value, type))
+    return builder.create<arith::ConstantOp>(loc, value, type);
+  return nullptr;
 }
 
 }  // namespace Util

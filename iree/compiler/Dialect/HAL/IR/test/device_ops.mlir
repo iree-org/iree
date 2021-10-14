@@ -13,12 +13,12 @@ func @device_allocator(%device: !hal.device) -> !hal.allocator {
 // CHECK-LABEL: @device_switch
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
 func @device_switch(%device: !hal.device) -> i32 {
-  // CHECK-DAG: %[[C0:.+]] = constant 0
-  %c0 = constant 0 : i32
-  // CHECK-DAG: %[[C1:.+]] = constant 1
-  %c1 = constant 1 : i32
-  // CHECK-DAG: %[[C2:.+]] = constant 2
-  %c2 = constant 2 : i32
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0
+  %c0 = arith.constant 0 : i32
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1
+  %c1 = arith.constant 1 : i32
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2
+  %c2 = arith.constant 2 : i32
   // CHECK: = hal.device.switch<%[[DEVICE]] : !hal.device> -> i32
   %0 = hal.device.switch<%device : !hal.device> -> i32
     // CHECK-NEXT: #hal.device.match.id<"vulkan-v1.?-*"> {

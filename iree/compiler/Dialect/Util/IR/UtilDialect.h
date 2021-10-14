@@ -26,6 +26,9 @@ class UtilDialect : public Dialect {
   Type parseType(DialectAsmParser& parser) const override;
   void printType(Type type, DialectAsmPrinter& os) const override;
 
+  Operation* materializeConstant(OpBuilder& builder, Attribute value, Type type,
+                                 Location loc) override;
+
  private:
   void registerAttributes();
   void registerTypes();

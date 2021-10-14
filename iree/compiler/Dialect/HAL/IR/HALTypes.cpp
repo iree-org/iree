@@ -338,11 +338,11 @@ size_t getElementBitCount(IntegerAttr elementType) {
 }
 
 Value getElementBitCount(Location loc, Value elementType, OpBuilder &builder) {
-  return builder.createOrFold<AndOp>(
+  return builder.createOrFold<arith::AndIOp>(
       loc,
-      builder.createOrFold<IndexCastOp>(loc, builder.getIndexType(),
-                                        elementType),
-      builder.createOrFold<ConstantIndexOp>(loc, 0xFF));
+      builder.createOrFold<arith::IndexCastOp>(loc, builder.getIndexType(),
+                                               elementType),
+      builder.createOrFold<arith::ConstantIndexOp>(loc, 0xFF));
 }
 
 size_t getElementByteCount(IntegerAttr elementType) {
@@ -350,13 +350,13 @@ size_t getElementByteCount(IntegerAttr elementType) {
 }
 
 Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
-  auto c1 = builder.createOrFold<ConstantIndexOp>(loc, 1);
-  auto c8 = builder.createOrFold<ConstantIndexOp>(loc, 8);
+  auto c1 = builder.createOrFold<arith::ConstantIndexOp>(loc, 1);
+  auto c8 = builder.createOrFold<arith::ConstantIndexOp>(loc, 8);
   auto bitCount = getElementBitCount(loc, elementType, builder);
-  return builder.createOrFold<UnsignedDivIOp>(
+  return builder.createOrFold<arith::DivUIOp>(
       loc,
-      builder.createOrFold<SubIOp>(
-          loc, builder.createOrFold<AddIOp>(loc, bitCount, c8), c1),
+      builder.createOrFold<arith::SubIOp>(
+          loc, builder.createOrFold<arith::AddIOp>(loc, bitCount, c8), c1),
       c8);
 }
 
@@ -462,23 +462,23 @@ BufferConstraintsAdaptor::BufferConstraintsAdaptor(Location loc,
 }
 
 Value BufferConstraintsAdaptor::getMaxAllocationSize(OpBuilder &builder) {
-  return builder.createOrFold<mlir::ConstantOp>(
+  return builder.createOrFold<mlir::arith::ConstantOp>(
       loc_, bufferConstraints_.max_allocation_sizeAttr());
 }
 
 Value BufferConstraintsAdaptor::getMinBufferOffsetAlignment(
     OpBuilder &builder) {
-  return builder.createOrFold<mlir::ConstantOp>(
+  return builder.createOrFold<mlir::arith::ConstantOp>(
       loc_, bufferConstraints_.min_buffer_offset_alignmentAttr());
 }
 
 Value BufferConstraintsAdaptor::getMaxBufferRange(OpBuilder &builder) {
-  return builder.createOrFold<mlir::ConstantOp>(
+  return builder.createOrFold<mlir::arith::ConstantOp>(
       loc_, bufferConstraints_.max_buffer_rangeAttr());
 }
 
 Value BufferConstraintsAdaptor::getMinBufferRangeAlignment(OpBuilder &builder) {
-  return builder.createOrFold<mlir::ConstantOp>(
+  return builder.createOrFold<mlir::arith::ConstantOp>(
       loc_, bufferConstraints_.min_buffer_range_alignmentAttr());
 }
 
@@ -761,7 +761,8 @@ Attribute ExecutableTargetAttr::getMatchExpression() {
 Value MatchAlwaysAttr::buildConditionExpression(Location loc, Value value,
                                                 OpBuilder builder) const {
   // #hal.match.always -> true
-  return builder.createOrFold<ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
+  return builder.createOrFold<arith::ConstantIntOp>(loc, /*value=*/1,
+                                                    /*width=*/1);
 }
 
 static ArrayAttr parseMultiMatchAttrArray(DialectAsmParser &p) {
@@ -807,7 +808,7 @@ Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
   // #hal.match.any<[a, b, c]> -> or(or(a, b), c)
   if (getConditions().empty()) {
     // Empty returns false (no conditions match).
-    return builder.create<ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
+    return builder.create<arith::ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
   }
   auto conditionValues =
       llvm::map_range(getConditions(), [&](MatchAttrInterface attr) {
@@ -815,8 +816,8 @@ Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
       });
   Value resultValue;
   for (auto conditionValue : conditionValues) {
-    resultValue = resultValue ? builder.createOrFold<OrOp>(loc, resultValue,
-                                                           conditionValue)
+    resultValue = resultValue ? builder.createOrFold<arith::OrIOp>(
+                                    loc, resultValue, conditionValue)
                               : conditionValue;
   }
   return resultValue;
@@ -837,7 +838,7 @@ Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
   // #hal.match.all<[a, b, c]> -> and(and(a, b), c)
   if (getConditions().empty()) {
     // Empty returns true (all 0 conditions match).
-    return builder.create<ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
+    return builder.create<arith::ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
   }
   auto conditionValues =
       llvm::map_range(getConditions(), [&](MatchAttrInterface attr) {
@@ -845,8 +846,8 @@ Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
       });
   Value resultValue;
   for (auto conditionValue : conditionValues) {
-    resultValue = resultValue ? builder.createOrFold<AndOp>(loc, resultValue,
-                                                            conditionValue)
+    resultValue = resultValue ? builder.createOrFold<arith::AndIOp>(
+                                    loc, resultValue, conditionValue)
                               : conditionValue;
   }
   return resultValue;

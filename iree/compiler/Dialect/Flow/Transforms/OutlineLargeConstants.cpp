@@ -27,7 +27,7 @@ namespace Flow {
 // Returns true if |constantOp| is large enough to be considered for pooling.
 // Some constants are small enough that inlining them into the ringbuffer is
 // more efficient and fewer bindings.
-static bool isConstantLarge(ConstantOp constantOp,
+static bool isConstantLarge(arith::ConstantOp constantOp,
                             size_t minLargeConstantSize) {
   auto type = constantOp.getType();
   if (auto shapedType = type.dyn_cast<RankedTensorType>()) {
@@ -43,12 +43,12 @@ static bool isConstantLarge(ConstantOp constantOp,
 // Returns a list of all large constants in the module.
 // Only walks top-level functions and ops to avoid pulling constants out of
 // executables.
-static std::vector<ConstantOp> findLargeConstantsInModule(
+static std::vector<arith::ConstantOp> findLargeConstantsInModule(
     ModuleOp moduleOp, size_t minLargeConstantSize) {
-  std::vector<ConstantOp> largeConstantOps;
+  std::vector<arith::ConstantOp> largeConstantOps;
   for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
     for (auto &block : funcOp.getBlocks()) {
-      for (auto constantOp : block.getOps<ConstantOp>()) {
+      for (auto constantOp : block.getOps<arith::ConstantOp>()) {
         if (isConstantLarge(constantOp, minLargeConstantSize)) {
           largeConstantOps.push_back(constantOp);
         }
@@ -80,7 +80,8 @@ class OutlineLargeConstantsPass
 
     // Create all top-level util.globals from large constants in the module.
     OpBuilder moduleBuilder(&moduleOp.getBody()->front());
-    std::vector<std::pair<ConstantOp, IREE::Util::GlobalOp>> replacements;
+    std::vector<std::pair<arith::ConstantOp, IREE::Util::GlobalOp>>
+        replacements;
     for (auto &largeConstantOp :
          findLargeConstantsInModule(moduleOp, minLargeConstantSize)) {
       std::string name;
@@ -89,7 +90,7 @@ class OutlineLargeConstantsPass
       } while (moduleSymbols.lookup(name) != nullptr);
       auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           largeConstantOp.getLoc(), name, /*isMutable=*/false,
-          largeConstantOp.getType(), largeConstantOp.getValue());
+          largeConstantOp.getType(), largeConstantOp.value());
       globalOp.setPrivate();
       replacements.emplace_back(largeConstantOp, globalOp);
 

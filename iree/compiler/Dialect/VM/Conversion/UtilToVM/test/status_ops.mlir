@@ -3,7 +3,7 @@
 // CHECK-LABEL: vm.func private @status_check_ok
 func @status_check_ok() {
   // CHECK: %[[CODE:.+]] =
-  %statusCode = constant 1 : i32
+  %statusCode = arith.constant 1 : i32
   // CHECK: vm.cond_fail %[[CODE]]
   util.status.check_ok %statusCode
   return
@@ -14,7 +14,7 @@ func @status_check_ok() {
 // CHECK-LABEL: vm.func private @status_check_ok_with_message
 func @status_check_ok_with_message() {
   // CHECK: %[[CODE:.+]] =
-  %statusCode = constant 1 : i32
+  %statusCode = arith.constant 1 : i32
   // CHECK: vm.cond_fail %[[CODE]], "failure message"
   util.status.check_ok %statusCode, "failure message"
   return

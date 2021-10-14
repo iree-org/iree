@@ -133,9 +133,10 @@ linalg::ProcInfo getGPUProcessorIdAndCountImpl<GPUGlobalId, GPUGlobalCount>(
   // ordering issue cause it assumes that the workgroup size has already been
   // set. If using affine_map can help, make sure that the workgroup size is set
   // before.
-  return {builder.create<AddIOp>(
-              loc, builder.create<MulIOp>(loc, blockId, blockDim), threadId),
-          builder.create<MulIOp>(loc, blockDim, gridDim)};
+  return {
+      builder.create<arith::AddIOp>(
+          loc, builder.create<arith::MulIOp>(loc, blockId, blockDim), threadId),
+      builder.create<arith::MulIOp>(loc, blockDim, gridDim)};
 }
 
 template <typename GPUIdOp, typename GPUCountOp>
@@ -179,7 +180,7 @@ scf::ParallelOp collapseParallelLoops(PatternRewriter &rewriter,
 
   // Compute the number of iterations of each loops starting from the innermost.
   Location loc = pLoopOp.getLoc();
-  Value totalNumIterations = rewriter.create<ConstantIndexOp>(loc, 1);
+  Value totalNumIterations = rewriter.create<arith::ConstantIndexOp>(loc, 1);
 
   // Track the "stride" of each loop, i.e. product of the total number of
   // iterations of the inner loops.
@@ -190,17 +191,17 @@ scf::ParallelOp collapseParallelLoops(PatternRewriter &rewriter,
   auto steps = pLoopOp.step();
   for (int i = numLoops - 1; i >= 0; --i) {
     Value lb = lbs[i], ub = ubs[i], step = steps[i];
-    Value iterCount = rewriter.create<SignedDivIOp>(
-        loc, rewriter.create<SubIOp>(loc, ub, lb), step);
+    Value iterCount = rewriter.create<arith::DivSIOp>(
+        loc, rewriter.create<arith::SubIOp>(loc, ub, lb), step);
     iterationStride[i] = totalNumIterations;
     totalNumIterations =
-        rewriter.create<MulIOp>(loc, totalNumIterations, iterCount);
+        rewriter.create<arith::MulIOp>(loc, totalNumIterations, iterCount);
   }
 
   // Create the collapsed parallel loop op with lowerbound 0, step 1 and upper
   // bound being the totalNumIterations.
-  Value newLb = rewriter.create<ConstantIndexOp>(loc, 0);
-  Value newStep = rewriter.create<ConstantIndexOp>(loc, 1);
+  Value newLb = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value newStep = rewriter.create<arith::ConstantIndexOp>(loc, 1);
   scf::ParallelOp newPLoopOp =
       rewriter.create<scf::ParallelOp>(loc, newLb, totalNumIterations, newStep);
 
@@ -216,14 +217,14 @@ scf::ParallelOp collapseParallelLoops(PatternRewriter &rewriter,
   BlockAndValueMapping map;
   for (int i : llvm::seq<int>(0, numLoops)) {
     Value iterNum =
-        rewriter.create<SignedDivIOp>(loc, loopIv, iterationStride[i]);
+        rewriter.create<arith::DivSIOp>(loc, loopIv, iterationStride[i]);
     AffineExpr d0, d1;
     bindDims(rewriter.getContext(), d0, d1);
     AffineExpr s0 = getAffineSymbolExpr(0, rewriter.getContext());
     Value newIv = makeComposedAffineApply(rewriter, loc, d0 + d1 * s0,
                                           {lbs[i], iterNum, steps[i]});
     map.map(pLoopBody.getArgument(i), newIv);
-    loopIv = rewriter.create<SignedRemIOp>(loc, loopIv, iterationStride[i]);
+    loopIv = rewriter.create<arith::RemSIOp>(loc, loopIv, iterationStride[i]);
   }
   for (Operation &op : pLoopBody.without_terminator()) {
     rewriter.clone(op, map);
@@ -325,8 +326,9 @@ LogicalResult distributeSingleIterationPerProcessor(
   auto step = pLoopOp.step();
   SmallVector<Value, 2> ivReplacements;
   for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
-    Value iterValue = rewriter.create<AddIOp>(
-        loc, lbs[i], rewriter.create<MulIOp>(loc, procInfo[i].procId, step[i]));
+    Value iterValue = rewriter.create<arith::AddIOp>(
+        loc, lbs[i],
+        rewriter.create<arith::MulIOp>(loc, procInfo[i].procId, step[i]));
     ivReplacements.push_back(iterValue);
   }
   Region &pLoopOpRegion = pLoopOp.getLoopBody();
@@ -336,9 +338,9 @@ LogicalResult distributeSingleIterationPerProcessor(
     Value cond = nullptr;
     auto ubs = pLoopOp.upperBound();
     for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
-      Value cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::slt,
-                                          ivReplacements[i], ubs[i]);
-      cond = (cond ? rewriter.create<AndOp>(loc, cond, cmp) : cmp);
+      Value cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt,
+                                                 ivReplacements[i], ubs[i]);
+      cond = (cond ? rewriter.create<arith::AndIOp>(loc, cond, cmp) : cmp);
       signatureConverter.remapInput(i, ivReplacements[i]);
     }
     rewriter.applySignatureConversion(&pLoopOpRegion, signatureConverter);

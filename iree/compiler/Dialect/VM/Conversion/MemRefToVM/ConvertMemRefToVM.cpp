@@ -59,7 +59,7 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   auto memrefType = memrefValue.getType().cast<ShapedType>();
   if (memrefType.getRank() == 0) {
     // Rank 0 buffers (like memref<i32>) have only a single valid offset at 0.
-    return rewriter.createOrFold<ConstantIndexOp>(loc, 0);
+    return rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
   }
   assert(memrefType.getRank() == 1 && "memrefs should have been flattened");
 

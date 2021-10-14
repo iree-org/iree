@@ -2,14 +2,14 @@
 
 // CHECK-LABEL: @allocator_compute_size
 func @allocator_compute_size(%arg0: !hal.allocator) -> index {
-  // CHECK-DAG: %[[DIM0:.+]] = constant 100
-  %dim0 = constant 100 : index
-  // CHECK-DAG: %[[DIM1:.+]] = constant 200
-  %dim1 = constant 200 : index
-  // CHECK-DAG: %[[TYPE:.+]] = constant 32
-  %type = constant 32 : i32
-  // CHECK-DAG: %[[ENCODING:.+]] = constant 1
-  %encoding = constant 1 : i32
+  // CHECK-DAG: %[[DIM0:.+]] = arith.constant 100
+  %dim0 = arith.constant 100 : index
+  // CHECK-DAG: %[[DIM1:.+]] = arith.constant 200
+  %dim1 = arith.constant 200 : index
+  // CHECK-DAG: %[[TYPE:.+]] = arith.constant 32
+  %type = arith.constant 32 : i32
+  // CHECK-DAG: %[[ENCODING:.+]] = arith.constant 1
+  %encoding = arith.constant 1 : i32
   // CHECK: %[[SIZE:.+]] = hal.allocator.compute_size<%arg0 : !hal.allocator>
   // CHECK-SAME:                                shape([%[[DIM0]], %[[DIM1]]])
   // CHECK-SAME:                                 type(%[[TYPE]])
@@ -26,18 +26,18 @@ func @allocator_compute_size(%arg0: !hal.allocator) -> index {
 
 // CHECK-LABEL: @allocator_compute_offset
 func @allocator_compute_offset(%arg0: !hal.allocator) -> index {
-  // CHECK-DAG: %[[IDX0:.+]] = constant 10
-  %idx0 = constant 10 : index
-  // CHECK-DAG: %[[IDX1:.+]] = constant 20
-  %idx1 = constant 20 : index
-  // CHECK-DAG: %[[DIM0:.+]] = constant 100
-  %dim0 = constant 100 : index
-  // CHECK-DAG: %[[DIM1:.+]] = constant 200
-  %dim1 = constant 200 : index
-  // CHECK-DAG: %[[TYPE:.+]] = constant 32
-  %type = constant 32 : i32
-  // CHECK-DAG: %[[ENCODING:.+]] = constant 1
-  %encoding = constant 1 : i32
+  // CHECK-DAG: %[[IDX0:.+]] = arith.constant 10
+  %idx0 = arith.constant 10 : index
+  // CHECK-DAG: %[[IDX1:.+]] = arith.constant 20
+  %idx1 = arith.constant 20 : index
+  // CHECK-DAG: %[[DIM0:.+]] = arith.constant 100
+  %dim0 = arith.constant 100 : index
+  // CHECK-DAG: %[[DIM1:.+]] = arith.constant 200
+  %dim1 = arith.constant 200 : index
+  // CHECK-DAG: %[[TYPE:.+]] = arith.constant 32
+  %type = arith.constant 32 : i32
+  // CHECK-DAG: %[[ENCODING:.+]] = arith.constant 1
+  %encoding = arith.constant 1 : i32
   // CHECK: %[[OFFSET:.+]] = hal.allocator.compute_offset<%arg0 : !hal.allocator>
   // CHECK-SAME:                                  indices([%[[IDX0]], %[[IDX1]]])
   // CHECK-SAME:                                    shape([%[[DIM0]], %[[DIM1]]])
@@ -56,22 +56,22 @@ func @allocator_compute_offset(%arg0: !hal.allocator) -> index {
 
 // CHECK-LABEL: @allocator_compute_range
 func @allocator_compute_range(%arg0: !hal.allocator) -> (index, index) {
-  // CHECK-DAG: %[[IDX0:.+]] = constant 10
-  %idx0 = constant 10 : index
-  // CHECK-DAG: %[[IDX1:.+]] = constant 20
-  %idx1 = constant 20 : index
-  // CHECK-DAG: %[[LEN0:.+]] = constant 11
-  %len0 = constant 11 : index
-  // CHECK-DAG: %[[LEN1:.+]] = constant 21
-  %len1 = constant 21 : index
-  // CHECK-DAG: %[[DIM0:.+]] = constant 100
-  %dim0 = constant 100 : index
-  // CHECK-DAG: %[[DIM1:.+]] = constant 200
-  %dim1 = constant 200 : index
-  // CHECK-DAG: %[[TYPE:.+]] = constant 32
-  %type = constant 32 : i32
-  // CHECK-DAG: %[[ENCODING:.+]] = constant 1
-  %encoding = constant 1 : i32
+  // CHECK-DAG: %[[IDX0:.+]] = arith.constant 10
+  %idx0 = arith.constant 10 : index
+  // CHECK-DAG: %[[IDX1:.+]] = arith.constant 20
+  %idx1 = arith.constant 20 : index
+  // CHECK-DAG: %[[LEN0:.+]] = arith.constant 11
+  %len0 = arith.constant 11 : index
+  // CHECK-DAG: %[[LEN1:.+]] = arith.constant 21
+  %len1 = arith.constant 21 : index
+  // CHECK-DAG: %[[DIM0:.+]] = arith.constant 100
+  %dim0 = arith.constant 100 : index
+  // CHECK-DAG: %[[DIM1:.+]] = arith.constant 200
+  %dim1 = arith.constant 200 : index
+  // CHECK-DAG: %[[TYPE:.+]] = arith.constant 32
+  %type = arith.constant 32 : i32
+  // CHECK-DAG: %[[ENCODING:.+]] = arith.constant 1
+  %encoding = arith.constant 1 : i32
   // CHECK: = hal.allocator.compute_range<%arg0 : !hal.allocator>
   // CHECK-SAME:                  indices([%[[IDX0]], %[[IDX1]]])
   // CHECK-SAME:                  lengths([%[[LEN0]], %[[LEN1]]])
@@ -92,8 +92,8 @@ func @allocator_compute_range(%arg0: !hal.allocator) -> (index, index) {
 // CHECK-LABEL: @allocator_allocate
 //  CHECK-SAME: (%[[ALLOCATOR:.+]]: !hal.allocator)
 func @allocator_allocate(%allocator: !hal.allocator) {
-  // CHECK-DAG: %[[SIZE:.+]] = constant 123
-  %size = constant 123 : index
+  // CHECK-DAG: %[[SIZE:.+]] = arith.constant 123
+  %size = arith.constant 123 : index
   //      CHECK: %[[REF:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
   // CHECK-SAME:   type("HostVisible|HostCoherent")
   // CHECK-SAME:   usage(Transfer)
@@ -123,10 +123,10 @@ func @allocator_constant_buffer(%allocator: !hal.allocator) {
 // CHECK-LABEL: @allocator_map_byte_buffer
 //  CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
 func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !util.byte_buffer) {
-  // CHECK-DAG: %[[OFFSET:.+]] = constant 100
-  %offset = constant 100 : index
-  // CHECK-DAG: %[[LENGTH:.+]] = constant 200
-  %length = constant 200 : index
+  // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 100
+  %offset = arith.constant 100 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 200
+  %length = arith.constant 200 : index
   //      CHECK: = hal.allocator.map<%[[ALLOCATOR]] : !hal.allocator>
   // CHECK-SAME:   source(%arg1 : !util.byte_buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-SAME:   type("DeviceVisible|DeviceLocal")
@@ -143,14 +143,14 @@ func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !util.byte_bu
 // CHECK-LABEL: @allocator_pack
 //  CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
 func @allocator_pack(%allocator: !hal.allocator) {
-  // CHECK-DAG: %[[BASE_OFFSET:.+]] = constant 999
-  %base_offset = constant 999 : index
-  // CHECK-DAG: %[[SIZE_0:.+]] = constant 100
-  %size_0 = constant 100 : index
-  // CHECK-DAG: %[[SIZE_1:.+]] = constant 101
-  %size_1 = constant 101 : index
-  // CHECK-DAG: %[[SIZE_2:.+]] = constant 102
-  %size_2 = constant 102 : index
+  // CHECK-DAG: %[[BASE_OFFSET:.+]] = arith.constant 999
+  %base_offset = arith.constant 999 : index
+  // CHECK-DAG: %[[SIZE_0:.+]] = arith.constant 100
+  %size_0 = arith.constant 100 : index
+  // CHECK-DAG: %[[SIZE_1:.+]] = arith.constant 101
+  %size_1 = arith.constant 101 : index
+  // CHECK-DAG: %[[SIZE_2:.+]] = arith.constant 102
+  %size_2 = arith.constant 102 : index
   // CHECK-NEXT: %{{.+}}:4 =
   %total_length, %offset_0, %offset_1, %offset_2 =
       // CHECK-SAME: hal.allocator.pack<%[[ALLOCATOR]] : !hal.allocator>

@@ -84,8 +84,8 @@ class ConversionPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
-                    StandardOpsDialect, math::MathDialect, AffineDialect,
-                    memref::MemRefDialect>();
+                    StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                    math::MathDialect, AffineDialect, memref::MemRefDialect>();
   }
 
   StringRef getArgument() const override { return "iree-vm-conversion"; }
@@ -141,7 +141,8 @@ class ConversionPass
     populateAffineToStdConversionPatterns(conversionPatterns);
     conversionPatterns.insert<ElideTieShapeOp>(context);
 
-    conversionTarget.addIllegalDialect<StandardOpsDialect>();
+    conversionTarget.addIllegalDialect<StandardOpsDialect,
+                                       mlir::arith::ArithmeticDialect>();
     conversionTarget.addIllegalDialect<AffineDialect>();
     conversionTarget.addIllegalDialect<math::MathDialect>();
 

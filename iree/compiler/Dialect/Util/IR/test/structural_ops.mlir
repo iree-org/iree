@@ -20,8 +20,8 @@ util.initializer attributes {foo} {
 
 // CHECK: util.initializer {
 util.initializer {
-  // CHECK-NEXT: %[[ZERO:.+]] = constant 0 : i32
-  %zero = constant 0 : i32
+  // CHECK-NEXT: %[[ZERO:.+]] = arith.constant 0 : i32
+  %zero = arith.constant 0 : i32
   // CHECK-NEXT:   br ^bb1(%[[ZERO]] : i32)
   br ^bb1(%zero: i32)
   // CHECK-NEXT: ^bb1(%0: i32):
