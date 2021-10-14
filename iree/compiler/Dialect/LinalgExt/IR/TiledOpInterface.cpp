@@ -68,8 +68,8 @@ struct ExtractSliceTiledOpInterface
     ReifiedRankedShapedTypeDims returnShape;
     (void)extractSliceOp.reifyResultShapes(b, returnShape);
     Location loc = op->getLoc();
-    Value zero = b.create<ConstantIndexOp>(loc, 0);
-    Value one = b.create<ConstantIndexOp>(loc, 1);
+    Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
+    Value one = b.create<arith::ConstantIndexOp>(loc, 1);
     SmallVector<Range> loopRanges(returnShape[0].size(),
                                   Range{zero, nullptr, one});
     for (auto ub : enumerate(returnShape[0])) {
