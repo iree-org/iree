@@ -16,7 +16,7 @@
     
     
       
-        <title>WIP on Matrix Multiplication on CPU - IREE</title>
+        <title>Work in progress on Matrix Multiplication on CPU - IREE</title>
       
     
     
@@ -101,7 +101,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              WIP on Matrix Multiplication on CPU
+              Work in progress on Matrix Multiplication on CPU
             
           </span>
         </div>
@@ -667,12 +667,12 @@
       
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
-          WIP on Matrix Multiplication on CPU
+          Work in progress on Matrix Multiplication on CPU
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <a href="./" class="md-nav__link md-nav__link--active">
-        WIP on Matrix Multiplication on CPU
+        Work in progress on Matrix Multiplication on CPU
       </a>
       
         
@@ -860,7 +860,7 @@ possible now that we are doing this within a compiler. This allows us to focus
 on <em>how</em> we get the compiler to generate that schedule and kernel with purely
 algebraic transformations that compose and enable further compiler
 optimizations.</p>
-<p>At the basis of this work is the [extensible op system of the Linalg dialect] (https://mlir.llvm.org/docs/Dialects/Linalg/OpDSL/) in the MLIR compiler toolkit.
+<p>At the basis of this work is the <a href="https://mlir.llvm.org/docs/Dialects/Linalg/OpDSL/">extensible op system of the Linalg dialect</a> in the MLIR compiler toolkit.
 In this case, a general purpose, mixed precision mmt4d op is defined via a high level
 description directly in the compiler and is then available to both users of the compiler
 (as a <code>linalg.mmt4d</code> op) or for direct emission via Python based IR construction
