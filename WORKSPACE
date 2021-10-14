@@ -54,11 +54,25 @@ maybe(
     name = "vulkan_sdk",
 )
 ###############################################################################
+
+###############################################################################
+# EmitC
+
+maybe(
+    local_repository,
+    name = "emitc",
+    path = "third_party/mlir-emitc",
+)
+
+###############################################################################
+
+###############################################################################
 # All other IREE submodule dependencies
 
 load("//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")
 
 configure_iree_submodule_deps()
+###############################################################################
 
 ###############################################################################
 # bazel toolchains rules for remote execution (https://releases.bazel.build/bazel-toolchains.html).

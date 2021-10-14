@@ -4,9 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(MLIR_EMITC_SOURCE_DIR
-  "${IREE_SOURCE_DIR}/third_party/mlir-emitc/"
-)
+set(MLIR_EMITC_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/")
 
 external_cc_library(
   PACKAGE
@@ -15,15 +13,15 @@ external_cc_library(
     TranslateToCpp
   ROOT
     ${MLIR_EMITC_SOURCE_DIR}
-    HDRS
-      "include/emitc/Target/Cpp/CppEmitter.h"
-    SRCS
-      "lib/Target/Cpp/TranslateToCpp.cpp"
-    DEPS
-      MLIREmitC
-      MLIRIR
-      MLIRSCF
-      MLIRStandard
+  HDRS
+    "include/emitc/Target/Cpp/CppEmitter.h"
+  SRCS
+    "lib/Target/Cpp/TranslateToCpp.cpp"
+  DEPS
+    MLIREmitC
+    MLIRIR
+    MLIRSCF
+    MLIRStandard
   INCLUDES
     "${MLIR_EMITC_SOURCE_DIR}/include/"
   PUBLIC

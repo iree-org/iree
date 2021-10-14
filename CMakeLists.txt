@@ -439,7 +439,7 @@ if(IREE_BUILD_COMPILER)
 endif()
 
 if(IREE_ENABLE_EMITC)
-  add_subdirectory(build_tools/third_party/mlir-emitc EXCLUDE_FROM_ALL)
+  add_subdirectory(third_party/mlir-emitc EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_BUILD_TESTS)
