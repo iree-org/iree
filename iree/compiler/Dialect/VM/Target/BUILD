@@ -15,6 +15,6 @@ cc_library(
     hdrs = ["init_targets.h"],
     deps = [
         "//iree/compiler/Dialect/VM/Target/Bytecode",
-        "//iree/compiler/Dialect/VM/Target/C"
+        "//iree/compiler/Dialect/VM/Target/C",
     ],
 )

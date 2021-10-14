@@ -4,13 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 iree_cmake_extra_content(content = """
 if(NOT ${IREE_ENABLE_EMITC})
