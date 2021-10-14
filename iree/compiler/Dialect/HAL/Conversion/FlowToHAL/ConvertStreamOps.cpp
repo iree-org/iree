@@ -264,11 +264,12 @@ class StreamSchedulingState {
   Value device() { return device_; }
   Value allocator() { return allocator_; }
 
-  // Returns a ConstantIndexOp of |value|.
+  // Returns a arith::ConstantIndexOp of |value|.
   Value lookupOrCreateIndex(int64_t value, OpBuilder &builder) {
     auto it = indexConstantMap.find(value);
     if (it != indexConstantMap.end()) return it->second;
-    auto constantValue = builder.createOrFold<ConstantIndexOp>(loc, value);
+    auto constantValue =
+        builder.createOrFold<arith::ConstantIndexOp>(loc, value);
     indexConstantMap.insert(std::make_pair(value, constantValue));
     return constantValue;
   }
@@ -401,8 +402,8 @@ class StreamSchedulingState {
     if (it != memoizedElementTypesConstants.end()) return it->second;
     auto i32Value = IREE::HAL::getElementTypeValue(elementType);
     assert(i32Value.hasValue() && "unhandled element type for allocation");
-    auto constantValue =
-        builder.createOrFold<ConstantIntOp>(loc, i32Value.getValue(), 32);
+    auto constantValue = builder.createOrFold<arith::ConstantIntOp>(
+        loc, i32Value.getValue(), 32);
     memoizedElementTypesConstants[elementType] = constantValue;
     return constantValue;
   }
@@ -412,8 +413,8 @@ class StreamSchedulingState {
     if (it != memoizedEncodingTypesConstants.end()) return it->second;
     auto i32Value = IREE::HAL::getEncodingTypeValue(encodingType);
     assert(i32Value.hasValue() && "unhandled encoding type for allocation");
-    auto constantValue =
-        builder.createOrFold<ConstantIntOp>(loc, i32Value.getValue(), 32);
+    auto constantValue = builder.createOrFold<arith::ConstantIntOp>(
+        loc, i32Value.getValue(), 32);
     memoizedEncodingTypesConstants[encodingType] = constantValue;
     return constantValue;
   }
@@ -758,7 +759,7 @@ static void recordInterfaceBindings(
       // Need an explicit index cast to i32 since the
       // CommandBufferPushConstantsOp is intrinsically i32 based.
       if (inputValue.getType().isa<IndexType>()) {
-        pushConstantValue = rewriter.create<mlir::IndexCastOp>(
+        pushConstantValue = rewriter.create<mlir::arith::IndexCastOp>(
             dispatchOp.getLoc(), rewriter.getIntegerType(32),
             pushConstantValue);
       }
@@ -797,9 +798,9 @@ static std::array<Value, 3> calculateDispatchWorkgroupSize(
   // When no workgroup size is specified we just assume [1,1,1].
   // This yields a workgroup count that models the extents of the workload.
   return {
-      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
-      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
-      builder.createOrFold<mlir::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, 1),
   };
 }
 
@@ -828,40 +829,42 @@ static std::array<Value, 3> calculateWorkloadWorkgroupCount(
     const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
   std::array<Value, 3> result;
 
-  auto constantOne = builder.createOrFold<mlir::ConstantIndexOp>(loc, 1);
+  auto constantOne = builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, 1);
   if (workload.size() <= 3) {
     // 1-D to 3-D are easy (pad 2 to 0 dimensions) and divide by workgroup size.
     for (int i = 0; i < 3; ++i) {
       // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
       Value workloadI = i < workload.size() ? workload[i] : constantOne;
-      workloadI = builder.createOrFold<mlir::SubIOp>(
+      workloadI = builder.createOrFold<mlir::arith::SubIOp>(
           loc,
-          builder.createOrFold<mlir::AddIOp>(loc, workloadI, workgroupSize[i]),
+          builder.createOrFold<mlir::arith::AddIOp>(loc, workloadI,
+                                                    workgroupSize[i]),
           constantOne);
-      result[i] = builder.createOrFold<UnsignedDivIOp>(loc, workloadI,
+      result[i] = builder.createOrFold<arith::DivUIOp>(loc, workloadI,
                                                        workgroupSize[i]);
     }
   } else {
     // TODO(#4140): remapping of N-D to 3-D: this is not how you do this!
     Value flatWorkload = constantOne;
     for (auto workloadI : workload) {
-      flatWorkload = builder.createOrFold<MulIOp>(loc, flatWorkload, workloadI);
+      flatWorkload =
+          builder.createOrFold<arith::MulIOp>(loc, flatWorkload, workloadI);
     }
     for (int i = 0; i < 3; ++i) {
       // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
-      auto rounded = builder.createOrFold<mlir::SubIOp>(
+      auto rounded = builder.createOrFold<mlir::arith::SubIOp>(
           loc,
-          builder.createOrFold<mlir::AddIOp>(loc, flatWorkload,
-                                             workgroupSize[i]),
+          builder.createOrFold<mlir::arith::AddIOp>(loc, flatWorkload,
+                                                    workgroupSize[i]),
           constantOne);
-      auto workgroupCountI = builder.createOrFold<mlir::UnsignedDivIOp>(
+      auto workgroupCountI = builder.createOrFold<mlir::arith::DivUIOp>(
           loc, rounded, workgroupSize[i]);
       result[i] = workgroupCountI;
 
       // Multiply back out and subtract from invocations.
-      flatWorkload = builder.createOrFold<SubIOp>(
+      flatWorkload = builder.createOrFold<arith::SubIOp>(
           loc, flatWorkload,
-          builder.createOrFold<MulIOp>(loc, workgroupCountI, rounded));
+          builder.createOrFold<arith::MulIOp>(loc, workgroupCountI, rounded));
     }
   }
 
@@ -969,32 +972,32 @@ static Value splatFillPattern(Location loc, Value baseValue,
                               OpBuilder &builder) {
   // Bitcast to an integer, then use integer math for the rest of the pattern.
   auto baseBitWidth = baseValue.getType().getIntOrFloatBitWidth();
-  baseValue = builder.createOrFold<BitcastOp>(
+  baseValue = builder.createOrFold<arith::BitcastOp>(
       loc, builder.getIntegerType(baseBitWidth), baseValue);
 
   switch (baseBitWidth) {
     case 8: {
       // (v << 24) | (v << 16) | (v << 8) | v
-      auto b0 = builder.createOrFold<ZeroExtendIOp>(loc, baseValue,
-                                                    builder.getIntegerType(32));
-      auto c8 = builder.create<ConstantIntOp>(loc, 8, 32);
-      auto b1 = builder.createOrFold<ShiftLeftOp>(loc, b0, c8);
-      auto c16 = builder.create<ConstantIntOp>(loc, 16, 32);
-      auto b2 = builder.createOrFold<ShiftLeftOp>(loc, b0, c16);
-      auto c24 = builder.create<ConstantIntOp>(loc, 24, 32);
-      auto b3 = builder.createOrFold<ShiftLeftOp>(loc, b0, c24);
-      return builder.createOrFold<OrOp>(
+      auto b0 = builder.createOrFold<arith::ExtUIOp>(
+          loc, baseValue, builder.getIntegerType(32));
+      auto c8 = builder.create<arith::ConstantIntOp>(loc, 8, 32);
+      auto b1 = builder.createOrFold<arith::ShLIOp>(loc, b0, c8);
+      auto c16 = builder.create<arith::ConstantIntOp>(loc, 16, 32);
+      auto b2 = builder.createOrFold<arith::ShLIOp>(loc, b0, c16);
+      auto c24 = builder.create<arith::ConstantIntOp>(loc, 24, 32);
+      auto b3 = builder.createOrFold<arith::ShLIOp>(loc, b0, c24);
+      return builder.createOrFold<arith::OrIOp>(
           loc, b0,
-          builder.createOrFold<OrOp>(loc, b1,
-                                     builder.createOrFold<OrOp>(loc, b2, b3)));
+          builder.createOrFold<arith::OrIOp>(
+              loc, b1, builder.createOrFold<arith::OrIOp>(loc, b2, b3)));
     }
     case 16: {
       // (v << 16) | v
-      auto c16 = builder.create<ConstantIntOp>(loc, 16, 32);
-      auto b0 = builder.createOrFold<ZeroExtendIOp>(loc, baseValue,
-                                                    builder.getIntegerType(32));
-      auto b1 = builder.createOrFold<ShiftLeftOp>(loc, b0, c16);
-      return builder.createOrFold<OrOp>(loc, b0, b1);
+      auto c16 = builder.create<arith::ConstantIntOp>(loc, 16, 32);
+      auto b0 = builder.createOrFold<arith::ExtUIOp>(
+          loc, baseValue, builder.getIntegerType(32));
+      auto b1 = builder.createOrFold<arith::ShLIOp>(loc, b0, c16);
+      return builder.createOrFold<arith::OrIOp>(loc, b0, b1);
     }
     case 32:
       return baseValue;
@@ -1133,7 +1136,7 @@ static LogicalResult recordTensorUpdate(Value device, Value commandBuffer,
 static void hoistConstants(Block &streamBlock,
                            ConversionPatternRewriter &rewriter) {
   for (auto &op : streamBlock) {
-    if (isa<ConstantOp>(op)) {
+    if (isa<arith::ConstantOp>(op)) {
       auto newOp = rewriter.clone(op);
       op.replaceAllUsesWith(newOp);
     }
@@ -1172,7 +1175,7 @@ static LogicalResult recordStreamCommands(
       }
     } else if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(op)) {
       // No-op; handled by the buffer allocation.
-    } else if (isa<ConstantOp>(op)) {
+    } else if (isa<arith::ConstantOp>(op)) {
       // Note that even though constants were hoisted early, they can be
       // materialized as part of various conversions so do it again to get
       // any new ones.

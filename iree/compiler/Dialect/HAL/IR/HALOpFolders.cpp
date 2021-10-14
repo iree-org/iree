@@ -44,7 +44,7 @@ static Value getElementCount(Location loc, Value baseValue,
                              ValueRange shapeDims, OpBuilder &builder) {
   Value value = baseValue;
   for (auto dim : shapeDims) {
-    value = builder.createOrFold<mlir::MulIOp>(loc, value, dim);
+    value = builder.createOrFold<mlir::arith::MulIOp>(loc, value, dim);
   }
   return value;
 }
@@ -94,7 +94,8 @@ struct ExpandAllocatorComputeOffsetOp
 
     // TODO(#6762): switch based on op.encoding().
 
-    auto offset = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 0);
+    auto offset =
+        rewriter.createOrFold<mlir::arith::ConstantIndexOp>(op.getLoc(), 0);
     for (size_t i = 0; i < op.indices().size(); ++i) {
       // TODO(benvanik): check error case in debug builds.
       // if (indices[i] >= shape[i]) {
@@ -104,16 +105,16 @@ struct ExpandAllocatorComputeOffsetOp
       // }
       auto axisOffset = op.indices()[i];
       for (size_t j = i + 1; j < op.shape().size(); ++j) {
-        axisOffset = rewriter.createOrFold<mlir::MulIOp>(
+        axisOffset = rewriter.createOrFold<mlir::arith::MulIOp>(
             op.getLoc(), axisOffset, op.shape()[j]);
       }
-      offset =
-          rewriter.createOrFold<mlir::AddIOp>(op.getLoc(), offset, axisOffset);
+      offset = rewriter.createOrFold<mlir::arith::AddIOp>(op.getLoc(), offset,
+                                                          axisOffset);
     }
     auto elementSize =
         getElementByteCount(op.getLoc(), op.element_type(), rewriter);
-    auto byteOffset =
-        rewriter.createOrFold<mlir::MulIOp>(op.getLoc(), offset, elementSize);
+    auto byteOffset = rewriter.createOrFold<mlir::arith::MulIOp>(
+        op.getLoc(), offset, elementSize);
 
     rewriter.replaceOp(op, {byteOffset});
     return success();
@@ -140,12 +141,13 @@ struct ExpandAllocatorComputeRangeOp
     BufferConstraintsAdaptor bufferConstraints(op.getLoc(), op.allocator());
 
     SmallVector<Value, 6> endIndices(op.shape().size());
-    auto one = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 1);
+    auto one =
+        rewriter.createOrFold<mlir::arith::ConstantIndexOp>(op.getLoc(), 1);
     for (size_t i = 0; i < endIndices.size(); ++i) {
-      endIndices[i] = rewriter.createOrFold<mlir::SubIOp>(
+      endIndices[i] = rewriter.createOrFold<mlir::arith::SubIOp>(
           op.getLoc(),
-          rewriter.createOrFold<mlir::AddIOp>(op.getLoc(), op.indices()[i],
-                                              op.lengths()[i]),
+          rewriter.createOrFold<mlir::arith::AddIOp>(
+              op.getLoc(), op.indices()[i], op.lengths()[i]),
           one);
     }
 
@@ -158,10 +160,10 @@ struct ExpandAllocatorComputeRangeOp
 
     auto elementSize =
         getElementByteCount(op.getLoc(), op.element_type(), rewriter);
-    auto offsetLength = rewriter.createOrFold<mlir::AddIOp>(
+    auto offsetLength = rewriter.createOrFold<mlir::arith::AddIOp>(
         op.getLoc(),
-        rewriter.createOrFold<mlir::SubIOp>(op.getLoc(), endByteOffset,
-                                            startByteOffset),
+        rewriter.createOrFold<mlir::arith::SubIOp>(op.getLoc(), endByteOffset,
+                                                   startByteOffset),
         elementSize);
 
     rewriter.replaceOp(op, {startByteOffset, offsetLength});
@@ -209,8 +211,10 @@ struct ExpandAllocatorConstantOp
     auto hostBuffer = rewriter.createOrFold<IREE::Util::ByteBufferConstantOp>(
         op.getLoc(), IREE::Util::ByteBufferType::get(rewriter.getContext()),
         op.value());
-    auto zero = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), 0);
-    auto neg1 = rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), -1);
+    auto zero =
+        rewriter.createOrFold<mlir::arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto neg1 =
+        rewriter.createOrFold<mlir::arith::ConstantIndexOp>(op.getLoc(), -1);
     auto deviceBuffer = rewriter.createOrFold<AllocatorMapOp>(
         op.getLoc(), bufferType, op.allocator(), memoryTypes, bufferUsage,
         hostBuffer, zero, neg1);
@@ -220,8 +224,8 @@ struct ExpandAllocatorConstantOp
       SmallVector<Value, 4> shape;
       if (shapedType.getRank() >= 1) {
         for (auto dim : shapedType.getShape()) {
-          shape.push_back(
-              rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), dim));
+          shape.push_back(rewriter.createOrFold<mlir::arith::ConstantIndexOp>(
+              op.getLoc(), dim));
         }
       }
       auto bufferView = rewriter.createOrFold<BufferViewCreateOp>(
@@ -289,9 +293,9 @@ struct PropagateAllocatorPackBaseOffset
 
     // Zero offsets don't do anything and can just be removed so we can avoid
     // inserting a bunch of additional IR.
-    if (auto constantOp =
-            dyn_cast_or_null<ConstantIndexOp>(baseOffset.getDefiningOp())) {
-      if (constantOp.getValue() == 0) {
+    if (auto constantOp = dyn_cast_or_null<arith::ConstantIndexOp>(
+            baseOffset.getDefiningOp())) {
+      if (constantOp.value() == 0) {
         return success();
       }
     }
@@ -299,8 +303,8 @@ struct PropagateAllocatorPackBaseOffset
     // Propagate the offset to all returned slice offsets.
     rewriter.setInsertionPointAfter(op);
     for (auto sliceOffset : op.packed_offsets()) {
-      auto addOp =
-          rewriter.create<mlir::AddIOp>(op.getLoc(), baseOffset, sliceOffset);
+      auto addOp = rewriter.create<mlir::arith::AddIOp>(op.getLoc(), baseOffset,
+                                                        sliceOffset);
       SmallPtrSet<Operation *, 1> exclusions;
       exclusions.insert(addOp);
       sliceOffset.replaceAllUsesExcept(addOp.result(), exclusions);
@@ -509,7 +513,7 @@ struct FoldCommandBufferFillBufferSubspans
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.target_buffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.source_buffer();
-      newTargetOffset = rewriter.createOrFold<mlir::AddIOp>(
+      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
           subspanOp.getLoc(), subspanOp.source_offset(), op.target_offset());
       needsUpdate = true;
     }
@@ -547,7 +551,7 @@ struct FoldCommandBufferCopyBufferSubspans
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.source_buffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.source_buffer();
-      newSourceOffset = rewriter.createOrFold<mlir::AddIOp>(
+      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
           subspanOp.getLoc(), subspanOp.source_offset(), op.source_offset());
       needsUpdate = true;
     }
@@ -556,7 +560,7 @@ struct FoldCommandBufferCopyBufferSubspans
     if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
             op.target_buffer().getDefiningOp())) {
       newTargetBuffer = subspanOp.source_buffer();
-      newTargetOffset = rewriter.createOrFold<mlir::AddIOp>(
+      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
           subspanOp.getLoc(), subspanOp.source_offset(), op.target_offset());
       needsUpdate = true;
     }
@@ -600,7 +604,7 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
       if (auto subspanOp = dyn_cast<BufferSubspanOp>(definingOp)) {
         needsUpdate = true;
         bindingBuffers[i] = subspanOp.source_buffer();
-        bindingOffsets[i] = rewriter.createOrFold<mlir::AddIOp>(
+        bindingOffsets[i] = rewriter.createOrFold<mlir::arith::AddIOp>(
             subspanOp.getLoc(), subspanOp.source_offset(), bindingOffsets[i]);
       }
     }

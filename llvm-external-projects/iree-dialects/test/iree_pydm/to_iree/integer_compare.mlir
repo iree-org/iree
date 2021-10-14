@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @lt
 iree_pydm.func @lt(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[R:.*]] = cmpi slt, %arg0, %arg1 : i32
+  // CHECK: %[[R:.*]] = arith.cmpi slt, %arg0, %arg1 : i32
   %0 = apply_compare "lt", %arg0, %arg1 : !iree_pydm.integer, !iree_pydm.integer
   // CHECK: return {{.*}}, %[[R]]
   return %0 : !iree_pydm.bool
@@ -10,7 +10,7 @@ iree_pydm.func @lt(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!
 
 // CHECK-LABEL: @le
 iree_pydm.func @le(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[R:.*]] = cmpi sle, %arg0, %arg1 : i32
+  // CHECK: %[[R:.*]] = arith.cmpi sle, %arg0, %arg1 : i32
   %0 = apply_compare "le", %arg0, %arg1 : !iree_pydm.integer, !iree_pydm.integer
   // CHECK: return {{.*}}, %[[R]]
   return %0 : !iree_pydm.bool
@@ -18,7 +18,7 @@ iree_pydm.func @le(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!
 
 // CHECK-LABEL: @eq
 iree_pydm.func @eq(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[R:.*]] = cmpi eq, %arg0, %arg1 : i32
+  // CHECK: %[[R:.*]] = arith.cmpi eq, %arg0, %arg1 : i32
   %0 = apply_compare "eq", %arg0, %arg1 : !iree_pydm.integer, !iree_pydm.integer
   // CHECK: return {{.*}}, %[[R]]
   return %0 : !iree_pydm.bool
@@ -26,7 +26,7 @@ iree_pydm.func @eq(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!
 
 // CHECK-LABEL: @is
 iree_pydm.func @is(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[R:.*]] = cmpi eq, %arg0, %arg1 : i32
+  // CHECK: %[[R:.*]] = arith.cmpi eq, %arg0, %arg1 : i32
   %0 = apply_compare "is", %arg0, %arg1 : !iree_pydm.integer, !iree_pydm.integer
   // CHECK: return {{.*}}, %[[R]]
   return %0 : !iree_pydm.bool
@@ -34,7 +34,7 @@ iree_pydm.func @is(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!
 
 // CHECK-LABEL: @ne
 iree_pydm.func @ne(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[R:.*]] = cmpi ne, %arg0, %arg1 : i32
+  // CHECK: %[[R:.*]] = arith.cmpi ne, %arg0, %arg1 : i32
   %0 = apply_compare "ne", %arg0, %arg1 : !iree_pydm.integer, !iree_pydm.integer
   // CHECK: return {{.*}}, %[[R]]
   return %0 : !iree_pydm.bool
@@ -42,7 +42,7 @@ iree_pydm.func @ne(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!
 
 // CHECK-LABEL: @isnot
 iree_pydm.func @isnot(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[R:.*]] = cmpi ne, %arg0, %arg1 : i32
+  // CHECK: %[[R:.*]] = arith.cmpi ne, %arg0, %arg1 : i32
   %0 = apply_compare "isnot", %arg0, %arg1 : !iree_pydm.integer, !iree_pydm.integer
   // CHECK: return {{.*}}, %[[R]]
   return %0 : !iree_pydm.bool
@@ -50,7 +50,7 @@ iree_pydm.func @isnot(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) ->
 
 // CHECK-LABEL: @gt
 iree_pydm.func @gt(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[R:.*]] = cmpi sgt, %arg0, %arg1 : i32
+  // CHECK: %[[R:.*]] = arith.cmpi sgt, %arg0, %arg1 : i32
   %0 = apply_compare "gt", %arg0, %arg1 : !iree_pydm.integer, !iree_pydm.integer
   // CHECK: return {{.*}}, %[[R]]
   return %0 : !iree_pydm.bool
@@ -58,7 +58,7 @@ iree_pydm.func @gt(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!
 
 // CHECK-LABEL: @ge
 iree_pydm.func @ge(%arg0 : !iree_pydm.integer, %arg1 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
-  // CHECK: %[[R:.*]] = cmpi sge, %arg0, %arg1 : i32
+  // CHECK: %[[R:.*]] = arith.cmpi sge, %arg0, %arg1 : i32
   %0 = apply_compare "ge", %arg0, %arg1 : !iree_pydm.integer, !iree_pydm.integer
   // CHECK: return {{.*}}, %[[R]]
   return %0 : !iree_pydm.bool

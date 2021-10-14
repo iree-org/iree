@@ -271,7 +271,7 @@ want to compare it to a constant value. This last part is just syntactic sugar
 around
 
 ```mlir
-%expected = constant dense<101.0> : tensor<f32>
+%expected = arith.constant dense<101.0> : tensor<f32>
 check.expect_almost_eq(%result, %expected) : tensor<f32>
 ```
 

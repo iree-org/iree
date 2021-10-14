@@ -16,6 +16,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -405,8 +406,8 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
     for (auto returnOp :
          llvm::make_early_inc_range(llvmFuncOp.getOps<mlir::ReturnOp>())) {
       rewriter.setInsertionPoint(returnOp);
-      auto returnValue =
-          rewriter.createOrFold<mlir::ConstantIntOp>(returnOp.getLoc(), 0, 32);
+      auto returnValue = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
+          returnOp.getLoc(), 0, 32);
       rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, returnValue);
     }
 
@@ -676,6 +677,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateMathToLLVMConversionPatterns(converter, patterns);
   populateMemRefToLLVMConversionPatterns(converter, patterns);
   populateStdToLLVMConversionPatterns(converter, patterns);
+  arith::populateArithmeticToLLVMConversionPatterns(converter, patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
@@ -700,6 +702,7 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addLegalOp<ModuleOp, IREE::HAL::InterfaceOp,
                     IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
   target.addIllegalDialect<ShapeDialect, StandardOpsDialect,
+                           mlir::arith::ArithmeticDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();
   target.addIllegalOp<UnrealizedConversionCastOp>();
@@ -709,15 +712,15 @@ void ConvertToLLVMPass::runOnOperation() {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
-  target.addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect,
-                                    IREE::Util::UtilDialect,
-                                    IREE::HAL::HALDialect, math::MathDialect>(
-      [&](Operation *op) {
-        auto funcParent = op->getParentOfType<FuncOp>();
-        if (!funcParent) return false;
-        if (isEntryPoint(funcParent)) return false;
-        return true;
-      });
+  target.addDynamicallyLegalDialect<
+      ShapeDialect, StandardOpsDialect, mlir::math::MathDialect,
+      mlir::arith::ArithmeticDialect, IREE::Util::UtilDialect,
+      IREE::HAL::HALDialect, math::MathDialect>([&](Operation *op) {
+    auto funcParent = op->getParentOfType<FuncOp>();
+    if (!funcParent) return false;
+    if (isEntryPoint(funcParent)) return false;
+    return true;
+  });
 
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();

@@ -193,8 +193,8 @@ SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
 
 SmallVector<Range> ScatterOp::getLoopBounds(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<ConstantIndexOp>(loc, 0);
-  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
     Value ub = getDimValue(builder, loc, updates(), dim);
@@ -278,9 +278,9 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   loadIndices.push_back(ivs.front());
   loadIndices.push_back(Value());
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
-    loadIndices.back() = b.create<ConstantIndexOp>(loc, i);
+    loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
     Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
-    starts.push_back(b.create<IndexCastOp>(loc, b.getIndexType(), idx));
+    starts.push_back(b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx));
   }
   starts.append(std::next(ivs.begin()), ivs.end());
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
@@ -378,8 +378,8 @@ SmallVector<Range> SortOp::getLoopBounds(OpBuilder &builder) {
   int64_t operandRank = getOperandRank();
   SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
-  Value zero = builder.create<ConstantIndexOp>(loc, 0);
-  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   Value source = operand(0);
   for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
     loopBounds[dim].offset = zero;
@@ -443,20 +443,21 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   SmallVector<Value> indices, sortBlkArgs;
   indices.append(ivs.begin(), ivs.end());
   // Bubble sort innermost loop.
-  Value zero = b.create<ConstantIndexOp>(loc, 0);
-  Value one = b.create<ConstantIndexOp>(loc, 1);
+  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
   Value ub;
   if (getOperandType(0).isDynamicDim(sortDim)) {
     ub = b.create<memref::DimOp>(loc, operand(0), sortDim);
   } else {
-    ub = b.create<ConstantIndexOp>(loc, getOperandType(0).getDimSize(sortDim));
+    ub = b.create<arith::ConstantIndexOp>(
+        loc, getOperandType(0).getDimSize(sortDim));
   }
-  ub = b.create<SubIOp>(loc, ub, one);
+  ub = b.create<arith::SubIOp>(loc, ub, one);
   auto scfFor = b.create<scf::ForOp>(
       loc, zero, ub, one, ValueRange{},
       [&](OpBuilder &b, Location loc, Value iv, ValueRange iters) {
         SmallVector<Value> indices(ivs);
-        Value ivPlusOne = b.create<AddIOp>(loc, iv, one);
+        Value ivPlusOne = b.create<arith::AddIOp>(loc, iv, one);
         for (auto output : getOutputOperands()) {
           indices[sortDim] = iv;
           sortBlkArgs.push_back(
@@ -494,7 +495,8 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
       [&](OpBuilder &b, Location loc) {
         // Swap the pairs if false.
         SmallVector<Value> indices(ivs.begin(), ivs.end());
-        Value ivPlusOne = b.create<AddIOp>(loc, scfFor.getInductionVar(), one);
+        Value ivPlusOne =
+            b.create<arith::AddIOp>(loc, scfFor.getInductionVar(), one);
         for (int i = 0, e = getNumOutputs(); i < e; ++i) {
           Value v1 = sortBlkArgs[i * 2];
           Value v2 = sortBlkArgs[i * 2 + 1];
@@ -551,20 +553,20 @@ SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
 SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
   SmallVector<Range> res;
   Location loc = getLoc();
-  Value zero = builder.create<ConstantIndexOp>(loc, 0);
-  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   for (auto en : llvm::enumerate(getOperandShape().drop_back())) {
     Value size;
     if (en.value() == ShapedType::kDynamicSize) {
       size = getDimValue(builder, loc, getReal(), en.index());
     } else {
-      size = builder.create<ConstantIndexOp>(loc, en.value());
+      size = builder.create<arith::ConstantIndexOp>(loc, en.value());
     }
     res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/one});
   }
 
   Value size = getDimValue(builder, loc, getReal(), getOperandRank() - 1);
-  Value stride = builder.create<ShiftLeftOp>(loc, one, getStage());
+  Value stride = builder.create<arith::ShLIOp>(loc, one, getStage());
   res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
   return res;
 }
@@ -577,15 +579,15 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
 
   auto f32Type = b.getF32Type();
   auto indexToF32 = [](OpBuilder &builder, Location loc, Value v) -> Value {
-    v = builder.create<IndexCastOp>(loc, builder.getI32Type(), v);
-    return builder.create<SIToFPOp>(loc, builder.getF32Type(), v);
+    v = builder.create<arith::IndexCastOp>(loc, builder.getI32Type(), v);
+    return builder.create<arith::SIToFPOp>(loc, builder.getF32Type(), v);
   };
 
   // We will need exp(-2 * PI * j / m * I), compute "-2 * PI / m" for imag part
   // first.
-  Value coeff = b.create<ConstantFloatOp>(
+  Value coeff = b.create<arith::ConstantFloatOp>(
       loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
-  coeff = b.create<DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
+  coeff = b.create<arith::DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
 
   b.create<linalg::GenericOp>(
       loc, TypeRange{}, ValueRange{}, operands, maps, getLoopIteratorTypes(),
@@ -596,7 +598,7 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
         Value rhsImag = args[3];
 
         // Compute "-2 * PI / m * j"
-        Value w = b.create<MulFOp>(
+        Value w = b.create<arith::MulFOp>(
             loc, coeff,
             indexToF32(b, loc, b.create<linalg::IndexOp>(loc, rank - 1)));
         Value wReal = b.create<math::CosOp>(loc, w);
@@ -604,20 +606,20 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
 
         // t = w * a[k + j + mh];
         // ->  (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
-        Value xu = b.create<MulFOp>(loc, wReal, rhsReal);
-        Value yv = b.create<MulFOp>(loc, wImag, rhsImag);
-        Value xv = b.create<MulFOp>(loc, wReal, rhsImag);
-        Value yu = b.create<MulFOp>(loc, wImag, rhsReal);
-        Value tReal = b.create<SubFOp>(loc, xu, yv);
-        Value tImag = b.create<AddFOp>(loc, xv, yu);
+        Value xu = b.create<arith::MulFOp>(loc, wReal, rhsReal);
+        Value yv = b.create<arith::MulFOp>(loc, wImag, rhsImag);
+        Value xv = b.create<arith::MulFOp>(loc, wReal, rhsImag);
+        Value yu = b.create<arith::MulFOp>(loc, wImag, rhsReal);
+        Value tReal = b.create<arith::SubFOp>(loc, xu, yv);
+        Value tImag = b.create<arith::AddFOp>(loc, xv, yu);
 
         // cplx u = a[k + j];
         // a[k + j] = u + t;
         // a[k + j + mh] = u - t;
-        Value r1 = b.create<AddFOp>(loc, lhsReal, tReal);
-        Value r2 = b.create<AddFOp>(loc, lhsImag, tImag);
-        Value r3 = b.create<SubFOp>(loc, lhsReal, tReal);
-        Value r4 = b.create<SubFOp>(loc, lhsImag, tImag);
+        Value r1 = b.create<arith::AddFOp>(loc, lhsReal, tReal);
+        Value r2 = b.create<arith::AddFOp>(loc, lhsImag, tImag);
+        Value r3 = b.create<arith::SubFOp>(loc, lhsReal, tReal);
+        Value r4 = b.create<arith::SubFOp>(loc, lhsImag, tImag);
         b.create<linalg::YieldOp>(loc, ValueRange{r1, r2, r3, r4});
       });
 }
@@ -645,20 +647,20 @@ void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
 
         // t = w * a[k + j + mh];
         // ->  (x + yi)(u + vi) = (xu - yv) + (xv + yu)i
-        Value xu = b.create<MulFOp>(loc, wReal, rhsReal);
-        Value yv = b.create<MulFOp>(loc, wImag, rhsImag);
-        Value xv = b.create<MulFOp>(loc, wReal, rhsImag);
-        Value yu = b.create<MulFOp>(loc, wImag, rhsReal);
-        Value tReal = b.create<SubFOp>(loc, xu, yv);
-        Value tImag = b.create<AddFOp>(loc, xv, yu);
+        Value xu = b.create<arith::MulFOp>(loc, wReal, rhsReal);
+        Value yv = b.create<arith::MulFOp>(loc, wImag, rhsImag);
+        Value xv = b.create<arith::MulFOp>(loc, wReal, rhsImag);
+        Value yu = b.create<arith::MulFOp>(loc, wImag, rhsReal);
+        Value tReal = b.create<arith::SubFOp>(loc, xu, yv);
+        Value tImag = b.create<arith::AddFOp>(loc, xv, yu);
 
         // cplx u = a[k + j];
         // a[k + j] = u + t;
         // a[k + j + mh] = u - t;
-        Value r1 = b.create<AddFOp>(loc, lhsReal, tReal);
-        Value r2 = b.create<AddFOp>(loc, lhsImag, tImag);
-        Value r3 = b.create<SubFOp>(loc, lhsReal, tReal);
-        Value r4 = b.create<SubFOp>(loc, lhsImag, tImag);
+        Value r1 = b.create<arith::AddFOp>(loc, lhsReal, tReal);
+        Value r2 = b.create<arith::AddFOp>(loc, lhsImag, tImag);
+        Value r3 = b.create<arith::SubFOp>(loc, lhsReal, tReal);
+        Value r4 = b.create<arith::SubFOp>(loc, lhsImag, tImag);
         b.create<linalg::YieldOp>(loc, ValueRange{r1, r2, r3, r4});
       });
 }
@@ -682,9 +684,9 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   Value real = getReal();
   Value imag = getImag();
   Value stage = getStage();
-  Value one = b.create<ConstantIndexOp>(loc, 1);
-  Value wholeSize = b.create<ShiftLeftOp>(loc, one, stage);
-  Value halfSize = b.create<SignedShiftRightOp>(loc, wholeSize, one);
+  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
+  Value wholeSize = b.create<arith::ShLIOp>(loc, one, stage);
+  Value halfSize = b.create<arith::ShRSIOp>(loc, wholeSize, one);
 
   auto rank = getOperandRank();
   SmallVector<Value> operands;
@@ -698,7 +700,8 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
       b.create<memref::SubViewOp>(loc, imag, lhsIvs, sizes, ones));
 
   SmallVector<OpFoldResult> rhsIvs(ivs.begin(), ivs.end());
-  rhsIvs.back() = b.create<AddIOp>(loc, ivs.back(), halfSize).getResult();
+  rhsIvs.back() =
+      b.create<arith::AddIOp>(loc, ivs.back(), halfSize).getResult();
   operands.push_back(
       b.create<memref::SubViewOp>(loc, real, rhsIvs, sizes, ones));
   operands.push_back(
@@ -819,8 +822,8 @@ SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
 
 SmallVector<Range> ReverseOp::getLoopBounds(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<ConstantIndexOp>(loc, 0);
-  Value one = builder.create<ConstantIndexOp>(loc, 1);
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getOperandRank())) {
     Value ub = getDimValue(builder, loc, input(), dim);
@@ -835,8 +838,9 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   SmallVector<Value> mirrorIndices(ivs.begin(), ivs.end());
   for (auto dim : dims()) {
     auto size = getDimValue(b, loc, input(), dim);
-    size = b.create<SubIOp>(loc, size, b.create<ConstantIndexOp>(loc, 1));
-    mirrorIndices[dim] = b.create<SubIOp>(loc, size, mirrorIndices[dim]);
+    size = b.create<arith::SubIOp>(loc, size,
+                                   b.create<arith::ConstantIndexOp>(loc, 1));
+    mirrorIndices[dim] = b.create<arith::SubIOp>(loc, size, mirrorIndices[dim]);
   }
   Value val = b.create<memref::LoadOp>(loc, input(), ivs);
   b.create<memref::StoreOp>(loc, val, output(), mirrorIndices);

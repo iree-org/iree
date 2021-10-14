@@ -5,7 +5,7 @@ llvm.func @sink(f32)
 // CHECK-LABEL: llvm.func internal @binding_ptrs
 func @binding_ptrs() {
   // CHECK-DAG: %[[C72:.+]] = llvm.mlir.constant(72 : index) : i64
-  %c72 = constant 72 : index
+  %c72 = arith.constant 72 : index
 
   // CHECK: %[[STATE:.+]] = llvm.load %arg0 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>>
   // CHECK: %[[PC:.+]] = llvm.extractvalue %[[STATE]][3] : !llvm.struct<"iree_hal_executable_dispatch_state_v0_t", (array<3 x i32>, array<3 x i32>, i64, ptr<i32>, i64, ptr<ptr<i8>>, ptr<i64>)>
@@ -39,7 +39,7 @@ func @binding_ptrs() {
   %memref = hal.interface.binding.subspan @io::@ret0[%c72] : memref<?x2xf32>{%dim}
 
   // CHECK: %[[VAL:.+]] = llvm.load
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %val = memref.load %memref[%c0, %c0] : memref<?x2xf32>
 
   // CHECK: llvm.call @sink(%[[VAL]])

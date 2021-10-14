@@ -55,8 +55,8 @@ def logical_or():
 # CHECK-LABEL: func @logical_not
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
-# CHECK: %[[T:.*]] = constant true
-# CHECK: %[[F:.*]] = constant false
+# CHECK: %[[T:.*]] = arith.constant true
+# CHECK: %[[F:.*]] = arith.constant false
 # CHECK: %[[R:.*]] = select %[[XBOOL]], %[[F]], %[[T]]
 @test_import_global
 def logical_not():
@@ -68,11 +68,11 @@ def logical_not():
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
 # CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}} {
-# CHECK:   %[[TWOVAL:.*]] = constant 2
+# CHECK:   %[[TWOVAL:.*]] = arith.constant 2
 # CHECK:   %[[TWOBOXED:.*]] = box %[[TWOVAL]] : !iree_pydm.integer -> !iree_pydm.object
 # CHECK:   yield %[[TWOBOXED]]
 # CHECK: } else {
-# CHECK:   %[[THREEVAL:.*]] = constant 3
+# CHECK:   %[[THREEVAL:.*]] = arith.constant 3
 # CHECK:   %[[THREEBOXED:.*]] = box %[[THREEVAL]] : !iree_pydm.integer -> !iree_pydm.object
 # CHECK:   yield %[[THREEBOXED]]
 # CHECK: }

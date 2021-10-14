@@ -45,6 +45,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandard",
+        "@llvm-project//mlir:ArithmeticToLLVM",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToNVVMTransforms",
         "@llvm-project//mlir:GPUToROCDLTransforms",

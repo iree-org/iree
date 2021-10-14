@@ -567,7 +567,7 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
   OpBuilder entryBuilder = OpBuilder::atBlockBegin(entryBlock);
 
   // +0 offset is used a lot.
-  auto zeroOffset = entryBuilder.createOrFold<mlir::ConstantIndexOp>(
+  auto zeroOffset = entryBuilder.createOrFold<mlir::arith::ConstantIndexOp>(
       clonedFuncOp.getLoc(), 0);
 
   for (auto regionOperand : llvm::enumerate(regionOperands)) {
@@ -587,7 +587,7 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
         Value offset = zeroOffset;
         if (value.bindingOffset.staticOffset != BindingOffset::INVALID_OFFSET &&
             value.bindingOffset.staticOffset != 0) {
-          offset = entryBuilder.createOrFold<mlir::ConstantIndexOp>(
+          offset = entryBuilder.createOrFold<mlir::arith::ConstantIndexOp>(
               clonedFuncOp.getLoc(), value.bindingOffset.staticOffset);
         }
 

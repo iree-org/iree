@@ -215,8 +215,9 @@ class ProcessTransferRead final
     unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
     SmallVector<Value, 4> indices(adaptor.indices().begin(),
                                   adaptor.indices().end());
-    indices.back() = rewriter.create<SignedDivIOp>(
-        loc, indices.back(), rewriter.create<ConstantIndexOp>(loc, ratio));
+    indices.back() = rewriter.create<arith::DivSIOp>(
+        loc, indices.back(),
+        rewriter.create<arith::ConstantIndexOp>(loc, ratio));
 
     // If the transfer_read can be replaced by a load after vectorization use
     // LoadOp and cast back to the original type.
@@ -271,8 +272,9 @@ class ProcessTransferWrite final
 
     unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
     SmallVector<Value, 4> indices(adaptor.indices());
-    indices.back() = rewriter.create<SignedDivIOp>(
-        loc, indices.back(), rewriter.create<ConstantIndexOp>(loc, ratio));
+    indices.back() = rewriter.create<arith::DivSIOp>(
+        loc, indices.back(),
+        rewriter.create<arith::ConstantIndexOp>(loc, ratio));
 
     // If the transfer_write can be replaced by a store after vectorization cast
     // the original value and use StoreOp.
@@ -386,13 +388,14 @@ struct ScalarizeVectorTransferRead final
       return failure();
 
     Location loc = readOp.getLoc();
-    Value newVector = rewriter.create<ConstantOp>(
+    Value newVector = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       SmallVector<Value, 4> indices(readOp.indices().begin(),
                                     readOp.indices().end());
-      indices.back() = rewriter.createOrFold<AddIOp>(
-          loc, indices.back(), rewriter.createOrFold<ConstantIndexOp>(loc, i));
+      indices.back() = rewriter.createOrFold<arith::AddIOp>(
+          loc, indices.back(),
+          rewriter.createOrFold<arith::ConstantIndexOp>(loc, i));
       Value scalar = rewriter.create<memref::LoadOp>(loc, scalarType,
                                                      readOp.source(), indices);
       newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
@@ -417,8 +420,9 @@ struct ScalarizeVectorTransferWrite final
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       SmallVector<Value, 4> indices(writeOp.indices().begin(),
                                     writeOp.indices().end());
-      indices.back() = rewriter.createOrFold<AddIOp>(
-          loc, indices.back(), rewriter.createOrFold<ConstantIndexOp>(loc, i));
+      indices.back() = rewriter.createOrFold<arith::AddIOp>(
+          loc, indices.back(),
+          rewriter.createOrFold<arith::ConstantIndexOp>(loc, i));
       Value scalar =
           rewriter.create<vector::ExtractOp>(loc, writeOp.vector(), i);
       rewriter.create<memref::StoreOp>(loc, scalar, writeOp.source(), indices);

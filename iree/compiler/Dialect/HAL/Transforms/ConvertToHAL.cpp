@@ -43,7 +43,7 @@ class ConvertToHALPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
     registry.insert<HALDialect>();
-    registry.insert<StandardOpsDialect>();
+    registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect>();
   }
 
   StringRef getArgument() const override { return "iree-convert-to-hal"; }

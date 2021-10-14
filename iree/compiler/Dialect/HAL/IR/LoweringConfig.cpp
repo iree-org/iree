@@ -137,7 +137,7 @@ SmallVector<Value, 4> getTileSizes(OpBuilder &b, Operation *op,
                                    unsigned level) {
   return llvm::to_vector<4>(
       llvm::map_range(getTileSizes(op, level), [&](int64_t t) -> Value {
-        return b.create<ConstantIndexOp>(op->getLoc(), t);
+        return b.create<arith::ConstantIndexOp>(op->getLoc(), t);
       }));
 }
 

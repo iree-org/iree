@@ -64,8 +64,8 @@ static LogicalResult verifySupportedTilingOptions(
 static Value getValue(OpBuilder &builder, Location loc,
                       OpFoldResult valueOrAttr) {
   if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-    return builder.create<ConstantIndexOp>(loc,
-                                           attr.cast<IntegerAttr>().getInt());
+    return builder.create<arith::ConstantIndexOp>(
+        loc, attr.cast<IntegerAttr>().getInt());
   }
   return valueOrAttr.get<Value>();
 }
@@ -265,7 +265,8 @@ struct TiledOpInterfaceTilingPass
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
                 linalg_ext::LinalgExtDialect, memref::MemRefDialect,
-                StandardOpsDialect, tensor::TensorDialect, scf::SCFDialect>();
+                StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                math::MathDialect, tensor::TensorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override;
 };

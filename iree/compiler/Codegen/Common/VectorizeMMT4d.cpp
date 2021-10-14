@@ -56,7 +56,7 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     int K0 = lhsType.getShape()[3];
 
     auto loc = mmt4DOp.getLoc();
-    auto c0 = rewriter.create<ConstantIndexOp>(loc, 0);
+    auto c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
 
     auto lhsVecType = VectorType::get({1, 1, M0, K0}, rewriter.getF32Type());
     auto rhsVecType = VectorType::get({1, 1, N0, K0}, rewriter.getF32Type());

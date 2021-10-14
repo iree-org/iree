@@ -2,8 +2,8 @@
 
 // CHECK-LABEL: @buffer_view_create
 func @buffer_view_create(%arg0: !hal.buffer, %arg1: index, %arg2: index) -> !hal.buffer_view {
-  %c1 = constant 1 : i32
-  %c32 = constant 32 : i32
+  %c1 = arith.constant 1 : i32
+  %c32 = arith.constant 32 : i32
   // CHECK: %view = hal.buffer_view.create
   // CHECK-SAME: buffer(%arg0 : !hal.buffer)
   // CHECK-SAME: shape([%arg1, %arg2])

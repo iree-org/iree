@@ -22,11 +22,12 @@ namespace {
 // Legalizes boolean (i1) constants to i8 with a linalg.generic operation
 // downcasting to i1. This occurs as IREE does not currently support tightly
 // packing and unpacking i1 buffers.
-class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
+class ConvertBoolConstantPattern
+    : public OpRewritePattern<mlir::arith::ConstantOp> {
  public:
-  using OpRewritePattern<mlir::ConstantOp>::OpRewritePattern;
+  using OpRewritePattern<mlir::arith::ConstantOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(mlir::ConstantOp op,
+  LogicalResult matchAndRewrite(mlir::arith::ConstantOp op,
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     auto resultTy = op.getType().dyn_cast<ShapedType>();
@@ -43,7 +44,7 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
     if (!attr) return failure();
 
     // Create a new ConstantOp that contains the same values as an int8.
-    auto newConst = rewriter.createOrFold<ConstantOp>(
+    auto newConst = rewriter.createOrFold<arith::ConstantOp>(
         loc, attr.mapValues(rewriter.getIntegerType(8),
                             [&](APInt src) { return src.zext(8); }));
 
@@ -78,7 +79,7 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
                                        getParallelIteratorTypeName()),
                 [&](OpBuilder &nestedBuilder, Location nestedLoc,
                     ValueRange blockArgs) {
-                  auto cast = rewriter.create<TruncateIOp>(
+                  auto cast = rewriter.create<arith::TruncIOp>(
                       nestedLoc, rewriter.getIntegerType(1), blockArgs[0]);
                   rewriter.create<linalg::YieldOp>(nestedLoc,
                                                    cast->getResult(0));
@@ -95,7 +96,8 @@ class ConvertBoolConstantPattern : public OpRewritePattern<mlir::ConstantOp> {
 class PromoteI1ToI8Pass : public PromoteI1ToI8Base<PromoteI1ToI8Pass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, mlir::StandardOpsDialect>();
+    registry.insert<linalg::LinalgDialect, mlir::StandardOpsDialect,
+                    mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
 
   void runOnOperation() override {

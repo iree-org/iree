@@ -1,5 +1,5 @@
 func @table() {
-  %input = constant dense<[-5405, 15214, -14896, 22008, 12529, -13501]> : tensor<6xi16>
+  %input = arith.constant dense<[-5405, 15214, -14896, 22008, 12529, -13501]> : tensor<6xi16>
 
   // This generates [0, ... 512] for a constant value to avoid an excessively large constant.
   %init = linalg.init_tensor [513] : tensor<513xi16>
@@ -9,7 +9,7 @@ func @table() {
     outs(%init: tensor<513xi16>) {
     ^bb0(%arg1: i16):
       %i = linalg.index 0 : index
-      %0 = index_cast %i : index to i16
+      %0 = arith.index_cast %i : index to i16
       linalg.yield %0 : i16
     } -> tensor<513xi16>
 

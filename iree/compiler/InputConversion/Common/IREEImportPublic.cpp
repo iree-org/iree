@@ -45,7 +45,7 @@ struct IREEImportPublicPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::iree::IREEDialect, IREE::Flow::FlowDialect,
                     IREE::HAL::HALDialect, IREE::Util::UtilDialect,
-                    mlir::StandardOpsDialect>();
+                    mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
   }
   void runOnOperation() override;
 };

@@ -77,8 +77,8 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   }
 
   if (!ubDim) {
-    if (auto cstUb = ub.getDefiningOp<ConstantIndexOp>())
-      ubDim = getAffineConstantExpr(cstUb.getValue(), minOp.getContext());
+    if (auto cstUb = ub.getDefiningOp<arith::ConstantIndexOp>())
+      ubDim = getAffineConstantExpr(cstUb.value(), minOp.getContext());
     else
       return false;
   }
@@ -128,7 +128,7 @@ static bool isDivisible(Value v, int64_t dividend) {
 ///   %affine.min affine_map<(d0, d1) -> (N, d0 - d1)>(%ub, %iv)
 /// ```
 /// With N a compile time constant. This operations can be replace by
-/// `%cN = constant N : index` if we can prove that %lb, %step and %ub are
+/// `%cN = arith.constant N : index` if we can prove that %lb, %step and %ub are
 /// divisible by N.
 static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
   AffineMap map = minOp.getAffineMap();
@@ -153,7 +153,8 @@ struct AffineMinDistributedSCFCanonicalizationPattern
       mlir::AffineMinOp minOp, mlir::PatternRewriter &rewriter) const override {
     Optional<int64_t> cst = foldAffineMin(minOp);
     if (!cst) return failure();
-    rewriter.replaceOpWithNewOp<ConstantOp>(minOp, rewriter.getIndexAttr(*cst));
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(minOp,
+                                                   rewriter.getIndexAttr(*cst));
     return failure();
   }
 };

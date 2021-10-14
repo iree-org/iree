@@ -9,9 +9,9 @@ hal.executable private @fold_block_id  {
       ordinal = 0 : index
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
-      %x = constant 112: index
-      %y = constant 42: index
-      %z = constant 1: index
+      %x = arith.constant 112: index
+      %y = arith.constant 42: index
+      %z = arith.constant 1: index
       hal.return %x, %y, %z: index, index, index
     }
     builtin.module {
@@ -28,9 +28,9 @@ hal.executable private @fold_block_id  {
   }
 }
 // CHECK-LABEL: func @fold_block_id()
-//   CHECK-DAG:   %[[C3:.+]] = constant 3
-//   CHECK-DAG:   %[[C8:.+]] = constant 8
-//   CHECK-DAG:   %[[C11:.+]] = constant 11
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3
+//   CHECK-DAG:   %[[C8:.+]] = arith.constant 8
+//   CHECK-DAG:   %[[C11:.+]] = arith.constant 11
 //   CHECK-DAG:   return %[[C3]], %[[C8]], %[[C11]]
 
 // -----
@@ -44,9 +44,9 @@ hal.executable private @fold_interface_workgroup_id  {
       ordinal = 0 : index
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
-      %x = constant 112: index
-      %y = constant 42: index
-      %z = constant 1: index
+      %x = arith.constant 112: index
+      %y = arith.constant 42: index
+      %z = arith.constant 1: index
       hal.return %x, %y, %z: index, index, index
     }
     builtin.module {
@@ -63,9 +63,9 @@ hal.executable private @fold_interface_workgroup_id  {
   }
 }
 // CHECK-LABEL: func @fold_interface_workgroup_id()
-//   CHECK-DAG:   %[[C3:.+]] = constant 3
-//   CHECK-DAG:   %[[C8:.+]] = constant 8
-//   CHECK-DAG:   %[[C11:.+]] = constant 11
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3
+//   CHECK-DAG:   %[[C8:.+]] = arith.constant 8
+//   CHECK-DAG:   %[[C11:.+]] = arith.constant 11
 //   CHECK-DAG:   return %[[C3]], %[[C8]], %[[C11]]
 
 // -----
@@ -93,9 +93,9 @@ hal.executable private @fold_thread_id  {
   }
 }
 // CHECK-LABEL: func @fold_thread_id()
-//   CHECK-DAG:   %[[C7:.+]] = constant 7
-//   CHECK-DAG:   %[[C11:.+]] = constant 11
-//   CHECK-DAG:   %[[C21:.+]] = constant 21
+//   CHECK-DAG:   %[[C7:.+]] = arith.constant 7
+//   CHECK-DAG:   %[[C11:.+]] = arith.constant 11
+//   CHECK-DAG:   %[[C21:.+]] = arith.constant 21
 //   CHECK-DAG:   return %[[C7]], %[[C11]], %[[C21]]
 
 // -----

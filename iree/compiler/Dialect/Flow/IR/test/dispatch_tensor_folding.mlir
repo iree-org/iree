@@ -1,9 +1,9 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | IreeFileCheck %s
 
 func @canonicalizeStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>) {
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %c2 = constant 2 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c2 = arith.constant 2 : index
     %0 = flow.dispatch.tensor.load %arg0, offsets=[%c0, %c0], sizes=[%c2, %c2], strides=[%c1, %c1] : !flow.dispatch.tensor<readonly:4x4xf32> -> tensor<?x?xf32>
     "test.sink"(%0) : (tensor<?x?xf32>) -> ()
     return
@@ -20,9 +20,9 @@ func @canonicalizeStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>)
 // -----
 
 func @canonicalizePartiallyStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>, %offset: index, %size: index, %stride: index) {
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %c2 = constant 2 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c2 = arith.constant 2 : index
     %0 = flow.dispatch.tensor.load %arg0, offsets=[%offset, %c0], sizes=[%size, %c2], strides=[%stride, %c1] : !flow.dispatch.tensor<readonly:4x4xf32> -> tensor<?x?xf32>
     "test.sink"(%0) : (tensor<?x?xf32>) -> ()
     return
@@ -40,7 +40,7 @@ func @canonicalizePartiallyStaticOperands(%arg0: !flow.dispatch.tensor<readonly:
 // -----
 
 func @canonicalizeDimOfTensorTile(%arg0: !flow.dispatch.tensor<readonly:250x1024xf32>, %arg1 : index, %arg2: index) {
-    %c0 = constant 0 : index
+    %c0 = arith.constant 0 : index
     %0 = affine.min affine_map<(d0) -> (64, -d0 + 250)>(%arg1)
     %1 = flow.dispatch.tensor.load %arg0, offsets = [%arg2, 0], sizes = [%0, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:250x1024xf32> -> tensor<?x1024xf32>
     %2 = tensor.dim %1, %c0 : tensor<?x1024xf32>

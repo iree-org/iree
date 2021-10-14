@@ -9,8 +9,8 @@ func @duplicate_dispatches(%cmd1 : !hal.command_buffer, %cmd2 : !hal.command_buf
   // CHECK: %[[EXE:.+]] = util.global.load @_executable
   %exe = util.global.load @_executable : !hal.executable
 
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
   hal.command_buffer.dispatch<%cmd1 : !hal.command_buffer> target(%exe : !hal.executable)[0] workgroups([%c1, %c1, %c1])
   hal.command_buffer.execution_barrier<%cmd1 : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
   hal.command_buffer.dispatch<%cmd1 : !hal.command_buffer> target(%exe : !hal.executable)[1] workgroups([%c2, %c2, %c2])

@@ -25,8 +25,8 @@ func @expandInputs(%arg0 : tensor<?x2xf32>, %arg1 : !shapex.ranked_shape<[?,?]>,
 // CHECK-LABEL: @expandResults
 // CHECK-SAME: () -> (index, index)
 func @expandResults() -> (!shapex.ranked_shape<[?,?]>) {
-  %idx0 = constant 5 : index
-  %idx1 = constant 6 : index
+  %idx0 = arith.constant 5 : index
+  %idx1 = arith.constant 6 : index
   // CHECK: %[[RS:.+]] = shapex.make_ranked_shape
   %rs = shapex.make_ranked_shape %idx0, %idx1 : (index, index) -> !shapex.ranked_shape<[?,?]>
   // CHECK-DAG: %[[CAST_IDX0:.+]] = shapex.ranked_dim %[[RS]][0]

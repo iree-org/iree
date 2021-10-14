@@ -70,6 +70,7 @@ cc_library(
         ":UtilInterfacesGen",
         ":UtilOpsGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",

@@ -29,7 +29,8 @@ class WrapEntryPointsPass
     : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<StandardOpsDialect, IREE::HAL::HALDialect,
+    registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                    IREE::HAL::HALDialect,
                     // TODO: memref is here because the **tensor** dim op was
                     // moved there for some reason. When that goes away we can
                     // drop this dependency.

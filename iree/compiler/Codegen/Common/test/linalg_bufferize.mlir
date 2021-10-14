@@ -1,11 +1,11 @@
 // RUN: iree-opt %s --iree-codegen-linalg-bufferize -canonicalize -cse -split-input-file | IreeFileCheck %s
 
 func @tile_from_tensor_load() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -52,11 +52,11 @@ hal.interface private @io  {
 // -----
 
 func @tile_from_tensor_load_inplace() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -98,11 +98,11 @@ hal.interface private @io  {
 // -----
 
 func @tile_from_tensor_load_inplace_and_copy() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -151,11 +151,11 @@ hal.interface private @io  {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @tile_from_pointwise_lhs() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -212,11 +212,11 @@ hal.interface private @io  {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @tile_from_pointwise_lhs_inplace() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -269,11 +269,11 @@ hal.interface private @io  {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @tile_from_pointwise_outs() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -328,11 +328,11 @@ hal.interface private @io  {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @tile_from_pointwise_outs_inplace() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -382,11 +382,11 @@ hal.interface private @io  {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @tile_from_matmul_outs() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -436,11 +436,11 @@ hal.interface private @io  {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @tile_from_matmul_outs_inplace() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
@@ -484,8 +484,8 @@ hal.interface private @io  {
 // -----
 
 func @bufferize_dynamic() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %4 = hal.interface.load.constant offset = 0 : index
   %5 = hal.interface.load.constant offset = 1 : index
   %6 = hal.interface.load.constant offset = 2 : index
@@ -504,11 +504,11 @@ func @bufferize_dynamic() {
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %20 = muli %workgroup_size_y, %workgroup_id_y : index
-  %21 = muli %workgroup_size_y, %workgroup_count_y : index
+  %20 = arith.muli %workgroup_size_y, %workgroup_id_y : index
+  %21 = arith.muli %workgroup_size_y, %workgroup_count_y : index
   scf.for %arg0 = %20 to %4 step %21 {
-    %22 = muli %workgroup_size_x, %workgroup_id_x : index
-    %23 = muli %workgroup_size_x, %workgroup_count_x : index
+    %22 = arith.muli %workgroup_size_x, %workgroup_id_x : index
+    %23 = arith.muli %workgroup_size_x, %workgroup_count_x : index
     scf.for %arg1 = %22 to %7 step %23 {
       %24 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg0)[%4, %workgroup_size_y]
       %25 = flow.dispatch.tensor.load %LHS, offsets = [%arg0, %c0], sizes = [%24, %5], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
@@ -564,8 +564,8 @@ hal.interface private @io  {
 // -----
 
 func @bufferize_dynamic_inplace() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %4 = hal.interface.load.constant offset = 0 : index
   %5 = hal.interface.load.constant offset = 1 : index
   %6 = hal.interface.load.constant offset = 2 : index
@@ -581,11 +581,11 @@ func @bufferize_dynamic_inplace() {
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %20 = muli %workgroup_size_y, %workgroup_id_y : index
-  %21 = muli %workgroup_size_y, %workgroup_count_y : index
+  %20 = arith.muli %workgroup_size_y, %workgroup_id_y : index
+  %21 = arith.muli %workgroup_size_y, %workgroup_count_y : index
   scf.for %arg0 = %20 to %4 step %21 {
-    %22 = muli %workgroup_size_x, %workgroup_id_x : index
-    %23 = muli %workgroup_size_x, %workgroup_count_x : index
+    %22 = arith.muli %workgroup_size_x, %workgroup_id_x : index
+    %23 = arith.muli %workgroup_size_x, %workgroup_count_x : index
     scf.for %arg1 = %22 to %7 step %23 {
       %24 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg0)[%4, %workgroup_size_y]
       %25 = flow.dispatch.tensor.load %LHS, offsets = [%arg0, %c0], sizes = [%24, %5], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
@@ -635,11 +635,11 @@ hal.interface private @io  {
 // -----
 
 func @reshape_simple() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
-  %c4 = constant 4 : index
-  %c12 = constant 12 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:12xi32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
@@ -660,11 +660,11 @@ hal.interface private @io  {
 // -----
 
 func @reshape_fused_source() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
-  %c4 = constant 4 : index
-  %c12 = constant 12 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:12xi32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
@@ -675,7 +675,7 @@ func @reshape_fused_source() {
     iterator_types = ["parallel", "parallel"]}
     ins(%3 : tensor<3x4xi32>) outs(%4 : tensor<3x4xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
-      %6 = addi %arg0, %arg0 : i32
+      %6 = arith.addi %arg0, %arg0 : i32
       linalg.yield %6 : i32
     } -> tensor<3x4xi32>
   flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
@@ -686,7 +686,7 @@ hal.interface private @io  {
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
 //       CHECK: func @reshape_fused_source()
-//       CHECK:   %[[C0:.+]] = constant 0
+//       CHECK:   %[[C0:.+]] = arith.constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<3x4xi32>
 //       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]]
@@ -697,11 +697,11 @@ hal.interface private @io  {
 // -----
 
 func @reshape_fused_source_and_copyout() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
-  %c4 = constant 4 : index
-  %c12 = constant 12 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:12xi32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = hal.interface.binding.subspan @io::@ret1[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
@@ -713,7 +713,7 @@ func @reshape_fused_source_and_copyout() {
     iterator_types = ["parallel", "parallel"]}
     ins(%4 : tensor<3x4xi32>) outs(%5 : tensor<3x4xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
-      %7 = addi %arg0, %arg0 : i32
+      %7 = arith.addi %arg0, %arg0 : i32
       linalg.yield %7 : i32
     } -> tensor<3x4xi32>
   flow.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
@@ -726,7 +726,7 @@ hal.interface private @io  {
   hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 }
 //       CHECK: func @reshape_fused_source_and_copyout()
-//       CHECK:   %[[C0:.+]] = constant 0
+//       CHECK:   %[[C0:.+]] = arith.constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<12xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@ret1[%[[C0]]] : memref<3x4xi32>
@@ -739,11 +739,11 @@ hal.interface private @io  {
 // -----
 
 func @reshape_fused_target() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
-  %c4 = constant 4 : index
-  %c12 = constant 12 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:3x4xi32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:12xi32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
@@ -753,7 +753,7 @@ func @reshape_fused_target() {
     iterator_types = ["parallel", "parallel"]}
     ins(%2 : tensor<3x4xi32>) outs(%3 : tensor<3x4xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
-      %5 = addi %arg0, %arg0 : i32
+      %5 = arith.addi %arg0, %arg0 : i32
       linalg.yield %5 : i32
     } -> tensor<3x4xi32>
   %5 = linalg.tensor_collapse_shape %4 [[0, 1]] : tensor<3x4xi32> into tensor<12xi32>
@@ -765,7 +765,7 @@ hal.interface private @io  {
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
 //       CHECK: func @reshape_fused_target()
-//       CHECK:   %[[C0:.+]] = constant 0
+//       CHECK:   %[[C0:.+]] = arith.constant 0
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]] : memref<3x4xi32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]] : memref<12xi32>
 //       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[RET0]] {{\[}}[0, 1]]
@@ -776,11 +776,11 @@ hal.interface private @io  {
 // -----
 
 func @dot_general_lowering() {
-  %cst = constant 0.000000e+00 : f32
-  %c3 = constant 3 : index
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c1 = constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c3 = arith.constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x1x2xf32>
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:2x3xf32>
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:1x3xf32>
@@ -792,11 +792,11 @@ func @dot_general_lowering() {
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %5 = muli %workgroup_size_y, %workgroup_id_y : index
-  %6 = muli %workgroup_size_y, %workgroup_count_y : index
+  %5 = arith.muli %workgroup_size_y, %workgroup_id_y : index
+  %6 = arith.muli %workgroup_size_y, %workgroup_count_y : index
   scf.for %arg0 = %5 to %c1 step %6 {
-    %7 = muli %workgroup_size_x, %workgroup_id_x : index
-    %8 = muli %workgroup_size_x, %workgroup_count_x : index
+    %7 = arith.muli %workgroup_size_x, %workgroup_id_x : index
+    %8 = arith.muli %workgroup_size_x, %workgroup_count_x : index
     scf.for %arg1 = %7 to %c3 step %8 {
       %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1)>(%arg0)[%workgroup_size_y]
       %10 = tensor.extract_slice %4[%arg0, 0] [%9, 2] [1, 1] : tensor<1x2xf32> to tensor<?x2xf32>
@@ -833,7 +833,7 @@ hal.interface private @io  {
 // -----
 
 func @slice() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %2 = hal.interface.load.constant offset = 0 : index
   %3 = hal.interface.load.constant offset = 1 : index
   %4 = hal.interface.load.constant offset = 2 : index
@@ -858,7 +858,7 @@ hal.interface private @io  {
 // -----
 
 func @slice_rank_reducing() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %2 = hal.interface.load.constant offset = 0 : index
   %3 = hal.interface.load.constant offset = 1 : index
   %4 = hal.interface.load.constant offset = 2 : index
@@ -884,7 +884,7 @@ hal.interface private @io  {
 // -----
 
 func @slice_multiple_copy() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %3 = hal.interface.load.constant offset = 0 : index
   %4 = hal.interface.load.constant offset = 1 : index
   %5 = hal.interface.load.constant offset = 2 : index
@@ -923,7 +923,7 @@ hal.interface private @io  {
 // -----
 
 func @slice_in_place() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %2 = hal.interface.load.constant offset = 0 : index
   %3 = hal.interface.load.constant offset = 1 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readwrite:?x?xi32>{%2, %3}
@@ -941,7 +941,7 @@ hal.interface private @io  {
 // -----
 
 func @slice_whole_stride_dispatch_0() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %dim0 = hal.interface.load.constant offset = 0 : index
   %dim1 = hal.interface.load.constant offset = 1 : index
   %dim2 = hal.interface.load.constant offset = 2 : index
@@ -966,8 +966,8 @@ hal.interface private @io  {
 // -----
 
 func @subtensor_insert() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %dim0 = hal.interface.load.constant offset = 0 : index
   %dim1 = hal.interface.load.constant offset = 1 : index
   %dim2 = hal.interface.load.constant offset = 2 : index
@@ -991,8 +991,8 @@ hal.interface private @io  {
   hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @subtensor_insert()
-//   CHECK-DAG:   %[[C0:.+]] = constant 0
-//   CHECK-DAG:   %[[C1:.+]] = constant 1
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
@@ -1005,7 +1005,7 @@ hal.interface private @io  {
 // -----
 
 func @tensor_extract() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:i32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x9xi32>
   %2 = linalg.init_tensor [3, 9] : tensor<3x9xi32>
@@ -1028,7 +1028,7 @@ hal.interface private @io  {
 // -----
 
 func @load_to_store() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:3x4xi32>
   %3 = flow.dispatch.tensor.load %2, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
@@ -1049,14 +1049,14 @@ hal.interface private @io  {
 // -----
 
 func @constant() {
-  %c0 = constant 0 : index
-  %cst = constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
   %0 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:2x2x3xi32>
   flow.dispatch.tensor.store %cst, %0, offsets = [], sizes = [], strides = [] : tensor<2x2x3xi32> -> !flow.dispatch.tensor<writeonly:2x2x3xi32>
   return
 }
 // CHECK-LABEL: func @constant()
-//       CHECK:   %[[CST:.+]] = constant {{.+}} : tensor<2x2x3xi32>
+//       CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<2x2x3xi32>
 //       CHECK:   %[[MEMREF:.+]] = memref.buffer_cast %[[CST]] : memref<2x2x3xi32>
 //       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan @io::@ret0
 //       CHECK:   linalg.copy(%[[MEMREF]], %[[RESULT]])
@@ -1064,11 +1064,11 @@ func @constant() {
 // -----
 
 func @rhs_non_splat_constant() {
-  %c0 = constant 0 : index
-  %cst = constant dense<[[0.706495285, -0.567672312, 0.483717591, 0.522725761, 0.7563259], [-0.0899272263, -0.283501834, -0.350822538, -0.351515919, -0.337136656], [-0.451804549, 0.372324884, -0.620518147, 0.235451385, 0.851095855]]> : tensor<3x5xf32>
-  %cst_0 = constant 0.000000e+00 : f32
-  %c5 = constant 5 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant dense<[[0.706495285, -0.567672312, 0.483717591, 0.522725761, 0.7563259], [-0.0899272263, -0.283501834, -0.350822538, -0.351515919, -0.337136656], [-0.451804549, 0.372324884, -0.620518147, 0.235451385, 0.851095855]]> : tensor<3x5xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c5 = arith.constant 5 : index
+  %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x5x3x1xf32>
   %1 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:5x5xf32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x5x3x1xf32> -> tensor<1x5x3x1xf32>
@@ -1102,7 +1102,7 @@ hal.interface private @io  {
   hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @rhs_non_splat_constant
-//   CHECK-DAG:   %[[CONSTANT:.+]] = constant {{.+}} : tensor<3x5xf32>
+//   CHECK-DAG:   %[[CONSTANT:.+]] = arith.constant {{.+}} : tensor<3x5xf32>
 //   CHECK-DAG:   %[[RHS:.+]] = memref.buffer_cast %[[CONSTANT]]
 //   CHECK-DAG:   %[[LHS_INPUT:.+]] = hal.interface.binding.subspan @io::@arg0[%{{.+}}] : memref<1x5x3x1xf32>
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @io::@ret0[%{{.+}}] : memref<5x5xf32>
@@ -1120,8 +1120,8 @@ hal.interface private @io  {
 // -----
 
 func @gather() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %dim0 = hal.interface.load.constant offset = 0 : index
   %dim1 = hal.interface.load.constant offset = 1 : index
   %dim2 = hal.interface.load.constant offset = 2 : index
@@ -1138,7 +1138,7 @@ func @gather() {
   %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<?xi32>) outs(%3 : tensor<?x?xf32>) {
   ^bb0( %arg2: i32, %arg3: f32):  // no predecessors
     %iv1 = linalg.index 1 : index
-    %8 = index_cast %arg2 : i32 to index
+    %8 = arith.index_cast %arg2 : i32 to index
     %9 = tensor.extract %4[%8, %iv1] : tensor<?x?xf32>
     linalg.yield %9 : f32
   } -> tensor<?x?xf32>
@@ -1161,9 +1161,9 @@ hal.interface private @io  {
 // -----
 
 func @pooling_nhwc_sum() {
-  %c2 = constant 2 : index
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan @io::@ro0[%c0] : !flow.dispatch.tensor<readonly:f32>
   %1 = hal.interface.binding.subspan @io::@ro1[%c0] : !flow.dispatch.tensor<readonly:1x4x6x1xf32>
   %2 = hal.interface.binding.subspan @io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
@@ -1202,8 +1202,8 @@ hal.interface private @io  {
 // -----
 
 func @read_only_subtensor() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %pc0 = hal.interface.load.constant offset = 0 : index
   %pc1 = hal.interface.load.constant offset = 1 : index
   %pc2 = hal.interface.load.constant offset = 2 : index
@@ -1246,9 +1246,9 @@ func @read_only_subtensor() {
       %23 = linalg.init_tensor [%21, %22] : tensor<?x?xf32>
       %24 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%11, %14, %17, %20 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>) outs(%23 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32, %arg5: f32, %arg6: f32):  // no predecessors
-        %25 = mulf %arg4, %arg5 : f32
-        %26 = mulf %arg2, %arg3 : f32
-        %27 = addf %26, %25 : f32
+        %25 = arith.mulf %arg4, %arg5 : f32
+        %26 = arith.mulf %arg2, %arg3 : f32
+        %27 = arith.addf %26, %25 : f32
         %28 = math.sqrt %27 : f32
         linalg.yield %28 : f32
       } -> tensor<?x?xf32>
@@ -1277,7 +1277,7 @@ func @read_only_subtensor() {
 // -----
 
 func @reshape_read_only() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %dim0 = hal.interface.load.constant offset = 0 : index
   %dim1 = hal.interface.load.constant offset = 1 : index
   %dim2 = hal.interface.load.constant offset = 2 : index
@@ -1293,7 +1293,7 @@ func @reshape_read_only() {
       iterator_types = ["parallel"]}
       ins(%3 : tensor<?xf32>) outs(%5 : tensor<?xf32>) {
       ^bb0(%arg0 : f32, %arg1 : f32):
-         %7 = addf %arg0, %arg0 : f32
+         %7 = arith.addf %arg0, %arg0 : f32
          linalg.yield %7 : f32
       } -> tensor<?xf32>
   flow.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = []: tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>
@@ -1310,7 +1310,7 @@ func @reshape_read_only() {
 // -----
 
 func @use_buffer_for_operand_when_output_tensor_not_used() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
 
   %input_subspan = hal.interface.binding.subspan @interface_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:1x225x225x16xf32>
   %filter_subspan = hal.interface.binding.subspan @interface_io::@ro1[%c0] : !flow.dispatch.tensor<readonly:3x3x16x32xf32>
@@ -1321,7 +1321,7 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
   %filter = flow.dispatch.tensor.load %filter_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
   %offset = flow.dispatch.tensor.load %offset_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
 
-  %cst = constant 0.0 : f32
+  %cst = arith.constant 0.0 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
   %2 = linalg.conv_2d_nhwc_hwcf
@@ -1338,7 +1338,7 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
          ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
          outs(%0 : tensor<1x112x112x32xf32>) {
          ^bb0(%a: f32, %b: f32, %c: f32):
-            %sub = subf %a, %b : f32
+            %sub = arith.subf %a, %b : f32
             linalg.yield %sub : f32
          } -> tensor<1x112x112x32xf32>
   flow.dispatch.tensor.store %3, %output_subspan, offsets = [], sizes = [], strides = [] : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
@@ -1366,7 +1366,7 @@ hal.interface private @interface_io  {
 // -----
 
 func @dont_use_buffer_for_operand_when_output_tensor_used() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
 
   %input_subspan = hal.interface.binding.subspan @interface_io::@ro0[%c0] : !flow.dispatch.tensor<readonly:1x225x225x16xf32>
   %filter_subspan = hal.interface.binding.subspan @interface_io::@ro1[%c0] : !flow.dispatch.tensor<readonly:3x3x16x32xf32>
@@ -1377,8 +1377,8 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
   %filter = flow.dispatch.tensor.load %filter_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
   %offset = flow.dispatch.tensor.load %offset_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
 
-  %cst0 = constant 0.0 : f32
-  %cst1 = constant 1.0 : f32
+  %cst0 = arith.constant 0.0 : f32
+  %cst1 = arith.constant 1.0 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst0, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
   %2 = linalg.conv_2d_nhwc_hwcf
@@ -1396,8 +1396,8 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
          ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
          outs(%3 : tensor<1x112x112x32xf32>) {
          ^bb0(%a: f32, %b: f32, %c: f32):
-            %sub = subf %a, %b : f32
-            %add = addf %sub, %c : f32
+            %sub = arith.subf %a, %b : f32
+            %add = arith.addf %sub, %c : f32
             linalg.yield %add : f32
          } -> tensor<1x112x112x32xf32>
   flow.dispatch.tensor.store %4, %output_subspan, offsets = [], sizes = [], strides = []: tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
@@ -1418,10 +1418,10 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
 // -----
 
 func @bufferize_cst_output_tensor() {
-  %c0 = constant 0 : index
-  %cst1 = constant dense<-2147483648> : tensor<i32>
-  %zero = constant 0.000000e+00 : f32
-  %cst5 = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  %c0 = arith.constant 0 : index
+  %cst1 = arith.constant dense<-2147483648> : tensor<i32>
+  %zero = arith.constant 0.000000e+00 : f32
+  %cst5 = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
   %input = hal.interface.binding.subspan @io::@ro0[%c0] : !flow.dispatch.tensor<readonly:5xf32>
   %output = hal.interface.binding.subspan @io::@wo1[%c0] : !flow.dispatch.tensor<writeonly:i32>
   %1 = flow.dispatch.tensor.load %input, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:5xf32> -> tensor<5xf32>
@@ -1431,10 +1431,10 @@ func @bufferize_cst_output_tensor() {
          ins(%1, %cst5 : tensor<5xf32>, tensor<5xi32>)
          outs(%cst1 : tensor<i32>) {
   ^bb0(%arg0: f32, %arg1: i32, %arg2: i32):
-    %8 = cmpf oeq, %arg0, %zero : f32
-    %9 = zexti %8 : i1 to i32
-    %10 = muli %9, %arg1 : i32
-    %11 = cmpi sgt, %10, %arg2 : i32
+    %8 = arith.cmpf oeq, %arg0, %zero : f32
+    %9 = arith.extui %8 : i1 to i32
+    %10 = arith.muli %9, %arg1 : i32
+    %11 = arith.cmpi sgt, %10, %arg2 : i32
     %12 = select %11, %10, %arg2 : i32
     linalg.yield %12 : i32
   } -> tensor<i32>
@@ -1449,8 +1449,8 @@ hal.interface private @interface_io  {
 
 // CHECK-LABEL: func @bufferize_cst_output_tensor()
 
-//       CHECK-DAG: %[[CST1:.+]] = constant dense<-2147483648> : tensor<i32>
-//       CHECK-DAG: %[[CST5:.+]] = constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+//       CHECK-DAG: %[[CST1:.+]] = arith.constant dense<-2147483648> : tensor<i32>
+//       CHECK-DAG: %[[CST5:.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
 //       CHECK: %[[CAST1:.+]] = memref.buffer_cast %[[CST1]] : memref<i32>
 //       CHECK: %[[CAST5:.+]] = memref.buffer_cast %[[CST5]] : memref<5xi32>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan @io::@ro0[%c0] : memref<5xf32>
@@ -1463,12 +1463,12 @@ hal.interface private @interface_io  {
 // -----
 
 func @cast_follwed_by_store() {
-  %c0 = constant 0 : index
-  %cst = constant 0.000000e+00 : f32
-  %c4 = constant 4 : index
-  %c64 = constant 64 : index
-  %c1 = constant 1 : index
-  %c32 = constant 32 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c4 = arith.constant 4 : index
+  %c64 = arith.constant 64 : index
+  %c1 = arith.constant 1 : index
+  %c32 = arith.constant 32 : index
   %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x32x1024xf32>
   %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x1024x64xf32>
   %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4x32x64xf32>
@@ -1499,7 +1499,7 @@ func @cast_follwed_by_store() {
 }
 
 // CHECK-LABEL: func @cast_follwed_by_store()
-//   CHECK-DAG: %[[ZERO:.+]] = constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
 //   CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<4x32x1024xf32>
 //   CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4x1024x64xf32>
 //   CHECK-DAG: %[[RESULT:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<4x32x64xf32>
@@ -1512,9 +1512,9 @@ func @cast_follwed_by_store() {
 // -----
 
 func @rank_reduced_subtensor_insert() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
   %dim0 = hal.interface.load.constant offset = 0 : index
   %dim1 = hal.interface.load.constant offset = 1 : index
   %dim2 = hal.interface.load.constant offset = 2 : index
@@ -1546,11 +1546,11 @@ hal.interface private @io  {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func @bufferize_transfer_op() {
-  %c3 = constant 3 : index
-  %cst = constant 0.000000e+00 : f32
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c1 = constant 1 : index
+  %c3 = arith.constant 3 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:2x3xf32>
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:3x4xf32>
   %2 = hal.interface.binding.subspan @io::@arg2[%c0] : !flow.dispatch.tensor<readonly:2x4xf32>
@@ -1608,11 +1608,11 @@ hal.interface private @io  {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func @bufferize_transfer_op_inplace() {
-  %c3 = constant 3 : index
-  %cst = constant 0.000000e+00 : f32
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c1 = constant 1 : index
+  %c3 = arith.constant 3 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:2x3xf32>
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:3x4xf32>
   %3 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<readwrite:2x4xf32>
@@ -1664,11 +1664,11 @@ hal.interface private @io  {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @multi_result() {
-  %c0 = constant 0 : index
-  %c2 = constant 2 : index
-  %c4 = constant 4 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
   %dim0 = hal.interface.load.constant offset = 0 : index
   %dim1 = hal.interface.load.constant offset = 1 : index
   %dim2 = hal.interface.load.constant offset = 2 : index
@@ -1691,10 +1691,10 @@ func @multi_result() {
   %11 = hal.interface.workgroup.count[1] : index
   %12 = hal.interface.workgroup.size[0] : index
   %13 = hal.interface.workgroup.size[1] : index
-  %14 = muli %9, %13 : index
-  %15 = muli %11, %13 : index
-  %16 = muli %8, %12 : index
-  %17 = muli %10, %12 : index
+  %14 = arith.muli %9, %13 : index
+  %15 = arith.muli %11, %13 : index
+  %16 = arith.muli %8, %12 : index
+  %17 = arith.muli %10, %12 : index
   scf.for %arg0 = %14 to %4 step %15 {
     scf.for %arg1 = %16 to %5 step %17 {
       %18 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg0)[%4, %13]
@@ -1706,8 +1706,8 @@ func @multi_result() {
         ins(%20, %21 : tensor<?x?xf32>, tensor<?x?xf32>)
         outs(%shape, %shape : tensor<?x?xf32>, tensor<?x?xf32>) {
         ^bb0(%arg2: f32, %arg3 : f32, %arg4 : f32, %arg5 : f32):  // no predecessors
-          %23 = mulf %arg2, %arg3 : f32
-          %24 = addf %arg2, %arg3 : f32
+          %23 = arith.mulf %arg2, %arg3 : f32
+          %24 = arith.addf %arg2, %arg3 : f32
           linalg.yield %23, %24 : f32, f32
         } -> (tensor<?x?xf32>, tensor<?x?xf32>)
       flow.dispatch.tensor.store %22#0, %2, offsets = [%arg0, %arg1], sizes = [%18, %19], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
@@ -1741,11 +1741,11 @@ hal.interface private @io  {
 #map1 = affine_map<()[s0] -> (s0 * 16)>
 module  {
   func @padded_matmul() {
-    %c0 = constant 0 : index
-    %c12544 = constant 12544 : index
-    %c64 = constant 64 : index
-    %c16 = constant 16 : index
-    %cst = constant 0.000000e+00 : f32
+    %c0 = arith.constant 0 : index
+    %c12544 = arith.constant 12544 : index
+    %c64 = arith.constant 64 : index
+    %c16 = arith.constant 16 : index
+    %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:12544x27xf32>
     %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:27x16xf32>
     %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:12544x16xf32>
@@ -1783,7 +1783,7 @@ module  {
 // CHECK-LABEL: func @padded_matmul()
 // CHECK-DAG: %[[LHS_PADDED:.+]] = memref.alloc() : memref<64x32xf32>
 // CHECK-DAG: %[[RHS_PADDED:.+]] = memref.alloc() : memref<32x16xf32>
-// CHECK-DAG: %[[C0:.+]] = constant 0.000000e+00 : f32
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<12544x27xf32>
 // CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<27x16xf32>
 // CHECK-DAG: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<12544x16xf32>
@@ -1802,10 +1802,10 @@ module  {
 // -----
 
 func @dot_general_padded() {
-  %c0 = constant 0 : index
-  %c3 = constant 3 : index
-  %c1 = constant 1 : index
-  %cst = constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c3 = arith.constant 3 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
   %m = hal.interface.load.constant offset = 0 : index
   %n = hal.interface.load.constant offset = 1 : index
   %k = hal.interface.load.constant offset = 2 : index
@@ -1882,12 +1882,12 @@ hal.interface private @io  {
 // -----
 
 func @im2col() {
-  %c0 = constant 0 : index
-  %cst = constant 0.000000e+00 : f32
-  %c112 = constant 112 : index
-  %c32 = constant 32 : index
-  %c16 = constant 16 : index
-  %c4 = constant 4 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c112 = arith.constant 112 : index
+  %c32 = arith.constant 32 : index
+  %c16 = arith.constant 16 : index
+  %c4 = arith.constant 4 : index
   %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
   %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:3x3x8x32xf32>
   %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
@@ -1965,10 +1965,10 @@ hal.interface private @io  {
 // -----
 
 func @multi_result_reduce() {
-  %c0 = constant 0 : index
-  %c0_i32 = constant 0 : i32
-  %c-2147483648_i32 = constant -2147483648 : i32
-  %c2 = constant 2 : index
+  %c0 = arith.constant 0 : index
+  %c0_i32 = arith.constant 0 : i32
+  %c-2147483648_i32 = arith.constant -2147483648 : i32
+  %c2 = arith.constant 2 : index
   %d0 = hal.interface.load.constant offset = 0 : index
   %d1 = hal.interface.load.constant offset = 1 : index
   %d2 = hal.interface.load.constant offset = 2 : index
@@ -1989,10 +1989,10 @@ func @multi_result_reduce() {
     %17 = linalg.fill(%c0_i32, %13) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} : i32, tensor<?xi32> -> tensor<?xi32>
     %18:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%7, %9 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%14, %17 : tensor<?xi32>, tensor<?xi32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} {
     ^bb0(%arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32):  // no predecessors
-      %19 = cmpi sge, %arg1, %arg3 : i32
+      %19 = arith.cmpi sge, %arg1, %arg3 : i32
       %20 = select %19, %arg1, %arg3 : i32
-      %21 = cmpi eq, %arg1, %arg3 : i32
-      %22 = cmpi slt, %arg2, %arg4 : i32
+      %21 = arith.cmpi eq, %arg1, %arg3 : i32
+      %22 = arith.cmpi slt, %arg2, %arg4 : i32
       %23 = select %22, %arg2, %arg4 : i32
       %24 = select %19, %arg2, %arg4 : i32
       %25 = select %21, %23, %24 : i32
@@ -2038,14 +2038,14 @@ hal.interface private @io  {
 #map6 = affine_map<(d0, d1) -> (32, d0 - d1)>
 module  {
   func @l1_tiled_matmul_no_fill() {
-    %cst = constant 0.000000e+00 : f32
-    %c32 = constant 32 : index
-    %c24 = constant 24 : index
-    %c144 = constant 144 : index
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %c250 = constant 250 : index
-    %c370 = constant 370 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %c32 = arith.constant 32 : index
+    %c24 = arith.constant 24 : index
+    %c144 = arith.constant 144 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c250 = arith.constant 250 : index
+    %c370 = arith.constant 370 : index
     %0 = hal.interface.binding.subspan @io::@ro1[%c0] : !flow.dispatch.tensor<readonly:250x144xf32>
     %1 = hal.interface.binding.subspan @io::@ro2[%c0] : !flow.dispatch.tensor<readonly:144x370xf32>
     %init = hal.interface.binding.subspan @io::@ro3[%c0] : !flow.dispatch.tensor<readonly:250x370xf32>
@@ -2100,11 +2100,11 @@ module  {
 }
 
 // CHECK-LABEL: l1_tiled_matmul_no_fill
-//    CHECK-DAG: %[[M:.+]] = constant 250 : index
-//    CHECK-DAG: %[[N:.+]] = constant 370 : index
-//    CHECK-DAG: %[[K:.+]] = constant 144 : index
-//    CHECK-DAG: %[[L1_MN_SIZE:.+]] = constant 32 : index
-//    CHECK-DAG: %[[L1_K_SIZE:.+]] = constant 24 : index
+//    CHECK-DAG: %[[M:.+]] = arith.constant 250 : index
+//    CHECK-DAG: %[[N:.+]] = arith.constant 370 : index
+//    CHECK-DAG: %[[K:.+]] = arith.constant 144 : index
+//    CHECK-DAG: %[[L1_MN_SIZE:.+]] = arith.constant 32 : index
+//    CHECK-DAG: %[[L1_K_SIZE:.+]] = arith.constant 24 : index
 //    CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan @io::@ro1[%{{.*}}] : memref<250x144xf32>
 //    CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan @io::@ro2[%{{.*}}] : memref<144x370xf32>
 //    CHECK-DAG: %[[INIT:.+]] = hal.interface.binding.subspan @io::@ro3[%{{.*}}] : memref<250x370xf32>
@@ -2144,14 +2144,14 @@ module  {
 #map6 = affine_map<(d0, d1) -> (32, d0 - d1)>
 module  {
   func @l1_tiled_matmul_no_fill_readwrite() {
-    %cst = constant 0.000000e+00 : f32
-    %c32 = constant 32 : index
-    %c24 = constant 24 : index
-    %c144 = constant 144 : index
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %c250 = constant 250 : index
-    %c370 = constant 370 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %c32 = arith.constant 32 : index
+    %c24 = arith.constant 24 : index
+    %c144 = arith.constant 144 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c250 = arith.constant 250 : index
+    %c370 = arith.constant 370 : index
     %0 = hal.interface.binding.subspan @io::@ro1[%c0] : !flow.dispatch.tensor<readonly:250x144xf32>
     %1 = hal.interface.binding.subspan @io::@ro2[%c0] : !flow.dispatch.tensor<readonly:144x370xf32>
     %2 = hal.interface.binding.subspan @io::@wo[%c0] : !flow.dispatch.tensor<readwrite:250x370xf32>
@@ -2204,11 +2204,11 @@ module  {
 }
 
 // CHECK-LABEL: l1_tiled_matmul_no_fill_readwrite
-//    CHECK-DAG: %[[M:.+]] = constant 250 : index
-//    CHECK-DAG: %[[N:.+]] = constant 370 : index
-//    CHECK-DAG: %[[K:.+]] = constant 144 : index
-//    CHECK-DAG: %[[L1_MN_SIZE:.+]] = constant 32 : index
-//    CHECK-DAG: %[[L1_K_SIZE:.+]] = constant 24 : index
+//    CHECK-DAG: %[[M:.+]] = arith.constant 250 : index
+//    CHECK-DAG: %[[N:.+]] = arith.constant 370 : index
+//    CHECK-DAG: %[[K:.+]] = arith.constant 144 : index
+//    CHECK-DAG: %[[L1_MN_SIZE:.+]] = arith.constant 32 : index
+//    CHECK-DAG: %[[L1_K_SIZE:.+]] = arith.constant 24 : index
 //    CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan @io::@ro1[%{{.*}}] : memref<250x144xf32>
 //    CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan @io::@ro2[%{{.*}}] : memref<144x370xf32>
 //    CHECK-DAG: %[[DST:.+]] = hal.interface.binding.subspan @io::@wo[%{{.*}}] : memref<250x370xf32>
@@ -2244,14 +2244,14 @@ module  {
 #map6 = affine_map<(d0, d1) -> (32, d0 - d1)>
 module  {
   func @l1_tiled_matmul() {
-    %cst = constant 0.000000e+00 : f32
-    %c32 = constant 32 : index
-    %c24 = constant 24 : index
-    %c144 = constant 144 : index
-    %c0 = constant 0 : index
-    %c1 = constant 1 : index
-    %c250 = constant 250 : index
-    %c370 = constant 370 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %c32 = arith.constant 32 : index
+    %c24 = arith.constant 24 : index
+    %c144 = arith.constant 144 : index
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c250 = arith.constant 250 : index
+    %c370 = arith.constant 370 : index
     %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:250x144xf32>
     %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:144x370xf32>
     %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:250x370xf32>
@@ -2305,11 +2305,11 @@ module  {
 }
 
 // CHECK-LABEL: l1_tiled_matmul
-//    CHECK-DAG: %[[M:.+]] = constant 250 : index
-//    CHECK-DAG: %[[N:.+]] = constant 370 : index
-//    CHECK-DAG: %[[K:.+]] = constant 144 : index
-//    CHECK-DAG: %[[L1_MN_SIZE:.+]] = constant 32 : index
-//    CHECK-DAG: %[[L1_K_SIZE:.+]] = constant 24 : index
+//    CHECK-DAG: %[[M:.+]] = arith.constant 250 : index
+//    CHECK-DAG: %[[N:.+]] = arith.constant 370 : index
+//    CHECK-DAG: %[[K:.+]] = arith.constant 144 : index
+//    CHECK-DAG: %[[L1_MN_SIZE:.+]] = arith.constant 32 : index
+//    CHECK-DAG: %[[L1_K_SIZE:.+]] = arith.constant 24 : index
 //    CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%{{.*}}] : memref<250x144xf32>
 //    CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%{{.*}}] : memref<144x370xf32>
 //    CHECK-DAG: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%{{.*}}] : memref<250x370xf32>
@@ -2335,19 +2335,19 @@ module  {
 // -----
 
 func @sort1D() {
-  %c4 = constant 4 : index
-  %c3 = constant 3 : index
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c3 = arith.constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan @io::@ro[%c0] : !flow.dispatch.tensor<readonly:4xi32>
   %1 = hal.interface.binding.subspan @io::@wo[%c0] : !flow.dispatch.tensor<writeonly:4xi32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
   %3 = scf.for %arg0 = %c0 to %c4 step %c1 iter_args(%arg1 = %2) -> (tensor<4xi32>) {
     %4 = scf.for %arg2 = %c0 to %c3 step %c1 iter_args(%arg3 = %arg1) -> (tensor<4xi32>) {
-      %5 = addi %arg2, %c1 : index
+      %5 = arith.addi %arg2, %c1 : index
       %6 = tensor.extract %arg3[%arg2] : tensor<4xi32>
       %7 = tensor.extract %arg3[%5] : tensor<4xi32>
-      %8 = cmpi sgt, %6, %7 : i32
+      %8 = arith.cmpi sgt, %6, %7 : i32
       %11 = scf.if %8 -> (tensor<4xi32>) {
         %12 = tensor.insert %6 into %arg3[%5] : tensor<4xi32>
         %13 = tensor.insert %7 into %12[%arg2] : tensor<4xi32>
@@ -2372,7 +2372,7 @@ hal.interface private @io  {
 //       CHECK:   linalg.copy(%[[INPUT]], %[[OUTPUT]])
 //       CHECK:   scf.for %[[ARG0:.+]] =
 //       CHECK:     scf.for %[[ARG1:.+]] =
-//   CHECK-DAG:       %[[P1:.+]] = addi %[[ARG1]]
+//   CHECK-DAG:       %[[P1:.+]] = arith.addi %[[ARG1]]
 //   CHECK-DAG:       %[[V1:.+]] = memref.load %[[OUTPUT]][%[[ARG1]]]
 //   CHECK-DAG:       %[[V2:.+]] = memref.load %[[OUTPUT]][%[[P1]]]
 //       CHECK:       scf.if
@@ -2383,18 +2383,18 @@ hal.interface private @io  {
 // -----
 
 func @sort1D_inplace() {
-  %c4 = constant 4 : index
-  %c3 = constant 3 : index
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c3 = arith.constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan @io::@rw[%c0] : !flow.dispatch.tensor<readwrite:4xi32>
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:4xi32> -> tensor<4xi32>
   %3 = scf.for %arg0 = %c0 to %c4 step %c1 iter_args(%arg1 = %2) -> (tensor<4xi32>) {
     %4 = scf.for %arg2 = %c0 to %c3 step %c1 iter_args(%arg3 = %arg1) -> (tensor<4xi32>) {
-      %5 = addi %arg2, %c1 : index
+      %5 = arith.addi %arg2, %c1 : index
       %6 = tensor.extract %arg3[%arg2] : tensor<4xi32>
       %7 = tensor.extract %arg3[%5] : tensor<4xi32>
-      %8 = cmpi sgt, %6, %7 : i32
+      %8 = arith.cmpi sgt, %6, %7 : i32
       %11 = scf.if %8 -> (tensor<4xi32>) {
         %12 = tensor.insert %6 into %arg3[%5] : tensor<4xi32>
         %13 = tensor.insert %7 into %12[%arg2] : tensor<4xi32>
@@ -2416,7 +2416,7 @@ hal.interface private @io  {
 //   CHECK-DAG:   %[[INOUT:.+]] = hal.interface.binding.subspan @io::@rw
 //       CHECK:   scf.for %[[ARG0:.+]] =
 //       CHECK:     scf.for %[[ARG1:.+]] =
-//   CHECK-DAG:       %[[P1:.+]] = addi %[[ARG1]]
+//   CHECK-DAG:       %[[P1:.+]] = arith.addi %[[ARG1]]
 //   CHECK-DAG:       %[[V1:.+]] = memref.load %[[INOUT]][%[[ARG1]]]
 //   CHECK-DAG:       %[[V2:.+]] = memref.load %[[INOUT]][%[[P1]]]
 //       CHECK:       scf.if
@@ -2426,12 +2426,12 @@ hal.interface private @io  {
 // -----
 
 func @linalg_ext_sort_1d() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan @io::@rw[%c0] : !flow.dispatch.tensor<readwrite:128xi32>
   %1 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:128xi32> -> tensor<128xi32>
   %2 = linalg_ext.sort dimension(0) outs(%1 : tensor<128xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
-    %3 = cmpi sgt, %arg0, %arg1 : i32
+    %3 = arith.cmpi sgt, %arg0, %arg1 : i32
     linalg_ext.yield %3 : i1
   } -> tensor<128xi32>
   flow.dispatch.tensor.store %2, %0, offsets = [], sizes = [], strides = [] : tensor<128xi32> -> !flow.dispatch.tensor<readwrite:128xi32>
@@ -2446,7 +2446,7 @@ func @linalg_ext_sort_1d() {
 // -----
 
 builtin.func @tensor_insert_slice() {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %1 = hal.interface.load.constant offset = 0 : index
   %2 = hal.interface.load.constant offset = 1 : index
   %d0 = hal.interface.load.constant offset = 2 : index
@@ -2499,9 +2499,9 @@ hal.interface @io attributes {push_constants = 2 : index, sym_visibility = "priv
 // -----
 
 builtin.func @dynamic_update_slice() {
-  %c0 = constant 0 : index
-  %c3 = constant 3 : index
-  %c0_i32 = constant 0 : i32
+  %c0 = arith.constant 0 : index
+  %c3 = arith.constant 3 : index
+  %c0_i32 = arith.constant 0 : i32
   %d0 = hal.interface.load.constant offset = 0 : index
   %d1 = hal.interface.load.constant offset = 1 : index
   %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:?xi32>{%d0}
@@ -2509,11 +2509,11 @@ builtin.func @dynamic_update_slice() {
   %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>{%d1, %d0}
   %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
   %4 = tensor.extract %3[] : tensor<i32>
-  %5 = cmpi slt, %4, %c0_i32 : i32
+  %5 = arith.cmpi slt, %4, %c0_i32 : i32
   %6 = select %5, %4, %c0_i32 : i32
-  %7 = cmpi sgt, %6, %c0_i32 : i32
+  %7 = arith.cmpi sgt, %6, %c0_i32 : i32
   %8 = select %7, %6, %c0_i32 : i32
-  %9 = index_cast %8 : i32 to index
+  %9 = arith.index_cast %8 : i32 to index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
@@ -2546,11 +2546,11 @@ hal.interface @io attributes {sym_visibility = "private"} {
 // -----
 
 func @multi_level_tile_fuse() {
-  %c4 = constant 4 : index
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %cst = constant 0.000000e+00 : f32
+  %c4 = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %cst = arith.constant 0.000000e+00 : f32
   %m = hal.interface.load.constant offset = 0 : index
   %n = hal.interface.load.constant offset = 1 : index
   %k = hal.interface.load.constant offset = 2 : index
@@ -2605,7 +2605,7 @@ func @multi_level_tile_fuse() {
       }
       %19 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> ()>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4, %18 : tensor<f32>, tensor<?x?xf32>) outs(%11 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
-        %20 = addf %arg2, %arg3 : f32
+        %20 = arith.addf %arg2, %arg3 : f32
         linalg.yield %20 : f32
       } -> tensor<?x?xf32>
       flow.dispatch.tensor.store %19, %3, offsets = [%arg0, %arg1], sizes = [%9, %10], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
@@ -2620,7 +2620,7 @@ hal.interface private @io {
   hal.interface.binding @arg3, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @multi_level_tile_fuse()
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[M:.+]] = hal.interface.load.constant offset = 0
 //   CHECK-DAG:   %[[N:.+]] = hal.interface.load.constant offset = 1
 //   CHECK-DAG:   %[[K:.+]] = hal.interface.load.constant offset = 2
@@ -2652,11 +2652,11 @@ hal.interface private @io {
 // -----
 
 func @operand_fusion() {
-  %c4 = constant 4 : index
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %cst = constant 0.000000e+00 : f32
+  %c4 = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %cst = arith.constant 0.000000e+00 : f32
   %m = hal.interface.load.constant offset = 0 : index
   %n = hal.interface.load.constant offset = 1 : index
   %k = hal.interface.load.constant offset = 2 : index
@@ -2689,7 +2689,7 @@ func @operand_fusion() {
           outs(%17: tensor<?x?xf32>) -> tensor<?x?xf32>
       %19 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> ()>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4, %18 : tensor<f32>, tensor<?x?xf32>) outs(%11 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
-        %20 = addf %arg2, %arg3 : f32
+        %20 = arith.addf %arg2, %arg3 : f32
         linalg.yield %20 : f32
       } -> tensor<?x?xf32>
       flow.dispatch.tensor.store %19, %3, offsets = [%arg0, %arg1], sizes = [%9, %10], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
@@ -2704,7 +2704,7 @@ hal.interface private @io {
   hal.interface.binding @arg3, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
 }
 // CHECK-LABEL: func @operand_fusion()
-//   CHECK-DAG:   %[[C0:.+]] = constant 0 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[M:.+]] = hal.interface.load.constant offset = 0
 //   CHECK-DAG:   %[[N:.+]] = hal.interface.load.constant offset = 1
 //   CHECK-DAG:   %[[K:.+]] = hal.interface.load.constant offset = 2

@@ -16,9 +16,9 @@ hal.executable private @static_scatter_update_slice  {
 
     builtin.module {
       builtin.func @static_scatter_update_slice() {
-        %c40 = constant 40 : index
-        %c500 = constant 500 : index
-        %c0 = constant 0 : index
+        %c40 = arith.constant 40 : index
+        %c500 = arith.constant 500 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<40x500xi32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<40x1xi32>
         %2 = hal.interface.binding.subspan @io::@s0b2_rw_external[%c0] : memref<100x500xi32>

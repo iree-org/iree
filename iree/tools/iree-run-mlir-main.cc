@@ -20,7 +20,7 @@
 // // CHECK-LABEL: @foo
 // // CHECK: 1xf32: 2
 // func @foo() -> tensor<f32> {
-//   %0 = constant dense<2.0> : tensor<f32>
+//   %0 = arith.constant dense<2.0> : tensor<f32>
 //   return %0 : tensor<f32>
 // }
 //

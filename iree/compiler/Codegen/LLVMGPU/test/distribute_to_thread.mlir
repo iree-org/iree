@@ -16,9 +16,9 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
     workgroup_size = [64 : index, 1 : index, 1 : index]}
   builtin.module  {
     builtin.func @dot_dispatch_0() {
-      %cst = constant 0.000000e+00 : f32
-      %c0 = constant 0 : index
-      %c1024 = constant 1024 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %c0 = arith.constant 0 : index
+      %c1024 = arith.constant 1024 : index
       %0 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : memref<1024x1024xf32>
       %1 = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : memref<1024x1024xf32>
       %2 = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : memref<1024x1024xf32>
@@ -64,11 +64,11 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:  memref.global "private" @{{.*}} : memref<4x256xf32, 3>
 //         CHECK:  memref.global "private" @{{.*}} : memref<2x4xf32, 3>
-//     CHECK-DAG:  %[[C0:.+]] = constant 0 : index
-//     CHECK-DAG:  %[[C2:.+]] = constant 2 : index
-//     CHECK-DAG:  %[[C4:.+]] = constant 4 : index
-//     CHECK-DAG:  %[[C256:.+]] = constant 256 : index
-//     CHECK-DAG:  %[[C1024:.+]] = constant 1024 : index
+//     CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
+//     CHECK-DAG:  %[[C2:.+]] = arith.constant 2 : index
+//     CHECK-DAG:  %[[C4:.+]] = arith.constant 4 : index
+//     CHECK-DAG:  %[[C256:.+]] = arith.constant 256 : index
+//     CHECK-DAG:  %[[C1024:.+]] = arith.constant 1024 : index
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
 //         CHECK:    linalg.copy(%{{.*}}, %{{.*}}) {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, #{{.*}}>, memref<2x4xf32, #{{.*}}, 3>
@@ -97,17 +97,17 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
       workgroup_size = [1: index, 1: index, 1: index]}
     builtin.module  {
       builtin.func @predict_dispatch_153() {
-        %c0 = constant 0 : index
-        %cst = constant 0x7FC00000 : f32
-        %cst_0 = constant 0xFF800000 : f32
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0x7FC00000 : f32
+        %cst_0 = arith.constant 0xFF800000 : f32
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<1000xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<f32>
         linalg.fill(%cst_0, %1) {lowering.config = #config}  : f32, memref<f32>
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering.config = #config} {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
-          %2 = cmpf ogt, %arg0, %arg1 : f32
+          %2 = arith.cmpf ogt, %arg0, %arg1 : f32
           %3 = select %2, %arg0, %arg1 : f32
-          %4 = cmpf uno, %arg0, %arg1 : f32
+          %4 = arith.cmpf uno, %arg0, %arg1 : f32
           %5 = select %4, %cst, %3 : f32
           linalg.yield %5 : f32
         }

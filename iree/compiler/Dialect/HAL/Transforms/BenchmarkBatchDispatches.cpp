@@ -24,7 +24,8 @@ class BenchmarkBatchDispatchesPass
       : repeatCount_(repeatCount) {}
 
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<HALDialect, StandardOpsDialect>();
+    registry.insert<HALDialect, StandardOpsDialect,
+                    mlir::arith::ArithmeticDialect>();
   }
 
   StringRef getArgument() const override {
