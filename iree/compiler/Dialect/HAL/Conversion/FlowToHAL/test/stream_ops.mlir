@@ -609,14 +609,8 @@ func @tensorSplatDynamic(%value: i8, %dim: index) -> tensor<?x128xi8> {
   // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%allocator : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[SIZE]]}
   %0 = flow.ex.stream.fragment(%value, %dim) : (i8, index) -> tensor<?x128xi8>{%dim} =
       (%arg0: i8, %arg1: index) -> tensor<?x128xi8> {
-    //  CHECK-DAG: %[[B0:.+]] = arith.extui %[[VALUE]] : i8 to i32
-    //  CHECK-DAG: %[[B1:.+]] = arith.shli %[[B0]], %c8
-    //  CHECK-DAG: %[[B2:.+]] = arith.shli %[[B0]], %c16
-    //  CHECK-DAG: %[[B3:.+]] = arith.shli %[[B0]], %c24
-    //  CHECK-DAG: %[[ORA:.+]] = arith.ori %[[B2]], %[[B3]]
-    //  CHECK-DAG: %[[ORB:.+]] = arith.ori %[[B1]], %[[ORA]]
-    //  CHECK-DAG: %[[PATTERN:.+]] = arith.ori %[[B0]], %[[ORB]]
-    // CHECK-NEXT: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %[[SIZE]]] pattern(%[[PATTERN]] : i32, %c4_i32)
+    //  CHECK-DAG: %[[PATTERN:.+]] = arith.extui %[[VALUE]] : i8 to i32
+    // CHECK-NEXT: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %[[SIZE]]] pattern(%[[PATTERN]] : i32, %c1_i32)
     %1 = flow.tensor.splat %arg0 : tensor<?x128xi8>{%arg1}
     flow.return %1 : tensor<?x128xi8>
   }
@@ -656,10 +650,8 @@ func @tensorSplatF16(%value: f16) -> tensor<2x128xf16> {
   %0 = flow.ex.stream.fragment(%value) : (f16) -> tensor<2x128xf16> =
       (%arg0: f16) -> tensor<2x128xf16> {
     //  CHECK-DAG: %[[BITCAST:.+]] = arith.bitcast %[[VALUE]] : f16 to i16
-    //  CHECK-DAG: %[[B0:.+]] = arith.extui %[[BITCAST]] : i16 to i32
-    //  CHECK-DAG: %[[B1:.+]] = arith.shli %[[B0]], %c16
-    //  CHECK-DAG: %[[PATTERN:.+]] = arith.ori %[[B0]], %[[B1]]
-    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c512] pattern(%[[PATTERN]] : i32, %c4_i32)
+    //  CHECK-DAG: %[[PATTERN:.+]] = arith.extui %[[BITCAST]] : i16 to i32
+    // CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer> target(%[[BUFFER]] : !hal.buffer)[%c0, %c512] pattern(%[[PATTERN]] : i32, %c2_i32)
     %1 = flow.tensor.splat %arg0 : tensor<2x128xf16>
     flow.return %1 : tensor<2x128xf16>
   }
