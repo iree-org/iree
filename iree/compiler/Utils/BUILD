@@ -15,11 +15,13 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
+        "ConversionUtils.cpp",
         "FlatbufferUtils.cpp",
         "GraphUtils.cpp",
         "TracingUtils.cpp",
     ],
     hdrs = [
+        "ConversionUtils.h",
         "FlatbufferUtils.h",
         "GraphUtils.h",
         "PatternUtils.h",

@@ -18,7 +18,9 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/map_lmhlo_to_scalar_op.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -30,37 +32,68 @@ namespace iree_compiler {
 
 namespace {
 
-static Type convertInteger(IntegerType intType) {
+static Type convertIntegerToSignless(IntegerType intType) {
   return IntegerType::get(intType.getContext(),
                           intType.getIntOrFloatBitWidth());
 }
 
-static Optional<Type> convertTensor(TensorType tensorType) {
-  if (!tensorType.hasRank() || tensorType.getRank() != 0) return llvm::None;
+static Optional<Type> convertRank0TensorToScalar(RankedTensorType tensorType) {
+  if (tensorType.getRank() != 0) return llvm::None;
   Type elementType = tensorType.getElementType();
   if (auto intType = elementType.dyn_cast<IntegerType>()) {
-    elementType = convertInteger(intType);
+    elementType = convertIntegerToSignless(intType);
   }
   return elementType;
 }
 
-static Value materializeUnrealizedConversion(OpBuilder &builder, Type type,
-                                             ValueRange inputs, Location loc) {
-  return builder.create<UnrealizedConversionCastOp>(loc, type, inputs[0])
+static Optional<Value> materializeCastToSignless(OpBuilder &builder,
+                                                 IntegerType toType,
+                                                 ValueRange inputs,
+                                                 Location loc) {
+  assert(inputs.size() == 1 && "too many inputs to type conversion");
+  Value fromValue = inputs[0];
+  auto fromType = fromValue.getType();
+  if (fromType.isSignlessInteger() || !toType.isSignlessInteger())
+    return llvm::None;
+  // Use unrealized conversion casts to do signful->signless conversion.
+  return builder.create<UnrealizedConversionCastOp>(loc, toType, fromValue)
       ->getResult(0);
 }
 
+static Optional<Value> materializeCastToScalar(OpBuilder &builder, Type toType,
+                                               ValueRange inputs,
+                                               Location loc) {
+  assert(inputs.size() == 1 && "too many inputs to type conversion");
+  Value fromValue = inputs[0];
+  auto fromType = fromValue.getType().dyn_cast<RankedTensorType>();
+  if (!fromType || fromType.getRank() != 0) return llvm::None;
+
+  if (auto intFromType = fromType.getElementType().dyn_cast<IntegerType>()) {
+    if (!intFromType.isSignlessInteger()) {
+      if (!toType.isSignlessInteger()) return llvm::None;
+      fromType = fromType.clone(toType).cast<RankedTensorType>();
+      fromValue =
+          builder.create<UnrealizedConversionCastOp>(loc, fromType, fromValue)
+              ->getResult(0);
+    }
+  }
+
+  Type extractType = fromType.getElementType();
+  return builder.createOrFold<tensor::ExtractOp>(loc, extractType, fromValue);
+}
+
+/// Note: only designed to work for casts involving rank-0 tensors and scalars
+/// implicitly captured within op regions.
 class MhloToStdTypeConverter : public TypeConverter {
  public:
   MhloToStdTypeConverter() {
     addConversion([](Type type) { return type; });
 
-    addConversion(convertTensor);
-    addConversion(convertInteger);
+    addConversion(convertRank0TensorToScalar);
+    addConversion(convertIntegerToSignless);
 
-    addTargetMaterialization(materializeUnrealizedConversion);
-    addSourceMaterialization(materializeUnrealizedConversion);
-    addArgumentMaterialization(materializeUnrealizedConversion);
+    addArgumentMaterialization(materializeCastToScalar);
+    addTargetMaterialization(materializeCastToScalar);
   }
 };
 

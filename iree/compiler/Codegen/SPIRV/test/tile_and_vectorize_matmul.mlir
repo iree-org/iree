@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
+#config = {tileSizes = [[8, 64], [], [8, 4], [0, 0, 4]]}
 
 hal.executable private @matmul_static_shape_f16  {
   hal.interface private @io  {
@@ -66,7 +66,7 @@ hal.executable private @matmul_static_shape_f16  {
 
 // -----
 
-#config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
+#config = {tileSizes = [[8, 64], [], [8, 4], [0, 0, 4]]}
 
 hal.executable private @matmul_static_shape_f32  {
   hal.interface private @io  {

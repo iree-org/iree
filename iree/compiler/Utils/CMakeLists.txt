@@ -14,11 +14,13 @@ iree_cc_library(
   NAME
     Utils
   HDRS
+    "ConversionUtils.h"
     "FlatbufferUtils.h"
     "GraphUtils.h"
     "PatternUtils.h"
     "TracingUtils.h"
   SRCS
+    "ConversionUtils.cpp"
     "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
     "TracingUtils.cpp"

@@ -62,6 +62,7 @@ iree_cc_library(
     MLIRMath
     MLIRMemRef
     MLIRPass
+    MLIRReconcileUnrealizedCasts
     MLIRSCFToStandard
     MLIRShape
     MLIRShapeOpsTransforms
