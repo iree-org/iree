@@ -78,12 +78,11 @@ static unsigned dimToIndex(StringRef dim) {
 static void populateTilingToInvocationPatterns(MLIRContext *context,
                                                RewritePatternSet &patterns) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
-      [&](OpBuilder &builder, Operation *operation) {
-        SmallVector<int64_t> tileSizes = getTileSizes(operation, 2);
+      [&](OpBuilder &builder, Operation *op) {
+        SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
         return llvm::to_vector<4>(
             llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-              return builder.create<arith::ConstantIndexOp>(operation->getLoc(),
-                                                            v);
+              return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
             }));
       };
 
@@ -162,7 +161,7 @@ static void populateTilingReductionPatterns(
     MLIRContext *context, RewritePatternSet &patterns,
     linalg::LinalgTransformationFilter marker) {
   auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    SmallVector<int64_t> tileSizes = getTileSizes(op, 3);
+    SmallVector<int64_t> tileSizes = getTileSizes(op, 2);
     return llvm::to_vector<4>(
         llvm::map_range(tileSizes, [&](int64_t v) -> Value {
           return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);

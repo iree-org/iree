@@ -108,7 +108,7 @@ hal.executable private @static_3d_sort  {
 
 //                CHECK: func @static_3d_sort()
 //                CHECK:   linalg_ext.sort
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 0, 16], [], [1, 0, 1]]}
+//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 0, 16], [1, 0, 1]]}
 
 // -----
 
