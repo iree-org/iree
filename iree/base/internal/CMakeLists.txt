@@ -345,6 +345,7 @@ iree_cc_library(
     "threading_win32.c"
   DEPS
     ${CMAKE_DL_LIBS}
+    ::fpu_state
     ::internal
     ::synchronization
     iree::base

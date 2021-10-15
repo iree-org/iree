@@ -334,6 +334,7 @@ cc_library(
     ],
     hdrs = ["threading.h"],
     deps = [
+        ":fpu_state",
         ":internal",
         ":synchronization",
         "//build_tools:default_linkopts",
