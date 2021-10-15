@@ -174,7 +174,7 @@ The full dump step by step of a linalg.matmul operation can be found [here](http
 ### GEMM
 
 We compare the performance of a single GEMM operation to highly optimized
-library cuBlas using [mmperf framework](https://github.com/mmperf/mmperf). 
+library cuBLAS using [mmperf framework](https://github.com/mmperf/mmperf). 
 
 ![Compilation diagram](./2021-10-cuda-memperf.png)
 
