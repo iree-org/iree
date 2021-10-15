@@ -860,16 +860,19 @@ possible now that we are doing this within a compiler. This allows us to focus
 on <em>how</em> we get the compiler to generate that schedule and kernel with purely
 algebraic transformations that compose and enable further compiler
 optimizations.</p>
-<p>At the basis of this work is the <a href="https://mlir.llvm.org/docs/Dialects/Linalg/OpDSL/">extensible op system of the Linalg dialect</a> in the MLIR compiler toolkit.
-In this case, a general purpose, mixed precision mmt4d op is defined via a high level
-description directly in the compiler and is then available to both users of the compiler
-(as a <code>linalg.mmt4d</code> op) or for direct emission via Python based IR construction
-(i.e. for direct integration into high level frameworks without rebuilding the compiler).
-The ability to define such new special forms cheaply, and without any systemic framework
-level cost, is part of the extensibility and composition story that we expect will become
-increasingly important in development and deployment scenarios in the future, and in this
-case, it let us spring board off of high quality code generation which was already well
-integrated and composed well with other features of the compiler.</p>
+<p>At the basis of this work is the
+<a href="https://mlir.llvm.org/docs/Dialects/Linalg/OpDSL/">extensible op system of the Linalg dialect</a>
+in the MLIR compiler toolkit. In this case, a general purpose, mixed precision
+mmt4d op is defined via a high level description directly in the compiler and is
+then available to both users of the compiler (as a <code>linalg.mmt4d</code> op) or for
+direct emission via Python based IR construction (i.e. for direct integration
+into high level frameworks without rebuilding the compiler). The ability to
+define such new special forms cheaply, and without any systemic framework level
+cost, is part of the extensibility and composition story that we expect will
+become increasingly important in development and deployment scenarios in the
+future, and in this case, it let us spring board off of high quality code
+generation which was already well integrated and composed well with other
+features of the compiler.</p>
 <h2 id="existing-matrix-multplication-code-generation">Existing Matrix Multplication Code Generation<a class="headerlink" href="#existing-matrix-multplication-code-generation" title="Permanent link">&para;</a></h2>
 <p>Let us start by discussing IREE’s existing matmul code generation and highlight
 the issues that <code>mmt4d</code> aims to overcome.</p>
@@ -920,9 +923,9 @@ further tiled to fit target architecture registers (e.g. 8x8).</p>
 <li>
 <p><strong>Inefficent memory traversal:</strong> For efficiency reasons, we always need
     <code>tile_m_v&gt;1</code> and <code>tile_n_v&gt;1</code>. That is because the higher these values, the
-    less memory-load instructions are needed overall; and this is also dictated by
-    the SIMD instructions that we want to use. But that means that the kernel is
-    accessing simultaneously multiple rows or columns of the left-hand and
+    fewer memory-load instructions are needed overall; and this is also dictated
+    by the SIMD instructions that we want to use. But that means that the kernel
+    is accessing simultaneously multiple rows or columns of the left-hand and
     right-hand side matrices. And in this existing approach, they are stored in
     linear layout, not in a tiled layout, so these accesses are not contiguous
     in memory. This is detrimental to memory access performance, meaning the
@@ -973,8 +976,10 @@ matrices represented as 4D tensors. Moreover, these conversions should be
 tileable and decompose well. Thankfully, the transformation from 2D to 4D can be
 written as a reshape followed by a transpose as in the following digram:</p>
 <p><img alt="graphviz" src="../2021-10-13-mmt4d-graph_flow.svg" /></p>
-<p>So we can think of the outermost two dimensions of the 4D representations as the tile position in the overall matrix, and the innermost two as the element position within one tile. Hopefully
-the following Python pseudocode makes it more concrete:</p>
+<p>So we can think of the outermost two dimensions of the 4D representations as the
+tile position in the overall matrix, and the innermost two as the element
+position within one tile. Hopefully the following Python pseudocode makes it
+more concrete:</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">pack_2d_4d</span><span class="p">(</span><span class="n">operand</span><span class="p">,</span> <span class="n">parallel_size</span><span class="p">,</span> <span class="n">reduction_size</span><span class="p">):</span>
  <span class="n">i1</span> <span class="o">=</span> <span class="n">operand</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">//</span> <span class="n">parallel_size</span> <span class="c1"># M1</span>
  <span class="n">i2</span> <span class="o">=</span> <span class="n">parallel_size</span>    <span class="c1"># M0</span>
