@@ -9,14 +9,14 @@
       
       
       
-        <link rel="canonical" href="https://google.github.io/iree/deployment-configurations/gpu-vulkan/">
+        <link rel="canonical" href="https://google.github.io/iree/blog/2021-10-15-cuda-backend/">
       
       <link rel="icon" href="../../ghost.svg">
       <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-7.3.3">
     
     
       
-        <title>GPU - Vulkan - IREE</title>
+        <title>CUDA backend - IREE</title>
       
     
     
@@ -69,7 +69,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#vulkan-gpu-hal-driver" class="md-skip">
+        <a href="#cuda-backend-in-iree" class="md-skip">
           Skip to content
         </a>
       
@@ -101,7 +101,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              GPU - Vulkan
+              CUDA backend
             
           </span>
         </div>
@@ -327,16 +327,14 @@
 
   
   
-    
-  
   
     
       
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
       
       
       
@@ -359,7 +357,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cpu-dylib/" class="md-nav__link">
+      <a href="../../deployment-configurations/cpu-dylib/" class="md-nav__link">
         CPU - Dylib
       </a>
     </li>
@@ -373,7 +371,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bare-metal/" class="md-nav__link">
+      <a href="../../deployment-configurations/bare-metal/" class="md-nav__link">
         CPU - Bare-Metal
       </a>
     </li>
@@ -385,171 +383,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          GPU - Vulkan
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../deployment-configurations/gpu-vulkan/" class="md-nav__link">
         GPU - Vulkan
       </a>
-      
-        
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#support-matrix" class="md-nav__link">
-    Support matrix
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#get-runtime-and-compiler" class="md-nav__link">
-    Get runtime and compiler
-  </a>
-  
-    <nav class="md-nav" aria-label="Get runtime and compiler">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#get-iree-runtime-with-vulkan-hal-driver" class="md-nav__link">
-    Get IREE runtime with Vulkan HAL driver
-  </a>
-  
-    <nav class="md-nav" aria-label="Get IREE runtime with Vulkan HAL driver">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-runtime-from-source" class="md-nav__link">
-    Build runtime from source
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-compiler-for-spir-v-exchange-format" class="md-nav__link">
-    Get compiler for SPIR-V exchange format
-  </a>
-  
-    <nav class="md-nav" aria-label="Get compiler for SPIR-V exchange format">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#download-as-python-package" class="md-nav__link">
-    Download as Python package
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-compiler-from-source" class="md-nav__link">
-    Build compiler from source
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compile-and-run-the-model" class="md-nav__link">
-    Compile and run the model
-  </a>
-  
-    <nav class="md-nav" aria-label="Compile and run the model">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#compile-the-model" class="md-nav__link">
-    Compile the model
-  </a>
-  
-    <nav class="md-nav" aria-label="Compile the model">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#compile-using-the-command-line" class="md-nav__link">
-    Compile using the command-line
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#run-the-model" class="md-nav__link">
-    Run the model
-  </a>
-  
-    <nav class="md-nav" aria-label="Run the model">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#run-using-the-command-line" class="md-nav__link">
-    Run using the command-line
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -787,14 +625,16 @@
 
   
   
+    
+  
   
     
       
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_7" type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_7" type="checkbox" id="__nav_7" checked>
       
       
       
@@ -815,11 +655,153 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../../blog/2021-10-15-cuda-backend/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          CUDA backend
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         CUDA backend
       </a>
+      
+        
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#bring-up" class="md-nav__link">
+    Bring up
+  </a>
+  
+    <nav class="md-nav" aria-label="Bring up">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hal-support" class="md-nav__link">
+    Hal support
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compiler-support" class="md-nav__link">
+    Compiler support
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flatbuffer-definition" class="md-nav__link">
+    FlatBuffer definition
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hello-world" class="md-nav__link">
+    Hello world
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    Performance
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tiling-and-distribution" class="md-nav__link">
+    Tiling and distribution
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vectorization" class="md-nav__link">
+    Vectorization
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-memory-optimization" class="md-nav__link">
+    Shared memory optimization
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimization-pipeline" class="md-nav__link">
+    Optimization pipeline
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results-and-next-steps" class="md-nav__link">
+    Results and next steps
+  </a>
+  
+    <nav class="md-nav" aria-label="Results and next steps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gemm" class="md-nav__link">
+    GEMM
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    Future work
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -831,7 +813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../blog/2021-10-13-mmt4d/" class="md-nav__link">
+      <a href="../2021-10-13-mmt4d/" class="md-nav__link">
         Work in progress on Matrix Multiplication on CPU
       </a>
     </li>
@@ -845,7 +827,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../blog/2021-07-19-tflite-tosa/" class="md-nav__link">
+      <a href="../2021-07-19-tflite-tosa/" class="md-nav__link">
         TFLite Support via TOSA
       </a>
     </li>
@@ -885,71 +867,38 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#support-matrix" class="md-nav__link">
-    Support matrix
+  <a href="#bring-up" class="md-nav__link">
+    Bring up
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#get-runtime-and-compiler" class="md-nav__link">
-    Get runtime and compiler
-  </a>
-  
-    <nav class="md-nav" aria-label="Get runtime and compiler">
+    <nav class="md-nav" aria-label="Bring up">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#get-iree-runtime-with-vulkan-hal-driver" class="md-nav__link">
-    Get IREE runtime with Vulkan HAL driver
-  </a>
-  
-    <nav class="md-nav" aria-label="Get IREE runtime with Vulkan HAL driver">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-runtime-from-source" class="md-nav__link">
-    Build runtime from source
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-compiler-for-spir-v-exchange-format" class="md-nav__link">
-    Get compiler for SPIR-V exchange format
-  </a>
-  
-    <nav class="md-nav" aria-label="Get compiler for SPIR-V exchange format">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#download-as-python-package" class="md-nav__link">
-    Download as Python package
+  <a href="#hal-support" class="md-nav__link">
+    Hal support
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#build-compiler-from-source" class="md-nav__link">
-    Build compiler from source
+  <a href="#compiler-support" class="md-nav__link">
+    Compiler support
   </a>
   
 </li>
         
-      </ul>
-    </nav>
+          <li class="md-nav__item">
+  <a href="#flatbuffer-definition" class="md-nav__link">
+    FlatBuffer definition
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hello-world" class="md-nav__link">
+    Hello world
+  </a>
   
 </li>
         
@@ -959,24 +908,37 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compile-and-run-the-model" class="md-nav__link">
-    Compile and run the model
+  <a href="#performance" class="md-nav__link">
+    Performance
   </a>
   
-    <nav class="md-nav" aria-label="Compile and run the model">
+    <nav class="md-nav" aria-label="Performance">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#compile-the-model" class="md-nav__link">
-    Compile the model
+  <a href="#tiling-and-distribution" class="md-nav__link">
+    Tiling and distribution
   </a>
   
-    <nav class="md-nav" aria-label="Compile the model">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
-  <a href="#compile-using-the-command-line" class="md-nav__link">
-    Compile using the command-line
+  <a href="#vectorization" class="md-nav__link">
+    Vectorization
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shared-memory-optimization" class="md-nav__link">
+    Shared memory optimization
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#optimization-pipeline" class="md-nav__link">
+    Optimization pipeline
   </a>
   
 </li>
@@ -985,24 +947,26 @@
     </nav>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#run-the-model" class="md-nav__link">
-    Run the model
+      
+        <li class="md-nav__item">
+  <a href="#results-and-next-steps" class="md-nav__link">
+    Results and next steps
   </a>
   
-    <nav class="md-nav" aria-label="Run the model">
+    <nav class="md-nav" aria-label="Results and next steps">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#run-using-the-command-line" class="md-nav__link">
-    Run using the command-line
+  <a href="#gemm" class="md-nav__link">
+    GEMM
   </a>
   
 </li>
         
-      </ul>
-    </nav>
+          <li class="md-nav__item">
+  <a href="#future-work" class="md-nav__link">
+    Future work
+  </a>
   
 </li>
         
@@ -1024,214 +988,153 @@
               
                 
                 
-                <h1 id="vulkan-gpu-hal-driver">Vulkan GPU HAL Driver<a class="headerlink" href="#vulkan-gpu-hal-driver" title="Permanent link">&para;</a></h1>
-<p>IREE can accelerate model execution on GPUs via <a href="https://www.khronos.org/vulkan/">Vulkan</a>, a low-overhead
-graphics and compute API. Vulkan is cross-platform: it is available on many
-operating systems, including Android, Linux, and Windows. Vulkan is also
-cross-vendor: it is supported by most GPU vendors, including AMD, ARM, Intel,
-NVIDIA, and Qualcomm.</p>
-<!-- TODO(??): when to use CPU vs GPU -->
+                <p>Tuesday, October 15, 2021<br>
+ By Thomas Raoux</p>
+<h1 id="cuda-backend-in-iree">CUDA Backend in IREE<a class="headerlink" href="#cuda-backend-in-iree" title="Permanent link">&para;</a></h1>
+<p>IREE is being designed with re-targetability as a core goal: it should be
+possible to use IREE to target a broad spectrum of power regimes, from embedded
+systems to distributed clusters; and it should be possible to extend IREE to
+target new back-ends without having to reinvent the wheel each time. </p>
+<p>To explore this, we recently branched out from our initial focus on low-latency
+mobile deployments with a goal of using IREE to target data center workloads on
+Nvidia CUDA. This post describes how we quickly brought up a CUDA back-end for
+IREE and used it to train <a href="https://en.wikipedia.org/wiki/BERT_(language_model)">BERT</a>,
+then shares some metrics and next steps.</p>
+<h2 id="bring-up">Bring up<a class="headerlink" href="#bring-up" title="Permanent link">&para;</a></h2>
+<h3 id="hal-support">Hal support<a class="headerlink" href="#hal-support" title="Permanent link">&para;</a></h3>
+<p>IREE has a <a href="https://github.com/google/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables">HAL API</a>
+that abstract all the targets behind a common interface. The first step to
+supporting a CUDA target was to map the HAL API onto CUDA. We use the CUDA
+driver API to reduce dependencies and be closer to the hardware. The HAL API is
+based on other GPU APIs like Vulkan and Metal, so it was a natural fit for CUDA.
+The HAL API exposes memory allocations, basic fill and memset commands, kernel
+dispatch, and general command buffer handling. The original implementation uses
+the <a href="https://developer.nvidia.com/blog/cuda-graphs/">CUDA graph API</a>
+as a graph maps naturally to command buffers. There is also an implementation
+using CUDA streams for comparison.</p>
+<p>HAL exposes an API that can be tested independently, even if we are not able to
+create CUDA kernels yet we can test a large portion of the CUDA driver using
+<a href="https://github.com/google/iree/blob/main/iree/hal/cts/README.md">CTS tests</a>.
+Those can be run to make sure a system has the required CUDA support.</p>
+<p><img align="left" alt="Compilation flow" src="../2021-10-15-cuda-compiler-flow.png" /></p>
+<h3 id="compiler-support">Compiler support<a class="headerlink" href="#compiler-support" title="Permanent link">&para;</a></h3>
+<p>CUDA has an open source backend in LLVM generating PTX that we are leveraging.
+Therefore IREE can create <a href="https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html">NVVM</a>
+(CUDA LLVM variant) and use LLVM's backend to generate PTX. The CUDA driver
+will do the "last mile compilation" at runtime to convert PTX into the GPU's native ISA.</p>
+<p>IREE compiler pipeline starts from linalg on tensor representation. A large part
+of the compiler is independent of the target.</p>
+<p>The linalg on tensor representation of the graph is broken up into dispatch
+regions that are processed by NVVM Codegen. A simple implementation of the
+compiler is to run bufferization and convert linalg to standard followed by
+conversion to NVVM/LLVM. Most of those transformation can re-use upstream MLIR
+transformations and share it with any other backend targeting LLVM IR.
+Leveraging MLIR conversion to LLVM will allow us to quickly go from a simple
+"hello world" to supporting full models.</p>
+<p>IREE code generation is based on MLIR infrastructure so each step can easily be
+tested independently using the MLIR lit framework.</p>
+<h3 id="flatbuffer-definition">FlatBuffer definition<a class="headerlink" href="#flatbuffer-definition" title="Permanent link">&para;</a></h3>
+<p>Kernels are encoded in a FlatBuffer containing the PTX code as well as the
+workgroup size to use for the dispatch. This allows serialization of the kernels
+in the IR, it is then de-serialized by the HAL layer.</p>
+<div class="highlight"><pre><span></span><code>table CUDAExecutableDef {
+  // A map of entry point ordinals to string names as used in the shader
+  // library.
+  entry_points:[string];
 
-<h2 id="support-matrix">Support matrix<a class="headerlink" href="#support-matrix" title="Permanent link">&para;</a></h2>
-<p>As IREE and the compiler ecosystem it operates within matures, more
-target specific optimizations will be implemented. At this stage, expect
-reasonable performance across all GPUs and for improvements to be
-made over time for specific vendors and architectures.</p>
-<table>
-<thead>
-<tr>
-<th align="center">GPU Vendor</th>
-<th align="center">Category</th>
-<th align="center">Performance</th>
-<th align="center">Focus Architecture</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center">ARM Mali GPU</td>
-<td align="center">Mobile</td>
-<td align="center">Good</td>
-<td align="center">Valhall</td>
-</tr>
-<tr>
-<td align="center">Qualcomm Adreno GPU</td>
-<td align="center">Mobile</td>
-<td align="center">Reasonable</td>
-<td align="center">640+</td>
-</tr>
-<tr>
-<td align="center">AMD GPU</td>
-<td align="center">Desktop/server</td>
-<td align="center">Reasonable</td>
-<td align="center">-</td>
-</tr>
-<tr>
-<td align="center">NVIDIA GPU</td>
-<td align="center">Desktop/server</td>
-<td align="center">Reasonable</td>
-<td align="center">-</td>
-</tr>
-</tbody>
-</table>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>In order to use Vulkan to drive the GPU, you need to have a functional Vulkan
-environment. IREE requires Vulkan 1.1 on Android and 1.2 elsewhere. It can be
-verified by the following steps:</p>
-<div class="tabbed-set" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Android</label><div class="tabbed-content">
-<p>Android mandates Vulkan 1.1 support since Android 10. You just need to
-make sure the device's Android version is 10 or higher.</p>
-</div>
-<input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><label for="__tabbed_1_2">Linux</label><div class="tabbed-content">
-<p>Run the following command in a shell:</p>
-<div class="highlight"><pre><span></span><code>vulkaninfo <span class="p">|</span> grep apiVersion
+  // Block sizes for each entry point.
+  block_sizes:[CUDABlockSizeDef];
+
+  // PTX string of the module.
+  ptx_image:string;
+}
 </code></pre></div>
-<p>If <code>vulkaninfo</code> does not exist, you will need to <a href="https://vulkan.lunarg.com/sdk/home/">install the latest Vulkan
-SDK</a>. For Ubuntu 18.04/20.04, installing via LunarG's package
-repository is recommended, as it places Vulkan libraries and tools under
-system paths so it's easy to discover.</p>
-<p>If the showed version is lower than Vulkan 1.2, you will need to update the
-driver for your GPU.</p>
-</div>
-<input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><label for="__tabbed_1_3">Windows</label><div class="tabbed-content">
-<p>Run the following command in a shell:</p>
-<div class="highlight"><pre><span></span><code>vulkaninfo <span class="p">|</span> grep apiVersion
-</code></pre></div>
-<p>If <code>vulkaninfo</code> does not exist, you will need to <a href="https://vulkan.lunarg.com/sdk/home/">install the latest Vulkan
-SDK</a>.</p>
-<p>If the showed version is lower than Vulkan 1.2, you will need to update the
-driver for your GPU.</p>
-</div>
-</div>
-<h2 id="get-runtime-and-compiler">Get runtime and compiler<a class="headerlink" href="#get-runtime-and-compiler" title="Permanent link">&para;</a></h2>
-<h3 id="get-iree-runtime-with-vulkan-hal-driver">Get IREE runtime with Vulkan HAL driver<a class="headerlink" href="#get-iree-runtime-with-vulkan-hal-driver" title="Permanent link">&para;</a></h3>
-<p>Next you will need to get an IREE runtime that supports the Vulkan HAL driver
-so it can execute the model on GPU via Vulkan.</p>
-<!-- TODO(??): vcpkg -->
-
-<h4 id="build-runtime-from-source">Build runtime from source<a class="headerlink" href="#build-runtime-from-source" title="Permanent link">&para;</a></h4>
-<p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows and the <a href="../../building-from-source/android/">Android cross-compilation</a>
-page for Android. The Vulkan HAL driver is compiled in by default on non-Apple
-platforms.</p>
-<!-- TODO(??): a way to verify Vulkan is compiled in and supported -->
-
-<p>If you want to explicitly specify HAL drivers to support, you will need to add
-<code>Vulkan</code> to the <code>IREE_HAL_DRIVERS_TO_BUILD</code> CMake list variable when
-configuring (for target).</p>
-<h3 id="get-compiler-for-spir-v-exchange-format">Get compiler for SPIR-V exchange format<a class="headerlink" href="#get-compiler-for-spir-v-exchange-format" title="Permanent link">&para;</a></h3>
-<p>Vulkan expects the program running on GPU to be expressed by the <a href="https://www.khronos.org/registry/spir-v/">SPIR-V</a>
-binary exchange format, which the model must be compiled into.</p>
-<!-- TODO(??): vcpkg -->
-
-<h4 id="download-as-python-package">Download as Python package<a class="headerlink" href="#download-as-python-package" title="Permanent link">&para;</a></h4>
-<p>Python packages for various IREE functionalities are regularly published on
-IREE's <a href="https://github.com/google/iree/releases/">GitHub Releases</a> page.  Right now these are just
-snapshots of the <code>main</code> development branch.</p>
-<p>You can install the Python package containing the SPIR-V compiler by</p>
-<div class="highlight"><pre><span></span><code>python -m pip install iree-compiler-snapshot <span class="se">\</span>
-    -f https://github.com/google/iree/releases
-</code></pre></div>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p><code>iree-translate</code> is installed as <code>/path/to/python/site-packages/iree/tools/core/iree-translate</code>.
-You can find out the full path to the <code>site-packages</code> directory via the
-<code>python -m site</code> command.</p>
-</div>
-<h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">&para;</a></h4>
-<p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows and the <a href="../../building-from-source/android/">Android cross-compilation</a>
-page for Android. The SPIR-V compiler backend is compiled in by default on all
-platforms.</p>
-<p>If you want to explicitly specify HAL drivers to support, you will need to add
-<code>Vulkan-SPIRV</code> to the <code>IREE_TARGET_BACKENDS_TO_BUILD</code> CMake list variable when
-configuring (for host).</p>
-<h2 id="compile-and-run-the-model">Compile and run the model<a class="headerlink" href="#compile-and-run-the-model" title="Permanent link">&para;</a></h2>
-<p>With the compiler for SPIR-V and runtime for Vulkan, we can now compile a model
-and run it on the GPU.</p>
-<h3 id="compile-the-model">Compile the model<a class="headerlink" href="#compile-the-model" title="Permanent link">&para;</a></h3>
-<p>IREE compilers transform a model into its final deployable format in many
-sequential steps. A model authored with Python in an ML framework should use the
-corresponding framework's import tool to convert into a format (i.e.,
-<a href="https://mlir.llvm.org/">MLIR</a>) expected by main IREE compilers first.</p>
-<p>Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a> and convert it using IREE's
-<a href="../../ml-frameworks/tensorflow/">TensorFlow importer</a>. Then,</p>
-<h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
-<p>In the build directory, run the following command:</p>
-<p><div class="highlight"><pre><span></span><code>iree/tools/iree-translate <span class="se">\</span>
-    -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
-<span class="hll">    -iree-hal-target-backends<span class="o">=</span>vulkan-spirv <span class="se">\</span>
-</span><span class="hll">    -iree-vulkan-target-triple<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
-</span>    iree_input.mlir -o mobilenet-vulkan.vmfb
-</code></pre></div>
-where <code>iree_input.mlir</code> is the model's initial MLIR representation generated by
-IREE's TensorFlow importer.</p>
-<p>Note that a target triple of the form <code>&lt;vendor/arch&gt;-&lt;product&gt;-&lt;os&gt;</code> is needed
-to compile towards each GPU architecture. If no triple is specified then a safe but
-more limited default will be used.
-We don't support the full spectrum here<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>; the following table summarizes the
-currently recognized ones:</p>
-<table>
-<thead>
-<tr>
-<th align="center">GPU Vendor</th>
-<th align="center">Target Triple</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center">ARM Mali GPU</td>
-<td align="center"><code>valhall-g78-android11</code></td>
-</tr>
-<tr>
-<td align="center">Qualcomm Adreno GPU</td>
-<td align="center"><code>adreno-unknown-android11</code></td>
-</tr>
-<tr>
-<td align="center">AMD GPU</td>
-<td align="center">e.g., <code>rdna1-5700xt-linux</code></td>
-</tr>
-<tr>
-<td align="center">NVIDIA GPU</td>
-<td align="center">e..g, <code>ampere-rtx3080-windows</code></td>
-</tr>
-<tr>
-<td align="center">SwiftShader CPU</td>
-<td align="center"><code>cpu-swiftshader-unknown</code></td>
-</tr>
-</tbody>
-</table>
-<h3 id="run-the-model">Run the model<a class="headerlink" href="#run-the-model" title="Permanent link">&para;</a></h3>
-<h4 id="run-using-the-command-line">Run using the command-line<a class="headerlink" href="#run-using-the-command-line" title="Permanent link">&para;</a></h4>
-<p>In the build directory, run the following command:</p>
-<div class="highlight"><pre><span></span><code>iree/tools/iree-run-module <span class="se">\</span>
-<span class="hll">    --driver<span class="o">=</span>vulkan <span class="se">\</span>
-</span>    --module_file<span class="o">=</span>mobilenet-vulkan.vmfb <span class="se">\</span>
-    --entry_function<span class="o">=</span>predict <span class="se">\</span>
-    --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
-</code></pre></div>
-<p>The above assumes the exported function in the model is named as <code>predict</code> and
-it expects one 224x224 RGB image. We are feeding in an image with all 0 values
-here for brevity, see <code>iree-run-module --help</code> for the format to specify
-concrete values.</p>
-<!-- TODO(??): Vulkan profiles / API versions / extensions -->
-
-<!-- TODO(??): deployment options -->
-
-<!-- TODO(??): measuring performance -->
-
-<!-- TODO(??): troubleshooting -->
-
-<div class="footnote">
-<hr />
-<ol>
-<li id="fn:1">
-<p>It's also impossible to capture all details of a Vulkan implementation
-with a target triple, given the allowed variances on extensions, properties,
-limits, etc. So the target triple is just an approximation for usage.&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
-</li>
-</ol>
-</div>
+<h3 id="hello-world">Hello world<a class="headerlink" href="#hello-world" title="Permanent link">&para;</a></h3>
+<p>Together those 3 steps are enough to provide most of the functionality and we
+can now successfully compile full models.</p>
+<p><img alt="Compilation diagram" src="../2021-10-15-cuda-bring_up.png" /></p>
+<p>The steps to reproduce running a simple op end to end through CUDA backend are
+described <a href="https://github.com/google/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example">here</a>.</p>
+<h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
+<p>Now that we have enabled functionality we need to look at the performance. Once
+again we can leverage existing MLIR transformations to speed up the developement
+work.</p>
+<h3 id="tiling-and-distribution">Tiling and distribution<a class="headerlink" href="#tiling-and-distribution" title="Permanent link">&para;</a></h3>
+<p>The first obvious step to get efficient code on CUDA is to make sure we
+distribute the work on enough blocks and threads to fill up the GPU. At the time
+of bring up not all ops were being tiled and distributed in the common IREE
+layer. During dispatch region creation we apply tile and fuse which will
+distribute the work into a set of workgroups that are mapped to CUDA blocks.</p>
+<p>At the beginning of the code generation we look at the dispatch region and
+decide on the tile size for a workgroup. For CUDA we also decide the number of
+threads per block. 
+We will then have a pass tiling the ops in the dispatch region a second time to
+distribute the work onto threads within the block.</p>
+<p>At this stage the IR looks like the following:
+<div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
+    %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
+    %10 = memref.subview %in0[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
+    %11 = memref.subview %in1[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
+    %12 = memref.subview %out[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
+    linalg.generic {
+        indexing_maps = [affine_map&lt;(d0) -&gt; (d0)&gt;,
+                         affine_map&lt;(d0) -&gt; (d0)&gt;,
+                         affine_map&lt;(d0) -&gt; (d0)&gt;],
+        iterator_types = [&quot;parallel&quot;]} 
+      ins(%10, %11 : 
+          memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;,
+          memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;)
+      outs(%12 : memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;) {
+    ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
+      %13 = addf %arg1, %arg2 : f32
+      linalg.yield %13 : f32
+    }
+</code></pre></div></p>
+<h3 id="vectorization">Vectorization<a class="headerlink" href="#vectorization" title="Permanent link">&para;</a></h3>
+<p>Even though GPUs execute most operations as scalar, memory operations are
+optimized to access 128 bits of data per thread. Therefore it is critical to
+vectorize load/store operations.
+After tiling to a size we vectorize the IR to get vector read/write mapping to
+load4/store4. This helps significantly improve the memory access pattern of the
+code generated.</p>
+<p>This convert the previous IR to:
+<div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
+    %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
+    %10 = memref.subview %in0[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
+    %11 = memref.subview %in1[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
+    %12 = memref.subview %out[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
+    %13 = vector.transfer_read %10[%c0], %cst {in_bounds = [true]} : memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;, vector&lt;4xf32&gt;
+    %14 = vector.transfer_read %11[%c0], %cst {in_bounds = [true]} : memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;, vector&lt;4xf32&gt;
+    %15 = addf %13, %14 : vector&lt;4xf32&gt;
+    vector.transfer_write %15, %12[%c0] {in_bounds = [true]} : vector&lt;4xf32&gt;, memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
+</code></pre></div></p>
+<h3 id="shared-memory-optimization">Shared memory optimization<a class="headerlink" href="#shared-memory-optimization" title="Permanent link">&para;</a></h3>
+<p>Nvidia GPUs have a fast shared memory that needs to be leveraged to optimize
+cases where we may be memory bound and have the potential to re-use memory
+reads.</p>
+<p>For operations like GEMM using shared memory gives us a significant speed up. 
+We leverage memory promotion, vector distribution and software pipelining
+transformations from MLIR to generate efficient copies from global to shared
+memory that can be interleaved with the compute work.</p>
+<h3 id="optimization-pipeline">Optimization pipeline<a class="headerlink" href="#optimization-pipeline" title="Permanent link">&para;</a></h3>
+<p>Those different transformations compose to this flow:</p>
+<p><img alt="Compilation diagram" src="../2021-10-15-cuda-optimization-flow.png" /></p>
+<p>The full dump step by step of a linalg.matmul operation can be found <a href="https://gist.github.com/ThomasRaoux/8bded9d7c3f7426fc1ca8598deb53220">here</a>.</p>
+<h2 id="results-and-next-steps">Results and next steps<a class="headerlink" href="#results-and-next-steps" title="Permanent link">&para;</a></h2>
+<h3 id="gemm">GEMM<a class="headerlink" href="#gemm" title="Permanent link">&para;</a></h3>
+<p>We compare the performance of a single GEMM operation to highly optimized
+library cuBLAS using <a href="https://github.com/mmperf/mmperf">mmperf framework</a>. </p>
+<p><img alt="Compilation diagram" src="../2021-10-15-cuda-memperf.png" /></p>
+<p>The graph can be re-produced based on <a href="https://github.com/mmperf/mmperf#compare-mmperf-results-among-different-backends">instructions on mmperf</a></p>
+<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
+<p><a href="https://nod.ai/">Nod.ai</a> has contributed an experimental HAL module for <a href="https://rocmdocs.amd.com/">ROCM</a>
+that allows us to re-use the compiler parts to support ROCM, more support is
+going to be added in the future.</p>
+<p>Several performance improvements are still under progress, including optimizing
+the runtime allocator to reduce the host-side overhead and tuning tile sizes
+based profiling.</p>
+<p>Several models are running and we will publish more detailed benchmark results
+in the near future.</p>
                 
               
               

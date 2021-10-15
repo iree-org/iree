@@ -31,6 +31,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://google.github.io/iree/blog/2021-10-15-cuda-backend/</loc>
+         <lastmod>2021-10-15</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://google.github.io/iree/building-from-source/</loc>
          <lastmod>2021-10-15</lastmod>
          <changefreq>daily</changefreq>
