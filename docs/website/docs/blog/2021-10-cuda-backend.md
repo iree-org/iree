@@ -56,9 +56,9 @@ Leveraging MLIR conversion to LLVM will allow us to quickly go from a simple
 IREE code generation is based on MLIR infrastructure so each step can easily be
 tested independently using the MLIR lit framework.
 
-### Flat buffer definition
+### FlatBuffer definition
 
-Kernels are encoded in a flat buffer containing the PTX code as well as the
+Kernels are encoded in a FlatBuffer containing the PTX code as well as the
 workgroup size to use for the dispatch. This allows serialization of the kernels
 in the IR, it is then de-serialized by the HAL layer.
 
