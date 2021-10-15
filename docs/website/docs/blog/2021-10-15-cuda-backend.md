@@ -1,5 +1,5 @@
 
- Tuesday, October 15, 2021<br>
+ Friday, October 15, 2021<br>
  By Thomas Raoux
 
 # CUDA Backend in IREE
@@ -17,7 +17,7 @@ then shares some metrics and next steps.
 
 ## Bring up
 
-### Hal support
+### HAL support
 
 IREE has a [HAL API](https://github.com/google/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables)
 that abstract all the targets behind a common interface. The first step to
@@ -44,8 +44,8 @@ Therefore IREE can create [NVVM](https://docs.nvidia.com/cuda/nvvm-ir-spec/index
 (CUDA LLVM variant) and use LLVM's backend to generate PTX. The CUDA driver
 will do the "last mile compilation" at runtime to convert PTX into the GPU's native ISA.
 
-IREE compiler pipeline starts from linalg on tensor representation. A large part
-of the compiler is independent of the target.
+IREE compiler pipeline starts from [linalg](https://mlir.llvm.org/docs/Dialects/Linalg/)
+with tensor operands. A large part of the compiler is independent of the target.
 
 The linalg on tensor representation of the graph is broken up into dispatch
 regions that are processed by NVVM Codegen. A simple implementation of the
@@ -136,8 +136,8 @@ Even though GPUs execute most operations as scalar, memory operations are
 optimized to access 128 bits of data per thread. Therefore it is critical to
 vectorize load/store operations.
 After tiling to a size we vectorize the IR to get vector read/write mapping to
-load4/store4. This helps significantly improve the memory access pattern of the
-code generated.
+load4/store4. This significantly improves the memory access pattern of the code
+generated.
 
 This convert the previous IR to:
 ```
