@@ -39,6 +39,7 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}}));
+  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}}));
 
   tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}}));
   tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}}));
@@ -154,8 +155,8 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   }
 
   size_t numLoops = partitionedLoops.back() + 1;
-
-  std::array<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
+  // To get peak occupancy we need a workgroup size of at least two warps.
+  std::array<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
   unsigned vectorSize = 4;
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
   // Set all non-parallel loops to zero tile size.
@@ -197,15 +198,14 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   // Set the inner most parallel loop to `lowerTs`.
   for (int64_t depth = numLoops; depth > 0; depth--) {
     if (partitionedLoopsSet.count(depth - 1)) {
-      workgroupTileSizes[depth - 1] = cudaWarpSize * vectorSize;
+      workgroupTileSizes[depth - 1] = workgroupSize[0] * vectorSize;
       break;
     }
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    // Tile reduction dimension to 1. Using a large tile size may allow better
-    // scheduling and could help in case one of the input has transpose.
-    // TODO(thomasraoux): improve the heuristic.
-    workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 1);
+    // Tile reduction dimension to 4 to allow doing load4 if the reduction size
+    // is the most inner dimension.
+    workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 4);
   }
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(
