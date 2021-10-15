@@ -105,7 +105,6 @@ struct TiledLoopInfo {
   OpFoldResult lb;
   OpFoldResult ub;
   OpFoldResult step;
-  Optional<int64_t> workgroupSize;
   unsigned distributionDim;
 };
 using RootOpFilteringFn = std::function<bool(Operation *)>;
@@ -122,9 +121,6 @@ LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
 LogicalResult getComputeOps(FuncOp funcOp,
                             SmallVectorImpl<Operation *> &computeOps,
                             SmallVectorImpl<TiledLoopInfo> &tiledLoops);
-
-/// Collect information about loops matching tiled+distribute pattern.
-SmallVector<TiledLoopInfo> getTiledLoopInfo(FuncOp funcOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir
