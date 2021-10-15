@@ -185,9 +185,9 @@ hal.executable private @depthwise_conv_static_shape_f32  {
 
 // check tiling loop along filter height/width and input channel
 //      CHECK:    scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:        -> (vector<4xf32>)
+// CHECK-SAME:        -> (vector<1x1x1x4xf32>)
 //      CHECK:      scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:          -> (vector<4xf32>)
+// CHECK-SAME:          -> (vector<1x1x1x4xf32>)
 
 
 // CHECK: vector.fma
