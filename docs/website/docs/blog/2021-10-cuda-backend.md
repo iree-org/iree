@@ -19,14 +19,15 @@ IREE and used it to train BERT, then shares some metrics and next steps.
 ### Hal support
 
 IREE has a [HAL API](https://github.com/google/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables)
-that abstract all the targets behind a common interface. The first to support
-CUDA target was to map HAL API onto CUDA. We use CUDA driver API to reduce
-dependency and be close to the hardware. The API is close to a typical GPU APIs 
-so it was a natural fit for CUDA. HAL API exposes memory allocations, basic fill
-and memset commands as well as kernel dispatch, general command buffer handling.
-The original implementation uses [CUDA graph API](https://developer.nvidia.com/blog/cuda-graphs/)
-as a graph maps naturally to a command buffer. There is also an implementation
-using CUDA stream for comparison. 
+that abstract all the targets behind a common interface. The first step to
+supporting a CUDA target was to map the HAL API onto CUDA. We use the CUDA
+driver API to reduce dependencies and be closer to the hardware. The HAL API is
+based on other GPU APIs like Vulkan and Metal, so it was a natural fit for CUDA.
+The HAL API exposes memory allocations, basic fill and memset commands, kernel
+dispatch, and general command buffer handling. The original implementation uses
+the [CUDA graph API](https://developer.nvidia.com/blog/cuda-graphs/)
+as a graph maps naturally to command buffers. There is also an implementation
+using CUDA streams for comparison.
 
 HAL exposes an API that can be tested independently, even if we are not able to
 create CUDA kernels yet we can test a large portion of the CUDA driver using
