@@ -326,7 +326,7 @@ class LowerBoundExprVisitor
       if (vals.size() != 1 || !vals[0]) {
         return failure();
       }
-      loopInfo.constWorkgroupSize = wgSize;
+      loopInfo.workgroupSize = wgSize.getValue();
       dimension = checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp>(vals);
     } else {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
@@ -383,11 +383,11 @@ class StepExprVisitor
       expr = e.cast<AffineBinaryOpExpr>();
     } else {
       // Check if WorkgroupSizeOp is folded.
-      if (loopInfo.constWorkgroupSize) {
+      if (loopInfo.workgroupSize) {
         if (auto stepBySize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
-          loopInfo.step = IntegerAttr::get(
-              IndexType::get(applyOp.getContext()),
-              stepBySize.getValue() / loopInfo.constWorkgroupSize.getValue());
+          loopInfo.step =
+              IntegerAttr::get(IndexType::get(applyOp.getContext()),
+                               stepBySize.getValue() / *loopInfo.workgroupSize);
         }
       } else {
         loopInfo.step =
@@ -396,7 +396,7 @@ class StepExprVisitor
     }
 
     if (failed(processSentinel(expr.getLHS(), sentinels)) ||
-        (!loopInfo.constWorkgroupSize &&
+        (!loopInfo.workgroupSize &&
          failed(processSentinel(expr.getRHS(), sentinels)))) {
       return failure();
     }
@@ -421,14 +421,14 @@ class StepExprVisitor
     }
 
     if ((sentinels.size() != 2 || !loopInfo.step) &&
-        (sentinels.size() != 1 || !loopInfo.constWorkgroupSize)) {
+        (sentinels.size() != 1 || !loopInfo.workgroupSize)) {
       return failure();
     }
     SmallVector<Value> vals = getValuesForDimsOrSymbols(applyOp, sentinels);
-    if ((loopInfo.constWorkgroupSize &&
+    if ((loopInfo.workgroupSize &&
          !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp>(
              vals, loopInfo.distributionDim)) ||
-        (!loopInfo.constWorkgroupSize &&
+        (!loopInfo.workgroupSize &&
          !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp,
                           IREE::HAL::InterfaceWorkgroupSizeOp>(
              vals, loopInfo.distributionDim))) {

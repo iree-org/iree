@@ -105,7 +105,7 @@ struct TiledLoopInfo {
   OpFoldResult lb;
   OpFoldResult ub;
   OpFoldResult step;
-  AffineConstantExpr constWorkgroupSize;
+  Optional<int64_t> workgroupSize;
   unsigned distributionDim;
 };
 using RootOpFilteringFn = std::function<bool(Operation *)>;
