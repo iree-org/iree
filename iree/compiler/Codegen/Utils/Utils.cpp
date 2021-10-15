@@ -318,24 +318,14 @@ class LowerBoundExprVisitor
   }
 
   LogicalResult visitMulExpr(AffineBinaryOpExpr expr) {
-    SmallVector<Value> vals;
-    Optional<unsigned> dimension;
-    // workgroupSizeOp may have been folded into a constant expression.
-    if (auto wgSize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
-      vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS()});
-      if (vals.size() != 1 || !vals[0]) {
-        return failure();
-      }
-      loopInfo.workgroupSize = wgSize.getValue();
-      dimension = checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp>(vals);
-    } else {
-      vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
-      if (vals.size() != 2 || !vals[0] || !vals[1]) {
-        return failure();
-      }
-      dimension = checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp,
-                                  IREE::HAL::InterfaceWorkgroupSizeOp>(vals);
+    SmallVector<Value> vals =
+        getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
+    if (vals.size() != 2 || !vals[0] || !vals[1]) {
+      return failure();
     }
+    Optional<unsigned> dimension =
+        checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp,
+                        IREE::HAL::InterfaceWorkgroupSizeOp>(vals);
     if (!dimension) {
       return failure();
     }
@@ -382,22 +372,11 @@ class StepExprVisitor
       }
       expr = e.cast<AffineBinaryOpExpr>();
     } else {
-      // Check if WorkgroupSizeOp is folded.
-      if (loopInfo.workgroupSize) {
-        if (auto stepBySize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
-          loopInfo.step =
-              IntegerAttr::get(IndexType::get(applyOp.getContext()),
-                               stepBySize.getValue() / *loopInfo.workgroupSize);
-        }
-      } else {
-        loopInfo.step =
-            IntegerAttr::get(IndexType::get(applyOp.getContext()), 1);
-      }
+      loopInfo.step = IntegerAttr::get(IndexType::get(applyOp.getContext()), 1);
     }
 
     if (failed(processSentinel(expr.getLHS(), sentinels)) ||
-        (!loopInfo.workgroupSize &&
-         failed(processSentinel(expr.getRHS(), sentinels)))) {
+        failed(processSentinel(expr.getRHS(), sentinels))) {
       return failure();
     }
     // Either there are 3 sentinels and step isnt set, or there are two
@@ -420,18 +399,13 @@ class StepExprVisitor
       }
     }
 
-    if ((sentinels.size() != 2 || !loopInfo.step) &&
-        (sentinels.size() != 1 || !loopInfo.workgroupSize)) {
+    if (sentinels.size() != 2 || !loopInfo.step) {
       return failure();
     }
-    SmallVector<Value> vals = getValuesForDimsOrSymbols(applyOp, sentinels);
-    if ((loopInfo.workgroupSize &&
-         !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp>(
-             vals, loopInfo.distributionDim)) ||
-        (!loopInfo.workgroupSize &&
-         !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp,
-                          IREE::HAL::InterfaceWorkgroupSizeOp>(
-             vals, loopInfo.distributionDim))) {
+    if (!checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp,
+                         IREE::HAL::InterfaceWorkgroupSizeOp>(
+            getValuesForDimsOrSymbols(applyOp, sentinels),
+            loopInfo.distributionDim)) {
       return failure();
     }
     return success();
@@ -557,16 +531,6 @@ LogicalResult getComputeOps(FuncOp funcOp,
     }
   }
   return success();
-}
-
-SmallVector<TiledLoopInfo> getTiledLoopInfo(FuncOp funcOp) {
-  SmallVector<TiledLoopInfo> info;
-  funcOp.walk([&](scf::ForOp forOp) {
-    if (auto tiledLoopInfo = isTiledLoop(forOp.getContext(), forOp)) {
-      info.emplace_back(std::move(tiledLoopInfo.getValue()));
-    }
-  });
-  return info;
 }
 
 }  // namespace iree_compiler
