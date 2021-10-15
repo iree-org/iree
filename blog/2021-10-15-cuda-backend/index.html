@@ -699,7 +699,7 @@
         
           <li class="md-nav__item">
   <a href="#hal-support" class="md-nav__link">
-    Hal support
+    HAL support
   </a>
   
 </li>
@@ -876,7 +876,7 @@
         
           <li class="md-nav__item">
   <a href="#hal-support" class="md-nav__link">
-    Hal support
+    HAL support
   </a>
   
 </li>
@@ -988,7 +988,7 @@
               
                 
                 
-                <p>Tuesday, October 15, 2021<br>
+                <p>Friday, October 15, 2021<br>
  By Thomas Raoux</p>
 <h1 id="cuda-backend-in-iree">CUDA Backend in IREE<a class="headerlink" href="#cuda-backend-in-iree" title="Permanent link">&para;</a></h1>
 <p>IREE is being designed with re-targetability as a core goal: it should be
@@ -1001,7 +1001,7 @@ Nvidia CUDA. This post describes how we quickly brought up a CUDA back-end for
 IREE and used it to train <a href="https://en.wikipedia.org/wiki/BERT_(language_model)">BERT</a>,
 then shares some metrics and next steps.</p>
 <h2 id="bring-up">Bring up<a class="headerlink" href="#bring-up" title="Permanent link">&para;</a></h2>
-<h3 id="hal-support">Hal support<a class="headerlink" href="#hal-support" title="Permanent link">&para;</a></h3>
+<h3 id="hal-support">HAL support<a class="headerlink" href="#hal-support" title="Permanent link">&para;</a></h3>
 <p>IREE has a <a href="https://github.com/google/iree/blob/main/docs/developers/design_roadmap.md#hal-hardware-abstraction-layer-and-multi-architecture-executables">HAL API</a>
 that abstract all the targets behind a common interface. The first step to
 supporting a CUDA target was to map the HAL API onto CUDA. We use the CUDA
@@ -1022,8 +1022,8 @@ Those can be run to make sure a system has the required CUDA support.</p>
 Therefore IREE can create <a href="https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html">NVVM</a>
 (CUDA LLVM variant) and use LLVM's backend to generate PTX. The CUDA driver
 will do the "last mile compilation" at runtime to convert PTX into the GPU's native ISA.</p>
-<p>IREE compiler pipeline starts from linalg on tensor representation. A large part
-of the compiler is independent of the target.</p>
+<p>IREE compiler pipeline starts from <a href="https://mlir.llvm.org/docs/Dialects/Linalg/">linalg</a>
+with tensor operands. A large part of the compiler is independent of the target.</p>
 <p>The linalg on tensor representation of the graph is broken up into dispatch
 regions that are processed by NVVM Codegen. A simple implementation of the
 compiler is to run bufferization and convert linalg to standard followed by
@@ -1095,8 +1095,8 @@ distribute the work onto threads within the block.</p>
 optimized to access 128 bits of data per thread. Therefore it is critical to
 vectorize load/store operations.
 After tiling to a size we vectorize the IR to get vector read/write mapping to
-load4/store4. This helps significantly improve the memory access pattern of the
-code generated.</p>
+load4/store4. This significantly improves the memory access pattern of the code
+generated.</p>
 <p>This convert the previous IR to:
 <div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
     %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
