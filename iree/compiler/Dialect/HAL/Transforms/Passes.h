@@ -67,7 +67,7 @@ std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass();
 std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 
 //===----------------------------------------------------------------------===//
-// Executable translation and optimization
+// Executable translation
 //===----------------------------------------------------------------------===//
 
 // Defines hal.executables and hal.interfaces for flow.executable ops based on
@@ -138,6 +138,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 // TODO(#1124): replace with memory side effects once supported upstream.
 std::unique_ptr<OperationPass<FuncOp>> createCSEVariableLoadsPass();
 
+// Elides stateful command buffer ops that set redundant state.
+std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass();
+
 // Repeats dispatches `iree-hal-repeat-dispatch-num` times, which is 1 by
 // default.
 std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
@@ -153,6 +156,7 @@ inline void registerHALPasses() {
   createAssignTargetDevicesPass({});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createConvertToHALPass();
+  createElideRedundantCommandsPass();
   createIdentifyConstantPoolsPass();
   createInlineDeviceSwitchesPass();
   createLinkExecutablesPass();

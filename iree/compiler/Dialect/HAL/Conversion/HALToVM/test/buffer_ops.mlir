@@ -4,7 +4,7 @@
 func @buffer_subspan(%arg0 : !hal.buffer) -> !hal.buffer {
   %c42 = arith.constant 42 : index
   %c43 = arith.constant 43 : index
-  // CHECK: %ref = vm.call @hal.buffer.subspan(%arg0, %c42, %c43) : (!vm.ref<!hal.buffer>, i32, i32) -> !vm.ref<!hal.buffer>
+  // CHECK: %ref = vm.call @hal.buffer.subspan(%arg0, %c42, %c43) {nosideeffects} : (!vm.ref<!hal.buffer>, i32, i32) -> !vm.ref<!hal.buffer>
   %buffer = hal.buffer.subspan<%arg0 : !hal.buffer>[%c42, %c43] : !hal.buffer
   return %buffer : !hal.buffer
 }

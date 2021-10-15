@@ -375,6 +375,45 @@ def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
   }];
 }
 
+def HAL_AllocatorTryMapOp : HAL_Op<"allocator.try_map", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
+  ]> {
+  let summary = [{allocator-supported host buffer wrapping operation}];
+  let description = [{
+    Tries wrapping a !hal.buffer around host read-only memory backed by the
+    given byte buffer. The returned buffer may be host-only and not directly
+    usable on devices. If the mapping cannot be completed (such as trying to
+    map the host memory as device-local on devices with discrete memory) then
+    did_map will indicate that the returned buffer is null.
+  }];
+
+  let arguments = (ins
+    HAL_Allocator:$allocator,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    // TODO(benvanik): support other types (and mutable buffers).
+    ByteBufferType:$source,
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length
+  );
+  let results = (outs
+    I1:$did_map,
+    HAL_Buffer:$result
+  );
+
+  // TODO(benvanik): change type/usage to ref params.
+  let assemblyFormat = [{
+    `<` $allocator `:` type($allocator) `>`
+    `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
+    `type` `(` $memory_types `)`
+    `usage` `(` $buffer_usage `)`
+    `:` type($did_map) `,` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+// TODO(#7277): remove when switched to streams (happens there now).
 def HAL_AllocatorPackOp : HAL_PureOp<"allocator.pack", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     AttrSizedOperandSegments,
