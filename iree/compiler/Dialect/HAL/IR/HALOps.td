@@ -67,6 +67,7 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
         "getTiedResultOperandIndices",
     ]>,
     DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+    Util_ShapeAwareOp,
   ]> {
   let summary = [{conversion placeholder for HAL<->tensor type conversion}];
   let description = [{
@@ -105,6 +106,11 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+  }];
+
   let hasFolder = 1;
 }
 
@@ -112,6 +118,7 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
 // !hal.allocator / iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
+// TODO(#7277): remove when switched to streams (happens there now).
 def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -159,6 +166,7 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
   let hasCanonicalizer = 1;
 }
 
+// TODO(#7277): remove when switched to streams (happens there now).
 def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     SameVariadicOperandSize,
@@ -210,6 +218,7 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
   let hasCanonicalizer = 1;
 }
 
+// TODO(#7277): remove when switched to streams (happens there now).
 def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     SameVariadicOperandSize,
@@ -297,6 +306,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   }];
 }
 
+// TODO(#7277): remove when switched to streams (happens there now).
 def HAL_AllocatorConstantOp : HAL_Op<"allocator.constant", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -1228,6 +1238,8 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
 //===----------------------------------------------------------------------===//
 // Constant pooling
 //===----------------------------------------------------------------------===//
+
+// TODO(#7277): remove when switched to streams (happens there now).
 
 def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
     IsolatedFromAbove,
@@ -2333,7 +2345,8 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
 
 def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>
+    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+    Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
@@ -2358,6 +2371,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   let verifier = [{ return verifyInterfaceBindingSubspanOp(*this); }];
 
   let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
+
     /// Returns the hal.interface.binding op associated with this op.
     /// Returns null op if not found.
     IREE::HAL::InterfaceBindingOp queryBindingOp();

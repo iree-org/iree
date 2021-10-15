@@ -112,10 +112,7 @@ list(APPEND CMAKE_MODULE_PATH ${LLVM_MAIN_SRC_DIR}/cmake/modules)
 # Configure Python3 deps so that everyone downstream of here latches to the same
 # thing.
 include(MLIRDetectPythonEnv)
-find_package(Python3 ${LLVM_MINIMUM_PYTHON_VERSION}
-  COMPONENTS Interpreter Development NumPy REQUIRED)
-mlir_detect_pybind11_install()
-find_package(pybind11 2.6 CONFIG REQUIRED)
+mlir_configure_python_dev_packages()
 
 # Include IREE and LLVM if building standalone.
 if(IREE_COMPILER_API_STANDALONE)

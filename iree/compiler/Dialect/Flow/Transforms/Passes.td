@@ -126,7 +126,6 @@ def ConvertLinalgMatmulToMmt4D :
   ];
 }
 
-
 def PadTensorToSubTensorInsert :
     Pass<"iree-flow-pad-tensor-to-subtensor-insert", ""> {
   let summary = "Convert linalg.pad_tensor into linalg.fill + subtensor_insert";

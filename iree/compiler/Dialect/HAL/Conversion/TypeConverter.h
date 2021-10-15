@@ -19,7 +19,8 @@ namespace iree_compiler {
 class HALTypeConverter : public TypeConverter {
  public:
   HALTypeConverter(
-      ArrayRef<const HALConversionDialectInterface *> conversionInterfaces);
+      ArrayRef<const HALConversionDialectInterface *> conversionInterfaces,
+      bool supportTensors);
 
   // TODO(benvanik): signature conversion for output buffers.
 

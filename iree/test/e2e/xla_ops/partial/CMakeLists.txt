@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_linalg_on_tensors_vulkan-spirv_vulkan_f16
+    check_vulkan-spirv_vulkan_f16
   SRCS
     "add_f16.mlir"
     "dot_f16.mlir"

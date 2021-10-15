@@ -58,6 +58,7 @@ static std::vector<arith::ConstantOp> findLargeConstantsInModule(
   return largeConstantOps;
 }
 
+// TODO(#7277): remove when switched to streams (happens there now).
 class OutlineLargeConstantsPass
     : public OutlineLargeConstantsBase<OutlineLargeConstantsPass> {
  public:

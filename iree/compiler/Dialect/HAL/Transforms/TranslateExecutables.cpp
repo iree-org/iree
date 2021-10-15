@@ -127,7 +127,7 @@ createTranslateExecutablesPass() {
   return std::make_unique<TranslateExecutablesPass>();
 }
 
-static PassRegistration<TranslateExecutablesPass> linkPass([] {
+static PassRegistration<TranslateExecutablesPass> translatePass([] {
   return std::make_unique<TranslateExecutablesPass>();
 });
 

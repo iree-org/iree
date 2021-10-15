@@ -23,6 +23,14 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+  // TODO(#7277): remove when switched to streams by default.
+  Option<bool> streamFormation{
+      *this, "stream-formation",
+      llvm::cl::desc("Whether to build flow.streams for async scheduling."),
+      llvm::cl::init(true)};
+};
+
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
 //
@@ -34,7 +42,8 @@ namespace Flow {
 //     - Directly passing supported flow plus core ops
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager);
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    const TransformOptions &transformOptions);
 
 void registerFlowTransformPassPipeline();
 

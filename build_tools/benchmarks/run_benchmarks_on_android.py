@@ -337,7 +337,7 @@ def run_benchmarks_for_category(
 
     # If we have a tracing-enabled benchmark tool and the capture collecting
     # tool, catpure a trace of the benchmark run.
-    catpure_filename = None
+    capture_filename = None
     if traced_benchmark_tool is not None and trace_capture_tool is not None:
       run_cmd = [
           "TRACY_NO_EXIT=1", "taskset",
