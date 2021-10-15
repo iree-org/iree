@@ -19,6 +19,8 @@ namespace mlir {
 namespace iree_compiler {
 
 /// If the value is a threadID return the range [0, workgroupSize-1].
+/// If the number of workgroup is known also return the range of workgroupId ad
+/// workgroupCount.
 static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
     Value processorValue, SmallVectorImpl<Value> & /*dims*/,
     SmallVectorImpl<Value> & /*symbols*/, ArrayRef<int64_t> workgroupCount,
