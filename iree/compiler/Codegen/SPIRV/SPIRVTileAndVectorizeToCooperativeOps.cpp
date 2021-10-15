@@ -100,9 +100,9 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
                                    OpBuilder &builder, Location loc,
                                    ArrayRef<Range> parallelLoopRanges) {
     auto counts = llvm::to_vector<3>(subgroupCounts);
-    // Only consider parallel dimensions given that we haven't supported
-    // workgroup memory yet. We'll use vector unroll later to "tile" along
-    // reduction dimensions.
+    // Only consider parallel dimensions for tiling and distribution. Reduction
+    // dimension distribution needs synchronization. We'll use vector unroll
+    // later to "tile" along reduction dimensions.
     unsigned size = std::min(parallelLoopRanges.size(), 3ul);
     counts.resize(size, 1);
     return getSubgroupIdsAndCounts(builder, loc, counts);
@@ -117,9 +117,9 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
 
   auto setTileSizesFn = [](OpBuilder &builder, Operation *op) {
     SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
-    // Only consider parallel dimensions given that we haven't supported
-    // workgroup memory yet. We'll use vector unroll later to "tile" along
-    // reduction dimensions.
+    // Only consider parallel dimensions for tiling and distribution. Reduction
+    // dimension distribution needs synchronization. We'll use vector unroll
+    // later to "tile" along reduction dimensions.
     tileSizes.resize(
         std::min(cast<linalg::LinalgOp>(op).getNumParallelLoops(), 3u));
     return llvm::to_vector<4>(
@@ -172,8 +172,8 @@ Optional<SmallVector<int64_t, 4>> getCooperativeOpVectorShape(
   // to match the native cooperative op sizes.
   //
   // A better way might be to inspect the SSA value chain to figure out how the
-  // transfer ops are used (e.g., for cooperative matrix A/B/C matrix). But we
-  // need to do vectorization before bufferization for that.
+  // transfer ops are used (e.g., for cooperative matrix A/B/C matrix) and use
+  // the corresponding cooperative matrix configuration.
 
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
     auto insert =

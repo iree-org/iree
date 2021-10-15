@@ -83,13 +83,21 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   auto pipeline =
       IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorizeToCooperativeOps;
 
-  // For now only support one subgroup per workgroup.
+  // For now only support one subgroup per workgroup because in the above
+  // configuration deduction step we only consider whether the input workload is
+  // perfectly divisible by some native cooperative matrix size.
+  //
+  // TODO: Use some heuristics to deduce how many subgroups should be used and
+  // the tile sizes for each subgroup, considering the input workload size and
+  // native cooperative matrix size choices.
   int64_t subgroupSize = resourceLimits.subgroup_size().getInt();
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
   TileSizesListType tileSizes;
-  // Because we only have one subgroup, the workgroup's tile size is just the
-  // chosen cooperative matrix size (for subgroup).
+  // Again because we only consider whether the input workload is perfectly
+  // divisible by some native cooperative matrix size, not some multiples of it,
+  // need to make sure the subgroup tile sizes are the same as the workgroup
+  // one.
   tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
   tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
 
