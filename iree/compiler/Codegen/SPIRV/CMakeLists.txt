@@ -30,7 +30,8 @@ iree_cc_library(
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVRemoveOneTripTiledLoops.cpp"
     "SPIRVTileAndDistribute.cpp"
-    "SPIRVVectorToCooperativeMatrix.cpp"
+    "SPIRVTileAndVectorizeToCooperativeOps.cpp"
+    "SPIRVVectorToCooperativeOps.cpp"
     "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
@@ -39,6 +40,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineToStandard
     MLIRAnalysis
+    MLIRArithmetic
     MLIRArithmeticToSPIRV
     MLIRGPUOps
     MLIRGPUToSPIRV

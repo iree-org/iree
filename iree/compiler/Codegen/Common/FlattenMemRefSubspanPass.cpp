@@ -424,7 +424,7 @@ struct AdjustConversionCast final
 
     Value input = operands.front();
     // We only want to handle cases where the cast op handles memref types.
-    if (!input.getType().isa<ShapedType>()) return failure();
+    if (!input.getType().isa<BaseMemRefType>()) return failure();
 
     if (!isRankZeroOrOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
@@ -582,7 +582,7 @@ struct FlattenMemRefSubspanPass
           if (castOp->getNumOperands() != 1) return false;
 
           Type inputType = castOp->getOperandTypes().front();
-          return !inputType.isa<ShapedType>() ||
+          return !inputType.isa<BaseMemRefType>() ||
                  isRankZeroOrOneMemRef(inputType);
         });
 

@@ -106,6 +106,10 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       case IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize:
         addSPIRVTileAndVectorizePassPipeline(nestedModulePM);
         break;
+      case IREE::HAL::DispatchLoweringPassPipeline::
+          SPIRVVectorizeToCooperativeOps:
+        addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(nestedModulePM);
+        break;
       default:
         llvm_unreachable("Unsupported pipeline on GPU target.");
     }
