@@ -103,7 +103,7 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
     // Only consider parallel dimensions for tiling and distribution. Reduction
     // dimension distribution needs synchronization. We'll use vector unroll
     // later to "tile" along reduction dimensions.
-    unsigned size = std::min(parallelLoopRanges.size(), 3ul);
+    unsigned size = std::min(parallelLoopRanges.size(), static_cast<size_t>(3));
     counts.resize(size, 1);
     return getSubgroupIdsAndCounts(builder, loc, counts);
   };
