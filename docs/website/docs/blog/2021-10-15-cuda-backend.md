@@ -1,5 +1,5 @@
 
- Tuesday, October 15, 2021<br>
+ Friday, October 15, 2021<br>
  By Thomas Raoux
 
 # CUDA Backend in IREE
