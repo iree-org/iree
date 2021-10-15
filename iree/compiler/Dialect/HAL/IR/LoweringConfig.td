@@ -66,7 +66,7 @@ def HAL_LoweringConfigAttr :
     StructFieldAttr<"passPipeline",
         DefaultValuedAttr<
             DispatchLoweringPassPipelineEnum,
-            "IREE::HAL::DispatchLoweringPassPipeline::None">>,
+            "\"IREE::HAL::DispatchLoweringPassPipeline::None\"">>,
     StructFieldAttr<"workgroupSize",
         DefaultValuedAttr<I64ArrayAttr, "{}">>
   ]>;
