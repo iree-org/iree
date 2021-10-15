@@ -39,8 +39,8 @@ Those can be run to make sure a system has the required CUDA support.
 
 CUDA has an open source backend in LLVM generating PTX that we are leveraging.
 Therefore IREE can create [NVVM](https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html)
-(CUDA LLVM variant) and use LLVM has backend to generate PTX. CUDA driver will
-do the "last mile compilation" just in time and convert PTX into native isa.
+(CUDA LLVM variant) and use LLVM's backend to generate PTX. The CUDA driver
+will do the "last mile compilation" at runtime to convert PTX into the GPU's native ISA.
 
 IREE compiler pipeline starts from linalg on tensor representation. A large part
 of the compiler is independent of the target.
