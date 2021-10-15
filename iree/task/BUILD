@@ -71,6 +71,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/base/internal:atomic_slist",
+        "//iree/base/internal:fpu_state",
         "//iree/base/internal:prng",
         "//iree/base/internal:synchronization",
         "//iree/base/internal:threading",

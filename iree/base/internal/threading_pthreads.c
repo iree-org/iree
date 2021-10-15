@@ -22,7 +22,6 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/call_once.h"
-#include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
 #include "iree/base/tracing.h"
@@ -82,10 +81,6 @@ static int iree_thread_set_name(pthread_t handle, const char* name) {
 }
 
 static void* iree_thread_start_routine(void* param) {
-  // We cannot rely on the global process settings for FPU state.
-  // Be explicit here on what we need.
-  iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
-
   // NOTE: we own a reference to the thread handle so that the creation
   // thread can't delete this out from under us.
   iree_thread_t* thread = (iree_thread_t*)param;

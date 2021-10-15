@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/task/executor_impl.h"
@@ -350,6 +351,10 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
 // Thread entry point for each worker.
 static int iree_task_worker_main(iree_task_worker_t* worker) {
   IREE_TRACE_ZONE_BEGIN(thread_zone);
+
+  // We cannot rely on the global process settings for FPU state.
+  // Be explicit here on what we need.
+  iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
 
   // Reset affinity (as it can change over time).
   // TODO(benvanik): call this after waking in case CPU hotplugging happens.
