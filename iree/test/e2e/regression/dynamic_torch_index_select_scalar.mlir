@@ -1,5 +1,5 @@
 func @torch_index_select1() {
-  %lhs = util.dynamic_shape_constant
+  %lhs = flow.tensor.constant
     dense<[[[1,2,3,4,5]],
            [[6,7,8,9,10]],
            [[11,12,13,14,15]],
@@ -15,7 +15,7 @@ func @torch_index_select1() {
 }
 
 func @torch_index_select2() {
-   %lhs = util.dynamic_shape_constant
+   %lhs = flow.tensor.constant
     dense<[[[1,2,3,4,5]],
            [[6,7,8,9,10]],
            [[11,12,13,14,15]],

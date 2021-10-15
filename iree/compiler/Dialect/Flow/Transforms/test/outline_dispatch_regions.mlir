@@ -164,16 +164,10 @@ func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32>
   %x = arith.constant 1024 : index
   // CHECK-DAG: %[[Y:.+]] = arith.constant 512
   %y = arith.constant 512 : index
-  // CHECK-NEXT: %[[ARG0_SHAPE:.+]] = shapex.make_ranked_shape %[[ARG0_DIM1]], %[[ARG0_DIM3]]
-  //  CHECK-DAG: %[[IN_ARG0_DIM1:.+]] = shapex.ranked_dim %[[ARG0_SHAPE]][1]
-  //  CHECK-DAG: %[[IN_ARG0_DIM3:.+]] = shapex.ranked_dim %[[ARG0_SHAPE]][3]
-  // CHECK-NEXT: %[[RET0_SHAPE:.+]] = shapex.make_ranked_shape %[[ARG0_DIM3]], %[[ARG0_DIM1]]
-  //  CHECK-DAG: %[[IN_RET0_DIM0:.+]] = shapex.ranked_dim %[[RET0_SHAPE]][0]
-  //  CHECK-DAG: %[[IN_RET0_DIM1:.+]] = shapex.ranked_dim %[[RET0_SHAPE]][1]
   // CHECK-NEXT: %[[RET0:.+]] = flow.dispatch @dynamicShapeDispatch_dispatch_0::@dynamicShapeDispatch_dispatch_0[
   // CHECK-SAME:   %[[X]], %[[Y]]
-  // CHECK-SAME: ](%arg0, %[[IN_ARG0_DIM1]], %[[IN_ARG0_DIM3]], %[[IN_RET0_DIM0]], %[[IN_RET0_DIM1]])
-  // CHECK-SAME: : (tensor<7x?x24x?xf32>{%[[IN_ARG0_DIM1]], %[[IN_ARG0_DIM3]]}, index, index, index, index) -> tensor<?x?x1024xf32>{%[[IN_RET0_DIM0]], %[[IN_RET0_DIM1]]}
+  // CHECK-SAME: ](%arg0, %[[ARG0_DIM1]], %[[ARG0_DIM3]], %[[ARG0_DIM3]], %[[ARG0_DIM1]])
+  // CHECK-SAME: : (tensor<7x?x24x?xf32>{%[[ARG0_DIM1]], %[[ARG0_DIM3]]}, index, index, index, index) -> tensor<?x?x1024xf32>{%[[ARG0_DIM3]], %[[ARG0_DIM1]]}
   %ret0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<7x?x24x?xf32>{%dim1, %dim3}) -> tensor<?x?x1024xf32>{%dim3, %dim1} = (
     %arg: !flow.dispatch.tensor<readonly:7x?x24x?xf32>, %ret: !flow.dispatch.tensor<writeonly:?x?x1024xf32>
   ) {

@@ -87,6 +87,10 @@ def FLOW_ExecutableRefAttr : AliasedSymbolRefAttr;
 def FLOW_GlobalRefAttr : AliasedSymbolRefAttr;
 def FLOW_GlobalPtr : Util_AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 
+//===----------------------------------------------------------------------===//
+// Dispatch types
+//===----------------------------------------------------------------------===//
+
 def FLOW_TensorAccessCanReadPred : CPred<[{
   $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
       IREE::Flow::TensorAccess::ReadOnly ||

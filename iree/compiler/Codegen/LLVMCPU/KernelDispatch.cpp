@@ -398,7 +398,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, linalg_ext::FftOp fftOp,
   if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
     APInt value;
     if (matchPattern(fftOp.getStage(), m_ConstantInt(&value))) {
-      workgroupTileSizes[rank - 1] = 1 << value.getSExtValue();
+      workgroupTileSizes[rank - 1] = 1ll << value.getSExtValue();
       workgroupTileSizes[rank - 1] =
           std::max(workgroupTileSizes[rank - 1],
                    static_cast<int64_t>(defaultWorkgroupTileSize));

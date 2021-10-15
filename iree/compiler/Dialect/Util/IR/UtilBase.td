@@ -32,6 +32,8 @@ def Util_Element : AnyTypeOf<[AnySignlessInteger, AnyFloat]>;
 def Util_MemRef : MemRefOf<[Util_Element]>;
 def Util_Tensor : TensorOf<[Util_Element]>;
 
+def Util_Offset : AnyTypeOf<[Index, AnyInteger]>;
+
 class Util_IndexAttrBase<string descr> :
     TypedAttrBase<
       Index, "IntegerAttr",

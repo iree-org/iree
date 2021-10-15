@@ -127,7 +127,7 @@ static LogicalResult setFftConfig(FuncOp entryPoint, linalg_ext::FftOp op) {
   if (workgroupTileSize.size() >= rank && workgroupTileSize[rank - 1] != 0) {
     APInt value;
     if (matchPattern(op.getStage(), m_ConstantInt(&value))) {
-      workgroupTileSize[rank - 1] = 1 << value.getSExtValue();
+      workgroupTileSize[rank - 1] = 1ll << value.getSExtValue();
     } else {
       op.emitError("non-constant stage might not work for fft op");
       return failure();

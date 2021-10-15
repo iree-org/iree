@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Optional.h"
@@ -526,7 +527,7 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
 static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                                ShapedType rhsType, ValueRange rhsDynamicDims) {
   if (lhsType.hasStaticShape() && rhsType.hasStaticShape() &&
-      lhsType.getNumElements() == rhsType.getNumElements()) {
+      lhsType == rhsType) {
     // Static shape equivalence means we can fast-path the check.
     return true;
   }
@@ -552,6 +553,47 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
     }
   }
   return true;
+}
+
+OpFoldResult TensorConstantOp::fold(ArrayRef<Attribute> operands) {
+  auto dynamicType = getType();
+  if (dynamicType.getNumDynamicDims() == 0) {
+    return value();
+  }
+  return {};
+}
+
+namespace {
+
+struct ExpandDynamicShapeConstant : public OpRewritePattern<TensorConstantOp> {
+  using OpRewritePattern<TensorConstantOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorConstantOp op,
+                                PatternRewriter &rewriter) const override {
+    auto constantOp =
+        rewriter.create<arith::ConstantOp>(op.getLoc(), op.value());
+    auto dynamicType = op.getType();
+    auto staticType = constantOp.getType().cast<ShapedType>();
+    SmallVector<Value> dynamicDims;
+    for (int64_t i = 0; i < dynamicType.getNumDynamicDims(); ++i) {
+      auto dimValue = rewriter
+                          .create<arith::ConstantIndexOp>(
+                              op.getLoc(), staticType.getDimSize(i))
+                          .getResult();
+      dynamicDims.push_back(
+          rewriter.create<IREE::Util::DoNotOptimizeOp>(op.getLoc(), dimValue)
+              .getResult(0));
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, dynamicType, constantOp.getResult(), dynamicDims);
+    return success();
+  }
+};
+
+}  // namespace
+
+void TensorConstantOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandDynamicShapeConstant>(context);
 }
 
 OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
@@ -627,11 +669,55 @@ struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
   }
 };
 
+struct ResolveShapedRank : public OpRewritePattern<RankOp> {
+  using OpRewritePattern<RankOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(RankOp op,
+                                PatternRewriter &rewriter) const override {
+    auto shapedType = op.memrefOrTensor().getType().cast<ShapedType>();
+    rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op,
+                                                        shapedType.getRank());
+    return success();
+  }
+};
+
+struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
+  using OpRewritePattern<tensor::DimOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::DimOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.getConstantIndex().hasValue()) {
+      return rewriter.notifyMatchFailure(
+          op, "non-constant index dim ops are unsupported");
+    }
+    auto idx = op.getConstantIndex().getValue();
+
+    auto shapedType = op.source().getType().cast<ShapedType>();
+    if (!shapedType.isDynamicDim(idx)) {
+      rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(
+          op, shapedType.getDimSize(idx));
+      return success();
+    }
+
+    auto dynamicDims = IREE::Util::findDynamicDims(op.source(), op);
+    if (!dynamicDims.hasValue()) {
+      return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");
+    }
+    unsigned dimOffset = 0;
+    for (unsigned i = 0; i < idx; ++i) {
+      if (shapedType.isDynamicDim(i)) ++dimOffset;
+    }
+    rewriter.replaceOp(op, dynamicDims.getValue()[dimOffset]);
+
+    return success();
+  }
+};
+
 }  // namespace
 
 void TensorReshapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<FlattenTensorReshapeChain>(context);
+  results.insert<ResolveShapedRank>(context);
+  results.insert<ResolveShapedDim>(context);
 }
 
 void TensorLoadOp::getCanonicalizationPatterns(

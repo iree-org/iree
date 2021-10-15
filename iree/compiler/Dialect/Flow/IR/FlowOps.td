@@ -34,6 +34,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     "getTiedOperandsIndexAndLength",
   ]>,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
   let description = [{
@@ -121,6 +122,13 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 
     /// Returns the index of the args() operand in the Operation operands list.
     unsigned mapArgOperandToOpOperand(unsigned i) { return i + workgroup_count().size(); };
+
+    ValueRange getOperandDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx - workgroup_count().size(), operands(), operand_dims());
+    }
+    ValueRange getResultDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, results(), result_dims());
+    }
   }];
 
   let verifier = [{ return verifyDispatchWorkgroupsOp(*this); }];
@@ -540,6 +548,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     "getTiedOperandsIndexAndLength",
   ]>,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
   let description = [{
@@ -588,6 +597,13 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 
     // StreamableOpInterface:
     bool isTransfer() { return false; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx - workgroup_count().size(), operands(), operand_dims());
+    }
+    ValueRange getResultDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, results(), result_dims());
+    }
   }];
 
   let assemblyFormat = [{
@@ -606,6 +622,30 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 // Tensor ops
 //===----------------------------------------------------------------------===//
 
+// TODO(benvanik): make this behave like std.constant if not dynamic.
+def FLOW_TensorConstantOp : FLOW_Op<"tensor.constant"> {
+  let summary = [{tensor constant that can have dynamic dimensions}];
+  let description = [{
+    Allows specifying a constant where the return value can erase shape
+    information. This operation is declared as having side effects and has no
+    folder, so will not be optimized away by the compiler. The underlying shape
+    information should be hidden from the compiler and resolved at runtime.
+
+    ```mlir
+    %c = flow.tensor.constant tensor<2x2xf32> -> tensor<?x?xf32>
+    %res = "mhlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+    ```
+  }];
+  let arguments = (ins ElementsAttr:$value);
+  let results = (outs AnyTensor:$result);
+  let assemblyFormat = [{
+    $value attr-dict `->` type($result)
+  }];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   FLOW_StreamableOp,
   AllElementTypesMatch<["source", "result"]>,
@@ -616,6 +656,7 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
       "getTiedResultOperandIndices",
   ]>,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{reshapes a tensor}];
   let description = [{
@@ -653,6 +694,9 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
   let hasFolder = 1;
@@ -665,6 +709,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
                   "$_self.cast<ShapedType>().getElementType()">,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{loads a value from a tensor element}];
   let description = [{
@@ -698,6 +743,11 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
     }]>,
   ];
 
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return ValueRange{}; }
+  }];
+
   // TODO(benvanik): canonicalize to slice+load if dims are known.
   let hasFolder = 1;
   let hasCanonicalizer = 1;
@@ -710,6 +760,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
                   "$_self.cast<ShapedType>().getElementType()">,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{stores a value into a tensor element}];
   let description = [{
@@ -745,6 +796,11 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
     }]>,
   ];
 
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return target_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+  }];
+
   let hasFolder = 1;
 }
 
@@ -754,6 +810,7 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
                   "result", "value",
                   "$_self.cast<ShapedType>().getElementType()">,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{splats a value into a shaped tensor}];
   let description = [{
@@ -776,6 +833,9 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
   let hasCanonicalizer = 1;
@@ -786,6 +846,7 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   FLOW_StreamableOp,
   AllTypesMatch<["operand", "result"]>,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{performs a full tensor clone operation}];
   let description = [{
@@ -818,6 +879,9 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return operand_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return operand_dims(); }
   }];
 
   // TODO(benvanik): canonicalize away entirely in most cases.
@@ -830,6 +894,7 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
   AllElementTypesMatch<["source", "result"]>,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{slices out a subregion of a tensor}];
   let description = [{
@@ -857,6 +922,9 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
   // TODO(benvanik): canonicalize multiple slices (traverse upward through ssa).
@@ -875,6 +943,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
       "getTiedResultOperandIndices",
   ]>,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{updates a tensor with the contents of another tensor}];
   let description = [{
@@ -911,6 +980,11 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) {
+      return idx == 0 ? target_dims() : update_dims();
+    }
+    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
   }];
 
   let verifier = [{ return verifyTensorUpdateOp(*this); }];
@@ -940,13 +1014,14 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 // Streams
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): replace with real segmented stream ops.
+// TODO(#7277): remove when switched to streams (happens there now).
 def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface>,
   DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+  Util_ShapeAwareOp,
 ]> {
   let summary = [{experimental op for defining formed stream regions}];
   let description = [{
@@ -989,6 +1064,15 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
       "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, operands(), operand_dims());
+    }
+    ValueRange getResultDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, results(), result_dims());
+    }
+  }];
 
   let verifier = [{ return verifyExStreamFragmentOp(*this); }];
 

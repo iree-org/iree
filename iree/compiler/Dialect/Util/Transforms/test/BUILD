@@ -17,7 +17,11 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "block_patterns.mlir",
+            "combine_initializers.mlir",
             "drop_compiler_hints.mlir",
+            "fold_globals.mlir",
+            "fuse_globals.mlir",
             "simplify_global_accesses.mlir",
         ],
         include = ["*.mlir"],
