@@ -74,14 +74,20 @@ The flatbuffer can then be loaded to a VM module and run through IREE's runtime.
 
 ## Samples
 
-| Colab notebooks |  |
-| -- | -- |
-Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb)
+* The
+[tflitehub folder](https://github.com/google/iree-samples/tree/main/tflitehub)
+in the [iree-samples repository](https://github.com/google/iree-samples)
+contains test scripts to compile, run, and compare various TensorFlow Lite
+models sourced from [TensorFlow Hub](https://tfhub.dev/).
 
-An example smoke test of the
+* An example smoke test of the
 [TensorFlow Lite C API](https://github.com/google/iree/tree/main/bindings/tflite)
 is available
 [here](https://github.com/google/iree/blob/main/bindings/tflite/smoke_test.cc).
+
+| Colab notebooks |  |
+| -- | -- |
+Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb)
 
 !!! todo
 

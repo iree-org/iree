@@ -25,10 +25,7 @@ theme:
 
     - navigation.top  # Back to top button
 
-    # Insiders only: navigation indices
-    #     1) supply index.md page under each section
-    #     2) list each index.md page in the `nav:` section below
-    # - navigation.indexes
+    - navigation.indexes  # section names can link to index.md pages
 
   palette:
     # Light mode
@@ -94,29 +91,34 @@ markdown_extensions:
 
 # Navigation with explicit ordering and nesting.
 # https://www.mkdocs.org/user-guide/configuration/#nav
+# Note: may include external links and titles are optional for internal links
 nav:
   - Home: 'index.md'
   - 'ML frameworks':
+      - 'ml-frameworks/index.md'
       - TensorFlow: 'ml-frameworks/tensorflow.md'
       - TensorFlow Lite: 'ml-frameworks/tensorflow-lite.md'
       - JAX: 'ml-frameworks/jax.md'
   - 'Deployment configurations':
+      - 'deployment-configurations/index.md'
       - CPU - Dylib: 'deployment-configurations/cpu-dylib.md'
       - CPU - Bare-Metal: 'deployment-configurations/bare-metal.md'
       - GPU - Vulkan: 'deployment-configurations/gpu-vulkan.md'
   - 'Building from source':
-      # - 'building-from-source/index.md'  # TODO(scotttodd): insiders + navigation.indexes
+      - 'building-from-source/index.md'
       - 'building-from-source/getting-started.md'
-      - Optional features: 'building-from-source/optional-features.md'
-      - Android cross-compilation: 'building-from-source/android.md'
-      - RISC-V cross-compilation: 'building-from-source/riscv.md'
+      - 'building-from-source/optional-features.md'
+      - 'building-from-source/android.md'
+      - 'building-from-source/riscv.md'
   - 'Bindings':
+      - 'bindings/index.md'
       - C API: 'bindings/c-api.md'
       - Python: 'bindings/python.md'
       - TensorFlow Lite: 'bindings/tensorflow-lite.md'
   - 'Community':
       - Projects: 'community/projects.md'
   - 'Blog':
+      - 'blog/index.md'
       - CUDA backend: 'blog/2021-10-15-cuda-backend.md'
       - Work in progress on Matrix Multiplication on CPU: 'blog/2021-10-13-mmt4d.md'
       - TFLite Support via TOSA: 'blog/2021-07-19-tflite-tosa.md'
