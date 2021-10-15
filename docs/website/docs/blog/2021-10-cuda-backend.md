@@ -84,7 +84,7 @@ can now successfully compile full models.
 ![Compilation diagram](./2021-10-cuda-bring_up.png)
 
 The steps to reproduce running a simple op end to end through CUDA backend are
-describe [here](https://github.com/google/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
+described [here](https://github.com/google/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
 
 ## Performance
 
