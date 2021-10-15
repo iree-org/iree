@@ -88,8 +88,8 @@ described [here](https://github.com/google/iree/blob/main/docs/developers/design
 
 ## Performance
 
-Now that we have enable functionality we need to look at the performance. Once
-again we an leverage existing MLIR transformations to speed up the developement
+Now that we have enabled functionality we need to look at the performance. Once
+again we can leverage existing MLIR transformations to speed up the developement
 work.
 
 ### Tiling and distribution
