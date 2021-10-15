@@ -144,7 +144,6 @@ iree_check_single_backend_test_suite(
     "dylib"
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
-    "-iree-llvm-link-embedded=true"
 )
 
 iree_check_single_backend_test_suite(

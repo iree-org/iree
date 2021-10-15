@@ -47,9 +47,6 @@ iree_check_single_backend_test_suite(
             "tensor_cast.mlir",
         ],
     ),
-    compiler_flags = [
-        "-iree-llvm-link-embedded=true",
-    ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
@@ -67,9 +64,6 @@ iree_check_single_backend_test_suite(
             "tensor_cast.mlir",
         ],
     ),
-    compiler_flags = [
-        "-iree-llvm-link-embedded=true",
-    ],
     driver = "cuda",
     tags = [
         "noasan",
@@ -94,9 +88,6 @@ iree_check_single_backend_test_suite(
             "tensor_cast.mlir",
         ],
     ),
-    compiler_flags = [
-        "-iree-llvm-link-embedded=true",
-    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

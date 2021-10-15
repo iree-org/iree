@@ -47,9 +47,6 @@ iree_check_single_backend_test_suite(
         exclude = [
         ],
     ),
-    compiler_flags = [
-        "-iree-llvm-link-embedded=true",
-    ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )

@@ -36,8 +36,6 @@ iree_check_single_backend_test_suite(
     "dylib-llvm-aot"
   DRIVER
     "dylib"
-  COMPILER_FLAGS
-    "-iree-llvm-link-embedded=true"
 )
 
 iree_check_single_backend_test_suite(

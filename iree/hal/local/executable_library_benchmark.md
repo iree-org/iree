@@ -58,7 +58,6 @@ iree-translate \
     iree/samples/simple_embedding/simple_embedding_test.mlir \
     -o=module.vmfb \
     -iree-hal-target-backends=dylib-llvm-aot \
-    -iree-llvm-link-embedded=true \
     -iree-llvm-debug-symbols=false \
     -iree-llvm-target-triple=x86_64-pc-linux-elf \
     -print-ir-after-all \
