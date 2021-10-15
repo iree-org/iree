@@ -51,7 +51,7 @@ hal.executable private @workgroup_tile_loop  {
     }
     builtin.module {
       builtin.func @workgroup_tile_loop() {
-        %c2048 = constant 2048 : index
+        %c2048 = arith.constant 2048 : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %idx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
@@ -80,7 +80,7 @@ hal.executable private @workgroup_tile_loop_negative  {
     }
     builtin.module {
       builtin.func @workgroup_tile_loop_negative() {
-        %c2048 = constant 2048 : index
+        %c2048 = arith.constant 2048 : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %idx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
