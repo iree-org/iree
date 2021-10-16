@@ -11,6 +11,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
@@ -61,6 +62,20 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     // Sure!
     return true;
   }
+
+  void handleTerminator(Operation *op, Block *newDest) const final {
+    auto returnOp = dyn_cast<IREE::Util::InitializerReturnOp>(op);
+    if (!returnOp) return;
+    // util.initialize.return takes no args.
+    OpBuilder builder(op);
+    builder.create<mlir::BranchOp>(op->getLoc(), newDest, ValueRange{});
+    op->erase();
+  }
+
+  void handleTerminator(Operation *op,
+                        ArrayRef<Value> valuesToReplace) const final {
+    // util.initialize.return takes no args.
+  }
 };
 
 UtilDialect::UtilDialect(MLIRContext *context)
@@ -76,8 +91,9 @@ UtilDialect::UtilDialect(MLIRContext *context)
 
 Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
-  if (arith::ConstantOp::isBuildableWith(value, type))
+  if (arith::ConstantOp::isBuildableWith(value, type)) {
     return builder.create<arith::ConstantOp>(loc, value, type);
+  }
   return nullptr;
 }
 

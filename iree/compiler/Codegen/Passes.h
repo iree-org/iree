@@ -244,6 +244,11 @@ void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm);
 /// performs distribution to threads with vectorization.
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
 
+/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
+/// distributed Linalg ops to SPIR-V cooperative matrix code. Additionally
+/// performs distribution to threads with vectorization.
+void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm);
+
 /// Pass to perform the final conversion to SPIR-V dialect.
 ///
 /// This pass converts remaining interface ops into SPIR-V global variables,
@@ -272,10 +277,14 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVRemoveOneTripTiledLoopPass();
 /// and invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
 
+/// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize to
+/// vector ops suitable for lowering to SPIR-V cooperative ops.
+std::unique_ptr<OperationPass<FuncOp>>
+createSPIRVTileAndVectorizeToCooperativeOpsPass();
+
 /// Pass to convert vector read/write/arithmetic operations to the corresponding
 /// cooperative matrix ops when possible.
-std::unique_ptr<OperationPass<FuncOp>>
-createSPIRVVectorToCooperativeMatrixPass();
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToCooperativeOpsPass();
 
 /// Pass to lower linalg.copy for copying data to workgroup memory.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVCopyToWorkgroupMemoryPass();

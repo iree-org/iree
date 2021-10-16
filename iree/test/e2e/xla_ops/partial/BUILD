@@ -24,7 +24,7 @@ package(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_linalg_on_tensors_vulkan-spirv_vulkan_f16",
+    name = "check_vulkan-spirv_vulkan_f16",
     srcs = [
         "add_f16.mlir",
         "dot_f16.mlir",

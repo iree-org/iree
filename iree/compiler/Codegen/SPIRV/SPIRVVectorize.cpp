@@ -295,8 +295,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
           contractLoweringPatterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
-      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(contractLoweringPatterns));
     }

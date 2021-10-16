@@ -38,6 +38,8 @@ namespace {
 /// - For output:
 ///   - N must be 1.
 ///   - Co must be a multiple of 4.
+/// - For input:
+///   - Ci must be < 4.
 /// - For filter:
 ///   - Hf must be 1.
 ///   - Hf must be 1.
@@ -64,38 +66,37 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
       }
     }
 
-    auto inputViewOp =
-        convOp.getInputOperand(0)->get().getDefiningOp<memref::SubViewOp>();
-    auto filterViewOp =
-        convOp.getInputOperand(1)->get().getDefiningOp<memref::SubViewOp>();
-    auto outputViewOp =
-        convOp.getOutputOperand(0)->get().getDefiningOp<memref::SubViewOp>();
-    if (!filterViewOp || !inputViewOp || !outputViewOp) return failure();
+    Value input = convOp.image();
+    Value filter = convOp.filter();
+    Value output = convOp.outputs()[0];
+
+    auto inputType = input.getType().cast<ShapedType>();
+    auto filterType = filter.getType().cast<ShapedType>();
+    auto outputType = output.getType().cast<ShapedType>();
 
     // The filter/input/output view should have static sizes to vectorize.
-    if (!llvm::empty(filterViewOp.getDynamicSizes()) ||
-        !llvm::empty(inputViewOp.getDynamicSizes()) ||
-        !llvm::empty(outputViewOp.getDynamicSizes())) {
+    if (!inputType.hasStaticShape() || !filterType.hasStaticShape() ||
+        !outputType.hasStaticShape()) {
       return failure();
     }
 
+    auto filterShape = filterType.getShape();
+    auto outputShape = outputType.getShape();
+
     // The output batch dimension should be 1.
-    if (outputViewOp.getStaticSize(0) != 1) return failure();
+    if (outputShape[0] != 1) return failure();
 
     // We addtionally expect the filter height/width dimensions are both 1 to
     // simplify vectorization. Other patterns can generate loops to create 1x1
     // filter subivews.
-    if (filterViewOp.getStaticSize(0) != 1 ||
-        filterViewOp.getStaticSize(1) != 1) {
-      return failure();
-    }
+    if (filterShape[0] != 1 || filterShape[1] != 1) return failure();
 
-    int64_t numInputChannels = filterViewOp.getStaticSize(2);
-    int64_t numOutputChannels = filterViewOp.getStaticSize(3);
+    int64_t numInputChannels = filterShape[2];
+    int64_t numOutputChannels = filterShape[3];
     if (numInputChannels > 4 || numOutputChannels % 4 != 0) return failure();
 
-    int64_t numOutputHeights = outputViewOp.getStaticSize(1);
-    int64_t numOutputWidths = outputViewOp.getStaticSize(2);
+    int64_t numOutputHeights = outputShape[1];
+    int64_t numOutputWidths = outputShape[2];
     int64_t heightStride = convOp.strides().getValue<int64_t>({0});
     int64_t widthStride = convOp.strides().getValue<int64_t>({1});
 
@@ -112,7 +113,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
     MLIRContext *context = convOp.getContext();
     Location loc = convOp.getLoc();
 
-    Type elementType = filterViewOp.getType().getElementType();
+    Type elementType = filterType.getElementType();
     auto filterVectorType =
         VectorType::get({numInputChannels, numOutputChannels}, elementType);
     auto vector1x4Type = VectorType::get({1, 4}, elementType);
@@ -122,7 +123,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
     // Load the entire filter subview.
     SmallVector<Value, 4> filterIndices(4, zero);
     Value wholeFilter = rewriter.create<vector::TransferReadOp>(
-        loc, filterVectorType, filterViewOp, filterIndices);
+        loc, filterVectorType, filter, filterIndices);
 
     // Get filter slices so that later we can use them for dot product with the
     // input. Both the height and width dimensions are 1; so we just need to
@@ -159,6 +160,8 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
     // batch. We only contribute numInputChannels accumulation along the
     // reduction dimension. So read in the result from the output, compose a
     // chain of numInputChannels vector dot operations, and then write out.
+    bool hasTensorSemantics = convOp.hasTensorSemantics();
+    Value outputWrite = output;
     for (int oh = 0; oh < numOutputHeights; ++oh) {
       for (int ow = 0; ow < numOutputWidths; ++ow) {
         // Read in the input vector for these 4 input channels a a batch. The
@@ -170,7 +173,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
         inputIndices[2] = rewriter.createOrFold<arith::ConstantIndexOp>(
             loc, ow * widthStride);
         Value inputVector = rewriter.create<vector::TransferReadOp>(
-            loc, inputVectorType, inputViewOp, inputIndices);
+            loc, inputVectorType, input, inputIndices);
 
         for (int oc = 0; oc < numOutputChannels / 4; ++oc) {
           // Read in the initial value for this output vector.
@@ -182,7 +185,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
           outputIndices[3] =
               rewriter.createOrFold<arith::ConstantIndexOp>(loc, oc * 4);
           Value outputVector = rewriter.create<vector::TransferReadOp>(
-              loc, vector1x4Type, outputViewOp, outputIndices);
+              loc, vector1x4Type, output, outputIndices);
 
           // Peform a chain of dot product and accumulation.
           for (int i = 0; i < numInputChannels; ++i) {
@@ -196,13 +199,19 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
           }
 
           // Write out the output vector.
-          rewriter.create<vector::TransferWriteOp>(loc, outputVector,
-                                                   outputViewOp, outputIndices);
+          auto writeOp = rewriter.create<vector::TransferWriteOp>(
+              loc, outputVector, outputWrite, outputIndices);
+          if (hasTensorSemantics) outputWrite = writeOp.getResult(0);
         }
       }
     }
 
-    rewriter.eraseOp(convOp);
+    if (hasTensorSemantics) {
+      rewriter.replaceOp(convOp, outputWrite);
+    } else {
+      rewriter.eraseOp(convOp);
+    }
+
     return success();
   }
 };
@@ -235,37 +244,36 @@ struct VectorizeLinalgDepthwiseConv
                                 PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "inspecting " << convOp << "\n");
 
-    auto inputViewOp =
-        convOp.getInputOperand(0)->get().getDefiningOp<memref::SubViewOp>();
-    auto filterViewOp =
-        convOp.getInputOperand(1)->get().getDefiningOp<memref::SubViewOp>();
-    auto outputViewOp =
-        convOp.getOutputOperand(0)->get().getDefiningOp<memref::SubViewOp>();
-    if (!filterViewOp || !inputViewOp || !outputViewOp) return failure();
+    Value input = convOp.image();
+    Value filter = convOp.filter();
+    Value output = convOp.outputs()[0];
+
+    auto inputType = input.getType().cast<ShapedType>();
+    auto filterType = filter.getType().cast<ShapedType>();
+    auto outputType = output.getType().cast<ShapedType>();
 
     // The filter/input/output view should have static sizes to vectorize.
-    if (!llvm::empty(filterViewOp.getDynamicSizes()) ||
-        !llvm::empty(inputViewOp.getDynamicSizes()) ||
-        !llvm::empty(outputViewOp.getDynamicSizes())) {
+    if (!inputType.hasStaticShape() || !filterType.hasStaticShape() ||
+        !outputType.hasStaticShape()) {
       return failure();
     }
 
+    auto filterShape = filterType.getShape();
+    auto outputShape = outputType.getShape();
+
     // The output batch dimension should be 1.
-    if (outputViewOp.getStaticSize(0) != 1) return failure();
+    if (outputShape[0] != 1) return failure();
 
     // We addtionally expect the filter height/width dimensions are both 1 to
     // simplify vectorization. Other patterns can generate loops to create 1x1
     // filter subivews.
-    if (filterViewOp.getStaticSize(0) != 1 ||
-        filterViewOp.getStaticSize(1) != 1) {
-      return failure();
-    }
+    if (filterShape[0] != 1 || filterShape[1] != 1) return failure();
 
-    int64_t numChannels = outputViewOp.getStaticSize(3);
+    int64_t numChannels = outputShape[3];
     if (numChannels % 4 != 0) return failure();
 
-    int64_t numOutputHeights = outputViewOp.getStaticSize(1);
-    int64_t numOutputWidths = outputViewOp.getStaticSize(2);
+    int64_t numOutputHeights = outputShape[1];
+    int64_t numOutputWidths = outputShape[2];
     int64_t heightStride = convOp.strides().getValue<int64_t>({0});
     int64_t widthStride = convOp.strides().getValue<int64_t>({1});
 
@@ -281,22 +289,28 @@ struct VectorizeLinalgDepthwiseConv
 
     Location loc = convOp.getLoc();
 
-    Type elementType = filterViewOp.getType().getElementType();
-    auto vector4Type = VectorType::get(4, elementType);
-    auto filterVectorType = VectorType::get({numChannels}, elementType);
+    Type elementType = filterType.getElementType();
+    auto vector4Type = VectorType::get({1, 1, 1, 4}, elementType);
+    auto filterVectorType = VectorType::get({1, 1, numChannels}, elementType);
     Value zero = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
 
     // Load the entire filter subview.
     SmallVector<Value, 4> filterIndices(3, zero);
     Value wholeFilter = rewriter.create<vector::TransferReadOp>(
-        loc, filterVectorType, filterViewOp, filterIndices);
+        loc, filterVectorType, filter, filterIndices);
 
     // Compute the (numOutputHeights * numOutputWidths * numChannels) output
     // batch. We only contribute numChannels accumulation along the reduction
     // dimension.
+    bool hasTensorSemantics = convOp.hasTensorSemantics();
+    Value outputWrite = output;
     for (int oc = 0; oc < numChannels / 4; ++oc) {
       Value filterVector = rewriter.create<vector::ExtractStridedSliceOp>(
-          loc, wholeFilter, /*offsets=*/oc * 4, /*sizes=*/4, /*strides=*/1);
+          loc, wholeFilter, /*offsets=*/ArrayRef<int64_t>{0, 0, oc * 4},
+          /*sizes=*/ArrayRef<int64_t>{1, 1, 4},
+          /*strides=*/ArrayRef<int64_t>{1, 1, 1});
+      filterVector =
+          rewriter.create<vector::ShapeCastOp>(loc, vector4Type, filterVector);
 
       for (int oh = 0; oh < numOutputHeights; ++oh) {
         for (int ow = 0; ow < numOutputWidths; ++ow) {
@@ -309,7 +323,7 @@ struct VectorizeLinalgDepthwiseConv
           outputIndices[3] =
               rewriter.createOrFold<arith::ConstantIndexOp>(loc, oc * 4);
           Value outputVector = rewriter.create<vector::TransferReadOp>(
-              loc, vector4Type, outputViewOp, outputIndices);
+              loc, vector4Type, output, outputIndices);
 
           // Read in the input vector for these 4 input channels a a batch.
           SmallVector<Value, 4> inputIndices(4, zero);
@@ -320,20 +334,25 @@ struct VectorizeLinalgDepthwiseConv
           inputIndices[3] =
               rewriter.createOrFold<arith::ConstantIndexOp>(loc, oc * 4);
           Value inputVector = rewriter.create<vector::TransferReadOp>(
-              loc, vector4Type, inputViewOp, inputIndices);
+              loc, vector4Type, input, inputIndices);
 
           // Peform element-wise product and accumulation.
           outputVector = rewriter.create<vector::FMAOp>(
               loc, inputVector, filterVector, outputVector);
 
           // Write out the output vector.
-          rewriter.create<vector::TransferWriteOp>(loc, outputVector,
-                                                   outputViewOp, outputIndices);
+          auto writeOp = rewriter.create<vector::TransferWriteOp>(
+              loc, outputVector, outputWrite, outputIndices);
+          if (hasTensorSemantics) outputWrite = writeOp.getResult(0);
         }
       }
     }
 
-    rewriter.eraseOp(convOp);
+    if (hasTensorSemantics) {
+      rewriter.replaceOp(convOp, outputWrite);
+    } else {
+      rewriter.eraseOp(convOp);
+    }
     return success();
   }
 };

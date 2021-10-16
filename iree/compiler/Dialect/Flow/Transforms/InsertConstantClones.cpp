@@ -30,9 +30,7 @@ namespace Flow {
 // function returns or branches. This is a workaround for not having a full
 // DFA pass that attributes tensors with their usage information.
 //
-// TODO(#5492): related to DFA for HAL buffer attributes but we want this at the
-// flow level so that we can schedule the commands appropriately but we may be
-// able to push this down into the HAL stream work when that arrives.
+// TODO(#7277): remove when switched to streams (happens there now).
 class InsertConstantClonesPass
     : public InsertConstantClonesBase<InsertConstantClonesPass> {
  public:

@@ -42,15 +42,3 @@ func @unfoldable_constant() -> i32 {
   %result = arith.addi %input, %input : i32
   return %result : i32
 }
-
-// -----
-
-// TODO(#5897): enable when vmvx supports dynamic shapes.
-// X-CHECK-LABEL: vm.rodata private @dynamic_constant_const dense<3.000000e+00> : tensor<2x3xf32>
-// X-CHECK: vm.func @dynamic_constant
-// func @dynamic_constant() -> tensor<?x?xf32> {
-//   // X-CHECK: vm.call @hal.buffer_view.dim
-//   %input = util.dynamic_shape_constant dense<3.0> : tensor<2x3xf32> -> tensor<?x?xf32>
-//   %res = "mhlo.abs"(%input) : (tensor<?x?xf32>) -> tensor<?x?xf32>
-//   return %res : tensor<?x?xf32>
-// }

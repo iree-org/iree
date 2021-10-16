@@ -12,29 +12,39 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+
+#define DEBUG_TYPE "iree-spirv-nvidia-config"
 
 namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
+struct CooperativeMatrixSize {
+  int64_t m;
+  int64_t n;
+  int64_t k;
+};
+
 /// Returns the cooperative matrix (M, N, K) sizes that are supported by the
 /// target environment and match the given parameters.
-static Optional<SmallVector<int64_t, 4>> getCooperativeMatrixSize(
+static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
     spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
-    Type initType, Type resultType) {
-  for (auto coopMatmulProperties :
-       resourceLimits.cooperative_matrix_properties_nv()
-           .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>()) {
-    if (coopMatmulProperties.a_type().getValue() == lhsType &&
-        coopMatmulProperties.b_type().getValue() == rhsType &&
-        coopMatmulProperties.c_type().getValue() == initType &&
-        coopMatmulProperties.result_type().getValue() == resultType &&
-        coopMatmulProperties.scope().getValue() == spirv::Scope::Subgroup) {
-      return SmallVector<int64_t, 4>{
-          coopMatmulProperties.m_size().getValue().getSExtValue(),
-          coopMatmulProperties.n_size().getValue().getSExtValue(),
-          coopMatmulProperties.k_size().getValue().getSExtValue()};
+    Type resultType, int64_t m, int64_t n, int64_t k) {
+  auto properties = resourceLimits.cooperative_matrix_properties_nv()
+                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  for (auto property : properties) {
+    if (property.a_type().getValue() == lhsType &&
+        property.b_type().getValue() == rhsType &&
+        property.c_type().getValue() == resultType &&
+        property.result_type().getValue() == resultType &&
+        property.scope().getValue() == spirv::Scope::Subgroup) {
+      int64_t matmulM = property.m_size().getValue().getZExtValue();
+      int64_t matmulN = property.n_size().getValue().getZExtValue();
+      int64_t matmulK = property.k_size().getValue().getZExtValue();
+      if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0)
+        return CooperativeMatrixSize{matmulM, matmulN, matmulK};
     }
   }
   return llvm::None;
@@ -42,63 +52,54 @@ static Optional<SmallVector<int64_t, 4>> getCooperativeMatrixSize(
 
 static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
                                  linalg::MatmulOp op) {
+  // This configuration is only for cooperative matrix.
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
     return success();
   }
 
-  ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
-  ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
+  Value lhs = op.inputs()[0], rhs = op.inputs()[1], init = op.outputs()[0];
 
-  if (llvm::any_of(lhsShape, ShapedType::isDynamic) ||
-      llvm::any_of(rhsShape, ShapedType::isDynamic)) {
-    return success();
-  }
+  ArrayRef<int64_t> lhsShape = getUntiledShape(lhs);
+  ArrayRef<int64_t> rhsShape = getUntiledShape(rhs);
+  if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
+  if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
 
-  auto resourceLimits = targetEnv.getResourceLimits();
+  // TODO: Cooperative matrix support is fairly restricted. We can only have
+  // a curated list of fused element wise ops as defined in the extension
+  // SPV_NV_cooperative_matrix. Check that once we move bufferization after
+  // vectorization.
+
   auto getElementType = [](Value v) {
     return v.getType().cast<ShapedType>().getElementType();
   };
 
-  auto outputElementType = getElementType(op.outputs()[0]);
-
-  Optional<SmallVector<int64_t, 4>> coopMatSize = getCooperativeMatrixSize(
-      resourceLimits, getElementType(op.inputs()[0]),
-      getElementType(op.inputs()[1]), outputElementType, outputElementType);
+  auto resourceLimits = targetEnv.getResourceLimits();
+  auto coopMatSize = getCooperativeMatrixSize(
+      resourceLimits, getElementType(lhs), getElementType(rhs),
+      getElementType(init), lhsShape[0], rhsShape[1], lhsShape[1]);
   if (!coopMatSize) return success();
 
-  // Check that the matmul sizes are a multiple of the tilesize.
-  auto isMultipleOf = [](int64_t s, int64_t ts) {
-    return !ShapedType::isDynamic(s) && (s % ts) == 0;
-  };
+  auto pipeline =
+      IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorizeToCooperativeOps;
 
-  if (!isMultipleOf(lhsShape[0], (*coopMatSize)[0]) ||
-      !isMultipleOf(rhsShape[1], (*coopMatSize)[1]) ||
-      !isMultipleOf(lhsShape[1], (*coopMatSize)[2]) ||
-      !isMultipleOf(rhsShape[0], (*coopMatSize)[2])) {
-    return success();
-  }
-
-  // For now this is being hard-wired to be {4, 4, 2}. This can actually be set
-  // to whatever, but ultimately depends on register pressure.
-  const int64_t numVecMatmulPerSubgroupX = 4;
-  const int64_t numVecMatmulPerSubgroupY = 4;
-  const int64_t numVecMatmulPerSubgroupK = 2;
-
-  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+  // For now only support one subgroup per workgroup because in the above
+  // configuration deduction step we only consider whether the input workload is
+  // perfectly divisible by some native cooperative matrix size.
+  //
+  // TODO: Use some heuristics to deduce how many subgroups should be used and
+  // the tile sizes for each subgroup, considering the input workload size and
+  // native cooperative matrix size choices.
+  int64_t subgroupSize = resourceLimits.subgroup_size().getInt();
+  std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
   TileSizesListType tileSizes;
-  // Workgroup level.
-  tileSizes.push_back({numVecMatmulPerSubgroupY * (*coopMatSize)[0],
-                       numVecMatmulPerSubgroupX * (*coopMatSize)[1],
-                       numVecMatmulPerSubgroupK * (*coopMatSize)[2]});
-  // Subgroup level.
-  tileSizes.push_back({numVecMatmulPerSubgroupY * (*coopMatSize)[0],
-                       numVecMatmulPerSubgroupX * (*coopMatSize)[1]});
-
-  int64_t subgroupSize =
-      resourceLimits.subgroup_size().getValue().getSExtValue();
-  std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
+  // Again because we only consider whether the input workload is perfectly
+  // divisible by some native cooperative matrix size, not some multiples of it,
+  // need to make sure the subgroup tile sizes are the same as the workgroup
+  // one.
+  tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
+  tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
 
   return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
                                                op, tileSizes, {}, pipeline,
