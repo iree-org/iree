@@ -8,7 +8,7 @@
 #map5 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-#config = {tileSizes = [[8, 16], [], [1, 1], [0, 0, 1]]}
+#config = {tileSizes = [[8, 16], [1, 1], [0, 0, 1]]}
 
 hal.executable private @matmul  {
   hal.interface @io {
@@ -82,7 +82,7 @@ hal.executable private @matmul  {
 
 // -----
 
-#config = {tileSizes = [[1, 4, 32], [], [1, 1, 1]]}
+#config = {tileSizes = [[1, 4, 32], [1, 1, 1]]}
 
 hal.executable private @conv_1d  {
   hal.interface @io {
@@ -165,7 +165,7 @@ hal.executable private @conv_1d  {
 #map6 = affine_map<(d0)[s0] -> (4, -d0 + s0)>
 #map7 = affine_map<(d0)[s0] -> (32, -d0 + s0)>
 
-#config = {tileSizes = [[0, 1, 4, 32], [], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]]}
+#config = {tileSizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]]}
 
 hal.executable private @conv_no_padding  {
   hal.interface @io {
@@ -292,7 +292,7 @@ hal.executable private @conv_no_padding  {
 
 // -----
 
-#config = {tileSizes = [[0, 0, 1, 4, 32], [], [0, 0, 1, 1, 1]]}
+#config = {tileSizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]]}
 
 hal.executable private @conv_3d  {
   hal.interface @io {
@@ -365,7 +365,7 @@ hal.executable private @conv_3d  {
 #map6 = affine_map<()[s0] -> (32, s0 * -32 + 13)>
 #map7 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1092 + s0 + d1 * 78 + d2 * 6 + d3)>
 
-#config = {tileSizes = [[1, 4, 32], [], [1, 1, 1]]}
+#config = {tileSizes = [[1, 4, 32], [1, 1, 1]]}
 
 module  {
   hal.executable private @pooling_nhwc_max  {

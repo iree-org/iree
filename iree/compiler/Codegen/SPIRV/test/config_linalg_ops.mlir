@@ -100,7 +100,7 @@ hal.executable @tensor_insert {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 16], [], [1, 1]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[1, 16], [1, 1]{{\]}}}
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
 // CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [16, 1]}
