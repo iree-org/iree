@@ -43,6 +43,7 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
+option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
 
 option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
 option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
@@ -516,8 +517,18 @@ endif()
 
 add_subdirectory(iree/tools)
 
+if(IREE_BUILD_TRACY)
+  if(NOT LINUX)
+    message(WARNING "Building Tracy (IREE_BUILD_TRACY) on non-Linux is unsupported and may fail below.")
+  endif()
+  add_subdirectory(build_tools/third_party/tracy ${CMAKE_CURRENT_BINARY_DIR}/tracy)
+  if(NOT TARGET IREETracyCaptureServer)
+    message(SEND_ERROR "Could not build Tracy. Either unset IREE_BUILD_TRACY or look for missing dependencies above and install them.")
+  endif()
+endif()
+
 # Order constraint: The python bindings install tools targets from iree/tools
-# and must come after it.
+# and tracy, and must come after it.
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)
 endif()
