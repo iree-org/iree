@@ -930,6 +930,8 @@ static CommandQueue* iree_hal_vulkan_device_select_queue(
     iree_hal_vulkan_device_t* device,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity) {
+  command_categories |= IREE_HAL_COMMAND_CATEGORY_DISPATCH;
+
   // TODO(benvanik): meaningful heuristics for affinity. We don't generate
   // anything from the compiler that uses multiple queues and until we do it's
   // best not to do anything too clever here.
@@ -946,6 +948,8 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+
+  command_categories |= IREE_HAL_COMMAND_CATEGORY_DISPATCH;
 
   // Select the command pool to used based on the types of commands used.
   // Note that we may not have a dedicated transfer command pool if there are
