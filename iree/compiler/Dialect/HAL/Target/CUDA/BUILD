@@ -51,6 +51,7 @@ cc_library(
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:IPO",
         "@llvm-project//llvm:Linker",
+        "@llvm-project//llvm:MC",
         "@llvm-project//llvm:NVPTXCodeGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
