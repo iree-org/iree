@@ -12,7 +12,8 @@ import sys
 def main(args=None):
   if args is None:
     args = sys.argv[1:]
-  exe = os.path.join(os.path.dirname(__file__), "..", "..", "iree-tracy-capture")
+  exe = os.path.join(os.path.dirname(__file__), "..", "..",
+                     "iree-tracy-capture")
   return subprocess.call(args=[exe] + args)
 
 
