@@ -4,6 +4,17 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(_python_extra_srcs)
+set(_extra_install_tool_targets)
+set(_tracy_enabled OFF)
+
+if(TARGET IREETracyCaptureServer)
+  message(STATUS "Bundline Tracy CLI tools with Python API")
+  set(_tracy_enabled ON)
+  list(APPEND _python_extra_srcs "scripts/iree-tracy-capture")
+  list(APPEND _extra_install_tool_targets "IREETracyCaptureServer")
+endif()
+
 ################################################################################
 # Package
 ################################################################################
@@ -43,6 +54,8 @@ iree_py_library(
     "tracing.py"
     "scripts/iree_benchmark_trace/__main__.py"
     "scripts/iree_run_trace/__main__.py"
+    "scripts/iree_run_module/__main__.py"
+    ${_python_extra_srcs}
   PYEXT_DEPS
     ::PyExtRt
 )
@@ -58,6 +71,20 @@ iree_symlink_tool(
   FROM_TOOL_TARGET iree_tools_iree-run-trace
   TO_EXE_NAME iree-run-trace
 )
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree_tools_iree-run-module
+  TO_EXE_NAME iree-run-module
+)
+
+if(_tracy_enabled)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET IREETracyCaptureServer
+    TO_EXE_NAME iree-tracy-capture
+  )
+endif()
 
 ################################################################################
 # Tests
@@ -102,7 +129,9 @@ iree_py_install_package(
   DEPS
     bindings_python_iree_runtime_PyExtRt
     iree_tools_iree-benchmark-trace
+    iree_tools_iree-run-module
     iree_tools_iree-run-trace
+    ${_extra_install_tool_targets}
   ADDL_PACKAGE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/README.md
 )
@@ -116,7 +145,9 @@ install(
 install(
   TARGETS
     iree_tools_iree-benchmark-trace
+    iree_tools_iree-run-module
     iree_tools_iree-run-trace
+    ${_extra_install_tool_targets}
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
   COMPONENT "${PY_INSTALL_COMPONENT}"
 )
