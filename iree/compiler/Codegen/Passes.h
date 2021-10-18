@@ -273,8 +273,7 @@ createSPIRVLowerExecutableTargetPass();
 /// WARNING: DO NOT USE. This is a legacy pass that is to be deprecated.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVRemoveOneTripTiledLoopPass();
 
-/// Pass to tile and distribute Linalg ops with buffer semantics to subgroups
-/// and invocations.
+/// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
 
 /// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize to

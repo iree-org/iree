@@ -258,7 +258,7 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
     // Inline initial value into all loads.
     for (auto loadOp : global.loadOps) {
       OpBuilder builder(loadOp);
-      auto constantOp = builder.create<mlir::ConstantOp>(
+      auto constantOp = builder.create<arith::ConstantOp>(
           loadOp.getLoc(), loadOp.result().getType(),
           global.op.initial_valueAttr());
       loadOp.replaceAllUsesWith(constantOp.getResult());
@@ -363,7 +363,9 @@ class FoldGlobalsPass
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect, mlir::StandardOpsDialect>();
+    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {

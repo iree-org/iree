@@ -242,7 +242,7 @@ def SPIRVRemoveOneTripTiledLoop :
 // TODO: Rename argument to be fully qualified.
 def SPIRVTileAndDistribute : Pass<"iree-spirv-tile-and-distribute", "FuncOp"> {
   let summary = "Tile and distribute Linalg ops with buffer semantics to "
-                "subgroups and invocations";
+                "invocations";
   let constructor = "mlir::iree_compiler::createSPIRVTileAndDistributePass()";
 }
 

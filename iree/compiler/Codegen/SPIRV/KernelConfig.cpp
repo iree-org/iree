@@ -184,7 +184,6 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
-  tileSizes.emplace_back();  // Subgroup level
   tileSizes.push_back(invocationTileSizes);
   // Tiling along reduction dimensions
   if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
@@ -306,7 +305,6 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
-  tileSizes.emplace_back();
   tileSizes.push_back(invocationTileSizes);
   tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
@@ -437,7 +435,6 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSize);
-  tileSizes.emplace_back();  // Subgroup level.
   tileSizes.push_back(threadTileSize);
 
   return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
