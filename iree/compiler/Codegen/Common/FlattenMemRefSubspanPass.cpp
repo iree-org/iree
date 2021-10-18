@@ -67,7 +67,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 /// Returns true if the given `type` is a MemRef of rank 1.
-static bool isRankeOneMemRef(Type type) {
+static bool isRankOneMemRef(Type type) {
   if (auto memrefType = type.dyn_cast<MemRefType>()) {
     return memrefType.hasRank() && memrefType.getRank() == 1;
   }
@@ -83,7 +83,7 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
     // Convert n-D MemRef to 1-D MemRef.
     addConversion([](MemRefType type) -> Optional<Type> {
       // 1-D MemRef types are okay.
-      if (isRankeOneMemRef(type)) return type;
+      if (isRankOneMemRef(type)) return type;
 
       // Convert to a MemRef with unknown dimension. This is actually more akin
       // to how IREE uses memref types: they are for representing a view from a
@@ -310,7 +310,7 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
   LogicalResult matchAndRewrite(
       memref::LoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankeOneMemRef(adaptor.memref().getType())) {
+    if (!isRankOneMemRef(adaptor.memref().getType())) {
       return rewriter.notifyMatchFailure(
           loadOp, "expected converted memref of rank <= 1");
     }
@@ -335,7 +335,7 @@ struct LinearizeStoreIndices final
   LogicalResult matchAndRewrite(
       memref::StoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!isRankeOneMemRef(adaptor.memref().getType())) {
+    if (!isRankOneMemRef(adaptor.memref().getType())) {
       return rewriter.notifyMatchFailure(
           storeOp, "expected converted memref of rank <= 1");
     }
@@ -364,7 +364,7 @@ struct LinearizeTransferReadIndices final
       return rewriter.notifyMatchFailure(
           transferReadOp, "cannot convert op with non-minor identity map");
     }
-    if (!isRankeOneMemRef(adaptor.source().getType())) {
+    if (!isRankOneMemRef(adaptor.source().getType())) {
       return rewriter.notifyMatchFailure(
           transferReadOp, "expected converted memref of rank <= 1");
     }
@@ -395,7 +395,7 @@ struct LinearizeTransferWriteIndices final
       return rewriter.notifyMatchFailure(
           transferWriteOp, "cannot convert op with non-minor identity map");
     }
-    if (!isRankeOneMemRef(adaptor.source().getType())) {
+    if (!isRankOneMemRef(adaptor.source().getType())) {
       return rewriter.notifyMatchFailure(
           transferWriteOp, "expected converted memref of rank <= 1");
     }
@@ -427,7 +427,7 @@ struct AdjustConversionCast final
     // We only want to handle cases where the cast op handles memref types.
     if (!input.getType().isa<BaseMemRefType>()) return failure();
 
-    if (!isRankeOneMemRef(input.getType())) {
+    if (!isRankOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
           castOp, "expected converted memref of rank <= 1");
     }
@@ -464,7 +464,7 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
   LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
     auto memrefType = op.memref().getType().template cast<MemRefType>();
-    if (!isRankeOneMemRef(memrefType)) {
+    if (!isRankOneMemRef(memrefType)) {
       return rewriter.notifyMatchFailure(op, "expected 1-D memref");
     }
 
@@ -558,32 +558,30 @@ struct FlattenMemRefSubspanPass
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp,
                                  memref::AllocaOp, memref::AllocOp,
                                  memref::GetGlobalOp>([](Operation *op) {
-      return isRankeOneMemRef(op->getResultTypes().front());
+      return isRankOneMemRef(op->getResultTypes().front());
     });
     target.addDynamicallyLegalOp<memref::GlobalOp>(
-        [](memref::GlobalOp op) { return isRankeOneMemRef(op.type()); });
+        [](memref::GlobalOp op) { return isRankOneMemRef(op.type()); });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
-      return isRankeOneMemRef(loadOp.getMemRefType());
+      return isRankOneMemRef(loadOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
-      return isRankeOneMemRef(storeOp.getMemRefType());
+      return isRankOneMemRef(storeOp.getMemRefType());
     });
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
         [](vector::TransferReadOp readOp) {
-          return isRankeOneMemRef(readOp.source().getType().cast<MemRefType>());
+          return isRankOneMemRef(readOp.source().getType().cast<MemRefType>());
         });
     target.addDynamicallyLegalOp<vector::TransferWriteOp>(
         [](vector::TransferWriteOp writeOp) {
-          return isRankeOneMemRef(
-              writeOp.source().getType().cast<MemRefType>());
+          return isRankOneMemRef(writeOp.source().getType().cast<MemRefType>());
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
         [](UnrealizedConversionCastOp castOp) {
           if (castOp->getNumOperands() != 1) return false;
 
           Type inputType = castOp->getOperandTypes().front();
-          return !inputType.isa<BaseMemRefType>() ||
-                 isRankeOneMemRef(inputType);
+          return !inputType.isa<BaseMemRefType>() || isRankOneMemRef(inputType);
         });
 
     // Use partial conversion here so that we can ignore allocations created by
