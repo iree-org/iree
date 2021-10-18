@@ -1,3 +1,9 @@
+// Copyright 2021 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #version 450
 
 // Polyfill for buffer fills that are not aligned to 4 byte offsets or lengths.
@@ -12,13 +18,12 @@ layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(set = 3, binding = 0) buffer OutputBuffer { uint output_elements[]; };
 
 layout(push_constant) uniform Constants {
-  // TODO(scotttodd): // low and high for 8 byte pattern
+  // TODO(scotttodd): low and high for 8 byte pattern
   uint fill_pattern;
   uint fill_pattern_width;  // should be 1 or 2 (or 8 later on)
   uint fill_offset_bytes;   // must be aligned to pattern width
   uint fill_length_bytes;
-}
-input_constants;
+} input_constants;
 
 void FillBufferUnalignedHelper(uint fill_offset_bytes, uint fill_length_bytes) {
   uint fill_aligned_offset = fill_offset_bytes % 4;
