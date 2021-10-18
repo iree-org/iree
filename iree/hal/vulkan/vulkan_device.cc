@@ -14,6 +14,7 @@
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/api.h"
+#include "iree/hal/vulkan/builtin_executables.h"
 #include "iree/hal/vulkan/command_queue.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
@@ -363,6 +364,8 @@ typedef struct iree_hal_vulkan_device_t {
   // Used only for emulated timeline semaphores.
   TimePointSemaphorePool* semaphore_pool;
   TimePointFencePool* fence_pool;
+
+  BuiltinExecutables* builtin_executables;
 } iree_hal_vulkan_device_t;
 
 extern const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable;
@@ -622,6 +625,12 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   }
 
   if (iree_status_is_ok(status)) {
+    device->builtin_executables =
+        new BuiltinExecutables(device->logical_device);
+    status = device->builtin_executables->InitializeExecutables();
+  }
+
+  if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
     iree_hal_device_destroy((iree_hal_device_t*)device);
@@ -647,6 +656,7 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
 
   // Now that no commands are outstanding we can release all resources that may
   // have been in use.
+  delete device->builtin_executables;
   delete device->descriptor_pool_cache;
   delete device->semaphore_pool;
   delete device->fence_pool;
@@ -930,6 +940,12 @@ static CommandQueue* iree_hal_vulkan_device_select_queue(
     iree_hal_vulkan_device_t* device,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity) {
+  // TODO(scotttodd): revisit queue selection logic and remove this
+  //   * the unaligned buffer fill polyfill and tracing timestamp queries may
+  //     both insert dispatches into command buffers that at compile time are
+  //     expected to only contain transfer commands
+  //   * we could set a bit at recording time if emulation or tracing is used
+  //     and submit to the right queue based on that
   command_categories |= IREE_HAL_COMMAND_CATEGORY_DISPATCH;
 
   // TODO(benvanik): meaningful heuristics for affinity. We don't generate
@@ -949,6 +965,12 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
 
+  // TODO(scotttodd): revisit queue selection logic and remove this
+  //   * the unaligned buffer fill polyfill and tracing timestamp queries may
+  //     both insert dispatches into command buffers that at compile time are
+  //     expected to only contain transfer commands
+  //   * we could set a bit at recording time if emulation or tracing is used
+  //     and submit to the right queue based on that
   command_categories |= IREE_HAL_COMMAND_CATEGORY_DISPATCH;
 
   // Select the command pool to used based on the types of commands used.
@@ -974,7 +996,7 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
   return iree_hal_vulkan_direct_command_buffer_allocate(
       device->logical_device, command_pool, mode, command_categories,
       queue_affinity, queue->tracing_context(), device->descriptor_pool_cache,
-      out_command_buffer);
+      device->builtin_executables, out_command_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_device_create_descriptor_set(

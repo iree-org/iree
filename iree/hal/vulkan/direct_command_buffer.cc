@@ -50,6 +50,15 @@ typedef struct iree_hal_vulkan_direct_command_buffer_t {
   // This must remain valid until all in-flight submissions of the command
   // buffer complete.
   DescriptorSetGroup descriptor_set_group;
+
+  BuiltinExecutables* builtin_executables;
+
+  // Shadow copy of push constants used during normal operation, for restoring
+  // after builtin_executables uses vkCmdPushConstants. Size must be greater
+  // than or equal to the push constant memory used by builtin_executables.
+  // TODO(scotttodd): use [maxPushConstantsSize - 16, maxPushConstantsSize]
+  //                  instead of [0, 16] to reduce frequency of updates
+  uint8_t push_constants_storage[IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT];
 } iree_hal_vulkan_direct_command_buffer_t;
 
 extern const iree_hal_command_buffer_vtable_t
@@ -71,6 +80,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_vulkan_tracing_context_t* tracing_context,
     iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
+    iree::hal::vulkan::BuiltinExecutables* builtin_executables,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(command_pool);
@@ -108,6 +118,8 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     new (&command_buffer->descriptor_set_arena)
         DescriptorSetArena(descriptor_pool_cache);
     new (&command_buffer->descriptor_set_group) DescriptorSetGroup();
+
+    command_buffer->builtin_executables = builtin_executables;
 
     *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
   } else {
@@ -512,14 +524,47 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
   VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
       iree_hal_buffer_allocated_buffer(target_buffer));
 
-  // Note that fill only accepts 4-byte aligned values so we need to splat out
-  // our variable-length pattern.
-  target_offset += iree_hal_buffer_byte_offset(target_buffer);
-  uint32_t dword_pattern =
-      iree_hal_vulkan_splat_pattern(pattern, pattern_length);
-  command_buffer->syms->vkCmdFillBuffer(command_buffer->handle,
-                                        target_device_buffer, target_offset,
-                                        length, dword_pattern);
+  // vkCmdFillBuffer requires a 4 byte alignment for the offset, pattern, and
+  // length. We use a polyfill here that fills the unaligned start and end of
+  // fill operations, if needed.
+
+  if (target_offset % 4 != 0 || length % 4 != 0) {
+    // TODO(scotttodd): only restore push constants that have been modified?
+    //                  (this can pass uninitialized memory right now, which
+    //                   *should* be safe but is wasteful)
+    IREE_RETURN_IF_ERROR(
+        command_buffer->builtin_executables->FillBufferUnaligned(
+            command_buffer->handle, &(command_buffer->descriptor_set_arena),
+            target_buffer, target_offset, length, pattern, pattern_length,
+            command_buffer->push_constants_storage));
+
+    // Continue using vkCmdFillBuffer below, but only for the inner aligned
+    // portion of the fill operation.
+    // For example:
+    //   original offset 2, length 8
+    //   aligned  offset 4, length 4
+    // [0x00,0x00,0xAB,0xAB | 0xAB,0xAB,0xAB,0xAB | 0xAB,0xAB,0x00,0x00]
+    //            <-------> <---------------------> <------->
+    //            unaligned     vkCmdFillBuffer     unaligned
+    iree_device_size_t aligned_target_offset =
+        iree_device_align(target_offset, 4);
+    iree_device_size_t target_end = target_offset + length;
+    iree_device_size_t rounded_down_target_end = (target_end / 4) * 4;
+    length -= (aligned_target_offset - target_offset) +
+              (target_end - rounded_down_target_end);
+    target_offset = aligned_target_offset;
+  }
+
+  if (length > 0) {
+    // Note that vkCmdFillBuffer only accepts 4-byte aligned values so we need
+    // to splat out our variable-length pattern.
+    target_offset += iree_hal_buffer_byte_offset(target_buffer);
+    uint32_t dword_pattern =
+        iree_hal_vulkan_splat_pattern(pattern, pattern_length);
+    command_buffer->syms->vkCmdFillBuffer(command_buffer->handle,
+                                          target_device_buffer, target_offset,
+                                          length, dword_pattern);
+  }
 
   return iree_ok_status();
 }
@@ -583,6 +628,13 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
     const void* values, iree_host_size_t values_length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  iree_host_size_t storage_size =
+      IREE_ARRAYSIZE(command_buffer->push_constants_storage);
+  if (offset < storage_size) {
+    memcpy(command_buffer->push_constants_storage + offset, values,
+           std::min(values_length, storage_size) - offset);
+  }
 
   command_buffer->syms->vkCmdPushConstants(
       command_buffer->handle,
