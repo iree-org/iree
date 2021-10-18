@@ -74,7 +74,7 @@ iree_mlir_benchmark_suite(
     "dylib-sync"
 )
 
-# CPU, Dylib, 1-thread, big/little-core, full-inference
+# CPU, Dylib, 1 through 4 threads little-core, 1-thread big core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
     ${DEEPLABV3_FP32_MODULE}
@@ -93,10 +93,83 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
+    # "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
+)
+
+iree_mlir_benchmark_suite(
+  MODULES
+    ${DEEPLABV3_FP32_MODULE}
+    ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+
+  BENCHMARK_MODES
+    "2-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-llvm-loop-unrolling=true"
+    # "--iree-flow-enable-padding-linalg-ops"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=2"
+)
+
+iree_mlir_benchmark_suite(
+  MODULES
+    ${DEEPLABV3_FP32_MODULE}
+    ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+
+  BENCHMARK_MODES
+    "3-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-llvm-loop-unrolling=true"
+    # "--iree-flow-enable-padding-linalg-ops"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=3"
+)
+
+iree_mlir_benchmark_suite(
+  MODULES
+    ${DEEPLABV3_FP32_MODULE}
+    ${MOBILESSD_FP32_MODULE}
+    ${POSENET_FP32_MODULE}
+
+  BENCHMARK_MODES
+    "4-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-llvm-loop-unrolling=true"
+    # "--iree-flow-enable-padding-linalg-ops"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=4"
 )
 
 # GPU, Vulkan, Adreno, full-inference

@@ -52,6 +52,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tarfile
 import time
 
@@ -305,6 +306,7 @@ def run_benchmarks_for_category(
 
   # Push all model artifacts to the device and run them.
   root_benchmark_dir = os.path.dirname(benchmark_category_dir)
+
   for benchmark_case_dir in benchmark_case_dirs:
     benchmark_info = compose_benchmark_info_object(device_info,
                                                    benchmark_category_dir,
@@ -326,7 +328,18 @@ def run_benchmarks_for_category(
         f"--benchmark_repetitions={repetitions}",
         "--benchmark_format=json",
     ]
-    resultjson = adb_execute_in_dir(cmd, android_relative_dir, verbose=verbose)
+
+    resultjson = ""
+    for i in range(3):
+      try:
+        resultjson = adb_execute_in_dir(cmd, android_relative_dir, verbose=verbose)
+        break
+      except subprocess.CalledProcessError:
+        print(f"{cmd} failed. Retrying", file=sys.stderr)
+        pass
+    if resultjson == "":
+      print("Benchmark failed. Skipping", file=sys.stderr)
+      continue
 
     print(resultjson)
     resultjson = json.loads(resultjson)

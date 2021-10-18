@@ -62,27 +62,6 @@ set(MOBILENET_V3SMALL_MODULE
 #                                                                              #
 ################################################################################
 
-# CPU, VMVX, 3-thread, little-core, full-inference
-iree_mlir_benchmark_suite(
-  MODULES
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
-
-  BENCHMARK_MODES
-    "3-thread,little-core,full-inference"
-  TARGET_BACKEND
-    "vmvx"
-  TARGET_ARCHITECTURE
-    "CPU-ARM64-v8A"
-  TRANSLATION_FLAGS
-    "--iree-input-type=mhlo"
-    "--iree-flow-inline-constants-max-byte-length=2048"
-  DRIVER
-    "vmvx"
-  RUNTIME_FLAGS
-    "--task_topology_group_count=3"
-)
-
 # CPU, Dylib-Sync, big/little-core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
@@ -106,7 +85,7 @@ iree_mlir_benchmark_suite(
     "dylib-sync"
 )
 
-# CPU, Dylib, 1-thread, big/little-core, full-inference
+# CPU, Dylib, 1 through 4 threads little-core, 1-thread big core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
     ${MOBILENET_V2_MODULE}
@@ -124,20 +103,42 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
+    # "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
 
-# CPU, Dylib, 3-thread, big/little-core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
     ${MOBILENET_V2_MODULE}
     ${MOBILENET_V3SMALL_MODULE}
 
   BENCHMARK_MODES
-    "3-thread,big-core,full-inference"
+    "2-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-llvm-loop-unrolling=true"
+    # "--iree-flow-enable-padding-linalg-ops"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=2"
+)
+
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
+
+  BENCHMARK_MODES
     "3-thread,little-core,full-inference"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -148,10 +149,34 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
+    # "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=3"
+)
+
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILENET_V2_MODULE}
+    ${MOBILENET_V3SMALL_MODULE}
+
+  BENCHMARK_MODES
+    "4-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-llvm-loop-unrolling=true"
+    # "--iree-flow-enable-padding-linalg-ops"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=4"
 )
 
 # GPU, Vulkan, Adreno, full-inference
@@ -301,11 +326,10 @@ iree_mlir_benchmark_suite(
     "dylib-sync"
 )
 
-# CPU, Dylib, 1-thread, big/little-core, full-inference
+# CPU, Dylib, 1 through 4 threads little-core, 1-thread big core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
     ${MOBILEBERT_FP32_MODULE}
-
   BENCHMARK_MODES
     "1-thread,big-core,full-inference"
     "1-thread,little-core,full-inference"
@@ -318,19 +342,40 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
+    # "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
 
-# CPU, Dylib, 3-thread, big/little-core, full-inference
 iree_mlir_benchmark_suite(
   MODULES
     ${MOBILEBERT_FP32_MODULE}
 
   BENCHMARK_MODES
-    "3-thread,big-core,full-inference"
+    "2-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    # TODO: Merge this rule once we can use the same flags as the common one.
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    # "--iree-flow-enable-padding-linalg-ops"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=2"
+)
+
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILEBERT_FP32_MODULE}
+
+  BENCHMARK_MODES
     "3-thread,little-core,full-inference"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -341,8 +386,31 @@ iree_mlir_benchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
+    # "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=3"
+)
+
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILEBERT_FP32_MODULE}
+
+  BENCHMARK_MODES
+    "4-thread,little-core,full-inference"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    # TODO: Merge this rule once we can use the same flags as the common one.
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    # "--iree-flow-enable-padding-linalg-ops"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=4"
 )
