@@ -37,6 +37,7 @@ cc_library(
         ":StaticLibraryGenerator",
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/LLVMCPU",
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/HAL/Target",

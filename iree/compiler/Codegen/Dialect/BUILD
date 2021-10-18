@@ -55,7 +55,7 @@ cc_library(
     deps = [
         ":IREECodegenDialectGen",
         ":LoweringConfigGen",
-        "//iree/compiler/Codegen/Utils:Utils",
+        "//iree/compiler/Codegen/Utils",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",

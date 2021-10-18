@@ -8,6 +8,7 @@
 
 #include <mutex>
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -77,13 +78,13 @@ class ROCMTargetBackend final : public TargetBackend {
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerROCDLDialectTranslation(registry);
+    registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
       MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
-    ;
     configItems.emplace_back(b.getIdentifier("executable_targets"),
                              getExecutableTargets(context));
 

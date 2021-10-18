@@ -32,7 +32,7 @@ iree_cc_library(
     MLIRIR
     MLIRParser
     MLIRStandard
-    iree::compiler::Codegen::Utils::Utils
+    iree::compiler::Codegen::Utils
   PUBLIC
 )
 
