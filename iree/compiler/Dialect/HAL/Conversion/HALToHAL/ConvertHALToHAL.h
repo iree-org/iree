@@ -14,6 +14,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+// TODO(#7277): remove when switched to streams (happens there now).
+
 // Adds op legality rules to |conversionTarget| to ensure all incoming HAL
 // pseudo ops are removed during HAL->HAL lowering.
 void setupHALToHALLegality(MLIRContext *context,

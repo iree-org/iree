@@ -297,13 +297,30 @@ mark_as_advanced(
 include(iree_setup_toolchain)
 
 #-------------------------------------------------------------------------------
-# Configure python early if there are any features that need it.
-# Note that doing this early ensures that dependencies that make incidental
-# use of Python (such as LLVM) resolve the same version.
+# Python
+# If building features that require Python development, find them early in
+# one invocation (some CMake versions are sensitive to resolving out of order).
+# Otherwise, for features that just require the interpreter, find that alone.
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_COMPILER} OR
-   ${IREE_BUILD_PYTHON_BINDINGS})
+if(IREE_BUILD_PYTHON_BINDINGS)
+  # After CMake 3.18, we are able to limit the scope of the search to just
+  # Development.Module. Searching for Development will fail in situations where
+  # the Python libraries are not available. When possible, limit to just
+  # Development.Module.
+  # See https://pybind11.readthedocs.io/en/stable/compiling.html#findpython-mode
+  if(CMAKE_VERSION VERSION_LESS "3.18.0")
+    message(WARNING
+      "This version of CMake is not compatible with statically built Python "
+      "installations. If Python fails to detect below this may apply to you. "
+      "Recommend upgrading to at least CMake 3.18. "
+      "Detected current version: ${CMAKE_VERSION}"
+    )
+    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+  else()
+    find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
+  endif()
+elseif(IREE_BUILD_COMPILER)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
 endif()
 
@@ -388,15 +405,6 @@ else()
     target_include_directories(MLIRSupport PUBLIC ${_common_include_dirs})
   endfunction()
   _hack_llvm_include_paths()
-endif()
-
-#-------------------------------------------------------------------------------
-# Python bindings.
-#-------------------------------------------------------------------------------
-
-if(IREE_BUILD_PYTHON_BINDINGS)
-  # Note: Optional because python libs can be manually specified.
-  find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 endif()
 
 #-------------------------------------------------------------------------------

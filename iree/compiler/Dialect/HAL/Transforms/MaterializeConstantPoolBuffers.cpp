@@ -23,6 +23,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+// TODO(#7277): remove when switched to streams (happens there now).
 class MaterializeConstantPoolBuffersPass
     : public PassWrapper<MaterializeConstantPoolBuffersPass,
                          OperationPass<ModuleOp>> {
@@ -141,8 +142,8 @@ class MaterializeConstantPoolBuffersPass
     auto storageValueAttr =
         storageOp.value().cast<IREE::Util::SerializableAttrInterface>();
     uint64_t runtimeLength =
-        align(storageValueAttr.getStorageSize(),
-              bufferConstraints.min_buffer_range_alignment());
+        IREE::Util::align(storageValueAttr.getStorageSize(),
+                          bufferConstraints.min_buffer_range_alignment());
     auto lengthValue =
         builder.createOrFold<mlir::arith::ConstantIndexOp>(loc, runtimeLength);
     auto memoryType = IREE::HAL::MemoryTypeBitfield::DeviceLocal |
@@ -191,14 +192,14 @@ class MaterializeConstantPoolBuffersPass
     auto variableSymRef = SymbolRefAttr::get(context, globalOp.getName());
     uint64_t bufferLength = 0;
     for (auto splatOp : poolOp.getOps<ConstantPoolSplatOp>()) {
-      uint64_t splatOffset =
-          align(bufferLength, bufferConstraints.min_buffer_offset_alignment());
+      uint64_t splatOffset = IREE::Util::align(
+          bufferLength, bufferConstraints.min_buffer_offset_alignment());
       uint64_t unpaddedLength =
           getRoundedElementByteWidth(
               splatOp.value().getType().getElementType()) *
           splatOp.value().getNumElements();
-      uint64_t splatLength =
-          align(unpaddedLength, bufferConstraints.min_buffer_range_alignment());
+      uint64_t splatLength = IREE::Util::align(
+          unpaddedLength, bufferConstraints.min_buffer_range_alignment());
       splatOp.runtime_bufferAttr(variableSymRef);
       splatOp.runtime_rangeAttr(
           IREE::Util::ByteRangeAttr::get(context, splatOffset, splatLength));

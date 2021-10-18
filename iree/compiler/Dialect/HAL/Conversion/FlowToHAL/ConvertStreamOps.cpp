@@ -506,6 +506,7 @@ static BufferRange allocateOutputBuffer(Value streamValue, Value externalValue,
 // mapping 1:1 with the |streamOp| results.
 static LogicalResult allocateOutputBuffers(
     IREE::Flow::ExStreamFragmentOp streamOp,
+    SmallPtrSet<Value, 16> &coveredValues,
     StreamSchedulingState &schedulingState, ConversionPatternRewriter &rewriter,
     SmallVectorImpl<Value> &output) {
   auto tiedStreamOp =
@@ -521,7 +522,8 @@ static LogicalResult allocateOutputBuffers(
     auto externalValue = result.value();
 
     // Ignore already allocated buffers.
-    if (schedulingState.hasTensorBufferRange(streamValue)) {
+    if (schedulingState.hasTensorBufferRange(streamValue) ||
+        coveredValues.contains(streamValue)) {
       outputBuffers.push_back(
           schedulingState.lookupTensorBufferRange(streamValue).buffer);
       continue;
@@ -565,41 +567,9 @@ static LogicalResult allocateOutputBuffers(
 static LogicalResult allocateTransientBuffers(
     IREE::Flow::ExStreamFragmentOp streamOp,
     LivenessIntervalList &livenessIntervals,
+    SmallPtrSet<Value, 16> &coveredValues,
     StreamSchedulingState &schedulingState,
     ConversionPatternRewriter &rewriter) {
-  // TODO(#5410): unify with slice/update handling below. We should have a
-  // more generic way of handling these special ops and need to be able to hook
-  // into ones that directly control aliasing behavior like slice/update.
-  SmallPtrSet<Value, 16> coveredValues;
-  auto walkResult = streamOp.walk([&](IREE::HAL::ConstantSubspanOp subspanOp) {
-    auto tensorValue = subspanOp.result();
-    auto bufferValue = schedulingState.loadGlobal(
-        IREE::HAL::BufferType::get(rewriter.getContext()),
-        subspanOp.runtime_buffer().getLeafReference().getValue(), rewriter);
-    auto runtimeRange = subspanOp.runtime_range();
-    auto offsetValue =
-        schedulingState.lookupOrCreateIndex(runtimeRange.getOffset(), rewriter);
-    auto lengthValue =
-        schedulingState.lookupOrCreateIndex(runtimeRange.getLength(), rewriter);
-    auto subspanValue = rewriter.createOrFold<IREE::HAL::BufferSubspanOp>(
-        subspanOp.getLoc(), bufferValue.getType(), bufferValue, offsetValue,
-        lengthValue);
-    auto bufferRange = BufferRange{subspanValue, lengthValue};
-    if (failed(
-            schedulingState.mapTensorToBufferRange(tensorValue, bufferRange))) {
-      return WalkResult::interrupt();
-    }
-    schedulingState.forEachEquivalentTensorValue(
-        tensorValue, [&](Value alias) { coveredValues.insert(alias); });
-    return WalkResult::advance();
-  });
-
-  if (walkResult.wasInterrupted()) {
-    return streamOp.emitOpError() << "constant subspan op was mapped to "
-                                     "multiple buffer ranges while allocating "
-                                     "transient buffers";
-  }
-
   // Gather all of the transient values we need to allocate buffers for.
   SmallVector<Value> transientValues;
   SmallVector<int64_t> lifetimeIntervals;
@@ -727,10 +697,13 @@ static void recordInterfaceBindings(
     auto bufferRange = schedulingState.lookupTensorBufferRange(tensorValue);
     assert(bufferRange.buffer && "buffer not preallocated");
     assert(bufferRange.length && "buffer has no precomputed size");
-    bindings.push_back(
-        std::make_tuple(schedulingState.lookupOrCreateIndex(
-                            bindingOp.binding().getSExtValue(), rewriter),
-                        bufferRange.buffer, zeroOffset, bufferRange.length));
+    bindings.push_back({
+        schedulingState.lookupOrCreateIndex(bindingOp.binding().getSExtValue(),
+                                            rewriter),
+        bufferRange.buffer,
+        zeroOffset,
+        bufferRange.length,
+    });
   };
 
   for (auto bindingAttr : bindingsAttr) {
@@ -743,14 +716,15 @@ static void recordInterfaceBindings(
       auto storageBuffer = schedulingState.loadGlobal(
           IREE::HAL::BufferType::get(builder.getContext()),
           constantStorageAttr.storage(), rewriter);
-      bindings.push_back(std::make_tuple(
+      bindings.push_back({
           schedulingState.lookupOrCreateIndex(
               bindingOp.binding().getSExtValue(), rewriter),
           storageBuffer,
           schedulingState.lookupOrCreateIndex(
               constantStorageAttr.offset().getSExtValue(), rewriter),
           schedulingState.lookupOrCreateIndex(
-              constantStorageAttr.length().getSExtValue(), rewriter)));
+              constantStorageAttr.length().getSExtValue(), rewriter),
+      });
     } else if (auto pushConstantAttr =
                    bindingAttr.dyn_cast<IREE::HAL::ExPushConstantAttr>()) {
       auto inputValue =
@@ -1250,12 +1224,48 @@ class ExStreamFragmentOpConversion
       }
     }
 
+    // TODO(#5410): unify with slice/update handling below. We should have a
+    // more generic way of handling these special ops and need to be able to
+    // hook into ones that directly control aliasing behavior like slice/update.
+    SmallPtrSet<Value, 16> coveredValues;
+    auto walkResult =
+        streamOp.walk([&](IREE::HAL::ConstantSubspanOp subspanOp) {
+          auto tensorValue = subspanOp.result();
+          auto bufferValue = schedulingState.loadGlobal(
+              IREE::HAL::BufferType::get(rewriter.getContext()),
+              subspanOp.runtime_buffer().getLeafReference().getValue(),
+              rewriter);
+          auto runtimeRange = subspanOp.runtime_range();
+          auto offsetValue = schedulingState.lookupOrCreateIndex(
+              runtimeRange.getOffset(), rewriter);
+          auto lengthValue = schedulingState.lookupOrCreateIndex(
+              runtimeRange.getLength(), rewriter);
+          auto subspanValue = rewriter.createOrFold<IREE::HAL::BufferSubspanOp>(
+              subspanOp.getLoc(), bufferValue.getType(), bufferValue,
+              offsetValue, lengthValue);
+          auto bufferRange = BufferRange{subspanValue, lengthValue};
+          if (failed(schedulingState.mapTensorToBufferRange(tensorValue,
+                                                            bufferRange))) {
+            return WalkResult::interrupt();
+          }
+          schedulingState.forEachEquivalentTensorValue(
+              tensorValue, [&](Value alias) { coveredValues.insert(alias); });
+          return WalkResult::advance();
+        });
+
+    if (walkResult.wasInterrupted()) {
+      return streamOp.emitOpError()
+             << "constant subspan op was mapped to "
+                "multiple buffer ranges while allocating "
+                "transient buffers";
+    }
+
     // Allocate buffers for values that escape the stream via return.
     // These may alias input buffers above such as when an input is returned or
     // a return value is tied.
     SmallVector<Value> outputBuffers;
-    if (failed(allocateOutputBuffers(streamOp, schedulingState, rewriter,
-                                     outputBuffers))) {
+    if (failed(allocateOutputBuffers(streamOp, coveredValues, schedulingState,
+                                     rewriter, outputBuffers))) {
       return failure();
     }
 
@@ -1266,7 +1276,8 @@ class ExStreamFragmentOpConversion
     // ops as buffers will start to alias. All reordering must have happened
     // prior to this conversion.
     if (failed(allocateTransientBuffers(streamOp, livenessIntervals,
-                                        schedulingState, rewriter))) {
+                                        coveredValues, schedulingState,
+                                        rewriter))) {
       return failure();
     }
 

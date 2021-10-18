@@ -13,6 +13,42 @@
 namespace mlir {
 namespace iree_compiler {
 
+template <typename T>
+struct GenericConvertTypesPattern : public OpConversionPattern<T> {
+  using OpConversionPattern<T>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      T op, llvm::ArrayRef<Value> newOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type> resultTypes;
+    for (auto oldType : op.getOperation()->getResultTypes()) {
+      SmallVector<Type> newTypes;
+      if (failed(this->getTypeConverter()->convertType(oldType, newTypes))) {
+        return rewriter.notifyMatchFailure(op, "unsupported result type");
+      }
+      // TODO(benvanik): figure out this silly expansion stuff. Seems broken.
+      // resultTypes.append(newTypes);
+      resultTypes.push_back(newTypes.front());
+    }
+    auto newOp = rewriter.create<T>(op.getLoc(), resultTypes, newOperands,
+                                    op->getAttrs());
+    rewriter.replaceOp(op, newOp->getResults());
+    return success();
+  }
+};
+
+template <typename OpT>
+inline void addGenericLegalOp(ConversionTarget &conversionTarget,
+                              TypeConverter &typeConverter) {
+  conversionTarget.addDynamicallyLegalOp<OpT>([&](OpT op) {
+    return llvm::all_of(
+               op->getOperandTypes(),
+               [&typeConverter](Type t) { return typeConverter.isLegal(t); }) &&
+           llvm::all_of(op->getResultTypes(), [&typeConverter](Type t) {
+             return typeConverter.isLegal(t);
+           });
+  });
+}
+
 // Populates conversion patterns that perform conversion on util dialect ops.
 // These patterns ensure that nested types are run through the provided
 // |typeConverter|.

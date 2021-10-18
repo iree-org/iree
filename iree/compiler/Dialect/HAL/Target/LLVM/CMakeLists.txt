@@ -68,6 +68,7 @@ iree_cc_library(
     LLVMAnalysis
     LLVMCore
     LLVMInstrumentation
+    LLVMMC
     LLVMPasses
     LLVMSupport
     LLVMTarget

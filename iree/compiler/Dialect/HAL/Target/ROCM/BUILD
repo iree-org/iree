@@ -40,6 +40,7 @@ cc_library(
         "@llvm-project//llvm:IPO",
         "@llvm-project//llvm:IRReader",
         "@llvm-project//llvm:Linker",
+        "@llvm-project//llvm:MC",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
         "@llvm-project//mlir:LLVMDialect",

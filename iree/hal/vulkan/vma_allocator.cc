@@ -344,6 +344,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_wrap_buffer(
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer) {
+  // TODO(#7242): use VK_EXT_external_memory_host to import memory.
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
                           "wrapping of external buffers not supported");
 }

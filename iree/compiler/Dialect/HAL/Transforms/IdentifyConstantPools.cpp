@@ -26,6 +26,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+// TODO(#7277): remove when switched to streams (happens there now).
 class IdentifyConstantPoolsPass
     : public PassWrapper<IdentifyConstantPoolsPass, OperationPass<ModuleOp>> {
  public:

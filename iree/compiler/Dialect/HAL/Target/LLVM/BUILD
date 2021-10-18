@@ -76,6 +76,7 @@ cc_library(
         "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Instrumentation",
+        "@llvm-project//llvm:MC",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",

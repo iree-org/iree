@@ -60,6 +60,8 @@ static inline bool usefulStreamWork(ArrayRef<Operation *> currentStreamOps) {
 // function CFG, create the streams, and then thread the streams through the CFG
 // to append additional stream work. For now, we just look at basic blocks and
 // cluster adjacent dispatches and flow ops together.
+//
+// TODO(#7277): remove when switched to streams (happens there now).
 class FormStreamsPass : public FormStreamsBase<FormStreamsPass> {
  public:
   void runOnOperation() override {

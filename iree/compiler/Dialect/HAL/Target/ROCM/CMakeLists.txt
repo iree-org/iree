@@ -27,6 +27,7 @@ iree_cc_library(
     LLVMCore
     LLVMIRReader
     LLVMLinker
+    LLVMMC
     LLVMSupport
     LLVMTarget
     LLVMipo

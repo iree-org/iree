@@ -29,6 +29,7 @@ cc_library(
         "@iree//iree/compiler/Dialect/Shape/IR",
         "@iree//iree/compiler/Dialect/Shape/Transforms",
         "@iree//iree/compiler/Dialect/Util/IR",
+        "@iree//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

@@ -2,9 +2,6 @@
 
 // CHECK-LABEL: @preserve_compiler_hints
 func @preserve_compiler_hints() {
-  // CHECK: util.do_not_optimize()
-  util.do_not_optimize()
-
   // CHECK: %[[C:.+]] = arith.constant 2
   %c = arith.constant 2 : i32
   // CHECK: util.do_not_optimize(%[[C]])
