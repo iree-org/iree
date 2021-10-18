@@ -82,14 +82,15 @@ static void populateTilingToInvocationPatterns(
         std::reverse(tileSizes.begin(), tileSizes.end());
         if (tileSizes.empty()) return SmallVector<Value, 4>();
         SmallVector<unsigned> partitionedLoops = getPartitionedLoops(operation);
-        llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
-                                                     partitionedLoops.end());
-        tileSizesVal.reserve(tileSizes.size());
-        for (auto val : llvm::enumerate(tileSizes)) {
-          int64_t useTileSize =
-              partitionedLoopsSet.count(val.index()) ? val.value() : 0;
-          tileSizesVal.push_back(builder.create<arith::ConstantIndexOp>(
-              operation->getLoc(), useTileSize));
+        unsigned maxDepth = partitionedLoops.back() + 1;
+        auto zero =
+            builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
+        tileSizesVal.resize(maxDepth, zero);
+        size_t tileSizeIdx = 0;
+        for (unsigned depth : partitionedLoops) {
+          tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
+              operation->getLoc(), tileSizes[tileSizeIdx++]);
+          if (tileSizeIdx == tileSizes.size()) break;
         }
         return tileSizesVal;
       };
