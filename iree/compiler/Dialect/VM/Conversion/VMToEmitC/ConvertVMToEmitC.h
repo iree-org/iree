@@ -34,72 +34,29 @@ struct VMAnalysis {
   }
 
   uint16_t getRefRegisterOrdinal(Value ref) {
-    auto originalRef = lookup(ref);
-    if (originalRef.hasValue()) {
-      assert(originalRef.getValue().getType().isa<IREE::VM::RefType>());
-      return registerAllocation.mapToRegister(originalRef.getValue()).ordinal();
-    }
-
-    auto ptr = ordinalMapping.find(ref);
-    assert(ptr != ordinalMapping.end() &&
-           "ref for original block arg not found");
-    return ptr->second;
+    assert(ref.getType().isa<IREE::VM::RefType>());
+    return registerAllocation.mapToRegister(ref).ordinal();
   }
 
   bool isLastValueUse(Value ref, Operation *op) {
-    auto originalRef = lookup(ref);
-
-    if (originalRef.hasValue()) {
-      assert(originalRef.getValue().getType().isa<IREE::VM::RefType>());
-      return valueLiveness.isLastValueUse(originalRef.getValue(), op);
-    }
-
-    auto ptr = lastUseMapping.find({ref, op});
-    ref.dump();
-    assert(ptr != lastUseMapping.end() &&
-           "ref for original block arg not found");
-    return ptr->second;
+    assert(ref.getType().isa<IREE::VM::RefType>());
+    return valueLiveness.isLastValueUse(ref, op);
   }
 
-  void mapValue(Value original, Value replacement) {
-    assert(original.getType().isa<IREE::VM::RefType>());
-    mapping.map(replacement, original);
-    return;
+  void cacheLocalRef(int64_t ordinal, Operation *op) {
+    assert(!localRefs.count(ordinal));
+    localRefs[ordinal] = op;
   }
 
-  void mapLastUse(Value original, Operation *op, Value replacement) {
-    bool lastUse = isLastValueUse(original, op);
-    lastUseMapping[{replacement, op}] = lastUse;
-  }
-
-  void mapOrdinal(Value original, Value replacement) {
-    uint16_t ordinal = getRefRegisterOrdinal(original);
-    ordinalMapping[replacement] = ordinal;
+  Operation *lookupLocalRef(int64_t ordinal) {
+    assert(localRefs.count(ordinal));
+    return localRefs[ordinal];
   }
 
  private:
   RegisterAllocation registerAllocation;
   ValueLiveness valueLiveness;
-  BlockAndValueMapping mapping;
-  DenseMap<Value, uint16_t> ordinalMapping;
-  DenseMap<std::pair<Value, Operation *>, bool> lastUseMapping;
-
-  Optional<Value> lookup(Value ref) {
-    if (ref.getType().isa<IREE::VM::RefType>()) {
-      return ref;
-    }
-
-    if (mapping.contains(ref)) {
-      Value result = mapping.lookup(ref);
-
-      if (!result.getType().isa<IREE::VM::RefType>()) {
-        result.dump();
-      }
-      assert(result.getType().isa<IREE::VM::RefType>());
-      return result;
-    }
-    return {};
-  }
+  DenseMap<int64_t, Operation *> localRefs;
 };
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
