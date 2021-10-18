@@ -94,7 +94,7 @@ cc_library(
         "//iree/base/internal:synchronization",
         "//iree/base/internal/flatcc:parsing",
         "//iree/hal",
-        "//iree/hal/vulkan/builtin:fill_unaligned_spv",
+        "//iree/hal/vulkan/builtin:builtin_shaders_spv",
         "//iree/hal/vulkan/util:arena",
         "//iree/hal/vulkan/util:intrusive_list",
         "//iree/hal/vulkan/util:ref_ptr",

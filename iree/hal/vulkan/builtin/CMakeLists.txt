@@ -12,13 +12,13 @@ iree_add_all_subdirs()
 
 iree_c_embed_data(
   NAME
-    fill_unaligned_spv
+    builtin_shaders_spv
   SRCS
     "fill_unaligned.spv"
   C_FILE_OUTPUT
-    "fill_unaligned_spv.c"
+    "builtin_shaders_spv.c"
   H_FILE_OUTPUT
-    "fill_unaligned_spv.h"
+    "builtin_shaders_spv.h"
   FLATTEN
   PUBLIC
 )

@@ -9,7 +9,7 @@
 #include <cstddef>
 
 #include "iree/base/tracing.h"
-#include "iree/hal/vulkan/builtin/fill_unaligned_spv.h"
+#include "iree/hal/vulkan/builtin/builtin_shaders_spv.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
 #include "iree/hal/vulkan/native_descriptor_set_layout.h"
 #include "iree/hal/vulkan/native_executable_layout.h"
@@ -60,9 +60,9 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
     shader_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     shader_create_info.pNext = NULL;
     shader_create_info.flags = 0;
-    shader_create_info.codeSize = fill_unaligned_spv_create()->size;
+    shader_create_info.codeSize = builtin_shaders_spv_create()[0].size;
     shader_create_info.pCode =
-        (const uint32_t*)fill_unaligned_spv_create()->data;
+        (const uint32_t*)builtin_shaders_spv_create()[0].data;
     status = VK_RESULT_TO_STATUS(logical_device_->syms()->vkCreateShaderModule(
         *logical_device_, &shader_create_info, logical_device_->allocator(),
         &fill_unaligned_shader));

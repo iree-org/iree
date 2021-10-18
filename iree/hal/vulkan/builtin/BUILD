@@ -13,9 +13,11 @@ package(
 )
 
 c_embed_data(
-    name = "fill_unaligned_spv",
-    srcs = ["fill_unaligned.spv"],
-    c_file_output = "fill_unaligned_spv.c",
+    name = "builtin_shaders_spv",
+    srcs = [
+        "fill_unaligned.spv",
+    ],
+    c_file_output = "builtin_shaders_spv.c",
     flatten = True,
-    h_file_output = "fill_unaligned_spv.h",
+    h_file_output = "builtin_shaders_spv.h",
 )
