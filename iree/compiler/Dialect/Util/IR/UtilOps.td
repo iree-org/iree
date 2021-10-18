@@ -177,6 +177,47 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
 }
 
 //===----------------------------------------------------------------------===//
+// Alignment Arithmetic
+//===----------------------------------------------------------------------===//
+
+def Util_AlignOp : Util_PureOp<"align", [
+  SameOperandsAndResultType
+  ]> {
+  let summary = "Aligns up to a power-of-two alignment if required";
+  let description = [{
+     Aligns |value| up to the given power-of-two |alignment| if required.
+  }];
+
+  let arguments = (ins
+    SignlessIntegerLike:$value,
+    SignlessIntegerLike:$alignment
+  );
+
+  let results = (outs
+    SignlessIntegerLike:$result
+  );
+
+  let assemblyFormat = [{
+    $value `,` $alignment attr-dict `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$value,
+      "int64_t":$alignment
+    ),
+    [{
+      build($_builder, $_state, value.getType(), value,
+       $_builder.createOrFold<arith::ConstantIndexOp>($_state.location, alignment));
+    }]>,
+  ];
+
+  //TODO(#5405): add canonicalizers/folders to simplify cases with constnat
+  // alignment values with in a certain range (not zero) as well as duplicate
+  // alignments (EX: util.align 16 -> util.align 4)
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 

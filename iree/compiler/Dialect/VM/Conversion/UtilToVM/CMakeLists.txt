@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "ConvertUtilToVM.h"
   SRCS
+    "ConvertAlignmentOps.cpp"
     "ConvertGlobalOps.cpp"
     "ConvertListOps.cpp"
     "ConvertStatusOps.cpp"
