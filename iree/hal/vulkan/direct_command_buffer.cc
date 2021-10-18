@@ -524,8 +524,6 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
   VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
       iree_hal_buffer_allocated_buffer(target_buffer));
 
-  iree_status_t status = iree_ok_status();
-
   // vkCmdFillBuffer requires a 4 byte alignment for the offset, pattern, and
   // length. We use a polyfill here that fills the unaligned start and end of
   // fill operations, if needed.
@@ -534,10 +532,11 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
     // TODO(scotttodd): only restore push constants that have been modified?
     //                  (this can pass uninitialized memory right now, which
     //                   *should* be safe but is wasteful)
-    status = command_buffer->builtin_executables->FillBufferUnaligned(
-        command_buffer->handle, &(command_buffer->descriptor_set_arena),
-        target_buffer, target_offset, length, pattern, pattern_length,
-        command_buffer->push_constants_storage);
+    IREE_RETURN_IF_ERROR(
+        command_buffer->builtin_executables->FillBufferUnaligned(
+            command_buffer->handle, &(command_buffer->descriptor_set_arena),
+            target_buffer, target_offset, length, pattern, pattern_length,
+            command_buffer->push_constants_storage));
 
     // Continue using vkCmdFillBuffer below, but only for the inner aligned
     // portion of the fill operation.
@@ -556,7 +555,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
     target_offset = aligned_target_offset;
   }
 
-  if (iree_status_is_ok(status) && length > 0) {
+  if (length > 0) {
     // Note that vkCmdFillBuffer only accepts 4-byte aligned values so we need
     // to splat out our variable-length pattern.
     target_offset += iree_hal_buffer_byte_offset(target_buffer);
@@ -567,7 +566,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
                                           length, dword_pattern);
   }
 
-  return status;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
