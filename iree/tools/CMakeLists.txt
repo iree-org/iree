@@ -48,10 +48,6 @@ if(IREE_ENABLE_EMITC)
   set(IREE_EMITC_CONDITIONAL_DEP
     MLIREmitC
   )
-  set(IREE_TRANSLATE_CONDITIONAL_DEPS
-    MLIREmitC
-    emitc::TranslateToCpp
-  )
 endif()
 
 iree_cc_binary(
@@ -359,7 +355,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
-      ${IREE_TRANSLATE_CONDITIONAL_DEPS}
+      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 

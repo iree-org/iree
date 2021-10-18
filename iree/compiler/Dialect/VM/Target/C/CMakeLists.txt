@@ -10,6 +10,20 @@ if(${IREE_ENABLE_EMITC})
 
   iree_cc_library(
     NAME
+      TranslateToCpp
+    HDRS
+      CppEmitter.h
+    SRCS
+      TranslateToCpp.cpp
+    DEPS
+      MLIREmitC
+      MLIRIR
+      MLIRSCF
+      MLIRStandard
+  )
+
+  iree_cc_library(
+    NAME
       C
     HDRS
       "CModuleTarget.h"
@@ -19,11 +33,11 @@ if(${IREE_ENABLE_EMITC})
       "TranslationFlags.cpp"
       "TranslationRegistration.cpp"
     DEPS
+      ::TranslateToCpp
       LLVMSupport
       MLIRIR
       MLIRPass
       MLIRSupport
-      emitc::TranslateToCpp
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Conversion::VMToEmitC

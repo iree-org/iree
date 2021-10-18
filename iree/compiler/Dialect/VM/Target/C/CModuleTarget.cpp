@@ -6,13 +6,13 @@
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
-#include "emitc/Target/Cpp/CppEmitter.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
+#include "iree/compiler/Dialect/VM/Target/C/CppEmitter.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Pass/PassManager.h"
