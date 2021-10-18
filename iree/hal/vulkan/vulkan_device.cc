@@ -940,11 +940,12 @@ static CommandQueue* iree_hal_vulkan_device_select_queue(
     iree_hal_vulkan_device_t* device,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity) {
-  // The unaligned buffer polyfill inserts dispatches into command buffers that
-  // may otherwise only contain transfer commands.
-  // For now just assume that all code may go down that path.
-  // TODO(scotttodd): compiler analysis to label command buffers known to only
-  //                  contain aligned fills
+  // TODO(scotttodd): revisit queue selection logic and remove this
+  //   * the unaligned buffer fill polyfill and tracing timestamp queries may
+  //     both insert dispatches into command buffers that at compile time are
+  //     expected to only contain transfer commands
+  //   * we could set a bit at recording time if emulation or tracing is used
+  //     and submit to the right queue based on that
   command_categories |= IREE_HAL_COMMAND_CATEGORY_DISPATCH;
 
   // TODO(benvanik): meaningful heuristics for affinity. We don't generate
@@ -964,11 +965,12 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
 
-  // The unaligned buffer polyfill inserts dispatches into command buffers that
-  // may otherwise only contain transfer commands.
-  // For now just assume that all code may go down that path.
-  // TODO(scotttodd): compiler analysis to label command buffers known to only
-  //                  contain aligned fills
+  // TODO(scotttodd): revisit queue selection logic and remove this
+  //   * the unaligned buffer fill polyfill and tracing timestamp queries may
+  //     both insert dispatches into command buffers that at compile time are
+  //     expected to only contain transfer commands
+  //   * we could set a bit at recording time if emulation or tracing is used
+  //     and submit to the right queue based on that
   command_categories |= IREE_HAL_COMMAND_CATEGORY_DISPATCH;
 
   // Select the command pool to used based on the types of commands used.

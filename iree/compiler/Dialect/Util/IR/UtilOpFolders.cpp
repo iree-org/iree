@@ -132,7 +132,7 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
       return failure();
     }
     if (constantValue != initialValue) {
-      operands.insert(rewriter.create<mlir::ConstantOp>(
+      operands.insert(rewriter.create<arith::ConstantOp>(
           op.getLoc(),
           rewriter.getIntegerAttr(op.result().getType(), constantValue),
           op.result().getType()));
@@ -170,7 +170,7 @@ static Value makeRangeEnd(Location loc, Value offset, Value length,
                           OpBuilder &builder) {
   return makeRangeEnd(
       loc, offset, length,
-      builder.create<mlir::ConstantOp>(
+      builder.create<arith::ConstantOp>(
           loc, builder.getIntegerAttr(offset.getType(), 1), offset.getType()),
       builder);
 }
@@ -219,10 +219,10 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
 
     // Min/max with constant ranges. This allows for normal folding to happen
     // downstream of the op.
-    auto constantMinOp = rewriter.create<mlir::ConstantOp>(
+    auto constantMinOp = rewriter.create<arith::ConstantOp>(
         op.getLoc(), rewriter.getIntegerAttr(op.min().getType(), constantMin),
         op.min().getType());
-    auto constantMaxOp = rewriter.create<mlir::ConstantOp>(
+    auto constantMaxOp = rewriter.create<arith::ConstantOp>(
         op.getLoc(),
         rewriter.getIntegerAttr(op.max().getType(),
                                 constantMax - constantMin + 1),
@@ -254,7 +254,7 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
       // Two ranges turn into min/max.
       minValue = rewriter.create<mlir::MinUIOp>(loc, op.offsets().front(),
                                                 op.offsets().back());
-      auto one = rewriter.create<mlir::ConstantOp>(
+      auto one = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIntegerAttr(op.min().getType(), 1),
           op.min().getType());
       auto endLhs = makeRangeEnd(loc, op.offsets().front(),
@@ -319,7 +319,7 @@ struct ExpandUnfoldableConstantOp
   using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto stdConst = rewriter.create<ConstantOp>(op.getLoc(), op.value());
+    auto stdConst = rewriter.create<arith::ConstantOp>(op.getLoc(), op.value());
     rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, stdConst.getResult());
     return success();
   }
