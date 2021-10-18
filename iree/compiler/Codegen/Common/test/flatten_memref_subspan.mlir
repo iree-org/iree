@@ -304,3 +304,30 @@ hal.interface private @io  {
 //      CHECK:   %[[MEMREF:.+]] = hal.interface.binding.subspan @io::@ro[%[[ARG0]]] : memref<?xf32>
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]], %[[ARG3]]]
 //      CHECK:   vector.transfer_write %[[ARG4]], %[[MEMREF]][%[[INDEX]]]
+
+// -----
+
+func @load_store_rank_zero_subspan_with_offset(%offset : index) {
+  %subspan0 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<f32>
+  %subspan1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%offset] : memref<f32>
+  %val = memref.load %subspan0[] : memref<f32>
+  memref.store %val, %subspan1[] : memref<f32>
+  return
+}
+
+hal.interface private @io  {
+  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 floordiv 4)>
+//      CHECK: func @load_store_rank_zero_subspan_with_offset
+// CHECK-SAME: (%[[OFFSET:.+]]: index)
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//      CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>{%[[C1]]}
+//      CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan @io::@s0b1_xw_external[%[[C0]]] : memref<?xf32>{%[[C1]]}
+//      CHECK:   %[[INDEX0:.+]] = affine.apply #[[MAP]]()[%[[OFFSET]]]
+//      CHECK:   %[[LOAD:.+]] = memref.load %[[SPAN0]][%[[INDEX0]]] : memref<?xf32>
+//      CHECK:   %[[INDEX1:.+]] = affine.apply #[[MAP]]()[%[[OFFSET]]]
+//      CHECK:   memref.store %[[LOAD]], %[[SPAN1]][%[[INDEX1]]] : memref<?xf32>
