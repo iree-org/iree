@@ -28,6 +28,10 @@ typedef struct iree_hal_vulkan_builtin_fill_unaligned_constants_t {
   uint32_t fill_length_bytes;
 } iree_hal_vulkan_builtin_fill_unaligned_constants_t;
 
+static_assert(sizeof(iree_hal_vulkan_builtin_fill_unaligned_constants_t) ==
+                  IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT,
+              "push constant count must match struct size");
+
 }  // namespace
 
 BuiltinExecutables::BuiltinExecutables(VkDeviceHandle* logical_device)
@@ -43,13 +47,33 @@ BuiltinExecutables::~BuiltinExecutables() {
     iree_hal_executable_layout_destroy(executable_layout_);
   }
 
-  for (int i = 0; i < descriptor_set_layouts_.size(); ++i) {
+  for (size_t i = 0; i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT; ++i) {
     iree_hal_descriptor_set_layout_release(descriptor_set_layouts_[i]);
   }
 }
 
 iree_status_t BuiltinExecutables::InitializeExecutables() {
   IREE_TRACE_SCOPE();
+
+  // Create descriptor set layouts for our compute pipeline.
+  // Even though we're just using one set, we still need to create layout
+  // bindings for those preceding it.
+  for (size_t i = 0; i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT; ++i) {
+    iree_hal_descriptor_set_layout_t* layout = NULL;
+    iree_hal_descriptor_set_layout_binding_t layout_binding;
+    layout_binding.binding = 0;
+    layout_binding.type = IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    layout_binding.access = i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET
+                                ? IREE_HAL_MEMORY_ACCESS_NONE
+                                : IREE_HAL_MEMORY_ACCESS_WRITE;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_descriptor_set_layout_create(
+        logical_device_,
+        i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET
+            ? IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE
+            : IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY,
+        /*binding_count=*/1, &layout_binding, &layout));
+    descriptor_set_layouts_[i] = layout;
+  }
 
   iree_status_t status = iree_ok_status();
 
@@ -68,34 +92,12 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
         &fill_unaligned_shader));
   }
 
-  // Create descriptor set layouts for our compute pipeline.
-  // The `maxBoundDescriptorSets` limit is 4 on many devices we support, so the
-  // compiler should have reserved index 3 for our exclusive use.
-  // Even though we're just using set 3, we still need to create layout bindings
-  // for sets 0-2.
-  descriptor_set_layouts_.reserve(4);
-  for (int i = 0; i < 4; ++i) {
-    if (!iree_status_is_ok(status)) break;
-    iree_hal_descriptor_set_layout_t* layout = NULL;
-    iree_hal_descriptor_set_layout_binding_t layout_binding;
-    layout_binding.binding = 0;
-    layout_binding.type = IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    layout_binding.access =
-        i < 3 ? IREE_HAL_MEMORY_ACCESS_NONE : IREE_HAL_MEMORY_ACCESS_WRITE;
-    status = iree_hal_vulkan_native_descriptor_set_layout_create(
-        logical_device_,
-        i < 3 ? IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE
-              : IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY,
-        /*binding_count=*/1, &layout_binding, &layout);
-    if (iree_status_is_ok(status)) descriptor_set_layouts_.push_back(layout);
-  }
-
   // Create pipeline layout.
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_native_executable_layout_create(
-        logical_device_,
-        /*push_constant_count=*/4, /*set_layout_count=*/4,
-        descriptor_set_layouts_.data(), &executable_layout_);
+        logical_device_, IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT / 4,
+        IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT, descriptor_set_layouts_,
+        &executable_layout_);
   }
 
   // Create pipeline.
@@ -141,18 +143,6 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
     iree_host_size_t pattern_length, const void* push_constants_to_restore) {
   IREE_TRACE_SCOPE();
 
-  iree_hal_descriptor_set_binding_t binding;
-  binding.binding = 0;
-  binding.buffer = target_buffer;
-  binding.offset = 0;
-  binding.length = IREE_WHOLE_BUFFER;
-  IREE_RETURN_IF_ERROR(descriptor_set_arena->BindDescriptorSet(
-      command_buffer, executable_layout_, /*set=*/3, /*binding_count=*/1,
-      &binding));
-
-  logical_device_->syms()->vkCmdBindPipeline(
-      command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
-
   iree_hal_vulkan_builtin_fill_unaligned_constants_t constants;
   switch (pattern_length) {
     case 1:
@@ -165,10 +155,24 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
       constants.fill_pattern = *static_cast<const uint32_t*>(pattern);
       break;
     default:
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "pattern length (%" PRIhsz ") is not a power of two", pattern_length);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "pattern length (%" PRIhsz
+                              ") is not a power of two or is too large",
+                              pattern_length);
   }
+
+  iree_hal_descriptor_set_binding_t binding;
+  binding.binding = 0;
+  binding.buffer = target_buffer;
+  binding.offset = 0;
+  binding.length = IREE_WHOLE_BUFFER;
+  IREE_RETURN_IF_ERROR(descriptor_set_arena->BindDescriptorSet(
+      command_buffer, executable_layout_,
+      IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET, /*binding_count=*/1, &binding));
+
+  logical_device_->syms()->vkCmdBindPipeline(
+      command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
+
   constants.fill_pattern_width = pattern_length;
   constants.fill_offset_bytes = target_offset;
   constants.fill_length_bytes = length;
@@ -178,7 +182,9 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
       VK_SHADER_STAGE_COMPUTE_BIT, /*offset=*/0,
       sizeof(iree_hal_vulkan_builtin_fill_unaligned_constants_t), &constants);
 
-  // TODO(scotttodd): insert memory barrier(s)?
+  // TODO(scotttodd): insert memory barrier if we need to do dispatch<->dispatch
+  //   synchronization. The barriers inserted normally by callers would be for
+  //   transfer<->dispatch.
 
   logical_device_->syms()->vkCmdDispatch(command_buffer, 1, 1, 1);
 

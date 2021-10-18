@@ -20,6 +20,14 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
+// The `maxBoundDescriptorSets` limit is 4 on many devices we support and we
+// want to avoid conflicts with what the compiler uses, so we'll expect the
+// compiler to have reserved the index 3 for our exclusive use.
+#define IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT 4
+#define IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET 3
+
+#define IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT 16
+
 class BuiltinExecutables {
  public:
   BuiltinExecutables(VkDeviceHandle* logical_device);
@@ -45,9 +53,11 @@ class BuiltinExecutables {
       iree_host_size_t pattern_length, const void* push_constants_to_restore);
 
  private:
-  VkDeviceHandle* logical_device_;
+  VkDeviceHandle* logical_device_ = NULL;
 
-  std::vector<iree_hal_descriptor_set_layout_t*> descriptor_set_layouts_;
+  iree_hal_descriptor_set_layout_t*
+      descriptor_set_layouts_[IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT] = {
+          NULL};
   iree_hal_executable_layout_t* executable_layout_ = NULL;
   VkPipeline pipeline_ = VK_NULL_HANDLE;
 };

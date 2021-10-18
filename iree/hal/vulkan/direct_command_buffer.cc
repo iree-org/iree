@@ -58,7 +58,7 @@ typedef struct iree_hal_vulkan_direct_command_buffer_t {
   // than or equal to the push constant memory used by builtin_executables.
   // TODO(scotttodd): use [maxPushConstantsSize - 16, maxPushConstantsSize]
   //                  instead of [0, 16] to reduce frequency of updates
-  uint8_t push_constants_storage[16];
+  uint8_t push_constants_storage[IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT];
 } iree_hal_vulkan_direct_command_buffer_t;
 
 extern const iree_hal_command_buffer_vtable_t
