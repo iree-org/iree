@@ -13,6 +13,60 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+class CommandBufferFillBufferOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferFillBufferOp> {
+ public:
+  CommandBufferFillBufferOpConversion(MLIRContext *context,
+                                      SymbolTable &importSymbols,
+                                      TypeConverter &typeConverter,
+                                      StringRef importName)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::CommandBufferFillBufferOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getType();
+    IREE::HAL::CommandBufferFillBufferOp::Adaptor newOperands(operands);
+
+    SmallVector<Value, 8> callOperands = {
+        newOperands.command_buffer(),
+        newOperands.target_buffer(),
+        newOperands.target_offset(),
+        newOperands.length(),
+    };
+
+    // The pattern will be promoted as needed to a 32 bit type, but we still
+    // need to bitcast from float to int and track the original pattern length.
+    auto originalPatternType = op.pattern().getType();
+    auto newPatternType = typeConverter->convertType(originalPatternType);
+    auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
+    auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
+        op.getLoc(), patternBitWidth / 8, 32);
+    Value pattern;
+    if (originalPatternType.isSignedInteger()) {
+      pattern = op.pattern();
+    } else {
+      pattern = rewriter.createOrFold<arith::BitcastOp>(
+          op.getLoc(), rewriter.getIntegerType(patternBitWidth), op.pattern());
+    }
+    callOperands.push_back(pattern);
+    callOperands.push_back(patternLength);
+
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(),
+        callOperands);
+
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+ private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 class CommandBufferPushDescriptorSetOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferPushDescriptorSetOp> {
  public:
@@ -86,7 +140,7 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       .insert<VMImportOpConversion<IREE::HAL::CommandBufferExecutionBarrierOp>>(
           context, importSymbols, typeConverter,
           "hal.command_buffer.execution_barrier");
-  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferFillBufferOp>>(
+  patterns.insert<CommandBufferFillBufferOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");

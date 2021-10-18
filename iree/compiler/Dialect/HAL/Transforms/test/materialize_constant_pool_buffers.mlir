@@ -33,10 +33,10 @@ hal.constant_pool @splat_variable_init attributes {buffer_constraints = #hal.buf
 // CHECK-SAME:   usage("Constant|Transfer|Mapping|Dispatch") : !hal.buffer{%c64}
 //      CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
 // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%c0, %c4]
-// CHECK-SAME:   pattern(%c1065353216_i32 : i32, %c4_i32)
+// CHECK-SAME:   pattern(%c1065353216_i32 : i32)
 //      CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
 // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%c32, %c32_0]
-// CHECK-SAME:   pattern(%c1234567890_i32 : i32, %c4_i32_1)
+// CHECK-SAME:   pattern(%c1234567890_i32 : i32)
 
 // -----
 
@@ -70,7 +70,7 @@ hal.constant_pool @pool attributes {buffer_constraints = #hal.buffer_constraints
 // CHECK-SAME:   : !hal.buffer{%c64}
 //      CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
 // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%c0, %c4]
-// CHECK-SAME:   pattern(%c1065353216_i32 : i32, %c4_i32)
+// CHECK-SAME:   pattern(%c1065353216_i32 : i32)
 //      CHECK: hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
 // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%c32, %c32_0]
-// CHECK-SAME:   pattern(%c1234567890_i32 : i32, %c4_i32_1)
+// CHECK-SAME:   pattern(%c1234567890_i32 : i32)

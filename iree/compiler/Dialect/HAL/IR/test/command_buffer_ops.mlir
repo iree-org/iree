@@ -57,22 +57,20 @@ func @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME: %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index,
-//  CHECK-SAME: %[[PATTERN:.+]]: i32,
-//  CHECK-SAME: %[[PATTERN_LENGTH:.+]]: i32)
+//  CHECK-SAME: %[[PATTERN:.+]]: i32)
 func @command_buffer_fill_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer,
     %offset: index,
     %length: index,
-    %pattern: i32,
-    %pattern_length: i32
+    %pattern: i32
   ) {
   //      CHECK: hal.command_buffer.fill_buffer<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]], %[[LENGTH]]]
-  // CHECK-SAME:   pattern(%[[PATTERN]] : i32, %[[PATTERN_LENGTH]])
+  // CHECK-SAME:   pattern(%[[PATTERN]] : i32)
   hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
       target(%buffer : !hal.buffer)[%offset, %length]
-      pattern(%pattern : i32, %pattern_length)
+      pattern(%pattern : i32)
   return
 }
 

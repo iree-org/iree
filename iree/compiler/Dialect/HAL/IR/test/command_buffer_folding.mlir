@@ -38,7 +38,7 @@ func @fold_buffer_subspan_into_fill_buffer(
   hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
       // CHECK-SAME: target(%[[BASE_BUFFER]] : !hal.buffer)[%c108192, %c8192]
       target(%target_subspan : !hal.buffer)[%c100000, %c8192]
-      pattern(%c1234_i32 : i32, %c4_i32)
+      pattern(%c1234_i32 : i32)
   return
 }
 

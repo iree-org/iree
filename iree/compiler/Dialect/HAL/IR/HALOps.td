@@ -1025,15 +1025,14 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     HAL_BufferType:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
-    I32:$pattern,
-    I32:$pattern_length
+    AnyTypeOf<[I8, I16, I32, F16, F32]>:$pattern
   );
 
   let assemblyFormat = [{
     `<` $command_buffer `:` type($command_buffer) `>`
     `target` `(` $target_buffer `:` type($target_buffer) `)`
     `` `[` $target_offset `,` $length `]`
-    `pattern` `(` $pattern `:` type($pattern) `,` $pattern_length `)`
+    `pattern` `(` $pattern `:` type($pattern)`)`
     attr-dict-with-keyword
   }];
 

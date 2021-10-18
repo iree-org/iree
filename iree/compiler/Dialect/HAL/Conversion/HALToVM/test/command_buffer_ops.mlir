@@ -40,14 +40,32 @@ func @command_buffer_fill_buffer(
   %arg0: !hal.command_buffer,
   %arg1: !hal.buffer
 ) {
-  %c4 = arith.constant 4 : i32
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : i32
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %c300, %c4) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %c300_0, %c4) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
-      pattern(%c300 : i32, %c4)
+      pattern(%c300 : i32)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_fill_buffer_f16
+func @command_buffer_fill_buffer_f16(
+  %arg0: !hal.command_buffer,
+  %arg1: !hal.buffer
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %cst = arith.constant 0.5 : f16
+  // CHECK: %c2 = vm.const.i32 2 : i32
+  // CHECK: %c14336 = vm.const.i32 14336 : i32
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %c14336, %c2) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
+      target(%arg1 : !hal.buffer)[%c100, %c200]
+      pattern(%cst : f16)
   return
 }
 
