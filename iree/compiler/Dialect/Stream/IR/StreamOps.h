@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_STREAM_IR_FLOWOPS_H_
-#define IREE_COMPILER_DIALECT_STREAM_IR_FLOWOPS_H_
+#ifndef IREE_COMPILER_DIALECT_STREAM_IR_STREAMOPS_H_
+#define IREE_COMPILER_DIALECT_STREAM_IR_STREAMOPS_H_
 
 #include <cstdint>
 
@@ -31,4 +31,4 @@
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h.inc"  // IWYU pragma: export
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_IR_FLOWOPS_H_
+#endif  // IREE_COMPILER_DIALECT_STREAM_IR_STREAMOPS_H_

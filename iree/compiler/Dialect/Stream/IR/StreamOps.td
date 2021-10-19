@@ -377,7 +377,7 @@ def Stream_ResourcePackOp : Stream_PureOp<"resource.pack", [
     required to be live for that range.
 
     ```mlir
-    // Computes thte total length required for the packed values and the offsets
+    // Computes the total length required for the packed values and the offsets
     // of the 3 slices requested relative to the base of the packed memory:
     %total_length, %offset_0, %offset_1, %offset_2 =
         stream.resource.pack
@@ -404,7 +404,7 @@ def Stream_ResourcePackOp : Stream_PureOp<"resource.pack", [
 
     The total length required to pack all slices is returned and can be used to
     acquire storage. The individual slice offsets are 0-based and as such if are
-    directly used as buffer offsets may need additional offseting. This can
+    directly used as buffer offsets may need additional offsetting. This can
     either be applied via the optional `offset` operand or slicing of the
     underlying allocation buffer.
   }];

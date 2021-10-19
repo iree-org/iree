@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_STREAM_IR_FLOWTYPES_H_
-#define IREE_COMPILER_DIALECT_STREAM_IR_FLOWTYPES_H_
+#ifndef IREE_COMPILER_DIALECT_STREAM_IR_STREAMTYPES_H_
+#define IREE_COMPILER_DIALECT_STREAM_IR_STREAMTYPES_H_
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
@@ -62,4 +62,4 @@ namespace Stream {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_IR_FLOWTYPES_H_
+#endif  // IREE_COMPILER_DIALECT_STREAM_IR_STREAMTYPES_H_

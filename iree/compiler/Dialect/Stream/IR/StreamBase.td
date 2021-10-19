@@ -36,7 +36,7 @@ def Stream_Dialect : Dialect {
     +--------+    +----------+    +-------+
     ```
 
-    This sits inbetween the `flow` and `hal` dialects.
+    This sits in-between the `flow` and `hal` dialects.
 
     * `flow` models tensor programs by separating work into dispatchable
       functions in order to isolate the main host program data flow and the
@@ -160,7 +160,7 @@ def Stream_AffinityAttr : AttrDef<Stream_Dialect, "Affinity", []> {
   let valueType = NoneType;
 
   let extraClassDeclaration = [{
-    // Returns a affinity active for the given operation.
+    // Returns an affinity active for the given operation.
     // This will recursively walk parent operations until one with the
     // `stream.affinity` attribute is found.
     static AffinityAttr lookup(Operation *op);
@@ -455,7 +455,7 @@ def Stream_StagingResource : DialectType<Stream_Dialect, And<[
 ]>, "staging resource"> {
   let description = [{
     Stream upload/download staging resource. These are used outside of streams
-    and then transfered to other stream resources such as variables or
+    and then transferred to other stream resources such as variables or
     transients for use inside of streams. Dispatches and several other
     operations cannot directly operate on these resources.
   }];

@@ -148,8 +148,7 @@ static bool materializeCOW(Location loc, Value rootValue, OpBuilder &builder) {
     // All uses are as normal capturing SSA values.
     return false;
   } else if (tiedUses.size() == 1 && untiedUses == 0 && !forceClone) {
-    // Only one use and it's tied - we've already reserved our results for
-    // it.
+    // Only one use and it's tied - we've already reserved our results for it.
     return false;
   }
 
