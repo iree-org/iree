@@ -70,6 +70,7 @@ iree_mlir_benchmark_suite(
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
     "--iree-llvm-link-embedded=true"
+    "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib-sync"
 )
@@ -93,7 +94,7 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
-    # "--iree-flow-enable-padding-linalg-ops"
+    "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -117,7 +118,7 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
-    # "--iree-flow-enable-padding-linalg-ops"
+    "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -141,7 +142,7 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
-    # "--iree-flow-enable-padding-linalg-ops"
+    "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -165,7 +166,7 @@ iree_mlir_benchmark_suite(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
-    # "--iree-flow-enable-padding-linalg-ops"
+    "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -190,6 +191,7 @@ iree_mlir_benchmark_suite(
     "--iree-vulkan-target-triple=adreno-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-enable-fusion-with-reduction-ops"
+    "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "vulkan"
 )
@@ -212,6 +214,7 @@ iree_mlir_benchmark_suite(
     "--iree-vulkan-target-triple=valhall-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
+    "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "vulkan"
 )
@@ -235,6 +238,7 @@ iree_mlir_benchmark_suite(
     "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
+    "--iree-flow-enable-padding-linalg-ops"
   DRIVER
     "vulkan"
   RUNTIME_FLAGS
