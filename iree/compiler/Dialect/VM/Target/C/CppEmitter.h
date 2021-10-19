@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Formated in LLVM style. Avoid reformatting for upcoming upstreaming.
 // clang-format off
 
 #ifndef EMITC_TARGET_CPP_CPPEMITTER_H
