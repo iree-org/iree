@@ -1,4 +1,9 @@
 #!/bin/bash
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 # The version of tbb installed on manylinux2014 is too old to support the
 # parallel STL libraries on the installed GCC9-based toolchain. Further,
 # Intel *broke* compatibility starting in 2021 for GCC<=10.
