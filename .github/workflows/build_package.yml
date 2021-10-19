@@ -190,7 +190,7 @@ jobs:
         run: |
           package_dir="./iree-install/python_packages/iree_runtime"
           export CIBW_BEFORE_ALL_LINUX="./main_checkout/build_tools/github_actions/install_tracy_cli_deps_manylinux2014.sh"
-          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg"
+          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py instrumented-py-runtime-pkg"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( Make source packages.
           mkdir -p $package_dir && touch $package_dir/setup.py
