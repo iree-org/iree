@@ -159,6 +159,9 @@ TEST(StringBuilderTest, Format) {
   EXPECT_EQ(strlen(builder.builder.buffer), 6 + 1024);  // NUL check
   EXPECT_EQ(builder.ToString(),
             std::string("abcabc") + std::string(1023, ' ') + std::string("x"));
+
+  fprintf(stderr, "\x1b[31;1mRED RED RED \x1b[0mNORMAL\n");
+  abort();
 }
 
 }  // namespace
