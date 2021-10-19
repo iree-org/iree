@@ -41,7 +41,6 @@ class CommandBufferFillBufferOpConversion
     // The pattern will be promoted as needed to a 32 bit type, but we still
     // need to bitcast from float to int and track the original pattern length.
     auto originalPatternType = op.pattern().getType();
-    auto newPatternType = typeConverter->convertType(originalPatternType);
     auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
     auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternBitWidth / 8, 32);
