@@ -59,10 +59,10 @@ func @command_buffer_fill_buffer_f16(
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  %cst = arith.constant 0.5 : f16
+  %cst = arith.constant 5.0 : f16
   // CHECK: %c2 = vm.const.i32 2 : i32
-  // CHECK: %c14336 = vm.const.i32 14336 : i32
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %c14336, %c2) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  // CHECK: %c17664 = vm.const.i32 17664 : i32
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %c17664, %c2) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%cst : f16)
