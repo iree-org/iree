@@ -58,6 +58,26 @@ typedef struct iree_vm_value_t {
   };
 } iree_vm_value_t;
 
+static inline iree_vm_value_t iree_vm_value_make_none() {
+  iree_vm_value_t result;
+  result.type = IREE_VM_VALUE_TYPE_NONE;
+  return result;
+}
+
+static inline iree_vm_value_t iree_vm_value_make_i8(int8_t value) {
+  iree_vm_value_t result;
+  result.type = IREE_VM_VALUE_TYPE_I8;
+  result.i8 = value;
+  return result;
+}
+
+static inline iree_vm_value_t iree_vm_value_make_i16(int16_t value) {
+  iree_vm_value_t result;
+  result.type = IREE_VM_VALUE_TYPE_I16;
+  result.i16 = value;
+  return result;
+}
+
 static inline iree_vm_value_t iree_vm_value_make_i32(int32_t value) {
   iree_vm_value_t result;
   result.type = IREE_VM_VALUE_TYPE_I32;
