@@ -270,6 +270,27 @@ iree_mlir_benchmark_suite(
     "--batch_size=32"
 )
 
+# GPU, Vulkan, Mali, full-inference
+iree_mlir_benchmark_suite(
+  MODULES
+    ${MOBILEBERT_FP16_MODULE}
+
+  BENCHMARK_MODES
+    "full-inference"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-flow-demote-f32-to-f16"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+)
+
 ################################################################################
 #                                                                              #
 # Speical benchmark configurations                                             #
