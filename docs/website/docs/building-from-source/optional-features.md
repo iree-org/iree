@@ -1,4 +1,4 @@
-# Optional Features
+# Optional features
 
 This page details the optional features and build modes for the project.
 Most of these are controlled by various CMake options, sometimes requiring
