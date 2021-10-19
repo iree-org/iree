@@ -75,6 +75,17 @@ iree_check_single_backend_test_suite(
     target_backend = "dylib-llvm-aot",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_dylib_embedded-llvm-aot_dylib",
+    srcs = LLVM_SRCS,
+    compiler_flags = [
+        "-iree-input-type=tosa",
+        "-iree-llvm-link-embedded=true",
+    ],
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
+)
+
 VMVX_SRCS = enforce_glob(
     [
         "abs.mlir",
