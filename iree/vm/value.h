@@ -82,7 +82,7 @@ static inline int64_t iree_vm_value_get_i64(iree_vm_value_t *value) {
   return value->i64;
 }
 
-static inline iree_vm_value_t iree_vm_value_make_f32(int32_t value) {
+static inline iree_vm_value_t iree_vm_value_make_f32(float value) {
   iree_vm_value_t result;
   result.type = IREE_VM_VALUE_TYPE_F32;
   result.f32 = value;
