@@ -1032,7 +1032,7 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     `<` $command_buffer `:` type($command_buffer) `>`
     `target` `(` $target_buffer `:` type($target_buffer) `)`
     `` `[` $target_offset `,` $length `]`
-    `pattern` `(` $pattern `:` type($pattern)`)`
+    `pattern` `(` $pattern `:` type($pattern) `)`
     attr-dict-with-keyword
   }];
 

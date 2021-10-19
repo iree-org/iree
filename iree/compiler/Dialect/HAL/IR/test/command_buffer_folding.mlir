@@ -28,7 +28,6 @@ func @fold_buffer_subspan_into_fill_buffer(
     %buffer: !hal.buffer
   ) {
   %c0 = arith.constant 0 : index
-  %c4_i32 = arith.constant 4 : i32
   %c8192 = arith.constant 8192 : index
   %c100000 = arith.constant 100000 : index
   %c262144 = arith.constant 262144 : index
