@@ -447,10 +447,6 @@ if(IREE_BUILD_COMPILER)
   add_subdirectory(build_tools/third_party/mlir-hlo EXCLUDE_FROM_ALL)
 endif()
 
-if(IREE_ENABLE_EMITC)
-  add_subdirectory(build_tools/third_party/mlir-emitc EXCLUDE_FROM_ALL)
-endif()
-
 if(IREE_BUILD_TESTS)
   enable_testing(iree)
 endif()

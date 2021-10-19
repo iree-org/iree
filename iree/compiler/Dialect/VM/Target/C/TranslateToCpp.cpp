@@ -1,12 +1,14 @@
-//===- TranslateToCpp.cpp - Translating to C++ calls ----------------------===//
+// Copyright 2020 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
 
-#include "emitc/Target/Cpp/CppEmitter.h"
+// Formated in LLVM style. Avoid reformatting for upcoming upstreaming.
+// clang-format off
+
+#include "iree/compiler/Dialect/VM/Target/C/CppEmitter.h"
+
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -834,3 +836,4 @@ LogicalResult emitc::translateToCpp(Operation *op, raw_ostream &os,
   CppEmitter emitter(os, declareVariablesAtTop);
   return emitter.emitOperation(*op, /*trailingSemicolon=*/false);
 }
+// clang-format on

@@ -1,14 +1,11 @@
-//===- CppEmitter.h - Helpers to create C++ emitter -------------*- C++ -*-===//
+// Copyright 2020 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// This file defines helpers to emit C++ code using the EmitC dialect.
-//
-//===----------------------------------------------------------------------===//
+
+// Formated in LLVM style. Avoid reformatting for upcoming upstreaming.
+// clang-format off
 
 #ifndef EMITC_TARGET_CPP_CPPEMITTER_H
 #define EMITC_TARGET_CPP_CPPEMITTER_H
@@ -182,3 +179,4 @@ LogicalResult translateToCpp(Operation *op, raw_ostream &os,
 } // namespace mlir
 
 #endif // EMITC_TARGET_CPP_CPPEMITTER_H
+// clang-format on
