@@ -90,7 +90,7 @@ struct FlattenMemRefTypeConverter final : public TypeConverter {
       // byte buffer with potentially unknown total size, as transformation
       // passes can concatenate buffers, etc.
       return MemRefType::get(ShapedType::kDynamicSize, type.getElementType(),
-                             ArrayRef<AffineMap>(), type.getMemorySpace());
+                             AffineMap(), type.getMemorySpace());
     });
   }
 };
@@ -135,7 +135,7 @@ struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
       AllocOpTy allocOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = allocOp.getType().template dyn_cast<MemRefType>();
-    if (!oldType || !oldType.getAffineMaps().empty()) return failure();
+    if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
     Value dynamicDim = createTotalElementCountValue(
         oldType, allocOp.getDynamicSizes(), allocOp.getLoc(), rewriter);
@@ -166,13 +166,13 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
       memref::GlobalOp globalOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = globalOp.type().dyn_cast<MemRefType>();
-    if (!oldType || !oldType.getAffineMaps().empty()) return failure();
+    if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
     auto tensorType = RankedTensorType::get({oldType.getNumElements()},
                                             oldType.getElementType());
     auto memRefType =
         MemRefType::get({oldType.getNumElements()}, oldType.getElementType(),
-                        {}, oldType.getMemorySpace());
+                        AffineMap(), oldType.getMemorySpace());
     auto newInitialValue =
         flattenAttribute(globalOp.initial_valueAttr(), tensorType);
     rewriter.replaceOpWithNewOp<memref::GlobalOp>(
@@ -192,7 +192,7 @@ struct FlattenGetGlobal final
       memref::GetGlobalOp getOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = getOp.getType().dyn_cast<MemRefType>();
-    if (!oldType || !oldType.getAffineMaps().empty()) return failure();
+    if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
     auto globalOp = dyn_cast_or_null<memref::GlobalOp>(
         SymbolTable::lookupNearestSymbolFrom(getOp, getOp.nameAttr()));
@@ -218,7 +218,7 @@ struct FlattenBindingSubspan final
     auto oldType = subspanOp.getType().dyn_cast<MemRefType>();
     // IREE subspan ops only use memref types with the default identity
     // layout maps.
-    if (!oldType || !oldType.getAffineMaps().empty()) return failure();
+    if (!oldType || !oldType.getLayout().isIdentity()) return failure();
 
     Value dynamicDim = createTotalElementCountValue(
         oldType, subspanOp.dynamic_dims(), subspanOp.getLoc(), rewriter);

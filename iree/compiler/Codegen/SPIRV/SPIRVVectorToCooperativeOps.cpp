@@ -232,10 +232,13 @@ struct SPIRVVectorToCooperativeOpsPass final
     typeConverter.addConversion(
         [&typeConverter](MemRefType type) -> Optional<Type> {
           if (!type.hasStaticShape()) return llvm::None;
-          auto flattenType =
+          // In IREE all MemRefs are originated from subspan ops, which should
+          // have identity layout.
+          if (!type.getLayout().isIdentity()) return llvm::None;
+          auto flattenedType =
               MemRefType::get(ShapedType::kDynamicSize, type.getElementType(),
-                              type.getAffineMaps(), type.getMemorySpace());
-          return typeConverter.convertType(flattenType);
+                              AffineMap(), type.getMemorySpace());
+          return typeConverter.convertType(flattenedType);
         });
 
     // Add unrealized conversion cast ops to bridge type conversions: we are

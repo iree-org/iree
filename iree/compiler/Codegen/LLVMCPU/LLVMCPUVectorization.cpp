@@ -130,7 +130,7 @@ Optional<Value> allocateWorkgroupMemoryOnStack(
       }));
   if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
   MemRefType allocType =
-      MemRefType::get(shape, subview.getType().getElementType(), {});
+      MemRefType::get(shape, subview.getType().getElementType(), AffineMap());
   Value buffer = b.create<memref::AllocaOp>(subview.getLoc(), allocType);
   return buffer;
 }

@@ -47,7 +47,10 @@ iree_lit_test_suite(
             "vectorize_load_store.mlir",
         ],
         include = ["*.mlir"],
-        exclude = ["promote_workgroup_memory.mlir"],
+        # TODO(b/203528778) reenable
+        exclude = [
+            "promote_workgroup_memory.mlir",
+        ],
     ),
     data = [
         "//iree/tools:IreeFileCheck",
