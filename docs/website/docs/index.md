@@ -68,10 +68,10 @@ Using IREE involves these general steps:
 
 1. **Import your model**
 
-    Work in your framework of choice, then run your model through one of IREE's
-    import tools.
+    Work in your [framework of choice](./ml-frameworks), then run your model
+    through one of IREE's import tools.
 
-2. **Select your deployment configuration**
+2. **Select your [deployment configuration](./deployment-configurations)**
 
     Identify your target platform, accelerator(s), and other constraints.
 
@@ -124,7 +124,7 @@ static or dynamic linkage and the associated function calls are generated.
 ### Running models
 
 IREE offers a low level C API, as well as several specialized sets of
-_bindings_ for running IREE models using other languages:
+[bindings](./bindings) for running IREE models using other languages:
 
 * [C API](bindings/c-api.md)
 * [Python](bindings/python.md)

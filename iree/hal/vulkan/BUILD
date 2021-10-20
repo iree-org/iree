@@ -26,6 +26,8 @@ cc_library(
     name = "vulkan",
     srcs = [
         "api.cc",
+        "builtin_executables.cc",
+        "builtin_executables.h",
         "command_queue.h",
         "debug_reporter.cc",
         "debug_reporter.h",
@@ -92,6 +94,7 @@ cc_library(
         "//iree/base/internal:synchronization",
         "//iree/base/internal/flatcc:parsing",
         "//iree/hal",
+        "//iree/hal/vulkan/builtin",
         "//iree/hal/vulkan/util:arena",
         "//iree/hal/vulkan/util:intrusive_list",
         "//iree/hal/vulkan/util:ref_ptr",

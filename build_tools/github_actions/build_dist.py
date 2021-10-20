@@ -210,17 +210,30 @@ def build_py_pure_pkgs():
                  check=True)
 
 
-def build_py_runtime_pkg():
+def build_py_runtime_pkg(instrumented: bool = False):
   """Builds the iree-install/python_packages/iree_runtime package.
 
   This includes native, python-version dependent code and is designed to
   be built multiple times.
+
+  Note that an instrumented build may require additional dependencies.
+  See: install_tracy_cli_deps_manylinux2014.sh for how to set up on that
+  container.
   """
   install_python_requirements()
 
   # Clean up install and build trees.
   shutil.rmtree(INSTALL_DIR, ignore_errors=True)
   remove_cmake_cache()
+  extra_cmake_flags = []
+
+  # Extra options for instrumentation.
+  if instrumented:
+    print("*** Enabling options for instrumented build ***")
+    extra_cmake_flags.extend([
+        f"-DIREE_ENABLE_RUNTIME_TRACING=ON",
+        f"-DIREE_BUILD_TRACY=ON",
+    ])
 
   # CMake configure.
   print("*** Configuring ***")
@@ -234,7 +247,7 @@ def build_py_runtime_pkg():
       f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
       f"-DIREE_BUILD_SAMPLES=OFF",
       f"-DIREE_BUILD_TESTS=OFF",
-  ],
+  ] + extra_cmake_flags,
                  check=True)
 
   print("*** Building ***")
@@ -405,6 +418,8 @@ if command == "main-dist":
   build_main_dist()
 elif command == "py-runtime-pkg":
   build_py_runtime_pkg()
+elif command == "instrumented-py-runtime-pkg":
+  build_py_runtime_pkg(instrumented=True)
 elif command == "py-pure-pkgs":
   build_py_pure_pkgs()
 elif command == "py-xla-compiler-tools-pkg":

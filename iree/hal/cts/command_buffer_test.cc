@@ -37,6 +37,64 @@ class CommandBufferTest : public CtsTestBase {
   }
 
  protected:
+  std::vector<uint8_t> RunFillBufferTest(iree_device_size_t buffer_size,
+                                         iree_device_size_t target_offset,
+                                         iree_device_size_t fill_length,
+                                         const void* pattern,
+                                         iree_host_size_t pattern_length) {
+    iree_hal_command_buffer_t* command_buffer;
+    IREE_CHECK_OK(iree_hal_command_buffer_create(
+        device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
+        &command_buffer));
+    iree_hal_buffer_t* device_buffer;
+    IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(device_),
+        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+        IREE_HAL_BUFFER_USAGE_ALL, buffer_size, &device_buffer));
+
+    IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
+    // Start with a zero fill on the entire buffer...
+    uint8_t zero_val = 0x0;
+    IREE_CHECK_OK(iree_hal_command_buffer_fill_buffer(
+        command_buffer, device_buffer, /*target_offset=*/0,
+        /*length=*/buffer_size, &zero_val,
+        /*pattern_length=*/sizeof(zero_val)));
+    // (buffer barrier between the fill operations)
+    iree_hal_buffer_barrier_t buffer_barrier;
+    buffer_barrier.source_scope = IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE;
+    buffer_barrier.target_scope = IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE |
+                                  IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE;
+    buffer_barrier.buffer = device_buffer;
+    buffer_barrier.offset = 0;
+    buffer_barrier.length = buffer_size;
+    IREE_CHECK_OK(iree_hal_command_buffer_execution_barrier(
+        command_buffer, IREE_HAL_EXECUTION_STAGE_TRANSFER,
+        IREE_HAL_EXECUTION_STAGE_TRANSFER | IREE_HAL_EXECUTION_STAGE_DISPATCH,
+        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, /*memory_barrier_count=*/0, NULL,
+        /*buffer_barrier_count=*/1, &buffer_barrier));
+    // ... then fill the pattern on top.
+    IREE_CHECK_OK(iree_hal_command_buffer_fill_buffer(
+        command_buffer, device_buffer,
+        /*target_offset=*/target_offset, /*length=*/fill_length,
+        /*pattern=*/pattern,
+        /*pattern_length=*/pattern_length));
+    IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
+    IREE_CHECK_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_ANY,
+                                             command_buffer));
+
+    std::vector<uint8_t> actual_data(buffer_size);
+    IREE_CHECK_OK(
+        iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
+                                  /*target_buffer=*/actual_data.data(),
+                                  /*data_length=*/buffer_size));
+
+    iree_hal_command_buffer_release(command_buffer);
+    iree_hal_buffer_release(device_buffer);
+
+    return actual_data;
+  }
+
   static constexpr iree_device_size_t kBufferSize = 4096;
 };
 
@@ -81,67 +139,6 @@ TEST_P(CommandBufferTest, SubmitEmpty) {
                                             command_buffer));
 
   iree_hal_command_buffer_release(command_buffer);
-}
-
-TEST_P(CommandBufferTest, FillBufferWithRepeatedBytes) {
-  iree_hal_command_buffer_t* command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
-
-  iree_hal_buffer_t* device_buffer;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_,
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL, kBufferSize, &device_buffer));
-
-  std::vector<uint8_t> reference_buffer(kBufferSize);
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-
-  // Fill the device buffer with segments of different values so that we can
-  // test both fill and offset/size.
-  uint8_t val1 = 0x07;
-  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
-      command_buffer, device_buffer,
-      /*target_offset=*/0, /*length=*/kBufferSize / 4, /*pattern=*/&val1,
-      /*pattern_length=*/sizeof(val1)));
-  std::memset(reference_buffer.data(), val1, kBufferSize / 4);
-
-  uint8_t val2 = 0xbe;
-  IREE_ASSERT_OK(
-      iree_hal_command_buffer_fill_buffer(command_buffer, device_buffer,
-                                          /*target_offset=*/kBufferSize / 4,
-                                          /*length=*/kBufferSize / 4,
-                                          /*pattern=*/&val2,
-                                          /*pattern_length=*/sizeof(val2)));
-  std::memset(reference_buffer.data() + kBufferSize / 4, val2, kBufferSize / 4);
-
-  uint8_t val3 = 0x54;
-  IREE_ASSERT_OK(
-      iree_hal_command_buffer_fill_buffer(command_buffer, device_buffer,
-                                          /*target_offset=*/kBufferSize / 2,
-                                          /*length=*/kBufferSize / 2,
-                                          /*pattern=*/&val3,
-                                          /*pattern_length=*/sizeof(val3)));
-  std::memset(reference_buffer.data() + kBufferSize / 2, val3, kBufferSize / 2);
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
-
-  IREE_ASSERT_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-                                            command_buffer));
-
-  // Read the device buffer and compare.
-  std::vector<uint8_t> actual_data(kBufferSize);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
-                                           /*target_buffer=*/actual_data.data(),
-                                           /*data_length=*/kBufferSize));
-  EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
-
-  // Must release the command buffer before resources used by it.
-  iree_hal_command_buffer_release(command_buffer);
-  iree_hal_buffer_release(device_buffer);
 }
 
 TEST_P(CommandBufferTest, CopyWholeBuffer) {
@@ -255,6 +252,126 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(device_buffer);
   iree_hal_buffer_release(host_buffer);
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length1) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 1;
+  uint8_t pattern = 0x07;
+  std::vector<uint8_t> reference_buffer{0x07, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length3) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 3;
+  uint8_t pattern = 0x07;
+  std::vector<uint8_t> reference_buffer{0x07, 0x07, 0x07, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length8) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 8;
+  uint8_t pattern = 0x07;
+  std::vector<uint8_t> reference_buffer{0x07, 0x07, 0x07, 0x07,  //
+                                        0x07, 0x07, 0x07, 0x07,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern1_offset2_length8) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 2;
+  iree_device_size_t fill_length = 8;
+  uint8_t pattern = 0x07;
+  std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x07, 0x07,  //
+                                        0x07, 0x07, 0x07, 0x07,  //
+                                        0x07, 0x07, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern2_offset0_length8) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 8;
+  uint16_t pattern = 0xAB23;
+  std::vector<uint8_t> reference_buffer{0x23, 0xAB, 0x23, 0xAB,  //
+                                        0x23, 0xAB, 0x23, 0xAB,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern2_offset0_length10) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 10;
+  uint16_t pattern = 0xAB23;
+  std::vector<uint8_t> reference_buffer{0x23, 0xAB, 0x23, 0xAB,  //
+                                        0x23, 0xAB, 0x23, 0xAB,  //
+                                        0x23, 0xAB, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern2_offset2_length8) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 2;
+  iree_device_size_t fill_length = 8;
+  uint16_t pattern = 0xAB23;
+  std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x23, 0xAB,  //
+                                        0x23, 0xAB, 0x23, 0xAB,  //
+                                        0x23, 0xAB, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern4_offset0_length8) {
+  iree_device_size_t buffer_size = 16;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 8;
+  uint32_t pattern = 0xAB23CD45;
+  std::vector<uint8_t> reference_buffer{0x45, 0xCD, 0x23, 0xAB,  //
+                                        0x45, 0xCD, 0x23, 0xAB,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
 INSTANTIATE_TEST_SUITE_P(
