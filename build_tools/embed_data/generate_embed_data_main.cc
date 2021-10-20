@@ -14,16 +14,6 @@
 #include <string>
 #include <vector>
 
-// #include "iree/base/internal/flags.h"
-
-// IREE_FLAG(string, identifier, "resources", "name of the resources function");
-// IREE_FLAG(string, output_header, "", "output header file");
-// IREE_FLAG(string, output_impl, "", "output impl file");
-// IREE_FLAG(string, strip_prefix, "", "strip prefix from filenames");
-// IREE_FLAG(bool, flatten, false,
-//           "whether to flatten the directory structure (only include
-//           basename)");
-
 static std::string CEscape(const std::string& src) {
   static const char kHexChar[] = "0123456789ABCDEF";
   std::string dest;
