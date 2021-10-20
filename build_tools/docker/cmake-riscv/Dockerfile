@@ -15,7 +15,7 @@ RUN tar -xf "toolchain_iree_rv32.tar.gz" -C /usr/src/
 RUN wget "https://storage.googleapis.com/iree-shared-files/qemu-riscv.tar.gz"
 RUN tar -xf "qemu-riscv.tar.gz" -C /usr/src/
 
-FROM gcr.io/iree-oss/cmake-python@sha256:97986dd151ff759708c189870b53b78c073c9ef47914ec61a0ba01ae4bcca10f AS final
+FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 AS final
 COPY --from=install-riscv "/usr/src/toolchain_iree" "/usr/src/toolchain_iree"
 COPY --from=install-riscv "/usr/src/toolchain_iree_rv32imf" "/usr/src/toolchain_iree_rv32imf"
 COPY --from=install-riscv "/usr/src/qemu-riscv" "/usr/src/qemu-riscv"

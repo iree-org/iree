@@ -12,7 +12,7 @@ RUN wget "https://github.com/google-research/google-research/tarball/${KWS_COMMI
   && tar --extract --gzip --file=google-research.tar.gz \
     --wildcards */kws_streaming --strip-components=1
 
-FROM gcr.io/iree-oss/cmake-python@sha256:97986dd151ff759708c189870b53b78c073c9ef47914ec61a0ba01ae4bcca10f AS final
+FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 AS final
 
 # Install bazel.
 COPY --from=gcr.io/iree-oss/bazel@sha256:31c3acef0aeb2976b63b8cb946bda1de9bc8b5319b7e079e507afad2a62d13e7 \

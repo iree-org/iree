@@ -38,7 +38,7 @@ RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
     mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/tools && \
     rm *tools*linux*.zip
 
-FROM gcr.io/iree-oss/cmake@sha256:b2394378ca9518bc2caaee168f1ff66677548232b79cfc999067447ed07f8de1 as final
+FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 as final
 ARG ANDROID_SDK_VERSION
 ARG ANDROID_NDK_VERSION
 ARG GRADLE_VERSION

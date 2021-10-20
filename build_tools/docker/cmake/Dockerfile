@@ -35,3 +35,20 @@ COPY --from=install-cmake \
   "/usr/share/cmake-${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}"
 
 RUN apt-get update && apt-get install -y ninja-build
+
+# At this point, everything requires Python.
+RUN apt-get update \
+  && apt-get install -y \
+    python3.7 \
+    python3.7-dev \
+  && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 1 \
+  && apt-get install -y \
+    python3-pip \
+    python3-setuptools \
+    python3-distutils \
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install \
+    numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
+    pybind11==2.6.1
+
+ENV PYTHON_BIN /usr/bin/python3
