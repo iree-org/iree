@@ -132,9 +132,9 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   bool tileToSquare = false;
   unsigned log2Threads = llvm::Log2_64(residualThreads);
   if (ow == oh && residualThreads != 1 && log2Threads % 2 == 0) {
-    int64_t yz = 1 << (log2Threads / 2);
+    int64_t yz = 1ll << (log2Threads / 2);
 
-    int64_t chosenTileSize = 1 << (llvm::Log2_64(residualTilingFactor) / 2);
+    int64_t chosenTileSize = 1ll << (llvm::Log2_64(residualTilingFactor) / 2);
     while (chosenTileSize >= 1 && ow % (yz * chosenTileSize) != 0) {
       chosenTileSize >>= 1;
     }
@@ -184,7 +184,6 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
-  tileSizes.emplace_back();  // Subgroup level
   tileSizes.push_back(invocationTileSizes);
   // Tiling along reduction dimensions
   if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
@@ -306,7 +305,6 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
-  tileSizes.emplace_back();
   tileSizes.push_back(invocationTileSizes);
   tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
@@ -339,7 +337,7 @@ static LogicalResult setOpConfig(spirv::ResourceLimitsAttr limits,
   if (workgroupTileSize.size() >= rank && workgroupTileSize[rank - 1] != 0) {
     APInt value;
     if (matchPattern(op.getStage(), m_ConstantInt(&value))) {
-      workgroupTileSize[rank - 1] = 1 << value.getSExtValue();
+      workgroupTileSize[rank - 1] = 1ll << value.getSExtValue();
     } else {
       op.emitError("non-constant stage might not work for fft op");
       return failure();
@@ -437,7 +435,6 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSize);
-  tileSizes.emplace_back();  // Subgroup level.
   tileSizes.push_back(threadTileSize);
 
   return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),

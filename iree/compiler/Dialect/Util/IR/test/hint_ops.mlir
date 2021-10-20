@@ -4,9 +4,6 @@
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
 func @parse_print_do_not_optimize(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
-  // CHECK: util.do_not_optimize()
-  util.do_not_optimize()
-
   // CHECK-NEXT: util.do_not_optimize(%[[ARG0]]) : tensor<i32>
   %1 = util.do_not_optimize(%arg0) : tensor<i32>
 
@@ -32,17 +29,5 @@ func @parse_print_unfoldable_constant(%arg0 : tensor<i32>, %arg1 : tensor<i32>) 
   // CHECK: util.unfoldable_constant @func_with_args : (f32) -> ()
   %csymref = util.unfoldable_constant @func_with_args : (f32) -> ()
 
-  return
-}
-
-// -----
-
-// CHECK-LABEL: @parse_print_dynamic_shape_constant
-func @parse_print_dynamic_shape_constant() {
-  // CHECK-NEXT: util.dynamic_shape_constant dense<2> : tensor<2xi32> -> tensor<?xi32>
-  %c = util.dynamic_shape_constant dense<2> : tensor<2xi32> -> tensor<?xi32>
-
-  // CHECK-NEXT: util.dynamic_shape_constant dense<2> : tensor<2xi32> {attr = "foo"} -> tensor<?xi32>
-  %has_attr = util.dynamic_shape_constant dense<2> : tensor<2xi32> {attr = "foo"} -> tensor<?xi32>
   return
 }

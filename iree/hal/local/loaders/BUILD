@@ -61,11 +61,9 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal:dynamic_library",
-        "//iree/base/internal/flatcc:parsing",
         "//iree/hal",
         "//iree/hal/local",
         "//iree/hal/local:executable_library",
-        "//iree/schemas:dylib_executable_def_c_fbs",
     ],
 )
 

@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(canonicalize,iree-spirv-remove-one-trip-tiled-loop,iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}
+#config = {tileSizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}
 
 hal.executable private @conv_static_shape_f32  {
   hal.interface @io {
@@ -99,7 +99,7 @@ hal.executable private @conv_static_shape_f32  {
 
 // -----
 
-#config = {tileSizes = [[0, 2, 2, 32], [], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
+#config = {tileSizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
 
 hal.executable private @depthwise_conv_static_shape_f32  {
   hal.interface @io {
@@ -111,7 +111,7 @@ hal.executable private @depthwise_conv_static_shape_f32  {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
       interface = @io,
       ordinal = 0 : index,
-      workgroup_size = [8: index, 2: index, 2: index],
+      workgroup_size = [4: index, 4: index, 4: index],
       translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
@@ -185,9 +185,9 @@ hal.executable private @depthwise_conv_static_shape_f32  {
 
 // check tiling loop along filter height/width and input channel
 //      CHECK:    scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:        -> (vector<4xf32>)
+// CHECK-SAME:        -> (vector<1x1x1x4xf32>)
 //      CHECK:      scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:          -> (vector<4xf32>)
+// CHECK-SAME:          -> (vector<1x1x1x4xf32>)
 
 
 // CHECK: vector.fma

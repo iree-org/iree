@@ -242,8 +242,17 @@ def SPIRVRemoveOneTripTiledLoop :
 // TODO: Rename argument to be fully qualified.
 def SPIRVTileAndDistribute : Pass<"iree-spirv-tile-and-distribute", "FuncOp"> {
   let summary = "Tile and distribute Linalg ops with buffer semantics to "
-                "subgroups and invocations";
+                "invocations";
   let constructor = "mlir::iree_compiler::createSPIRVTileAndDistributePass()";
+}
+
+def SPIRVTileAndVectorizeToCooperativeOps : Pass<
+    "iree-spirv-tile-and-vectorize-to-cooperative-ops", "FuncOp"> {
+  let summary = "Tile Linalg ops with buffer semantics to subgroups and "
+                "vectorize to vector ops suitable for lowering to SPIR-V "
+                "cooperative ops";
+  let constructor =
+    "mlir::iree_compiler::createSPIRVTileAndVectorizeToCooperativeOpsPass()";
 }
 
 def SPIRVVectorize : Pass<"iree-spirv-vectorize", "FuncOp"> {
@@ -251,20 +260,18 @@ def SPIRVVectorize : Pass<"iree-spirv-vectorize", "FuncOp"> {
   let constructor = "mlir::iree_compiler::createSPIRVVectorizePass()";
 }
 
+def SPIRVVectorToCooperativeOps :
+    Pass<"iree-spirv-vector-to-cooperative-ops", "FuncOp"> {
+  let summary = "Convert vector ops to SPIR-V cooperative ops";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVVectorToCooperativeOpsPass()";
+}
+
 // TODO: Rename argument to be fully qualified.
 def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
-}
-
-// TODO: Rename argument to be fully qualified.
-def SPIRVVectorToCooperativeMatrix :
-    Pass<"iree-spirv-vector-to-cooperative-matrix", "FuncOp"> {
-  let summary = "Convert vector ops to SPIR-V cooperative matrix ops "
-                "when possible";
-  let constructor =
-      "mlir::iree_compiler::createSPIRVVectorToCooperativeMatrixPass()";
 }
 
 // TODO: Rename argument to be fully qualified.

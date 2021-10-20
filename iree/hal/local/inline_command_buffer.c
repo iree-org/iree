@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/local/executable_library.h"
@@ -463,8 +464,13 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
                                                (void**)&local_memory.data));
   }
 
+  // Since we are running on a borrowed thread, we know nothing about the
+  // floating point state. Reset it.
+  iree_fpu_state_t fpu_state =
+      iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
   iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
       local_executable, entry_point, dispatch_state, local_memory);
+  iree_fpu_state_pop(fpu_state);
 
   if (local_memory.data) {
     iree_allocator_free(command_buffer->host_allocator, local_memory.data);

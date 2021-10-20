@@ -83,7 +83,8 @@ static LogicalResult convertToFlowModule(ModuleOp moduleOp) {
   mlir::applyPassManagerCLOptions(passManager);
   mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
-  IREE::Flow::buildFlowTransformPassPipeline(passManager);
+  IREE::Flow::TransformOptions flowOptions;
+  IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError()
            << "failed to run flow transformation pass pipeline";
@@ -146,8 +147,10 @@ void buildIREEVMTransformPassPipeline(
       break;
   }
 
+  IREE::Flow::TransformOptions flowOptions;
+
   buildCommonInputConversionPassPipeline(passManager);
-  IREE::Flow::buildFlowTransformPassPipeline(passManager);
+  IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());

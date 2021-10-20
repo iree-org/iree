@@ -1,6 +1,39 @@
-// Tests folding and canonicalization of tensor ops.
-
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
+
+// -----
+
+// CHECK-LABEL: @expandStaticShapeConstant
+func @expandStaticShapeConstant() -> (tensor<2x4xi32>, index, index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-DAG: %[[CST:.+]] = arith.constant dense<2> : tensor<2x4xi32>
+  %0 = flow.tensor.constant dense<2> : tensor<2x4xi32> -> tensor<2x4xi32>
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+  %d0 = tensor.dim %0, %c0 : tensor<2x4xi32>
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  %d1 = tensor.dim %0, %c1 : tensor<2x4xi32>
+  // CHECK: return %[[CST]], %[[C2]], %[[C4]]
+  return %0, %d0, %d1 : tensor<2x4xi32>, index, index
+}
+
+// -----
+
+// CHECK-LABEL: @expandDynamicShapeConstant
+func @expandDynamicShapeConstant() -> (tensor<?x?xi32>, index, index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-DAG: %[[CST:.+]] = arith.constant dense<2> : tensor<2x4xi32>
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK-DAG: %[[D0:.+]] = util.do_not_optimize(%[[C2]]) : index
+  // CHECK-DAG: %[[D1:.+]] = util.do_not_optimize(%[[C4]]) : index
+  // CHECK: %[[T:.+]] = flow.tensor.reshape %[[CST]] : tensor<2x4xi32> -> tensor<?x?xi32>{%[[D0]], %[[D1]]}
+  %0 = flow.tensor.constant dense<2> : tensor<2x4xi32> -> tensor<?x?xi32>
+  %d0 = tensor.dim %0, %c0 : tensor<?x?xi32>
+  %d1 = tensor.dim %0, %c1 : tensor<?x?xi32>
+  // CHECK: return %[[T]], %[[D0]], %[[D1]]
+  return %0, %d0, %d1 : tensor<?x?xi32>, index, index
+}
 
 // CHECK-LABEL: @reshapeNoOpScalar
 func @reshapeNoOpScalar(%arg0: tensor<f32>) -> tensor<f32> {
@@ -117,28 +150,6 @@ func @storeConstScalar() -> tensor<i32> {
   %2 = flow.tensor.store %1, %0 : tensor<i32>
   // CHECK-NEXT: return %[[C]]
   return %2 : tensor<i32>
-}
-
-// -----
-
-// CHECK-LABEL: @splatConst
-func @splatConst() -> tensor<4xi32> {
-  %0 = arith.constant 4 : i32
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<4> : tensor<4xi32>
-  %1 = flow.tensor.splat %0 : tensor<4xi32>
-  // CHECK-NEXT: return %[[C]]
-  return %1 : tensor<4xi32>
-}
-
-// -----
-
-// CHECK-LABEL: @splatConstScalar
-func @splatConstScalar() -> tensor<i32> {
-  %0 = arith.constant 4 : i32
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<4> : tensor<i32>
-  %1 = flow.tensor.splat %0 : tensor<i32>
-  // CHECK-NEXT: return %[[C]]
-  return %1 : tensor<i32>
 }
 
 // -----

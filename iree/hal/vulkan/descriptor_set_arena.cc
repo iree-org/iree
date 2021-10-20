@@ -42,27 +42,32 @@ static void PopulateDescriptorSetWriteInfos(
         iree_hal_buffer_allocated_buffer(binding.buffer));
     buffer_info.offset =
         iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
-    // Round up to a multiple of 32-bit. 32-bit is the most native bitwidth on
-    // GPUs; it has the best support compared to other bitwidths. We use VMA to
-    // manage GPU memory for us and VMA should already handled proper alignment
-    // when performing allocations; here we just need to provide the proper
-    // "view" to Vulkan drivers over the allocated memory.
-    //
-    // Note this is needed because we can see unusal buffers like tensor<3xi8>.
-    // Depending on GPU capabilities, this might not always be directly
-    // supported by the hardware. Under such circumstances, we need to emulate
-    // i8 support with i32. Shader CodeGen takes care of that: the shader will
-    // read the buffer as tensor<i32> and perform bit shifts to extract each
-    // byte and conduct computations. The extra additional byte is read but
-    // not really used by the shader. Here in application we need to match the
-    // ABI and provide the buffer as 32-bit aligned, otherwise the whole read by
-    // the shader is considered as out of bounds per the Vulkan spec.
-    // See https://github.com/google/iree/issues/2022#issuecomment-640617234
-    // for more details.
-    buffer_info.range = iree_device_align(
-        std::min(binding.length,
-                 iree_hal_buffer_byte_length(binding.buffer) - binding.offset),
-        4);
+    if (binding.length == IREE_WHOLE_BUFFER) {
+      buffer_info.range = VK_WHOLE_SIZE;
+    } else {
+      // Round up to a multiple of 32-bit. 32-bit is the most native bitwidth on
+      // GPUs; it has the best support compared to other bitwidths. We use VMA
+      // to manage GPU memory for us and VMA should already handled proper
+      // alignment when performing allocations; here we just need to provide the
+      // proper "view" to Vulkan drivers over the allocated memory.
+      //
+      // Note this is needed because we can see unusal buffers like
+      // tensor<3xi8>. Depending on GPU capabilities, this might not always be
+      // directly supported by the hardware. Under such circumstances, we need
+      // to emulate i8 support with i32. Shader CodeGen takes care of that: the
+      // shader will read the buffer as tensor<i32> and perform bit shifts to
+      // extract each byte and conduct computations. The extra additional byte
+      // is read but not really used by the shader. Here in application we need
+      // to match the ABI and provide the buffer as 32-bit aligned, otherwise
+      // the whole read by the shader is considered as out of bounds per the
+      // Vulkan spec. See
+      // https://github.com/google/iree/issues/2022#issuecomment-640617234 for
+      // more details.
+      buffer_info.range = iree_device_align(
+          std::min(binding.length, iree_hal_buffer_byte_length(binding.buffer) -
+                                       binding.offset),
+          4);
+    }
 
     auto& write_info = write_infos[i];
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

@@ -9,8 +9,10 @@
 
 import importlib
 import io
+import logging
 import os
 import platform
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -56,6 +58,9 @@ _TOOL_MODULE_PACKAGES = {
 # Environment variable holding directories to be searched for named tools.
 # Delimitted by os.pathsep.
 _TOOL_PATH_ENVVAR = "IREE_TOOL_PATH"
+
+# We do complicated logging so retain our own Logger instance.
+logger = logging.getLogger(__name__)
 
 
 class CompilerToolError(Exception):
@@ -172,6 +177,8 @@ def invoke_immediate(command_line: List[str],
   streams individually and only pump pipes not connected to a different stage.
   Uses threads to pump everything that is required.
   """
+  if logger.isEnabledFor(logging.INFO):
+    logging.info("Invoke IREE Tool: %s", _quote_command_line(command_line))
   run_args = {}
   input_file_handle = None
   stderr_handle = sys.stderr
@@ -207,6 +214,10 @@ def invoke_pipeline(command_lines: List[List[str]], immediate_input=None):
   to stderr on completion or the first failing stage of the pipeline will have
   an exception raised with its stderr output.
   """
+  logging.info(
+      "Invoke IREE Pipeline:\n  %s",
+      "\n  ".join([_quote_command_line(line) for line in command_lines]))
+
   stages = []
   pipeline_input = (subprocess.DEVNULL
                     if immediate_input is None else subprocess.PIPE)
@@ -303,3 +314,7 @@ def _write_binary_stderr(out_handle, contents):
     out_handle.write(contents.decode("utf-8"))
   else:
     out_handle.write(contents)
+
+
+def _quote_command_line(command_line: List[str]) -> str:
+  return " ".join([shlex.quote(token) for token in command_line])

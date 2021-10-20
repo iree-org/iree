@@ -47,6 +47,47 @@ class AllocatorMapOpConversion
   mutable IREE::VM::ImportOp importOp;
 };
 
+class AllocatorTryMapOpConversion
+    : public OpConversionPattern<IREE::HAL::AllocatorTryMapOp> {
+ public:
+  AllocatorTryMapOpConversion(TypeConverter &typeConverter,
+                              MLIRContext *context, SymbolTable &importSymbols)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(
+        "hal.allocator.map.byte_buffer");
+    assert(importOp);
+  }
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::AllocatorTryMapOp op, llvm::ArrayRef<Value> rawOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    IREE::HAL::AllocatorTryMapOp::Adaptor operands(rawOperands);
+    auto callOp = rewriter.create<IREE::VM::CallOp>(
+        op.getLoc(), importOp.getName(),
+        ArrayRef<Type>{getTypeConverter()->convertType(op.result().getType())},
+        ArrayRef<Value>{
+            operands.allocator(),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), /*try=*/1),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
+                                                        op.memory_typesAttr()),
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
+                                                        op.buffer_usageAttr()),
+            operands.source(),
+            operands.offset(),
+            operands.length(),
+        });
+    copyImportAttrs(importOp, callOp);
+    auto result = callOp.results().front();
+    auto didMap = rewriter.create<IREE::VM::CmpNZRefOp>(
+        op.getLoc(), rewriter.getI32Type(), result);
+    rewriter.replaceOp(op, {didMap, result});
+    return success();
+  }
+
+ private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 }  // namespace
 
 void populateHALAllocatorToVMPatterns(MLIRContext *context,
@@ -57,6 +98,8 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.allocator.allocate");
   patterns.insert<AllocatorMapOpConversion>(typeConverter, context,
                                             importSymbols);
+  patterns.insert<AllocatorTryMapOpConversion>(typeConverter, context,
+                                               importSymbols);
 }
 
 }  // namespace iree_compiler

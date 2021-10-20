@@ -18,17 +18,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Aligns |value| to |alignment|, rounding up if needed.
-static inline uint64_t align(uint64_t value, uint64_t alignment) {
-  return (value + (alignment - 1)) & ~(alignment - 1);
-}
-static inline uint64_t align(uint64_t value, const APInt &alignment) {
-  return align(value, alignment.getZExtValue());
-}
-
-// Aligns |value| to |alignment|, rounding up if needed.
-Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder);
-
 // Returns the number of bytes an element of the given type occupies
 // post-conversion. For example, the size of i1 would be '1 byte'.
 int32_t getRoundedElementByteWidth(Type type);
@@ -37,6 +26,10 @@ int32_t getRoundedElementByteWidth(Type type);
 // The returned value may either be produced at the current insertion site or
 // pulled from a dominating block/block argument.
 Value getValueSize(Location loc, Value value, OpBuilder &builder);
+
+// TODO(#7277): kill nearly all tensor related mappings from HAL when using
+// streams. Only tensors that get turned into buffer views on boundaries should
+// exist in the HAL pipeline.
 
 // An adaptor used for tensor->buffer rewrites.
 // This abstracts the source and destination types to allow for implicit

@@ -1,515 +1,90 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))' %s | IreeFileCheck %s
-// TODO(antiagainst): Fix promotion to workgroup and enable the test.
-// | IreeFileCheck %s -check-prefix=PROMOTE
+// RUN: iree-opt -split-input-file -iree-spirv-vectorize %s | IreeFileCheck %s
 
-hal.executable private @matmul_static_shape  {
-  hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.5, [Shader, CooperativeMatrixNV], [SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
-          {cooperative_matrix_properties_nv = [
-            {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
-             m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},
-            {a_type = f16, b_type = f16, c_type = f16, k_size = 16 : i32,
-             m_size = 16 : i32, n_size = 16 : i32, result_type = f16,
-             scope = 3 : i32},
-            {a_type = f16, b_type = f16, c_type = f32, k_size = 16 : i32,
-             m_size = 16 : i32, n_size = 16 : i32, result_type = f32,
-             scope = 3 : i32}],
-           max_compute_shared_memory_size = 49152 : i32,
-           max_compute_workgroup_invocations = 1024 : i32,
-           max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-           subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @io, ordinal = 0 : index,
-      workgroup_size = [32: index, 1: index, 1: index]
-    }
-    builtin.module {
-      func @matmul_static_shape() {
-        %c32 = arith.constant 32 : index
-        %c4096 = arith.constant 4096 : index
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
-        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4096x4096xf16>
-        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
-        %3 = hal.interface.workgroup.size[0] : index
-        %4 = hal.interface.workgroup.size[1] : index
-        scf.for %arg0 = %c0 to %c4096 step %c32 {
-          %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%4]
-          %6 = memref.subview %0[%5, %arg0] [64, 32] [1, 1] : memref<4096x4096xf16> to memref<64x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-          %7 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%3]
-          %8 = memref.subview %1[%arg0, %7] [32, 64] [1, 1] : memref<4096x4096xf16> to memref<32x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-          %9 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%4]
-          %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%3]
-          %11 = memref.subview %2[%9, %10] [64, 64] [1, 1] : memref<4096x4096xf16> to memref<64x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[64, 64, 32], [64, 64]]}}
-            ins(%6, %8 : memref<64x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<32x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
-            outs(%11 : memref<64x64xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
-        }
-        return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
+func @matmul_2x128x4() {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c2 = arith.constant 2 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<2x4xf32>
+  %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4x128xf32>
+  %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<2x128xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %3 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_id_y]
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_count_y]
+  scf.for %arg0 = %3 to %c2 step %4 {
+    %5 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
+    %6 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_count_x]
+    scf.for %arg1 = %5 to %c128 step %6 {
+      %7 = memref.subview %0[%arg0, 0] [2, 4] [1, 1] : memref<2x4xf32> to memref<2x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
+      %8 = memref.subview %1[0, %arg1] [4, 128] [1, 1] : memref<4x128xf32> to memref<4x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
+      %9 = memref.subview %2[%arg0, %arg1] [2, 128] [1, 1] : memref<2x128xf32> to memref<2x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
+      %10 = "gpu.thread_id"() {dimension = "x"} : () -> index
+      %11 = "gpu.thread_id"() {dimension = "y"} : () -> index
+      %12 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%10]
+      %13 = memref.subview %9[%11, %12] [1, 4] [1, 1] : memref<2x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>> to memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
+      linalg.fill(%cst, %13) {__internal_linalg_transform__ = "vectorize", lowering.config = {tileSizes = [[2, 128], [], [1, 4], [0, 0, 4]]}} : f32, memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
+      %17 = memref.subview %7[%11, 0] [1, 4] [1, 1] : memref<2x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>> to memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
+      %18 = memref.subview %8[0, %12] [4, 4] [1, 1] : memref<4x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
+      linalg.matmul {__internal_linalg_transform__ = "vectorize", lowering.config = {tileSizes = [[2, 128], [], [1, 4], [0, 0, 4]]}}
+        ins(%17, %18 : memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
+        outs(%13 : memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
     }
   }
+  return
 }
 
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 64)>
-//      CHECK: func @matmul_static_shape
-//  CHECK-DAG:  %[[CST:.+]] = arith.constant 0.0
-//  CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:  %[[C16:.+]] = arith.constant 16 : index
-//  CHECK-DAG:  %[[C32:.+]] = arith.constant 32 : index
-//  CHECK-DAG:  %[[C48:.+]] = arith.constant 48 : index
-//  CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]]
-//  CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1[%[[C0]]]
-//  CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]]
-//      CHECK:  %[[BIDX:.+]] = hal.interface.workgroup.size[0]
-//      CHECK:  %[[BIDY:.+]] = hal.interface.workgroup.size[1]
-//      CHECK:  %[[BOFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//      CHECK:  %[[BOFFSET_X:.+]] = affine.apply #[[MAP0]]()[%[[BIDX]]]
-//      CHECK:    %[[SUBVIEW_RESULT:.+]] = memref.subview %[[RET0]]
-// CHECK-SAME:      [%[[BOFFSET_Y]], %[[BOFFSET_X]]] [64, 64]
+// CHECK-LABEL: func @matmul_2x128x4()
 
-//  CHECK-DAG:  %[[READ_INIT_0_0:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C0]], %[[C0]]]
-//  CHECK-DAG:  %[[READ_INIT_0_1:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C0]], %[[C16]]]
-//  CHECK-DAG:  %[[READ_INIT_0_2:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C0]], %[[C32]]]
-//  CHECK-DAG:  %[[READ_INIT_0_3:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C0]], %[[C48]]]
+//   CHECK-DAG:   %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<1x4xf32>
+//   CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
 
-//  CHECK-DAG:  %[[READ_INIT_1_0:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C16]], %[[C0]]]
-//  CHECK-DAG:  %[[READ_INIT_1_1:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C16]], %[[C16]]]
-//  CHECK-DAG:  %[[READ_INIT_1_2:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C16]], %[[C32]]]
-//  CHECK-DAG:  %[[READ_INIT_1_3:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C16]], %[[C48]]]
-
-//  CHECK-DAG:  %[[READ_INIT_2_0:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C32]], %[[C0]]]
-//  CHECK-DAG:  %[[READ_INIT_2_1:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C32]], %[[C16]]]
-//  CHECK-DAG:  %[[READ_INIT_2_2:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C32]], %[[C32]]]
-//  CHECK-DAG:  %[[READ_INIT_2_3:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C32]], %[[C48]]]
-
-//  CHECK-DAG:  %[[READ_INIT_3_0:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C48]], %[[C0]]]
-//  CHECK-DAG:  %[[READ_INIT_3_1:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C48]], %[[C16]]]
-//  CHECK-DAG:  %[[READ_INIT_3_2:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C48]], %[[C32]]]
-//  CHECK-DAG:  %[[READ_INIT_3_3:.+]] = vector.transfer_read
-// CHECK-SAME:    %[[SUBVIEW_RESULT]][%[[C48]], %[[C48]]]
-
-//      CHECK:  %[[FOR_RES:.+]]:16 = scf.for %[[IV0:.+]] = {{.*}} to
-// CHECK-SAME:  iter_args(%[[ACC_0_0:.+]] = %[[READ_INIT_0_0]],
-// CHECK-SAME:  %[[ACC_0_1:.+]] = %[[READ_INIT_0_1]],
-// CHECK-SAME:  %[[ACC_0_2:.+]] = %[[READ_INIT_0_2]],
-// CHECK-SAME:  %[[ACC_0_3:.+]] = %[[READ_INIT_0_3]],
-// CHECK-SAME:  %[[ACC_1_0:.+]] = %[[READ_INIT_1_0]],
-// CHECK-SAME:  %[[ACC_1_1:.+]] = %[[READ_INIT_1_1]],
-// CHECK-SAME:  %[[ACC_1_2:.+]] = %[[READ_INIT_1_2]],
-// CHECK-SAME:  %[[ACC_1_3:.+]] = %[[READ_INIT_1_3]],
-// CHECK-SAME:  %[[ACC_2_0:.+]] = %[[READ_INIT_2_0]],
-// CHECK-SAME:  %[[ACC_2_1:.+]] = %[[READ_INIT_2_1]],
-// CHECK-SAME:  %[[ACC_2_2:.+]] = %[[READ_INIT_2_2]],
-// CHECK-SAME:  %[[ACC_2_3:.+]] = %[[READ_INIT_2_3]],
-// CHECK-SAME:  %[[ACC_3_0:.+]] = %[[READ_INIT_3_0]],
-// CHECK-SAME:  %[[ACC_3_1:.+]] = %[[READ_INIT_3_1]],
-// CHECK-SAME:  %[[ACC_3_2:.+]] = %[[READ_INIT_3_2]],
-// CHECK-SAME:  %[[ACC_3_3:.+]] = %[[READ_INIT_3_3]])
-//      CHECK:    %[[SUBVIEW_LHS:.+]] = memref.subview %[[ARG0]]
-// CHECK-SAME:      [%[[BOFFSET_Y]], %[[IV0]]] [64, 32]
-//      CHECK:    %[[SUBVIEW_RHS:.+]] = memref.subview %[[ARG1]]
-// CHECK-SAME:      [%[[IV0]], %[[BOFFSET_X]]] [32, 64]
-
-//  CHECK-DAG:    %[[READ_LHS_0_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_0_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C0]], %[[C16]]]
-
-//  CHECK-DAG:    %[[READ_LHS_1_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C16]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_1_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C16]], %[[C16]]]
-
-//  CHECK-DAG:    %[[READ_LHS_2_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C32]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_2_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C32]], %[[C16]]]
-
-//  CHECK-DAG:    %[[READ_LHS_3_0:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C48]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_LHS_3_1:.+]] = vector.transfer_read %[[SUBVIEW_LHS]][%[[C48]], %[[C16]]]
-
-//  CHECK-DAG:    %[[READ_RHS_0_0:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_RHS_0_1:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C16]]]
-//  CHECK-DAG:    %[[READ_RHS_0_2:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C32]]]
-//  CHECK-DAG:    %[[READ_RHS_0_3:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C0]], %[[C48]]]
-
-//  CHECK-DAG:    %[[READ_RHS_1_0:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C16]], %[[C0]]]
-//  CHECK-DAG:    %[[READ_RHS_1_1:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C16]], %[[C16]]]
-//  CHECK-DAG:    %[[READ_RHS_1_2:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C16]], %[[C32]]]
-//  CHECK-DAG:    %[[READ_RHS_1_3:.+]] = vector.transfer_read %[[SUBVIEW_RHS]][%[[C16]], %[[C48]]]
-
-//      CHECK:    %[[CONTRACT_0_0_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_0]], %[[ACC_0_0]]
-//      CHECK:    %[[CONTRACT_0_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1_0]], %[[CONTRACT_0_0_1]]
-//      CHECK:    %[[CONTRACT_0_1_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_1]], %[[ACC_0_1]]
-//      CHECK:    %[[CONTRACT_0_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1_1]], %[[CONTRACT_0_1_1]]
-//      CHECK:    %[[CONTRACT_0_2_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_2]], %[[ACC_0_2]]
-//      CHECK:    %[[CONTRACT_0_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1_2]], %[[CONTRACT_0_2_1]]
-//      CHECK:    %[[CONTRACT_0_3_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_3]], %[[ACC_0_3]]
-//      CHECK:    %[[CONTRACT_0_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1_3]], %[[CONTRACT_0_3_1]]
-
-//      CHECK:    %[[CONTRACT_1_0_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0_0]], %[[ACC_1_0]]
-//      CHECK:    %[[CONTRACT_1_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1_0]], %[[CONTRACT_1_0_1]]
-//      CHECK:    %[[CONTRACT_1_1_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0_1]], %[[ACC_1_1]]
-//      CHECK:    %[[CONTRACT_1_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1_1]], %[[CONTRACT_1_1_1]]
-//      CHECK:    %[[CONTRACT_1_2_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0_2]], %[[ACC_1_2]]
-//      CHECK:    %[[CONTRACT_1_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1_2]], %[[CONTRACT_1_2_1]]
-//      CHECK:    %[[CONTRACT_1_3_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0_3]], %[[ACC_1_3]]
-//      CHECK:    %[[CONTRACT_1_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1_3]], %[[CONTRACT_1_3_1]]
-
-//      CHECK:    %[[CONTRACT_2_0_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0_0]], %[[ACC_2_0]]
-//      CHECK:    %[[CONTRACT_2_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1_0]], %[[CONTRACT_2_0_1]]
-//      CHECK:    %[[CONTRACT_2_1_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0_1]], %[[ACC_2_1]]
-//      CHECK:    %[[CONTRACT_2_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1_1]], %[[CONTRACT_2_1_1]]
-//      CHECK:    %[[CONTRACT_2_2_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0_2]], %[[ACC_2_2]]
-//      CHECK:    %[[CONTRACT_2_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1_2]], %[[CONTRACT_2_2_1]]
-//      CHECK:    %[[CONTRACT_2_3_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0_3]], %[[ACC_2_3]]
-//      CHECK:    %[[CONTRACT_2_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1_3]], %[[CONTRACT_2_3_1]]
-
-//      CHECK:    %[[CONTRACT_3_0_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0_0]], %[[ACC_3_0]]
-//      CHECK:    %[[CONTRACT_3_0:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1_0]], %[[CONTRACT_3_0_1]]
-//      CHECK:    %[[CONTRACT_3_1_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0_1]], %[[ACC_3_1]]
-//      CHECK:    %[[CONTRACT_3_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1_1]], %[[CONTRACT_3_1_1]]
-//      CHECK:    %[[CONTRACT_3_2_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0_2]], %[[ACC_3_2]]
-//      CHECK:    %[[CONTRACT_3_2:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1_2]], %[[CONTRACT_3_2_1]]
-//      CHECK:    %[[CONTRACT_3_3_1:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0_3]], %[[ACC_3_3]]
-//      CHECK:    %[[CONTRACT_3_3:.+]] = vector.contract
-// CHECK-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1_3]], %[[CONTRACT_3_3_1]]
-
-//      CHECK:    scf.yield %[[CONTRACT_0_0]], %[[CONTRACT_0_1]],
-// CHECK-SAME:      %[[CONTRACT_0_2]], %[[CONTRACT_0_3]], %[[CONTRACT_1_0]],
-// CHECK-SAME:      %[[CONTRACT_1_1]], %[[CONTRACT_1_2]], %[[CONTRACT_1_3]],
-// CHECK-SAME:      %[[CONTRACT_2_0]], %[[CONTRACT_2_1]], %[[CONTRACT_2_2]],
-// CHECK-SAME:      %[[CONTRACT_2_3]], %[[CONTRACT_3_0]], %[[CONTRACT_3_1]],
-// CHECK-SAME:      %[[CONTRACT_3_2]], %[[CONTRACT_3_3]]
-
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#0, %[[SUBVIEW_RESULT]][%[[C0]], %[[C0]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#1, %[[SUBVIEW_RESULT]][%[[C0]], %[[C16]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#2, %[[SUBVIEW_RESULT]][%[[C0]], %[[C32]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#3, %[[SUBVIEW_RESULT]][%[[C0]], %[[C48]]]
-
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#4, %[[SUBVIEW_RESULT]][%[[C16]], %[[C0]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#5, %[[SUBVIEW_RESULT]][%[[C16]], %[[C16]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#6, %[[SUBVIEW_RESULT]][%[[C16]], %[[C32]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#7, %[[SUBVIEW_RESULT]][%[[C16]], %[[C48]]]
-
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#8, %[[SUBVIEW_RESULT]][%[[C32]], %[[C0]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#9, %[[SUBVIEW_RESULT]][%[[C32]], %[[C16]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#10, %[[SUBVIEW_RESULT]][%[[C32]], %[[C32]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#11, %[[SUBVIEW_RESULT]][%[[C32]], %[[C48]]]
-
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#12, %[[SUBVIEW_RESULT]][%[[C48]], %[[C0]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#13, %[[SUBVIEW_RESULT]][%[[C48]], %[[C16]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#14, %[[SUBVIEW_RESULT]][%[[C48]], %[[C32]]]
-//  CHECK-DAG:  vector.transfer_write %[[FOR_RES]]#15, %[[SUBVIEW_RESULT]][%[[C48]], %[[C48]]]
-
-// -----
-
-hal.executable private @matmul_static_shape  {
-  hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.5, [Shader, CooperativeMatrixNV], [SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
-          {cooperative_matrix_properties_nv = [
-            {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
-             m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},
-            {a_type = f16, b_type = f16, c_type = f16, k_size = 16 : i32,
-             m_size = 16 : i32, n_size = 16 : i32, result_type = f16,
-             scope = 3 : i32},
-            {a_type = f16, b_type = f16, c_type = f32, k_size = 16 : i32,
-             m_size = 16 : i32, n_size = 16 : i32, result_type = f32,
-             scope = 3 : i32}],
-           max_compute_shared_memory_size = 49152 : i32,
-           max_compute_workgroup_invocations = 1024 : i32,
-           max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-           subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point @matmul_static_shape attributes {
-      interface = @io, ordinal = 0 : index,
-      workgroup_size = [32: index, 1: index, 1: index]
-    }
-    builtin.module {
-      func @matmul_static_shape() {
-        %c32 = arith.constant 32 : index
-        %c4096 = arith.constant 4096 : index
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
-        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4096x4096xf16>
-        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
-        %3 = hal.interface.workgroup.size[0] : index
-        %4 = hal.interface.workgroup.size[1] : index
-        scf.for %arg0 = %c0 to %c4096 step %c32 {
-          %5 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%4]
-          %6 = memref.subview %0[%5, %arg0] [128, 32] [1, 1] : memref<4096x4096xf16> to memref<128x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-          %7 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%3]
-          %8 = memref.subview %1[%arg0, %7] [32, 128] [1, 1] : memref<4096x4096xf16> to memref<32x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-          %9 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%4]
-          %10 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%3]
-          %11 = memref.subview %2[%9, %10] [128, 128] [1, 1] : memref<4096x4096xf16> to memref<128x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[64, 64, 32], [64, 64]]}}
-            ins(%6, %8 : memref<128x32xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<32x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
-            outs(%11 : memref<128x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
-        }
-        return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
-    }
-  }
-}
-
-//  PROMOTE-DAG: #[[MAP4:.+]] = affine_map<()[s0] -> (s0 * 64 - (s0 floordiv 2) * 128)>
-//      PROMOTE: func @matmul_static_shape
-//  PROMOTE-DAG:  %[[C0:.+]] = arith.constant 0 : index
-//  PROMOTE-DAG:  %[[C2:.+]] = arith.constant 2
-//  PROMOTE-DAG:  %[[C16:.+]] = arith.constant 16
-//  PROMOTE-DAG:  %[[C32:.+]] = arith.constant 32
-//  PROMOTE-DAG:  %[[C48:.+]] = arith.constant 48
-//  PROMOTE-DAG:  %[[ALLOC1:.+]] = memref.alloc() : memref<128x32xf16, 3>
-//  PROMOTE-DAG:  %[[ALLOC2:.+]] = memref.alloc() : memref<32x128xf16, 3>
-//  PROMOTE-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0[%[[C0]]]
-//  PROMOTE-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1[%[[C0]]]
-//  PROMOTE-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0[%[[C0]]]
-
-//      PROMOTE:  %[[RESULT_SUBVIEW:.+]] = memref.subview %[[RET0]]
-//      PROMOTE:  %[[WGMEM_LHS_SUBVIEW:.+]] = memref.subview %[[ALLOC1]][0, 0] [128, 32] [1, 1]
-//      PROMOTE:  %[[WGMEM_RHS_SUBVIEW:.+]] = memref.subview %[[ALLOC2]][0, 0] [32, 128] [1, 1]
-//      PROMOTE:  %[[SG_X:.+]] = gpu.subgroup_id
-//      PROMOTE:  %[[SG_Y:.+]] = arith.divsi %[[SG_X]], %[[C2]]
-//      PROMOTE:  %[[SGOFFSET_Y:.+]] = affine.apply #[[MAP4]]()[%[[SG_Y]]]
-//      PROMOTE:  %[[SG_LHS_SUBVIEW:.+]] = memref.subview %[[WGMEM_LHS_SUBVIEW]][%[[SGOFFSET_Y]], 0]
-//      PROMOTE:  %[[SGOFFSET_X:.+]] = affine.apply #[[MAP4]]()[%[[SG_X]]]
-//      PROMOTE:  %[[SG_RHS_SUBVIEW:.+]] = memref.subview %[[WGMEM_RHS_SUBVIEW]][0, %[[SGOFFSET_X]]]
-//      PROMOTE:  %[[SG_RESULT_SUBVIEW:.+]] = memref.subview %[[RESULT_SUBVIEW]][%[[SGOFFSET_Y]], %[[SGOFFSET_X]]]
-
-//  PROMOTE-DAG:  %[[READ_INIT_0_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C0]]]
-//  PROMOTE-DAG:  %[[READ_INIT_0_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C16]]]
-//  PROMOTE-DAG:  %[[READ_INIT_0_2:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C32]]]
-//  PROMOTE-DAG:  %[[READ_INIT_0_3:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C48]]]
-
-//  PROMOTE-DAG:  %[[READ_INIT_1_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C16]], %[[C0]]]
-//  PROMOTE-DAG:  %[[READ_INIT_1_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C16]], %[[C16]]]
-//  PROMOTE-DAG:  %[[READ_INIT_1_2:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C16]], %[[C32]]]
-//  PROMOTE-DAG:  %[[READ_INIT_1_3:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C16]], %[[C48]]]
-
-//  PROMOTE-DAG:  %[[READ_INIT_2_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C32]], %[[C0]]]
-//  PROMOTE-DAG:  %[[READ_INIT_2_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C32]], %[[C16]]]
-//  PROMOTE-DAG:  %[[READ_INIT_2_2:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C32]], %[[C32]]]
-//  PROMOTE-DAG:  %[[READ_INIT_2_3:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C32]], %[[C48]]]
-
-//  PROMOTE-DAG:  %[[READ_INIT_3_0:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C0]]]
-//  PROMOTE-DAG:  %[[READ_INIT_3_1:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C16]]]
-//  PROMOTE-DAG:  %[[READ_INIT_3_2:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C32]]]
-//  PROMOTE-DAG:  %[[READ_INIT_3_3:.+]] = vector.transfer_read
-// PROMOTE-SAME:    %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C48]]]
-
-//      PROMOTE:  %[[FOR_RES:.+]]:16 = scf.for %[[IV0:.+]] = {{.*}} to
-// PROMOTE-SAME:  iter_args(%[[ACC_0_0:.+]] = %[[READ_INIT_0_0]],
-// PROMOTE-SAME:  %[[ACC_0_1:.+]] = %[[READ_INIT_0_1]],
-// PROMOTE-SAME:  %[[ACC_0_2:.+]] = %[[READ_INIT_0_2]],
-// PROMOTE-SAME:  %[[ACC_0_3:.+]] = %[[READ_INIT_0_3]],
-// PROMOTE-SAME:  %[[ACC_1_0:.+]] = %[[READ_INIT_1_0]],
-// PROMOTE-SAME:  %[[ACC_1_1:.+]] = %[[READ_INIT_1_1]],
-// PROMOTE-SAME:  %[[ACC_1_2:.+]] = %[[READ_INIT_1_2]],
-// PROMOTE-SAME:  %[[ACC_1_3:.+]] = %[[READ_INIT_1_3]],
-// PROMOTE-SAME:  %[[ACC_2_0:.+]] = %[[READ_INIT_2_0]],
-// PROMOTE-SAME:  %[[ACC_2_1:.+]] = %[[READ_INIT_2_1]],
-// PROMOTE-SAME:  %[[ACC_2_2:.+]] = %[[READ_INIT_2_2]],
-// PROMOTE-SAME:  %[[ACC_2_3:.+]] = %[[READ_INIT_2_3]],
-// PROMOTE-SAME:  %[[ACC_3_0:.+]] = %[[READ_INIT_3_0]],
-// PROMOTE-SAME:  %[[ACC_3_1:.+]] = %[[READ_INIT_3_1]],
-// PROMOTE-SAME:  %[[ACC_3_2:.+]] = %[[READ_INIT_3_2]],
-// PROMOTE-SAME:  %[[ACC_3_3:.+]] = %[[READ_INIT_3_3]])
-
-//      PROMOTE:    %[[LHS_SUBVIEW:.+]] = memref.subview %[[ARG0]]
-//      PROMOTE:    %[[RHS_SUBVIEW:.+]] = memref.subview %[[ARG1]]
-//      PROMOTE:    linalg.copy(%[[LHS_SUBVIEW]], %[[WGMEM_LHS_SUBVIEW]])
-//      PROMOTE:    linalg.copy(%[[RHS_SUBVIEW]], %[[WGMEM_RHS_SUBVIEW]])
-
-//  PROMOTE-DAG:    %[[READ_LHS_0_0:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C0]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_LHS_0_1:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C0]], %[[C16]]]
-
-//  PROMOTE-DAG:    %[[READ_LHS_1_0:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C16]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_LHS_1_1:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C16]], %[[C16]]]
-
-//  PROMOTE-DAG:    %[[READ_LHS_2_0:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C32]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_LHS_2_1:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C32]], %[[C16]]]
-
-//  PROMOTE-DAG:    %[[READ_LHS_3_0:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C48]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_LHS_3_1:.+]] = vector.transfer_read %[[SG_LHS_SUBVIEW]][%[[C48]], %[[C16]]]
-
-//  PROMOTE-DAG:    %[[READ_RHS_0_0:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_RHS_0_1:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C16]]]
-//  PROMOTE-DAG:    %[[READ_RHS_0_2:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C32]]]
-//  PROMOTE-DAG:    %[[READ_RHS_0_3:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C0]], %[[C48]]]
-
-//  PROMOTE-DAG:    %[[READ_RHS_1_0:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C0]]]
-//  PROMOTE-DAG:    %[[READ_RHS_1_1:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C16]]]
-//  PROMOTE-DAG:    %[[READ_RHS_1_2:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C32]]]
-//  PROMOTE-DAG:    %[[READ_RHS_1_3:.+]] = vector.transfer_read %[[SG_RHS_SUBVIEW]][%[[C16]], %[[C48]]]
-
-//      PROMOTE:    %[[CONTRACT_0_0_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_0]], %[[ACC_0_0]]
-//      PROMOTE:    %[[CONTRACT_0_0:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1_0]], %[[CONTRACT_0_0_1]]
-//      PROMOTE:    %[[CONTRACT_0_1_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_1]], %[[ACC_0_1]]
-//      PROMOTE:    %[[CONTRACT_0_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1_1]], %[[CONTRACT_0_1_1]]
-//      PROMOTE:    %[[CONTRACT_0_2_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_2]], %[[ACC_0_2]]
-//      PROMOTE:    %[[CONTRACT_0_2:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1_2]], %[[CONTRACT_0_2_1]]
-//      PROMOTE:    %[[CONTRACT_0_3_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_0_0]], %[[READ_RHS_0_3]], %[[ACC_0_3]]
-//      PROMOTE:    %[[CONTRACT_0_3:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_0_1]], %[[READ_RHS_1_3]], %[[CONTRACT_0_3_1]]
-
-//      PROMOTE:    %[[CONTRACT_1_0_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0_0]], %[[ACC_1_0]]
-//      PROMOTE:    %[[CONTRACT_1_0:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1_0]], %[[CONTRACT_1_0_1]]
-//      PROMOTE:    %[[CONTRACT_1_1_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0_1]], %[[ACC_1_1]]
-//      PROMOTE:    %[[CONTRACT_1_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1_1]], %[[CONTRACT_1_1_1]]
-//      PROMOTE:    %[[CONTRACT_1_2_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0_2]], %[[ACC_1_2]]
-//      PROMOTE:    %[[CONTRACT_1_2:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1_2]], %[[CONTRACT_1_2_1]]
-//      PROMOTE:    %[[CONTRACT_1_3_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_1_0]], %[[READ_RHS_0_3]], %[[ACC_1_3]]
-//      PROMOTE:    %[[CONTRACT_1_3:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_1_1]], %[[READ_RHS_1_3]], %[[CONTRACT_1_3_1]]
-
-//      PROMOTE:    %[[CONTRACT_2_0_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0_0]], %[[ACC_2_0]]
-//      PROMOTE:    %[[CONTRACT_2_0:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1_0]], %[[CONTRACT_2_0_1]]
-//      PROMOTE:    %[[CONTRACT_2_1_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0_1]], %[[ACC_2_1]]
-//      PROMOTE:    %[[CONTRACT_2_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1_1]], %[[CONTRACT_2_1_1]]
-//      PROMOTE:    %[[CONTRACT_2_2_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0_2]], %[[ACC_2_2]]
-//      PROMOTE:    %[[CONTRACT_2_2:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1_2]], %[[CONTRACT_2_2_1]]
-//      PROMOTE:    %[[CONTRACT_2_3_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_2_0]], %[[READ_RHS_0_3]], %[[ACC_2_3]]
-//      PROMOTE:    %[[CONTRACT_2_3:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_2_1]], %[[READ_RHS_1_3]], %[[CONTRACT_2_3_1]]
-
-//      PROMOTE:    %[[CONTRACT_3_0_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0_0]], %[[ACC_3_0]]
-//      PROMOTE:    %[[CONTRACT_3_0:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1_0]], %[[CONTRACT_3_0_1]]
-//      PROMOTE:    %[[CONTRACT_3_1_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0_1]], %[[ACC_3_1]]
-//      PROMOTE:    %[[CONTRACT_3_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1_1]], %[[CONTRACT_3_1_1]]
-//      PROMOTE:    %[[CONTRACT_3_2_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0_2]], %[[ACC_3_2]]
-//      PROMOTE:    %[[CONTRACT_3_2:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1_2]], %[[CONTRACT_3_2_1]]
-//      PROMOTE:    %[[CONTRACT_3_3_1:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_3_0]], %[[READ_RHS_0_3]], %[[ACC_3_3]]
-//      PROMOTE:    %[[CONTRACT_3_3:.+]] = vector.contract
-// PROMOTE-SAME:      %[[READ_LHS_3_1]], %[[READ_RHS_1_3]], %[[CONTRACT_3_3_1]]
-
-//      PROMOTE:    scf.yield %[[CONTRACT_0_0]], %[[CONTRACT_0_1]],
-// PROMOTE-SAME:      %[[CONTRACT_0_2]], %[[CONTRACT_0_3]], %[[CONTRACT_1_0]],
-// PROMOTE-SAME:      %[[CONTRACT_1_1]], %[[CONTRACT_1_2]], %[[CONTRACT_1_3]],
-// PROMOTE-SAME:      %[[CONTRACT_2_0]], %[[CONTRACT_2_1]], %[[CONTRACT_2_2]],
-// PROMOTE-SAME:      %[[CONTRACT_2_3]], %[[CONTRACT_3_0]], %[[CONTRACT_3_1]],
-// PROMOTE-SAME:      %[[CONTRACT_3_2]], %[[CONTRACT_3_3]]
-
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#0, %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C0]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#1, %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C16]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#2, %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C32]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#3, %[[SG_RESULT_SUBVIEW]][%[[C0]], %[[C48]]]
-
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#4, %[[SG_RESULT_SUBVIEW]][%[[C16]], %[[C0]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#5, %[[SG_RESULT_SUBVIEW]][%[[C16]], %[[C16]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#6, %[[SG_RESULT_SUBVIEW]][%[[C16]], %[[C32]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#7, %[[SG_RESULT_SUBVIEW]][%[[C16]], %[[C48]]]
-
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#8, %[[SG_RESULT_SUBVIEW]][%[[C32]], %[[C0]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#9, %[[SG_RESULT_SUBVIEW]][%[[C32]], %[[C16]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#10, %[[SG_RESULT_SUBVIEW]][%[[C32]], %[[C32]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#11, %[[SG_RESULT_SUBVIEW]][%[[C32]], %[[C48]]]
-
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#12, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C0]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#13, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C16]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#14, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C32]]]
-//  PROMOTE-DAG:  vector.transfer_write %[[FOR_RES]]#15, %[[SG_RESULT_SUBVIEW]][%[[C48]], %[[C48]]]
+//       CHECK:   scf.for %[[IV_Y:.+]] =
+//       CHECK:     %[[LHS_TILE:.+]] = memref.subview %{{.+}}[%{{.+}}, 0] [1, 4]
+//       CHECK:     scf.for %[[IV_X:.+]] =
+//       CHECK:       %[[ACC_TILE:.+]] = memref.subview %{{.+}}[%{{.+}}, %{{.+}}] [1, 4]
+//       CHECK:       vector.transfer_write %[[ZERO]], %[[ACC_TILE]][%[[C0]], %[[C0]]]
+//       CHECK:       %[[RHS_TILE:.+]] = memref.subview %{{.+}}[0, %{{.+}}] [4, 4]
+//       CHECK:       %[[LHS_VECTOR:.+]] = vector.transfer_read %[[LHS_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
+//       CHECK:       %[[RHS_0_READ:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
+//       CHECK:       %[[RHS_0_T0:.+]] = vector.transpose %[[RHS_0_READ]], [1, 0]
+//       CHECK:       %[[RHS_1_READ:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C1]], %[[C0]]], %[[PAD]]
+//       CHECK:       %[[RHS_1_T0:.+]] = vector.transpose %[[RHS_1_READ]], [1, 0]
+//       CHECK:       %[[RHS_2_READ:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C2]], %[[C0]]], %[[PAD]]
+//       CHECK:       %[[RHS_2_T0:.+]] = vector.transpose %[[RHS_2_READ]], [1, 0]
+//       CHECK:       %[[RHS_3_READ:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C3]], %[[C0]]], %[[PAD]]
+//       CHECK:       %[[RHS_3_T0:.+]] = vector.transpose %[[RHS_3_READ]], [1, 0]
+//       CHECK:       %[[ACC_0:.+]] = vector.transfer_read %[[ACC_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
+//       CHECK:       %[[LHS_0:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]}
+//       CHECK:       %[[RHS_0_T1:.+]] = vector.transpose %[[RHS_0_T0]], [1, 0]
+//       CHECK:       %[[RHS_0_VECTOR:.+]] = vector.extract %[[RHS_0_T1]][0] : vector<1x4xf32>
+//       CHECK:       %[[LHS_0_SCALAR:.+]] = vector.extract %[[LHS_0]][0, 0] : vector<1x1xf32>
+//       CHECK:       %[[LHS_0_VECTOR:.+]] = splat %[[LHS_0_SCALAR]] : vector<4xf32>
+//       CHECK:       %[[ACC_0_VECTOR:.+]] = vector.extract %[[ACC_0]][0] : vector<1x4xf32>
+//       CHECK:       %[[FMA_0:.+]] = vector.fma %[[LHS_0_VECTOR]], %[[RHS_0_VECTOR]], %[[ACC_0_VECTOR]] : vector<4xf32>
+//       CHECK:       %[[LHS_1:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]}
+//       CHECK:       %[[RHS_1_T1:.+]] = vector.transpose %[[RHS_1_T0]], [1, 0]
+//       CHECK:       %[[RHS_1_VECTOR:.+]] = vector.extract %[[RHS_1_T1]][0] : vector<1x4xf32>
+//       CHECK:       %[[LHS_1_SCALAR:.+]] = vector.extract %[[LHS_1]][0, 0] : vector<1x1xf32>
+//       CHECK:       %[[LHS_1_VECTOR:.+]] = splat %[[LHS_1_SCALAR]] : vector<4xf32>
+//       CHECK:       %[[FMA_1:.+]] = vector.fma %[[LHS_1_VECTOR]], %[[RHS_1_VECTOR]], %[[FMA_0]] : vector<4xf32>
+//       CHECK:       %[[LHS_2:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]}
+//       CHECK:       %[[RHS_2_T1:.+]] = vector.transpose %[[RHS_2_T0]], [1, 0]
+//       CHECK:       %[[RHS_2_VECTOR:.+]] = vector.extract %[[RHS_2_T1]][0] : vector<1x4xf32>
+//       CHECK:       %[[LHS_2_SCALAR:.+]] = vector.extract %[[LHS_2]][0, 0] : vector<1x1xf32>
+//       CHECK:       %[[LHS_2_VECTOR:.+]] = splat %[[LHS_2_SCALAR]] : vector<4xf32>
+//       CHECK:       %[[FMA_2:.+]] = vector.fma %[[LHS_2_VECTOR]], %[[RHS_2_VECTOR]], %[[FMA_1]] : vector<4xf32>
+//       CHECK:       %[[LHS_3:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0, 3], sizes = [1, 1], strides = [1, 1]}
+//       CHECK:       %[[RHS_3_T1:.+]] = vector.transpose %[[RHS_3_T0]], [1, 0]
+//       CHECK:       %[[RHS_3_VECTOR:.+]] = vector.extract %[[RHS_3_T1]][0] : vector<1x4xf32>
+//       CHECK:       %[[LHS_3_SCALAR:.+]] = vector.extract %[[LHS_3]][0, 0] : vector<1x1xf32>
+//       CHECK:       %[[LHS_3_VECTOR:.+]] = splat %[[LHS_3_SCALAR]] : vector<4xf32>
+//       CHECK:       %[[FMA_3:.+]] = vector.fma %[[LHS_3_VECTOR]], %[[RHS_3_VECTOR]], %[[FMA_2]] : vector<4xf32>
+//       CHECK:       %[[INSERT:.+]] = vector.insert %[[FMA_3]], %[[ZERO]] [0]
+//       CHECK:       vector.transfer_write %[[INSERT]], %[[ACC_TILE]][%[[C0]], %[[C0]]]

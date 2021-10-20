@@ -15,8 +15,6 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/librt/librt.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/compiler/Utils/FlatbufferUtils.h"
-#include "iree/schemas/dylib_executable_def_builder.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
@@ -59,6 +57,44 @@ static std::string guessModuleName(mlir::ModuleOp moduleOp) {
   } else {
     return "llvm_module";
   }
+}
+
+// Appends the |debugDatabase| to the end of |baseFile| and writes the footer
+// so the runtime can find it.
+static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
+                                         Artifact &debugFileArtifact) {
+  auto debugFileOr = debugFileArtifact.read();
+  if (!debugFileOr.hasValue()) {
+    return failure();
+  }
+  auto debugFile = std::move(debugFileOr).getValue();
+
+  // NOTE: we align the sizes so that the files all start at nice offsets.
+  auto baseFileSize = IREE::Util::align(baseFile.size(), 16);
+  auto debugFileSize = IREE::Util::align(debugFile.size(), 16);
+
+  // Matches iree_hal_system_executable_footer_t.
+  struct Footer {
+    uint8_t magic[8];  // IREEDBG\0
+    uint32_t version;
+    uint32_t flags;
+    uint64_t libraryOffset;
+    uint64_t librarySize;
+    uint64_t debugOffset;
+    uint64_t debugSize;
+  } footer = {{0}};
+  std::memcpy(footer.magic, "IREEDBG\0", sizeof(footer.magic));
+  footer.version = 0;
+  footer.librarySize = baseFile.size();
+  footer.debugOffset = baseFileSize;
+  footer.debugSize = debugFile.size();
+
+  baseFile.resize(baseFileSize + debugFileSize + sizeof(footer));
+  std::memcpy(baseFile.data() + baseFileSize, debugFile.data(),
+              debugFile.size());
+  std::memcpy(baseFile.data() + baseFileSize + debugFileSize, &footer,
+              sizeof(footer));
+  return success();
 }
 
 class LLVMAOTTargetBackend final : public TargetBackend {
@@ -379,46 +415,51 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       binaryOp.mime_typeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
     } else {
-      FlatbufferBuilder builder;
-      iree_DyLibExecutableDef_start_as_root(builder);
-
-      // Embed debug symbols at the end of the flatbuffer by adding first in the
-      // bottoms-up builder.
-      flatbuffers_uint8_vec_ref_t debugDatabaseRef = 0;
-      flatbuffers_string_ref_t debugDatabaseFilenameRef = 0;
-      if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
-        debugDatabaseRef = builder.streamUint8Vec([&](raw_ostream &stream) {
-          return linkArtifacts.debugFile.readInto(stream);
-        });
-        debugDatabaseFilenameRef = builder.createString(
-            llvm::sys::path::filename(linkArtifacts.debugFile.path));
-      }
-
-      // Embed entire dynamic library output.
-      flatbuffers_uint8_vec_ref_t libraryEmbeddedRef =
-          builder.streamUint8Vec([&](raw_ostream &stream) {
-            return linkArtifacts.libraryFile.readInto(stream);
-          });
-      if (!libraryEmbeddedRef) {
+      // Load the linked system library and optionally tag on the debug
+      // database. This debug database sits at the tail of the file and is
+      // ignored by system loaders and tools but still accessible to the runtime
+      // loader. Not all platforms have separate debug databases and need this.
+      auto libraryFileOr = linkArtifacts.libraryFile.read();
+      if (!libraryFileOr.hasValue()) {
         return variantOp.emitError()
                << "failed to read back dylib temp file at "
                << linkArtifacts.libraryFile.path;
       }
+      auto libraryFile = std::move(libraryFileOr).getValue();
+      if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
+        if (failed(appendDebugDatabase(libraryFile, linkArtifacts.debugFile))) {
+          return variantOp.emitError()
+                 << "failed to append debug database to dylib file";
+        }
+      }
+      auto bufferAttr = DenseIntElementsAttr::get(
+          VectorType::get({static_cast<int64_t>(libraryFile.size())},
+                          IntegerType::get(executableBuilder.getContext(), 8)),
+          std::move(libraryFile));
 
-      iree_DyLibExecutableDef_library_embedded_add(builder, libraryEmbeddedRef);
-      iree_DyLibExecutableDef_debug_database_filename_add(
-          builder, debugDatabaseFilenameRef);
-      iree_DyLibExecutableDef_debug_database_embedded_add(builder,
-                                                          debugDatabaseRef);
-      iree_DyLibExecutableDef_end_as_root(builder);
-
-      // Add the binary data to the target executable.
+      // Add the binary to the parent hal.executable.
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
           variantOp.getLoc(), variantOp.sym_name(),
-          variantOp.target().getFormat(),
-          builder.getBufferAttr(executableBuilder.getContext()));
-      binaryOp.mime_typeAttr(
-          executableBuilder.getStringAttr("application/x-flatbuffers"));
+          variantOp.target().getFormat(), bufferAttr);
+      const char *mimeType = nullptr;
+      switch (targetTriple.getObjectFormat()) {
+        case llvm::Triple::ObjectFormatType::COFF:
+          mimeType = "application/x-msdownload";
+          break;
+        case llvm::Triple::ObjectFormatType::ELF:
+          mimeType = "application/x-elf";
+          break;
+        case llvm::Triple::ObjectFormatType::MachO:
+          mimeType = "application/x-dylib";
+          break;
+        case llvm::Triple::ObjectFormatType::Wasm:
+          mimeType = "application/wasm";
+          break;
+        default:
+          mimeType = "application/octet-stream";
+          break;
+      }
+      binaryOp.mime_typeAttr(executableBuilder.getStringAttr(mimeType));
     }
     return success();
   }

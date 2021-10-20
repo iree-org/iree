@@ -62,9 +62,8 @@ class ExecutableCreateOpConversion
                             ->getParentOfType<IREE::HAL::ExecutableOp>();
     auto insertPoint = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(rewriter.getInsertionBlock()->getParentOp());
-    std::string rodataName = (StringRef("_") + executableOp.getName() + "_" +
-                              executableBinaryOp.getName() + "_binary")
-                                 .str();
+    std::string rodataName =
+        (executableOp.getName() + "_" + executableBinaryOp.getName()).str();
     std::replace(rodataName.begin(), rodataName.end(), '-', '_');
     auto rodataOp = rewriter.create<IREE::VM::RodataOp>(
         executableBinaryOp.getLoc(), rodataName, executableBinaryOp.data());

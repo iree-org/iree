@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/HAL/Conversion/HALToHAL/ConvertHALToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
-#include "iree/compiler/Dialect/HAL/Conversion/UtilToHAL/ConvertUtilToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -36,7 +35,7 @@ namespace IREE {
 namespace HAL {
 namespace {
 
-// A pass converting the IREE flow dialect into the IREE HAL dialect.
+// TODO(#7277): remove when switched to streams (use ConvertToHAL2).
 class ConvertToHALPass
     : public PassWrapper<ConvertToHALPass, OperationPass<ModuleOp>> {
  public:
@@ -66,13 +65,10 @@ class ConvertToHALPass
       }
     }
 
-    HALTypeConverter typeConverter(conversionInterfaces);
+    HALTypeConverter typeConverter(conversionInterfaces, false);
     HALConversionTarget conversionTarget(context, typeConverter);
 
     OwningRewritePatternList patterns(&getContext());
-
-    populateUtilToHALPatterns(context, conversionTarget, typeConverter,
-                              patterns);
 
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);

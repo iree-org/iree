@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | IreeFileCheck %s
 
-#config = {tileSizes = [[8, 64], [], [8, 4], [0, 0, 4]]}
+#config = {tileSizes = [[8, 64], [8, 4], [0, 0, 4]]}
 
 hal.executable private @fuse_and_vectorize_fill_matmul  {
   hal.interface @io {
@@ -70,7 +70,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
 
 // -----
 
-#config = {tileSizes = [[8, 64], [], [8, 4], [0, 0, 4]]}
+#config = {tileSizes = [[8, 64], [8, 4], [0, 0, 4]]}
 
 hal.executable private @fuse_and_vectorize_matmul_add  {
   hal.interface @io {
