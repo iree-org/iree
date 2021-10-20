@@ -193,7 +193,14 @@ static constexpr int kZIPMagicLocalOffset = 90;
 static StringRef mimeTypeToFileExtension(StringRef mimeType) {
   return StringSwitch<StringRef>(mimeType)
       .Case("application/x-flatbuffers", ".fb")
+      .Case("application/octet-stream", ".bin")
       .Case("application/x-elf", ".so")
+      .Case("application/x-msdownload", ".dll")
+      .Case("application/x-dylib", ".dylib")
+      .Case("application/wasm", ".wasm")
+      .Case("application/json", ".json")
+      .Case("application/x-yaml", ".yaml")
+      .Case("text/plain", ".txt")
       .Default(".bin");
 }
 
