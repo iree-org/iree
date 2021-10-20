@@ -154,28 +154,6 @@ func @storeConstScalar() -> tensor<i32> {
 
 // -----
 
-// CHECK-LABEL: @splatConst
-func @splatConst() -> tensor<4xi32> {
-  %0 = arith.constant 4 : i32
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<4> : tensor<4xi32>
-  %1 = flow.tensor.splat %0 : tensor<4xi32>
-  // CHECK-NEXT: return %[[C]]
-  return %1 : tensor<4xi32>
-}
-
-// -----
-
-// CHECK-LABEL: @splatConstScalar
-func @splatConstScalar() -> tensor<i32> {
-  %0 = arith.constant 4 : i32
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<4> : tensor<i32>
-  %1 = flow.tensor.splat %0 : tensor<i32>
-  // CHECK-NEXT: return %[[C]]
-  return %1 : tensor<i32>
-}
-
-// -----
-
 // CHECK-LABEL: @splatDynamicShape
 //  CHECK-SAME: (%[[DIM0:.+]]: index, %[[DIM1:.+]]: index)
 func @splatDynamicShape(%dim0: index, %dim1: index) -> tensor<?x?xi32> {

@@ -839,7 +839,6 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   }];
 
   let hasCanonicalizer = 1;
-  let hasFolder = 1;
 }
 
 def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [

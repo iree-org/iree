@@ -17,5 +17,8 @@ A high bar should be set for pages published to the website:
   overspecialize on a specific Linux distribution or a particular version of
   Visual Studio on Windows)
 
+When in doubt, the guide at https://developers.google.com/style offers good
+instructions.
+
 Developer documentation _can_ compromise on each of these points. Pages may
 also be promoted to website/ after some refinement.

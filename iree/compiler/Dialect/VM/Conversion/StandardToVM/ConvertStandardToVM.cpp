@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
-#include "iree/base/api.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
@@ -739,8 +738,9 @@ class AssertOpConversion : public OpConversionPattern<AssertOp> {
     AssertOpAdaptor operands(newOperands, srcOp->getAttrDictionary());
     auto status = rewriter.create<IREE::VM::ConstI32Op>(
         srcOp.getLoc(),
-        rewriter.getIntegerAttr(rewriter.getIntegerType(32),
-                                IREE_STATUS_FAILED_PRECONDITION));
+        rewriter.getIntegerAttr(
+            rewriter.getIntegerType(32),
+            static_cast<int32_t>(IREE::Util::StatusCode::FailedPrecondition)));
     // TODO(benvanik): invert cond_fail instead.
     auto invertedCondition = rewriter.createOrFold<IREE::VM::XorI32Op>(
         srcOp.getLoc(), operands.arg().getType(), operands.arg(),

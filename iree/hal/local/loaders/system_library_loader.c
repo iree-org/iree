@@ -17,47 +17,57 @@
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_layout.h"
 
-// flatcc schemas:
-#include "iree/base/internal/flatcc/parsing.h"
-#include "iree/schemas/dylib_executable_def_reader.h"
-#include "iree/schemas/dylib_executable_def_verifier.h"
-
 //===----------------------------------------------------------------------===//
-// Verification and file utilities
+// iree_hal_system_executable_footer_t
 //===----------------------------------------------------------------------===//
 
-// Verifies the structure of the flatbuffer so that we can avoid doing so during
-// runtime.
-static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
-    iree_const_byte_span_t flatbuffer_data) {
-  // Special handling for valid but mismatching flatbuffers.
-  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16 ||
-      !flatbuffers_has_identifier(flatbuffer_data.data,
-                                  iree_DyLibExecutableDef_file_identifier)) {
-    return iree_status_from_code(IREE_STATUS_CANCELLED);
+// An optional footer that may exist on the system library that is used to add
+// additional debug information for use directly by IREE, such as PDB or dSYM
+// files. This is only expected to be present when there is a debug database
+// but we may want to extend it in the future.
+typedef struct iree_hal_system_executable_footer_t {
+  uint8_t magic[8];  // IREE_HAL_SYSTEM_EXECUTABLE_FOOTER_MAGIC
+  uint32_t version;  // IREE_HAL_SYSTEM_EXECUTABLE_FOOTER_VERSION
+  uint32_t flags;    // reserved
+  // Offset of the library within the parent data stream.
+  // Almost always zero but here in case we want to allow for chaining.
+  uint64_t library_offset;
+  // Size of the system library in bytes.
+  uint64_t library_size;
+  // Offset of the start of the embedded debug database within the parent data
+  // stream. There may be padding between the library and this offset.
+  uint64_t debug_offset;
+  // Size of the debug database in bytes.
+  uint64_t debug_size;
+} iree_hal_system_executable_footer_t;
+
+// EXPERIMENTAL: this is not a stable interface yet. The binary format may
+// change at any time.
+#define IREE_HAL_SYSTEM_EXECUTABLE_FOOTER_MAGIC "IREEDBG\0"
+#define IREE_HAL_SYSTEM_EXECUTABLE_FOOTER_VERSION 0
+
+// Tries to find an iree_hal_system_executable_footer_t at the end of the
+// given executable data stream.
+static const iree_hal_system_executable_footer_t*
+iree_hal_system_executable_try_query_footer(
+    iree_const_byte_span_t executable_data) {
+  if (executable_data.data_length <
+      sizeof(iree_hal_system_executable_footer_t)) {
+    return NULL;
   }
-
-  // Run flatcc generated verification. This ensures all pointers are in-bounds
-  // and that we can safely walk the file, but not that the actual contents of
-  // the flatbuffer meet our expectations.
-  int verify_ret = iree_DyLibExecutableDef_verify_as_root(
-      flatbuffer_data.data, flatbuffer_data.data_length);
-  if (verify_ret != flatcc_verify_ok) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "flatbuffer verification failed: %s",
-                            flatcc_verify_error_string(verify_ret));
+  const uint8_t* footer_ptr = executable_data.data +
+                              executable_data.data_length -
+                              sizeof(iree_hal_system_executable_footer_t);
+  const iree_hal_system_executable_footer_t* footer =
+      (const iree_hal_system_executable_footer_t*)(footer_ptr);
+  static_assert(sizeof(IREE_HAL_SYSTEM_EXECUTABLE_FOOTER_MAGIC) - /*NUL*/ 1 ==
+                    sizeof(footer->magic),
+                "magic number value must match struct size");
+  if (memcmp(footer->magic, IREE_HAL_SYSTEM_EXECUTABLE_FOOTER_MAGIC,
+             sizeof(footer->magic)) != 0) {
+    return NULL;
   }
-
-  iree_DyLibExecutableDef_table_t executable_def =
-      iree_DyLibExecutableDef_as_root(flatbuffer_data.data);
-
-  if (!flatbuffers_uint8_vec_len(
-          iree_DyLibExecutableDef_library_embedded_get(executable_def))) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "executable library_embedded is missing/empty");
-  }
-
-  return iree_ok_status();
+  return footer;
 }
 
 //===----------------------------------------------------------------------===//
@@ -66,9 +76,6 @@ static iree_status_t iree_hal_dylib_executable_flatbuffer_verify(
 
 typedef struct iree_hal_system_executable_t {
   iree_hal_local_executable_t base;
-
-  // Flatbuffer definition referencing the executable memory.
-  iree_DyLibExecutableDef_table_t def;
 
   // Loaded platform dynamic library.
   iree_dynamic_library_t* handle;
@@ -88,29 +95,45 @@ typedef struct iree_hal_system_executable_t {
 extern const iree_hal_local_executable_vtable_t
     iree_hal_system_executable_vtable;
 
-static iree_status_t iree_hal_system_executable_extract_and_load(
-    iree_hal_system_executable_t* executable, iree_allocator_t host_allocator) {
-  flatbuffers_uint8_vec_t embedded_library_vec =
-      iree_DyLibExecutableDef_library_embedded_get(executable->def);
+// Loads the executable and optional debug database from the given
+// |executable_data| in memory. The memory must remain live for the lifetime
+// of the executable.
+static iree_status_t iree_hal_system_executable_load(
+    iree_hal_system_executable_t* executable,
+    iree_const_byte_span_t executable_data, iree_allocator_t host_allocator) {
+  // Check to see if the library has a footer indicating embedded debug data.
+  iree_const_byte_span_t library_data = iree_make_const_byte_span(NULL, 0);
+  iree_const_byte_span_t debug_data = iree_make_const_byte_span(NULL, 0);
+  const iree_hal_system_executable_footer_t* footer =
+      iree_hal_system_executable_try_query_footer(executable_data);
+  if (footer) {
+    // Debug file present; split the data contents.
+    iree_host_size_t data_length =
+        executable_data.data_length - sizeof(*footer);
+    if (footer->library_size > data_length ||
+        footer->debug_offset + footer->debug_size > data_length) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "system library footer references out of range bytes");
+    }
+    library_data =
+        iree_make_const_byte_span(executable_data.data, footer->library_size);
+    debug_data = iree_make_const_byte_span(
+        executable_data.data + footer->debug_offset, footer->debug_size);
+  } else {
+    // Entire data contents are the library.
+    library_data = executable_data;
+  }
+
   IREE_RETURN_IF_ERROR(iree_dynamic_library_load_from_memory(
-      iree_make_cstring_view("aot"),
-      iree_make_const_byte_span(
-          embedded_library_vec,
-          flatbuffers_uint8_vec_len(embedded_library_vec)),
+      iree_make_cstring_view("aot"), library_data,
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &executable->handle));
 
-  flatbuffers_string_t debug_database_filename =
-      iree_DyLibExecutableDef_debug_database_filename_get(executable->def);
-  flatbuffers_uint8_vec_t debug_database_embedded_vec =
-      iree_DyLibExecutableDef_debug_database_embedded_get(executable->def);
-  if (flatbuffers_string_len(debug_database_filename) &&
-      flatbuffers_uint8_vec_len(debug_database_embedded_vec)) {
+  if (debug_data.data_length > 0) {
     IREE_RETURN_IF_ERROR(iree_dynamic_library_attach_symbols_from_memory(
-        executable->handle,
-        iree_make_const_byte_span(
-            debug_database_embedded_vec,
-            flatbuffers_uint8_vec_len(debug_database_embedded_vec))));
+        executable->handle, debug_data));
   }
+
   return iree_ok_status();
 }
 
@@ -212,12 +235,12 @@ static iree_status_t iree_hal_system_executable_resolve_imports(
 }
 
 static iree_status_t iree_hal_system_executable_create(
-    iree_DyLibExecutableDef_table_t executable_def,
+    iree_const_byte_span_t executable_data,
     iree_host_size_t executable_layout_count,
     iree_hal_executable_layout_t* const* executable_layouts,
     const iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
-  IREE_ASSERT_ARGUMENT(executable_def);
+  IREE_ASSERT_ARGUMENT(executable_data.data && executable_data.data_length);
   IREE_ASSERT_ARGUMENT(!executable_layout_count || executable_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
@@ -234,15 +257,11 @@ static iree_status_t iree_hal_system_executable_create(
         &iree_hal_system_executable_vtable, executable_layout_count,
         executable_layouts, &executable->layouts[0], host_allocator,
         &executable->base);
-    executable->def = executable_def;
   }
   if (iree_status_is_ok(status)) {
-    // Attempt to extract the embedded flatbuffer library and load it.
-    // Will scribble information into executable.
-    // This is bad, but ehh all this is getting deleted soon and hopefully we
-    // can avoid ever touching the disk at all.
-    status =
-        iree_hal_system_executable_extract_and_load(executable, host_allocator);
+    // Attempt to extract the embedded library and load it.
+    status = iree_hal_system_executable_load(executable, executable_data,
+                                             host_allocator);
   }
   if (iree_status_is_ok(status)) {
     // Query metadata and get the entry point function pointers.
@@ -414,17 +433,11 @@ static iree_status_t iree_hal_system_library_loader_try_load(
       (iree_hal_system_library_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Verify and fetch the executable flatbuffer wrapper.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
-                                    iree_hal_dylib_executable_flatbuffer_verify(
-                                        executable_spec->executable_data));
-  iree_DyLibExecutableDef_table_t executable_def =
-      iree_DyLibExecutableDef_as_root(executable_spec->executable_data.data);
-
   // Perform the load (and requisite disgusting hackery).
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_system_executable_create(
-              executable_def, executable_spec->executable_layout_count,
+              executable_spec->executable_data,
+              executable_spec->executable_layout_count,
               executable_spec->executable_layouts,
               base_executable_loader->import_provider,
               executable_loader->host_allocator, out_executable));

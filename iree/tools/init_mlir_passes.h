@@ -83,7 +83,7 @@ inline void registerMlirPasses() {
   registerConvertLinalgToSPIRVPass();
 
   // TOSA.
-  registerTosaToLinalgOnTensorsPass();
+  registerTosaToLinalgPass();
   registerTosaToStandardPass();
 }
 
