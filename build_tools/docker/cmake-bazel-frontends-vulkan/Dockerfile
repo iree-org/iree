@@ -11,7 +11,7 @@ FROM gcr.io/iree-oss/cmake-bazel-frontends@sha256:60abf30296e323d519471dc8b876bf
 
 ARG VULKAN_SDK_VERSION=1.2.154.0
 
-COPY --from=gcr.io/iree-oss/vulkan@sha256:fd91349b22b5dbf81fdd3a290d3c239702065bc6d694e3665d03cbddc78d4250 \
+COPY --from=gcr.io/iree-oss/vulkan@sha256:e1c1c5ddbe6b130ff0577572b97094e7a64a3aa003fdd4a91d1b21be705ddf8a \
   /opt/vulkan-sdk/ /opt/vulkan-sdk/
 
 ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
