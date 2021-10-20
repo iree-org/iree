@@ -45,11 +45,17 @@ class CommandBufferFillBufferOpConversion
     auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternBitWidth / 8, 32);
     Value pattern;
-    if (originalPatternType.isSignedInteger()) {
+    if (originalPatternType.isInteger(8) || originalPatternType.isInteger(16) ||
+        originalPatternType.isInteger(32)) {
       pattern = op.pattern();
-    } else {
+    } else if (originalPatternType.isF32()) {
       pattern = rewriter.createOrFold<arith::BitcastOp>(
           op.getLoc(), rewriter.getIntegerType(patternBitWidth), op.pattern());
+    } else {
+      // Note: f16 in particular would need special handling since a promotion
+      // to f32 changes the bit representation.
+      return op.emitOpError()
+             << "unhandled fill buffer type: " << originalPatternType;
     }
     callOperands.push_back(pattern);
     callOperands.push_back(patternLength);
