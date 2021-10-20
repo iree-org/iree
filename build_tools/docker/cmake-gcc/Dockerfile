@@ -9,7 +9,7 @@
 # blame me. I wasn't the one that made Dockerfile a really unextensible format.
 
 # apparently even building the compiler requires Python now 😭
-FROM gcr.io/iree-oss/cmake-python@sha256:7e31103ee35f52e6d6019adf474bc60758710e95f20ee33ed94aee3f8780edbd AS final
+FROM gcr.io/iree-oss/cmake-python@sha256:7b805ffc94cdb93d3af2781566df42c55a16a60eb3fb3e97ced78712357f4813 AS final
 
 ENV CC /usr/bin/gcc-9
 ENV CXX /usr/bin/g++-9
