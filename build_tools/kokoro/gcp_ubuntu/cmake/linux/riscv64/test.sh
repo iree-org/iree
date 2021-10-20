@@ -38,6 +38,7 @@ echo "Test e2e mlir --> bytecode module --> iree-run-module"
 "${BUILD_HOST_DIR?}/install/bin/iree-translate" \
   -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot \
+  -iree-llvm-link-embedded=false \
   -iree-llvm-target-triple=riscv64 \
   -iree-llvm-target-cpu=generic-rv64 \
   -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c" \
