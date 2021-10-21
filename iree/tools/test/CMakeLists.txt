@@ -17,18 +17,15 @@ iree_lit_test_suite(
     "iree-benchmark-module.mlir"
     "iree-run-mlir.mlir"
     "iree-run-module.mlir"
-    "iree-run-trace.mlir"
     "multiple_args.mlir"
     "multiple_exported_functions.mlir"
     "repeated_return.mlir"
     "scalars.mlir"
   DATA
-    ::iree-run-trace.yaml
     iree::tools::IreeFileCheck
     iree::tools::iree-benchmark-module
     iree::tools::iree-run-mlir
     iree::tools::iree-run-module
-    iree::tools::iree-run-trace
     iree::tools::iree-translate
   LABELS
     "hostonly"
