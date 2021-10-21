@@ -17,9 +17,6 @@ package(
 cc_binary(
     name = "generate_embed_data",
     srcs = ["generate_embed_data_main.cc"],
-    deps = [
-        "//iree/base/internal:flags",
-    ],
 )
 
 c_embed_data(
