@@ -122,4 +122,120 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_i8_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+    "vmvx"
+  DRIVERS
+    "dylib"
+    "vmvx"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+    "vmvx"
+  DRIVERS
+    "dylib"
+    "vmvx"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_i8_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+    "vmvx"
+  DRIVERS
+    "dylib"
+    "vmvx"
+  OPT_FLAGS
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
+    "--iree-codegen-vectorize-linalg-mmt4d"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_f32_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+    "vmvx"
+  DRIVERS
+    "dylib"
+    "vmvx"
+  OPT_FLAGS
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
+    "--iree-codegen-vectorize-linalg-mmt4d"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_i8_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+  DRIVERS
+    "dylib"
+  OPT_FLAGS
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
+    "--iree-codegen-vectorize-linalg-mmt4d"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_f32_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+  DRIVERS
+    "dylib"
+  OPT_FLAGS
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
+    "--iree-codegen-vectorize-linalg-mmt4d"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
