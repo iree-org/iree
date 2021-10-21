@@ -1,4 +1,4 @@
-# Copyright 2020 The IREE Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -6,62 +6,10 @@
 
 include(CMakeParseArguments)
 
-# Helper for iree_check_test and iree_trace_runner_test.
-# Just a thin wrapper around iree_bytecode_module, passing it some
-# common flags, including the appropriate --iree-llvm-target-triple in the
-# Android case.
-function(iree_bytecode_module_for_iree_check_test_and_friends)
-  if(NOT IREE_BUILD_TESTS)
-    return()
-  endif()
-
-  cmake_parse_arguments(
-    _RULE
-    ""
-    "MODULE_NAME;SRC;TARGET_BACKEND;OPT_TOOL;MODULE_FILE_NAME"
-    "FLAGS;OPT_FLAGS"
-    ${ARGN}
-  )
-
-  if(ANDROID)
-    # Android's CMake toolchain defines some variables that we can use to infer
-    # the appropriate target triple from the configured settings:
-    # https://developer.android.com/ndk/guides/cmake#android_platform
-    #
-    # In typical CMake fashion, the various strings are pretty fuzzy and can
-    # have multiple values like "latest", "android-25"/"25"/"android-N-MR1".
-    #
-    # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
-    # should pretty consistently be just a number we can use for target triple.
-    set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
-    list(APPEND _RULE_FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
-  endif()
-
-  iree_bytecode_module(
-    NAME
-      "${_RULE_MODULE_NAME}"
-    MODULE_FILE_NAME
-      "${_RULE_MODULE_FILE_NAME}"
-    SRC
-      "${_RULE_SRC}"
-    FLAGS
-      "-iree-mlir-to-vm-bytecode-module"
-      "-mlir-print-op-on-diagnostic=false"
-      "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
-      ${_RULE_FLAGS}
-    OPT_TOOL
-      ${_RULE_OPT_TOOL}
-    OPT_FLAGS
-      ${_RULE_OPT_FLAGS}
-    TESTONLY
-  )
-endfunction()
-
-# iree_check_test()
+# iree_trace_runner_test()
 #
-# Creates a test using iree-check-module for the specified source file.
-#
-# Mirrors the bzl rule of the same name.
+# Creates a test using a specified trace-runner program for the specified
+# replay trace.
 #
 # Parameters:
 #   NAME: Name of the target
@@ -70,37 +18,25 @@ endfunction()
 #   DRIVER: driver to run the module with.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
 #       translation and backend flags are passed automatically.
-#   RUNNER_ARGS: additional args to pass to iree-check-module. The driver
-#       and input file are passed automatically.
+#   RUNNER_ARGS: additional args to pass to the trace-runner program. The driver
+#       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
 #       if OPT_FLAGS is specified.
 #   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
 #       these flags.
-#   MODULE_FILE_NAME: Optional, specifies the absolute path to the filename
-#       to use for the generated IREE module (.vmfb).
-function(iree_check_test)
+#   TRACE_RUNNER: trace-runner program to run.
+#   TRACE: trace file input to the trace-runner program.
+#   MODULE_FILE_NAME: specifies the absolute path to the filename to use for the
+#       generated IREE module (.vmfb). Mandatory, unlike in iree_check_test,
+#       because trace files (.yaml) reference a specific module file path.
+function(iree_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
-  # Check tests require (by way of iree_bytecode_module) some tools.
-  #
-  # On the host, we can either build the tools directly, if IREE_BUILD_COMPILER
-  # is enabled, or reuse the tools from an existing build (or binary release).
-  #
-  # In some configurations (e.g. when cross compiling for Android), we can't
-  # always build the tools and may depend on them from a host build.
-  #
-  # For now we enable check tests:
-  #   On the host if IREE_BUILD_COMPILER is set
-  #   Always when cross compiling (assuming host tools exist)
-  #
-  # In the future, we should probably add some orthogonal options that give
-  # more control (such as using tools from a binary release in a runtime-only
-  # host build, or skipping check tests in an Android build).
-  # TODO(#4662): add flexible configurable options that cover more uses
+  # See comment in iree_check_test about this condition.
   if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
     return()
   endif()
@@ -108,7 +44,7 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;OPT_TOOL;MODULE_FILE_NAME"
+    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;OPT_TOOL;TRACE_RUNNER;MODULE_FILE_NAME"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
     ${ARGN}
   )
@@ -118,17 +54,11 @@ function(iree_check_test)
 
   set(_MODULE_NAME "${_RULE_NAME}_module")
 
-  if(DEFINED _RULE_MODULE_FILE_NAME)
-    set(_MODULE_FILE_NAME "${_RULE_MODULE_FILE_NAME}")
-  else(DEFINED _RULE_MODULE_FILE_NAME)
-    set(_MODULE_FILE_NAME "${_MODULE_NAME}.vmfb")
-  endif(DEFINED _RULE_MODULE_FILE_NAME)
-
   iree_bytecode_module_for_iree_check_test_and_friends(
     MODULE_NAME
       "${_MODULE_NAME}"
     MODULE_FILE_NAME
-      "${_MODULE_FILE_NAME}"
+      "${_RULE_MODULE_FILE_NAME}"
     SRC
       "${_RULE_SRC}"
     TARGET_BACKEND
@@ -150,10 +80,8 @@ function(iree_check_test)
   add_custom_target(
     "${_MODULE_TARGET_NAME}"
      DEPENDS
-       "${_MODULE_FILE_NAME}"
+       "${_RULE_MODULE_FILE_NAME}"
   )
-
-  set(_RUNNER_TARGET "iree_tools_iree-check-module")
 
   # A target specifically for the test. We could combine this with the above,
   # but we want that one to get pulled into iree_bytecode_module.
@@ -161,7 +89,7 @@ function(iree_check_test)
   add_dependencies(
     "${_NAME}"
     "${_MODULE_TARGET_NAME}"
-    "${_RUNNER_TARGET}"
+    "${_RULE_TRACE_RUNNER}"
   )
 
   iree_run_binary_test(
@@ -170,9 +98,11 @@ function(iree_check_test)
     DRIVER
       "${_RULE_DRIVER}"
     TEST_BINARY
-      "${_RUNNER_TARGET}"
+      "${_RULE_TRACE_RUNNER}"
     TEST_INPUT_FILE_ARG
-      "${_MODULE_FILE_NAME}"
+      ${_RULE_TRACE}
+    DATA
+      ${_MODULE_FILE_NAME}
     ARGS
       ${_RULE_RUNNER_ARGS}
     LABELS
@@ -180,43 +110,49 @@ function(iree_check_test)
   )
 endfunction()
 
-# iree_check_single_backend_test_suite()
+# iree_single_backend_generated_trace_runner_test()
 #
-# Creates a test suite of iree-check-module tests for a single backend/driver pair.
+# Variant of iree_trace_runner_test where instead of specifying
+# a source file (and possibly a trace file and module path), one passes a
+# generator program.
 #
-# Mirrors the bzl rule of the same name.
-#
-# One test is generated per source file.
 # Parameters:
-#   NAME: name of the generated test suite.
-#   SRCS: source mlir files containing the module.
+#   NAME: Name of the target
+#   GENERATOR: Program (at the moment, must be Python3) to run to generate the
+#       source file (and possibly a trace file and module path). It will be
+#       invoked with the following standard flags, in addition to GENERATOR_ARGS:
+#         --output_code=${CMAKE_CURRENT_BINARY_DIR}/name.mlir
+#         --output_trace=${CMAKE_CURRENT_BINARY_DIR}/name.yaml
+#         --module_path=${CMAKE_CURRENT_BINARY_DIR}/name.vmfb
+#   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
 #       translation and backend flags are passed automatically.
-#   RUNNER_ARGS: additional args to pass to the underlying iree-check-module
-#       tests. The driver and input file are passed automatically. To use
-#       different args per test, create a separate suite or iree_check_test.
-#   LABELS: Additional labels to apply to the generated tests. The package path is
-#       added automatically.
+#   RUNNER_ARGS: additional args to pass to the trace-runner program. The driver
+#       and input file flags are passed automatically.
+#   LABELS: Additional labels to apply to the test. The package path and
+#       "driver=${DRIVER}" are added automatically.
 #   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
 #       if OPT_FLAGS is specified.
 #   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
 #       these flags.
-function(iree_check_single_backend_test_suite)
+#   TRACE_RUNNER: trace-runner program to run.
+function(iree_single_backend_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
-  # Note: we could check IREE_BUILD_COMPILER here, but cross compilation makes
-  # that a little tricky. Instead, we let iree_check_test handle the checks,
-  # meaning this function may run some configuration but generate no targets.
+  # Copied from iree_check_test. Refer to the comment there.
+  if(NOT IREE_BUILD_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+    return()
+  endif()
 
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER;OPT_TOOL"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
+    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;OPT_TOOL;TRACE_RUNNER"
+    "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
     ${ARGN}
   )
 
@@ -245,42 +181,88 @@ function(iree_check_single_backend_test_suite)
     endif()
   endif()
 
-  foreach(_SRC IN LISTS _RULE_SRCS)
-    set(_TEST_NAME "${_RULE_NAME}_${_SRC}")
-    iree_check_test(
-      NAME
-        ${_TEST_NAME}
-      SRC
-        ${_SRC}
-      TARGET_BACKEND
-        ${_RULE_TARGET_BACKEND}
-      DRIVER
-        ${_RULE_DRIVER}
-      COMPILER_FLAGS
-        ${_RULE_COMPILER_FLAGS}
-      RUNNER_ARGS
-        ${_RULE_RUNNER_ARGS}
-      LABELS
-        ${_RULE_LABELS}
-      OPT_TOOL
-        ${_RULE_OPT_TOOL}
-      OPT_FLAGS
-        ${_RULE_OPT_FLAGS}
-    )
-  endforeach()
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  
+  set(_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.mlir")
+
+  set(_GENERATOR_OUTPUT "${_SRC}")
+  set(_TRACE "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.yaml")
+  set(_MODULE_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.vmfb")
+  list(APPEND _GENERATOR_STANDARD_FLAGS "--output_code=${_SRC}")
+  list(APPEND _GENERATOR_STANDARD_FLAGS "--output_trace=${_TRACE}")
+  list(APPEND _GENERATOR_STANDARD_FLAGS "--module_path=${_MODULE_FILE_NAME}")
+  list(APPEND _GENERATOR_OUTPUT "${_TRACE}")
+
+  add_custom_command(
+    COMMAND
+      "${Python3_EXECUTABLE}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_GENERATOR}"
+      ${_GENERATOR_STANDARD_FLAGS}
+      ${_RULE_GENERATOR_ARGS}
+    OUTPUT
+      ${_GENERATOR_OUTPUT}
+    DEPENDS
+      ${_RULE_GENERATOR}
+  )
+
+  add_custom_target(
+    "${_NAME}_generated_files"
+    DEPENDS
+      ${_GENERATOR_OUTPUT}
+  )
+
+  iree_trace_runner_test(
+    NAME
+      "${_RULE_NAME}"
+    SRC
+      "${_SRC}"
+    TRACE
+      "${_TRACE}"
+    TRACE_RUNNER
+      "${_RULE_TRACE_RUNNER}"
+    MODULE_FILE_NAME
+      "${_MODULE_FILE_NAME}"
+    TARGET_BACKEND
+      ${_RULE_TARGET_BACKEND}
+    DRIVER
+      ${_RULE_DRIVER}
+    COMPILER_FLAGS
+      ${_RULE_COMPILER_FLAGS}
+    RUNNER_ARGS
+      ${_RULE_RUNNER_ARGS}
+    LABELS
+      ${_RULE_LABELS}
+    OPT_TOOL
+      ${_RULE_OPT_TOOL}
+    OPT_FLAGS
+      ${_RULE_OPT_FLAGS}
+  )
+
+  # Note we are relying on the fact that the target created by
+  # iree_trace_runner_test is _NAME, even though we passed _RULE_NAME to it,
+  # i.e. we are relying on the prefixing to be identical.
+  add_dependencies("${_NAME}" "${_NAME}_generated_files")
 endfunction()
 
 
-# iree_check_test_suite()
+# iree_generated_trace_runner_test()
 #
-# Creates a test suite of iree-check-module tests.
+# Creates a set of iree_single_backend_generated_trace_runner_test's differing
+# by target backend and driver.
 #
 # Mirrors the bzl rule of the same name.
 #
 # One test is generated per source and backend/driver pair.
 # Parameters:
-#   NAME: name of the generated test suite.
-#   SRCS: source mlir files containing the module.
+#   NAME: Name of the target
+#   GENERATOR: Program (at the moment, must be Python3) to run to generate the
+#       source file (and possibly a trace file and module path). It will be
+#       invoked with the following standard flags, in addition to GENERATOR_ARGS:
+#         --output_code=${CMAKE_CURRENT_BINARY_DIR}/name.mlir
+#         --output_trace=${CMAKE_CURRENT_BINARY_DIR}/name.yaml
+#         --module_path=${CMAKE_CURRENT_BINARY_DIR}/name.vmfb
+#   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKENDS: backends to compile the module for. These form pairs with
 #       the DRIVERS argument (due to cmake limitations they are separate list
 #       arguments). The lengths must exactly match. If no backends or drivers are
@@ -289,16 +271,18 @@ endfunction()
 #       TARGET_BACKENDS argument (due to cmake limitations they are separate list
 #       arguments). The lengths must exactly match. If no backends or drivers are
 #       specified, a test will be generated for every supported pair.
-#   RUNNER_ARGS: additional args to pass to the underlying iree-check-module tests. The
-#       driver and input file are passed automatically. To use different args per
-#       test, create a separate suite or iree_check_test.
-#   LABELS: Additional labels to apply to the generated tests. The package path is
-#       added automatically.
+#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
+#       translation and backend flags are passed automatically.
+#   RUNNER_ARGS: additional args to pass to the trace-runner program. The driver
+#       and input file flags are passed automatically.
+#   LABELS: Additional labels to apply to the test. The package path and
+#       "driver=${DRIVER}" are added automatically.
 #   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
 #       if OPT_FLAGS is specified.
 #   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
 #       these flags.
-function(iree_check_test_suite)
+#   TRACE_RUNNER: trace-runner program to run.
+function(iree_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -306,8 +290,8 @@ function(iree_check_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
-    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS"
+    "NAME;GENERATOR;OPT_TOOL;TRACE_RUNNER"
+    "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
     ${ARGN}
   )
 
@@ -328,12 +312,16 @@ function(iree_check_test_suite)
   foreach(_INDEX RANGE "${_MAX_INDEX}")
     list(GET _RULE_TARGET_BACKENDS ${_INDEX} _TARGET_BACKEND)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
-    set(_SUITE_NAME "${_RULE_NAME}_${_TARGET_BACKEND}_${_DRIVER}")
-    iree_check_single_backend_test_suite(
+    set(_SINGLE_BACKEND_TEST_NAME "${_RULE_NAME}_${_TARGET_BACKEND}_${_DRIVER}")
+    iree_single_backend_generated_trace_runner_test(
       NAME
-        ${_SUITE_NAME}
-      SRCS
-        ${_RULE_SRCS}
+        ${_SINGLE_BACKEND_TEST_NAME}
+      GENERATOR
+        ${_RULE_GENERATOR}
+      GENERATOR_ARGS
+        ${_RULE_GENERATOR_ARGS}
+      TRACE_RUNNER
+        ${_RULE_TRACE_RUNNER}
       TARGET_BACKEND
         ${_TARGET_BACKEND}
       DRIVER
