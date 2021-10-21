@@ -122,21 +122,73 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
       }
     }
 
-    // TODO: Second tile reduction loops.
+    // Tile reduction loops.
+    {
+      OwningRewritePatternList l1patterns(&getContext());
+      l1patterns.insert<TileWorkgroups>(
+          context,
+          linalg::LinalgTilingOptions().setTileSizeComputationFunction(
+              [](OpBuilder &builder,
+                 Operation *operation) -> SmallVector<Value, 4> {
+                auto tiles =
+                    getTileSizes(builder, operation,
+                                 static_cast<unsigned>(TilingLevel::L1Tiles));
+                auto numParallelLoops =
+                    dyn_cast<linalg::LinalgOp>(operation).getNumParallelLoops();
+                auto zeroTileVal = builder.create<arith::ConstantIndexOp>(
+                    operation->getLoc(), 0);
+                SmallVector<Value> reductionTiles(tiles.size(), zeroTileVal);
+                for (int i = numParallelLoops; i < tiles.size(); ++i) {
+                  reductionTiles[i] = tiles[i];
+                }
+                return std::move(reductionTiles);
+              }),
+          linalg::LinalgTransformationFilter(
+              Identifier::get(getWorkgroupMarker(), context),
+              Identifier::get(getVectorizeMarker(), context)));
+
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Apply canoncalization
+    {
+      OwningRewritePatternList canonicalizationPatterns(&getContext());
+      linalg::populateLinalgTilingCanonicalizationPatterns(
+          canonicalizationPatterns);
+      memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
+                                                 context);
+      scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
+    }
   }
 
   if (!lowerToVectors) {
     return;
   }
 
+  {
+    // Set vectorization marker globally
+    OpBuilder builder(funcOp.getContext());
+    funcOp.walk([&](linalg::LinalgOp op) {
+      op->setAttr("__internal_linalg_transform__",
+                  builder.getStringAttr("vectorize"));
+    });
+  }
+
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns(&getContext());
     linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
-                                        linalg::CopyOp, linalg::FillOp>(
+                                        linalg::GenericOp, linalg::CopyOp,
+                                        linalg::FillOp>(
         vectorizationPatterns, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
-            Identifier::get(getWorkgroupMarker(), context)));
+            Identifier::get(getVectorizeMarker(), context)));
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorizationPatterns)))) {
       return signalPassFailure();
