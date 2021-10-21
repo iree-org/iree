@@ -25,10 +25,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::cl::opt<bool> disableL1Tiling(
-    "iree-codegen-llvm-disable-l1-tiling",
-    llvm::cl::desc("option to disable l1 tiling"), llvm::cl::init(false));
-
 namespace {
 // Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
 // that is always templated on an op.
@@ -82,8 +78,8 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  // First level of tiling patterns {
-  if (!disableL1Tiling) {
+  // First level of tiling patterns
+  {
     OwningRewritePatternList l1patterns(&getContext());
     l1patterns.insert<TileWorkgroups>(
         context,
@@ -141,9 +137,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
                   static_cast<unsigned>(TilingLevel::VectorTiles));
             }),
         linalg::LinalgTransformationFilter(
-            disableL1Tiling
-                ? Identifier::get(getWorkgroupMarker(), context)
-                : Identifier::get(getWorkgroupL1TileMarker(), context),
+            Identifier::get(getWorkgroupL1TileMarker(), context),
             Identifier::get(getVectorizeMarker(), context)));
 
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns)))) {
