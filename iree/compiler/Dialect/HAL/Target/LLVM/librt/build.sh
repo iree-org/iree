@@ -7,15 +7,22 @@
 set -x
 set -e
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-OUT="${SCRIPT_DIR}/bin"
-SRC="${SCRIPT_DIR}/src"
+SCRIPT_DIR="$(realpath `dirname $0`)"
+OUT="${SCRIPT_DIR?}/bin"
+SRC="${SCRIPT_DIR?}/src"
 LL_FILE="${OUT}/librt.ll"
 BC_FILE="${OUT}/librt.bc"
+IREE_SRC_DIR="$(git rev-parse --show-toplevel)"
+IREE_BUILD_DIR="${IREE_BUILD_DIR:-${IREE_SRC_DIR?}/../build}"
+CLANG="${CLANG:-$(which clang)}"
+CLANGXX="${CLANGXX:-$(which clang++)}"
+LLVM_AS="${LLVM_AS:-${IREE_BUILD_DIR}/third_party/llvm-project/llvm/bin/llvm-as}"
+LLVM_LINK="${LLVM_DIS:-${IREE_BUILD_DIR}/third_party/llvm-project/llvm/bin/llvm-link}"
+OPT="${OPT:-${IREE_BUILD_DIR}/third_party/llvm-project/llvm/bin/opt}"
 
 # Generate an LLVM IR assembly listing so we can easily read the file.
 # This is not checked in or used by the compiler.
-clang \
+${CLANG?} \
     -target wasm32 \
     -std=c17 \
     -O2 \
@@ -33,15 +40,14 @@ clang \
     "${SRC}/libm.c"
 
 ## Generate the LLVM IR assembly for the required math files from muls
-IREE_SRC_DIR="$( cd ${SCRIPT_DIR} && cd ../../../../../../../ && pwd)"
-MUSL_DIR=${IREE_SRC_DIR}/third_party/musl
+MUSL_DIR=${IREE_SRC_DIR?}/third_party/musl
 cd ${MUSL_DIR}
-CC=clang CXX=clang++ ./configure
-MUSL_DIR=${MUSL_DIR} make -f ${SCRIPT_DIR}/Makefile_musl.iree iree
+CC=${CLANG?} CXX=${CLANGXX?} ./configure
+MUSL_DIR=${MUSL_DIR} make -f ${SCRIPT_DIR?}/Makefile_musl.iree iree
 MUSL_LL_FILES=`find obj/ -name *.ll`
-cp ${MUSL_LL_FILES} ${OUT}
-rm ${MUSL_LL_FILES}
-cd ${SCRIPT_DIR}
+cp ${MUSL_LL_FILES?} ${OUT}
+rm ${MUSL_LL_FILES?}
+cd ${SCRIPT_DIR?}
 
 ALL_LL_FILES=`find ${OUT} -name *.ll`
 
@@ -49,7 +55,7 @@ cd ${OUT}
 git restore ${BC_FILE}
 for file in ${ALL_LL_FILES}
 do
-  opt ${file} -O3 -S -o ${file}.opt.ll
+  ${OPT?} ${file} -O3 -S -o ${file}.opt.ll
   # Clang adds a bunch of bad attributes and host-specific information that we
   # don't want (so we get at least somewhat deterministic builds).
   sed -i 's/^;.*$//' ${file}.opt.ll
@@ -61,11 +67,11 @@ do
   # Generate a binary bitcode file embedded into the compiler binary.
   # NOTE: we do this from stdin so that the filename on the user's system is not
   # embedded in the bitcode file (making it non-deterministic).
-  cat ${file}.opt.ll | llvm-as -o=${file}.opt.ll.bc
+  cat ${file}.opt.ll | ${LLVM_AS?} -o=${file}.opt.ll.bc
 done
 
 ALL_BC_FILES=`ls *.ll.bc`
-llvm-link ${ALL_BC_FILES} -o ${BC_FILE}
+${LLVM_LINK?} ${ALL_BC_FILES} -o ${BC_FILE}
 rm ${ALL_BC_FILES}
 ALL_LL_FILES=`ls *.ll`
 rm ${ALL_LL_FILES}

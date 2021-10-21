@@ -59,12 +59,10 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal::dynamic_library
-    iree::base::internal::flatcc::parsing
     iree::base::tracing
     iree::hal
     iree::hal::local
     iree::hal::local::executable_library
-    iree::schemas::dylib_executable_def_c_fbs
   DEFINES
     "IREE_HAL_HAVE_SYSTEM_LIBRARY_LOADER=1"
   PUBLIC

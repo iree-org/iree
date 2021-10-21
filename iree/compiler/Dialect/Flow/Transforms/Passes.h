@@ -131,12 +131,8 @@ createPadLinalgOpsToIntegerMultiplePass(int paddingSize = 4);
 //===----------------------------------------------------------------------===//
 
 // Outlines large tensor constants into util.globals at the module level.
-//
-// TODO(#5493): implement the support for inlining constants into the command
-// buffer and raise this value to one that is measured to be good.
-static constexpr size_t kMinLargeConstantSize = 1;
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineLargeConstantsPass(
-    size_t minLargeConstantSize = kMinLargeConstantSize);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOutlineLargeConstantsPass();
 
 // Deduplicates equivalent executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>

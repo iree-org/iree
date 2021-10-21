@@ -51,8 +51,6 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::librt
-    iree::compiler::Utils
-    iree::schemas::dylib_executable_def_c_fbs
   PUBLIC
 )
 
