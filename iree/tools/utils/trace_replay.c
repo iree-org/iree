@@ -501,29 +501,30 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
 
 // Writes an element of the given |element_type| with the given integral |value|
 // to |dst|.
-static void write_as_element_type(iree_hal_element_type_t element_type,
-                                  int value, void* dst) {
-#define IREE_WRITE_AS_ELEMENT_TYPE_CASE(ETYPE, CTYPE) \
-  case IREE_HAL_ELEMENT_TYPE_##ETYPE:                 \
-    *(CTYPE*)dst = (CTYPE)value;                      \
+static void iree_trace_replay_write_element(
+    iree_hal_element_type_t element_type, int value, void* dst) {
+#define IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(ETYPE, CTYPE) \
+  case IREE_HAL_ELEMENT_TYPE_##ETYPE:                      \
+    *(CTYPE*)dst = (CTYPE)value;                           \
     break;
 
   switch (element_type) {
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(SINT_8, int8_t)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(SINT_16, int16_t)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(SINT_32, int32_t)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(SINT_64, int64_t)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(UINT_8, uint8_t)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(UINT_16, uint16_t)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(UINT_32, uint32_t)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(UINT_64, uint64_t)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(FLOAT_32, float)
-    IREE_WRITE_AS_ELEMENT_TYPE_CASE(FLOAT_64, double)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_8, int8_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_16, int16_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_32, int32_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_64, int64_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_8, uint8_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_16, uint16_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_32, uint32_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_64, uint64_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_32, float)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_64, double)
     default:
-      assert(false && "unhandled element type");
+      IREE_ASSERT(false, "unhandled element type");
+      break;
   }
 
-#undef IREE_WRITE_AS_ELEMENT_TYPE_CASE
+#undef IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE
 }
 
 // Writes an identity matrix, with matrix elements of the given |element_type|,
@@ -540,9 +541,9 @@ static void write_as_element_type(iree_hal_element_type_t element_type,
 // These identity matrices are useful in matrix multiplication tests to
 // generate testcases that are easy to debug numerically, as the identity
 // matrix is the neutral element for matrix multiplication.
-static void generate_identity_matrix(iree_hal_element_type_t element_type,
-                                     iree_byte_span_t span,
-                                     iree_hal_dim_t inner_size) {
+static void iree_trace_replay_generate_identity_matrix(
+    iree_hal_element_type_t element_type, iree_byte_span_t span,
+    iree_hal_dim_t inner_size) {
   iree_host_size_t element_byte_count =
       iree_hal_element_byte_count(element_type);
   uint8_t* data_end = span.data + span.data_length;
@@ -550,7 +551,7 @@ static void generate_identity_matrix(iree_hal_element_type_t element_type,
   iree_host_size_t outer_index = 0;
   for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
     int value = inner_index == outer_index ? 1 : 0;
-    write_as_element_type(element_type, value, data);
+    iree_trace_replay_write_element(element_type, value, data);
     ++inner_index;
     if (inner_index == inner_size) {
       inner_index = 0;
@@ -562,7 +563,7 @@ static void generate_identity_matrix(iree_hal_element_type_t element_type,
 // Simple deterministic pseudorandom generator.
 // Typically in tests we want reproducible results both across runs and across
 // machines.
-static uint8_t pseudorandom_uint8(uint32_t* state) {
+static uint8_t iree_trace_replay_pseudorandom_uint8(uint32_t* state) {
   // Same as C++'s std::minstd_rand.
   *state = (*state * 48271) % 2147483647;
   // return the second-least-signicant out of the 4 bytes of state. it avoids
@@ -574,7 +575,7 @@ static uint8_t pseudorandom_uint8(uint32_t* state) {
 // |element_type|. The given |seed| is passed to the pseudorandom generator.
 // The pseudorandom values are reproducible both across runs and across
 // machines.
-static void generate_fully_specified_pseudorandom_buffer(
+static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
     iree_hal_element_type_t element_type, iree_byte_span_t span,
     uint32_t seed) {
   const bool is_unsigned = iree_hal_element_numerical_type(element_type) ==
@@ -584,9 +585,9 @@ static void generate_fully_specified_pseudorandom_buffer(
   uint8_t* data_end = span.data + span.data_length;
   uint32_t state = seed;
   for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
-    int value_in_uint8_range = pseudorandom_uint8(&state);
+    int value_in_uint8_range = iree_trace_replay_pseudorandom_uint8(&state);
     int value = value_in_uint8_range + (is_unsigned ? 0 : -128);
-    write_as_element_type(element_type, value, data);
+    iree_trace_replay_write_element(element_type, value, data);
   }
 }
 
@@ -614,7 +615,8 @@ static iree_status_t iree_trace_replay_generate_hal_buffer(
   if (strcmp(contents_generator_node->tag, "!tag:iree:identity_matrix") == 0) {
     if (shape_size == 2) {
       iree_hal_dim_t inner_size = shape[shape_size - 1];
-      generate_identity_matrix(element_type, mapping.contents, inner_size);
+      iree_trace_replay_generate_identity_matrix(element_type, mapping.contents,
+                                                 inner_size);
     } else {
       status = iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
@@ -629,8 +631,8 @@ static iree_status_t iree_trace_replay_generate_hal_buffer(
         iree_yaml_node_as_string(contents_generator_node));
     uint32_t seed;
     if (iree_string_view_atoi_uint32(seed_str, &seed)) {
-      generate_fully_specified_pseudorandom_buffer(element_type,
-                                                   mapping.contents, seed);
+      iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
+          element_type, mapping.contents, seed);
     } else {
       status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "could not parse the seed argument ('%s') of "
@@ -710,8 +712,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
       iree_hal_device_allocator(replay->device),
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
       IREE_HAL_BUFFER_USAGE_ALL, allocation_size, &buffer));
-  iree_status_t status;
-  status = iree_trace_replay_generate_hal_buffer(
+  iree_status_t status = iree_trace_replay_generate_hal_buffer(
       replay, document, contents_generator_node, element_type, buffer, shape,
       shape_rank);
   if (!iree_status_is_ok(status)) {

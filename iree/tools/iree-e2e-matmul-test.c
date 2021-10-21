@@ -536,51 +536,6 @@ static iree_status_t copy_list_of_buffer_views(
   return iree_ok_status();
 }
 
-// Local debugging helper, not playing a role in the actual tests.
-// Conditionally based on an environment variable, introduces errors in |matrix|
-// to allow introducing artificial test failures, to test the test's failure
-// case handler.
-static iree_status_t simulate_error(iree_hal_buffer_view_t* matrix) {
-  const char* simulate_error_env =
-      portable_getenv("IREE_MATMUL_TEST_SIMULATE_ERROR");
-  if (!simulate_error_env) {
-    return iree_ok_status();
-  }
-  int error_row, error_col;
-  float error_value;
-  if (3 != sscanf(simulate_error_env, "%d:%d:%g", &error_row, &error_col,
-                  &error_value)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "could not parse the IREE_MATMUL_TEST_SIMULATE_ERROR environment "
-        "variable. Expected \"%%d:%%d:%%g\" for row:col:value. Got: \"%s\"",
-        simulate_error_env);
-  }
-  iree_hal_dim_t dims[2];
-  IREE_RETURN_IF_ERROR(get_matrix_buffer_view_shape(matrix, dims));
-  void* data;
-  IREE_RETURN_IF_ERROR(get_buffer_view_dense_row_major_data(matrix, &data));
-  iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(matrix);
-  int rows = dims[0];
-  int cols = dims[1];
-  if (error_row >= rows || error_col >= cols) {
-    return iree_ok_status();
-  }
-  int offset = error_row * cols + error_col;
-  switch (elem_type) {
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      ((float*)data)[offset] = error_value;
-      break;
-    case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      ((int32_t*)data)[offset] = error_value;
-      break;
-    default:
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "unhandled data type");
-  }
-  return iree_ok_status();
-}
-
 // Special handler for function calls in a e2e matmul test trace.
 // Assumes that all calls are to functions that take 3 inputs (lhs, rhs, acc)
 // and return the result of a matmul (lhs*rhs+acc).
@@ -627,9 +582,6 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   iree_hal_buffer_view_t* actual_result;
   IREE_RETURN_IF_ERROR(
       iree_get_buffer_view_list_item(output_list, 0, &actual_result));
-
-  // Allow simulating error, to exercise the test failure handling code.
-  IREE_RETURN_IF_ERROR(simulate_error(actual_result));
 
   // Allocate an expected_result buffer, with same shape as actual_result.
   iree_hal_buffer_view_t* expected_result;
