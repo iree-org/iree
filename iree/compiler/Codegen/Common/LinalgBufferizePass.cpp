@@ -767,8 +767,8 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
 
 template <typename TensorType>
 static MemRefType getMemrefTypeForTensor(TensorType tensorType,
-                                         ArrayRef<AffineMap> layout = {},
-                                         unsigned memorySpace = 0) {
+                                         Attribute layout = Attribute(),
+                                         Attribute memorySpace = nullptr) {
   return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
                          layout, memorySpace);
 }
@@ -907,7 +907,7 @@ static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
                                    Value resultBuffer) {
   auto memrefType = getMemrefTypeForTensor(
       reshapeOp.getSrcType(), {},
-      resultBuffer.getType().cast<MemRefType>().getMemorySpaceAsInt());
+      resultBuffer.getType().cast<MemRefType>().getMemorySpace());
   using ReverseReshapeOpTy = typename std::conditional<
       std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
       memref::ExpandShapeOp, memref::CollapseShapeOp>::type;
@@ -921,8 +921,8 @@ static Value getReverseOfCastOp(OpBuilder &b, tensor::CastOp castOp,
                                 Value resultBuffer) {
   auto memrefType = getMemrefTypeForTensor(
       castOp.source().getType().cast<RankedTensorType>(),
-      resultBuffer.getType().cast<MemRefType>().getAffineMaps(),
-      resultBuffer.getType().cast<MemRefType>().getMemorySpaceAsInt());
+      resultBuffer.getType().cast<MemRefType>().getLayout(),
+      resultBuffer.getType().cast<MemRefType>().getMemorySpace());
   return b.create<memref::CastOp>(castOp.getLoc(), memrefType, resultBuffer);
 }
 
@@ -1027,7 +1027,7 @@ static Value getAliasingBufferForResult(OpBuilder &b, tensor::CastOp castOp,
   Value resultTensor = castOp.dest();
   auto outputType = getMemrefTypeForTensor(
       resultTensor.getType().cast<RankedTensorType>(), {},
-      inputBuffer.getType().cast<MemRefType>().getMemorySpaceAsInt());
+      inputBuffer.getType().cast<MemRefType>().getMemorySpace());
   return b.create<memref::CastOp>(castOp.getLoc(), outputType, inputBuffer);
 }
 
@@ -1058,7 +1058,7 @@ static Value getAliasingBufferForReshapeResult(OpBuilder &b,
   // Create the reshape op.
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
   auto reshapeResultType = getMemrefTypeForTensor(
-      resultTensorType, {}, inputBufferType.getMemorySpaceAsInt());
+      resultTensorType, {}, inputBufferType.getMemorySpace());
   using ReshapeOpTy = typename std::conditional<
       std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
       memref::CollapseShapeOp, memref::ExpandShapeOp>::type;
