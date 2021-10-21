@@ -1057,8 +1057,7 @@ struct CombineSplatUpdateFromToFill : public OpRewritePattern<AsyncUpdateOp> {
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(
         updateOp, updateOp.result().getType(), updateOp.target(),
         updateOp.target_size(), updateOp.target_offset(), updateOp.target_end(),
-        updateOp.update_size(), splatOp.value(), updateOp.tied_operandsAttr(),
-        updateOp.affinityAttr());
+        updateOp.update_size(), splatOp.value(), updateOp.affinityAttr());
     return success();
   }
 };
@@ -1096,8 +1095,7 @@ struct CombineSliceUpdateFromToCopy : public OpRewritePattern<AsyncUpdateOp> {
         updateOp, updateOp.result().getType(), updateOp.target(),
         updateOp.target_size(), updateOp.target_offset(), updateOp.target_end(),
         sliceOp.source(), sliceOp.source_size(), sliceOp.source_offset(),
-        sliceOp.source_end(), sliceOp.result_size(),
-        updateOp.tied_operandsAttr(), updateOp.affinityAttr());
+        sliceOp.source_end(), sliceOp.result_size(), updateOp.affinityAttr());
     return success();
   }
 };
@@ -1138,8 +1136,7 @@ struct AsyncCopyFullSourceToUpdate : public OpRewritePattern<AsyncCopyOp> {
       rewriter.replaceOpWithNewOp<IREE::Stream::AsyncUpdateOp>(
           copyOp, copyOp.result().getType(), copyOp.target(),
           copyOp.target_size(), copyOp.target_offset(), copyOp.target_end(),
-          copyOp.source(), copyOp.source_size(), copyOp.tied_operandsAttr(),
-          copyOp.affinityAttr());
+          copyOp.source(), copyOp.source_size(), copyOp.affinityAttr());
       return success();
     }
     return failure();
@@ -1196,6 +1193,29 @@ void AsyncTransferOp::getCanonicalizationPatterns(
   results.insert<RedundantTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
   results.insert<MaterializeCOW<AsyncTransferOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.load
+//===----------------------------------------------------------------------===//
+
+void AsyncLoadOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  // TODO(benvanik): splat + load -> splat value.
+  // TODO(benvanik): clone + ex load -> slice (ranged) + load.
+  // TODO(benvanik): slice + ex load -> slice (ranged) + load.
+  // TODO(benvanik): value->transfer->load -> value->slice->transfer->load?
+  // TODO(benvanik): combine multiple loads from the same target if contiguous.
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.store
+//===----------------------------------------------------------------------===//
+
+void AsyncStoreOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  // TODO(benvanik): if value is a constant splat then turn into fill.
+  // TODO(benvanik): combine multiple stores to the same target if contiguous.
 }
 
 //===----------------------------------------------------------------------===//

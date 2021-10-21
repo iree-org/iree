@@ -92,6 +92,21 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims);
+inline ParseResult parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
+                                         OpAsmParser::OperandType &resultDim) {
+  SmallVector<OpAsmParser::OperandType, 1> resultDims;
+  if (failed(parseShapedTiedResult(parser, resultType, resultDims))) {
+    return failure();
+  }
+  resultDim = resultDims.front();
+  return success();
+}
+void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
+                           ValueRange resultDims);
+
+ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
     SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
     ArrayAttr &tiedOperands);
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
