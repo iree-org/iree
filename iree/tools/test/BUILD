@@ -41,7 +41,6 @@ iree_lit_test_suite(
     ],
     tags = [
         "hostonly",
-        "notap",  # Disabled due to b/203702082
     ],
 )
 

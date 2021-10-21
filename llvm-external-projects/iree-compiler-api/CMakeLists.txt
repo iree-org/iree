@@ -30,7 +30,6 @@ if(IREE_COMPILER_API_SUB_PROJECT)
   message(STATUS "Building iree-compiler-api as part of IREE")
   set(LLVM_MAIN_SRC_DIR "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm")
   set(LLVM_MAIN_BINARY_DIR "${IREE_BINARY_DIR}/third_party/llvm-project")
-  set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
 else()
   # Standalone build.
   message(STATUS "Building iree-compiler-api standalone")
@@ -42,7 +41,6 @@ else()
   set(IREE_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/iree")
   set(LLVM_MAIN_SRC_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/llvm-project/llvm")
   set(LLVM_MAIN_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/llvm")
-  set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
   set(LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/mlir-hlo")
   # Resources generated on windows must have valid version numbers.
   # See set_windows_version_resource_properties.
@@ -62,7 +60,11 @@ message(STATUS "iree-compiler-api Directories:
   LLVM_MAIN_BINARY_DIR = ${LLVM_MAIN_BINARY_DIR}
 ")
 
+# LLVM dependent project directories.
+set(LLD_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../lld)
+set(LLD_MAIN_BINARY_DIR ${LLVM_MAIN_BINARY_DIR}/tools/lld)
 set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir)
+set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
 
 # Configuration includes.
 include(${IREE_SOURCE_DIR}/build_tools/cmake/iree_third_party_cmake_options.cmake)
@@ -88,6 +90,8 @@ endmacro()
 
 add_system_include_hack(${LLVM_MAIN_SRC_DIR}/include)
 add_system_include_hack(${LLVM_MAIN_BINARY_DIR}/include)
+add_system_include_hack(${LLD_MAIN_SRC_DIR}/include)
+add_system_include_hack(${LLD_MAIN_BINARY_DIR}/include)
 add_system_include_hack(${MLIR_MAIN_SRC_DIR}/include)
 add_system_include_hack(${MLIR_MAIN_BINARY_DIR}/include)
 add_system_include_hack(${IREE_SOURCE_DIR})

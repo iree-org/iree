@@ -8,7 +8,7 @@
 
 ARG BAZEL_VERSION=3.7.1
 
-FROM gcr.io/iree-oss/util@sha256:40846b4aea5886af3250399d6adfdb3e1195a8b0177706bb0375e812d62dc49c AS install-bazel
+FROM gcr.io/iree-oss/util@sha256:c9691ba3cd4287cee61be42103888d7c6f02c44c7c7b7d30a3dca7fc73ee92cb AS install-bazel
 WORKDIR /install-bazel
 ARG BAZEL_VERSION
 

@@ -1,4 +1,4 @@
-// RUN: (iree-translate -iree-input-type=tosa -iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-run-trace --driver=vmvx iree/tools/test/iree-run-trace.yaml) | IreeFileCheck %s
+// RUN: (iree-translate -iree-input-type=tosa -iree-hal-target-backends=vmvx -iree-mlir-to-vm-bytecode-module %s | iree-run-trace --driver=vmvx "$(dirname %s)/iree-run-trace.yaml") | IreeFileCheck %s
 
 //      CHECK: --- CALL[module.simple_mul] ---
 // CHECK-NEXT: 4xf32=10 4 6 8
