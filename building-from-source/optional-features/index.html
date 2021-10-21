@@ -1182,7 +1182,7 @@ compilation on Linux with clang is supported. Other OS's and compilers are
 <div class="tabbed-set" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><label for="__tabbed_4_1">Linux and MacOS</label><div class="tabbed-content">
 <div class="highlight"><pre><span></span><code><span class="c1"># From the iree source directory.</span>
 <span class="nb">cd</span> integrations/tensorflow
-python ../../configure_bazel.py
+<span class="nv">CC</span><span class="o">=</span>clang <span class="nv">CXX</span><span class="o">=</span>clang python ../../configure_bazel.py
 bazel build iree_tf_compiler:importer-binaries
 </code></pre></div>
 </div>
@@ -1196,6 +1196,17 @@ bazel build iree_tf_compiler:importer-binaries
 </div>
 <p>Importer binaries can be found under <code>bazel-bin/iree_tf_compiler</code> and can
 be used from the command line if desired.</p>
+<details class="note" open="open"><summary>Note</summary><p>Bazel's default configuration tends to build almost everything twice,
+for reasons that can only be surmised to be based in some technically
+correct but practically challenged viewpoint. It is also incompatible with
+ccache and other mechanisms for performing less incremental work. It is
+recommended to address both of these with a <code>.bazelrc</code> file in your
+home directory:</p>
+<div class="highlight"><pre><span></span><code>build --disk_cache=/path/to/home/.bazelcache
+build --nodistinct_host_configuration
+</code></pre></div>
+<p>We can't set these for you because of other inscrutable reasons.</p>
+</details>
 <h3 id="iree">IREE<a class="headerlink" href="#iree" title="Permanent link">&para;</a></h3>
 <p>The main IREE build will embed binaries built above and enable additional
 Python APIs. Within the build, the binaries are symlinked, so can be
