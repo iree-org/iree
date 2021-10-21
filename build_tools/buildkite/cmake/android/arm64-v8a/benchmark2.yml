@@ -9,7 +9,7 @@
 steps:
   - label: "Build"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:478fd1790e2bcc788ca52a7e3d1e514de713e97847fc14e2d33abb05bc40a4f6 build_tools/cmake/build_android_benchmark.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:0981a75325547d1bd5771290287cb8ef09181c4c127972d17132405394478ffb build_tools/cmake/build_android_benchmark.sh"
       - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' -czvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz build-host/benchmark_suites"
       - "tar -czvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-android/iree/tools/iree-benchmark-module build-android-trace/iree/tools/iree-benchmark-module"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
