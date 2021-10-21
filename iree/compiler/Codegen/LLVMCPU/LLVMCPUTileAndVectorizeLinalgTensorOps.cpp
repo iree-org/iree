@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -72,72 +73,56 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  // First level of tiling patterns {
-  {
-    OwningRewritePatternList l1patterns(&getContext());
-    l1patterns.insert<TileWorkgroups>(
-        context,
-        linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder,
-               Operation *operation) -> SmallVector<Value, 4> {
-              return getTileSizes(builder, operation,
-                                  static_cast<unsigned>(TilingLevel::L1Tiles));
-            }),
-        linalg::LinalgTransformationFilter(
-            Identifier::get(getWorkgroupMarker(), context),
-            Identifier::get(getWorkgroupL1TileMarker(), context)));
+  // Assume there is a single op with a lowering config we use to drive the
+  // tiling decisions.
+  IREE::HAL::LoweringConfig config;
+  funcOp.walk([&](linalg::LinalgOp linalgOp) {
+    if (auto opConfig = getLoweringConfig(linalgOp)) {
+      if (opConfig) {
+        // Duplicate configurations.
+        if (config) return signalPassFailure();
+        config = opConfig;
+      }
+    }
+  });
 
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
+  // Query if first level of tiling is needed.
+  auto l1TileSizes = getTileSizes(config, 1);
+  if (!l1TileSizes.empty()) {
+    // First tile and fuse paralell loops.
+    OpBuilder builder(funcOp.getContext());
+    SmallVector<Operation *> computeOps;
+    SmallVector<TiledLoopInfo> tiledLoops;
+    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return signalPassFailure();
     }
-  }
+    linalg::LinalgOp consumerOp = dyn_cast<linalg::LinalgOp>(computeOps.back());
+    SmallVector<int64_t> consumerTileSize(
+        l1TileSizes.begin(),
+        l1TileSizes.begin() + consumerOp.getNumParallelLoops());
+    auto identityIndicesOrder =
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, consumerTileSize.size()));
+    FailureOr<linalg::TileLoopNest> tileLoopNest =
+        linalg::tileConsumerAndFuseProducers(
+            builder, consumerOp, consumerTileSize, identityIndicesOrder);
+    if (failed(tileLoopNest)) return signalPassFailure();
+    consumerOp->replaceAllUsesWith(tileLoopNest->getRootOpReplacementResults());
 
-  // Apply canoncalization
-  {
-    OwningRewritePatternList canonicalizationPatterns(&getContext());
-    linalg::populateLinalgTilingCanonicalizationPatterns(
-        canonicalizationPatterns);
-    memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                               context);
-    scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(canonicalizationPatterns)))) {
-      return signalPassFailure();
+    // Apply canoncalization
+    {
+      OwningRewritePatternList canonicalizationPatterns(&getContext());
+      linalg::populateLinalgTilingCanonicalizationPatterns(
+          canonicalizationPatterns);
+      memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
+                                                 context);
+      scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
-  }
 
-  // Second level of tiling patterns{
-  {
-    OwningRewritePatternList l2patterns(&getContext());
-    l2patterns.insert<TileWorkgroups>(
-        context,
-        linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder,
-               Operation *operation) -> SmallVector<Value, 4> {
-              return getTileSizes(
-                  builder, operation,
-                  static_cast<unsigned>(TilingLevel::VectorTiles));
-            }),
-        linalg::LinalgTransformationFilter(
-            Identifier::get(getWorkgroupL1TileMarker(), context),
-            Identifier::get(getVectorizeMarker(), context)));
-
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns)))) {
-      return signalPassFailure();
-    }
-  }
-  // Apply canoncalization
-  {
-    OwningRewritePatternList canonicalizationPatterns(&getContext());
-    linalg::populateLinalgTilingCanonicalizationPatterns(
-        canonicalizationPatterns);
-    memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                               context);
-    scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(canonicalizationPatterns)))) {
-      return signalPassFailure();
-    }
+    // TODO: Second tile reduction loops.
   }
 
   if (!lowerToVectors) {
@@ -151,7 +136,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
                                         linalg::CopyOp, linalg::FillOp>(
         vectorizationPatterns, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
-            Identifier::get(getVectorizeMarker(), context)));
+            Identifier::get(getWorkgroupMarker(), context)));
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorizationPatterns)))) {
       return signalPassFailure();
@@ -165,6 +150,18 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
                                                        context);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns));
+  }
+
+  // Apply vector unroll
+  {
+    RewritePatternSet vectorUnrollPatterns(context);
+    vector::populateVectorUnrollPatterns(
+        vectorUnrollPatterns, vector::UnrollVectorOptions().setNativeShape(
+                                  getNativeVectorSize(config)));
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(vectorUnrollPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   // Apply vector specific operation lowering.
