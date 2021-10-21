@@ -81,7 +81,7 @@ function(iree_run_binary_test)
   if (DEFINED _RULE_TEST_INPUT_FILE_ARG)
     if (ANDROID)
       get_filename_component(_TEST_INPUT_FILE_BASENAME "${_RULE_TEST_INPUT_FILE_ARG}" NAME)
-      list(APPEND _RULE_ARGS "${_ANDROID_REL_DIR}/${_TEST_INPUT_FILE_BASENAME}")
+      list(APPEND _RULE_ARGS "${_ANDROID_ABS_DIR}/${_TEST_INPUT_FILE_BASENAME}")
     else()
       list(APPEND _RULE_ARGS "${_RULE_TEST_INPUT_FILE_ARG}")
     endif()
@@ -113,7 +113,7 @@ function(iree_run_binary_test)
       _ENVIRONMENT_VARS
         "TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}"
         "TEST_EXECUTABLE=$<TARGET_FILE:${_TEST_BINARY_TARGET}>"
-        "DATA=${_DATA_SPACE_SEPARATED}"
+        "TEST_DATA=${_DATA_SPACE_SEPARATED}"
         "TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir"
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
