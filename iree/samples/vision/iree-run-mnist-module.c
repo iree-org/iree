@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
   }
   iree_string_view_t image_path;
   if (argc == 1) {
-    image_path = iree_make_cstring_view("iree/samples/vision/mnist_test.png");
+    image_path = iree_make_cstring_view("mnist_test.png");
   } else {
     image_path = iree_make_cstring_view(argv[1]);
   }

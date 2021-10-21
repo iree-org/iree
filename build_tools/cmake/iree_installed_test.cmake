@@ -28,6 +28,7 @@ function(iree_add_installed_test)
     ${ARGN}
   )
 
+
   add_test(
     NAME
       ${_RULE_TEST_NAME}
@@ -59,7 +60,7 @@ function(iree_add_installed_test)
 
   # Write the to the installed ctest file template.
   set(_installed_ctest_input_file
-      "${CMAKE_BINARY_DIR}/iree_installed_tests.cmake.in")
+        "${CMAKE_BINARY_DIR}/iree_installed_tests.cmake.in")
   get_property(_has_tests GLOBAL PROPERTY IREE_HAS_INSTALLED_TESTS)
   if(NOT _has_tests)
     # First time.

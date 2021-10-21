@@ -54,26 +54,9 @@ function(iree_lit_test)
 
   list(TRANSFORM _RULE_DATA REPLACE "^::" "${_PACKAGE_NS}::")
   set(_DATA_DEP_PATHS)
-  foreach(_DATA_LABEL ${_RULE_DATA})
-    string(REPLACE "::" "_" _DATA_TARGET ${_DATA_LABEL})
-    string(REPLACE "::" "/" _FILE_PATH ${_DATA_LABEL})
-    set(_INPUT_PATH "${PROJECT_SOURCE_DIR}/${_FILE_PATH}")
-    set(_OUTPUT_PATH "${PROJECT_BINARY_DIR}/${_FILE_PATH}")
-    if(EXISTS "${_INPUT_PATH}")
-      # Create a target which copies the data file into the build directory.
-      # If this file is included in multiple rules, only create the target once.
-      if(NOT TARGET ${_DATA_TARGET})
-        add_custom_target(
-          ${_DATA_TARGET} ALL
-          COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different ${_INPUT_PATH} ${_OUTPUT_PATH}
-        )
-      endif()
-      list(APPEND _DATA_DEP_PATHS "${_OUTPUT_PATH}")
-    else()
-      list(APPEND _DATA_DEP_PATHS "$<TARGET_FILE:${_DATA_TARGET}>")
-    endif()
-  endforeach()
+  foreach(_DATA_DEP ${_RULE_DATA})
+    list(APPEND _DATA_DEP_PATHS $<TARGET_FILE:${_DATA_DEP}>)
+  endforeach(_DATA_DEP)
 
   iree_package_ns(_PACKAGE_NS)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
@@ -95,26 +78,12 @@ function(iree_lit_test)
       # Note that the data deps are not bundled: must be externally on the path.
       bin/run_lit.${IREE_HOST_SCRIPT_EXT}
       ${_TEST_FILE_PATH}
-      ${_DATA_DEP_PATHS}
-    WORKING_DIRECTORY
-      "${PROJECT_SOURCE_DIR}"
   )
-  set_property(
-    TEST ${_NAME_PATH}
-    PROPERTY
-    REQUIRED_FILES
-      "${_TEST_FILE_PATH}"
-      "${_DATA_DEP_PATHS}"
-  )
+  set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
 
-  install(
-    FILES
-      "${_TEST_FILE_PATH}"
-      "${_DATA_DEP_PATHS}"
-    DESTINATION
-      "tests/${_PACKAGE_PATH}"
-    COMPONENT
-      Tests
+  install(FILES ${_TEST_FILE_PATH}
+    DESTINATION "tests/${_PACKAGE_PATH}"
+    COMPONENT Tests
   )
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
 endfunction()
