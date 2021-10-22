@@ -11,7 +11,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/EmitCTypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -43,20 +43,23 @@ struct VMAnalysis {
     return valueLiveness.isLastValueUse(ref, op);
   }
 
-  void cacheLocalRef(int64_t ordinal, Operation *op) {
-    assert(!localRefs.count(ordinal));
-    localRefs[ordinal] = op;
+  void cacheLocalRef(int64_t ordinal, emitc::ApplyOp &applyOp) {
+    assert(!refs.count(ordinal));
+    refs[ordinal] = applyOp.getOperation();
   }
 
-  Operation *lookupLocalRef(int64_t ordinal) {
-    assert(localRefs.count(ordinal));
-    return localRefs[ordinal];
+  emitc::ApplyOp lookupLocalRef(int64_t ordinal) {
+    assert(refs.count(ordinal));
+    Operation *op = refs[ordinal];
+    return cast<emitc::ApplyOp>(op);
   }
+
+  DenseMap<int64_t, Operation *> &localRefs() { return refs; }
 
  private:
   RegisterAllocation registerAllocation;
   ValueLiveness valueLiveness;
-  DenseMap<int64_t, Operation *> localRefs;
+  DenseMap<int64_t, Operation *> refs;
 };
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
