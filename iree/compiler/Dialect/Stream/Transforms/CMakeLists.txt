@@ -17,6 +17,7 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   SRCS
+    "OutlineConstants.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "VerifyLowerings.cpp"

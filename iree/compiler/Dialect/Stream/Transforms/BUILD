@@ -15,6 +15,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "OutlineConstants.cpp",
         "PassDetail.h",
         "Passes.cpp",
         "VerifyLowerings.cpp",

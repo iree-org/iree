@@ -68,6 +68,12 @@ void buildStreamOptimizationPassPipeline(
 void registerStreamTransformPassPipelines();
 
 //===----------------------------------------------------------------------===//
+// Optimizations
+//===----------------------------------------------------------------------===//
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass();
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 
