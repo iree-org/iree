@@ -207,7 +207,6 @@ bool TiedOpInterface::hasAnyTiedUses(Value value) {
 bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
   auto tiedOp = dyn_cast<TiedOpInterface>(op);
   if (!tiedOp) return false;
-  SmallVector<Value> results;
   auto tiedIndices = tiedOp.getTiedResultOperandIndices();
   for (unsigned i = 0; i < tiedIndices.size(); ++i) {
     if (tiedIndices[i] == operandIndex) {

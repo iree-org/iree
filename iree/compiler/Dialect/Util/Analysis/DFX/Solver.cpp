@@ -15,6 +15,15 @@ namespace mlir {
 namespace iree_compiler {
 namespace DFX {
 
+Solver::~Solver() {
+  // Cleanup all elements; since we allocated them from the bump ptr allocator
+  // they won't have their destructors called otherwise. Some elements may have
+  // their own out-of-band allocations (like DenseMap) that would get leaked.
+  for (auto it : elementMap) {
+    it.second->~AbstractElement();
+  }
+}
+
 LogicalResult Solver::run() {
   LLVM_DEBUG(llvm::dbgs() << "[Solver] identified and initialized "
                           << depGraph.syntheticRoot.deps.size()
