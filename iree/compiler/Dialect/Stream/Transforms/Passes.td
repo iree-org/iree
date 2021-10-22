@@ -22,6 +22,18 @@ def OutlineConstants :
 }
 
 //===----------------------------------------------------------------------===//
+// Conversion
+//===----------------------------------------------------------------------===//
+
+def ConvertToStream :
+    Pass<"iree-stream-conversion", "mlir::ModuleOp"> {
+  let summary = "Converts from flow/std/etc dialects into the stream dialect.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createConvertToStreamPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 

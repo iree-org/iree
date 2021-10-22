@@ -62,6 +62,38 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Perform cleanup after constnat simplification as more canonicalizers may be
   // able to kick in.
   addCleanupPatterns(passManager);
+
+  //----------------------------------------------------------------------------
+  // Conversion
+  //----------------------------------------------------------------------------
+
+  // Converts from all input dialects into various levels of the stream dialect.
+  // Tensor-like things go to stream.tensor.* ops while lower level buffer-like
+  // things will go to stream.async.* ops.
+  passManager.addPass(IREE::Stream::createConvertToStreamPass());
+
+  // No more tensor.*/etc ops are allowed. This is conservative - there may be
+  // a lot of ops we convert but this will catch the majority of stragglers.
+  passManager.addPass(IREE::Stream::createVerifyLoweringToTensorsPass());
+
+  //----------------------------------------------------------------------------
+  // Constant/variable optimization
+  //----------------------------------------------------------------------------
+
+  // Cleanup globals that were created during conversion.
+  addCleanupPatterns(passManager);
+
+  // Bring all initializers together so that we can schedule them.
+  passManager.addPass(IREE::Util::createCombineInitializersPass());
+
+  //----------------------------------------------------------------------------
+  // Stream affinity/assignment
+  //----------------------------------------------------------------------------
+
+  // TODO(benvanik): pin based on target backends here.
+  // TODO(benvanik): compute affinities for executables.
+  // TODO(benvanik): annotate all dispatches with preferred executable affinity.
+  // TODO(benvanik): DFA to specify all value affinities and pin dispatches.
 }
 
 //===----------------------------------------------------------------------===//

@@ -74,6 +74,12 @@ void registerStreamTransformPassPipelines();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass();
 
 //===----------------------------------------------------------------------===//
+// Conversion
+//===----------------------------------------------------------------------===//
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertToStreamPass();
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 

@@ -179,8 +179,8 @@ static bool materializeCOW(Location loc, Value rootValue, OpBuilder &builder) {
   // Mixed/multiple tied uses. Clone for each tied use but leave the untied
   // ones referencing us.
   IREE::Stream::AffinityAttr sourceAffinity;
-  if (auto affinityOp = dyn_cast_or_null<IREE::Stream::AffinityOpInterface>(
-          rootValue.getDefiningOp())) {
+  if (auto affinityOp =
+          rootValue.getDefiningOp<IREE::Stream::AffinityOpInterface>()) {
     sourceAffinity = affinityOp.getAffinity();
   }
   for (auto &tiedUse : tiedUses) {
@@ -326,8 +326,7 @@ struct SelectResourceSizeOp : public OpRewritePattern<ResourceSizeOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ResourceSizeOp op,
                                 PatternRewriter &rewriter) const override {
-    auto selectOp =
-        dyn_cast_or_null<mlir::SelectOp>(op.operand().getDefiningOp());
+    auto selectOp = op.operand().getDefiningOp<mlir::SelectOp>();
     if (!selectOp) return failure();
     auto trueSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
         op.getLoc(), selectOp.true_value(), op.affinityAttr());
@@ -503,8 +502,7 @@ struct PropagateResourcePackBaseOffset
 
     // Zero offsets don't do anything and can just be removed so we can avoid
     // inserting a bunch of additional IR.
-    if (auto constantOp = dyn_cast_or_null<arith::ConstantIndexOp>(
-            baseOffset.getDefiningOp())) {
+    if (auto constantOp = baseOffset.getDefiningOp<arith::ConstantIndexOp>()) {
       if (constantOp.value() == 0) {
         return success();
       }
@@ -951,8 +949,8 @@ struct PropagateClonableOps : public OpRewritePattern<AsyncCloneOp> {
   LogicalResult matchAndRewrite(AsyncCloneOp cloneOp,
                                 PatternRewriter &rewriter) const override {
     if (cloneOp.use_empty()) return failure();
-    auto sourceOp = dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(
-        cloneOp.source().getDefiningOp());
+    auto sourceOp =
+        cloneOp.source().getDefiningOp<IREE::Stream::StreamableOpInterface>();
     if (!sourceOp || !sourceOp.preferCloneToConsumers()) return failure();
     for (auto &use : llvm::make_early_inc_range(cloneOp.result().getUses())) {
       rewriter.setInsertionPoint(use.getOwner());
@@ -1003,8 +1001,7 @@ struct PropagateSplatsThroughSlices : public OpRewritePattern<AsyncSliceOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    auto splatOp = dyn_cast_or_null<IREE::Stream::AsyncSplatOp>(
-        sliceOp.source().getDefiningOp());
+    auto splatOp = sliceOp.source().getDefiningOp<IREE::Stream::AsyncSplatOp>();
     if (!splatOp) return failure();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
         sliceOp, sliceOp.result().getType(), splatOp.value(),
@@ -1088,8 +1085,8 @@ struct CombineSplatUpdateFromToFill : public OpRewritePattern<AsyncUpdateOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
-    auto splatOp = dyn_cast_or_null<IREE::Stream::AsyncSplatOp>(
-        updateOp.update().getDefiningOp());
+    auto splatOp =
+        updateOp.update().getDefiningOp<IREE::Stream::AsyncSplatOp>();
     if (!splatOp) return failure();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(
         updateOp, updateOp.result().getType(), updateOp.target(),
@@ -1120,8 +1117,8 @@ struct CombineSliceUpdateFromToCopy : public OpRewritePattern<AsyncUpdateOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
-    auto sliceOp = dyn_cast_or_null<IREE::Stream::AsyncSliceOp>(
-        updateOp.update().getDefiningOp());
+    auto sliceOp =
+        updateOp.update().getDefiningOp<IREE::Stream::AsyncSliceOp>();
     if (!sliceOp || sliceOp->getBlock() != updateOp->getBlock()) {
       // Source is not a slice or a slice from out-of-block. We don't want to
       // grow memory usage by sinking the slice here (we may slice into the
@@ -1194,8 +1191,7 @@ void AsyncCopyOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult AsyncTransferOp::fold(ArrayRef<Attribute> operands) {
-  if (auto sourceTransferOp =
-          dyn_cast_or_null<AsyncTransferOp>(source().getDefiningOp())) {
+  if (auto sourceTransferOp = source().getDefiningOp<AsyncTransferOp>()) {
     if (sourceTransferOp.source().getType() == result().getType() &&
         sourceTransferOp.source_affinity() == result_affinity()) {
       return sourceTransferOp.source();
@@ -1337,8 +1333,7 @@ struct ChainAsyncExecuteWaits : public OpRewritePattern<AsyncExecuteOp> {
     SmallVector<Value> newTimepoints;
     SmallVector<std::pair<unsigned, Value>> replacements;
     for (auto operand : llvm::enumerate(op.operands())) {
-      if (auto awaitOp = dyn_cast_or_null<TimepointAwaitOp>(
-              operand.value().getDefiningOp())) {
+      if (auto awaitOp = operand.value().getDefiningOp<TimepointAwaitOp>()) {
         newTimepoints.push_back(awaitOp.timepoint());
         replacements.push_back(std::make_pair(
             operand.index(), awaitOp.getTiedResultOperand(operand.value())));
@@ -1793,8 +1788,7 @@ struct ChainCmdExecuteWaits : public OpRewritePattern<CmdExecuteOp> {
     SmallVector<Value> newTimepoints;
     SmallVector<std::pair<unsigned, Value>> replacements;
     for (auto operand : llvm::enumerate(op.operands())) {
-      if (auto awaitOp = dyn_cast_or_null<TimepointAwaitOp>(
-              operand.value().getDefiningOp())) {
+      if (auto awaitOp = operand.value().getDefiningOp<TimepointAwaitOp>()) {
         newTimepoints.push_back(awaitOp.timepoint());
         replacements.push_back(std::make_pair(
             operand.index(), awaitOp.getTiedResultOperand(operand.value())));
@@ -2106,8 +2100,8 @@ struct SinkSubviewsAcrossAwaits : public OpRewritePattern<TimepointAwaitOp> {
     rewriter.startRootUpdate(op);
     bool didChange = false;
     for (auto operand : llvm::enumerate(op.operands())) {
-      auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
-          operand.value().getDefiningOp());
+      auto subviewOp =
+          operand.value().getDefiningOp<IREE::Stream::ResourceSubviewOp>();
       if (!subviewOp) continue;
       didChange = true;
       unsigned operandIdx = static_cast<unsigned>(operand.index());

@@ -99,7 +99,8 @@ inline ParseResult parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
   if (failed(parseShapedTiedResult(parser, resultType, resultDims))) {
     return failure();
   }
-  resultDim = resultDims.front();
+  assert(resultDims.size() == 1 && "requires one dim");
+  resultDim = std::move(resultDims.front());
   return success();
 }
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
@@ -120,6 +121,7 @@ inline ParseResult parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
                                    tiedOperands))) {
     return failure();
   }
+  assert(resultDims.size() == 1 && "requires one dim");
   resultDim = std::move(resultDims.front());
   return success();
 }
