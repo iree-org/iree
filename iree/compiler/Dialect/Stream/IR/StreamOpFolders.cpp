@@ -309,6 +309,43 @@ OpFoldResult ResourceSizeOp::fold(ArrayRef<Attribute> operands) {
   return sizeAwareType.findSizeValue(operand(), *this);
 }
 
+namespace {
+
+// Propagates resource sizes through select ops by selecting on the sizes of the
+// select operands.
+//
+// Example:
+//  %a = stream... : !stream.resource<*>{%a_sz}
+//  %b = stream... : !stream.resource<*>{%b_sz}
+//  %c = select %cond, %a, %b : !stream.resource<*>
+//  %c_sz = stream.resource.size %c : !stream.resource<*>
+// ->
+//  %c = select %cond, %a, %b : !stream.resource<*>
+//  %c_sz = select %cond, %a_sz, %b_sz : index
+struct SelectResourceSizeOp : public OpRewritePattern<ResourceSizeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ResourceSizeOp op,
+                                PatternRewriter &rewriter) const override {
+    auto selectOp =
+        dyn_cast_or_null<mlir::SelectOp>(op.operand().getDefiningOp());
+    if (!selectOp) return failure();
+    auto trueSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
+        op.getLoc(), selectOp.true_value(), op.affinityAttr());
+    auto falseSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
+        op.getLoc(), selectOp.false_value(), op.affinityAttr());
+    rewriter.replaceOpWithNewOp<mlir::SelectOp>(op, selectOp.condition(),
+                                                trueSize, falseSize);
+    return success();
+  }
+};
+
+}  // namespace
+
+void ResourceSizeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SelectResourceSizeOp>(context);
+}
+
 //===----------------------------------------------------------------------===//
 // stream.resource.map
 //===----------------------------------------------------------------------===//

@@ -200,6 +200,7 @@ def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
