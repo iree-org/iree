@@ -103,7 +103,7 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
 void buildStreamAsyncPassPipeline(OpPassManager &passManager,
                                   const TransformOptions &transformOptions) {
   //----------------------------------------------------------------------------
-  // Tensor lowering
+  // Tensor lowering and resource management
   //----------------------------------------------------------------------------
 
   // Lower stream.tensor.* ops to stream.async.* ops based on
@@ -114,6 +114,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       IREE::Stream::createEncodeTensorsPass());
   addCleanupPatterns(passManager);
 
+  // Materialize copy-on-write behavior with explicit stream.async.* ops.
   // This will insert a lot of copies, so follow it up with a pass that elides
   // ones that aren't needed. This is easier to verify than if there was one
   // pass attempting to do both. Note that copy-on-write materialization is
@@ -124,6 +125,12 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Stream::createMaterializeCopyOnWritePass());
   passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
+
+  // Refine lifetime of all resources across the module.
+  // We do this after scheduling execution so that we know how the resources
+  // move across devices. We do it before scheduling waves as lifetime doesn't
+  // change and it makes the IR cleaner.
+  passManager.addPass(IREE::Stream::createRefineUsagePass());
 }
 
 //===----------------------------------------------------------------------===//
