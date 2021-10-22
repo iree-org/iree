@@ -261,9 +261,8 @@ endfunction()
 #
 # Parameters:
 # NAME: name of test
-# SRCS: Test source file
+# SRCS: Test source file (single file only, despite name)
 # ARGS: Command line arguments to the Python source file.
-# DEPS: List of deps the test requires
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 # GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
@@ -276,8 +275,8 @@ function(iree_py_test)
   cmake_parse_arguments(
     _RULE
     "GENERATED_IN_BINARY_DIR"
-    "NAME"
-    "ARGS;DEPS;LABELS;SRCS"
+    "NAME;SRCS"
+    "ARGS;LABELS"
     ${ARGN}
   )
 
