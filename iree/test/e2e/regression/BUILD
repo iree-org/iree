@@ -131,7 +131,6 @@ iree_check_single_backend_test_suite(
     ],
     opt_flags = [
         "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=%d N0=8" % (4 if lhs_rhs_type == "i8" else 1),
-        "--iree-codegen-vectorize-linalg-mmt4d",
     ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
@@ -152,7 +151,6 @@ iree_check_single_backend_test_suite(
     ],
     opt_flags = [
         "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=%d N0=8" % (4 if lhs_rhs_type == "i8" else 1),
-        "--iree-codegen-vectorize-linalg-mmt4d",
     ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
