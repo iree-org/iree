@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/file_path.h"
