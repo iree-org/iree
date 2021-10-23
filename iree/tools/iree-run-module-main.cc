@@ -162,9 +162,12 @@ iree_status_t Run() {
 
   inputs.reset();
   outputs.reset();
+
+
   iree_vm_module_release(hal_module);
   iree_vm_module_release(input_module);
   iree_vm_context_release(context);
+  iree_hal_clear_buffer(FLAG_driver);
 
   if (FLAG_print_statistics) {
     IREE_IGNORE_ERROR(iree_hal_allocator_statistics_fprint(
@@ -173,6 +176,7 @@ iree_status_t Run() {
 
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);
+
   return iree_ok_status();
 }
 

@@ -55,6 +55,8 @@ iree_cc_library(
     "semaphore.h"
     "string_util.c"
     "string_util.h"
+    "buffer_caching.c"
+    "buffer_caching.h"
   DEPS
     iree::base
     iree::base::core_headers
