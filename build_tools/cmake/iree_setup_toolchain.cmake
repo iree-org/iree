@@ -20,13 +20,23 @@ endif()
 if(IREE_USE_LINKER)
   set(IREE_LINKER_FLAG "-fuse-ld=${IREE_USE_LINKER}")
 
-  iree_append("${IREE_LINKER_FLAG}"
+  # Depending on how the C compiler is invoked, it may trigger an unused
+  # argument warning about -fuse-ld, which can foul up compiler flag detection,
+  # causing false negatives. We lack a finer grained way to suppress such a
+  # thing, and this is deemed least bad.
+  iree_append("-Wno-unused-command-line-argument"
     CMAKE_REQUIRED_FLAGS
     CMAKE_EXE_LINKER_FLAGS
     CMAKE_MODULE_LINKER_FLAGS
     CMAKE_SHARED_LINKER_FLAGS
   )
 
+  iree_append("${IREE_LINKER_FLAG}"
+    CMAKE_REQUIRED_FLAGS
+    CMAKE_EXE_LINKER_FLAGS
+    CMAKE_MODULE_LINKER_FLAGS
+    CMAKE_SHARED_LINKER_FLAGS
+  )
   include(CheckCXXSourceCompiles)
   include(CheckCSourceCompiles)
   set(MINIMAL_SRC "int main() { return 0; }")
