@@ -24,12 +24,14 @@ if(IREE_USE_LINKER)
   # argument warning about -fuse-ld, which can foul up compiler flag detection,
   # causing false negatives. We lack a finer grained way to suppress such a
   # thing, and this is deemed least bad.
-  iree_append("-Wno-unused-command-line-argument"
-    CMAKE_REQUIRED_FLAGS
-    CMAKE_EXE_LINKER_FLAGS
-    CMAKE_MODULE_LINKER_FLAGS
-    CMAKE_SHARED_LINKER_FLAGS
-  )
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    iree_append("-Wno-unused-command-line-argument"
+      CMAKE_REQUIRED_FLAGS
+      CMAKE_EXE_LINKER_FLAGS
+      CMAKE_MODULE_LINKER_FLAGS
+      CMAKE_SHARED_LINKER_FLAGS
+    )
+  endif()
 
   iree_append("${IREE_LINKER_FLAG}"
     CMAKE_REQUIRED_FLAGS
