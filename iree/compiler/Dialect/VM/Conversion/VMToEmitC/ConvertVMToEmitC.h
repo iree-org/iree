@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/EmitCTypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -32,33 +33,33 @@ struct VMAnalysis {
     return registerAllocation.getMaxRefRegisterOrdinal() + 1;
   }
 
-  int getRefRegisterOrdinal(Value ref) {
-    auto originalRef = originalValue(ref);
-    assert(originalRef.getType().isa<IREE::VM::RefType>());
-    return registerAllocation.mapToRegister(originalRef).ordinal();
+  uint16_t getRefRegisterOrdinal(Value ref) {
+    assert(ref.getType().isa<IREE::VM::RefType>());
+    return registerAllocation.mapToRegister(ref).ordinal();
   }
 
   bool isLastValueUse(Value ref, Operation *op) {
-    auto originalRef = originalValue(ref);
-    assert(originalRef.getType().isa<IREE::VM::RefType>());
-    return valueLiveness.isLastValueUse(originalRef, op);
+    assert(ref.getType().isa<IREE::VM::RefType>());
+    return valueLiveness.isLastValueUse(ref, op);
   }
 
-  void remapValue(Value original, Value replacement) {
-    assert(original.getType().isa<IREE::VM::RefType>());
-    mapping[replacement] = original;
-    return;
+  void cacheLocalRef(int64_t ordinal, emitc::ApplyOp &applyOp) {
+    assert(!refs.count(ordinal));
+    refs[ordinal] = applyOp.getOperation();
   }
+
+  emitc::ApplyOp lookupLocalRef(int64_t ordinal) {
+    assert(refs.count(ordinal));
+    Operation *op = refs[ordinal];
+    return cast<emitc::ApplyOp>(op);
+  }
+
+  DenseMap<int64_t, Operation *> &localRefs() { return refs; }
 
  private:
   RegisterAllocation registerAllocation;
   ValueLiveness valueLiveness;
-  DenseMap<Value, Value> mapping;
-
-  Value originalValue(Value ref) {
-    auto ptr = mapping.find(ref);
-    return ptr == mapping.end() ? ref : ptr->second;
-  }
+  DenseMap<int64_t, Operation *> refs;
 };
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;

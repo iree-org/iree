@@ -32,7 +32,12 @@ vm.module @call_ops {
   }
 
   // Check passing refs as arguments doesn't alter values on the call site
-  vm.export @test_call_r_v_preserve_ref
+  // TODO(simon-camp): In the C target we run the DropCompilerHintsPass after
+  // ordinal allocation and vm to EmitC conversion to prevent constant folding
+  // of the tests during the lattter. This means we would need to add a pattern
+  // that inserts calls to `iree_vm_ref_retain` for operand/result pairs of the
+  // do_not_optimize op.
+  vm.export @test_call_r_v_preserve_ref attributes {emitc.exclude}
   vm.func @test_call_r_v_preserve_ref() {
     %ref = vm.const.ref.zero : !vm.buffer
     %unused = vm.const.ref.rodata @buffer : !vm.buffer
