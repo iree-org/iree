@@ -367,8 +367,9 @@ def Util_SizeAwareType : TypeInterface<"SizeAwareTypeInterface"> {
   let extraClassDeclaration = [{
     // Walks the SSA use-def chain to find the size of the type.
     // Returns nullptr if the size cannot be found or if it is defined after
-    // |forOp|.
-    static Value findSizeValue(Value resourceValue, Operation *forOp);
+    // {|block|, |insertionPoint|}.
+    static Value findSizeValue(Value resourceValue, Block *block,
+                               Block::iterator insertionPoint);
 
     // Returns an SSA value representing the byte size of |value| or nullptr
     // if not a sized value.
