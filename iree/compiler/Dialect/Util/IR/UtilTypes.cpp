@@ -325,7 +325,7 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
                                             Block::iterator insertionPoint) {
   // See if the value is produced by a size-aware op; we can just ask for the
   // size it has tied. Walking upward is always good as we know any size we find
-  // dominates |forOp|.
+  // dominates {|block|, |insertionPoint|}.
   SmallVector<Value> worklist;
   worklist.push_back(resourceValue);
   while (!worklist.empty()) {
@@ -422,7 +422,7 @@ ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
 Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
                                      Block::iterator insertionPoint) {
   // Look up the use-def chain: always safe, as any value we reach dominates
-  // |forOp| implicitly.
+  // {|block|, |insertionPoint|} implicitly.
   SmallVector<Value> worklist;
   worklist.push_back(shapedValue);
   while (!worklist.empty()) {
@@ -438,10 +438,10 @@ Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
     }
   }
 
-  // Look down the use-def chain: not safe at some point because we'll move
-  // past where |forOp| is dominated. This is often fine for a bit, though, as
-  // |forOp| may be a user of |shapedValue| and be able to provide the shape
-  // itself.
+  // Look down the use-def chain: not safe at some point because we'll move past
+  // where {|block|, |insertionPoint|} is dominated. This is often fine for a
+  // bit, though, as {|block|, |insertionPoint|} may be a user of |shapedValue|
+  // and be able to provide the shape itself.
   for (auto &use : shapedValue.getUses()) {
     if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(use.getOwner())) {
       auto dynamicDims =
