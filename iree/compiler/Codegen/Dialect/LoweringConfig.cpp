@@ -122,7 +122,7 @@ struct IREEFieldParser<std::string> {
 template <typename ContainerT>
 struct IREEFieldParser<
     ContainerT, std::enable_if_t<std::is_member_function_pointer<decltype(
-                                 &ContainerT::push_back)>::value,
+                                     &ContainerT::push_back)>::value,
                                  ContainerT>> {
   using ElementT = typename ContainerT::value_type;
   static FailureOr<ContainerT> parse(DialectAsmParser &parser) {
