@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -mlir-print-local-scope -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
 
 // Odd K that forbids vectorization.
 
@@ -74,16 +74,19 @@ hal.executable @batch_matmul_1x3x32 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @batch_matmul_1x3x32
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [4, 1, 1]}
-//           CHECK-SAME:   workgroup_size = [4 : index, 1 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%[[X]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[Z]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 1, 4], [1, 1, 1]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [4, 1, 1]>
+//      CHECK: hal.executable.entry_point public @batch_matmul_1x3x32
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [4 : index, 1 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP]]()[%[[X]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[Z]]
 
-//                CHECK: func @batch_matmul_1x3x32()
-//                CHECK:   linalg.batch_matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 1, 4], [1, 1, 1]]}
+//      CHECK: func @batch_matmul_1x3x32()
+//      CHECK:   linalg.batch_matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -149,14 +152,17 @@ hal.executable private @matmul_64x16 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @matmul_64x16
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [4, 1]}
-//           CHECK-SAME:   workgroup_size = [4 : index, 1 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%[[X]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[ONE]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 4], [1, 1]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [4, 1]>
+//      CHECK: hal.executable.entry_point public @matmul_64x16
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [4 : index, 1 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP]]()[%[[X]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[ONE]]
 
-//                CHECK: func @matmul_64x16()
-//                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 4], [1, 1]]}
+//      CHECK: func @matmul_64x16()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]

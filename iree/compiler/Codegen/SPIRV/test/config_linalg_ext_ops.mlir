@@ -1,5 +1,4 @@
-// RUN: iree-opt -split-input-file -mlir-print-local-scope -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
-
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
 hal.executable private @static_1d_sort  {
   hal.interface @io {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
@@ -34,8 +33,10 @@ hal.executable private @static_1d_sort  {
 
 // Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
-// CHECK-LABEL: hal.executable.entry_point public @static_1d_sort
-//  CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize"}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
+//       CHECK: hal.executable.entry_point public @static_1d_sort
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%{{.+}}: index, %{{.+}}: index, %{{.+}}: index):
 //  CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
@@ -43,7 +44,7 @@ hal.executable private @static_1d_sort  {
 
 //       CHECK: func @static_1d_sort()
 //       CHECK:   linalg_ext.sort
-//  CHECK-SAME:     lowering.config = {}
+//  CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -98,17 +99,20 @@ hal.executable private @static_3d_sort  {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @static_3d_sort
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute", workloadPerWorkgroup = [16, 1]}
-//           CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[DIV:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[X]]]
-//           CHECK-NEXT:   hal.return %[[DIV]], %[[Y]], %[[ONE]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 0, 16], [1, 0, 1]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [16, 1]>
+//      CHECK: hal.executable.entry_point public @static_3d_sort
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[DIV:.+]] = affine.apply #[[MAP]]()[%[[X]]]
+// CHECK-NEXT:   hal.return %[[DIV]], %[[Y]], %[[ONE]]
 
-//                CHECK: func @static_3d_sort()
-//                CHECK:   linalg_ext.sort
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 0, 16], [1, 0, 1]]}
+//      CHECK: func @static_3d_sort()
+//      CHECK:   linalg_ext.sort
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -144,18 +148,20 @@ hal.executable private @static_1d_fft_stage2  {
   }
 }
 
-// CHECK-LABEL: hal.executable.entry_point public @static_1d_fft_stage2
-//  CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute"
-//  CHECK-SAME:   workloadPerWorkgroup = [4]}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[4]{{\]}}, native_vector_size = []>
+//   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [4]>
+//       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %{{.+}}: index, %{{.+}}: index):
 //  CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-//  CHECK-NEXT:   %[[T:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%[[ARG0]]]
+//  CHECK-NEXT:   %[[T:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
 //  CHECK-NEXT:   hal.return %[[T]], %[[ONE]], %[[ONE]]
 
 //       CHECK: func @static_1d_fft_stage2()
 //       CHECK:   linalg_ext.fft
-//  CHECK-SAME:     lowering.config = {tileSizes = {{\[}}[4]]}
+//  CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -214,14 +220,16 @@ hal.executable private @static_3d_fft_stage3  {
 }
 
 
-// CHECK-LABEL: hal.executable.entry_point public @static_3d_fft_stage3
-//  CHECK-SAME:   translation.info = {passPipeline = "SPIRVDistribute"
-//  CHECK-SAME:   workloadPerWorkgroup = [8, 1, 1]}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 1, 8]{{\]}}, native_vector_size = []>
+//   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [8, 1, 1]>
+//       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index):
-//  CHECK-NEXT:   %[[T:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[ARG0]]]
+//  CHECK-NEXT:   %[[T:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
 //  CHECK-NEXT:   hal.return %[[T]], %[[ARG1]], %[[ARG2]]
 
 //       CHECK: func @static_3d_fft_stage3()
 //       CHECK:   linalg_ext.fft
-//  CHECK-SAME:     lowering.config = {tileSizes = {{\[}}[1, 1, 8]]}
+//  CHECK-SAME:     lowering.config = #[[CONFIG]]

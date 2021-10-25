@@ -13,7 +13,9 @@
 #include <array>
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {

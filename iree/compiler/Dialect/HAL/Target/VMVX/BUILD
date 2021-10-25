@@ -30,6 +30,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",

@@ -1,6 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-tile-and-distribute))))' %s | IreeFileCheck %s
 
-#config = {tileSizes = [[2, 256, 4]]}
+#config = #iree_codegen.lowering.config<tile_sizes = [[2, 256, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [256, 2]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #map0 = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
@@ -12,7 +13,7 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
   hal.executable.entry_point @dot_dispatch_0 attributes {
     interface = @legacy_io,
     ordinal = 0 : index,
-    translation.info = {passPipeline = "LLVMGPUMatmulSimt" : i32, workloadPerWorkgroup = [256, 2]},
+    translation.info = #translation,
     workgroup_size = [64 : index, 1 : index, 1 : index]}
   builtin.module  {
     builtin.func @dot_dispatch_0() {
@@ -86,14 +87,15 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
 
 // -----
 
-#config = {tileSizes = [[]]}
+#config = #iree_codegen.lowering.config<tile_sizes = [[]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = []>
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
 hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @predict_dispatch_153 attributes {
       interface = @io,
       ordinal = 0 : index,
-      translation.info = {passPipeline = "LLVMGPUVectorize" : i32},
+      translation.info = #translation,
       workgroup_size = [1: index, 1: index, 1: index]}
     builtin.module  {
       builtin.func @predict_dispatch_153() {
@@ -120,7 +122,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
     }
   }
 }
-//      CHECK: #[[CONFIG:.+]] = {tileSizes = {{\[}}[]{{\]}}}
+//      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[]{{\]}}, native_vector_size = []>
 //      CHECK: hal.executable public @reduction_dispatch
 //      CHECK: linalg.fill
 // CHECK-SAME:     lowering.config = #[[CONFIG]]

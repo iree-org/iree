@@ -8,6 +8,7 @@
 
 #include <cstdlib>
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
@@ -110,6 +111,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
+    registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(

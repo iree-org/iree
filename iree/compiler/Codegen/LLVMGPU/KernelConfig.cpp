@@ -8,7 +8,7 @@
 
 #include <numeric>
 
-#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
@@ -100,7 +100,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   }
   // Currently just a basic tile size to enable tiling and vectorization.
   // TODO: pick a more efficient tile size and tile at subgroup level.
-  SmallVector<int64_t, 4> ts;
+  SmallVector<int64_t> ts;
   // Tile all the higher parallel dimension with a size of 1 and the 2 most
   // inner dimension with the tileX/tileY size.
   ts.append(op.getNumParallelLoops() - 2, 1);
@@ -110,14 +110,14 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   tileSizes.push_back(ts);  // Workgroup level.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt,
       workgroupSize);
 }
 
 static LogicalResult setFftConfig(FuncOp entryPoint, linalg_ext::FftOp op) {
   auto partitionedLoops = getPartitionedLoops(op);
   unsigned loopDepth = partitionedLoops.back() + 1;
-  SmallVector<int64_t, 4> workgroupTileSize(loopDepth, 0);
+  SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
   SmallVector<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
 
   // Tiling along partitioned loops with size 1.
@@ -137,14 +137,14 @@ static LogicalResult setFftConfig(FuncOp entryPoint, linalg_ext::FftOp op) {
   TileSizesListType tileSizes = {workgroupTileSize};
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
       workgroupSize);
 }
 
 // Basic default properties for linalg ops that haven't been tuned.
 static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
-  IREE::HAL::DispatchLoweringPassPipeline passPipeline =
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute;
+  IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
   SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
   if (partitionedLoops.empty()) {
@@ -210,43 +210,34 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize, workgroupSize);
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize,
+      workgroupSize);
 }
 
 /// Propagate the configuration annotated in the incoming IR.
-static LogicalResult setUserConfig(FuncOp entryPointFn, Operation *computeOp,
-                                   IREE::HAL::LoweringConfig config) {
-  IREE::HAL::DispatchLoweringPassPipeline passPipeline =
-      IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUVectorize;
-  if (auto setPassPipeline = getLoweringPassPipeline(config)) {
-    passPipeline = setPassPipeline.getValue();
+static LogicalResult setUserConfig(
+    FuncOp entryPointFn, Operation *computeOp,
+    IREE::Codegen::CompilationInfoAttr compilationInfo) {
+  if (auto translationInfo = getTranslationInfo(entryPointFn)) {
+    return computeOp->emitOpError(
+        "multiple ops within dispatch trying to set the translation "
+        "info");
   }
-  SmallVector<int64_t, 4> workgroupSize;
-  if (auto workgroupSizeAttr = config.workgroupSize()) {
-    workgroupSize = llvm::to_vector<4>(
-        llvm::map_range(workgroupSizeAttr, [](Attribute intAttr) {
-          return intAttr.cast<IntegerAttr>().getInt();
-        }));
-  }
-  if (failed(setOpConfigAndEntryPointFnTranslation(
-          entryPointFn, computeOp, config, passPipeline, workgroupSize))) {
-    return failure();
-  }
-  // Reset the op configuration to drop the pass-pipeline and workgroup size
-  // info. The op does not carry that information anymore.
-  auto resetConfig = IREE::HAL::LoweringConfig::get(
-      config.tileSizes(), config.nativeVectorSize(),
-      /*passPipeline =*/nullptr,
-      /*workgroupSize =*/nullptr, computeOp->getContext());
-  setLoweringConfig(computeOp, resetConfig);
+
+  SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
+  setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
+                     workgroupSize);
+  setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
+  eraseCompilationInfo(computeOp);
   return success();
 }
 
 static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
-  if (IREE::HAL::LoweringConfig config = getLoweringConfig(computeOp)) {
+  if (IREE::Codegen::CompilationInfoAttr compilationInfo =
+          getCompilationInfo(computeOp)) {
     // If the op already has a lowering config coming from the IR use this and
     // bypass the heuristic.
-    return setUserConfig(entryPointFn, computeOp, config);
+    return setUserConfig(entryPointFn, computeOp, compilationInfo);
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp) &&
@@ -294,8 +285,9 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // anything. Without any compute ops, this shouldnt be using tile and
       // distribute.
       setTranslationInfo(
-          funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          workgroupSize, workloadPerWorkgroup);
+          funcOp,
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+          workloadPerWorkgroup, workgroupSize);
       continue;
     }
 
@@ -330,8 +322,9 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // anything. Without any compute ops, this shouldnt be using tile and
       // distribute.
       setTranslationInfo(
-          funcOp, IREE::HAL::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          {1, 1, 1}, /*workloadPerWorkgroup=*/{});
+          funcOp,
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+          /*workloadPerWorkgroup=*/{}, {1, 1, 1});
       continue;
     }
     if (failed(setRootConfig(funcOp, rootOperation))) continue;
@@ -342,7 +335,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     // and distributed. The rest of the compilation must be structured to either
     // use `TileAndFuse` or they are independent configurations that are
     // determined based on the op.
-    IREE::HAL::LoweringConfig config = getLoweringConfig(rootOperation);
+    IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOperation);
     for (auto op : computeOps) {
       if (op == rootOperation) continue;
       setLoweringConfig(op, config);

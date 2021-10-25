@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -78,9 +79,8 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     l1patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder,
-               Operation *operation) -> SmallVector<Value, 4> {
-              return getTileSizes(builder, operation,
+            [](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
+              return getTileSizes(builder, op,
                                   static_cast<unsigned>(TilingLevel::L1Tiles));
             }),
         linalg::LinalgTransformationFilter(
@@ -112,11 +112,9 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     l2patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder,
-               Operation *operation) -> SmallVector<Value, 4> {
+            [](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
               return getTileSizes(
-                  builder, operation,
-                  static_cast<unsigned>(TilingLevel::VectorTiles));
+                  builder, op, static_cast<unsigned>(TilingLevel::VectorTiles));
             }),
         linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupL1TileMarker(), context),

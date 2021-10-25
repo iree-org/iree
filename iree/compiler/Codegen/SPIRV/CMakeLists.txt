@@ -71,6 +71,7 @@ iree_cc_library(
     MLIRVectorInterfaces
     MLIRVectorToSPIRV
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

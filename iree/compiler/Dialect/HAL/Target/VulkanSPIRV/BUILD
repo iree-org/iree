@@ -31,6 +31,7 @@ cc_library(
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/SPIRV",
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/Flow/IR",

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -mlir-print-local-scope -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
 
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 256)>
@@ -100,18 +100,21 @@ hal.executable public @matmul_256x1024x128_div_sub {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @matmul_256x1024x128_div_sub
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorizeToCooperativeOps", workloadPerWorkgroup = [16, 16]}
-//           CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[Y]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[C1]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[16, 16, 16], [16, 16, 16]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorizeToCooperativeOps", workload_per_wg = [16, 16]>
+//      CHECK: hal.executable.entry_point public @matmul_256x1024x128_div_sub
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[C1]]
 
-//                CHECK: func @matmul_256x1024x128_div_sub()
-//                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[16, 16, 16], [16, 16, 16]]}
+//      CHECK: func @matmul_256x1024x128_div_sub()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -194,5 +197,6 @@ hal.executable public @matmul_256x1024x8 {
   }
 }
 
-// CHECK-LABEL: hal.executable.entry_point public @matmul_256x1024x8
-//  CHECK-SAME:   passPipeline = "SPIRVVectorize"
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize"
+//       CHECK: hal.executable.entry_point public @matmul_256x1024x8
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]

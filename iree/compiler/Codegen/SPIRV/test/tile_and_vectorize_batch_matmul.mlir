@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8, 1]>
 hal.executable private @batch_matmul_static_shape  {
   hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -12,7 +12,7 @@ hal.executable private @batch_matmul_static_shape  {
     hal.executable.entry_point @batch_matmul_static_shape attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8, 1]}
+      translation.info = #translation
     }
     builtin.module {
       func @batch_matmul_static_shape() {
@@ -370,8 +370,8 @@ hal.executable private @batch_matmul_static_shape  {
 
 // -----
 
-#config = {tileSizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8, 1]>
 hal.executable private @fused_fill_batch_matmul  {
   hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -382,7 +382,7 @@ hal.executable private @fused_fill_batch_matmul  {
     hal.executable.entry_point @fused_fill_batch_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8, 1]}
+      translation.info = #translation
     }
     builtin.module {
       func @fused_fill_batch_matmul() {

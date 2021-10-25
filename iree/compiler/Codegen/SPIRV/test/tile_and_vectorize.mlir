@@ -8,7 +8,8 @@
 #map5 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-#config = {tileSizes = [[8, 16], [1, 1], [0, 0, 1]]}
+#config = #iree_codegen.lowering.config<tile_sizes = [[8, 16], [1, 1], [0, 0, 1]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [8, 16]>
 
 hal.executable private @matmul  {
   hal.interface @io {
@@ -20,7 +21,7 @@ hal.executable private @matmul  {
     hal.executable.entry_point @matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 8: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [8, 16]}
+      translation.info = #translation
     }
     builtin.module {
       func @matmul() {
@@ -82,8 +83,8 @@ hal.executable private @matmul  {
 
 // -----
 
-#config = {tileSizes = [[1, 4, 32], [1, 1, 1]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[1, 4, 32], [1, 1, 1]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4, 1]>
 hal.executable private @conv_1d  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -94,7 +95,7 @@ hal.executable private @conv_1d  {
     hal.executable.entry_point @conv_1d attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 4: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
+      translation.info = #translation
     }
     builtin.module {
       func @conv_1d() {
@@ -165,8 +166,8 @@ hal.executable private @conv_1d  {
 #map6 = affine_map<(d0)[s0] -> (4, -d0 + s0)>
 #map7 = affine_map<(d0)[s0] -> (32, -d0 + s0)>
 
-#config = {tileSizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4, 1]>
 hal.executable private @conv_no_padding  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -177,7 +178,7 @@ hal.executable private @conv_no_padding  {
     hal.executable.entry_point @conv_no_padding attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 4: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
+      translation.info = #translation
     }
     builtin.module {
       func @conv_no_padding() {
@@ -292,8 +293,8 @@ hal.executable private @conv_no_padding  {
 
 // -----
 
-#config = {tileSizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4, 1]>
 hal.executable private @conv_3d  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -304,7 +305,7 @@ hal.executable private @conv_3d  {
     hal.executable.entry_point @conv_3d attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 4: index, 1: index],
-      translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
+      translation.info = #translation
     }
     builtin.module {
       func @conv_3d() {
@@ -365,8 +366,8 @@ hal.executable private @conv_3d  {
 #map6 = affine_map<()[s0] -> (32, s0 * -32 + 13)>
 #map7 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1092 + s0 + d1 * 78 + d2 * 6 + d3)>
 
-#config = {tileSizes = [[1, 4, 32], [1, 1, 1]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[1, 4, 32], [1, 1, 1]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4, 1]>
 module  {
   hal.executable private @pooling_nhwc_max  {
     hal.interface @io {
@@ -378,7 +379,7 @@ module  {
       hal.executable.entry_point @pooling_nhwc_max attributes {
         interface = @io, ordinal = 0 : index,
         workgroup_size = [32: index, 4: index, 1: index],
-        translation.info = {passPipeline = 6 : i32, workloadPerWorkgroup = [32, 4, 1]}
+        translation.info = #translation
       }
       builtin.module {
         func @pooling_nhwc_max() {

@@ -59,10 +59,11 @@ hal.executable private @matmul_tensors  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}{{\[}}{{\]}}, [32, 32, 32], [4, 4, 4]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [32, 32, 32], [4, 4, 4]{{\]}}, native_vector_size = [4, 4, 4]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [64, 64]>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point public @matmul_tensors
-// CHECK-SAME:   translation.info = {passPipeline = "CPUTensorToVectors", workloadPerWorkgroup = [64, 64]}
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -118,11 +119,10 @@ hal.executable private @add_no_config  {
     }
   }
 }
-
-//       CHECK:  #[[CONFIG:[a-zA-Z]+]] = {passPipeline = "CPUDefault"}
-//       CHECK:  hal.executable private @add_no_config
-//       CHECK:  hal.executable.entry_point public @add_no_config
-//  CHECK-SAME:      translation.info = #[[CONFIG]]
+//      CHECK:  #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//      CHECK:  hal.executable private @add_no_config
+//      CHECK:  hal.executable.entry_point public @add_no_config
+// CHECK-SAME:      translation.info = #[[TRANSLATION]]
 
 // -----
 
@@ -192,9 +192,10 @@ hal.executable private @add  {
     }
   }
 }
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64]>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //      CHECK: hal.executable.entry_point public @add
-// CHECK-SAME:   translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64]}
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -296,8 +297,9 @@ hal.executable private @add4D  {
     }
   }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 64]>
 //      CHECK: hal.executable.entry_point public @add4D
-// CHECK-SAME:   translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64, 64]}
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]: index)
@@ -378,8 +380,9 @@ hal.executable private @batch_matmul_tensors  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [1, 4, 4, 4], tileSizes = {{\[}}[], [1, 32, 32, 32], [1, 4, 4, 4]{{\]}}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [1, 32, 32, 32], [1, 4, 4, 4]{{\]}}, native_vector_size = [1, 4, 4, 4]>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.entry_point public @batch_matmul_tensors
 // CHECK-NEXT: (%[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: index
@@ -393,6 +396,10 @@ hal.executable private @batch_matmul_tensors  {
 
 // -----
 
+#compilation = #iree_codegen.compilation.info<
+    #iree_codegen.lowering.config<tile_sizes = [[32, 32, 32]], native_vector_size = []>,
+    #iree_codegen.translation.info<"CPUVectorization", workload_per_wg = [32, 32]>,
+    workgroup_size = []>
 hal.executable private @preset_config_matmul_tensors  {
   hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @preset_config attributes {interface = @io, ordinal = 0 : index}
@@ -427,7 +434,11 @@ hal.executable private @preset_config_matmul_tensors  {
             %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 512, s0)>(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
             %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {passPipeline = "CPUVectorization", tileSizes = [[32, 32, 32]]}} ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %17 = linalg.matmul {
+                 __internal_linalg_transform__ = "workgroup",
+                 compilation.info = #compilation}
+                 ins(%8, %10 : tensor<?x256xf32>, tensor<256x?xf32>)
+                 outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:128x512xf32>
           }
         }
@@ -441,11 +452,12 @@ hal.executable private @preset_config_matmul_tensors  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = {passPipeline = "CPUVectorization", tileSizes = {{\[}}[32, 32, 32]{{\]}}}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[32, 32, 32]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUVectorization", workload_per_wg = [32, 32]>
 //      CHECK: hal.executable.entry_point
-// CHECK-SAME:     translation.info = {passPipeline = "CPUVectorization", workloadPerWorkgroup = [32, 32]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:     %[[NWG_X:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
@@ -511,9 +523,10 @@ hal.executable @tensor_insert {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:   translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64]}
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -548,12 +561,11 @@ hal.executable private @static_1d_fft_stage2  {
     }
   }
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[64]]}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64]{{\]}}, native_vector_size = []>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
-//  CHECK-SAME:   translation.info = {
-//  CHECK-SAME:     passPipeline = "CPUDefault"
-//  CHECK-SAME:     workloadPerWorkgroup = [64]}
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index):
 //  CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-NEXT:   %[[T0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
@@ -620,12 +632,11 @@ hal.executable private @static_3d_fft_stage3  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = {tileSizes = {{\[}}[64, 64, 64]]}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64, 64]{{\]}}, native_vector_size = []>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 64]>
 //       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
-//  CHECK-SAME:   translation.info = {
-//  CHECK-SAME:     passPipeline = "CPUDefault"
-//  CHECK-SAME:   workloadPerWorkgroup = [64, 64, 64]}
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //  CHECK-NEXT: ^{{.+}}(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index):
 //  CHECK-NEXT:   %[[T0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //  CHECK-NEXT:   %[[T1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
@@ -700,8 +711,9 @@ hal.executable private @outs_fusion {
     }
   }
 }
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.entry_point public @outs_fusion_fn
-// CHECK-SAME:   translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64]}
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
 
 // -----
 
@@ -768,9 +780,10 @@ hal.executable private @conv {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 64]>
 //      CHECK: hal.executable.entry_point public @conv attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64, 64]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]
 //  CHECK-DAG:     %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]
@@ -844,8 +857,9 @@ hal.executable private @conv_static {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 32]>
 //      CHECK: hal.executable.entry_point public @conv_static attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 64, 32]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]
 //  CHECK-DAG:     %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]
@@ -902,8 +916,9 @@ hal.executable private @generic_static {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [32, 8]>
 //      CHECK: hal.executable.entry_point public @generic_static attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [32, 8]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]
@@ -960,11 +975,12 @@ hal.executable private @matmul_static {
     }
   }
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = {nativeVectorSize = [4, 4, 4], tileSizes = {{\[}}[], [28, 8, 24], [4, 4, 4]{{\]}}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [28, 8, 24], [4, 4, 4]{{\]}}, native_vector_size = [4, 4, 4]>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 28)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [8, 28]>
 //       CHECK: hal.executable.entry_point public @matmul_static attributes
-//  CHECK-SAME:     translation.info = {passPipeline = "CPUTensorToVectors", workloadPerWorkgroup = [8, 28]}
+//  CHECK-SAME:     translation.info = #[[TRANSLATION]]
 //  CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
@@ -1035,8 +1051,9 @@ hal.executable private @restrict_num_workgroups {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 8, 4]>
 //       CHECK: hal.executable.entry_point public @restrict_num_workgroups attributes
-//  CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64, 8, 4]}
+//  CHECK-SAME:     translation.info = #[[TRANSLATION]]
 //  CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //   CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //   CHECK-DAG:     %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
@@ -1074,9 +1091,10 @@ hal.executable private @test_exp_0 {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_0 attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
@@ -1113,9 +1131,10 @@ hal.executable private @test_exp_1 {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECk-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_1 attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
@@ -1152,9 +1171,10 @@ hal.executable private @test_exp_2 {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_2 attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
@@ -1191,9 +1211,10 @@ hal.executable private @test_exp_3 {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_3 attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
@@ -1230,9 +1251,10 @@ hal.executable private @test_exp_4 {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_4 attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
@@ -1269,9 +1291,10 @@ hal.executable private @test_exp_5 {
     }
   }
 }
-//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_5 attributes
-// CHECK-SAME:     translation.info = {passPipeline = "CPUDefault", workloadPerWorkgroup = [64]}
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
