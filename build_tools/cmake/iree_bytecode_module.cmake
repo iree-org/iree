@@ -107,7 +107,7 @@ function(iree_bytecode_module)
   list(APPEND _ARGS "${_TRANSLATE_SRC_PATH}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_MODULE_FILE_NAME}")
-  list(APPEND _ARGS "-iree-llvm-embedded-linker-path=${_EMBEDDED_LINKER_TOOL_EXECUTABLE}")
+  list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_EMBEDDED_LINKER_TOOL_EXECUTABLE}\"")
 
   # Depending on the binary instead of the target here given we might not have
   # a target in this CMake invocation when cross-compiling.

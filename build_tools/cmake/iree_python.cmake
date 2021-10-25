@@ -220,7 +220,7 @@ function(iree_pyext_module)
   if(UNIX AND NOT APPLE)  # Apple does not support linker scripts.
     if(ARG_UNIX_LINKER_SCRIPT)
       set_target_properties(${_NAME} PROPERTIES LINK_FLAGS
-        "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/${ARG_UNIX_LINKER_SCRIPT}")
+        "-Wl,--version-script=\"${CMAKE_CURRENT_SOURCE_DIR}/${ARG_UNIX_LINKER_SCRIPT}\"")
     endif()
   endif()
 endfunction()
