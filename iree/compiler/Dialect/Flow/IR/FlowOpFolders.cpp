@@ -697,7 +697,8 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
       return success();
     }
 
-    auto dynamicDims = IREE::Util::findDynamicDims(op.source(), op);
+    auto dynamicDims = IREE::Util::findDynamicDims(
+        op.source(), op->getBlock(), Block::iterator(op.getOperation()));
     if (!dynamicDims.hasValue()) {
       return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");
     }

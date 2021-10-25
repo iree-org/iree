@@ -171,8 +171,9 @@ void excludeTiedOperandAndResultIndices(
 
 // Walks the SSA use-def chain to find the dynamic dimensions of the value.
 // Returns None if the shape cannot be found or if it is defined after
-// |forOp|.
-Optional<ValueRange> findDynamicDims(Value shapedValue, Operation *forOp);
+// {|block|, |insertionPoint|}.
+Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
+                                     Block::iterator insertionPoint);
 
 // Returns the dynamic dimensions for the value at |idx|.
 ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
