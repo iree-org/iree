@@ -148,6 +148,13 @@ function(iree_single_backend_generated_trace_runner_test)
     return()
   endif()
 
+  # Traces are YAML files and we assume that PyYAML is required. See the
+  # warning that is emitted in aggregate in the main CMakeLists.txt if this
+  # is not true.
+  if(NOT IREE_PYYAML_FOUND)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -183,7 +190,7 @@ function(iree_single_backend_generated_trace_runner_test)
 
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
-  
+
   set(_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.mlir")
 
   set(_GENERATOR_OUTPUT "${_SRC}")
