@@ -71,9 +71,12 @@ def IREECodegen_TranslationInfoAttr :
       does the entire `workload`.
 
   }];
-  let assemblyFormat = [{
-    `<` $passPipeline `,` `workload_per_wg` `=` $workloadPerWorkgroup `>`
-  }];
+
+  // TODO(ravishankarm): Commented out till patch D111594 lands.
+  // let assemblyFormat = [{
+  //   `<` $passPipeline `,` `workload_per_wg` `=` $workloadPerWorkgroup `>`
+  // }];
+
   let parameters = (ins
     AttrParameter<"StringAttr", "">:$passPipeline,
     AttrParameter<"ArrayAttr", "">:$workloadPerWorkgroup
@@ -110,9 +113,12 @@ def IREECodegen_LoweringConfigAttr :
     the pipeline.
 
   }];
-  let assemblyFormat = [{
-    `<` `tile_sizes` `=` $tileSizes `,` `native_vector_size` `=` $nativeVectorSize `>`
-  }];
+
+  // TODO(ravishankarm): Commented out till patch D111594 lands.
+  // let assemblyFormat = [{
+  //   `<` `tile_sizes` `=` $tileSizes `,` `native_vector_size` `=` $nativeVectorSize `>`
+  // }];
+
   let parameters = (ins
     AttrParameter<"ArrayAttr", "">:$tileSizes,
     AttrParameter<"ArrayAttr", "">:$nativeVectorSize
@@ -161,9 +167,12 @@ def IREECodegen_CompilationInfoAttr :
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
     AttrParameter<"ArrayAttr", "">:$workgroupSize
   );
-  let assemblyFormat = [{
-    `<` $loweringConfig `,` $translationInfo `,` `workgroup_size` `=` $workgroupSize `>`
-  }];
+
+  // TODO(ravishankarm): Commented out till patch D111594 lands.
+  // let assemblyFormat = [{
+  //   `<` $loweringConfig `,` $translationInfo `,` `workgroup_size` `=` $workgroupSize `>`
+  // }];
+
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
       "ArrayRef<int64_t>":$nativeVectorSize,
