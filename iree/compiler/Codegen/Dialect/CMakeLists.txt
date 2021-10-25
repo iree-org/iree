@@ -29,6 +29,7 @@ iree_cc_library(
   DEPS
     ::IREECodegenDialectGen
     ::LoweringConfigGen
+    LLVMSupport
     MLIRIR
     MLIRParser
     MLIRStandard

@@ -56,6 +56,7 @@ cc_library(
         ":IREECodegenDialectGen",
         ":LoweringConfigGen",
         "//iree/compiler/Codegen/Utils",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
