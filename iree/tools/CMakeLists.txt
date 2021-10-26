@@ -168,6 +168,25 @@ iree_cc_binary(
     yaml
 )
 
+iree_cc_binary(
+  NAME
+    iree-e2e-matmul-test
+  SRCS
+    "iree-e2e-matmul-test.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_path
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::hal::drivers
+    iree::modules::hal
+    iree::tools::utils::trace_replay
+    iree::tools::utils::yaml_util
+    iree::vm
+    yaml
+)
+
 if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME

@@ -266,6 +266,7 @@ include(iree_python)
 include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
+include(iree_trace_runner_test)
 include(iree_run_binary_test)
 include(iree_mlir_benchmark_suite)
 
@@ -321,8 +322,17 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   else()
     find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
   endif()
-elseif(IREE_BUILD_COMPILER)
+elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+endif()
+
+# Extended Python environment checks.
+if(Python3_FOUND)
+  iree_detect_pyyaml()
+endif()
+
+if(IREE_BUILD_TESTS AND NOT IREE_PYYAML_FOUND)
+  message(WARNING "IREE's regression test suite requires PyYAML to run all tests. It is not installed, so some tests will be disabled.")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -514,7 +524,7 @@ endif()
 add_subdirectory(iree/tools)
 
 if(IREE_BUILD_TRACY)
-  if(NOT LINUX)
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux")
     message(WARNING "Building Tracy (IREE_BUILD_TRACY) on non-Linux is unsupported and may fail below.")
   endif()
   add_subdirectory(build_tools/third_party/tracy ${CMAKE_CURRENT_BINARY_DIR}/tracy)

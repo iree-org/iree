@@ -178,7 +178,7 @@ involve working from the source tree (instead of the build tree).
     ``` shell
     # From the iree source directory.
     cd integrations/tensorflow
-    python ../../configure_bazel.py
+    CC=clang CXX=clang python ../../configure_bazel.py
     bazel build iree_tf_compiler:importer-binaries
     ```
 
@@ -193,6 +193,22 @@ involve working from the source tree (instead of the build tree).
 
 Importer binaries can be found under `bazel-bin/iree_tf_compiler` and can
 be used from the command line if desired.
+
+
+???+ Note
+    Bazel's default configuration tends to build almost everything twice,
+    for reasons that can only be surmised to be based in some technically
+    correct but practically challenged viewpoint. It is also incompatible with
+    ccache and other mechanisms for performing less incremental work. It is
+    recommended to address both of these with a `.bazelrc` file in your
+    home directory:
+
+    ```
+    build --disk_cache=/path/to/home/.bazelcache
+    build --nodistinct_host_configuration
+    ```
+
+    We can't set these for you because of other inscrutable reasons.
 
 ### IREE
 

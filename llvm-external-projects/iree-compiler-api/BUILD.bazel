@@ -55,6 +55,7 @@ cc_library(
     name = "CAPI",
     srcs = [
         "lib/CAPI/Compiler.cpp",
+        "lib/CAPI/Lld.cpp",
         "lib/CAPI/Tools.cpp",
     ],
     hdrs = [
@@ -68,6 +69,12 @@ cc_library(
         "//iree/compiler/Translation:IREEVM",
         "//iree/tools:init_targets",
         "//iree/tools:iree_translate_lib",
+        "@llvm-project//lld:COFF",
+        "@llvm-project//lld:Common",
+        "@llvm-project//lld:ELF",
+        "@llvm-project//lld:MachO",
+        "@llvm-project//lld:Wasm",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:IR",
     ],

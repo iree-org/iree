@@ -30,6 +30,7 @@ __all__ = [
 
 _BUILTIN_TOOLS = [
     "ireec",
+    "iree-lld",
     "iree-translate",
 ]
 
@@ -41,6 +42,7 @@ _TOOL_MODULE_MAP = {
     # in the external 'core' module. This is used for some outside packaging
     # options.
     "ireec": "iree.tools.core",
+    "iree-lld": "iree.tools.core",
     "iree-import-tflite": "iree.tools.tflite",
     "iree-import-xla": "iree.tools.xla",
     "iree-import-tf": "iree.tools.tf",

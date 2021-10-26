@@ -14,14 +14,23 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: name of target
-# ARGS: arguments passed to the test binary.
+# DRIVER: If specified, will pass --driver=DRIVER to the test binary and adds
+#     a driver label to the test.
+# TEST_INPUT_FILE_ARG: If specified, the input file will be added to DATA and
+#     its device path appended to ARGS. Note that the device path may be different
+#     from the host path, so this parameter should be used to portably pass file arguments
+#     to tests.
+# DATA: Additional input files needed by the test binary. When running tests on a
+#     separate device (e.g. Android), these files will be pushed to the device.
+#     TEST_INPUT_FILE_ARG is automatically added if specified.
+# ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARG and
+#     --driver=DRIVER are automatically added if specified.
 # TEST_BINARY: binary target to run as the test.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 #
-# Note: the DATA argument is not supported because CMake doesn't have a good way
-# to specify a data dependency for a test.
-#
+# Note: the DATA argument is not actually adding dependencies because CMake
+# doesn't have a good way to specify a data dependency for a test.
 #
 # Usage:
 # iree_cc_binary(
@@ -46,8 +55,8 @@ function(iree_run_binary_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_BINARY"
-    "ARGS;LABELS"
+    "NAME;TEST_BINARY;DRIVER;TEST_INPUT_FILE_ARG"
+    "ARGS;LABELS;DATA"
     ${ARGN}
   )
 
@@ -57,6 +66,27 @@ function(iree_run_binary_test)
   iree_package_ns(_PACKAGE_NS)
   iree_package_path(_PACKAGE_PATH)
   set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
+
+  # If driver was specified, add the corresponding test arg and label.
+  if (DEFINED _RULE_DRIVER)
+    list(APPEND _RULE_ARGS "--driver=${_RULE_DRIVER}")
+    list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER}")
+  endif()
+
+  if(ANDROID)
+    set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
+    set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
+  endif()
+
+  if (DEFINED _RULE_TEST_INPUT_FILE_ARG)
+    if (ANDROID)
+      get_filename_component(_TEST_INPUT_FILE_BASENAME "${_RULE_TEST_INPUT_FILE_ARG}" NAME)
+      list(APPEND _RULE_ARGS "${_ANDROID_ABS_DIR}/${_TEST_INPUT_FILE_BASENAME}")
+    else()
+      list(APPEND _RULE_ARGS "${_RULE_TEST_INPUT_FILE_ARG}")
+    endif()
+    list(APPEND _RULE_DATA "${_RULE_TEST_INPUT_FILE_ARG}")
+  endif()
 
   # Replace binary passed by relative ::name with iree::package::name
   string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _TEST_BINARY_TARGET ${_RULE_TEST_BINARY})
@@ -78,11 +108,13 @@ function(iree_run_binary_test)
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match
     # with the expectation of the run_android_test.{sh|bat|ps1} script.
+    string (REPLACE ";" " " _DATA_SPACE_SEPARATED "${_RULE_DATA}")
     set(
       _ENVIRONMENT_VARS
-        TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
-        TEST_EXECUTABLE=$<TARGET_FILE:${_TEST_BINARY_TARGET}>
-        TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
+        "TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}"
+        "TEST_EXECUTABLE=$<TARGET_FILE:${_TEST_BINARY_TARGET}>"
+        "TEST_DATA=${_DATA_SPACE_SEPARATED}"
+        "TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir"
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
   else()
@@ -100,4 +132,5 @@ function(iree_run_binary_test)
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST "${_TEST_NAME}" PROPERTY REQUIRED_FILES "${_RULE_DATA}")
 endfunction()
