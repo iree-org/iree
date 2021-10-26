@@ -99,9 +99,7 @@ def get_test_generators():
           # Generators using general random matrices
           ("random", "random", "random", "dynamic"),
           ("random", "random", "random", "static"),
-          # TODO: enable 'mixed' testcases. For now they cause iree-opt
-          # errors.
-          #("random", "random", "random", "mixed"),
+          ("random", "random", "random", "mixed"),
       ],
       "large": [
           # Fewer generators are used for large shapes, to limit the
