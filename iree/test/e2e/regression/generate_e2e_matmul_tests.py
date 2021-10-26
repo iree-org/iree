@@ -12,14 +12,15 @@ import os
 import yaml
 import re
 
-from enum import Enum
-from dataclasses import dataclass
+import enum
+import dataclasses
 
 
 # Data type of matrix entries. The string values must match MLIR data types.
 # This is a superset of the values accepted for the --lhs_rhs_types= flag,
 # as this also includes accumulator-specific types like i32.
-class MatrixElemTypeId(Enum):
+@enum.unique
+class MatrixElemTypeId(enum.Enum):
   I8 = "i8"
   I32 = "i32"
   F32 = "f32"
@@ -27,20 +28,23 @@ class MatrixElemTypeId(Enum):
 
 # Enumerates of the collections of shapes that we can generate tests for.
 # The values are the accepted values for the --shapes= flag.
-class ShapesId(Enum):
+@enum.unique
+class ShapesId(enum.Enum):
   SMALL = "small"
   LARGE = "large"
 
 
 # Enumerates ways to construct MLIR tensor types.
-class Dynamicity(Enum):
+@enum.unique
+class Dynamicity(enum.Enum):
   DYNAMIC = "dynamic"  # Use '?' everywhere. Example: tensor<?x?xf32>.
   STATIC = "static"  # Use fixed values everywhere. Example: tensor<4x6xf32>.
   MIXED = "mixed"  # Randomly mix '?' and values. Example: tensor<?x4xf32>.
 
 
 # Enumerates ways to initialize matrix buffer contents.
-class MatrixGenerator(Enum):
+@enum.unique
+class MatrixGenerator(enum.Enum):
   ZERO = "zero"  # Fill with zeros
   IDENTITY = "identity"  # Make an identity matrix (generalized to any shape).
   RANDOM = "random"  # Fill with (deterministic) pseudorandom values.
@@ -48,7 +52,7 @@ class MatrixGenerator(Enum):
 
 # Describes the shape of a matrix multiplication in the usual convention:
 # the LHS is {m}x{k}, the RHS is {k}x{n}, the accumulator/result is {m}x{n}.
-@dataclass
+@dataclasses.dataclass
 class TestShape:
   m: int
   k: int
@@ -58,7 +62,7 @@ class TestShape:
 # Describes how to construct MLIR tensor types and how to initialize buffer
 # contents for a test case (for an already given TestShape, and already given
 # matrix element data types).
-@dataclass
+@dataclasses.dataclass
 class TestGenerator:
   lhs: MatrixGenerator
   rhs: MatrixGenerator
