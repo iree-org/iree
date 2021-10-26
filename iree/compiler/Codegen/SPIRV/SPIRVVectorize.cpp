@@ -72,6 +72,8 @@ void populateVectorizationPatterns(MLIRContext *context,
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), context)));
+  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+  vector::populateVetorReductionToContractPatterns(patterns);
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.
@@ -141,6 +143,8 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
     {
       RewritePatternSet canonicalizationPatterns(funcOp.getContext());
+      vector::ExtractStridedSliceOp::getCanonicalizationPatterns(
+          canonicalizationPatterns, context);
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           canonicalizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,

@@ -31,6 +31,8 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), patterns.getContext())));
+  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+  vector::populateVetorReductionToContractPatterns(patterns);
 }
 
 static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
@@ -111,20 +113,17 @@ struct LLVMGPUVectorizationPass
     }
 
     {
-      // Step 2. Unroll the vetors to native size and canonicalize.
-      RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(vectorUnrollPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
-
+      // Step 3. Canonicalize.
       RewritePatternSet canonicalizationPatterns(funcOp.getContext());
+      vector::ExtractStridedSliceOp::getCanonicalizationPatterns(
+          canonicalizationPatterns, canonicalizationPatterns.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
           canonicalizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns));
     }
     {
-      // Step 3. Lower contract op to outer product.
+      // Step 4. Lower contract op to outer product.
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(

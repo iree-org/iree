@@ -152,6 +152,9 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
         vectorizationPatterns, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
             Identifier::get(getVectorizeMarker(), context)));
+    vector::populateVectorTransferPermutationMapLoweringPatterns(
+        vectorizationPatterns);
+    vector::populateVetorReductionToContractPatterns(vectorizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorizationPatterns)))) {
       return signalPassFailure();
