@@ -101,10 +101,6 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute:
         addSPIRVTileAndDistributePassPipeline(nestedModulePM);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVDistributeToGlobalID:
-        addSPIRVDistributeToGlobalIDPassPipeline(nestedModulePM);
-        break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
         addSPIRVTileAndVectorizePassPipeline(nestedModulePM);
         break;

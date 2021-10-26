@@ -207,15 +207,6 @@ def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
 }
 
 // TODO: Rename argument to be fully qualified.
-def SPIRVDistributeToGlobalID :
-    Pass<"iree-spirv-distribute-to-global-id", "FuncOp"> {
-  let summary = "Distribute Linalg ops with buffer semantics to global "
-                "invocations";
-  let constructor =
-      "mlir::iree_compiler::createSPIRVDistributeToGlobalIDPass()";
-}
-
-// TODO: Rename argument to be fully qualified.
 def SPIRVFoldProcessorIDUses :
     Pass<"iree-spirv-fold-gpu-procid-uses", "FuncOp"> {
   let summary = "Fold GPU processor ID uses where possible";
