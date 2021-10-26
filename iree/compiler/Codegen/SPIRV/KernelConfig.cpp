@@ -26,36 +26,6 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Utilities
-//===----------------------------------------------------------------------===//
-
-/// Defines the workgroup count region on entry point ops for the
-/// `SPIRVDistributeToGlobalID` pipeline.
-// TODO(ravishankarm): Remove this when that pipeline is deprecated.
-static LogicalResult setTranslationUsingDistributeToGlobalId(
-    FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
-  setTranslationInfo(
-      funcOp,
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeToGlobalID,
-      /*workloadPerWorkgroup=*/{}, workgroupSize);
-  MLIRContext *context = funcOp.getContext();
-  OpBuilder builder(context);
-  int64_t workgroupSizeX = workgroupSize[0];
-  auto numWorkgroupsFn = [workgroupSizeX](OpBuilder &b, Location loc,
-                                          std::array<Value, 3> workload) {
-    AffineExpr e1, e2, e3;
-    bindSymbols(b.getContext(), e1, e2, e3);
-    AffineExpr expr = e1 * e2 * e3;
-    expr = expr.ceilDiv(workgroupSizeX);
-    Value numWorkgroupsX = linalg::applyMapToValues(
-        b, loc, AffineMap::get(0, 3, expr), workload)[0];
-    Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-    return std::array<Value, 3>{numWorkgroupsX, one, one};
-  };
-  return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
-}
-
-//===----------------------------------------------------------------------===//
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
 
@@ -533,24 +503,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
-    int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
-
-    // If the dispatch region does not contain tiled and distributed Linalg ops,
-    // invoke the pipeline to distribute to global invocations.
-    if (tiledLoops.empty() && llvm::none_of(computeOps, [](Operation *op) {
-          return hasMarker(op, getWorkgroupMarker());
-        })) {
-      std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
-      if (failed(
-              setTranslationUsingDistributeToGlobalId(funcOp, workgroupSize))) {
-        return computeOps[0]->emitOpError(
-            "failed to set translation info for distributing to global IDs");
-      }
-      continue;
-    }
-
     Operation *rootOperation = nullptr;
-
     // Try to find a configuration according to a matmul/convolution op and use
     // it as the root op.
     for (Operation *computeOp : computeOps) {

@@ -28,8 +28,6 @@ def SPIRV_SimpleDistribute
     : StrEnumAttrCase<"SPIRVDistribute">;
 def SPIRV_Vectorize
     : StrEnumAttrCase<"SPIRVVectorize">;
-def SPIRV_DistributeToGlobalID
-    : StrEnumAttrCase<"SPIRVDistributeToGlobalID">;
 def SPIRV_VectorizeToCooperativeOps
     : StrEnumAttrCase<"SPIRVVectorizeToCooperativeOps">;
 
@@ -43,8 +41,8 @@ def DispatchLoweringPassPipelineEnum : StrEnumAttr<
     "identifier for pass pipeline use to lower dispatch region",
     [CPU_Default, CPU_TensorToVectors, CPU_Vectorization,
      LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
-     SPIRV_SimpleDistribute, SPIRV_DistributeToGlobalID,
-     SPIRV_Vectorize, SPIRV_VectorizeToCooperativeOps, None]> {
+     SPIRV_SimpleDistribute, SPIRV_Vectorize,
+     SPIRV_VectorizeToCooperativeOps, None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
 }
 

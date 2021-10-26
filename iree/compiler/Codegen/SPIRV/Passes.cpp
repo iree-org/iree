@@ -150,10 +150,6 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
   addLoopMaterializationPasses(pm);
 }
 
-void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createSPIRVDistributeToGlobalIDPass());
-}
-
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
   addLinalgBufferizePasses(pm.nest<ModuleOp>(), gpuAllocationFunction);
   pm.addPass(createSPIRVLowerExecutableTargetPass());
