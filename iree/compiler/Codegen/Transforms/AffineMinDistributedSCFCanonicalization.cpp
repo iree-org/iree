@@ -21,6 +21,40 @@ namespace iree_compiler {
 
 static bool isDivisible(Value v, int64_t dividend);
 
+static bool getSCFinfoFromAffineMinOp(AffineMinOp minOp, Value &iv, Value &ub,
+                                      Value &lb, Value &step) {
+  // Check if any of the dimensions is a ForOp or ParallelOp induction variable.
+  bool success = false;
+  for (auto dim : minOp.getDimOperands()) {
+    auto ivArg = dim.dyn_cast<BlockArgument>();
+    if (!ivArg) continue;
+    Operation *containingOp = ivArg.getOwner()->getParentOp();
+    auto forOp = dyn_cast_or_null<scf::ForOp>(containingOp);
+    if (forOp && forOp.getInductionVar() == dim) {
+      iv = dim;
+      ub = forOp.upperBound();
+      lb = forOp.lowerBound();
+      step = forOp.step();
+      success = true;
+      break;
+    }
+    auto parallelOp = dyn_cast_or_null<scf::ParallelOp>(containingOp);
+    if (!parallelOp) continue;
+    for (auto inductionVar : llvm::enumerate(parallelOp.getInductionVars())) {
+      if (inductionVar.value() == dim) {
+        iv = dim;
+        ub = parallelOp.upperBound()[inductionVar.index()];
+        lb = parallelOp.lowerBound()[inductionVar.index()];
+        step = parallelOp.step()[inductionVar.index()];
+        success = true;
+        break;
+      }
+    }
+    if (success) break;
+  }
+  return success;
+}
+
 /// Return true if we can prove that affineMinOp result is positive and
 /// divisible by the given |dividend|. This is true if all the the results of
 /// the associated affine map are positive and divisible by |dividend|.
@@ -32,38 +66,11 @@ static bool isDivisible(Value v, int64_t dividend);
 static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   if (!minOp.getSymbolOperands().empty() ||
       minOp.getAffineMap().getNumResults() != 2)
-    return {};
-  Value iv;
-  Value ub;
-  Value lb;
-  Value step;
-  // Check if any of the dimensions is a ForOp or ParallelOp induction variable.
-  for (auto dim : minOp.getDimOperands()) {
-    auto ivArg = dim.dyn_cast<BlockArgument>();
-    if (!ivArg) continue;
-    Operation *containingOp = ivArg.getOwner()->getParentOp();
-    auto forOp = dyn_cast_or_null<scf::ForOp>(containingOp);
-    if (forOp && forOp.getInductionVar() == dim) {
-      iv = dim;
-      ub = forOp.upperBound();
-      lb = forOp.lowerBound();
-      step = forOp.step();
-      break;
-    }
-    auto parallelOp = dyn_cast_or_null<scf::ParallelOp>(containingOp);
-    if (!parallelOp) continue;
-    for (auto inductionVar : llvm::enumerate(parallelOp.getInductionVars())) {
-      if (inductionVar.value() == dim) {
-        iv = dim;
-        ub = parallelOp.upperBound()[inductionVar.index()];
-        lb = parallelOp.lowerBound()[inductionVar.index()];
-        step = parallelOp.step()[inductionVar.index()];
-        break;
-      }
-    }
-    if (iv) break;
-  }
-  if (!iv) return false;
+    return false;
+
+  Value iv, ub, lb, step;
+  if (!getSCFinfoFromAffineMinOp(minOp, iv, ub, lb, step)) return false;
+
   // Calculate the affine map representing `%ub - %iv`.
   AffineExpr ivDim;
   AffineExpr ubDim;
@@ -130,7 +137,14 @@ static bool isDivisible(Value v, int64_t dividend) {
 /// With N a compile time constant. This operations can be replace by
 /// `%cN = arith.constant N : index` if we can prove that %lb, %step and %ub are
 /// divisible by N.
+///
+/// This can also be repalced by `d1` if `d1` and N are constants and `d1` is
+/// less than N.
 static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
+  if (!minOp.getSymbolOperands().empty() ||
+      minOp.getAffineMap().getNumResults() != 2)
+    return {};
+
   AffineMap map = minOp.getAffineMap();
   int64_t constantResult = 0;
   for (AffineExpr result : map.getResults()) {
@@ -138,9 +152,31 @@ static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
       constantResult = cst.getValue();
   }
   if (constantResult == 0) return {};
+
+  // If the bound is less than N, we can replace it with the bound directly.
+  Value iv, ub, lb, step;
+  if (!getSCFinfoFromAffineMinOp(minOp, iv, ub, lb, step)) return {};
+  auto getUbDimCst = [&]() -> Optional<int64_t> {
+    for (auto dim : llvm::enumerate(minOp.getDimOperands())) {
+      if (dim.value() != ub) continue;
+      auto expr = getAffineDimExpr(dim.index(), minOp.getContext())
+                      .dyn_cast<AffineConstantExpr>();
+      if (!expr) return {};
+      return expr.getValue();
+    }
+    return {};
+  };
+  if (auto cst = getUbDimCst()) {
+    if (cst < constantResult) {
+      return cst;
+    }
+  }
+
   // If afine.min map's results are all positive and divisible by
   // `constantResult` then it can be replaced by `constantResult`.
-  if (affineMinOpDivisible(minOp, constantResult)) return constantResult;
+  if (affineMinOpDivisible(minOp, constantResult)) {
+    return constantResult;
+  }
   return {};
 }
 
