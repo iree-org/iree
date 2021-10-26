@@ -429,6 +429,7 @@ class StepExprVisitor
 static Optional<TiledLoopInfo> isTiledLoop(MLIRContext *context,
                                            scf::ForOp forOp) {
   TiledLoopInfo loopInfo;
+  loopInfo.tiledLoop = forOp;
   auto lbApplyOp = forOp.lowerBound().getDefiningOp<AffineApplyOp>();
   if (!lbApplyOp) {
     return llvm::None;
