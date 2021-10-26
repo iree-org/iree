@@ -73,7 +73,7 @@ void populateVectorizationPatterns(MLIRContext *context,
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), context)));
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVetorReductionToContractPatterns(patterns);
+  vector::populateVectorReductionToContractPatterns(patterns);
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.

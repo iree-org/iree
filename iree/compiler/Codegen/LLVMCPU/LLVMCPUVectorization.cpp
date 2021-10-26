@@ -236,7 +236,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
             Identifier::get(getVectorizeMarker(), context)));
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
-    vector::populateVetorReductionToContractPatterns(vectorizationPatterns);
+    vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(vectorizationPatterns));
   }
@@ -264,10 +264,10 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
     RewritePatternSet vectorContractLoweringPatterns(context);
-    vectorContractLoweringPatterns
-        .insert<ContractionOpToOuterProductOpLowering,
-                ContractionOpToMatmulOpLowering, ContractionOpLowering>(
-            vectorTransformsOptions, context);
+    vectorContractLoweringPatterns.insert<
+        vector::ContractionOpToOuterProductOpLowering,
+        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
+        vectorTransformsOptions, context);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
     (void)applyPatternsAndFoldGreedily(

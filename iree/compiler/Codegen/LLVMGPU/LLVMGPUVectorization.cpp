@@ -32,7 +32,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), patterns.getContext())));
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVetorReductionToContractPatterns(patterns);
+  vector::populateVectorReductionToContractPatterns(patterns);
 }
 
 static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
@@ -133,7 +133,8 @@ struct LLVMGPUVectorizationPass
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMultiReductionLoweringPatterns(
-          contractLoweringPatterns);
+          contractLoweringPatterns,
+          vector::VectorMultiReductionLowering::InnerParallel);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(contractLoweringPatterns));
     }
