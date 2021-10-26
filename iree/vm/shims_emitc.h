@@ -7,10 +7,12 @@
 #ifndef IREE_VM_SHIMS_EMITC_H_
 #define IREE_VM_SHIMS_EMITC_H_
 
+#include "iree/base/attributes.h"
 #include "iree/vm/module.h"
+#include "iree/vm/shims.h"
 #include "iree/vm/stack.h"
 
-// see Calling convetion in module.h
+// see calling convention in module.h
 // Variadic arguments are not supported
 
 // 0v_v
@@ -34,13 +36,15 @@ static iree_status_t call_0v_i_shim(iree_vm_stack_t* stack,
                                     call_0v_i_t target_fn, void* module,
                                     void* module_state,
                                     iree_vm_execution_result_t* out_result) {
-  typedef struct {
-    int32_t ret0;
-  } results_t;
+  iree_vm_abi_i_t* rets = iree_vm_abi_i_checked_deref(call->results);
 
-  results_t* results = (results_t*)call->results.data;
+  if (IREE_UNLIKELY(!rets)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "argument/result signature mismatch");
+  }
 
-  return target_fn(stack, module, module_state, &results->ret0);
+  iree_vm_abi_i_reset(rets);
+  return target_fn(stack, module, module_state, &rets->i0);
 }
 
 // 0i_i
@@ -53,17 +57,16 @@ static iree_status_t call_0i_i_shim(iree_vm_stack_t* stack,
                                     call_0i_i_t target_fn, void* module,
                                     void* module_state,
                                     iree_vm_execution_result_t* out_result) {
-  typedef struct {
-    int32_t arg0;
-  } args_t;
-  typedef struct {
-    int32_t ret0;
-  } results_t;
+  const iree_vm_abi_i_t* args = iree_vm_abi_i_checked_deref(call->arguments);
+  iree_vm_abi_i_t* rets = iree_vm_abi_i_checked_deref(call->results);
 
-  const args_t* args = (const args_t*)call->arguments.data;
-  results_t* results = (results_t*)call->results.data;
+  if (IREE_UNLIKELY(!args || !rets)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "argument/result signature mismatch");
+  }
 
-  return target_fn(stack, module, module_state, args->arg0, &results->ret0);
+  iree_vm_abi_i_reset(rets);
+  return target_fn(stack, module, module_state, args->i0, &rets->i0);
 }
 
 static iree_status_t call_0i_i_import(iree_vm_stack_t* stack,
@@ -89,18 +92,16 @@ static iree_status_t call_0ii_i_shim(iree_vm_stack_t* stack,
                                      call_0ii_i_t target_fn, void* module,
                                      void* module_state,
                                      iree_vm_execution_result_t* out_result) {
-  typedef struct {
-    int32_t arg0;
-    int32_t arg1;
-  } args_t;
-  typedef struct {
-    int32_t ret0;
-  } results_t;
+  const iree_vm_abi_ii_t* args = iree_vm_abi_ii_checked_deref(call->arguments);
+  iree_vm_abi_i_t* rets = iree_vm_abi_i_checked_deref(call->results);
 
-  const args_t* args = (const args_t*)call->arguments.data;
-  results_t* results = (results_t*)call->results.data;
-  return target_fn(stack, module, module_state, args->arg0, args->arg1,
-                   &results->ret0);
+  if (IREE_UNLIKELY(!args || !rets)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "argument/result signature mismatch");
+  }
+
+  iree_vm_abi_i_reset(rets);
+  return target_fn(stack, module, module_state, args->i0, args->i1, &rets->i0);
 }
 
 #endif  // IREE_VM_SHIMS_EMITC_H_
