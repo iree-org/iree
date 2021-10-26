@@ -21,6 +21,8 @@ namespace iree_compiler {
 
 static bool isDivisible(Value v, int64_t dividend);
 
+/// Returns true if any of dimensions is a ForOp or ParallelOp induction
+/// variables. If so, store the values to `iv`, `ub`, `lb`, and `step`.
 static bool getSCFinfoFromAffineMinOp(AffineMinOp minOp, Value &iv, Value &ub,
                                       Value &lb, Value &step) {
   // Check if any of the dimensions is a ForOp or ParallelOp induction variable.
@@ -138,7 +140,7 @@ static bool isDivisible(Value v, int64_t dividend) {
 /// `%cN = arith.constant N : index` if we can prove that %lb, %step and %ub are
 /// divisible by N.
 ///
-/// This can also be repalced by `d1` if `d1` and N are constants and `d1` is
+/// This can also be repalced by `d0` if `d0` and N are constants and `d0` is
 /// less than N.
 static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
   if (!minOp.getSymbolOperands().empty() ||
@@ -158,8 +160,9 @@ static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
   if (constantResult == 0) return {};
 
   // If the bound is less than N, we can replace it with the bound directly.
-  // Note that the upper bound of the SCF loop is not the bound of accessing
-  // operand. They can be different in some cases, e.g., convolution ops.
+  // Note that the upper bound of the SCF loop is not the shape bound of
+  // accessing operand. They can be different in some cases, e.g., convolution
+  // ops.
   Value iv, ub, lb, step;
   if (!getSCFinfoFromAffineMinOp(minOp, iv, ub, lb, step)) return {};
   AffineExpr ivDim;
@@ -169,6 +172,7 @@ static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
       break;
     }
   }
+  // diffExpr = d0 - d1, where d1 is `iv`.
   AffineExpr ubDim = simplifyAffineExpr(diffExpr + ivDim, map.getNumDims(), 0);
   if (auto cst = ubDim.dyn_cast<AffineConstantExpr>()) {
     if (cst.getValue() < constantResult) {
