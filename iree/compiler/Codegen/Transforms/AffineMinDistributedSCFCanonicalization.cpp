@@ -147,28 +147,32 @@ static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
 
   AffineMap map = minOp.getAffineMap();
   int64_t constantResult = 0;
+  AffineExpr diffExpr;
   for (AffineExpr result : map.getResults()) {
-    if (auto cst = result.dyn_cast<AffineConstantExpr>())
+    if (auto cst = result.dyn_cast<AffineConstantExpr>()) {
       constantResult = cst.getValue();
+    } else {
+      diffExpr = result;
+    }
   }
   if (constantResult == 0) return {};
 
   // If the bound is less than N, we can replace it with the bound directly.
+  // Note that the upper bound of the SCF loop is not the bound of accessing
+  // operand. They can be different in some cases, e.g., convolution ops.
   Value iv, ub, lb, step;
   if (!getSCFinfoFromAffineMinOp(minOp, iv, ub, lb, step)) return {};
-  auto getUbDimCst = [&]() -> Optional<int64_t> {
-    for (auto dim : llvm::enumerate(minOp.getDimOperands())) {
-      if (dim.value() != ub) continue;
-      auto expr = getAffineDimExpr(dim.index(), minOp.getContext())
-                      .dyn_cast<AffineConstantExpr>();
-      if (!expr) return {};
-      return expr.getValue();
+  AffineExpr ivDim;
+  for (auto dim : llvm::enumerate(minOp.getDimOperands())) {
+    if (dim.value() == iv) {
+      ivDim = getAffineDimExpr(dim.index(), minOp.getContext());
+      break;
     }
-    return {};
-  };
-  if (auto cst = getUbDimCst()) {
-    if (cst < constantResult) {
-      return cst;
+  }
+  AffineExpr ubDim = simplifyAffineExpr(diffExpr + ivDim, map.getNumDims(), 0);
+  if (auto cst = ubDim.dyn_cast<AffineConstantExpr>()) {
+    if (cst.getValue() < constantResult) {
+      return cst.getValue();
     }
   }
 
