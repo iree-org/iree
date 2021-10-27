@@ -73,6 +73,14 @@ class TestGenerator:
 # Returns the list of TestShape's to use for the collection of shapes
 # identified by shapes_id.
 def get_test_shapes(shapes_id: ShapesId):
+  # Notes:
+  # 1. Be conservative in adding more shapes, as that can include both the
+  #    build and execution latency of tests. The build latency is nearly the
+  #    same for all shapes, while execution latency grows cubicly i.e.
+  #    linearly with m*k*n.
+  # 2. Some shapes are commented out: they used to be tested but have been
+  #    disabled to improve the trade-off between test coverage and build
+  #    latency.
   if shapes_id == ShapesId.SMALL:
     return [  # Small sizes, square matrices
         # was range(1, 40) before trimming. The choice of 18 is so that we
