@@ -71,62 +71,44 @@ function(iree_mlir_benchmark_suite)
     "BENCHMARK_MODES;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
-  # All fields' names for each module.
-  set(_FIELD_NAMES "_MODULE_NAME" "_MODULE_TAGS"
-                   "_MLIR_SOURCE" "_ENTRY_FUNCTION" "_FUNCTION_INPUTS")
-  list(LENGTH _FIELD_NAMES _FIELD_COUNT)
-  math(EXPR _MAX_FIELD_INDEX "${_FIELD_COUNT} - 1")
+  iree_validate_required_arguments(
+    _RULE
+    "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
+    "BENCHMARK_MODES;MODULES"
+  )
 
-  # Make sure we have some multiple of six elements.
-  list(LENGTH _RULE_MODULES _MODULE_TOTAL_ELEMENT_COUNT)
-  math(EXPR _MODULE_COUNT
-       "${_MODULE_TOTAL_ELEMENT_COUNT} / ${_FIELD_COUNT}")
-  math(EXPR _MODULE_ELEMENT_REMAINDER
-       "${_MODULE_TOTAL_ELEMENT_COUNT} % ${_FIELD_COUNT}")
-  if(NOT ${_MODULE_ELEMENT_REMAINDER} EQUAL 0)
-    message(SEND_ERROR "MODULES expected to have some multiple of six "
-                       "elements; some module has missing/redundant fields.")
-  endif()
+  foreach(_MODULE IN LISTS _RULE_MODULES)
+    cmake_parse_arguments(
+      _MODULE
+      ""
+      "NAME;TAGS;MLIR_SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
+      ""
+      ${_MODULE}
+    )
+    iree_validate_required_arguments(
+      _MODULE
+      "NAME;TAGS;MLIR_SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
+      ""
+    )
 
-  # Loop over all modules to create targets.
-  math(EXPR _MAX_MODULE_INDEX "${_MODULE_COUNT} - 1")
-  foreach(_MODULE_INDEX RANGE 0 "${_MAX_MODULE_INDEX}")
-    # Loop over all elements for the current module and assign them to the
-    # corresponding field names for later use.
-    foreach(_FIELD_INDEX RANGE 0 "${_MAX_FIELD_INDEX}")
-      list(GET _FIELD_NAMES ${_FIELD_INDEX} _FIELD_NAME)
-      math(EXPR _INDEX "${_MODULE_INDEX} * ${_FIELD_COUNT} + ${_FIELD_INDEX}")
-      list(GET _RULE_MODULES ${_INDEX} ${_FIELD_NAME})
-    endforeach()
-
-    # Use the last directory's name as the category.
     get_filename_component(_CATEGORY "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
-
-    # Generate all benchmarks to the root build directory. This helps for
-    # discovering them and execute them on devices.
     set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_CATEGORY}")
     set(_VMFB_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/vmfb")
 
-    # The source file used to generate benchmark artifacts.
-    set(_SOURCE_FILE "${_MLIR_SOURCE}")
     # The CMake target's name if we need to download from the web.
     set(_DOWNLOAD_TARGET_NAME "")
 
-    # If the source file is from the web, create a custom command to download it.
-    # And wrap that with a custom target so later we can use for dependency.
+    # If the source file is from the web, create a custom command to download
+    # it and wrap that with a custom target so later we can use for dependency.
     #
     # Note: We actually should not do this; instead, we should directly compile
     # from the initial source (i.e., TensorFlow Python models). But that is
-    # tangled with the pending Python testing infrastructure revamp so we'd prefer
-    # to not do that right now.
-    if("${_MLIR_SOURCE}" MATCHES "^https?://")
+    # tangled with the pending Python testing infrastructure revamp so we'd
+    # prefer to not do that right now.
+    if("${_MODULE_MLIR_SOURCE}" MATCHES "^https?://")
       # Update the source file to the downloaded-to place.
-      string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_MLIR_SOURCE}")
-      # TODO: we can do `list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)`
-      # after migrating to CMake 3.15.
-      list(LENGTH _SOURCE_URL_SEGMENTS _URL_SEGMENT_COUNT)
-      math(EXPR _SEGMENT_LAST_INDEX "${_URL_SEGMENT_COUNT} - 1")
-      list(GET _SOURCE_URL_SEGMENTS ${_SEGMENT_LAST_INDEX} _LAST_URL_SEGMENT)
+      string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_MODULE_MLIR_SOURCE}")
+      list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
       set(_DOWNLOAD_TARGET_NAME "iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
       string(REPLACE "tar.gz" "mlir" _FILE_NAME "${_LAST_URL_SEGMENT}")
@@ -137,10 +119,10 @@ function(iree_mlir_benchmark_suite)
           OUTPUT "${_SOURCE_FILE}"
           COMMAND
             "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/download_file.py"
-            "${_MLIR_SOURCE}" -o "${_ROOT_ARTIFACTS_DIR}"
+            "${_MODULE_MLIR_SOURCE}" -o "${_ROOT_ARTIFACTS_DIR}"
           DEPENDS
             "${IREE_ROOT_DIR}/scripts/download_file.py"
-          COMMENT "Downloading ${_MLIR_SOURCE}"
+          COMMENT "Downloading ${_MODULE_MLIR_SOURCE}"
         )
         add_custom_target("${_DOWNLOAD_TARGET_NAME}"
           DEPENDS "${_SOURCE_FILE}"
@@ -160,8 +142,8 @@ function(iree_mlir_benchmark_suite)
       string(REPLACE "," "-" _TAGS "${_MODULE_TAGS}")
       string(REPLACE "," "-" _MODE "${_BENCHMARK_MODE}")
       list(APPEND _COMMON_NAME_SEGMENTS
-           "${_TAGS}" "${_MODE}" "${_RULE_TARGET_BACKEND}"
-           "${_RULE_TARGET_ARCHITECTURE}")
+            "${_TAGS}" "${_MODE}" "${_RULE_TARGET_BACKEND}"
+            "${_RULE_TARGET_ARCHITECTURE}")
 
       # The full list of translation flags.
       set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
@@ -220,8 +202,8 @@ function(iree_mlir_benchmark_suite)
           "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
             --module_file="../../vmfb/compiled-${_VMFB_HASH}.vmfb"
             --driver=${_RULE_DRIVER}
-            --entry_function=${_ENTRY_FUNCTION}
-            --function_inputs=${_FUNCTION_INPUTS}
+            --entry_function=${_MODULE_ENTRY_FUNCTION}
+            --function_inputs=${_MODULE_FUNCTION_INPUTS}
             "${_ADDITIONAL_ARGS_CL}"
             -o "${_FLAG_FILE}"
         DEPENDS
@@ -241,5 +223,6 @@ function(iree_mlir_benchmark_suite)
       # Mark dependency so that we have one target to drive them all.
       add_dependencies(iree-benchmark-suites "${_FLAGFILE_GEN_TARGET_NAME}")
     endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
-  endforeach(_MODULE_INDEX RANGE 0 "${_MAX_MODULE_INDEX}")
-endfunction()
+
+  endforeach(_MODULE IN LISTS _RULE_MODULES)
+endfunction(iree_mlir_benchmark_suite)

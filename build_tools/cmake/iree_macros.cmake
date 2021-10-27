@@ -284,7 +284,7 @@ endfunction()
 # Adds test environment variable properties based on the current build options.
 #
 # Parameters:
-# TEST_NAME: the test name, e.g. iree/base:math_test
+#   TEST_NAME: the test name, e.g. iree/base:math_test
 function(iree_add_test_environment_properties TEST_NAME)
   # IREE_*_DISABLE environment variables may used to skip test cases which
   # require both a compiler target backend and compatible runtime HAL driver.
@@ -302,4 +302,54 @@ function(iree_add_test_environment_properties TEST_NAME)
      OR NOT "${IREE_HAL_DRIVER_DYLIB_SYNC}")
     set_property(TEST ${TEST_NAME} APPEND PROPERTY ENVIRONMENT "IREE_LLVMAOT_DISABLE=1")
   endif()
+endfunction()
+
+# iree_check_defined
+#
+# A lightweight way to check that all the given variables are defined. Useful
+# in cases like checking that a function has been passed all required arguments.
+# Doesn't give usage-specific error messages, but still significantly better
+# than no error checking.
+# Variable names should be passed directly without quoting or dereferencing.
+# Example:
+#
+# function(my_function)
+#   cmake_parse_arguments(
+#     PARSE_ARGV 0
+#     _RULE
+#     ""
+#     "DRIVER;TARGET_BACKEND"
+#     "SRCS;DEPS"
+#   )
+#   iree_check_defined(_RULE_DRIVER _RULE_TARGET_BACKEND _RULE_SRCS _RULE_DEPS)
+# endfunction()
+macro(iree_check_defined)
+  foreach(_VAR ${ARGN})
+    if(NOT DEFINED "${_VAR}")
+      message(SEND_ERROR "${_VAR} is not defined")
+    endif()
+  endforeach()
+endmacro()
+
+
+function(iree_validate_required_arguments PREFIX REQUIRED_ONE_VALUE_KEYWORDS REQUIRED_MULTI_VALUE_KEYWORDS)
+  if(DEFINED ${PREFIX}_UNPARSED_ARGUMENTS)
+    message(SEND_ERROR "Unparsed argument(s): '${${PREFIX}_UNPARSED_ARGUMENTS}'")
+  endif()
+  if(DEFINED ${PREFIX}_KEYWORDS_MISSING_VALUES)
+    message(SEND_ERROR
+              "No values for field(s) '${${PREFIX}_KEYWORDS_MISSING_VALUES}'")
+  endif()
+
+  foreach(_ONE_VALUE_KEYWORD IN LISTS REQUIRED_ONE_VALUE_KEYWORDS)
+    if(NOT DEFINED ${PREFIX}_${_ONE_VALUE_KEYWORD})
+      message(SEND_ERROR "Missing required argument ${_ONE_VALUE_KEYWORD}")
+    endif()
+  endforeach()
+
+  foreach(_MULTI_VALUE_KEYWORD IN LISTS REQUIRED_MULTI_VALUE_KEYWORDS)
+    if(NOT DEFINED ${PREFIX}_${_MULTI_VALUE_KEYWORD})
+      message(SEND_ERROR "Missing required argument ${_MULTI_VALUE_KEYWORD}")
+    endif()
+  endforeach()
 endfunction()
