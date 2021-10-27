@@ -211,7 +211,7 @@ local_pseudorandom_state = 1
 # A static size value, i.e. a size value that could appear in a MLIR type
 # such as 'tensor<?x4xf32>'. None means a dynamic size, similar to '?' in MLIR.
 @dataclasses.dataclass
-class StaticSize:
+class DimSize:
   value: typing.Optional[int]
 
 
@@ -219,28 +219,28 @@ class StaticSize:
 # or None (which maps to MLIR '?') depending on dynamicity.
 def static_size(x: int, dynamicity: Dynamicity):
   if dynamicity == Dynamicity.DYNAMIC:
-    return StaticSize(None)
+    return DimSize(None)
   elif dynamicity == Dynamicity.STATIC:
-    return StaticSize(x)
+    return DimSize(x)
   elif dynamicity == Dynamicity.MIXED:
     global local_pseudorandom_state
     # Same as C++ std::minstd_rand.
     # Using a local pseudorandom generator implementation ensures that it's
     # completely reproducible, across runs and across machines.
     local_pseudorandom_state = (local_pseudorandom_state * 48271) % 2147483647
-    return StaticSize(x if local_pseudorandom_state > 1073741824 else None)
+    return DimSize(x if local_pseudorandom_state > 1073741824 else None)
   else:
     raise ValueError(dynamicity)
 
 
 # Stringification used for generating MLIR types, e.g. tensor<?x?xf32>.
-def int_or_question_mark(s: StaticSize):
+def int_or_question_mark(s: DimSize):
   return s.value or "?"
 
 
 # Stringification used for generating alphanumeric identifiers, e.g.
 # func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
-def int_or_DYN(s: StaticSize):
+def int_or_DYN(s: DimSize):
   return s.value or "DYN"
 
 
@@ -251,12 +251,12 @@ def int_or_DYN(s: StaticSize):
 # These string values are used to generate MLIR function names and tensor shapes.
 @dataclasses.dataclass
 class TestInputMatricesStaticShapes:
-  lhs_rows: StaticSize
-  lhs_cols: StaticSize
-  rhs_rows: StaticSize
-  rhs_cols: StaticSize
-  acc_rows: StaticSize
-  acc_cols: StaticSize
+  lhs_rows: DimSize
+  lhs_cols: DimSize
+  rhs_rows: DimSize
+  rhs_cols: DimSize
+  acc_rows: DimSize
+  acc_cols: DimSize
 
 
 # Helper for generate_function. Generates TestInputMatricesStaticShapes, i.e.
