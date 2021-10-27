@@ -312,17 +312,7 @@ endfunction()
 # than no error checking.
 # Variable names should be passed directly without quoting or dereferencing.
 # Example:
-#
-# function(my_function)
-#   cmake_parse_arguments(
-#     PARSE_ARGV 0
-#     _RULE
-#     ""
-#     "DRIVER;TARGET_BACKEND"
-#     "SRCS;DEPS"
-#   )
-#   iree_check_defined(_RULE_DRIVER _RULE_TARGET_BACKEND _RULE_SRCS _RULE_DEPS)
-# endfunction()
+#   iree_check_defined(_SOME_VAR _AND_ANOTHER_VAR)
 macro(iree_check_defined)
   foreach(_VAR ${ARGN})
     if(NOT DEFINED "${_VAR}")
@@ -331,14 +321,22 @@ macro(iree_check_defined)
   endforeach()
 endmacro()
 
-
-function(iree_validate_required_arguments PREFIX REQUIRED_ONE_VALUE_KEYWORDS REQUIRED_MULTI_VALUE_KEYWORDS)
+# iree_validate_required_arguments
+#
+# Validates that no arguments went unparsed or were given no values and that all
+# required arguments have values. Expects to be called after
+# cmake_parse_arguments and verifies that the variables it creates have been
+# populated as appropriate.
+function(iree_validate_required_arguments
+         PREFIX
+         REQUIRED_ONE_VALUE_KEYWORDS
+         REQUIRED_MULTI_VALUE_KEYWORDS)
   if(DEFINED ${PREFIX}_UNPARSED_ARGUMENTS)
     message(SEND_ERROR "Unparsed argument(s): '${${PREFIX}_UNPARSED_ARGUMENTS}'")
   endif()
   if(DEFINED ${PREFIX}_KEYWORDS_MISSING_VALUES)
     message(SEND_ERROR
-              "No values for field(s) '${${PREFIX}_KEYWORDS_MISSING_VALUES}'")
+            "No values for field(s) '${${PREFIX}_KEYWORDS_MISSING_VALUES}'")
   endif()
 
   foreach(_ONE_VALUE_KEYWORD IN LISTS REQUIRED_ONE_VALUE_KEYWORDS)
