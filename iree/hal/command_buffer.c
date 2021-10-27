@@ -43,6 +43,16 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_command_buffer)(
           device, mode, command_categories, queue_affinity, out_command_buffer);
 
+#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+  // Wrap the command buffer with the validation layer if enabled in the build.
+  // It may be disabled to save code size and per-command overhead (only when
+  // inputs are trusted!).
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_wrap_validation(
+        device, *out_command_buffer, out_command_buffer);
+  }
+#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
