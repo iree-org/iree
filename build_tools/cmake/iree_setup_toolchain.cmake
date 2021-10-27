@@ -17,7 +17,7 @@ if(IREE_ENABLE_LLD)
   set(IREE_USE_LINKER "lld")
 endif()
 
-if(IREE_USE_LINKER)
+if(IREE_USE_LINKER AND NOT APPLE)
   set(IREE_LINKER_FLAG "-fuse-ld=${IREE_USE_LINKER}")
 
   # Depending on how the C compiler is invoked, it may trigger an unused
@@ -53,4 +53,6 @@ if(IREE_USE_LINKER)
     message(FATAL_ERROR "Compiler '${CMAKE_C_COMPILER}' does not support '${IREE_LINKER_FLAG}'")
   endif()
 
+elseif(IREE_USE_LINKER)
+    message(STATUS "On Apple OSX use system linker")
 endif()
