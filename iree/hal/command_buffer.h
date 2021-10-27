@@ -261,6 +261,9 @@ IREE_API_EXPORT void iree_hal_command_buffer_retain(
 IREE_API_EXPORT void iree_hal_command_buffer_release(
     iree_hal_command_buffer_t* command_buffer);
 
+IREE_API_EXPORT void* iree_hal_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable);
+
 // Returns a bitmask indicating the behavior of the command buffer.
 IREE_API_EXPORT iree_hal_command_buffer_mode_t
 iree_hal_command_buffer_mode(const iree_hal_command_buffer_t* command_buffer);
@@ -498,6 +501,9 @@ typedef struct iree_hal_command_buffer_vtable_t {
   IREE_API_UNSTABLE
 
   void(IREE_API_PTR* destroy)(iree_hal_command_buffer_t* command_buffer);
+
+  void*(IREE_API_PTR* dyn_cast)(iree_hal_command_buffer_t* command_buffer,
+                                const void* vtable);
 
   iree_hal_command_buffer_mode_t(IREE_API_PTR* mode)(
       const iree_hal_command_buffer_t* command_buffer);

@@ -25,6 +25,10 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 
+// Returns true if |command_buffer| is a task system command buffer.
+bool iree_hal_task_command_buffer_isa(
+    iree_hal_command_buffer_t* command_buffer);
+
 // Issues a recorded command buffer using the serial |queue_state|.
 // |queue_state| is used to track the synchronization scope of the queue from
 // prior commands such as signaled events and will be mutated as events are

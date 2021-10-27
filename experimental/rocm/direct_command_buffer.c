@@ -94,6 +94,21 @@ static void iree_hal_rocm_direct_command_buffer_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+bool iree_hal_rocm_direct_command_buffer_isa(
+    iree_hal_command_buffer_t* command_buffer) {
+  return iree_hal_command_buffer_dyn_cast(
+      command_buffer, &iree_hal_rocm_direct_command_buffer_vtable);
+}
+
+static void* iree_hal_rocm_direct_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
+  if (vtable == &iree_hal_rocm_direct_command_buffer_vtable) {
+    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
+    return command_buffer;
+  }
+  return NULL;
+}
+
 static iree_hal_command_buffer_mode_t iree_hal_rocm_direct_command_buffer_mode(
     const iree_hal_command_buffer_t* base_command_buffer) {
   const iree_hal_rocm_direct_command_buffer_t* command_buffer =
@@ -359,6 +374,7 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch_indirect(
 const iree_hal_command_buffer_vtable_t
     iree_hal_rocm_direct_command_buffer_vtable = {
         .destroy = iree_hal_rocm_direct_command_buffer_destroy,
+        .dyn_cast = iree_hal_rocm_direct_command_buffer_dyn_cast,
         .mode = iree_hal_rocm_direct_command_buffer_mode,
         .allowed_categories =
             iree_hal_rocm_direct_command_buffer_allowed_categories,
