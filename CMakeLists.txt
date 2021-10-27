@@ -434,17 +434,17 @@ if(IREE_ENABLE_THREADING)
   add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 endif()
 
-iree_set_flatcc_cmake_options()
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if (NOT CMAKE_CROSSCOMPILING)
-  install(TARGETS iree-flatcc-cli
-          COMPONENT iree-flatcc-cli
-          RUNTIME DESTINATION bin)
+  install(
+    TARGETS iree-flatcc-cli
+    COMPONENT iree-flatcc-cli
+    RUNTIME DESTINATION bin
+  )
 endif()
 
 if(IREE_BUILD_COMPILER)
