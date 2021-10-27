@@ -11,9 +11,9 @@ import argparse
 import os
 import yaml
 import re
-
 import enum
 import dataclasses
+import typing
 
 
 # Data type of matrix entries. The string values must match MLIR data types.
@@ -73,59 +73,69 @@ class TestGenerator:
 # Returns the list of TestShape's to use for the collection of shapes
 # identified by shapes_id.
 def get_test_shapes(shapes_id: ShapesId):
+  # Notes:
+  # 1. Be conservative in adding more shapes, as that can include both the
+  #    build and execution latency of tests. The build latency is nearly the
+  #    same for all shapes, while execution latency grows cubicly i.e.
+  #    linearly with m*k*n.
+  # 2. Some shapes are commented out: they used to be tested but have been
+  #    disabled to improve the trade-off between test coverage and build
+  #    latency.
   if shapes_id == ShapesId.SMALL:
     return [  # Small sizes, square matrices
-        TestShape(m=x, k=x, n=x) for x in range(1, 40)
+        # was range(1, 40) before trimming. The choice of 18 is so that we
+        # exercise a case just above 16, as 16 will be a common kernel width.
+        TestShape(m=x, k=x, n=x) for x in range(1, 18)
     ] + [
         # Small sizes, slightly rectangular matrices
         TestShape(m=2, k=3, n=4),
-        TestShape(m=8, k=7, n=6),
-        TestShape(m=15, k=16, n=17),
+        #TestShape(m=8, k=7, n=6),
+        #TestShape(m=15, k=16, n=17),
         TestShape(m=14, k=19, n=23),
-        TestShape(m=31, k=33, n=32),
+        #TestShape(m=31, k=33, n=32),
         TestShape(m=25, k=41, n=35),
         # Small sizes, involving vectors (i.e. most rectangular cases)
         TestShape(m=10, k=1, n=1),
         TestShape(m=1, k=10, n=1),
         TestShape(m=1, k=1, n=10),
-        TestShape(m=1, k=10, n=10),
-        TestShape(m=10, k=1, n=10),
-        TestShape(m=10, k=10, n=1),
+        #TestShape(m=1, k=10, n=10),
+        #TestShape(m=10, k=1, n=10),
+        #TestShape(m=10, k=10, n=1),
         # Small sizes, involving other very small dimensions just above 1
         TestShape(m=13, k=14, n=2),
         TestShape(m=3, k=17, n=12),
         TestShape(m=21, k=4, n=18),
         # Medium sizes, square matrices
-        TestShape(m=100, k=100, n=100),
+        #TestShape(m=100, k=100, n=100),
         # Medium sizes, slightly rectangular matrices
         TestShape(m=101, k=102, n=103),
         # Medium sizes, involving vectors (i.e. most rectangular cases)
         TestShape(m=10000, k=1, n=1),
         TestShape(m=1, k=10000, n=1),
         TestShape(m=1, k=1, n=10000),
-        TestShape(m=1, k=1000, n=1000),
-        TestShape(m=1000, k=1, n=1000),
-        TestShape(m=1000, k=1000, n=1),
+        #TestShape(m=1, k=1000, n=1000),
+        #TestShape(m=1000, k=1, n=1000),
+        #TestShape(m=1000, k=1000, n=1),
         # Medium sizes, involving other very small dimensions just above 1
         TestShape(m=1300, k=1300, n=2),
-        TestShape(m=1300, k=1300, n=3),
-        TestShape(m=1300, k=1300, n=4),
+        #TestShape(m=1300, k=1300, n=3),
+        #TestShape(m=1300, k=1300, n=4),
     ]
   if shapes_id == ShapesId.LARGE:
     return [
         # Large sizes, powers of two
         TestShape(m=256, k=256, n=512),
-        TestShape(m=512, k=512, n=128),
-        TestShape(m=1024, k=512, n=512),
-        TestShape(m=512, k=1024, n=512),
+        #TestShape(m=512, k=512, n=128),
+        #TestShape(m=1024, k=512, n=512),
+        #TestShape(m=512, k=1024, n=512),
         # Large sizes, powers of two minus one
         TestShape(m=127, k=63, n=511),
         # Large sizes, powers of two plus one
         TestShape(m=129, k=65, n=513),
         # Large sizes, misc.
-        TestShape(m=200, k=300, n=400),
+        #TestShape(m=200, k=300, n=400),
         TestShape(m=123, k=456, n=789),
-        TestShape(m=500, k=500, n=50),
+        #TestShape(m=500, k=500, n=50),
         # Be conservative in adding larger shapes. They can result in
         # high latency tests. If you have to, consider splitting them
         # out in a way that constrains the latency impact, e.g. by
@@ -191,21 +201,6 @@ def get_test_generators(shapes_id: ShapesId):
   raise ValueError(shapes_id)
 
 
-# Generates a name for a test function in the generated MLIR code.
-def function_name(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
-                  shape: TestShape, gen: TestGenerator):
-  dyn = gen.dynamicity.value
-  lhs_g = gen.lhs.value
-  rhs_g = gen.rhs.value
-  acc_g = gen.acc.value
-  input_t = lhs_rhs_type.value
-  acc_t = acc_type.value
-  m = shape.m
-  k = shape.k
-  n = shape.n
-  return f"{input_t}_{dyn}_{lhs_g}_{m}x{k}_times_{rhs_g}_{k}x{n}_plus_{acc_g}_{acc_t}"
-
-
 # Intentionally fixed seed! We want full reproducibility here, both across runs
 # and across machines.
 # Intentionally not shared with pseudorandom_generator_seed to limit the ways
@@ -213,44 +208,120 @@ def function_name(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
 local_pseudorandom_state = 1
 
 
+# A static size value, i.e. a size value that could appear in a MLIR type
+# such as 'tensor<?x4xf32>'. None means a dynamic size, similar to '?' in MLIR.
+@dataclasses.dataclass
+class DimSize:
+  value: typing.Optional[int]
+
+
 # Generates a compile-time MLIR size value, i.e. either a fixed positive integer
-# or a '?' depending on dynamicity.
+# or None (which maps to MLIR '?') depending on dynamicity.
 def static_size(x: int, dynamicity: Dynamicity):
   if dynamicity == Dynamicity.DYNAMIC:
-    return "?"
+    return DimSize(None)
   elif dynamicity == Dynamicity.STATIC:
-    return x
+    return DimSize(x)
   elif dynamicity == Dynamicity.MIXED:
     global local_pseudorandom_state
     # Same as C++ std::minstd_rand.
     # Using a local pseudorandom generator implementation ensures that it's
     # completely reproducible, across runs and across machines.
     local_pseudorandom_state = (local_pseudorandom_state * 48271) % 2147483647
-    return x if local_pseudorandom_state > 1073741824 else "?"
+    return DimSize(x if local_pseudorandom_state > 1073741824 else None)
   else:
     raise ValueError(dynamicity)
+
+
+# Stringification used for generating MLIR types, e.g. tensor<?x?xf32>.
+def int_or_question_mark(s: DimSize):
+  return s.value or "?"
+
+
+# Stringification used for generating alphanumeric identifiers, e.g.
+# func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
+def int_or_DYN(s: DimSize):
+  return s.value or "DYN"
+
+
+# Describes the fully resolved static dimensions of all 3 input matrices,
+# LHS, RHS, and Accumulator, in a testcase.
+# Each value is a string, which may either represent a positive integer such as "123",
+# or a "?" string, meaning a dynamic dimension as in MLIR.
+# These string values are used to generate MLIR function names and tensor shapes.
+@dataclasses.dataclass
+class TestInputMatricesStaticShapes:
+  lhs_rows: DimSize
+  lhs_cols: DimSize
+  rhs_rows: DimSize
+  rhs_cols: DimSize
+  acc_rows: DimSize
+  acc_cols: DimSize
+
+
+# Helper for generate_function. Generates TestInputMatricesStaticShapes, i.e.
+# converts from the runtime shape dimensions in TestShape and given dynamicity to
+# the set of static shapes to be used in a test function's input tensors.
+def generate_static_shapes(shape: TestShape, dynamicity: Dynamicity):
+  return TestInputMatricesStaticShapes(
+      lhs_rows=static_size(shape.m, dynamicity),
+      lhs_cols=static_size(shape.k, dynamicity),
+      rhs_rows=static_size(shape.k, dynamicity),
+      rhs_cols=static_size(shape.n, dynamicity),
+      acc_rows=static_size(shape.m, dynamicity),
+      acc_cols=static_size(shape.n, dynamicity),
+  )
+
+
+# Helper for generate_function.
+# Generates a name for a test function in the generated MLIR code.
+def generate_function_name(lhs_rhs_type: MatrixElemTypeId,
+                           acc_type: MatrixElemTypeId,
+                           static_shapes: TestInputMatricesStaticShapes):
+  input_t = lhs_rhs_type.value
+  acc_t = acc_type.value
+  lhs_m = int_or_DYN(static_shapes.lhs_rows)
+  lhs_k = int_or_DYN(static_shapes.lhs_cols)
+  rhs_k = int_or_DYN(static_shapes.rhs_rows)
+  rhs_n = int_or_DYN(static_shapes.rhs_cols)
+  acc_m = int_or_DYN(static_shapes.acc_rows)
+  acc_n = int_or_DYN(static_shapes.acc_cols)
+  return f"matmul_{lhs_m}x{lhs_k}x{input_t}_times_{rhs_k}x{rhs_n}x{input_t}_into_{acc_m}x{acc_n}x{acc_t}"
+
+
+# Represents a generated test function.
+@dataclasses.dataclass
+class MLIRFunction:
+  name: str
+  definition: str
 
 
 # Generates a test function in the generated MLIR code.
 # The generated function will take the same arguments as linalg.matmul and
 # will just call linalg.matmul with them, returning its result.
-def generate_function(func_name: str, lhs_rhs_type: MatrixElemTypeId,
+def generate_function(lhs_rhs_type: MatrixElemTypeId,
                       acc_type: MatrixElemTypeId, shape: TestShape,
-                      gen: TestGenerator):
-  lhs_m = static_size(shape.m, gen.dynamicity)
-  lhs_k = static_size(shape.k, gen.dynamicity)
-  rhs_k = static_size(shape.k, gen.dynamicity)
-  rhs_n = static_size(shape.n, gen.dynamicity)
-  acc_m = static_size(shape.m, gen.dynamicity)
-  acc_n = static_size(shape.n, gen.dynamicity)
+                      dynamicity: Dynamicity):
+  static_shapes = generate_static_shapes(shape, dynamicity)
+  func_name = generate_function_name(lhs_rhs_type, acc_type, static_shapes)
+  lhs_m = int_or_question_mark(static_shapes.lhs_rows)
+  lhs_k = int_or_question_mark(static_shapes.lhs_cols)
+  rhs_k = int_or_question_mark(static_shapes.rhs_rows)
+  rhs_n = int_or_question_mark(static_shapes.rhs_cols)
+  acc_m = int_or_question_mark(static_shapes.acc_rows)
+  acc_n = int_or_question_mark(static_shapes.acc_cols)
   lhs_tensor_type = f"tensor<{lhs_m}x{lhs_k}x{lhs_rhs_type.value}>"
   rhs_tensor_type = f"tensor<{rhs_k}x{rhs_n}x{lhs_rhs_type.value}>"
   acc_tensor_type = f"tensor<{acc_m}x{acc_n}x{acc_type.value}>"
-  return (
+  func_definition = (
       f"func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
       f"  %result = linalg.matmul ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
       f"  return %result: {acc_tensor_type}\n"
       f"}}\n")
+  return MLIRFunction(
+      name=func_name,
+      definition=func_definition,
+  )
 
 
 # Intentionally fixed seed! We want full reproducibility here, both across runs
@@ -315,22 +386,22 @@ def generate_trace(func_name: str, lhs_rhs_type: MatrixElemTypeId,
 # Generates all output files' contents as strings.
 def generate(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
              shapes_id: ShapesId):
-  functions = {}
+  function_definitions = {}
   traces = []
   for shape in get_test_shapes(shapes_id):
     for gen in get_test_generators(shapes_id):
-      func_name = function_name(lhs_rhs_type, acc_type, shape, gen)
+      function = generate_function(lhs_rhs_type, acc_type, shape,
+                                   gen.dynamicity)
       # Different testcases may differ only by runtime parameters but
       # share the same code. For example, dynamic-shapes testcases
       # share the same code involing tensor<?x?xf32> even though the runtime
       # value in the trace are different. That's why we call
       # generate_function conditionally, and generate_trace unconditionally.
-      if func_name not in functions:
-        functions[func_name] = generate_function(func_name, lhs_rhs_type,
-                                                 acc_type, shape, gen)
+      if function.name not in function_definitions:
+        function_definitions[function.name] = function.definition
       traces.append(
-          generate_trace(func_name, lhs_rhs_type, acc_type, shape, gen))
-  return (functions, traces)
+          generate_trace(function.name, lhs_rhs_type, acc_type, shape, gen))
+  return (function_definitions, traces)
 
 
 def parse_arguments():
@@ -363,10 +434,10 @@ def parse_arguments():
   return parser.parse_args()
 
 
-def write_code_file(functions, filename):
+def write_code_file(function_definitions, filename):
   with open(filename, "w") as file:
-    for funcname in functions:
-      file.write(functions[funcname] + "\n")
+    for funcname in function_definitions:
+      file.write(function_definitions[funcname] + "\n")
 
 
 def write_trace_file(traces, filename, module_path):
@@ -417,8 +488,8 @@ def main(args):
   lhs_rhs_type = MatrixElemTypeId(args.lhs_rhs_type)
   acc_type = infer_acc_type(lhs_rhs_type)
   shapes_id = ShapesId(args.shapes)
-  (functions, traces) = generate(lhs_rhs_type, acc_type, shapes_id)
-  write_code_file(functions, args.output_code)
+  (function_definitions, traces) = generate(lhs_rhs_type, acc_type, shapes_id)
+  write_code_file(function_definitions, args.output_code)
   write_trace_file(traces, args.output_trace, args.module_path)
 
 
