@@ -25,7 +25,7 @@ docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   gcr.io/iree-oss/cmake-swiftshader@sha256:031aded9cd66d30fcfa4dabea05a69721f33239516bc2e10ca216afd9ae4c012 \
-  build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-swiftshader/build.sh
+  build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-swiftshader-asan/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.
