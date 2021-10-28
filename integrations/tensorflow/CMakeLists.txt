@@ -8,57 +8,10 @@
 # dependent code under this directory tree. The CMake support is limited to
 # compiler binaries and python bindings.
 #
-# Bazel is a beast that likes to be the center of the universe. There is some
-# fragility in delegating to it in this fashion.
-#
 # If this directory is included, then building TensorFlow is assumed (the
 # config option happens at the higher level).
 
-set(_bazel_targets)
-set(_executable_paths)
-
-set(IREE_TF_TOOLS_ROOT
-    "${CMAKE_SOURCE_DIR}/integrations/tensorflow/bazel-bin/iree_tf_compiler"
-    CACHE STRING "Root directory for IREE TensorFlow integration binaries")
-
-
-if(${IREE_BUILD_TENSORFLOW_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
-  add_executable(iree_tf_compiler_iree-import-tf IMPORTED GLOBAL)
-  set_property(TARGET iree_tf_compiler_iree-import-tf
-    PROPERTY IMPORTED_LOCATION
-        "${IREE_TF_TOOLS_ROOT}/iree-import-tf"
-  )
-endif()
-
-if(${IREE_BUILD_TFLITE_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
-  add_executable(iree_tf_compiler_iree-import-tflite IMPORTED GLOBAL)
-  set_property(TARGET iree_tf_compiler_iree-import-tflite
-    PROPERTY IMPORTED_LOCATION
-        "${IREE_TF_TOOLS_ROOT}/iree-import-tflite"
-  )
-endif()
-
-if(${IREE_BUILD_XLA_COMPILER} OR ${IREE_BUILD_TENSORFLOW_ALL})
-  add_executable(iree_tf_compiler_iree-import-xla IMPORTED GLOBAL)
-  set_property(TARGET iree_tf_compiler_iree-import-xla
-    PROPERTY IMPORTED_LOCATION
-        "${IREE_TF_TOOLS_ROOT}/iree-import-xla"
-  )
-endif()
-
-if(${IREE_BUILD_TESTS})
-  add_executable(iree_tf_compiler_iree-tf-opt IMPORTED GLOBAL)
-  set_property(TARGET iree_tf_compiler_iree-tf-opt
-    PROPERTY IMPORTED_LOCATION
-        "${IREE_TF_TOOLS_ROOT}/iree-tf-opt"
-  )
-
-  add_executable(iree_tf_compiler_iree-opt-tflite IMPORTED GLOBAL)
-  set_property(TARGET iree_tf_compiler_iree-opt-tflite
-    PROPERTY IMPORTED_LOCATION
-        "${IREE_TF_TOOLS_ROOT}/iree-opt-tflite"
-  )
-endif()
+add_subdirectory(iree_tf_compiler)
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(bindings/python)

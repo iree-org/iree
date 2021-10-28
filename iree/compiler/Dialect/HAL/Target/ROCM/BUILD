@@ -31,6 +31,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",
@@ -40,6 +41,7 @@ cc_library(
         "@llvm-project//llvm:IPO",
         "@llvm-project//llvm:IRReader",
         "@llvm-project//llvm:Linker",
+        "@llvm-project//llvm:MC",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
         "@llvm-project//mlir:LLVMDialect",

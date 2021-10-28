@@ -66,20 +66,15 @@ def _convert_option_block(option, option_value):
     return ""
 
 
-def _convert_translate_tool_block(translate_tool):
-  if translate_tool is None:
+def _convert_target_block(name, target):
+  if target is None:
     return ""
   # Bazel target name to cmake binary name
   # Bazel `//iree/custom:custom-translate` -> CMake `iree_custom_custom-translate`
-  translate_tool = translate_tool.replace(
-      "//iree", "iree")  # iree/custom:custom-translate
-  translate_tool = translate_tool.replace(":",
-                                          "_")  # iree/custom_custom-translate
-  translate_tool = translate_tool.replace("/",
-                                          "_")  # iree_custom_custom-translate
-  return _convert_string_arg_block("TRANSLATE_TOOL",
-                                   translate_tool,
-                                   quote=False)
+  target = target.replace("//iree", "iree")  # iree/custom:custom-translate
+  target = target.replace(":", "_")  # iree/custom_custom-translate
+  target = target.replace("/", "_")  # iree_custom_custom-translate
+  return _convert_string_arg_block(name, target, quote=False)
 
 
 def _convert_srcs_block(srcs):
@@ -439,12 +434,15 @@ class BuildFileFunctions(object):
                            flags=None,
                            translate_tool=None,
                            c_identifier=None,
+                           opt_flags=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     src_block = _convert_string_arg_block("SRC", src)
     c_identifier_block = _convert_string_arg_block("C_IDENTIFIER", c_identifier)
-    translate_tool_block = _convert_translate_tool_block(translate_tool)
+    translate_tool_block = _convert_target_block("TRANSLATE_TOOL",
+                                                 translate_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
+    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
     testonly_block = _convert_option_block("TESTONLY", testonly)
 
     self.converter.body += (f"iree_bytecode_module(\n"
@@ -453,6 +451,7 @@ class BuildFileFunctions(object):
                             f"{c_identifier_block}"
                             f"{translate_tool_block}"
                             f"{flags_block}"
+                            f"{opt_flags_block}"
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
@@ -532,6 +531,7 @@ class BuildFileFunctions(object):
                                            target_backends_and_drivers=None,
                                            runner_args=None,
                                            tags=None,
+                                           opt_flags=None,
                                            **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
@@ -542,6 +542,7 @@ class BuildFileFunctions(object):
                                                       compiler_flags)
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
+    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
 
     self.converter.body += (f"iree_check_single_backend_test_suite(\n"
                             f"{name_block}"
@@ -551,6 +552,7 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
+                            f"{opt_flags_block}"
                             f")\n\n")
 
   def iree_check_test_suite(self,
@@ -560,6 +562,7 @@ class BuildFileFunctions(object):
                             compiler_flags=None,
                             runner_args=None,
                             tags=None,
+                            opt_flags=None,
                             **kwargs):
     target_backends = None
     drivers = None
@@ -576,6 +579,7 @@ class BuildFileFunctions(object):
                                                       compiler_flags)
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
+    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
 
     self.converter.body += (f"iree_check_test_suite(\n"
                             f"{name_block}"
@@ -585,6 +589,54 @@ class BuildFileFunctions(object):
                             f"{compiler_flags_block}"
                             f"{runner_args_block}"
                             f"{labels_block}"
+                            f"{opt_flags_block}"
+                            f")\n\n")
+
+  def iree_generated_trace_runner_test(self,
+                                       name,
+                                       generator,
+                                       generator_args=None,
+                                       trace_runner=None,
+                                       target_backends_and_drivers=None,
+                                       compiler_flags=None,
+                                       runner_args=None,
+                                       tags=None,
+                                       opt_tool=None,
+                                       opt_flags=None,
+                                       **kwargs):
+    target_backends = None
+    drivers = None
+    if target_backends_and_drivers is not None:
+      target_backends = [it[0] for it in target_backends_and_drivers]
+      drivers = [it[1] for it in target_backends_and_drivers]
+
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    generator_block = _convert_string_arg_block("GENERATOR",
+                                                generator,
+                                                quote=True)
+    generator_args_block = _convert_string_list_block("GENERATOR_ARGS",
+                                                      generator_args)
+    trace_runner_block = _convert_target_block("TRACE_RUNNER", trace_runner)
+    target_backends_block = _convert_string_list_block("TARGET_BACKENDS",
+                                                       target_backends)
+    drivers_block = _convert_string_list_block("DRIVERS", drivers)
+    compiler_flags_block = _convert_string_list_block("COMPILER_FLAGS",
+                                                      compiler_flags)
+    runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
+    labels_block = _convert_string_list_block("LABELS", tags)
+    opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
+
+    self.converter.body += (f"iree_generated_trace_runner_test(\n"
+                            f"{name_block}"
+                            f"{generator_block}"
+                            f"{generator_args_block}"
+                            f"{trace_runner_block}"
+                            f"{target_backends_block}"
+                            f"{drivers_block}"
+                            f"{compiler_flags_block}"
+                            f"{runner_args_block}"
+                            f"{labels_block}"
+                            f"{opt_flags_block}"
                             f")\n\n")
 
   def iree_e2e_cartesian_product_test_suite(self,

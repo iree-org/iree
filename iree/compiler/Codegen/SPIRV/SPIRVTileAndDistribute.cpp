@@ -6,17 +6,17 @@
 
 //===- SPIRVTileAndDistribute.cpp -----------------------------------------===//
 //
-// This pass tiles and distributes Linalg ops with buffer semantics to subgroups
-// and invocations.
+// This pass tiles and distributes Linalg ops with buffer semantics to
+// invocations.
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
@@ -71,81 +71,6 @@ static unsigned dimToIndex(StringRef dim) {
 }
 
 //===----------------------------------------------------------------------===//
-// Subgroup tiling patterns
-//===----------------------------------------------------------------------===//
-
-/// Computes the Value for subgroupID along each dimension given number of
-/// subgroups `numSubGroups` along each dimension (x-first, y-second, z-third).
-static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
-    OpBuilder &builder, Location loc, ArrayRef<int64_t> numSubgroups) {
-  Type indexType = builder.getIndexType();
-  Value subgroupId = builder.create<gpu::SubgroupIdOp>(loc, indexType);
-  SmallVector<linalg::ProcInfo, 2> procInfo(numSubgroups.size());
-
-  // subgroupID
-  //   = id.z * nsubgroups.y * nsubgroups.x + id.y * nsubgroups.x + id.x
-  for (size_t i = 0, e = numSubgroups.size(); i != e; ++i) {
-    Value nprocs = builder.create<arith::ConstantIndexOp>(loc, numSubgroups[i]);
-    AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
-    AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
-    Value procId =
-        makeComposedAffineApply(builder, loc, d0 % s0, {subgroupId, nprocs});
-    procInfo[e - i - 1] = linalg::ProcInfo{procId, nprocs};
-    subgroupId = builder.create<arith::DivSIOp>(loc, subgroupId, nprocs);
-  }
-  return procInfo;
-}
-
-namespace {
-/// Pattern to tile linalg.matmul for subgroups.
-struct TileMatmulSubgroupPattern
-    : public linalg::LinalgTilingPattern<linalg::MatmulOp> {
-  using Base = linalg::LinalgTilingPattern<linalg::MatmulOp>;
-  TileMatmulSubgroupPattern(MLIRContext *context,
-                            linalg::LinalgTilingOptions options,
-                            linalg::LinalgTransformationFilter marker,
-                            PatternBenefit benefit = 1)
-      : Base(context, options, marker, benefit) {}
-};
-}  // namespace
-
-/// Patterns for second level tiling to target subgroups.
-static void populateTilingToSubgroupPatterns(MLIRContext *context,
-                                             RewritePatternSet &patterns) {
-  auto getInnerTileSizeFn = [&](OpBuilder &builder,
-                                Operation *operation) -> SmallVector<Value, 4> {
-    SmallVector<int64_t> tileSizes = getTileSizes(operation, 1);
-    return llvm::to_vector<4>(
-        llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-          return builder.create<arith::ConstantIndexOp>(operation->getLoc(), v);
-        }));
-  };
-
-  auto getSubgroupProcInfoFn = [&](OpBuilder &builder, Location loc,
-                                   ArrayRef<Range> parallelLoopRanges) {
-    // TODO(ravishankarm): For now assume that there is always a single subgroup
-    std::array<int64_t, 3> numSubgroups = {1, 1, 1};
-    return getSubgroupIdsAndCounts(builder, loc, numSubgroups);
-  };
-
-  linalg::LinalgLoopDistributionOptions subgroupDistributionOptions;
-  subgroupDistributionOptions.procInfo = getSubgroupProcInfoFn;
-  subgroupDistributionOptions.distributionMethod = {
-      {linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-       linalg::DistributionMethod::CyclicNumProcsEqNumIters}};
-
-  patterns.insert<TileMatmulSubgroupPattern>(
-      context,
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-          .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(subgroupDistributionOptions),
-      getLinalgMatchAndReplaceMarker(
-          {getWorkgroupMemoryMarker(), getWorkgroupMarker()},
-          getVectorizeMarker(), context));
-}
-
-//===----------------------------------------------------------------------===//
 // Invocation tiling patterns
 //===----------------------------------------------------------------------===//
 
@@ -153,13 +78,8 @@ static void populateTilingToSubgroupPatterns(MLIRContext *context,
 static void populateTilingToInvocationPatterns(MLIRContext *context,
                                                RewritePatternSet &patterns) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
-      [&](OpBuilder &builder, Operation *operation) {
-        SmallVector<int64_t> tileSizes = getTileSizes(operation, 2);
-        return llvm::to_vector<4>(
-            llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-              return builder.create<arith::ConstantIndexOp>(operation->getLoc(),
-                                                            v);
-            }));
+      [&](OpBuilder &builder, Operation *op) {
+        return getTileSizes(builder, op, 1);
       };
 
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
@@ -237,11 +157,7 @@ static void populateTilingReductionPatterns(
     MLIRContext *context, RewritePatternSet &patterns,
     linalg::LinalgTransformationFilter marker) {
   auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    SmallVector<int64_t> tileSizes = getTileSizes(op, 3);
-    return llvm::to_vector<4>(
-        llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-          return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
-        }));
+    return getTileSizes(builder, op, 2);
   };
 
   auto tilingOptions = linalg::LinalgTilingOptions()
@@ -288,36 +204,32 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   auto entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp) return;
 
-  {  // Tile and distribute to subgroups.
-    RewritePatternSet subgroupTilingPatterns(&getContext());
-    populateTilingToSubgroupPatterns(context, subgroupTilingPatterns);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(subgroupTilingPatterns));
-
-    RewritePatternSet canonicalizationPatterns =
-        linalg::getLinalgTilingCanonicalizationPatterns(context);
-    populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(canonicalizationPatterns));
-    promoteSingleIterationLoops(funcOp);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After tiling to subgroups ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
   {  // Tile and distribute to invocations.
     RewritePatternSet invocationTilingPatterns(&getContext());
     populateTilingToInvocationPatterns(context, invocationTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(invocationTilingPatterns));
 
-    // Remove trip-one loops created during cyclic loop distribution if we can
-    // prove the tiling was perfect.
-    RewritePatternSet canoncalizationPatterns(context);
-    populateAffineMinSCFCanonicalizationPattern(canoncalizationPatterns);
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tiling to invocations ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
+
+  {
+    RewritePatternSet canonicalizationPatterns =
+        linalg::getLinalgTilingCanonicalizationPatterns(context);
+
+    populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
+
+    // Add patterns to fold affine.min ops created for convolution input
+    // subtensor/subview sizes. They have the affine map of
+    // (d0) -> (<tile-size>, <dim-size> - d0 * <stride>)>(%<processor-id>)`.
+    populateFoldGPUProcessorIDUsesPatterns(context, canonicalizationPatterns);
+
+    // Add patterns to remove trip-one loops created during cyclic loop
+    // distribution, if we can prove the tiling was perfect.
     SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
     if (workgroupSize.empty()) {
       entryPointOp.emitError("expected to have workgroup_size attribute");
@@ -328,21 +240,14 @@ void SPIRVTileAndDistributePass::runOnOperation() {
                                             SmallVectorImpl<Value> &symbols) {
       return getThreadRange(processorValue, dims, symbols, workgroupSize);
     };
-    populateRemoveSingleIterationLoopPattern(canoncalizationPatterns,
+    populateRemoveSingleIterationLoopPattern(canonicalizationPatterns,
                                              getThreadRangeFn);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(canoncalizationPatterns));
 
-    // Perform generic canonicalization.
-    RewritePatternSet threadLevelTilingCanonicalizationPatterns =
-        linalg::getLinalgTilingCanonicalizationPatterns(context);
-    populateAffineMinCanonicalizationPattern(
-        threadLevelTilingCanonicalizationPatterns);
-    (void)applyPatternsAndFoldGreedily(
-        funcOp, std::move(threadLevelTilingCanonicalizationPatterns));
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns));
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After tiling to invocations ---\n";
+      llvm::dbgs() << "--- After loop/affine canonicalization ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
@@ -353,14 +258,12 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     auto marker = getLinalgMatchAndReplaceMarker(getTileReductionMarker(),
                                                  getVectorizeMarker(), context);
     populateTilingReductionPatterns(context, reductionTilingPatterns, marker);
-    populateFoldGPUProcessorIDUsesPatterns(context, reductionTilingPatterns);
-    scf::populateSCFForLoopCanonicalizationPatterns(reductionTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(reductionTilingPatterns));
 
     RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
-    populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
+    scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns));
 

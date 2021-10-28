@@ -15,11 +15,31 @@ def iree_bytecode_module(
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
         embedded_linker_tool = "@llvm-project//lld:lld",
+        opt_tool = "//iree/tools:iree-opt",
+        opt_flags = [],
         c_identifier = "",
         **kwargs):
+    translate_src = src
+    if opt_flags:
+        translate_src = "%s.opt.mlir" % (name)
+        native.genrule(
+            name = "%s_opt" % (name),
+            srcs = [src],
+            outs = [translate_src],
+            cmd = " ".join([
+                "$(location %s)" % (opt_tool),
+                " ".join([('"%s"' % flag) for flag in opt_flags]),
+                "$(location %s)" % (src),
+                "-o $(location %s)" % (translate_src),
+            ]),
+            tools = [opt_tool],
+            message = "Transforming MLIR source for IREE module %s..." % (name),
+            output_to_bindir = 1,
+        )
+
     native.genrule(
         name = name,
-        srcs = [src],
+        srcs = [translate_src],
         outs = [
             "%s.vmfb" % (name),
         ],
@@ -29,7 +49,7 @@ def iree_bytecode_module(
                 " ".join(flags),
                 "-iree-llvm-embedded-linker-path=$(location %s)" % (embedded_linker_tool),
                 "-o $(location %s.vmfb)" % (name),
-                "$(location %s)" % (src),
+                "$(location %s)" % (translate_src),
             ]),
         ]),
         tools = [translate_tool, embedded_linker_tool],

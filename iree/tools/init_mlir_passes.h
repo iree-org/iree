@@ -46,6 +46,7 @@ inline void registerMlirPasses() {
   registerAffineScalarReplacementPass();
   registerParallelLoopCollapsingPass();
   registerPrintOpStatsPass();
+  registerViewOpGraphPassPass();
   registerStripDebugInfoPass();
   registerSymbolDCEPass();
 
@@ -82,7 +83,7 @@ inline void registerMlirPasses() {
   registerConvertLinalgToSPIRVPass();
 
   // TOSA.
-  registerTosaToLinalgOnTensorsPass();
+  registerTosaToLinalgPass();
   registerTosaToStandardPass();
 }
 

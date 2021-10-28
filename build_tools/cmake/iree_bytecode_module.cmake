@@ -32,8 +32,8 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER"
-    "FLAGS"
+    "NAME;SRC;TRANSLATE_TOOL;C_IDENTIFIER;OPT_TOOL;MODULE_FILE_NAME"
+    "FLAGS;OPT_FLAGS"
     ${ARGN}
   )
 
@@ -48,21 +48,72 @@ function(iree_bytecode_module)
     set(_TRANSLATE_TOOL "iree-translate")
   endif()
 
+  if(DEFINED _RULE_MODULE_FILE_NAME)
+    set(_MODULE_FILE_NAME "${_RULE_MODULE_FILE_NAME}")
+  else()
+    set(_MODULE_FILE_NAME "${_RULE_NAME}.vmfb")
+  endif()
+
+  # If OPT_FLAGS was specified, preprocess the source file with the OPT_TOOL
+  if(_RULE_OPT_FLAGS)
+    # Create the filename for the output of OPT_TOOL, which
+    # will relace _RULE_SRC as the input to iree_bytecode_module.
+    set(_TRANSLATE_SRC_BASENAME "${_RULE_NAME}.opt.mlir")
+    set(_TRANSLATE_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_TRANSLATE_SRC_BASENAME}")
+
+    # Set default for OPT_TOOL.
+    if(_RULE_OPT_TOOL)
+      set(_OPT_TOOL ${_RULE_OPT_TOOL})
+    else()
+      set(_OPT_TOOL "iree-opt")
+    endif()
+
+    # Prepare the OPT_TOOL command line.
+    iree_get_executable_path(_OPT_TOOL_EXECUTABLE ${_OPT_TOOL})
+
+    set(_ARGS "${_RULE_OPT_FLAGS}")
+    get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
+    list(APPEND _ARGS "${_SRC_PATH}")
+    list(APPEND _ARGS "-o")
+    list(APPEND _ARGS "${_TRANSLATE_SRC}")
+
+    add_custom_command(
+      OUTPUT
+        "${_TRANSLATE_SRC_BASENAME}"
+      COMMAND
+        ${_OPT_TOOL_EXECUTABLE}
+        ${_ARGS}
+      # Changes to the opt tool should trigger rebuilding.
+      # Using {_OPT_TOOL} as the dependency would only work when the tools
+      # are built in the same cmake build directory as the tests, that is,
+      # when NOT cross-compiling. Using {_OPT_TOOL_EXECUTABLE} works
+      # uniformly regardless of that.
+      DEPENDS
+        ${_OPT_TOOL_EXECUTABLE}
+        ${_RULE_SRC}
+    )
+  else()
+    # OPT_FLAGS was not specified, so are not using the OPT_TOOL.
+    # Just pass the source file directly as the source for the bytecode module.
+    set(_TRANSLATE_SRC "${_RULE_SRC}")
+  endif()
+
   iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
   iree_get_executable_path(_EMBEDDED_LINKER_TOOL_EXECUTABLE "lld")
 
   set(_ARGS "${_RULE_FLAGS}")
-  get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
-  list(APPEND _ARGS "${_SRC_PATH}")
+
+  get_filename_component(_TRANSLATE_SRC_PATH "${_TRANSLATE_SRC}" REALPATH)
+  list(APPEND _ARGS "${_TRANSLATE_SRC_PATH}")
   list(APPEND _ARGS "-o")
-  list(APPEND _ARGS "${_RULE_NAME}.vmfb")
-  list(APPEND _ARGS "-iree-llvm-embedded-linker-path=${_EMBEDDED_LINKER_TOOL_EXECUTABLE}")
+  list(APPEND _ARGS "${_MODULE_FILE_NAME}")
+  list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_EMBEDDED_LINKER_TOOL_EXECUTABLE}\"")
 
   # Depending on the binary instead of the target here given we might not have
   # a target in this CMake invocation when cross-compiling.
   add_custom_command(
     OUTPUT
-      "${_RULE_NAME}.vmfb"
+      "${_MODULE_FILE_NAME}"
     COMMAND
       ${_TRANSLATE_TOOL_EXECUTABLE}
       ${_ARGS}
@@ -71,7 +122,7 @@ function(iree_bytecode_module)
     DEPENDS
       ${_TRANSLATE_TOOL_EXECUTABLE}
       ${_EMBEDDED_LINKER_TOOL_EXECUTABLE}
-      ${_RULE_SRC}
+      ${_TRANSLATE_SRC}
   )
 
   if(_RULE_TESTONLY)

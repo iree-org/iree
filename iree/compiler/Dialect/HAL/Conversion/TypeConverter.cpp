@@ -15,7 +15,8 @@ namespace mlir {
 namespace iree_compiler {
 
 HALTypeConverter::HALTypeConverter(
-    ArrayRef<const HALConversionDialectInterface *> conversionInterfaces)
+    ArrayRef<const HALConversionDialectInterface *> conversionInterfaces,
+    bool supportTensors)
     : conversionInterfaces(conversionInterfaces.vec()) {
   // Custom conversion interfaces for external dialects.
   addConversion([this](Type type, SmallVectorImpl<Type> &results) {
@@ -31,10 +32,13 @@ HALTypeConverter::HALTypeConverter(
   // Tensors become buffers by default.
   // Shapes and types are carried independently or folded away entirely - all
   // we need at the HAL level is a blob of bytes.
-  addConversion([](TensorType type) -> Optional<Type> {
+  addConversion([=](TensorType type) -> Optional<Type> {
     // HAL only should be concerned with numeric values.
     if (HALTypeConverter::shouldConvertToBuffer(type)) {
-      return IREE::HAL::BufferType::get(type.getContext());
+      return supportTensors ? Optional<Type>{IREE::HAL::BufferViewType::get(
+                                  type.getContext())}
+                            : Optional<Type>{IREE::HAL::BufferType::get(
+                                  type.getContext())};
     }
     return llvm::None;
   });

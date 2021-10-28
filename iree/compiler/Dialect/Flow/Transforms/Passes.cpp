@@ -66,7 +66,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    const TransformOptions &transformOptions) {
   // Special case peephole optimizations.
   {
     passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
@@ -84,9 +85,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Simplify util.global accesses early on; this can help with dispatch
   // region formation as redundant store-loads are removed.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Util::createSimplifyGlobalAccessesPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
 
+  // Cleanup and canonicalization of util.global (and other util ops).
+  passManager.addPass(IREE::Util::createApplyPatternsPass());
+  passManager.addPass(IREE::Util::createFoldGlobalsPass());
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
@@ -152,60 +158,72 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // iree-benchmark-module to benchmark each dispatch individually, as well as
   // exporting all original model entry points.
   if (clExportBenchmarkFuncs) {
-    passManager.addPass(createExportBenchmarkFuncsPass());
+    passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
   }
 
   // Inject tracing that logs both input and output tensors from all dispatches.
   // We do this after deduping so that the executable names match later stages.
   if (clTraceDispatchTensors) {
-    passManager.addNestedPass<mlir::FuncOp>(createInjectDispatchTracingPass());
+    passManager.addNestedPass<mlir::FuncOp>(
+        IREE::Flow::createInjectDispatchTracingPass());
   }
+
+  // Cleanup the IR after we are done.
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+
+  passManager.addNestedPass<IREE::Flow::ExecutableOp>(
+      mlir::createCanonicalizerPass());
+  passManager.addNestedPass<IREE::Flow::ExecutableOp>(mlir::createCSEPass());
+
+  // Symbol DCE any remaining variables/functions that are now no longer
+  // required.
+  passManager.addPass(mlir::createSymbolDCEPass());
 
   //----------------------------------------------------------------------------
   // Stream formation.
   // Pre-conditions:
   //   - Full formation of dispatch regions
   //----------------------------------------------------------------------------
+  // TODO(#7277): remove when switched to streams (happens there now).
+  if (transformOptions.streamFormation) {
+    // Cleanup the IR before we try to form streams.
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
-  // Form streams.
-  // Cleanup the IR before we try to form streams.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+    // Outline large constants into globals so we can efficiently manage them.
+    passManager.addPass(IREE::Flow::createOutlineLargeConstantsPass());
 
-  // Reorder blocks to increase the grouping of streamable ops.
-  passManager.addNestedPass<mlir::FuncOp>(createHoistUnstreamableOpsPass());
+    // Reorder blocks to increase the grouping of streamable ops.
+    passManager.addNestedPass<mlir::FuncOp>(
+        IREE::Flow::createHoistUnstreamableOpsPass());
 
-  // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
-  // arbitrary ordering.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+    // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
+    // arbitrary ordering.
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
 
-  // Clone constants that escape basic blocks until we have better analysis.
-  passManager.addNestedPass<mlir::FuncOp>(createInsertConstantClonesPass());
+    // Clone constants that escape basic blocks until we have better analysis.
+    passManager.addNestedPass<mlir::FuncOp>(
+        IREE::Flow::createInsertConstantClonesPass());
 
-  // Group streamable ops into streams.
-  passManager.addNestedPass<mlir::FuncOp>(createFormStreamsPass());
+    // Group streamable ops into streams.
+    passManager.addNestedPass<mlir::FuncOp>(
+        IREE::Flow::createFormStreamsPass());
 
-  // Prior to leaving the pipeline we need to clean things up for following
-  // layers. These transforms may be undone by subsequent CSE/folding passes.
-  passManager.addPass(createOutlineLargeConstantsPass());
-
-  // Forming streams involves a fair amount of subgraph stitching, which can
-  // cause duplication. Run CSE to collapse.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-
-  // Symbol DCE any remaining variables/functions that are now no longer
-  // required.
-  passManager.addPass(mlir::createSymbolDCEPass());
+    // Forming streams involves a fair amount of subgraph stitching, which can
+    // cause duplication. Run CSE to collapse.
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+  }
 }
 
 void registerFlowTransformPassPipeline() {
-  PassPipelineRegistration<> transformPassPipeline(
+  PassPipelineRegistration<TransformOptions> transformPassPipeline(
       "iree-flow-transformation-pipeline",
       "Runs the full IREE flow dialect transformation pipeline",
-      [](OpPassManager &passManager) {
-        buildFlowTransformPassPipeline(passManager);
+      [](OpPassManager &passManager, const TransformOptions &transformOptions) {
+        buildFlowTransformPassPipeline(passManager, transformOptions);
       });
 }
 

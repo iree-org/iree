@@ -26,6 +26,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target

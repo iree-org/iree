@@ -8,8 +8,7 @@
 # variables set in the base image. Is this terrible layering? Yes, but don't
 # blame me. I wasn't the one that made Dockerfile a really unextensible format.
 
-# apparently even building the compiler requires Python now 😭
-FROM gcr.io/iree-oss/cmake-python@sha256:7e31103ee35f52e6d6019adf474bc60758710e95f20ee33ed94aee3f8780edbd AS final
+FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 AS final
 
 ENV CC /usr/bin/gcc-9
 ENV CXX /usr/bin/g++-9

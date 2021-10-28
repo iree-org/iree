@@ -1,7 +1,7 @@
 // RUN: iree-opt %s -cse -iree-llvmcpu-tile-and-vectorize -cse -canonicalize -split-input-file | IreeFileCheck %s
 
-#config0 = {tileSizes = [[64, 64]]}
-#config1 = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
+#config0 = #iree_codegen.lowering.config<tile_sizes = [[64, 64]], native_vector_size = []>
+#config1 = #iree_codegen.lowering.config<tile_sizes = [[64, 64], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0) -> (64, -d0 + 383)>
 #map2 = affine_map<(d0) -> (64, -d0 + 513)>

@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -112,11 +113,7 @@ class SPIRVRemoveOneTripTiledLoopPass
     auto translationInfo = getTranslationInfo(entryPointOp);
     if (!translationInfo) return;
 
-    ArrayAttr workloadPerWorkgroupAttr = translationInfo.workloadPerWorkgroup();
-    if (!workloadPerWorkgroupAttr) return;
-    auto workloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
-        workloadPerWorkgroupAttr,
-        [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+    auto workloadPerWorkgroup = translationInfo.getWorkloadPerWorkgroupVals();
 
     MLIRContext *context = &getContext();
     removeOneTripTiledLoops(context, funcOp, cast<linalg::LinalgOp>(rootOp[0]),

@@ -19,6 +19,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===----------------------------------------------------------------------===//
+// Utility functions to get entry point(s)
+//===----------------------------------------------------------------------===//
+
 bool isEntryPoint(FuncOp func) { return func.isPublic(); }
 
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
@@ -41,21 +45,9 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
   return entryPointOps;
 }
 
-IREE::HAL::TranslationInfo getTranslationInfo(FuncOp funcOp) {
-  auto entryPointOp = getEntryPoint(funcOp);
-  if (!entryPointOp) return nullptr;
-  return getTranslationInfo(entryPointOp);
-}
-
-void setTranslationInfo(FuncOp entryPointFn,
-                        IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-                        ArrayRef<int64_t> workgroupSize,
-                        ArrayRef<int64_t> workloadPerWorkgroup) {
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  auto translationInfo = buildTranslationInfo(
-      passPipeline, workloadPerWorkgroup, entryPointFn.getContext());
-  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
-}
+//===----------------------------------------------------------------------===//
+// Utility functions used in setting default configurations.
+//===----------------------------------------------------------------------===//
 
 SmallVector<unsigned> getPartitionedLoops(Operation *op) {
   if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
@@ -78,45 +70,6 @@ SmallVector<unsigned> getPartitionedLoops(Operation *op) {
     return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
   }
   return {};
-}
-
-LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op, IREE::HAL::LoweringConfig config,
-    IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize) {
-  auto partitionedLoops = getPartitionedLoops(op);
-  SmallVector<int64_t, 3> workloadPerWorkgroup;
-  auto tileSizes = getTileSizes(config, 0);
-  if (!tileSizes.empty() && !partitionedLoops.empty()) {
-    for (unsigned depth : partitionedLoops) {
-      if (depth >= tileSizes.size()) {
-        return op->emitOpError(
-                   "illegal configuration for lowering op, expect first level "
-                   "tile size to contain at least ")
-               << partitionedLoops.back() << " elements";
-      }
-      if (tileSizes[depth] == 0) {
-        return op->emitOpError("illegal to set tilesize of loop ")
-               << depth
-               << " to zero since it is set to be partitioned at the flow "
-                  "level";
-      }
-      workloadPerWorkgroup.push_back(tileSizes[depth]);
-    }
-    if (!workloadPerWorkgroup.empty()) {
-      workloadPerWorkgroup =
-          llvm::to_vector<3>(llvm::reverse(workloadPerWorkgroup));
-    }
-  }
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  if (!entryPointOp) {
-    return entryPointFn.emitOpError(
-        "unable to find entry point op for entry point function");
-  }
-  IREE::HAL::TranslationInfo translationInfo = buildTranslationInfo(
-      passPipeline, workloadPerWorkgroup, entryPointOp->getContext());
-  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
-  return success();
 }
 
 /// Walk up the defs of the view, to get the untiled value. Either walks up
@@ -318,14 +271,24 @@ class LowerBoundExprVisitor
   }
 
   LogicalResult visitMulExpr(AffineBinaryOpExpr expr) {
-    SmallVector<Value> vals =
-        getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
-    if (vals.size() != 2 || !vals[0] || !vals[1]) {
-      return failure();
+    SmallVector<Value> vals;
+    Optional<unsigned> dimension;
+    // workgroupSizeOp may have been folded into a constant expression.
+    if (auto wgSize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
+      vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS()});
+      if (vals.size() != 1 || !vals[0]) {
+        return failure();
+      }
+      loopInfo.workgroupSize = wgSize.getValue();
+      dimension = checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp>(vals);
+    } else {
+      vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
+      if (vals.size() != 2 || !vals[0] || !vals[1]) {
+        return failure();
+      }
+      dimension = checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp,
+                                  IREE::HAL::InterfaceWorkgroupSizeOp>(vals);
     }
-    Optional<unsigned> dimension =
-        checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp,
-                        IREE::HAL::InterfaceWorkgroupSizeOp>(vals);
     if (!dimension) {
       return failure();
     }
@@ -372,11 +335,22 @@ class StepExprVisitor
       }
       expr = e.cast<AffineBinaryOpExpr>();
     } else {
-      loopInfo.step = IntegerAttr::get(IndexType::get(applyOp.getContext()), 1);
+      // Check if WorkgroupSizeOp is folded.
+      if (loopInfo.workgroupSize) {
+        if (auto stepBySize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
+          loopInfo.step =
+              IntegerAttr::get(IndexType::get(applyOp.getContext()),
+                               stepBySize.getValue() / *loopInfo.workgroupSize);
+        }
+      } else {
+        loopInfo.step =
+            IntegerAttr::get(IndexType::get(applyOp.getContext()), 1);
+      }
     }
 
     if (failed(processSentinel(expr.getLHS(), sentinels)) ||
-        failed(processSentinel(expr.getRHS(), sentinels))) {
+        (!loopInfo.workgroupSize &&
+         failed(processSentinel(expr.getRHS(), sentinels)))) {
       return failure();
     }
     // Either there are 3 sentinels and step isnt set, or there are two
@@ -399,13 +373,18 @@ class StepExprVisitor
       }
     }
 
-    if (sentinels.size() != 2 || !loopInfo.step) {
+    if ((sentinels.size() != 2 || !loopInfo.step) &&
+        (sentinels.size() != 1 || !loopInfo.workgroupSize)) {
       return failure();
     }
-    if (!checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp,
-                         IREE::HAL::InterfaceWorkgroupSizeOp>(
-            getValuesForDimsOrSymbols(applyOp, sentinels),
-            loopInfo.distributionDim)) {
+    SmallVector<Value> vals = getValuesForDimsOrSymbols(applyOp, sentinels);
+    if ((loopInfo.workgroupSize &&
+         !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp>(
+             vals, loopInfo.distributionDim)) ||
+        (!loopInfo.workgroupSize &&
+         !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp,
+                          IREE::HAL::InterfaceWorkgroupSizeOp>(
+             vals, loopInfo.distributionDim))) {
       return failure();
     }
     return success();
@@ -531,6 +510,16 @@ LogicalResult getComputeOps(FuncOp funcOp,
     }
   }
   return success();
+}
+
+SmallVector<TiledLoopInfo> getTiledLoopInfo(FuncOp funcOp) {
+  SmallVector<TiledLoopInfo> info;
+  funcOp.walk([&](scf::ForOp forOp) {
+    if (auto tiledLoopInfo = isTiledLoop(forOp.getContext(), forOp)) {
+      info.emplace_back(std::move(tiledLoopInfo.getValue()));
+    }
+  });
+  return info;
 }
 
 }  // namespace iree_compiler

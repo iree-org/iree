@@ -25,6 +25,13 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Utils
+//===----------------------------------------------------------------------===//
+
+// Returns the dynamic size of the value at |index|.
+Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes);
+
+//===----------------------------------------------------------------------===//
 // custom<SymbolVisibility>($sym_visibility)
 //===----------------------------------------------------------------------===//
 // some.op custom<SymbolVisibility>($sym_visibility) $sym_name
@@ -70,6 +77,12 @@ ParseResult parseSizeAwareTypeList(
     SmallVectorImpl<OpAsmParser::OperandType> &sizes);
 void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
                             OperandRange sizes);
+ParseResult parseSizeAwareTypeList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types0,
+    SmallVectorImpl<Type> &types1,
+    SmallVectorImpl<OpAsmParser::OperandType> &sizes);
+void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
+                            TypeRange types1, OperandRange sizes);
 
 //===----------------------------------------------------------------------===//
 // custom<ShapedTiedResult>
@@ -83,6 +96,34 @@ ParseResult parseShapedTiedResult(
     ArrayAttr &tiedOperands);
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
                            ValueRange resultDims, ArrayAttr tiedOperands);
+
+inline ParseResult parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
+                                         OpAsmParser::OperandType &resultDim,
+                                         ArrayAttr &tiedOperands) {
+  SmallVector<OpAsmParser::OperandType> resultDims;
+  if (failed(parseShapedTiedResult(parser, resultType, resultDims,
+                                   tiedOperands))) {
+    return failure();
+  }
+  resultDim = std::move(resultDims.front());
+  return success();
+}
+inline void printShapedTiedResult(OpAsmPrinter &p, Operation *op,
+                                  Type resultType, Value resultDim,
+                                  ArrayAttr tiedOperands) {
+  printShapedTiedResult(p, op, resultType, ValueRange{resultDim}, tiedOperands);
+}
+
+ParseResult parseShapedResultList(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
+    TypeRange operandTypes, ArrayRef<OpAsmParser::OperandType> operandDims,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    ArrayAttr &tiedOperands);
+void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
+                           TypeRange operandTypes, ValueRange operandDims,
+                           TypeRange resultTypes, ValueRange resultDims,
+                           ArrayAttr tiedOperands);
 
 //===----------------------------------------------------------------------===//
 // custom<ShapedFunctionType>

@@ -75,6 +75,7 @@ cc_library(
         "//iree/base:core_headers",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:fpu_state",
         "//iree/hal",
     ],
 )

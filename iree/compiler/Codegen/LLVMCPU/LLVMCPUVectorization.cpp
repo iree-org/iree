@@ -130,7 +130,7 @@ Optional<Value> allocateWorkgroupMemoryOnStack(
       }));
   if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
   MemRefType allocType =
-      MemRefType::get(shape, subview.getType().getElementType(), {});
+      MemRefType::get(shape, subview.getType().getElementType(), AffineMap());
   Value buffer = b.create<memref::AllocaOp>(subview.getLoc(), allocType);
   return buffer;
 }
@@ -167,9 +167,8 @@ void LLVMCPUVectorizationPass::runOnOperation() {
     l1patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder,
-               Operation *operation) -> SmallVector<Value, 4> {
-              return getTileSizes(builder, operation,
+            [](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
+              return getTileSizes(builder, op,
                                   static_cast<unsigned>(TilingLevel::L1Tiles));
             }),
         linalg::LinalgTransformationFilter(
@@ -188,11 +187,9 @@ void LLVMCPUVectorizationPass::runOnOperation() {
     l2patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder,
-               Operation *operation) -> SmallVector<Value, 4> {
+            [](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
               return getTileSizes(
-                  builder, operation,
-                  static_cast<unsigned>(TilingLevel::VectorTiles));
+                  builder, op, static_cast<unsigned>(TilingLevel::VectorTiles));
             }),
         linalg::LinalgTransformationFilter(
             Identifier::get(getWorkgroupL1TileMarker(), context),

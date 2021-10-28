@@ -85,14 +85,35 @@ external_cc_library(
 if(NOT CMAKE_CROSSCOMPILING)
   add_executable(iree-flatcc-cli
     "${FLATCC_ROOT}/src/cli/flatcc_cli.c"
+    "${FLATCC_ROOT}/external/hash/cmetrohash64.c"
+    "${FLATCC_ROOT}/external/hash/str_set.c"
+    "${FLATCC_ROOT}/external/hash/ptr_set.c"
+    "${FLATCC_ROOT}/src/compiler/hash_tables/symbol_table.c"
+    "${FLATCC_ROOT}/src/compiler/hash_tables/scope_table.c"
+    "${FLATCC_ROOT}/src/compiler/hash_tables/name_table.c"
+    "${FLATCC_ROOT}/src/compiler/hash_tables/schema_table.c"
+    "${FLATCC_ROOT}/src/compiler/hash_tables/value_set.c"
+    "${FLATCC_ROOT}/src/compiler/fileio.c"
+    "${FLATCC_ROOT}/src/compiler/parser.c"
+    "${FLATCC_ROOT}/src/compiler/semantics.c"
+    "${FLATCC_ROOT}/src/compiler/coerce.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_schema.c"
+    "${FLATCC_ROOT}/src/compiler/flatcc.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_c.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_c_reader.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_c_sort.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_c_builder.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_c_verifier.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_c_sorter.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_c_json_parser.c"
+    "${FLATCC_ROOT}/src/compiler/codegen_c_json_printer.c"
+    "${FLATCC_ROOT}/src/runtime/builder.c"
+    "${FLATCC_ROOT}/src/runtime/emitter.c"
+    "${FLATCC_ROOT}/src/runtime/refmap.c"
   )
-
-  target_link_libraries(iree-flatcc-cli
-    flatcc
-  )
-
   target_include_directories(iree-flatcc-cli SYSTEM
     PUBLIC
+      "${FLATCC_ROOT}/external"
       "${FLATCC_ROOT}/include"
       "${FLATCC_ROOT}/config"
   )

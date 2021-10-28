@@ -100,6 +100,7 @@ cc_library(
     deps = [
         "//iree/compiler/Bindings/Native/Transforms",
         "//iree/compiler/Bindings/TFLite/Transforms",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
@@ -111,6 +112,7 @@ cc_library(
         "//iree/compiler/Dialect/Modules/VMVX/Transforms",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
+        "//iree/compiler/Dialect/Stream/IR",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/Util/Transforms",
         "//iree/compiler/Dialect/VM/Analysis",

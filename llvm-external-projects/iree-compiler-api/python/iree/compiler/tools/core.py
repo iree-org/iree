@@ -10,6 +10,7 @@
 # TODO(#4131) python>=3.7: Use postponed type annotations.
 
 from enum import Enum
+import logging
 import subprocess
 from typing import Any, Dict, List, Optional, Sequence, Union
 
@@ -104,7 +105,8 @@ class CompilerOptions:
       the option. Typically used for debugging Defaults to
       `OutputFormat.FLATBUFFER_BINARY`.
     extra_args: Optional list of additional arguments to pass to the compiler.
-      Example: ["--print-ir-after-all"]
+      Example: ["--print-ir-after-all", "-some-other-arg"]. Individual arguments
+      must be separate items in the list.
     optimize: Whether to apply some default high level optimizations (default
       True).
     output_mlir_debuginfo: Include debuginfo (including paths) in any saved or
@@ -189,6 +191,10 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
 
   # Translation to perform.
   cl.append("--iree-mlir-to-vm-bytecode-module")
+
+  # Tool paths.
+  lld_path = find_tool("iree-lld")
+  cl.append(f"--iree-llvm-embedded-linker-path={lld_path}")
 
   # MLIR flags.
   if options.output_mlir_debuginfo:

@@ -567,8 +567,8 @@ func @cloneFromLargeBufferToSmallBuffer(%input: tensor<2xi32>) -> tensor<7xi32> 
     %const_span = hal.constant.subspan @_const_pool_splats[#util.byte_range<0, 32>] : tensor<7xi32>
     // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
     // CHECK-DAG: %[[C28:.+]] = arith.constant 28 : index
-    // CHECK: %[[DSTBUF:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[C28]]}
-    // CHECK: %[[CSTBUF:.+]] = util.global.load @_const_pool_splats : !hal.buffer
+    // CHECK-DAG: %[[DSTBUF:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> type("HostVisible|DeviceVisible|DeviceLocal") usage("Transfer|Mapping|Dispatch") : !hal.buffer{%[[C28]]}
+    // CHECK-DAG: %[[CSTBUF:.+]] = util.global.load @_const_pool_splats : !hal.buffer
     // CHECK: hal.command_buffer.copy_buffer<%cmd : !hal.command_buffer> source(%[[CSTBUF]] : !hal.buffer)[%[[C0]]] target(%[[DSTBUF]] : !hal.buffer)[%[[C0]]] length(%[[C28]])
     %2 = flow.tensor.clone %const_span : tensor<7xi32>
     %3 = flow.tensor.update %arg0, %2[%c3] : tensor<2xi32> -> %2 as tensor<7xi32>

@@ -382,6 +382,20 @@ Value AllocatorMapOp::getOperandSize(unsigned idx) { return {}; }
 Value AllocatorMapOp::getResultSize(unsigned idx) { return length(); }
 
 //===----------------------------------------------------------------------===//
+// hal.allocator.try_map
+//===----------------------------------------------------------------------===//
+
+void AllocatorTryMapOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(did_map(), "did_map");
+  setNameFn(result(), "mapped");
+}
+
+Value AllocatorTryMapOp::getOperandSize(unsigned idx) { return {}; }
+
+Value AllocatorTryMapOp::getResultSize(unsigned idx) { return length(); }
+
+//===----------------------------------------------------------------------===//
 // hal.allocator.pack
 //===----------------------------------------------------------------------===//
 
@@ -584,10 +598,10 @@ void CommandBufferPushDescriptorSetOp::build(
   SmallVector<Value, 4> bindingOffsets;
   SmallVector<Value, 4> bindingLengths;
   for (auto binding : bindings) {
-    bindingOrdinals.push_back(std::get<0>(binding));
-    bindingBuffers.push_back(std::get<1>(binding));
-    bindingOffsets.push_back(std::get<2>(binding));
-    bindingLengths.push_back(std::get<3>(binding));
+    bindingOrdinals.push_back(binding.ordinal);
+    bindingBuffers.push_back(binding.buffer);
+    bindingOffsets.push_back(binding.byteOffset);
+    bindingLengths.push_back(binding.byteLength);
   }
   state.addOperands(bindingOrdinals);
   state.addOperands(bindingBuffers);
@@ -645,10 +659,10 @@ void DescriptorSetCreateOp::build(
   SmallVector<Value, 4> bindingOffsets;
   SmallVector<Value, 4> bindingLengths;
   for (auto binding : bindings) {
-    bindingOrdinals.push_back(std::get<0>(binding));
-    bindingBuffers.push_back(std::get<1>(binding));
-    bindingOffsets.push_back(std::get<2>(binding));
-    bindingLengths.push_back(std::get<3>(binding));
+    bindingOrdinals.push_back(binding.ordinal);
+    bindingBuffers.push_back(binding.buffer);
+    bindingOffsets.push_back(binding.byteOffset);
+    bindingLengths.push_back(binding.byteLength);
   }
   state.addOperands(bindingOrdinals);
   state.addOperands(bindingBuffers);

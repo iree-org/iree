@@ -468,12 +468,17 @@ static iree_status_t iree_hal_task_command_buffer_discard_buffer(
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_fill_buffer
 //===----------------------------------------------------------------------===//
-// NOTE: for large fills we could dispatch this as tiles for parallelism.
+// NOTE: for large copies we dispatch this as tiles for parallelism.
 // We'd want to do some measurement for when it's worth it; filling a 200KB
-// buffer: maybe not, filling a 200MB buffer: yeah.
+// buffer: maybe not, filling a 200MB buffer: yeah. For now we just do
+// arbitrarily sized chunks.
+
+// TODO(benvanik): make this a configurable setting. Must be aligned to pattern
+// length so pick a power of two.
+#define IREE_HAL_CMD_FILL_SLICE_LENGTH (128 * 1024)
 
 typedef struct iree_hal_cmd_fill_buffer_t {
-  iree_task_call_t task;
+  iree_task_dispatch_t task;
   iree_hal_buffer_t* target_buffer;
   iree_device_size_t target_offset;
   iree_device_size_t length;
@@ -481,15 +486,25 @@ typedef struct iree_hal_cmd_fill_buffer_t {
   uint8_t pattern[8];
 } iree_hal_cmd_fill_buffer_t;
 
-static iree_status_t iree_hal_cmd_fill_buffer(
-    uintptr_t user_context, iree_task_t* task,
+static iree_status_t iree_hal_cmd_fill_tile(
+    uintptr_t user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
   const iree_hal_cmd_fill_buffer_t* cmd =
       (const iree_hal_cmd_fill_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status =
-      iree_hal_buffer_fill(cmd->target_buffer, cmd->target_offset, cmd->length,
-                           cmd->pattern, cmd->pattern_length);
+  uint32_t length_per_slice = tile_context->workgroup_size[0];
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, length_per_slice);
+
+  iree_device_size_t slice_offset =
+      tile_context->workgroup_xyz[0] * length_per_slice;
+  iree_device_size_t remaining_length = cmd->length - slice_offset;
+  iree_device_size_t slice_length =
+      iree_min(length_per_slice, remaining_length);
+
+  iree_status_t status = iree_hal_buffer_fill(
+      cmd->target_buffer, cmd->target_offset + slice_offset, slice_length,
+      cmd->pattern, cmd->pattern_length);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -506,10 +521,20 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
   IREE_RETURN_IF_ERROR(
       iree_arena_allocate(&command_buffer->arena, sizeof(*cmd), (void**)&cmd));
 
-  iree_task_call_initialize(
+  const uint32_t workgroup_size[3] = {
+      /*x=*/IREE_HAL_CMD_FILL_SLICE_LENGTH,
+      /*y=*/1,
+      /*z=*/1,
+  };
+  const uint32_t workgroup_count[3] = {
+      /*x=*/length / workgroup_size[0] + 1,
+      /*y=*/1,
+      /*z=*/1,
+  };
+  iree_task_dispatch_initialize(
       command_buffer->scope,
-      iree_task_make_call_closure(iree_hal_cmd_fill_buffer, (uintptr_t)cmd),
-      &cmd->task);
+      iree_task_make_dispatch_closure(iree_hal_cmd_fill_tile, (uintptr_t)cmd),
+      workgroup_size, workgroup_count, &cmd->task);
   cmd->target_buffer = target_buffer;
   cmd->target_offset = target_offset;
   cmd->length = length;
@@ -576,12 +601,17 @@ static iree_status_t iree_hal_task_command_buffer_update_buffer(
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_copy_buffer
 //===----------------------------------------------------------------------===//
-// NOTE: for large copies we could dispatch this as tiles for parallelism.
+// NOTE: for large copies we dispatch this as tiles for parallelism.
 // We'd want to do some measurement for when it's worth it; copying a 200KB
-// buffer: maybe not, copying a 200MB buffer: yeah.
+// buffer: maybe not, copying a 200MB buffer: yeah. For now we just do
+// arbitrarily sized chunks.
+
+// TODO(benvanik): make this a configurable setting. Must be aligned to pattern
+// length so pick a power of two.
+#define IREE_HAL_CMD_COPY_SLICE_LENGTH (128 * 1024)
 
 typedef struct iree_hal_cmd_copy_buffer_t {
-  iree_task_call_t task;
+  iree_task_dispatch_t task;
   iree_hal_buffer_t* source_buffer;
   iree_device_size_t source_offset;
   iree_hal_buffer_t* target_buffer;
@@ -589,15 +619,25 @@ typedef struct iree_hal_cmd_copy_buffer_t {
   iree_device_size_t length;
 } iree_hal_cmd_copy_buffer_t;
 
-static iree_status_t iree_hal_cmd_copy_buffer(
-    uintptr_t user_context, iree_task_t* task,
+static iree_status_t iree_hal_cmd_copy_tile(
+    uintptr_t user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
   const iree_hal_cmd_copy_buffer_t* cmd =
       (const iree_hal_cmd_copy_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
+  uint32_t length_per_slice = tile_context->workgroup_size[0];
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, length_per_slice);
+
+  iree_device_size_t slice_offset =
+      tile_context->workgroup_xyz[0] * length_per_slice;
+  iree_device_size_t remaining_length = cmd->length - slice_offset;
+  iree_device_size_t slice_length =
+      iree_min(length_per_slice, remaining_length);
+
   iree_status_t status = iree_hal_buffer_copy_data(
-      cmd->source_buffer, cmd->source_offset, cmd->target_buffer,
-      cmd->target_offset, cmd->length);
+      cmd->source_buffer, cmd->source_offset + slice_offset, cmd->target_buffer,
+      cmd->target_offset + slice_offset, slice_length);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -614,10 +654,20 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
   IREE_RETURN_IF_ERROR(
       iree_arena_allocate(&command_buffer->arena, sizeof(*cmd), (void**)&cmd));
 
-  iree_task_call_initialize(
+  const uint32_t workgroup_size[3] = {
+      /*x=*/IREE_HAL_CMD_COPY_SLICE_LENGTH,
+      /*y=*/1,
+      /*z=*/1,
+  };
+  const uint32_t workgroup_count[3] = {
+      /*x=*/length / workgroup_size[0] + 1,
+      /*y=*/1,
+      /*z=*/1,
+  };
+  iree_task_dispatch_initialize(
       command_buffer->scope,
-      iree_task_make_call_closure(iree_hal_cmd_copy_buffer, (uintptr_t)cmd),
-      &cmd->task);
+      iree_task_make_dispatch_closure(iree_hal_cmd_copy_tile, (uintptr_t)cmd),
+      workgroup_size, workgroup_count, &cmd->task);
   cmd->source_buffer = source_buffer;
   cmd->source_offset = source_offset;
   cmd->target_buffer = target_buffer;
