@@ -1,7 +1,7 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization)'}))" -split-input-file %s | IreeFileCheck %s
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization{promote-workgroup-to-full-tiles}),cse'}))" -split-input-file %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
 
-#config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
+#config = #iree_codegen.lowering.config<tile_sizes = [[64, 64], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>
 hal.executable private @dynamic_matmul  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -114,7 +114,7 @@ hal.executable private @dynamic_matmul  {
 
 // -----
 
-#config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
+#config = #iree_codegen.lowering.config<tile_sizes = [[64, 64], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>
 hal.executable private @matmul_i8_i8_i32  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"

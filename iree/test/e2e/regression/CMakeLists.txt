@@ -176,7 +176,6 @@ iree_generated_trace_runner_test(
     "vmvx"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
-    "--iree-codegen-vectorize-linalg-mmt4d"
 )
 
 iree_generated_trace_runner_test(
@@ -197,7 +196,6 @@ iree_generated_trace_runner_test(
     "vmvx"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
-    "--iree-codegen-vectorize-linalg-mmt4d"
 )
 
 iree_generated_trace_runner_test(
@@ -216,7 +214,6 @@ iree_generated_trace_runner_test(
     "dylib"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
-    "--iree-codegen-vectorize-linalg-mmt4d"
 )
 
 iree_generated_trace_runner_test(
@@ -235,7 +232,6 @@ iree_generated_trace_runner_test(
     "dylib"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
-    "--iree-codegen-vectorize-linalg-mmt4d"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

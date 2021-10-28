@@ -697,7 +697,8 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
       return success();
     }
 
-    auto dynamicDims = IREE::Util::findDynamicDims(op.source(), op);
+    auto dynamicDims = IREE::Util::findDynamicDims(
+        op.source(), op->getBlock(), Block::iterator(op.getOperation()));
     if (!dynamicDims.hasValue()) {
       return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");
     }
@@ -766,6 +767,15 @@ void TensorSplatOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   // TODO(benvanik): canonicalize splat+slice to smaller splat.
   results.insert<FoldSplatReshapeIntoSplat>(context);
+}
+
+OpFoldResult TensorSplatOp::fold(ArrayRef<Attribute> operands) {
+  if (operands.size() == 1 && operands.front()) {
+    // Splat value is constant and we can fold the operation.
+    return SplatElementsAttr::get(result().getType().cast<ShapedType>(),
+                                  operands[0]);
+  }
+  return {};
 }
 
 OpFoldResult TensorCloneOp::fold(ArrayRef<Attribute> operands) {

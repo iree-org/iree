@@ -4,13 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.16.3)
-
-# Do not set MSVC warning flags like /W3 by default (since 3.15):
-#   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
-if(POLICY CMP0092)
-  cmake_policy(SET CMP0092 NEW)
-endif()
+cmake_minimum_required(VERSION 3.16.3...3.21)
 
 # LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
@@ -37,6 +31,7 @@ endif()
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
+option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
@@ -46,10 +41,9 @@ option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
 
 option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
-option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
-option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
-option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
-option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
+option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
+option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
+option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
@@ -72,15 +66,12 @@ if(${IREE_BUILD_TENSORFLOW_ALL} OR
   set(IREE_ENABLE_TENSORFLOW ON)
 endif()
 
+
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
 # Default python bindings to enabled for some features.
-if(${IREE_ENABLE_TENSORFLOW})
-  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" ON)
-else()
-  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
-endif()
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" "${IREE_ENABLE_TENSORFLOW}")
 
 #-------------------------------------------------------------------------------
 # Experimental project flags
@@ -440,17 +431,17 @@ if(IREE_ENABLE_THREADING)
   add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 endif()
 
-iree_set_flatcc_cmake_options()
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if (NOT CMAKE_CROSSCOMPILING)
-  install(TARGETS iree-flatcc-cli
-          COMPONENT iree-flatcc-cli
-          RUNTIME DESTINATION bin)
+  install(
+    TARGETS iree-flatcc-cli
+    COMPONENT iree-flatcc-cli
+    RUNTIME DESTINATION bin
+  )
 endif()
 
 if(IREE_BUILD_COMPILER)

@@ -6,11 +6,10 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
@@ -18,43 +17,13 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
 
 namespace mlir {
 namespace iree_compiler {
-
-//===----------------------------------------------------------------------===//
-// Utilities
-//===----------------------------------------------------------------------===//
-
-/// Defines the workgroup count region on entry point ops for the
-/// `SPIRVDistributeToGlobalID` pipeline.
-// TODO(ravishankarm): Remove this when that pipeline is deprecated.
-static LogicalResult setTranslationUsingDistributeToGlobalId(
-    FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
-  auto entryPointOp = getEntryPoint(funcOp);
-  MLIRContext *context = entryPointOp.getContext();
-  auto translationInfo = buildTranslationInfo(
-      IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistributeToGlobalID,
-      /*workloadPerWorkgroup =*/{}, context);
-  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
-  OpBuilder builder(context);
-  int64_t workgroupSizeX = workgroupSize[0];
-  auto numWorkgroupsFn = [workgroupSizeX](OpBuilder &b, Location loc,
-                                          std::array<Value, 3> workload) {
-    AffineExpr e1, e2, e3;
-    bindSymbols(b.getContext(), e1, e2, e3);
-    AffineExpr expr = e1 * e2 * e3;
-    expr = expr.ceilDiv(workgroupSizeX);
-    Value numWorkgroupsX = linalg::applyMapToValues(
-        b, loc, AffineMap::get(0, 3, expr), workload)[0];
-    Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-    return std::array<Value, 3>{numWorkgroupsX, one, one};
-  };
-  return defineWorkgroupCountRegion(builder, funcOp, numWorkgroupsFn);
-}
 
 //===----------------------------------------------------------------------===//
 // Convolution Default Configuration
@@ -107,9 +76,9 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   int64_t residualThreads = subgroupSize;
   int64_t residualTilingFactor = bestTilingFactor;
 
-  SmallVector<int64_t, 3> workgroupSize(3, 1);        // (X, Y, Z)
-  SmallVector<int64_t, 4> workgroupTileSizes(4, 0);   // (N, OH, OW, OC)
-  SmallVector<int64_t, 4> invocationTileSizes(4, 0);  // (N, OH, OW, OC)
+  SmallVector<int64_t, 3> workgroupSize(3, 1);     // (X, Y, Z)
+  SmallVector<int64_t> workgroupTileSizes(4, 0);   // (N, OH, OW, OC)
+  SmallVector<int64_t> invocationTileSizes(4, 0);  // (N, OH, OW, OC)
 
   // Deduce the configuration for the OC dimension.
   for (int64_t x = residualThreads; x >= 2; x >>= 1) {
@@ -181,7 +150,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     }
   }
 
-  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(invocationTileSizes);
@@ -244,10 +213,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   int64_t residualThreads = bestX * bestY;
   int64_t residualTilingFactor = (bestThreadM + bestThreadK) * bestThreadN;
 
-  SmallVector<int64_t, 3> workgroupSize(3, 1);               // (X, Y, Z)
-  SmallVector<int64_t, 4> workgroupTileSizes(2 + isBM, 0);   // (B, M, N)
-  SmallVector<int64_t, 4> invocationTileSizes(2 + isBM, 0);  // (B, M, N)
-  SmallVector<int64_t, 4> reductionTileSizes(3 + isBM, 0);   // (B, M, N, K)
+  SmallVector<int64_t, 3> workgroupSize(3, 1);            // (X, Y, Z)
+  SmallVector<int64_t> workgroupTileSizes(2 + isBM, 0);   // (B, M, N, K)
+  SmallVector<int64_t> invocationTileSizes(2 + isBM, 0);  // (B, M, N, K)
+  SmallVector<int64_t> reductionTileSizes(3 + isBM, 0);   // (B, M, N, K)
 
   if (isBM) workgroupTileSizes[0] = invocationTileSizes[0] = 1;
 
@@ -302,7 +271,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   }
   if (reductionTileSizes[2 + isBM] == 0) return success();
 
-  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(invocationTileSizes);
@@ -321,13 +290,13 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
 static LogicalResult setOpConfig(spirv::ResourceLimitsAttr limits,
                                  linalg_ext::FftOp op) {
   const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
-  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute;
+  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
   auto partitionedLoops = getPartitionedLoops(op);
   unsigned loopDepth = partitionedLoops.back() + 1;
-  SmallVector<int64_t, 4> workgroupTileSize(loopDepth, 0);
+  SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
 
   // Tiling along partitioned loops with size 1.
   for (int64_t loopIndex : partitionedLoops) {
@@ -357,7 +326,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op) {
   auto partitionedLoops = getPartitionedLoops(op);
   if (partitionedLoops.empty()) {
-    auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+    auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
     auto funcOp = op->getParentOfType<FuncOp>();
     return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, {}, pipeline,
@@ -367,7 +336,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
   int64_t numElementsPerWorkgroup = subgroupSize;
   int64_t numElementsPerThread = 1;
-  auto pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute;
+  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
   // Returns true if the given `operand` has 32-bit element type.
   auto has32BitElementType = [](Value operand) {
@@ -415,15 +384,15 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
     if (vectorize) {
       numElementsPerThread = numElementsPerWorkgroup / subgroupSize;
-      pipeline = IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorize;
+      pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
     }
   }
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
   unsigned loopDepth = partitionedLoops.back() + 1;
-  SmallVector<int64_t, 4> workgroupTileSize(loopDepth, 0);
-  SmallVector<int64_t, 4> threadTileSize(loopDepth, 0);
+  SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
+  SmallVector<int64_t> threadTileSize(loopDepth, 0);
 
   // Tiling along partitioned loops with size 1.
   for (int64_t loopIndex : partitionedLoops) {
@@ -534,24 +503,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
-    int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
-
-    // If the dispatch region does not contain tiled and distributed Linalg ops,
-    // invoke the pipeline to distribute to global invocations.
-    if (tiledLoops.empty() && llvm::none_of(computeOps, [](Operation *op) {
-          return hasMarker(op, getWorkgroupMarker());
-        })) {
-      std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
-      if (failed(
-              setTranslationUsingDistributeToGlobalId(funcOp, workgroupSize))) {
-        return computeOps[0]->emitOpError(
-            "failed to set translation info for distributing to global IDs");
-      }
-      continue;
-    }
-
     Operation *rootOperation = nullptr;
-
     // Try to find a configuration according to a matmul/convolution op and use
     // it as the root op.
     for (Operation *computeOp : computeOps) {
@@ -597,8 +549,9 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
         SmallVector<int64_t> workloadPerWorkgroup(tiledLoops.size(), 1);
         workloadPerWorkgroup.front() = subgroupSize * 4;
         setTranslationInfo(
-            funcOp, IREE::HAL::DispatchLoweringPassPipeline::SPIRVDistribute,
-            workgroupSize, workloadPerWorkgroup);
+            funcOp,
+            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute,
+            workloadPerWorkgroup, workgroupSize);
         return success();
       }
       return funcOp.emitError("contains no root Linalg operation");
@@ -610,7 +563,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     // and distributed. The rest of the compilation must be structured to either
     // use `TileAndFuse` or they are independent configurations that are
     // determined based on the op.
-    IREE::HAL::LoweringConfig config = getLoweringConfig(rootOperation);
+    IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOperation);
     for (auto op : computeOps) {
       if (op == rootOperation) continue;
       setLoweringConfig(op, config);

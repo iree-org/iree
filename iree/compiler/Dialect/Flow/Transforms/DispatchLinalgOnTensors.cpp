@@ -476,7 +476,8 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
                 // block argument. Single use can potentially be relaxed.
                 auto loadArg =
                     loadOp.source().template dyn_cast<BlockArgument>();
-                if (!loadArg || !loadArg.hasOneUse()) {
+                if (!loadArg || !loadArg.hasOneUse() ||
+                    loadArg.use_begin()->get() != storeOp.target()) {
                   return nullptr;
                 }
                 return loadArg;

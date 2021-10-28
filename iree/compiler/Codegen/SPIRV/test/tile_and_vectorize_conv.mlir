@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(canonicalize,iree-spirv-remove-one-trip-tiled-loop,iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
 hal.executable private @conv_static_shape_f32  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -13,7 +13,7 @@ hal.executable private @conv_static_shape_f32  {
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [4: index, 4: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = #translation
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = arith.constant 2: index
@@ -99,8 +99,8 @@ hal.executable private @conv_static_shape_f32  {
 
 // -----
 
-#config = {tileSizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
 hal.executable private @depthwise_conv_static_shape_f32  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -112,7 +112,7 @@ hal.executable private @depthwise_conv_static_shape_f32  {
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [4: index, 4: index, 4: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = #translation
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
       %x = arith.constant 6: index

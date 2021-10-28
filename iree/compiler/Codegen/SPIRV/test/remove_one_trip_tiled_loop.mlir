@@ -1,5 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-remove-one-trip-tiled-loop))))' %s | IreeFileCheck %s
 
+#config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
 hal.executable private @static_shaped_conv  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -9,7 +11,7 @@ hal.executable private @static_shaped_conv  {
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb"> {
     hal.executable.entry_point @static_shaped_conv attributes {
       interface = @io, ordinal = 0 : index,
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]},
+      translation.info = #translation,
       workgroup_size = [4 : index, 4 : index, 1 : index]
     }
     builtin.module {
@@ -46,8 +48,8 @@ hal.executable private @static_shaped_conv  {
               %16 = affine.min affine_map<(d0) -> (4, -d0 + 112)>(%arg0)
               %17 = affine.min affine_map<(d0) -> (4, -d0 + 112)>(%arg1)
               %18 = memref.subview %2[0, %arg0, %arg1, %arg2] [1, %16, %17, %14] [1, 1, 1, 1] : memref<1x112x112x32xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
-              linalg.fill(%cst, %18) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
-              linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, lowering.config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}, strides = dense<2> : tensor<2xi64>}
+              linalg.fill(%cst, %18) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
+              linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, lowering.config = #config, strides = dense<2> : tensor<2xi64>}
                 ins(%13, %15 : memref<1x?x?x3xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 151875 + s0 + d1 * 675 + d2 * 3 + d3)>>, memref<3x3x3x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 288 + s0 + d1 * 96 + d2 * 32 + d3)>>)
                 outs(%18 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>)
             }

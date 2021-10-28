@@ -5,6 +5,7 @@
 //       CHECK:   vector.transfer_read %{{.+}}[%c0], {{.+}} memref<4xf32, #{{.+}}>, vector<4xf32>
 //       CHECK:   addf %{{.*}}, %{{.*}} : vector<4xf32>
 //       CHECK:   vector.transfer_write {{.*}} : vector<4xf32>, memref<4xf32
+#config = #iree_codegen.lowering.config<tile_sizes = [[128], [4]], native_vector_size = []>
 hal.executable private @elementwise_static_shape  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -24,7 +25,7 @@ hal.executable private @elementwise_static_shape  {
         %ret0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128xf32>
         linalg.generic {
           __internal_linalg_transform__ = "workgroup",
-          lowering.config = {tileSizes = [[128], [4]]},
+          lowering.config = #config,
           indexing_maps = [affine_map<(i) -> (i)>,
                            affine_map<(i) -> (i)>,
                            affine_map<(i) -> (i)>],
@@ -54,6 +55,7 @@ hal.executable private @elementwise_static_shape  {
 //   CHECK-NOT:   vector.transfer_read
 //       CHECK:   scf.for
 //       CHECK:     scf.for
+#config = #iree_codegen.lowering.config<tile_sizes = [[1, 32], [1, 1]], native_vector_size = []>
 hal.executable private @elementwise_transpose  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -73,7 +75,7 @@ hal.executable private @elementwise_transpose  {
         %ret0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128x8xf32>
         linalg.generic {
           __internal_linalg_transform__ = "workgroup",
-          lowering.config = {tileSizes = [[1, 32], [1, 1]]},
+          lowering.config = #config,
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                            affine_map<(d0, d1) -> (d0)>,
                            affine_map<(d0, d1) -> (d0, d1)>],

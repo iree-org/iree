@@ -42,6 +42,7 @@ cc_library(
     deps = [
         ":cuda_libdevice",
         "//iree/compiler/Codegen:PassHeaders",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Utils",

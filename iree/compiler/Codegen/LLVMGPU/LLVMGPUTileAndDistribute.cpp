@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -38,19 +37,14 @@ static void populateTilingReductionPatterns(
   auto tileSizesFn = [&](OpBuilder &builder,
                          Operation *op) -> SmallVector<Value, 4> {
     SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
-    SmallVector<int64_t, 4> tileSizes = getTileSizes(op, 0);
-    Location loc = op->getLoc();
-    auto tileSizesVal =
-        llvm::to_vector<4>(llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-          return builder.create<arith::ConstantIndexOp>(loc, v);
-        }));
-    auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value, 4> tileSizes = getTileSizes(builder, op, 0);
+    auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
     for (unsigned depth : partitionedLoops) {
-      if (depth < tileSizesVal.size()) {
-        tileSizesVal[depth] = zero;
+      if (depth < tileSizes.size()) {
+        tileSizes[depth] = zero;
       }
     }
-    return tileSizesVal;
+    return tileSizes;
   };
 
   auto tilingOptions = linalg::LinalgTilingOptions()
@@ -69,8 +63,8 @@ static void populateTilingReductionPatterns(
 /// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
-    SmallVector<int64_t, 4> &workgroupSize,
-    SmallVector<int64_t, 4> &workloadPerWorkgroup) {
+    SmallVectorImpl<int64_t> &workgroupSize,
+    SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
         SmallVector<Value, 4> tileSizesVal;
@@ -95,7 +89,7 @@ static void populateTilingToInvocationPatterns(
         return tileSizesVal;
       };
 
-  auto getThreadProcInfoFn = [workgroupSize](
+  auto getThreadProcInfoFn = [&workgroupSize](
                                  OpBuilder &builder, Location loc,
                                  ArrayRef<Range> parallelLoopRanges) {
     return getGPUThreadIdsAndCounts(builder, loc, parallelLoopRanges.size(),
@@ -240,11 +234,8 @@ struct LLVMGPUTileAndDistributePass
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
         getEntryPoint(funcOp).workgroup_size().getValue(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-    auto workloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
-        getTranslationInfo(getEntryPoint(funcOp))
-            .workloadPerWorkgroup()
-            .getValue(),
-        [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+    auto workloadPerWorkgroup =
+        getTranslationInfo(getEntryPoint(funcOp)).getWorkloadPerWorkgroupVals();
 
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
