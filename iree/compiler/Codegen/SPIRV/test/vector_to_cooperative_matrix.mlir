@@ -19,17 +19,17 @@ hal.executable private @matmul_contract  {
         %cst = arith.constant 0 : i32
         %cst_i8 = arith.constant 0 : i8
         // CHECK: %[[ARG0_CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : memref<8x32xi8> to !spv.ptr<!spv.struct<(!spv.rtarray<i8, stride=1> [0])>, StorageBuffer>
+        // CHECK: %[[ARG1_CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG1]] : memref<32x8xi8> to !spv.ptr<!spv.struct<(!spv.rtarray<i8, stride=1> [0])>, StorageBuffer>
+        // CHECK: %[[ARG2_CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG2]] : memref<8x8xi32> to !spv.ptr<!spv.struct<(!spv.rtarray<i32, stride=4> [0])>, StorageBuffer>
         // CHECK: %[[C32:.+]] = spv.Constant 32 : i32
         // CHECK: %[[COL_MAJOR:.+]] = spv.Constant false
         // CHECK: %[[ADDR0:.+]] = spv.AccessChain %[[ARG0_CAST]]
         // CHECK: %[[A:.+]] = spv.CooperativeMatrixLoadNV %[[ADDR0]], %[[C32]], %[[COL_MAJOR]]
         %0 = vector.transfer_read %arg0[%c0, %c0], %cst_i8 : memref<8x32xi8>, vector<8x32xi8>
-        // CHECK: %[[ARG1_CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG1]] : memref<32x8xi8> to !spv.ptr<!spv.struct<(!spv.rtarray<i8, stride=1> [0])>, StorageBuffer>
         // CHECK: %[[C8:.+]] = spv.Constant 8 : i32
         // CHECK: %[[ADDR1:.+]] = spv.AccessChain %[[ARG1_CAST]]
         // CHECK: %[[B:.+]] = spv.CooperativeMatrixLoadNV %[[ADDR1]], %[[C8]], %[[COL_MAJOR]]
         %1 = vector.transfer_read %arg1[%c0, %c0], %cst_i8 : memref<32x8xi8>, vector<32x8xi8>
-        // CHECK: %[[ARG2_CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG2]] : memref<8x8xi32> to !spv.ptr<!spv.struct<(!spv.rtarray<i32, stride=4> [0])>, StorageBuffer>
         // CHECK: %[[ADDR2:.+]] = spv.AccessChain %[[ARG2_CAST]]
         // CHECK: %[[C:.+]] = spv.CooperativeMatrixLoadNV %[[ADDR2]], %[[C8]], %[[COL_MAJOR]]
         %2 = vector.transfer_read %arg2[%c0, %c0], %cst : memref<8x8xi32>, vector<8x8xi32>
@@ -69,12 +69,12 @@ hal.executable private @matmul_contract_licm  {
         // CHECK: %[[INIT:.+]] = builtin.unrealized_conversion_cast %[[C]] : !spv.coopmatrix<16x16xi32, Subgroup> to vector<16x16xi32>
         // CHECK: %[[LOOP:.+]] = scf.for
         // CHECK-SAME: iter_args(%[[ARG:.+]] = %[[INIT]])
+        // CHECK: %[[C1:.+]] = builtin.unrealized_conversion_cast %[[ARG]] : vector<16x16xi32> to !spv.coopmatrix<16x16xi32, Subgroup>
         %5 = scf.for %arg3 = %c0 to %c4096 step %c32 iter_args(%arg4 = %4) -> (vector<16x16xi32>) {
           // CHECK: %[[A:.+]] = spv.CooperativeMatrixLoadNV
           %6 = vector.transfer_read %arg0[%c0, %arg3], %c0_i8 {in_bounds = [true, true]} : memref<4096x4096xi8>, vector<16x32xi8>
           // CHECK: %[[B:.+]] = spv.CooperativeMatrixLoadNV
           %7 = vector.transfer_read %arg1[%arg3, %c0], %c0_i8 {in_bounds = [true, true]} : memref<4096x4096xi8>, vector<32x16xi8>
-          // CHECK: %[[C1:.+]] = builtin.unrealized_conversion_cast %[[ARG]] : vector<16x16xi32> to !spv.coopmatrix<16x16xi32, Subgroup>
           // CHECK: %[[R:.+]] = spv.CooperativeMatrixMulAddNV %[[A]], %[[B]], %[[C1]]
           %8 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} %6, %7, %arg4 : vector<16x32xi8>, vector<32x16xi8> into vector<16x16xi32>
           // CHECK: %[[YIELD:.+]] = builtin.unrealized_conversion_cast %[[R]] : !spv.coopmatrix<16x16xi32, Subgroup> to vector<16x16xi32>

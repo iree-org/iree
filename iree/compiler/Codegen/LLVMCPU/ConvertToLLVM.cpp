@@ -640,7 +640,7 @@ void ConvertToLLVMPass::runOnOperation() {
   {
     OwningRewritePatternList vectorToLoopsPatterns(&getContext());
     populateVectorToSCFConversionPatterns(
-        vectorToLoopsPatterns, VectorTransferToSCFOptions().setUnroll(true));
+        vectorToLoopsPatterns, VectorTransferToSCFOptions().enableFullUnroll());
     (void)applyPatternsAndFoldGreedily(getOperation(),
                                        std::move(vectorToLoopsPatterns));
   }
