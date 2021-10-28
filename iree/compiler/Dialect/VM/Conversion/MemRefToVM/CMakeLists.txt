@@ -19,6 +19,7 @@ iree_cc_library(
     "ConvertMemRefToVM.cpp"
   DEPS
     MLIRAffine
+    MLIRArithmetic
     MLIRIR
     MLIRMemRef
     MLIRPass
