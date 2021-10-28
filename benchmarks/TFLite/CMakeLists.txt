@@ -22,7 +22,7 @@ set(DEEPLABV3_FP32_MODULE
   TAGS
     "fp32"
   MLIR_SOURCE
-    "https://storage.googleapis.com/iree-model-artifacts/DeepLabV3-2bcafb1.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/DeepLabV3-2bcafb1.mlir.gz"
   ENTRY_FUNCTION
     "main"
   FUNCTION_INPUTS
@@ -35,7 +35,7 @@ set(MOBILESSD_FP32_MODULE
   TAGS
     "fp32"
   MLIR_SOURCE
-    "https://storage.googleapis.com/iree-model-artifacts/MobileSSD-2bcafb1.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileSSD-2bcafb1.mlir.gz"
   ENTRY_FUNCTION
     "main"
   FUNCTION_INPUTS
@@ -48,7 +48,7 @@ set(POSENET_FP32_MODULE
   TAGS
     "fp32"
   MLIR_SOURCE
-    "https://storage.googleapis.com/iree-model-artifacts/PoseNet-2bcafb1.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/PoseNet-2bcafb1.mlir.gz"
   ENTRY_FUNCTION
     "main"
   FUNCTION_INPUTS

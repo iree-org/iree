@@ -95,8 +95,11 @@ function(iree_mlir_benchmark_suite)
     set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_CATEGORY}")
     set(_VMFB_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/vmfb")
 
-    # The CMake target's name if we need to download from the web.
-    set(_DOWNLOAD_TARGET_NAME "")
+    # The name of the source file itself and any custom target that drives its
+    # creation. Depending on the format of the source, these will get updated
+    # below.
+    set(_SOURCE_FILE "${_MODULE_MLIR_SOURCE}")
+    set(_SOURCE_FILE_TARGET "")
 
     # If the source file is from the web, create a custom command to download
     # it and wrap that with a custom target so later we can use for dependency.
@@ -105,29 +108,42 @@ function(iree_mlir_benchmark_suite)
     # from the initial source (i.e., TensorFlow Python models). But that is
     # tangled with the pending Python testing infrastructure revamp so we'd
     # prefer to not do that right now.
-    if("${_MODULE_MLIR_SOURCE}" MATCHES "^https?://")
+    if("${_SOURCE_FILE}" MATCHES "^https?://")
       # Update the source file to the downloaded-to place.
       string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_MODULE_MLIR_SOURCE}")
       list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
-      set(_DOWNLOAD_TARGET_NAME "iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
+      set(_SOURCE_FILE_TARGET "iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
-      string(REPLACE "tar.gz" "mlir" _FILE_NAME "${_LAST_URL_SEGMENT}")
-      set(_SOURCE_FILE "${_ROOT_ARTIFACTS_DIR}/${_MODULE_NAME}.mlir")
-
-      if (NOT TARGET "${_DOWNLOAD_TARGET_NAME}")
+      string(REGEX REPLACE "\.gz$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
+      set(_NEW_SOURCE_FILE "${_ROOT_ARTIFACTS_DIR}/${_SOURCE_FILE_BASENAME}")
+      if (NOT TARGET "${_SOURCE_FILE_TARGET}")
         add_custom_command(
-          OUTPUT "${_SOURCE_FILE}"
+          OUTPUT "${_NEW_SOURCE_FILE}"
           COMMAND
             "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/download_file.py"
-            "${_MODULE_MLIR_SOURCE}" -o "${_ROOT_ARTIFACTS_DIR}"
+            "${_SOURCE_FILE}" -o "${_NEW_SOURCE_FILE}"
           DEPENDS
             "${IREE_ROOT_DIR}/scripts/download_file.py"
-          COMMENT "Downloading ${_MODULE_MLIR_SOURCE}"
+          COMMENT "Downloading ${_SOURCE_FILE}"
         )
-        add_custom_target("${_DOWNLOAD_TARGET_NAME}"
-          DEPENDS "${_SOURCE_FILE}"
+        add_custom_target("${_SOURCE_FILE_TARGET}"
+          DEPENDS "${_NEW_SOURCE_FILE}"
         )
+        set(_SOURCE_FILE "${_NEW_SOURCE_FILE}")
       endif()
+    endif()
+
+    # If the source is a TFLite file, import it.
+    if("${_SOURCE_FILE}" MATCHES "\.tflite$")
+      get_filename_component(_SOURCE_FILE_BASENAME "${_SOURCE_FILE}" NAME_WLE)
+      set(_SOURCE_FILE_TARGET "iree-import-tflite-${_SOURCE_FILE_BASENAME}")
+      set(_NEW_SOURCE_FILE "${_SOURCE_FILE}.mlir")
+      # if (NOT TARGET "${_SOURCE_FILE_TARGET}")
+      #   add_custom_command(
+      #     OUTPUT "${_NEW_SOURCE_FILE}"
+      #     COMMAND
+      # endif()
+
     endif()
 
     # Next create the command and target for compiling the input module into
@@ -171,7 +187,7 @@ function(iree_mlir_benchmark_suite)
           WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"
           DEPENDS
             iree_tools_iree-translate
-            "${_DOWNLOAD_TARGET_NAME}"
+            "${_SOURCE_FILE_TARGET}"
             COMMENT "Generating VMFB for ${_COMMON_NAME_SEGMENTS}"
         )
 

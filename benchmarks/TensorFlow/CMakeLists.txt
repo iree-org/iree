@@ -24,7 +24,7 @@ set(MOBILEBERT_FP16_MODULE
   # This uses the same input MLIR source as fp32 to save download time.
   # It requires users to have "--iree-flow-demote-f32-to-f16".
   MLIR_SOURCE
-    "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.mlir.gz"
   ENTRY_FUNCTION
     "serving_default"
   # The conversion done by "--iree-flow-demote-f32-to-f16" won't change the
@@ -39,7 +39,7 @@ set(MOBILEBERT_FP32_MODULE
   TAGS
     "fp32"
   MLIR_SOURCE
-    "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.mlir.gz"
   ENTRY_FUNCTION
     "serving_default"
   FUNCTION_INPUTS
@@ -52,7 +52,7 @@ set(MOBILENET_V2_MODULE
   TAGS
     "fp32,imagenet"
   MLIR_SOURCE
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-89edfa50d.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-89edfa50d.mlir.gz"
   ENTRY_FUNCTION
     "call"
   FUNCTION_INPUTS
@@ -65,7 +65,7 @@ set(MOBILENET_V3SMALL_MODULE
   TAGS
     "fp32,imagenet"
   MLIR_SOURCE
-    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-89edfa50d.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-89edfa50d.mlir.gz"
   ENTRY_FUNCTION
     "call"
   FUNCTION_INPUTS
