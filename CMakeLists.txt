@@ -31,6 +31,7 @@ endif()
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
+option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
@@ -40,10 +41,9 @@ option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
 
 option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
-option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
-option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
-option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
-option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
+option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
+option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
+option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
 
 set(IREE_HAL_DRIVERS_TO_BUILD "all"
   CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
@@ -66,15 +66,12 @@ if(${IREE_BUILD_TENSORFLOW_ALL} OR
   set(IREE_ENABLE_TENSORFLOW ON)
 endif()
 
+
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
 # Default python bindings to enabled for some features.
-if(${IREE_ENABLE_TENSORFLOW})
-  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" ON)
-else()
-  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
-endif()
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" "${IREE_ENABLE_TENSORFLOW}")
 
 #-------------------------------------------------------------------------------
 # Experimental project flags
