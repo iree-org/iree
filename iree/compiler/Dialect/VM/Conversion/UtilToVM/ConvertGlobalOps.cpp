@@ -179,25 +179,25 @@ class GlobalLoadIndirectOpConversion
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalLoadIndirectOp op, llvm::ArrayRef<Value> operands,
+      IREE::Util::GlobalLoadIndirectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto operandType = op.getType();
     auto convertedType = typeConverter.convertType(operandType);
     if (IREE::VM::RefType::isCompatible(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectRefOp>(
-          op, convertedType, op.global());
+          op, convertedType, adaptor.global());
     } else if (convertedType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectI32Op>(
-          op, convertedType, op.global());
+          op, convertedType, adaptor.global());
     } else if (convertedType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectI64Op>(
-          op, convertedType, op.global());
+          op, convertedType, adaptor.global());
     } else if (convertedType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectF32Op>(
-          op, convertedType, op.global());
+          op, convertedType, adaptor.global());
     } else if (convertedType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectF64Op>(
-          op, convertedType, op.global());
+          op, convertedType, adaptor.global());
     } else {
       return rewriter.notifyMatchFailure(op, "unhandled global type");
     }
@@ -249,25 +249,24 @@ class GlobalStoreIndirectOpConversion
       : OpConversionPattern(context) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalStoreIndirectOp op, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalStoreIndirectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Util::GlobalStoreIndirectOp::Adaptor operands(newOperands);
-    auto operandType = operands.value().getType();
+    auto operandType = adaptor.value().getType();
     if (operandType.isa<IREE::VM::RefType>()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectRefOp>(
-          op, operands.value(), op.global());
+          op, adaptor.value(), adaptor.global());
     } else if (operandType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectI32Op>(
-          op, operands.value(), op.global());
+          op, adaptor.value(), adaptor.global());
     } else if (operandType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectI64Op>(
-          op, operands.value(), op.global());
+          op, adaptor.value(), adaptor.global());
     } else if (operandType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectF32Op>(
-          op, operands.value(), op.global());
+          op, adaptor.value(), adaptor.global());
     } else if (operandType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectF64Op>(
-          op, operands.value(), op.global());
+          op, adaptor.value(), adaptor.global());
     } else {
       return rewriter.notifyMatchFailure(op, "unhandled global type");
     }
