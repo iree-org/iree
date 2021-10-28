@@ -17,13 +17,11 @@ namespace {
 Value promoteVector(Location loc, Value inputVector, Type promotedElementType,
                     PatternRewriter &rewriter) {
   VectorType inputVectorType = inputVector.getType().cast<VectorType>();
-  if (!promotedElementType ||
-      inputVectorType.getElementType() == promotedElementType) {
+  if (inputVectorType.getElementType() == promotedElementType) {
     return inputVector;
   } else {
-    auto promotedVectorType =
-        VectorType::get(inputVectorType.getShape(), promotedElementType);
-    if (promotedElementType.isa<IntegerType, IndexType>()) {
+    auto promotedVectorType = inputVectorType.clone(promotedElementType);
+    if (promotedElementType.isIntOrIndex()) {
       return rewriter.create<arith::ExtSIOp>(loc, inputVector,
                                              promotedVectorType);
     } else {
