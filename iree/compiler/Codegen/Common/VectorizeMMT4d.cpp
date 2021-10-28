@@ -14,6 +14,23 @@ namespace iree_compiler {
 
 namespace {
 
+Value promoteVector(Location loc, Value inputVector, Type promotedElementType,
+                    PatternRewriter &rewriter) {
+  VectorType inputVectorType = inputVector.getType().cast<VectorType>();
+  if (inputVectorType.getElementType() == promotedElementType) {
+    return inputVector;
+  } else {
+    auto promotedVectorType = inputVectorType.clone(promotedElementType);
+    if (promotedElementType.isIntOrIndex()) {
+      return rewriter.create<arith::ExtSIOp>(loc, inputVector,
+                                             promotedVectorType);
+    } else {
+      return rewriter.create<arith::ExtFOp>(loc, inputVector,
+                                            promotedVectorType);
+    }
+  }
+}
+
 /// Converts linalg.mmt4d into vector.contract.
 /// This converts linalg.mmt4d with operands <1x1xM0xK0>, <1x1xK0xN0>
 /// to vector.contract where K0 is the contraction dimension.
@@ -22,12 +39,13 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
 
   LogicalResult matchAndRewrite(linalg::Mmt4DOp mmt4DOp,
                                 PatternRewriter &rewriter) const override {
-    auto lhs = mmt4DOp.inputs()[0];
-    auto rhs = mmt4DOp.inputs()[1];
-    auto dst = mmt4DOp.outputs()[0];
+    Value lhs = mmt4DOp.inputs()[0];
+    Value rhs = mmt4DOp.inputs()[1];
+    Value dst = mmt4DOp.outputs()[0];
 
-    auto lhsType = lhs.getType().dyn_cast<ShapedType>();
-    auto rhsType = rhs.getType().dyn_cast<ShapedType>();
+    ShapedType lhsType = lhs.getType().dyn_cast<ShapedType>();
+    ShapedType rhsType = rhs.getType().dyn_cast<ShapedType>();
+    ShapedType dstType = dst.getType().dyn_cast<ShapedType>();
 
     // This pattern expects tensors of static shapes.
     // In practice, dynamic shapes are meant to be handled by other passes,
@@ -55,16 +73,20 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     int N0 = rhsType.getShape()[2];
     int K0 = lhsType.getShape()[3];
 
-    auto loc = mmt4DOp.getLoc();
-    auto c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Location loc = mmt4DOp.getLoc();
+    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
 
-    auto lhsVecType = VectorType::get({1, 1, M0, K0}, rewriter.getF32Type());
-    auto rhsVecType = VectorType::get({1, 1, N0, K0}, rewriter.getF32Type());
-    auto dstVecType = VectorType::get({1, 1, M0, N0}, rewriter.getF32Type());
+    Type lhsElementType = lhsType.getElementType();
+    Type rhsElementType = rhsType.getElementType();
+    Type dstElementType = dstType.getElementType();
 
-    auto lhsVecType2D = VectorType::get({M0, K0}, rewriter.getF32Type());
-    auto rhsVecType2D = VectorType::get({N0, K0}, rewriter.getF32Type());
-    auto dstVecType2D = VectorType::get({M0, N0}, rewriter.getF32Type());
+    auto lhsVecType = VectorType::get({1, 1, M0, K0}, lhsElementType);
+    auto rhsVecType = VectorType::get({1, 1, N0, K0}, rhsElementType);
+    auto dstVecType = VectorType::get({1, 1, M0, N0}, dstElementType);
+
+    auto lhsVecType2D = VectorType::get({M0, K0}, lhsElementType);
+    auto rhsVecType2D = VectorType::get({N0, K0}, rhsElementType);
+    auto dstVecType2D = VectorType::get({M0, N0}, dstElementType);
 
     auto identityMap = rewriter.getMultiDimIdentityMap(4);
 
@@ -84,6 +106,14 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     Value dstVec2D =
         rewriter.create<vector::ShapeCastOp>(loc, dstVecType2D, dstVec);
 
+    // Promote, if needed, the element type in the lhs and rhs vectors to
+    // match the dst vector, so that the vector.contract below will involve
+    // only one element type. This is in line with planned design, see
+    // the closing comment on https://reviews.llvm.org/D112508 where the
+    // alternative of using mixed types was considered.
+    Value promLhsVec2d = promoteVector(loc, lhsVec2D, dstElementType, rewriter);
+    Value promRhsVec2d = promoteVector(loc, rhsVec2D, dstElementType, rewriter);
+
     // Generate the vector.contract on 2D vectors replacing the mmt4d op.
     auto m = rewriter.getAffineDimExpr(0);
     auto n = rewriter.getAffineDimExpr(1);
@@ -96,7 +126,7 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
         {getParallelIteratorTypeName(), getParallelIteratorTypeName(),
          getReductionIteratorTypeName()});
     Value contractResult = rewriter.create<vector::ContractionOp>(
-        loc, lhsVec2D, rhsVec2D, dstVec2D, indexingMaps, iterators);
+        loc, promLhsVec2d, promRhsVec2d, dstVec2D, indexingMaps, iterators);
 
     // Convert the output vector from 2D shape (M0xN0) to 4D shape (1x1xM0xN0)
     Value contractResult4D =
