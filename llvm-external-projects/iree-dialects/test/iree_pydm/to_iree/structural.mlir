@@ -26,20 +26,20 @@ iree_pydm.func @br() -> (!iree_pydm.exception_result, !iree_pydm.none) {
 
 // -----
 // CHECK-LABEL: @box
-// NOTE: "9" is the type code for integer
-iree_pydm.func @box(%arg0 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.object<!iree_pydm.integer>) {
+// NOTE: "78" is the type code for signed i32
+iree_pydm.func @box(%arg0 : !iree_pydm.integer<32>) -> (!iree_pydm.exception_result, !iree_pydm.object<!iree_pydm.integer<32>>) {
   // CHECK: %[[LIST:.*]] = iree.list.create : !iree.list<!iree.variant>
   // CHECK: %[[c2:.*]] = arith.constant 2 : index
   // CHECK: iree.list.resize %[[LIST]], %c2 : !iree.list<!iree.variant>
   // CHECK: %[[c0:.*]] = arith.constant 0 : index
-  // CHECK: %[[c9:.*]] = arith.constant 9 : i32
+  // CHECK: %[[c9:.*]] = arith.constant 78 : i32
   // CHECK: iree.list.set %[[LIST]][%[[c0]]], %[[c9]] : !iree.list<!iree.variant>, i32
   // CHECK: %[[c1:.*]] = arith.constant 1 : index
   // CHECK: iree.list.set %[[LIST]][%[[c1]]], %arg0 : !iree.list<!iree.variant>, i32
   // CHECK: %[[c0_i32:.*]] = arith.constant 0 : i32
   // return %[[c0_i32]], %[[LIST]] : i32, !iree.list<!iree.variant>
-  %0 = box %arg0 : !iree_pydm.integer -> !iree_pydm.object<!iree_pydm.integer>
-  return %0 : !iree_pydm.object<!iree_pydm.integer>
+  %0 = box %arg0 : !iree_pydm.integer<32> -> !iree_pydm.object<!iree_pydm.integer<32>>
+  return %0 : !iree_pydm.object<!iree_pydm.integer<32>>
 }
 
 // -----
@@ -65,12 +65,12 @@ iree_pydm.func @alloc_store_load_var(%arg0 : !iree_pydm.object) -> (!iree_pydm.e
 
 // -----
 // CHECK-LABEL: @unbox
-// NOTE: "9" is the type code for integer
-iree_pydm.func @unbox(%arg0 : !iree_pydm.object) -> (!iree_pydm.exception_result, !iree_pydm.integer) {
+// NOTE: "78" is the type code for signed i32
+iree_pydm.func @unbox(%arg0 : !iree_pydm.object) -> (!iree_pydm.exception_result, !iree_pydm.integer<32>) {
   // CHECK:  %[[c0:.*]] = arith.constant 0 : index
-  // CHECK: %[[NEEDED_TYPE_CODE:.*]] = arith.constant 9 : i32
+  // CHECK: %[[NEEDED_TYPE_CODE:.*]] = arith.constant 78 : i32
   // CHECK: %[[TYPE_CODE:.*]] = iree.list.get %arg0[%[[c0]]] : !iree.list<!iree.variant> -> i32
-  // CHECK: %[[TYPE_EQ:.*]] = cmpi eq, %[[NEEDED_TYPE_CODE]], %[[TYPE_CODE]] : i32
+  // CHECK: %[[TYPE_EQ:.*]] = arith.cmpi eq, %[[NEEDED_TYPE_CODE]], %[[TYPE_CODE]] : i32
   // CHECK: cond_br %[[TYPE_EQ]], ^bb1, ^bb4
 
   // bb1: On equal
@@ -91,16 +91,16 @@ iree_pydm.func @unbox(%arg0 : !iree_pydm.object) -> (!iree_pydm.exception_result
   // CHECK: %[[VALUE_ERROR_CODE:.*]] = arith.constant -4 : i32
   // CHECK: %[[c0_i32_2:.*]] = arith.constant 0 : i32
   // CHECK: br ^bb2(%[[VALUE_ERROR_CODE]], %[[c0_i32_2]] : i32, i32)
-  %status, %primitive = unbox %arg0 : !iree_pydm.object -> !iree_pydm.integer
+  %status, %primitive = unbox %arg0 : !iree_pydm.object -> !iree_pydm.integer<32>
   raise_on_failure %status : !iree_pydm.exception_result
-  return %primitive : !iree_pydm.integer
+  return %primitive : !iree_pydm.integer<32>
 }
 
 // -----
 // CHECK-LABEL: @raise_on_failure_object_return
 iree_pydm.func @raise_on_failure_object_return(%arg0 : !iree_pydm.exception_result, %arg1: !iree_pydm.object) -> (!iree_pydm.exception_result, !iree_pydm.object) {
   // CHECK: %[[c0_i32:.*]] = arith.constant 0 : i32
-  // CHECK: %[[CMP:.*]] = cmpi eq, %[[c0_i32]], %arg0 : i32
+  // CHECK: %[[CMP:.*]] = arith.cmpi eq, %[[c0_i32]], %arg0 : i32
   // CHECK: cond_br %[[CMP]], ^bb1, ^bb2
   // bb1: success
   // CHECK: ^bb1:

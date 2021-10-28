@@ -291,6 +291,7 @@ cc_library(
         ":IREEPyDMTransformsIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
