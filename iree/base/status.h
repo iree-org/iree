@@ -230,6 +230,8 @@ typedef struct iree_status_handle_t* iree_status_t;
 #if IREE_STATUS_FEATURES == 0
 #define IREE_STATUS_IMPL_MAKE_(code, ...) \
   (iree_status_t)(uintptr_t)((code)&IREE_STATUS_CODE_MASK)
+#define IREE_STATUS_IMPL_MAKE_LOC_(file, line, code, ...) \
+  IREE_STATUS_IMPL_MAKE_(code)
 #undef IREE_STATUS_IMPL_RETURN_IF_API_ERROR_
 #define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, ...)                      \
   iree_status_t var = (IREE_STATUS_IMPL_IDENTITY_(                           \
@@ -254,6 +256,8 @@ typedef struct iree_status_handle_t* iree_status_t;
 #else
 #define IREE_STATUS_IMPL_MAKE_(...) \
   IREE_STATUS_IMPL_MAKE_SWITCH_(__FILE__, __LINE__, __VA_ARGS__)
+#define IREE_STATUS_IMPL_MAKE_LOC_(file, line, ...) \
+  IREE_STATUS_IMPL_MAKE_SWITCH_(file, line, __VA_ARGS__)
 #endif  // !IREE_STATUS_FEATURES
 
 // Returns an IREE_STATUS_OK.
@@ -270,6 +274,15 @@ typedef struct iree_status_handle_t* iree_status_t;
 //  return iree_make_status(IREE_STATUS_CANCELLED, "because reasons");
 //  return iree_make_status(IREE_STATUS_CANCELLED, "because %d > %d", a, b);
 #define iree_make_status IREE_STATUS_IMPL_MAKE_
+
+// Makes an iree_status_t with the given iree_status_code_t code using the given
+// source location. Besides taking the file and line of the source location this
+// is the same as iree_make_status.
+//
+// Examples:
+//  return iree_make_status_with_location(
+//      "file.c", 40, IREE_STATUS_CANCELLED, "because %d > %d", a, b);
+#define iree_make_status_with_location IREE_STATUS_IMPL_MAKE_LOC_
 
 // Propagates the error returned by (expr) by returning from the current
 // function on non-OK status. Optionally annotates the status with additional
