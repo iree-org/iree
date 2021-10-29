@@ -10,9 +10,9 @@
 # Benchmark models from TensorFlow                                             #
 #                                                                              #
 # Each module specification should be a list containing alternating keys and   #
-# values. The fields are: NAME, TAGS, MLIR_SOURCE, ENTRY_FUNCTION, and         #
+# values. The fields are: NAME, TAGS, SOURCE, ENTRY_FUNCTION, and              #
 # FUNCTION_INPUTS. See the iree_mlir_benchmark_suite definition for details    #
-# about these fields.                                                          #
+# about these fields. Note that these must be quoted when used as arguments.   #
 #                                                                              #
 ################################################################################
 
@@ -23,7 +23,7 @@ set(MOBILEBERT_FP16_MODULE
     "fp16"
   # This uses the same input MLIR source as fp32 to save download time.
   # It requires users to have "--iree-flow-demote-f32-to-f16".
-  MLIR_SOURCE
+  SOURCE
     "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.mlir.gz"
   ENTRY_FUNCTION
     "serving_default"
@@ -38,7 +38,7 @@ set(MOBILEBERT_FP32_MODULE
     "MobileBertSquad"
   TAGS
     "fp32"
-  MLIR_SOURCE
+  SOURCE
     "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.mlir.gz"
   ENTRY_FUNCTION
     "serving_default"
@@ -51,7 +51,7 @@ set(MOBILENET_V2_MODULE
     "MobileNetV2"
   TAGS
     "fp32,imagenet"
-  MLIR_SOURCE
+  SOURCE
     "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-89edfa50d.mlir.gz"
   ENTRY_FUNCTION
     "call"
@@ -64,7 +64,7 @@ set(MOBILENET_V3SMALL_MODULE
     "MobileNetV3Small"
   TAGS
     "fp32,imagenet"
-  MLIR_SOURCE
+  SOURCE
     "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-89edfa50d.mlir.gz"
   ENTRY_FUNCTION
     "call"
