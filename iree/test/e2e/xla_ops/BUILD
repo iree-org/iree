@@ -158,7 +158,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            #TODO(GH-7415): Enable this after failures with bazel bot
+            #TODO(#7415): Enable this after failures with bazel bot
             #and cmake-swiftshared bot are addressed
             "pow.mlir",
             "round.mlir",
@@ -298,13 +298,13 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",  # TODO(GH-6601): Eanble the test.
+            "fft.mlir",  # TODO(#6601): Eanble the test.
             "round.mlir",
-            "scatter.mlir",  # TODO(GH-6601): Enable the test.
-            "scatter_dynamic.mlir",  # TODO(GH-6601): Enable the test.
+            "scatter.mlir",  # TODO(#6601): Enable the test.
+            "scatter_dynamic.mlir",  # TODO(#6601): Enable the test.
             "sort.mlir",
-            "rng_uniform.mlir",  # TODO(GH-6995): Enable the test.
-            "rng_normal.mlir",  # TODO(GH-6995): Enable the test.
+            "rng_uniform.mlir",  # TODO(#6995): Enable the test.
+            "rng_normal.mlir",  # TODO(#6995): Enable the test.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
