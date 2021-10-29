@@ -26,29 +26,27 @@ class CommandBufferPushDescriptorSetOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferPushDescriptorSetOp op,
-      llvm::ArrayRef<Value> operands,
+      IREE::HAL::CommandBufferPushDescriptorSetOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getType();
-    IREE::HAL::CommandBufferPushDescriptorSetOp::Adaptor newOperands(operands);
 
     SmallVector<Value, 8> callOperands = {
-        newOperands.command_buffer(),
-        newOperands.executable_layout(),
-        newOperands.set(),
+        adaptor.command_buffer(),
+        adaptor.executable_layout(),
+        adaptor.set(),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
         /*executable_layout=*/-1,
         /*set=*/-1,
         /*bindings=*/
-        static_cast<int16_t>(newOperands.binding_ordinals().size()),
+        static_cast<int16_t>(adaptor.binding_ordinals().size()),
     };
-    for (size_t i = 0; i < newOperands.binding_ordinals().size(); ++i) {
-      callOperands.push_back(newOperands.binding_ordinals()[i]);
-      callOperands.push_back(newOperands.binding_buffers()[i]);
-      callOperands.push_back(newOperands.binding_offsets()[i]);
-      callOperands.push_back(newOperands.binding_lengths()[i]);
+    for (size_t i = 0; i < adaptor.binding_ordinals().size(); ++i) {
+      callOperands.push_back(adaptor.binding_ordinals()[i]);
+      callOperands.push_back(adaptor.binding_buffers()[i]);
+      callOperands.push_back(adaptor.binding_offsets()[i]);
+      callOperands.push_back(adaptor.binding_lengths()[i]);
     }
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(

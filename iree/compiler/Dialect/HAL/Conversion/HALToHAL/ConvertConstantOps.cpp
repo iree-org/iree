@@ -21,7 +21,7 @@ class ConstantSubspanConversion
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::ConstantSubspanOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::ConstantSubspanOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto bufferValue = rewriter.createOrFold<IREE::Util::GlobalLoadOp>(
         op.getLoc(), IREE::HAL::BufferType::get(rewriter.getContext()),

@@ -71,7 +71,7 @@ vm.module @control_flow_ops {
     vm.fail %code, "unreachable!"
   }
 
-  // TODO(GH-7487): Enable the test for emitc.
+  // TODO(#7487): Enable the test for emitc.
   vm.export @test_cond_br_ref_arg attributes {emitc.exclude}
   vm.func private @test_cond_br_ref_arg() {
     %c1 = vm.const.i32 1 : i32
