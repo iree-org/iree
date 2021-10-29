@@ -404,7 +404,7 @@ def filter_and_run_benchmarks(
   results = BenchmarkResults()
   captures = []
 
-  for directory in os.listdir(root_benchmark_dir):
+  for directory in sorted(os.listdir(root_benchmark_dir)):
     benchmark_category_dir = os.path.join(root_benchmark_dir, directory)
     matched_benchmarks = filter_benchmarks_for_category(
         benchmark_category_dir=benchmark_category_dir,
