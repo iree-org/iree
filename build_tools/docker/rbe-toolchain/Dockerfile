@@ -79,6 +79,12 @@ COPY --from=install-swiftshader /swiftshader /swiftshader
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
 
-
 ######################## LibXML2 for LLD #######################################
 RUN apt-get update && apt-get install -y libxml2-dev
+
+######################## Python and PyYaml for traces ##########################
+RUN apt-get update && apt-get install -y \
+  python3 \
+  python3-pip \
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install PyYAML==5.4.1
