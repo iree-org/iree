@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# iree_mlir_benchmark_suite()
+# iree_benchmark_suite()
 #
 # Generates benchmark suites for MLIR input modules. The generated artifacts
 # will be placed in the "<binary-root>/benchmark_suites/<category>" directory,
@@ -59,7 +59,7 @@
 # (e.g., full-inference vs. kernel-execution) and specify more contextual
 # requirements (e.g., big-core vs. little-core).
 #
-function(iree_mlir_benchmark_suite)
+function(iree_benchmark_suite)
   if(NOT IREE_BUILD_BENCHMARKS)
     return()
   endif()
@@ -148,7 +148,9 @@ function(iree_mlir_benchmark_suite)
             "${_TFLITE_FILE}"
             "-o=${_MODULE_SOURCE}"
           DEPENDS
+            integrations::tensorflow::iree_tf_compiler::iree-import-tflite
             "${_TFLITE_FILE}"
+          COMMENT "Importing TFLite file ${_TFLITE_FILE_BASENAME}"
         )
         add_custom_target("${_TFLITE_IMPORT_TARGET}"
           DEPENDS
@@ -265,4 +267,4 @@ function(iree_mlir_benchmark_suite)
     endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
 
   endforeach(_MODULE IN LISTS _RULE_MODULES)
-endfunction(iree_mlir_benchmark_suite)
+endfunction(iree_benchmark_suite)

@@ -5,7 +5,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Downloads a file from the web and untars it if necessary."""
+"""Downloads a file from the web and decompresses it if necessary."""
 
 import argparse
 import gzip
