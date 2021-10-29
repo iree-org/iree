@@ -202,12 +202,16 @@ static inline iree_hal_label_color_t iree_hal_label_color_unspecified() {
   return color;
 }
 
-// TODO(benvanik): replace with tables for iree_string_builder_*.
-#define iree_hal_command_buffer_mode_string(...) "TODO"
-//    {IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT, "ONE_SHOT"},
-#define iree_hal_command_category_string(...) "TODO"
-//    {IREE_HAL_COMMAND_CATEGORY_TRANSFER, "TRANSFER"},
-//    {IREE_HAL_COMMAND_CATEGORY_DISPATCH, "DISPATCH"},
+// Formats a command buffer mode bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t
+iree_hal_command_buffer_mode_format(iree_hal_command_buffer_mode_t value,
+                                    iree_bitfield_string_temp_t* out_temp);
+
+// Formats a command category bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
+    iree_hal_command_category_t value, iree_bitfield_string_temp_t* out_temp);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
