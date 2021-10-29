@@ -81,6 +81,23 @@ class ApplyBinaryFunc : public RtlFunc {
   std::string rtlName;
 };
 
+/// pydmrtl$apply_compare_${dunderName} RTL func.
+class ApplyCompareFunc : public RtlFunc {
+ public:
+  ApplyCompareFunc(StringRef dunderName) : rtlName("pydmrtl$apply_compare_") {
+    rtlName.append(dunderName.begin(), dunderName.end());
+  }
+  StringRef getRtlName() { return rtlName; }
+  FunctionType getRtlSignature(Builder b) {
+    Type objectType = b.getType<pydm_d::ObjectType>(nullptr);
+    Type boolType = b.getType<pydm_d::BoolType>();
+    return makeRaisingSignature(b, {objectType, objectType}, boolType);
+  }
+
+ private:
+  std::string rtlName;
+};
+
 template <typename RtlFuncTy, typename OpTy>
 class EmitImportCallBase : public OpRewritePattern<OpTy> {
  public:
@@ -159,6 +176,25 @@ struct ApplyBinaryPattern
   }
 };
 
+struct ApplyComparePattern
+    : public EmitImportCallBase<ApplyCompareFunc, pydm_d::ApplyCompareOp> {
+  using EmitImportCallBase::EmitImportCallBase;
+
+  LogicalResult matchAndRewrite(pydm_d::ApplyCompareOp srcOp,
+                                PatternRewriter &rewriter) const override {
+    // Only match object-object binary apply.
+    auto objectType = rewriter.getType<pydm_d::ObjectType>(nullptr);
+    if (!srcOp.left().getType().isa<pydm_d::ObjectType>() ||
+        !srcOp.right().getType().isa<pydm_d::ObjectType>())
+      return rewriter.notifyMatchFailure(srcOp, "not (object, object) variant");
+
+    ApplyCompareFunc f(srcOp.dunder_name());
+    replaceOpWithCall(srcOp, {srcOp.left(), srcOp.right()}, std::move(f),
+                      rewriter);
+    return success();
+  }
+};
+
 struct DynamicBinaryPromotePattern
     : public EmitImportCallBase<DynamicBinaryPromoteFunc,
                                 pydm_d::DynamicBinaryPromoteOp> {
@@ -197,8 +233,9 @@ struct LowerIREEPyDMToRTLPass
     auto moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
     RewritePatternSet patterns(context);
-    patterns.insert<ApplyBinaryPattern, DynamicBinaryPromotePattern,
-                    ObjectAsBoolPattern>(symbolTable);
+    patterns.insert<ApplyBinaryPattern, ApplyComparePattern,
+                    DynamicBinaryPromotePattern, ObjectAsBoolPattern>(
+        symbolTable);
 
     GreedyRewriteConfig config;
     if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns),

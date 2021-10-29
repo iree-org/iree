@@ -28,5 +28,6 @@ void mlir::iree_pydm::buildLowerToIREEPassPipeline(
 
   // Cleanup.
   passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createSymbolDCEPass());
   passManager.addPass(createCSEPass());
 }
