@@ -42,7 +42,7 @@ namespace {
 struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::NullOp op, ArrayRef<Value> operands,
+      IREE::Util::NullOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ConstRefZeroOp>(
         op, IREE::VM::RefType::get(op.getType()));
@@ -57,13 +57,12 @@ struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
 struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::CmpEQOp op, ArrayRef<Value> rawOperands,
+      IREE::Util::CmpEQOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Util::CmpEQOp::Adaptor operands(rawOperands);
-    auto operandType = operands.lhs().getType();
+    auto operandType = adaptor.lhs().getType();
     if (operandType.isa<IREE::VM::RefType>()) {
       rewriter.replaceOpWithNewOp<IREE::VM::CmpEQRefOp>(
-          op, rewriter.getI32Type(), operands.lhs(), operands.rhs());
+          op, rewriter.getI32Type(), adaptor.lhs(), adaptor.rhs());
       return success();
     }
     return failure();  // not used for non-ref types currently
@@ -78,7 +77,7 @@ struct ByteBufferConstantOpConversion
     : public OpConversionPattern<IREE::Util::ByteBufferConstantOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::ByteBufferConstantOp op, ArrayRef<Value> operands,
+      IREE::Util::ByteBufferConstantOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::RodataInlineOp>(
         op,
@@ -97,7 +96,7 @@ struct UnreachableOpConversion
     : public OpConversionPattern<IREE::Util::UnreachableOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::UnreachableOp srcOp, ArrayRef<Value> operands,
+      IREE::Util::UnreachableOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(
         srcOp,

@@ -23,9 +23,8 @@ class BufferLoadOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::BufferLoadOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::BufferLoadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::BufferLoadOp::Adaptor adaptor(operands);
     auto importType = importOp.getType();
     auto sizeConst = rewriter.createOrFold<mlir::arith::ConstantOp>(
         op.getLoc(),
@@ -66,9 +65,8 @@ class BufferStoreOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::BufferStoreOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::BufferStoreOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::BufferStoreOp::Adaptor adaptor(operands);
     auto importType = importOp.getType();
     auto sizeConst = rewriter.createOrFold<mlir::arith::ConstantOp>(
         op.getLoc(),
