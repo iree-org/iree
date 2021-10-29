@@ -47,5 +47,6 @@ def main(args):
   with open(args.output, "wb") as f:
     f.write(data)
 
+
 if __name__ == "__main__":
   main(parse_arguments())
