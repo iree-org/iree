@@ -29,12 +29,11 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, ArrayRef<Value> operands,
+      SrcOpTy srcOp, typename SrcOpTy::Adaptor srcAdaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
     if (srcOp.result().getType().template isa<VectorType>()) return failure();
 
-    typename SrcOpTy::Adaptor srcAdaptor(operands);
     switch (srcAdaptor.operand().getType().getIntOrFloatBitWidth()) {
       case 32:
         rewriter.replaceOpWithNewOp<Dst32OpTy>(
@@ -56,12 +55,11 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, ArrayRef<Value> operands,
+      SrcOpTy srcOp, typename SrcOpTy::Adaptor srcAdaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
     if (srcOp.result().getType().template isa<VectorType>()) return failure();
 
-    typename SrcOpTy::Adaptor srcAdaptor(operands);
     switch (srcAdaptor.lhs().getType().getIntOrFloatBitWidth()) {
       case 32:
         rewriter.replaceOpWithNewOp<Dst32OpTy>(

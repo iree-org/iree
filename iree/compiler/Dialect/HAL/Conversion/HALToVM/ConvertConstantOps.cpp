@@ -20,7 +20,7 @@ class ConstantPoolOpConversion
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::ConstantPoolOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::ConstantPoolOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     for (auto storageOp : op.getOps<IREE::HAL::ConstantStorageOp>()) {
       auto rodataName = (op.sym_name() + storageOp.sym_name()).str();
@@ -39,7 +39,7 @@ class ConstantStorageLookupOpConversion
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::ConstantStorageLookupOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::ConstantStorageLookupOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // I don't like this, but I can't figure out what to do.
     // Matches the logic above.

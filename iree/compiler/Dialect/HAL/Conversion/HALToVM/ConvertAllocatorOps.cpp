@@ -26,19 +26,17 @@ class AllocatorMapOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::AllocatorMapOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::AllocatorMapOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::AllocatorMapOp::Adaptor opAdaptor(operands);
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, importOp.getName(),
         ArrayRef<Type>{getTypeConverter()->convertType(op.getType())},
-        ArrayRef<Value>{opAdaptor.allocator(),
+        ArrayRef<Value>{adaptor.allocator(),
                         rewriter.createOrFold<IREE::VM::ConstI32Op>(
                             op.getLoc(), op.memory_typesAttr()),
                         rewriter.createOrFold<IREE::VM::ConstI32Op>(
                             op.getLoc(), op.buffer_usageAttr()),
-                        opAdaptor.source(), opAdaptor.offset(),
-                        opAdaptor.length()});
+                        adaptor.source(), adaptor.offset(), adaptor.length()});
     copyImportAttrs(importOp, callOp);
     return success();
   }

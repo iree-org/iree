@@ -37,9 +37,9 @@ template <typename OpTy>
 struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      OpTy op, ArrayRef<Value> operands,
+      OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, operands);
+    rewriter.replaceOp(op, adaptor.getOperands());
     return success();
   }
 };
@@ -50,11 +50,12 @@ struct RemoveIdentityConversionCast final
     : public OpConversionPattern<UnrealizedConversionCastOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      UnrealizedConversionCastOp op, ArrayRef<Value> operands,
+      UnrealizedConversionCastOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (op->getNumOperands() == 1 && op->getNumResults() == 1 &&
-        operands.front().getType() == op->getResultTypes().front()) {
-      rewriter.replaceOp(op, operands);
+        adaptor.getOperands().front().getType() ==
+            op->getResultTypes().front()) {
+      rewriter.replaceOp(op, adaptor.getOperands());
       return success();
     }
 

@@ -21,7 +21,7 @@ class DeviceQueryIntCastOpConversion
       : OpConversionPattern(typeConverter, context) {}
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::DeviceQueryOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // We only deal with in-dialect conversions to i32 in this pattern.
     auto targetType = op.value().getType();
@@ -33,7 +33,6 @@ class DeviceQueryIntCastOpConversion
     // ourselves instead of allowing the i32 do the same. We could let it handle
     // things but then we are generating more IR that may prevent other
     // canonicalizations (a select of i1 to i1 is easier to handle).
-    IREE::HAL::DeviceQueryOp::Adaptor adaptor(operands);
     auto queryOp = rewriter.create<IREE::HAL::DeviceQueryOp>(
         op.getLoc(), rewriter.getI1Type(), rewriter.getI32Type(),
         adaptor.device(), op.categoryAttr(), op.keyAttr(), Attribute{});
@@ -86,10 +85,9 @@ class DeviceQueryI32OpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::DeviceQueryOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!op.value().getType().isInteger(32)) return failure();
-    IREE::HAL::DeviceQueryOp::Adaptor adaptor(operands);
     auto results =
         rewriteToCall(op, adaptor, importOp, *getTypeConverter(), rewriter);
     if (!results.hasValue()) return failure();
