@@ -15,7 +15,7 @@ ARG GRADLE_DIST=bin
 ARG ANDROID_SDK_VERSION=7583922
 ARG ANDROID_NDK_VERSION=21.4.7075529
 
-FROM gcr.io/iree-oss/util@sha256:c9691ba3cd4287cee61be42103888d7c6f02c44c7c7b7d30a3dca7fc73ee92cb AS install-deps
+FROM gcr.io/iree-oss/base@sha256:8bd3dfa4e16c232802842c36f1139730e183f4263b709e76fec04df30de930db AS install-deps
 ARG GRADLE_VERSION
 ARG GRADLE_DIST
 ARG ANDROID_SDK_VERSION
@@ -23,7 +23,7 @@ ARG ANDROID_SDK_VERSION
 # Download and install Gradle
 RUN cd /opt && \
     wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
-    unzip gradle*.zip && \
+    unzip -q gradle*.zip && \
     rm gradle*.zip && \
     ln -s /opt/gradle-${GRADLE_VERSION}/bin/gradle /usr/bin/gradle
 
@@ -34,11 +34,11 @@ RUN cd /opt && \
 ENV ANDROID_SDK_ROOT /opt/android-sdk
 RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
     wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_VERSION}_latest.zip && \
-    unzip *tools*linux*.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools && \
+    unzip -q *tools*linux*.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools && \
     mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/tools && \
     rm *tools*linux*.zip
 
-FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 as final
+FROM gcr.io/iree-oss/base@sha256:8bd3dfa4e16c232802842c36f1139730e183f4263b709e76fec04df30de930db as final
 ARG ANDROID_SDK_VERSION
 ARG ANDROID_NDK_VERSION
 ARG GRADLE_VERSION

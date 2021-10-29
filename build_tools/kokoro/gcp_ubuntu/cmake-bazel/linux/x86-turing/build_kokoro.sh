@@ -30,7 +30,7 @@ docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   --gpus all \
-  gcr.io/iree-oss/cmake-bazel-frontends-nvidia@sha256:5aa62434af6b28f6172661c60235f338b073d254a850656068693642a55bcd78 \
+  gcr.io/iree-oss/cmake-bazel-frontends-nvidia@sha256:120f3f3dbe9df64eb5403a623e1460a2528139ec6690ddd61a3db85960c61c50 \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
