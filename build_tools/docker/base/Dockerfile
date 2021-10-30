@@ -107,10 +107,23 @@ RUN wget -q \
   && mkdir -p /opt/vulkan-sdk \
   && tar -xzf "vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" -C /opt/vulkan-sdk \
   && rm -rf /install-vulkan
+WORKDIR /
+
+ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
+
+ENV PATH="${VULKAN_SDK}/bin:$PATH"
+
+# Symlink the Vulkan loader to a system library directory. This is needed to
+# allow Vulkan applications to find the Vulkan loader. It also avoids using
+# LD_LIBRARY_PATH, which is not supported well by Docker.
+RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
+  && ln -s "${VULKAN_SDK}/lib/libvulkan.so.1" /usr/lib/x86_64-linux-gnu/
+
 ##############
 
 
 ######## GCC ########
+WORKDIR /
 
 # Avoid apt-add-repository, which requires software-properties-common, which is
 # a rabbit hole of python version compatibility issues. See
@@ -124,3 +137,5 @@ RUN echo "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu bionic mai
   && apt-get install -y gcc-9 g++-9
 
 ##############
+
+WORKDIR /

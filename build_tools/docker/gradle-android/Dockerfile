@@ -15,7 +15,7 @@ ARG GRADLE_DIST=bin
 ARG ANDROID_SDK_VERSION=7583922
 ARG ANDROID_NDK_VERSION=21.4.7075529
 
-FROM gcr.io/iree-oss/base@sha256:8bd3dfa4e16c232802842c36f1139730e183f4263b709e76fec04df30de930db AS install-deps
+FROM gcr.io/iree-oss/base@sha256:b8d9863c6ac913f167c6fab319d7cd883ab099312488709ee30b29976d63eb22 AS install-deps
 ARG GRADLE_VERSION
 ARG GRADLE_DIST
 ARG ANDROID_SDK_VERSION
@@ -38,7 +38,7 @@ RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
     mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/tools && \
     rm *tools*linux*.zip
 
-FROM gcr.io/iree-oss/base@sha256:8bd3dfa4e16c232802842c36f1139730e183f4263b709e76fec04df30de930db as final
+FROM gcr.io/iree-oss/base@sha256:b8d9863c6ac913f167c6fab319d7cd883ab099312488709ee30b29976d63eb22 as final
 ARG ANDROID_SDK_VERSION
 ARG ANDROID_NDK_VERSION
 ARG GRADLE_VERSION

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:9dbc756493624aaf82fb492ab12708100bab4d510e3eb4799cfcd6ad08988f4d AS final
+FROM gcr.io/iree-oss/cmake-bazel-frontends-vulkan@sha256:079bd1444c98932cc8b54a8d469f444d982e94a176ee3701da4df45dd94a5e59 AS final
 COPY --from=gcr.io/iree-oss/swiftshader@sha256:2c682d5144e8fa6ea012428299d906abbf41fd04b9c7c5865c657c4e7484c6c5 \
   /swiftshader /swiftshader
 
