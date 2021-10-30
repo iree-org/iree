@@ -254,44 +254,92 @@ LogicalResult UnboxOp::canonicalize(UnboxOp unboxOp,
 // DynamicBinaryPromoteOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult DynamicBinaryPromoteOp::canonicalize(DynamicBinaryPromoteOp op,
-                                                   PatternRewriter &rewriter) {
-  auto loc = op.getLoc();
-  auto leftType = op.left().getType();
-  auto rightType = op.right().getType();
-  auto leftResultType = op.getResultTypes()[0];
-  auto rightResultType = op.getResultTypes()[1];
-  auto leftPt = leftType.dyn_cast<PythonTypeInterface>();
-  auto rightPt = rightType.dyn_cast<PythonTypeInterface>();
-  if (!leftPt || !rightPt) return failure();
+namespace {
 
-  Optional<int> leftOrder = leftPt.getNumericPromotionOrder();
-  Optional<int> rightOrder = rightPt.getNumericPromotionOrder();
-  Value newLeft = op.left();
-  Value newRight = op.right();
+/// Resolves a DynamicBinaryPromote over numeric operands to either elide
+/// or insert specific PromoteNumeric ops.
+struct ResolveNumericDynamicBinaryPromote
+    : public OpRewritePattern<DynamicBinaryPromoteOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DynamicBinaryPromoteOp op,
+                                PatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    auto leftType = op.left().getType();
+    auto rightType = op.right().getType();
+    auto leftResultType = op.getResultTypes()[0];
+    auto rightResultType = op.getResultTypes()[1];
+    auto leftPt = leftType.dyn_cast<PythonTypeInterface>();
+    auto rightPt = rightType.dyn_cast<PythonTypeInterface>();
+    if (!leftPt || !rightPt) return failure();
 
-  // Simple case: same types pass through.
-  if (leftType == rightType) {
-    // Nothing - pass-through rewrite.
-  } else if (leftOrder && rightOrder) {
-    // Both numeric.
-    if (*leftOrder > *rightOrder) {
-      newRight = rewriter.create<PromoteNumericOp>(loc, leftType, newRight);
+    Optional<int> leftOrder = leftPt.getNumericPromotionOrder();
+    Optional<int> rightOrder = rightPt.getNumericPromotionOrder();
+    Value newLeft = op.left();
+    Value newRight = op.right();
+
+    if (leftOrder && rightOrder) {
+      // Both numeric.
+      if (*leftOrder > *rightOrder) {
+        newRight = rewriter.create<PromoteNumericOp>(loc, leftType, newRight);
+      }
+      if (*rightOrder > *leftOrder) {
+        newLeft = rewriter.create<PromoteNumericOp>(loc, rightType, newLeft);
+      }
+    } else {
+      return failure();
     }
-    if (*rightOrder > *leftOrder) {
-      newLeft = rewriter.create<PromoteNumericOp>(loc, rightType, newLeft);
+
+    // Need to box back to the original type (which will always be a generic
+    // object).
+    newLeft = rewriter.create<BoxOp>(loc, leftResultType, newLeft);
+    newRight = rewriter.create<BoxOp>(loc, rightResultType, newRight);
+
+    rewriter.replaceOp(op, {newLeft, newRight});
+    return success();
+  }
+};
+
+/// Generic pattern to unbox any operands that are a specific object
+/// type (i.e. object<integer>).
+struct UnboxOperands : public RewritePattern {
+  UnboxOperands(StringRef rootName, MLIRContext *context)
+      : RewritePattern(rootName, 1, context) {}
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op->getLoc();
+    bool changed = false;
+    SmallVector<Value> operands(op->getOperands());
+    auto excResultType = rewriter.getType<ExceptionResultType>();
+    for (Value &operand : operands) {
+      if (auto objectType = operand.getType().dyn_cast<ObjectType>()) {
+        Type primitiveType = objectType.getPrimitiveType();
+        if (primitiveType) {
+          // Unbox.
+          auto unboxOp = rewriter.create<UnboxOp>(
+              loc, TypeRange{excResultType, primitiveType}, operand);
+          operand = unboxOp.primitive();
+          changed = true;
+        }
+      }
     }
-  } else {
+
+    if (changed) {
+      rewriter.updateRootInPlace(op, [&]() { op->setOperands(operands); });
+      return success();
+    }
+
     return failure();
   }
+};
 
-  // Need to box back to the original type (which will always be a generic
-  // object).
-  newLeft = rewriter.create<BoxOp>(loc, leftResultType, newLeft);
-  newRight = rewriter.create<BoxOp>(loc, rightResultType, newRight);
+}  // namespace
 
-  rewriter.replaceOp(op, {newLeft, newRight});
-  return success();
+void DynamicBinaryPromoteOp::getCanonicalizationPatterns(
+    RewritePatternSet &patterns, MLIRContext *context) {
+  patterns.add<ResolveNumericDynamicBinaryPromote>(context);
+  patterns.add<UnboxOperands>(DynamicBinaryPromoteOp::getOperationName(),
+                              context);
 }
 
 //===----------------------------------------------------------------------===//

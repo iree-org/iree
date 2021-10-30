@@ -17,6 +17,8 @@ class IREEDialect;
 
 namespace iree_pydm {
 
+class FuncOp;
+
 #define GEN_PASS_CLASSES
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h.inc"
 

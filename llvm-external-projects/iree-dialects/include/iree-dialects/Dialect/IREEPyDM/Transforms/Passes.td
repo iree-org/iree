@@ -20,6 +20,24 @@ def FixateWeakNumeric : Pass<"fixate-weak-numeric", ""> {
   let constructor = "mlir::iree_pydm::createFixateWeakNumericPass()";
 }
 
+def LocalPropagateTypes : Pass<"pydm-local-propagate-types", "mlir::iree_pydm::FuncOp"> {
+  let summary = "Performs some local type propagation";
+  let description = [{
+    This pass does some very basic, post import type propagation. It isn't very
+    good and is basically sufficient to de-dynamize some core parts of the RTL.
+    It should be replaced with a real implementation as part of optimization.
+  }];
+  let constructor = "mlir::iree_pydm::createLocalPropagateTypesPass()";
+}
+
+def VariablesToSSA : Pass<"pydm-variables-to-ssa", "mlir::iree_pydm::FuncOp"> {
+  let summary = "Variables to SSA";
+  let description = [{
+    Attempts to variable loads and stores to SSA form, where possible.
+  }];
+  let constructor = "mlir::iree_pydm::createVariablesToSSAPass()";
+}
+
 def LowerIREEPyDMToRTL : Pass<"lower-iree-pydm-to-rtl", "ModuleOp"> {
   let summary = "Lowers PyDM ops with runtime implementations to calls";
   let description = [{

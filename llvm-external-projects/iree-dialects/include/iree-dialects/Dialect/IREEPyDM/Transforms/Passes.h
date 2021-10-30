@@ -21,6 +21,8 @@ class IREEDialect;
 
 namespace iree_pydm {
 
+class FuncOp;
+
 /// References sources, either passed literally or by reference to a file.
 /// One of `asmBlob` or `asmFilePath` should be populated.
 struct SourceBundle {
@@ -34,6 +36,8 @@ struct LowerToIREEOptions {
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertIREEPyDMToIREEPass();
+std::unique_ptr<OperationPass<FuncOp>> createLocalPropagateTypesPass();
+std::unique_ptr<OperationPass<FuncOp>> createVariablesToSSAPass();
 std::unique_ptr<OperationPass<>> createFixateWeakNumericPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLinkIREEPyDMRTLPass(
     Optional<SourceBundle> linkRtlSourceBundle = None);

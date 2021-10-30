@@ -502,6 +502,22 @@ def IREEPyDM_GetNumericPromotionOrderOp : IREEPyDM_PureOp<"get_numeric_promotion
   }];
 }
 
+def IREEPyDM_StaticInfoCastOp : IREEPyDM_PureOp<"static_info_cast"> {
+  let summary = "Adds or removes static type information";
+  let description = [{
+    This is often inserted as an artifact of type refinement where static
+    information is added to a type locally and a follow-on step is required
+    to resolve it.
+  }];
+  let arguments = (ins IREEPyDM_AnyValueType:$value);
+  let results = (outs IREEPyDM_AnyValueType);
+  let assemblyFormat = [{
+    $value `:` type($value) `->` type(results) attr-dict
+  }];
+  // TODO: Add verifier.
+  // let verifier = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Control flow
 //===----------------------------------------------------------------------===//
@@ -593,7 +609,7 @@ def IREEPyDM_DynamicBinaryPromoteOp : IREEPyDM_PureOp<"dynamic_binary_promote"> 
   let assemblyFormat = [{
     $left `,` $right `:` type($left) `,` type($right) attr-dict
   }];
-  let hasCanonicalizeMethod = 1;
+  let hasCanonicalizer = 1;
 }
 
 def IREEPyDM_PromoteNumericOp : IREEPyDM_PureOp<"promote_numeric"> {

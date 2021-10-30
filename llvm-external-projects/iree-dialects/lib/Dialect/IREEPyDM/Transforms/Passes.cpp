@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
 
+#include "iree-dialects/Dialect/IREEPyDM/IR/Ops.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -14,6 +15,7 @@ using namespace mlir::iree_pydm;
 
 void mlir::iree_pydm::buildLowerToIREEPassPipeline(
     OpPassManager& passManager, const LowerToIREEOptions& options) {
+  passManager.addNestedPass<iree_pydm::FuncOp>(createLocalPropagateTypesPass());
   // TODO: Needs to be iterative, support optimization passes, etc.
   passManager.addPass(createLowerIREEPyDMToRTLPass());
   if (options.linkRtlSource) {
