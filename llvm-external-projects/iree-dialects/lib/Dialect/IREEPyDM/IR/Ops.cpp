@@ -228,6 +228,20 @@ LogicalResult BoxOp::canonicalize(BoxOp op, PatternRewriter &rewriter) {
     return success();
   }
 
+  // Box to an appropriate type and static info cast.
+  ObjectType objectType = rewriter.getType<ObjectType>(nullptr);
+  if (op.object().getType() == objectType &&
+      !op.primitive().getType().isa<ObjectType>()) {
+    auto refinedBox = rewriter.create<BoxOp>(
+        op.getLoc(),
+        rewriter.getType<ObjectType>(
+            op.primitive().getType().cast<PrimitiveType>()),
+        op.primitive());
+    rewriter.replaceOpWithNewOp<StaticInfoCastOp>(op, op.object().getType(),
+                                                  refinedBox);
+    return success();
+  }
+
   return failure();
 }
 

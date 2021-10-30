@@ -15,7 +15,10 @@ using namespace mlir::iree_pydm;
 
 void mlir::iree_pydm::buildLowerToIREEPassPipeline(
     OpPassManager& passManager, const LowerToIREEOptions& options) {
+  passManager.addNestedPass<iree_pydm::FuncOp>(createVariablesToSSAPass());
   passManager.addNestedPass<iree_pydm::FuncOp>(createLocalPropagateTypesPass());
+  passManager.addPass(createCanonicalizerPass());
+
   // TODO: Needs to be iterative, support optimization passes, etc.
   passManager.addPass(createLowerIREEPyDMToRTLPass());
   if (options.linkRtlSource) {

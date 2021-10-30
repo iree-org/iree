@@ -472,6 +472,20 @@ class DynamicUnpackOpConversion
   }
 };
 
+/// If at this phase, there is nothing to do with a static info cast.
+/// Just drop it.
+class ElideStaticInfoCast
+    : public OpConversionPattern<pydm_d::StaticInfoCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      pydm_d::StaticInfoCastOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(srcOp, srcOp.value());
+    return success();
+  }
+};
+
 /// Generates a failure exception code.
 /// This is just temporary to allow some libraries to signal exceptions.
 class FailureOpConversion : public OpConversionPattern<pydm_d::FailureOp> {
@@ -842,11 +856,12 @@ void mlir::iree_pydm::populatePyDMToIREELoweringPatterns(
   patterns.insert<AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
                   ApplyCompareNumericConversion, BoolToPredConversion,
                   BoxOpConversion, CallOpConversion, ConstantOpConversion,
-                  DynamicUnpackOpConversion, FailureOpConversion,
-                  FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
-                  MakeTupleOpConversion, RaiseOnFailureOpConversion,
-                  ReturnOpConversion, StoreVarOpConversion, UnboxOpConversion>(
-      typeConverter, context);
+                  DynamicUnpackOpConversion, ElideStaticInfoCast,
+                  FailureOpConversion, FuncOpConversion, GetTypeCodeConversion,
+                  LoadVarOpConversion, MakeTupleOpConversion,
+                  RaiseOnFailureOpConversion, ReturnOpConversion,
+                  StoreVarOpConversion, UnboxOpConversion>(typeConverter,
+                                                           context);
 
   // External CFG ops.
   patterns.insert<BuiltinBranchConversion, BuiltinCondBranchConversion,
