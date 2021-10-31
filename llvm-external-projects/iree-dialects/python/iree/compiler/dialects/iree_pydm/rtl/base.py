@@ -146,6 +146,6 @@ class RtlBuilder:
   def optimize(self):
     """Optimizes the RTL modules by running through stage 1 compilation."""
     with self.context:
-      # TODO: Create a real pass pipeline to do first stage optimizations.
-      pm = passmanager.PassManager.parse("builtin.module(canonicalize,cse)")
+      pm = passmanager.PassManager.parse(
+          "builtin.module(pydm-post-import-pipeline)")
       pm.run(self.root_module)

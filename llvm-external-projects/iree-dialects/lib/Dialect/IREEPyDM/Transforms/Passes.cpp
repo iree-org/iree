@@ -14,12 +14,15 @@ using namespace mlir;
 namespace PYDM = mlir::iree_compiler::IREE::PYDM;
 using namespace PYDM;
 
-void PYDM::buildLowerToIREEPassPipeline(OpPassManager& passManager,
-                                        const LowerToIREEOptions& options) {
+void PYDM::buildPostImportPassPipeline(OpPassManager& passManager) {
   passManager.addNestedPass<PYDM::FuncOp>(createVariablesToSSAPass());
   passManager.addNestedPass<PYDM::FuncOp>(createLocalPropagateTypesPass());
   passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+}
 
+void PYDM::buildLowerToIREEPassPipeline(OpPassManager& passManager,
+                                        const LowerToIREEOptions& options) {
   // TODO: Needs to be iterative, support optimization passes, etc.
   passManager.addPass(createLowerIREEPyDMToRTLPass());
   if (options.linkRtlSource) {
@@ -36,4 +39,23 @@ void PYDM::buildLowerToIREEPassPipeline(OpPassManager& passManager,
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createSymbolDCEPass());
   passManager.addPass(createCSEPass());
+}
+
+void PYDM::registerPasses() {
+  registerIREEPyDMTransformsPasses();
+
+  PassPipelineRegistration<> postImportPassPipeline(
+      "pydm-post-import-pipeline",
+      "Runs passes to cleanup PyDM immediately post-import",
+      [](OpPassManager& passManager) {
+        buildPostImportPassPipeline(passManager);
+      });
+
+  PassPipelineRegistration<> lowerToIREEPipeline(
+      "pydm-lower-to-iree-pipeline",
+      "Runs passes to lower PyDM to IREE's input dialects",
+      [](OpPassManager& passManager) {
+        LowerToIREEOptions options;
+        buildLowerToIREEPassPipeline(passManager, options);
+      });
 }

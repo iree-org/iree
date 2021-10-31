@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   registerSCFPasses();
 
   // Local dialects.
-  mlir::iree_compiler::IREE::PYDM::registerIREEPyDMTransformsPasses();
+  mlir::iree_compiler::IREE::PYDM::registerPasses();
 
   DialectRegistry registry;
   registry.insert<

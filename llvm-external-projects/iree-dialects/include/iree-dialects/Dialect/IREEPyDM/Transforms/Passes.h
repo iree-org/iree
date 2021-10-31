@@ -45,11 +45,15 @@ std::unique_ptr<OperationPass<ModuleOp>> createLinkIREEPyDMRTLPass(
     Optional<SourceBundle> linkRtlSourceBundle = None);
 std::unique_ptr<OperationPass<ModuleOp>> createLowerIREEPyDMToRTLPass();
 
+void buildPostImportPassPipeline(OpPassManager& passManager);
 void buildLowerToIREEPassPipeline(OpPassManager& passManager,
                                   const LowerToIREEOptions& options);
 
 #define GEN_PASS_REGISTRATION
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h.inc"
+
+/// Register all passes and pass pipelines.
+void registerPasses();
 
 }  // namespace PYDM
 }  // namespace IREE

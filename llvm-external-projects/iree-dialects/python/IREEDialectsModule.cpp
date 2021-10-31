@@ -93,6 +93,7 @@ PYBIND11_MODULE(_ireeDialects, m) {
   // IREEPyDMDialect
   //===--------------------------------------------------------------------===//
   auto iree_pydm_m = m.def_submodule("iree_pydm");
+  mlirIREEPyDMRegisterPasses();
 
   py::class_<PyIREEPyDMSourceBundle>(
       iree_pydm_m, "SourceBundle", py::module_local(),
@@ -145,6 +146,15 @@ PYBIND11_MODULE(_ireeDialects, m) {
                                                  options.wrapped);
       },
       py::arg("pass_manager"), py::arg("link_rtl_asm") = py::none());
+
+  iree_pydm_m.def(
+      "build_post_import_pass_pipeline",
+      [](MlirPassManager passManager) {
+        MlirOpPassManager opPassManager =
+            mlirPassManagerGetAsOpPassManager(passManager);
+        mlirIREEPyDMBuildPostImportPassPipeline(opPassManager);
+      },
+      py::arg("pass_manager"));
 
 #define DEFINE_IREEPYDM_NULLARY_TYPE(Name)                                 \
   mlir_type_subclass(iree_pydm_m, #Name "Type", mlirTypeIsAIREEPyDM##Name, \

@@ -37,6 +37,9 @@ DEFINE_C_API_STRUCT(IREEPyDMSourceBundle, void);
 DEFINE_C_API_STRUCT(IREEPyDMLoweringOptions, void);
 #undef DEFINE_C_API_STRUCT
 
+/// Register all passes for PyDM.
+MLIR_CAPI_EXPORTED void mlirIREEPyDMRegisterPasses();
+
 /// Creates a PyDM source bundle from an ASM string.
 MLIR_CAPI_EXPORTED IREEPyDMSourceBundle
 ireePyDMSourceBundleCreateAsm(MlirStringRef asmString);
@@ -93,6 +96,12 @@ MLIR_CAPI_EXPORTED void ireePyDMLoweringOptionsLinkRtl(
 /// Destroys a created lowering options struct.
 MLIR_CAPI_EXPORTED void ireePyDMLoweringOptionsDestroy(
     IREEPyDMLoweringOptions options);
+
+/// Builds a pass pipeline which should be run immediately post import to
+/// perform non-local structural transformations not suitable at the AST level
+/// and do local type inference.
+MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildPostImportPassPipeline(
+    MlirOpPassManager passManager);
 
 /// Builds a pass pipeline which lowers the iree_pydm dialect to IREE.
 MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildLowerToIREEPassPipeline(

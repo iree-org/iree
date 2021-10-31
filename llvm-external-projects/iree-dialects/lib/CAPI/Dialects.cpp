@@ -36,6 +36,8 @@ MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREEPyDM, iree_pydm,
 DEFINE_C_API_PTR_METHODS(IREEPyDMSourceBundle, PYDM::SourceBundle)
 DEFINE_C_API_PTR_METHODS(IREEPyDMLoweringOptions, PYDM::LowerToIREEOptions)
 
+void mlirIREEPyDMRegisterPasses() { PYDM::registerPasses(); }
+
 bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type) {
   return unwrap(type).isa<PYDM::PrimitiveType>();
 }
@@ -83,6 +85,12 @@ MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
 
   auto cppType = unwrap(primitive).cast<PYDM::PrimitiveType>();
   return wrap(PYDM::ObjectType::get(unwrap(ctx), cppType));
+}
+
+MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildPostImportPassPipeline(
+    MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  PYDM::buildPostImportPassPipeline(*passManagerCpp);
 }
 
 // LowerToIREE Pass Pipeline.
