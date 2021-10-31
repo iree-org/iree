@@ -14,9 +14,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
-
-namespace pydm_d = mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
 namespace {
 
@@ -25,7 +24,7 @@ class RtlFunc {
   FunctionType makeRaisingSignature(Builder b, ArrayRef<Type> inputs,
                                     Type output) {
     return b.getType<FunctionType>(
-        inputs, TypeRange{b.getType<pydm_d::ExceptionResultType>(), output});
+        inputs, TypeRange{b.getType<PYDM::ExceptionResultType>(), output});
   }
 };
 
@@ -39,8 +38,8 @@ Operation *importRtlFunc(SymbolTable &symbolTable, RtlFuncTy rtlFunc) {
   // Does not exist - create detached and insert.
   FunctionType signature = rtlFunc.getRtlSignature(builder);
   OperationState state(symbolTable.getOp()->getLoc(),
-                       pydm_d::FuncOp::getOperationName());
-  pydm_d::FuncOp::build(builder, state, name, signature);
+                       PYDM::FuncOp::getOperationName());
+  PYDM::FuncOp::build(builder, state, name, signature);
   auto funcOp = Operation::create(state);
   SymbolTable::setSymbolVisibility(funcOp, SymbolTable::Visibility::Private);
   symbolTable.insert(funcOp);
@@ -50,8 +49,8 @@ Operation *importRtlFunc(SymbolTable &symbolTable, RtlFuncTy rtlFunc) {
 struct ObjectAsBoolFunc : public RtlFunc {
   StringRef getRtlName() { return "pydmrtl$object_as_bool"; }
   FunctionType getRtlSignature(Builder b) {
-    return makeRaisingSignature(b, {b.getType<pydm_d::ObjectType>(nullptr)},
-                                b.getType<pydm_d::BoolType>());
+    return makeRaisingSignature(b, {b.getType<PYDM::ObjectType>(nullptr)},
+                                b.getType<PYDM::BoolType>());
   }
 };
 
@@ -59,9 +58,9 @@ struct DynamicBinaryPromoteFunc : public RtlFunc {
   StringRef getRtlName() { return "pydmrtl$dynamic_binary_promote"; }
   FunctionType getRtlSignature(Builder b) {
     return makeRaisingSignature(b,
-                                {b.getType<pydm_d::ObjectType>(nullptr),
-                                 b.getType<pydm_d::ObjectType>(nullptr)},
-                                b.getType<pydm_d::TupleType>());
+                                {b.getType<PYDM::ObjectType>(nullptr),
+                                 b.getType<PYDM::ObjectType>(nullptr)},
+                                b.getType<PYDM::TupleType>());
   }
 };
 
@@ -73,7 +72,7 @@ class ApplyBinaryFunc : public RtlFunc {
   }
   StringRef getRtlName() { return rtlName; }
   FunctionType getRtlSignature(Builder b) {
-    Type objectType = b.getType<pydm_d::ObjectType>(nullptr);
+    Type objectType = b.getType<PYDM::ObjectType>(nullptr);
     return makeRaisingSignature(b, {objectType, objectType}, objectType);
   }
 
@@ -89,8 +88,8 @@ class ApplyCompareFunc : public RtlFunc {
   }
   StringRef getRtlName() { return rtlName; }
   FunctionType getRtlSignature(Builder b) {
-    Type objectType = b.getType<pydm_d::ObjectType>(nullptr);
-    Type boolType = b.getType<pydm_d::BoolType>();
+    Type objectType = b.getType<PYDM::ObjectType>(nullptr);
+    Type boolType = b.getType<PYDM::BoolType>();
     return makeRaisingSignature(b, {objectType, objectType}, boolType);
   }
 
@@ -119,16 +118,16 @@ class EmitImportCallBase : public OpRewritePattern<OpTy> {
       Value input = std::get<0>(it);
       Type expectedType = std::get<1>(it);
       // Detect boxing.
-      if (expectedType.isa<pydm_d::ObjectType>() &&
+      if (expectedType.isa<PYDM::ObjectType>() &&
           !input.getType().isa<ObjectType>()) {
-        input = rewriter.create<pydm_d::BoxOp>(loc, expectedType, input);
+        input = rewriter.create<PYDM::BoxOp>(loc, expectedType, input);
       }
       convertedInputs.push_back(input);
     }
 
-    auto callOp = rewriter.create<pydm_d::CallOp>(loc, signature.getResults(),
-                                                  symbolRef, convertedInputs);
-    rewriter.create<pydm_d::RaiseOnFailureOp>(loc, callOp.exc_result());
+    auto callOp = rewriter.create<PYDM::CallOp>(loc, signature.getResults(),
+                                                symbolRef, convertedInputs);
+    rewriter.create<PYDM::RaiseOnFailureOp>(loc, callOp.exc_result());
     return callOp.result();
   }
 
@@ -142,13 +141,13 @@ class EmitImportCallBase : public OpRewritePattern<OpTy> {
     } else {
       // Unpack 1 -> N.
       SmallVector<Type> unpackTypes = {
-          rewriter.getType<pydm_d::ExceptionResultType>()};
+          rewriter.getType<PYDM::ExceptionResultType>()};
       unpackTypes.append(op->getResultTypes().begin(),
                          op->getResultTypes().end());
-      auto unpackOp = rewriter.create<pydm_d::DynamicUnpackOp>(
+      auto unpackOp = rewriter.create<PYDM::DynamicUnpackOp>(
           op->getLoc(), unpackTypes, callResult);
-      rewriter.create<pydm_d::RaiseOnFailureOp>(op->getLoc(),
-                                                unpackOp.exc_result());
+      rewriter.create<PYDM::RaiseOnFailureOp>(op->getLoc(),
+                                              unpackOp.exc_result());
       rewriter.replaceOp(op, unpackOp.slots());
     }
   }
@@ -158,15 +157,15 @@ class EmitImportCallBase : public OpRewritePattern<OpTy> {
 };
 
 struct ApplyBinaryPattern
-    : public EmitImportCallBase<ApplyBinaryFunc, pydm_d::ApplyBinaryOp> {
+    : public EmitImportCallBase<ApplyBinaryFunc, PYDM::ApplyBinaryOp> {
   using EmitImportCallBase::EmitImportCallBase;
 
-  LogicalResult matchAndRewrite(pydm_d::ApplyBinaryOp srcOp,
+  LogicalResult matchAndRewrite(PYDM::ApplyBinaryOp srcOp,
                                 PatternRewriter &rewriter) const override {
     // Only match object-object binary apply.
-    auto objectType = rewriter.getType<pydm_d::ObjectType>(nullptr);
-    if (!srcOp.left().getType().isa<pydm_d::ObjectType>() ||
-        !srcOp.right().getType().isa<pydm_d::ObjectType>())
+    auto objectType = rewriter.getType<PYDM::ObjectType>(nullptr);
+    if (!srcOp.left().getType().isa<PYDM::ObjectType>() ||
+        !srcOp.right().getType().isa<PYDM::ObjectType>())
       return rewriter.notifyMatchFailure(srcOp, "not (object, object) variant");
 
     ApplyBinaryFunc f(srcOp.dunder_name());
@@ -177,15 +176,15 @@ struct ApplyBinaryPattern
 };
 
 struct ApplyComparePattern
-    : public EmitImportCallBase<ApplyCompareFunc, pydm_d::ApplyCompareOp> {
+    : public EmitImportCallBase<ApplyCompareFunc, PYDM::ApplyCompareOp> {
   using EmitImportCallBase::EmitImportCallBase;
 
-  LogicalResult matchAndRewrite(pydm_d::ApplyCompareOp srcOp,
+  LogicalResult matchAndRewrite(PYDM::ApplyCompareOp srcOp,
                                 PatternRewriter &rewriter) const override {
     // Only match object-object binary apply.
-    auto objectType = rewriter.getType<pydm_d::ObjectType>(nullptr);
-    if (!srcOp.left().getType().isa<pydm_d::ObjectType>() ||
-        !srcOp.right().getType().isa<pydm_d::ObjectType>())
+    auto objectType = rewriter.getType<PYDM::ObjectType>(nullptr);
+    if (!srcOp.left().getType().isa<PYDM::ObjectType>() ||
+        !srcOp.right().getType().isa<PYDM::ObjectType>())
       return rewriter.notifyMatchFailure(srcOp, "not (object, object) variant");
 
     ApplyCompareFunc f(srcOp.dunder_name());
@@ -197,10 +196,10 @@ struct ApplyComparePattern
 
 struct DynamicBinaryPromotePattern
     : public EmitImportCallBase<DynamicBinaryPromoteFunc,
-                                pydm_d::DynamicBinaryPromoteOp> {
+                                PYDM::DynamicBinaryPromoteOp> {
   using EmitImportCallBase::EmitImportCallBase;
 
-  LogicalResult matchAndRewrite(pydm_d::DynamicBinaryPromoteOp srcOp,
+  LogicalResult matchAndRewrite(PYDM::DynamicBinaryPromoteOp srcOp,
                                 PatternRewriter &rewriter) const override {
     replaceOpWithCall(srcOp, {srcOp.left(), srcOp.right()}, {}, rewriter);
     return success();
@@ -208,12 +207,12 @@ struct DynamicBinaryPromotePattern
 };
 
 struct ObjectAsBoolPattern
-    : public EmitImportCallBase<ObjectAsBoolFunc, pydm_d::AsBoolOp> {
+    : public EmitImportCallBase<ObjectAsBoolFunc, PYDM::AsBoolOp> {
   using EmitImportCallBase::EmitImportCallBase;
 
-  LogicalResult matchAndRewrite(pydm_d::AsBoolOp srcOp,
+  LogicalResult matchAndRewrite(PYDM::AsBoolOp srcOp,
                                 PatternRewriter &rewriter) const override {
-    auto valueType = srcOp.value().getType().dyn_cast<pydm_d::ObjectType>();
+    auto valueType = srcOp.value().getType().dyn_cast<PYDM::ObjectType>();
     if (!valueType)
       return rewriter.notifyMatchFailure(srcOp, "not an !object<>");
     replaceOpWithCall(srcOp, {srcOp.value()}, {}, rewriter);
@@ -249,7 +248,6 @@ struct LowerIREEPyDMToRTLPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::iree_pydm::createLowerIREEPyDMToRTLPass() {
+std::unique_ptr<OperationPass<ModuleOp>> PYDM::createLowerIREEPyDMToRTLPass() {
   return std::make_unique<LowerIREEPyDMToRTLPass>();
 }

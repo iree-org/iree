@@ -14,7 +14,7 @@ def PythonTypeInterface : TypeInterface<"PythonTypeInterface"> {
     Interface implemented by all Python types which represent a value in the
     data model.
   }];
-  let cppNamespace = "::mlir::iree_pydm";
+  let cppNamespace = "::mlir::iree_compiler::IREE::PYDM";
 
   let methods = [
     InterfaceMethod<[{

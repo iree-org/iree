@@ -19,7 +19,9 @@ namespace iree {
 class IREEDialect;
 }
 
-namespace iree_pydm {
+namespace iree_compiler {
+namespace IREE {
+namespace PYDM {
 
 class FuncOp;
 
@@ -49,7 +51,9 @@ void buildLowerToIREEPassPipeline(OpPassManager& passManager,
 #define GEN_PASS_REGISTRATION
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h.inc"
 
-}  // namespace iree_pydm
+}  // namespace PYDM
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_PASSES_H

@@ -13,9 +13,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
-
-namespace pydm_d = mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
 using llvm::dbgs;
 #define DEBUG_TYPE "pydm_opt"
@@ -234,7 +233,7 @@ struct LocalPropagateTypesPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<pydm_d::FuncOp>>
-mlir::iree_pydm::createLocalPropagateTypesPass() {
+std::unique_ptr<OperationPass<PYDM::FuncOp>>
+PYDM::createLocalPropagateTypesPass() {
   return std::make_unique<LocalPropagateTypesPass>();
 }

@@ -44,7 +44,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::Vulkan::VulkanDialect,
                   linalg_ext::LinalgExtDialect,
                   mlir::iree::IREEDialect,
-                  mlir::iree_pydm::IREEPyDMDialect>();
+                  IREE::PYDM::IREEPyDMDialect>();
   // clang-format on
 
   linalg_ext::registerTiledOpInterfaceExternalModels(registry);

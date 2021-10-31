@@ -11,12 +11,13 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
-void mlir::iree_pydm::buildLowerToIREEPassPipeline(
-    OpPassManager& passManager, const LowerToIREEOptions& options) {
-  passManager.addNestedPass<iree_pydm::FuncOp>(createVariablesToSSAPass());
-  passManager.addNestedPass<iree_pydm::FuncOp>(createLocalPropagateTypesPass());
+void PYDM::buildLowerToIREEPassPipeline(OpPassManager& passManager,
+                                        const LowerToIREEOptions& options) {
+  passManager.addNestedPass<PYDM::FuncOp>(createVariablesToSSAPass());
+  passManager.addNestedPass<PYDM::FuncOp>(createLocalPropagateTypesPass());
   passManager.addPass(createCanonicalizerPass());
 
   // TODO: Needs to be iterative, support optimization passes, etc.

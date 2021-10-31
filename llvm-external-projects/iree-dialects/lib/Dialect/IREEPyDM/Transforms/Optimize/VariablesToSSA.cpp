@@ -14,8 +14,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
-namespace pydm_d = mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
 using llvm::dbgs;
 #define DEBUG_TYPE "pydm_opt"
@@ -106,7 +106,7 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
     }
     Operation *terminator = block.getTerminator();
     if (!terminator ||
-        !llvm::isa<BranchOp, CondBranchOp, iree_pydm::ReturnOp>(terminator)) {
+        !llvm::isa<BranchOp, CondBranchOp, PYDM::ReturnOp>(terminator)) {
       return emitError(terminator->getLoc())
              << "unsupported terminator for block";
     }
@@ -196,7 +196,6 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
 
 }  // namespace
 
-std::unique_ptr<OperationPass<pydm_d::FuncOp>>
-mlir::iree_pydm::createVariablesToSSAPass() {
+std::unique_ptr<OperationPass<PYDM::FuncOp>> PYDM::createVariablesToSSAPass() {
   return std::make_unique<VariablesToSSAPass>();
 }

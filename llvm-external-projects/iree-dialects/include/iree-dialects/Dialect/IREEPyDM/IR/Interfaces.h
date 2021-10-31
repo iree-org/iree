@@ -11,11 +11,15 @@
 #include "mlir/IR/Types.h"
 
 namespace mlir {
-namespace iree_pydm {
+namespace iree_compiler {
+namespace IREE {
+namespace PYDM {
 
 enum class BuiltinTypeCode;
 
-}  // namespace iree_pydm
+}  // namespace PYDM
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #include "iree-dialects/Dialect/IREEPyDM/IR/TypeInterfaces.h.inc"

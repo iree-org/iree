@@ -551,7 +551,7 @@ def IREEPyDM_ExprStatementDiscardOp : IREEPyDM_Op<"expr_statement_discard"> {
 
 def FunctionalIfOp : IREEPyDM_Op<"functional_if", [
     DeclareOpInterfaceMethods<RegionBranchOpInterface>,
-    SingleBlockImplicitTerminator<"iree_pydm::YieldOp">, RecursiveSideEffects,
+    SingleBlockImplicitTerminator<"YieldOp">, RecursiveSideEffects,
     NoRegionArguments,
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
   let summary = "A functional if construct";

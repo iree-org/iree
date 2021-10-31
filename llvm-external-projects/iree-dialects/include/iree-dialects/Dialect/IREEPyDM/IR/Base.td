@@ -29,7 +29,7 @@ def IREEPyDM_Dialect : Dialect {
       - Makes IR decisions conducive to progress typeification, enabling
         optimization benefits compared to fully untyped programs.
   }];
-  let cppNamespace = "::mlir::iree_pydm";
+  let cppNamespace = "::mlir::iree_compiler::IREE::PYDM";
   let hasConstantMaterializer = 1;
 }
 

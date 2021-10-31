@@ -14,7 +14,9 @@
 #include "mlir/IR/Types.h"
 
 namespace mlir {
-namespace iree_pydm {
+namespace iree_compiler {
+namespace IREE {
+namespace PYDM {
 
 /// Base class for all unboxed primitive types.
 class PrimitiveType : public mlir::Type {
@@ -23,7 +25,9 @@ class PrimitiveType : public mlir::Type {
   static bool classof(Type type);
 };
 
-}  // namespace iree_pydm
+}  // namespace PYDM
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 // Include generated dialect code (this comment blocks clang-format from
@@ -34,7 +38,9 @@ class PrimitiveType : public mlir::Type {
 #include "iree-dialects/Dialect/IREEPyDM/IR/Types.h.inc"
 
 namespace mlir {
-namespace iree_pydm {
+namespace iree_compiler {
+namespace IREE {
+namespace PYDM {
 
 inline bool PrimitiveType::classof(Type type) {
   // Must corresponds with each subclass.
@@ -42,7 +48,9 @@ inline bool PrimitiveType::classof(Type type) {
                   ListType, NoneType, RealType, StrType, TupleType, TypeType>();
 }
 
-}  // namespace iree_pydm
+}  // namespace PYDM
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_DIALECT_H

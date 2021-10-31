@@ -15,14 +15,15 @@
 #include "mlir/IR/TypeUtilities.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
-using PyBoolType = mlir::iree_pydm::BoolType;
-using PyConstantOp = mlir::iree_pydm::ConstantOp;
-using PyIntegerType = mlir::iree_pydm::IntegerType;
-using PyRealType = mlir::iree_pydm::RealType;
-using PyCallOp = mlir::iree_pydm::CallOp;
-using PyFuncOp = mlir::iree_pydm::FuncOp;
+using PyBoolType = PYDM::BoolType;
+using PyConstantOp = PYDM::ConstantOp;
+using PyIntegerType = PYDM::IntegerType;
+using PyRealType = PYDM::RealType;
+using PyCallOp = PYDM::CallOp;
+using PyFuncOp = PYDM::FuncOp;
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -567,7 +568,7 @@ LogicalResult PromoteNumericOp::canonicalize(PromoteNumericOp op,
 // RaiseOnFailureOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult iree_pydm::RaiseOnFailureOp::fold(
+LogicalResult PYDM::RaiseOnFailureOp::fold(
     ArrayRef<Attribute> operands, SmallVectorImpl<OpFoldResult> &results) {
   assert(operands.size() == 1 && "expected one fold operand");
   // Unit exception result is success. Just elide.

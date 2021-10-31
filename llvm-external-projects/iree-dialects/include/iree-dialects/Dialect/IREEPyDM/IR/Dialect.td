@@ -40,13 +40,13 @@ class IREEPyDM_PrimitiveTypeDef<
     TypeDef<IREEPyDM_Dialect, name, /*traits=*/[
       DeclareTypeInterfaceMethods<PythonTypeInterface, overridenMethods>
     ],
-    /*baseCppClass=*/"::mlir::iree_pydm::PrimitiveType"> {
+    /*baseCppClass=*/"::mlir::iree_compiler::IREE::PYDM::PrimitiveType"> {
 }
 
 def IREEPyDM_AnyPrimitiveType : Type<
-    CPred<"$_self.isa<::mlir::iree_pydm::PrimitiveType>()">,
+    CPred<"$_self.isa<::mlir::iree_compiler::IREE::PYDM::PrimitiveType>()">,
     "unboxed primitive type",
-    "::mlir::iree_pydm::PrimitiveType">;
+    "::mlir::iree_compiler::IREE::PYDM::PrimitiveType">;
 
 def IREEPyDM_BoolType : IREEPyDM_PrimitiveTypeDef<"Bool", [
     "getNumericPromotionOrder", "getNumericCategory", "getNumericSubTypeCode"]> {
@@ -339,7 +339,7 @@ def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
   }];
 
   let parameters = (ins
-    "::mlir::iree_pydm::PrimitiveType":$primitiveType
+    "::mlir::iree_compiler::IREE::PYDM::PrimitiveType":$primitiveType
   );
 
   let printer = [{
@@ -426,7 +426,7 @@ def IREEPyDM_UnionType : IREEPyDM_TypeDef<"Union"> {
 //===----------------------------------------------------------------------===//
 
 def IREEPyDM_PrimitiveType : Type<CPred<
-  "$_self.isa<::mlir::iree_pydm::PrimitiveType>()">,
+  "$_self.isa<::mlir::iree_compiler::IREE::PYDM::PrimitiveType>()">,
   "Python unboxed primitive type">;
 
 def IREEPyDM_AnyValueType : AnyTypeOf<[
@@ -441,10 +441,10 @@ def IREEPyDM_AnyNumericType : AnyTypeOf<[
 ], "Python numeric type">;
 
 def IREEPyDM_GenericObjectType : Type<
-    CPred<"::mlir::iree_pydm::ObjectType::isGenericObjectType($_self)">,
+    CPred<"::mlir::iree_compiler::IREE::PYDM::ObjectType::isGenericObjectType($_self)">,
     "generic object",
-    "::mlir::iree_pydm::ObjectType">,
-    BuildableType<"$_builder.getType<::mlir::iree_pydm::ObjectType>(nullptr)">;
+    "::mlir::iree_compiler::IREE::PYDM::ObjectType">,
+    BuildableType<"$_builder.getType<::mlir::iree_compiler::IREE::PYDM::ObjectType>(nullptr)">;
 
 // TODO: Upstream this. Missing from OpBase.td.
 def IREEPyDM_FlatSymbolRefArrayAttr :

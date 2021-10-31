@@ -11,7 +11,9 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
-namespace iree_pydm {
+namespace iree_compiler {
+namespace IREE {
+namespace PYDM {
 
 class LoweringTypeConverter : public mlir::TypeConverter {
  public:
@@ -36,7 +38,9 @@ class LoweringTypeConverter : public mlir::TypeConverter {
   WeakFloatType weakFloatType = WeakFloatType::F32;
 };
 
-}  // namespace iree_pydm
+}  // namespace PYDM
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_TOIREE_TYPECONVERTER_H

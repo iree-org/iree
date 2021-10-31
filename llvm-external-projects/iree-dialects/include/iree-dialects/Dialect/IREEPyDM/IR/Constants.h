@@ -8,7 +8,9 @@
 #define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_CONSTANTS_H
 
 namespace mlir {
-namespace iree_pydm {
+namespace iree_compiler {
+namespace IREE {
+namespace PYDM {
 
 /// Category of the numeric type. These are arranged such that during promotion,
 /// the type with the largest category value determines the category of
@@ -127,7 +129,9 @@ enum class BuiltinTypeCode : int {
   FirstCustom = 0x101,
 };
 
-}  // namespace iree_pydm
+}  // namespace PYDM
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_CONSTANTS_H
