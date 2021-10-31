@@ -8,6 +8,7 @@ add_mlir_library(IREEDialectsIREEPyDMOptimizePasses
 
   LINK_LIBS PUBLIC
   IREEDialectsIREEPyDMDialect
+  IREEDialectsIREEPyDMUtils
   MLIRIR
   MLIRTransformUtils
 )

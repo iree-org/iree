@@ -7,9 +7,9 @@
 #include "../PassDetail.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Ops.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
+#include "iree-dialects/Dialect/IREEPyDM/Utils/TypeInference.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/BlockAndValueMapping.h"
-#include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -26,6 +26,8 @@ struct LocalPropagateTypesPass
   void runOnOperation() override {
     // Prepare selected canonicalization patterns.
     auto *context = &getContext();
+    PermutedTypePropagator propagator(context);
+
     RewritePatternSet canonicalizePatterns(context);
     ApplyBinaryOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     ApplyCompareOp::getCanonicalizationPatterns(canonicalizePatterns, context);
@@ -39,19 +41,31 @@ struct LocalPropagateTypesPass
     FrozenRewritePatternSet frozenCanonicalizePatterns(
         std::move(canonicalizePatterns));
     GreedyRewriteConfig rewriterConfig;
+    // During the main fixpoint iteration, we cannot simplify regions because
+    // our propagator is keeping a cache of permuted blocks (we can add blocks
+    // but not remove until iteration is complete).
     rewriterConfig.enableRegionSimplification = false;
 
     bool changed = false;
-    for (int i = 0; i < 50; ++i) {
-      LLVM_DEBUG(dbgs() << "--- Local type propagation iteration " << i << "\n");
-      DominanceInfo domInfo(getOperation());
-      changed = false;
-      if (sinkStaticInfoCasts()) changed = true;
-      sinkBlockArgumentFixups();
+    for (int i = 0; i < 500; ++i) {
+      LLVM_DEBUG(dbgs() << "--- Local type propagation iteration " << i
+                        << "\n");
       applyPatternsAndFoldGreedily(getOperation(), frozenCanonicalizePatterns,
                                    rewriterConfig);
+      changed = false;
+      if (sinkStaticInfoCasts()) changed = true;
+      permuteRefinedBlocks(propagator);
       if (!changed) break;
     }
+
+    // Now that iteration is complete and we are no longer using the
+    // propagator, do one final canonicalization with region simplification
+    // enabled. This will prune out all of the excess blocks we created.
+    // Note that because we are still using a subset of dialect-specific
+    // patterns, this is less than a full canonicalization pass will do.
+    rewriterConfig.enableRegionSimplification = true;
+    applyPatternsAndFoldGreedily(getOperation(), frozenCanonicalizePatterns,
+                                 rewriterConfig);
   }
 
   // Moving things around the CFG often creates unresolved static info casts.
@@ -84,7 +98,8 @@ struct LocalPropagateTypesPass
         // Most of our ops which accept objects are internally tolerant of
         // receiving a refinement.
         // TODO: Replace this with an interface query.
-        if (llvm::isa<BoxOp, DynamicBinaryPromoteOp, UnboxOp>(use->getOwner())) {
+        if (llvm::isa<BoxOp, DynamicBinaryPromoteOp, UnboxOp>(
+                use->getOwner())) {
           use->set(fromValue);
           changed = true;
           LLVM_DEBUG(dbgs()
@@ -110,114 +125,58 @@ struct LocalPropagateTypesPass
   }
 
   // We may have done type refinement on branch ops but not updated successors.
-  // We fix these up en-masse by adding static info casts within successor
-  // blocks as needed.
-  void sinkBlockArgumentFixups() {
+  // We fix these up en-masse by permuting the blocks using the propagator.
+  // This is not merely mechanical: by iterating in this way with a permutation
+  // cache, it is possible to refinements that include type cycles in the CFG.
+  void permuteRefinedBlocks(PermutedTypePropagator &propagator) {
     SmallVector<Block *> blocks;
     for (auto &block : getOperation().body()) {
       blocks.push_back(&block);
     }
 
+    // This loop adds new blocks so must iterate a snapshot.
     for (auto *block : blocks) {
-      LLVM_DEBUG(dbgs() << "  ++ Processing block " << block << "\n");
-      // In the tree of permutations, who was the prime mover?
-      Block *permutedParentBlock = permutedParentBlocks[block];
-      if (!permutedParentBlock) permutedParentBlock = block;
+      auto mismatchedPredecessors =
+          propagator.findMismatchedBlockPredecessors(block);
+      if (mismatchedPredecessors.empty()) continue;
+      LLVM_DEBUG(dbgs() << "  ++ Processing block " << block << " ("
+                        << mismatchedPredecessors.size()
+                        << " mismatched predecessors)\n");
 
-      SmallVector<Block *> predecessors(block->getPredecessors());
-      for (Block *predecessor : predecessors) {
-        Operation *terminator = predecessor->getTerminator();
-        LLVM_DEBUG(dbgs() << "  ++ Predecessor terminator: " << *terminator << "\n");
-        auto branchOp = llvm::cast<BranchOpInterface>(terminator);
-        Location loc = branchOp.getLoc();
-        unsigned successorIndex = 0;
-        for (Block *successor : terminator->getSuccessors()) {
-          if (successor == block) break;
-          successorIndex += 1;
+      auto *parentInfo = propagator.lookupParentBlock(block);
+      for (auto &mismatch : mismatchedPredecessors) {
+        Location loc = mismatch.terminator.getLoc();
+        Block *permutation =
+            propagator.findBlockPermutation(parentInfo, mismatch.signature);
+        if (!permutation) {
+          LLVM_DEBUG(dbgs() << "  -- Creating new permutation for "
+                            << mismatch.signature << "\n");
+          permutation = propagator.createBlockPermutation(
+              parentInfo, mismatch.signature.getInputs(),
+              [&](Block *newBlock, Block *origBlock,
+                  BlockAndValueMapping &mapping) {
+                OpBuilder builder(newBlock, newBlock->begin());
+                for (auto it : llvm::zip(newBlock->getArguments(),
+                                         origBlock->getArguments())) {
+                  Value newArgument = std::get<0>(it);
+                  Type newType = newArgument.getType();
+                  Value origArgument = std::get<1>(it);
+                  Type origType = origArgument.getType();
+                  if (newType != origType) {
+                    newArgument = builder.create<StaticInfoCastOp>(
+                        loc, origType, newArgument);
+                    LLVM_DEBUG(dbgs() << "  -- Adding cast " << newType
+                                      << " -> " << origType << "\n");
+                  }
+                  mapping.map(origArgument, newArgument);
+                }
+              });
+        } else {
+          LLVM_DEBUG(dbgs() << "  -- Re-using existing permutation for "
+                            << mismatch.signature << "\n");
         }
-        auto successorOperands = branchOp.getSuccessorOperands(successorIndex);
-        assert(successorOperands && "expected branch with explicit operands");
-        bool mismatch = false;
-        for (auto it :
-             llvm::zip(block->getArgumentTypes(), *successorOperands)) {
-          if (std::get<0>(it) != std::get<1>(it).getType()) {
-            mismatch = true;
-            break;
-          }
-        }
-        if (!mismatch) continue;
-
-        // See if we have already generated a permutation.
-        SmallVector<Value> permutedArguments(*successorOperands);
-        Block *existingPermutation =
-            findPermutation(permutedParentBlock, permutedArguments);
-        if (existingPermutation) {
-          LLVM_DEBUG(dbgs() << "Fixup successor " << successorIndex
-                            << " with existing permutation " << existingPermutation << "\n");
-          branchOp->setSuccessor(existingPermutation, successorIndex);
-          continue;
-        }
-
-        // Need to permute.
-        LLVM_DEBUG(dbgs() << "Fixup successor " << successorIndex << " from "
-                          << branchOp << "\n");
-        // If here, we are instantiating a new block with specialized arguments.
-        Block *newBlock = new Block();
-        newBlock->insertBefore(block);
-        for (auto newArgument : permutedArguments) {
-          newBlock->addArgument(newArgument.getType());
-        }
-        branchOp->setSuccessor(newBlock, successorIndex);
-
-        // Now cast back to the original block types, which then stand-in
-        // when inlining.
-        BlockAndValueMapping mapping;
-        mapping.map(block, newBlock);
-        SmallVector<Value> blockArguments(newBlock->getArguments().begin(),
-                                          newBlock->getArguments().end());
-        OpBuilder builder(newBlock, newBlock->begin());
-        for (auto it : llvm::zip(block->getArguments(), blockArguments)) {
-          Value origArgument = std::get<0>(it);
-          Value &newArgument = std::get<1>(it);
-          Type origType = origArgument.getType();
-          if (newArgument.getType() != origType) {
-            newArgument =
-                builder.create<StaticInfoCastOp>(loc, origType, newArgument);
-          }
-          mapping.map(origArgument, newArgument);
-        }
-
-        inlineBlockInto(block, newBlock, mapping);
-        permutedBlocks[permutedParentBlock].push_back(newBlock);
-        permutedParentBlocks[newBlock] = permutedParentBlock;
+        mismatch.terminator->setSuccessor(permutation, mismatch.successorIndex);
       }
-    }
-  }
-
-  Block *findPermutation(Block *permutedParentBlock,
-                         SmallVectorImpl<Value> &incomingArguments) {
-    for (Block *candidateBlock : permutedBlocks[permutedParentBlock]) {
-      if (candidateBlock->getNumArguments() != incomingArguments.size())
-        continue;
-      bool matched = true;
-      for (auto it :
-           llvm::zip(incomingArguments, candidateBlock->getArgumentTypes())) {
-        Type incomingType = std::get<0>(it).getType();
-        Type candidateType = std::get<1>(it);
-        if (incomingType != candidateType) {
-          matched = false;
-          break;
-        }
-      }
-      if (matched) return candidateBlock;
-    }
-    return nullptr;
-  }
-
-  void inlineBlockInto(Block *fromBlock, Block *toBlock,
-                       BlockAndValueMapping &mapping) {
-    for (auto &op : *fromBlock) {
-      toBlock->push_back(op.clone(mapping));
     }
   }
 
@@ -226,9 +185,6 @@ struct LocalPropagateTypesPass
     getOperation()->walk([&](StaticInfoCastOp op) { results.push_back(op); });
     return results;
   }
-
-  DenseMap<Block *, Block *> permutedParentBlocks;
-  DenseMap<Block *, SmallVector<Block *>> permutedBlocks;
 };
 
 }  // namespace

@@ -17,7 +17,6 @@
 
 using namespace mlir;
 using namespace mlir::iree;
-using namespace mlir::iree_pydm;
 
 int main(int argc, char **argv) {
   registerAsmPrinterCLOptions();
@@ -27,12 +26,12 @@ int main(int argc, char **argv) {
   registerSCFPasses();
 
   // Local dialects.
-  registerIREEPyDMTransformsPasses();
+  mlir::iree_compiler::IREE::PYDM::registerIREEPyDMTransformsPasses();
 
   DialectRegistry registry;
   registry.insert<
       // Local dialects
-      mlir::iree::IREEDialect, mlir::iree_pydm::IREEPyDMDialect,
+      mlir::iree::IREEDialect, mlir::iree_compiler::IREE::PYDM::IREEPyDMDialect,
       // Upstream dialects
       mlir::StandardOpsDialect, mlir::scf::SCFDialect>();
 
