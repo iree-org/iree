@@ -28,6 +28,10 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
     iree_hal_command_category_t command_categories, CUstream stream,
     iree_hal_command_buffer_t **out_command_buffer);
 
+// Returns true if |command_buffer| is a CUDA stream-based command buffer.
+bool iree_hal_cuda_stream_command_buffer_isa(
+    iree_hal_command_buffer_t *command_buffer);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

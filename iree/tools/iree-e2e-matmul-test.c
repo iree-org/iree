@@ -25,17 +25,6 @@ IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
-// We rely on environment variables for some internal knobs because they are
-// easier to propagate through ctest to this program than command-line
-// arguments.
-const char* portable_getenv(const char* env_var) {
-#ifdef IREE_PLATFORM_WINDOWS
-  return _getenv(env_var);
-#else
-  return getenv(env_var);
-#endif
-}
-
 // Helper to get a list item as a buffer_view.
 static iree_status_t iree_get_buffer_view_list_item(
     iree_vm_list_t* list, iree_host_size_t i,
@@ -380,8 +369,8 @@ static iree_status_t iree_check_matmul_failure(
   IREE_RETURN_IF_ERROR(get_matmul_sizes(lhs, rhs, acc, actual_result, &m_size,
                                         &k_size, &n_size));
   iree_hal_dim_t context = 8;
-  const char* context_env = portable_getenv("IREE_MATMUL_TEST_SHOW_CONTEXT");
-  if (getenv("IREE_MATMUL_TEST_SHOW_CONTEXT")) {
+  const char* context_env = getenv("IREE_MATMUL_TEST_SHOW_CONTEXT");
+  if (context_env) {
     if (1 != sscanf(context_env, "%d", &context)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "Failed to parse IREE_MATMUL_TEST_SHOW_CONTEXT "

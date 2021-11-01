@@ -16,6 +16,14 @@
 extern "C" {
 #endif  // __cplusplus
 
+// Defines how command buffers are recorded and executed.
+typedef enum iree_hal_cuda_command_buffer_mode_e {
+  // Command buffers are recorded into CUDA graphs.
+  IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH = 0,
+  // Command buffers are directly issued against a CUDA stream.
+  IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM = 1,
+} iree_hal_cuda_command_buffer_mode_t;
+
 // Parameters configuring an iree_hal_cuda_device_t.
 // Must be initialized with iree_hal_cuda_device_params_initialize prior to use.
 typedef struct iree_hal_cuda_device_params_t {
@@ -29,8 +37,8 @@ typedef struct iree_hal_cuda_device_params_t {
   // transient allocations while also increasing memory consumption.
   iree_host_size_t arena_block_size;
 
-  // Switch for using deferred command buffer or default graph command buffer
-  bool use_deferred_submission;
+  // Specifies how command buffers are recorded and executed.
+  iree_hal_cuda_command_buffer_mode_t command_buffer_mode;
 } iree_hal_cuda_device_params_t;
 
 // Initializes |out_params| to default values.
