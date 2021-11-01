@@ -126,7 +126,20 @@ ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
   // Try to use the result value and check if the untiled shape can be obtained
   // based on the uses.
   Value result = linalgOp->getResult(resultNum);
-  for (Operation *user : result.getUsers()) {
+  for (OpOperand &use : result.getUses()) {
+    Operation *user = use.getOwner();
+
+    // We can have fused element wise ops before flow.dispatch.tensor.store ops.
+    // Look through it.
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(user)) {
+      auto resultMap =
+          genericOp.getTiedIndexingMap(genericOp.getOutputOperand(0));
+      if (genericOp->hasOneUse() && genericOp.getNumResults() == 1 &&
+          genericOp.getTiedIndexingMap(&use) == resultMap) {
+        user = *genericOp->getUsers().begin();
+      }
+    }
+
     if (auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(user)) {
       return storeOp.target()
           .getType()
