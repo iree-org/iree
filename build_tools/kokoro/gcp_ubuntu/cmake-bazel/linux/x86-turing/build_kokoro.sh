@@ -7,7 +7,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Build and test the python bindings and frontend integrations on GPU within
-# gcr.io/iree-oss/cmake-bazel-frontends-nvidia
+# gcr.io/iree-oss/frontends-nvidia
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -30,7 +30,7 @@ docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
   --gpus all \
-  gcr.io/iree-oss/cmake-bazel-frontends-nvidia@sha256:21f5ebe7e3caa0bd629306c11fa105d886bd5d81f31ae623d670b99421d60dbf \
+  gcr.io/iree-oss/frontends-nvidia@sha256:975b4183c4fa2e0f3c13b1cac0e4ff48a3b4098d1ef106d7b0d18f782f2350e0 \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

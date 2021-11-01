@@ -7,7 +7,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Build and test the python bindings and frontend integrations within
-# gcr.io/iree-oss/cmake-bazel-frontends-swiftshader
+# gcr.io/iree-oss/frontends-swiftshader
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -24,7 +24,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-bazel-frontends-swiftshader@sha256:13b11db89f19b7c589b07c1939c56f004910c3f4c7faf3ca4e338fb5f54d704d \
+  gcr.io/iree-oss/frontends-swiftshader@sha256:938c067043872b92452b9c388f9384e6a3d2c4b13ec50c35f04af84c518c39cc \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-swiftshader/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

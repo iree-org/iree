@@ -43,21 +43,17 @@ DOCKER_DIR = 'build_tools/docker/'.replace('/', os.sep)
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
     'base': [],
-    'cmake-android': ['base'],
-    'cmake-emscripten': ['base'],
-    'cmake-swiftshader': ['base', 'swiftshader'],
-    'cmake-nvidia': ['base'],
-    'cmake-riscv': ['base'],
-    'cmake-bazel-frontends': ['base'],
-    'cmake-bazel-frontends-vulkan': ['cmake-bazel-frontends', 'base'],
-    'cmake-bazel-frontends-swiftshader': [
-        'cmake-bazel-frontends-vulkan', 'swiftshader'
-    ],
-    'cmake-bazel-frontends-nvidia': ['cmake-bazel-frontends-vulkan'],
+    'android': ['base'],
+    'emscripten': ['base'],
+    'nvidia': ['base'],
+    'riscv': ['base'],
     'gradle-android': ['base'],
+    'frontends': ['base'],
     'rbe-toolchain': ['base'],
-    'samples': ['cmake-swiftshader'],
     'swiftshader': ['base'],
+    'samples': ['swiftshader'],
+    'frontends-swiftshader': ['frontends', 'swiftshader'],
+    'frontends-nvidia': ['frontends'],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}
