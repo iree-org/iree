@@ -29,3 +29,12 @@ c_embed_data(
     h_file_output = "librt.h",
     identifier = "iree_compiler_librt",
 )
+
+c_embed_data(
+    name = "librt64",
+    srcs = ["bin/librt64.bc"],
+    c_file_output = "librt64.c",
+    flatten = True,
+    h_file_output = "librt64.h",
+    identifier = "iree_compiler_librt64",
+)
