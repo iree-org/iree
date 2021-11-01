@@ -17,6 +17,8 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/DestructiveUpdateUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
@@ -205,13 +207,39 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   if (!entryPointOp) return;
 
   {  // Tile and distribute to invocations.
-    RewritePatternSet invocationTilingPatterns(&getContext());
+    RewritePatternSet invocationTilingPatterns(context);
     populateTilingToInvocationPatterns(context, invocationTilingPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(invocationTilingPatterns));
 
+    RewritePatternSet canonicalizationPatterns =
+        linalg::getLinalgTilingCanonicalizationPatterns(context);
+    // Additionally pull in patterns to canonicalize flow.dispatch.tensor.load
+    // ops. Tiling can generate dim ops taking them as operands.
+    IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(
+        canonicalizationPatterns, context);
+    // Also for flow.dispatch.tensor.store op. We need it to fold away
+    // tensor.cast ops generated during tiling.
+    IREE::Flow::DispatchTensorStoreOp::getCanonicalizationPatterns(
+        canonicalizationPatterns, context);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns));
+
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tiling to invocations ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
+
+  {
+    if (failed(IREE::Flow::rewriteLinalgDestructiveUpdates(funcOp))) {
+      funcOp.emitError("failed to rewrite destructive updates");
+      return signalPassFailure();
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After rewriting destructive updates ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
@@ -222,6 +250,14 @@ void SPIRVTileAndDistributePass::runOnOperation() {
         linalg::getLinalgTilingCanonicalizationPatterns(context);
 
     populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
+
+    // Distructive update rewrites folds tensor.extract_slice/insert_sice into
+    // the corresponding flow.dispatch.flow.tensor.load/store ops. We need to
+    // canonicalize the the new flow ops to expose static shapes.
+    IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(
+        canonicalizationPatterns, context);
+    IREE::Flow::DispatchTensorStoreOp::getCanonicalizationPatterns(
+        canonicalizationPatterns, context);
 
     // Add patterns to fold affine.min ops created for convolution input
     // subtensor/subview sizes. They have the affine map of
@@ -254,7 +290,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   }
 
   {  // Tile reduction dimensions.
-    RewritePatternSet reductionTilingPatterns(&getContext());
+    RewritePatternSet reductionTilingPatterns(context);
     auto marker = getLinalgMatchAndReplaceMarker(getTileReductionMarker(),
                                                  getVectorizeMarker(), context);
     populateTilingReductionPatterns(context, reductionTilingPatterns, marker);

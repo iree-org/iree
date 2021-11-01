@@ -107,6 +107,11 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createSPIRVRemoveOneTripTiledLoopPass());
   // Tile and distribute to GPU invocations and vectorize.
   pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  // Run CSE to deduplicate GPU processor ID ops generated from tiling
+  // multiple Linalg ops. This exposes opportunties to cancel pairing ops like
+  // insert/extract slices and transfer write/read ops in canonicalization.
+  pm.addPass(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -115,10 +120,14 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   // forwarding, shape casting and casting op cancelling.
   pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
+
   addLoopMaterializationPasses(pm);
 }
 
 void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
+
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -139,25 +148,29 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
+
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Tile and distribute to GPU invocations.
   pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
-  pm.addPass(createCanonicalizerPass());
+  // Run CSE to deduplicate GPU processor ID ops generated from tiling
+  // multiple Linalg ops. This exposes opportunties to cancel pairing ops like
+  // insert/extract slices and transfer write/read ops in canonicalization.
   pm.addPass(createCSEPass());
+  pm.addPass(createCanonicalizerPass());
 
   addLoopMaterializationPasses(pm);
 }
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
-  addLinalgBufferizePasses(pm.nest<ModuleOp>(), gpuAllocationFunction);
   pm.addPass(createSPIRVLowerExecutableTargetPass());
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
   addSPIRVLoweringPasses(pm.nest<ModuleOp>());
 
   LLVM_DEBUG({
-    llvm::dbgs() << "Using SPIRV Pass pipeline:\n";
+    llvm::dbgs() << "Using SPIR-V pass pipeline:\n";
     pm.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });

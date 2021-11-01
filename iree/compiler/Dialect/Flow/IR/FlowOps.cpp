@@ -182,6 +182,34 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
   build(builder, state, ArrayRef<Type>(), value, target, ArrayRef<Value>(),
         ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
         builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
+  state.addAttributes(attributes);
+}
+
+void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
+                                  Value value, Value target,
+                                  ArrayRef<OpFoldResult> mixedOffsets,
+                                  ArrayRef<OpFoldResult> mixedSizes,
+                                  ArrayRef<OpFoldResult> mixedStrides,
+                                  ArrayRef<NamedAttribute> attributes) {
+  SmallVector<Value> offsets;
+  SmallVector<Value> sizes;
+  SmallVector<Value> strides;
+  SmallVector<int64_t> staticOffsets;
+  SmallVector<int64_t> staticSizes;
+  SmallVector<int64_t> staticStrides;
+
+  processMixedOperands(mixedOffsets, offsets, staticOffsets,
+                       ShapedType::kDynamicStrideOrOffset);
+  processMixedOperands(mixedSizes, sizes, staticSizes,
+                       ShapedType::kDynamicSize);
+  processMixedOperands(mixedStrides, strides, staticStrides,
+                       ShapedType::kDynamicStrideOrOffset);
+
+  build(builder, state, ArrayRef<Type>(), value, target, offsets, sizes,
+        strides, builder.getI64ArrayAttr(staticOffsets),
+        builder.getI64ArrayAttr(staticSizes),
+        builder.getI64ArrayAttr(staticStrides));
+  state.addAttributes(attributes);
 }
 
 //===----------------------------------------------------------------------===//

@@ -195,6 +195,62 @@ static Value isADestructiveUpdatePattern(Value tensor,
   return nullptr;
 }
 
+/// Given a `sliceOp` taking a slice from a `sourceOp`, computes the `offsets`,
+/// `sizes`, and `strides` relative to `sourceOp`'s source.
+LogicalResult computeSliceOffsetsSizesStrides(
+    OffsetSizeAndStrideOpInterface sourceOp,
+    OffsetSizeAndStrideOpInterface sliceOp,
+    SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides, OpBuilder &builder) {
+  // Special case where the source op has no offsets/sizes/strides. That means
+  // the full range.
+  if (sourceOp.offsets().empty() && sourceOp.static_offsets().empty() &&
+      sourceOp.sizes().empty() && sourceOp.static_sizes().empty() &&
+      sourceOp.strides().empty() && sourceOp.static_strides().empty()) {
+    offsets = sliceOp.getMixedOffsets();
+    sizes = sliceOp.getMixedSizes();
+    strides = sliceOp.getMixedStrides();
+    return success();
+  }
+
+  // Require the source op to have all-one strides This makes sure we can just
+  // use the slice op's strides as the final strides.
+  if (!llvm::all_of(
+          sourceOp.static_strides().getAsValueRange<IntegerAttr>(),
+          [](const APInt &stride) { return stride.getZExtValue() == 1; }))
+    return failure();
+
+  MLIRContext *context = sliceOp.getContext();
+  Location loc = sliceOp.getLoc();
+  AffineExpr sym0, sym1;
+  bindSymbols(context, sym0, sym1);
+  auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
+
+  auto getStrideValue = [&](OpFoldResult attrOrValue) {
+    if (auto val = attrOrValue.dyn_cast<Value>()) return val;
+    auto attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
+    auto cstOp = builder.create<arith::ConstantIndexOp>(loc, attr.getInt());
+    return cstOp.getResult();
+  };
+
+  // The new offsets should be adding source offsets and slice offsets, as the
+  // sliceOp is relative to the sourceOp.
+  offsets.clear();
+  for (auto pair :
+       llvm::zip(sourceOp.getMixedOffsets(), sliceOp.getMixedOffsets())) {
+    auto applyOp = builder.create<AffineApplyOp>(
+        loc, addMap,
+        ValueRange{getStrideValue(std::get<0>(pair)),
+                   getStrideValue(std::get<1>(pair))});
+    offsets.push_back(applyOp.getResult());
+  }
+  sizes = sliceOp.getMixedSizes();
+  strides = sliceOp.getMixedStrides();
+
+  return success();
+}
+
 /// Flos tensor.extract_slice ops on top of flow.dispatch.tensor.load ops into
 /// new flow.dispatch.tensor.load ops.
 static LogicalResult foldExtractSliceOp(OpBuilder &b,
@@ -216,10 +272,14 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
   }
   if (!loadOp) return failure();
 
+  SmallVector<OpFoldResult> offsets, sizes, strides;
+  if (failed(computeSliceOffsetsSizesStrides(loadOp, op, offsets, sizes,
+                                             strides, b)))
+    return failure();
+
   Value loaded = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      op.getLoc(), op.getResult().getType(), loadOp.source(), op.offsets(),
-      op.sizes(), op.strides(), op.static_offsets(), op.static_sizes(),
-      op.static_strides());
+      op.getLoc(), op.getResult().getType().cast<RankedTensorType>(),
+      loadOp.source(), offsets, sizes, strides);
 
   op.getResult().replaceAllUsesWith(loaded);
   op.erase();
@@ -227,9 +287,9 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
 }
 
 template <typename OpTy>
-static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b,
-                                                     OpTy linalgLikeOp,
-                                                     Value target) {
+static LogicalResult rewriteDestructiveUpdateInPlace(
+    OpBuilder &b, DispatchTensorStoreOp storeOp, OpTy linalgLikeOp,
+    Value target) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
                           << *linalgLikeOp.getOperation() << "\n");
   if (!linalgLikeOp->hasOneUse()) {
@@ -262,7 +322,8 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b,
 /// tensor.insert_slice.
 template <>
 LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
-    OpBuilder &b, tensor::InsertSliceOp insertSliceOp, Value target) {
+    OpBuilder &b, DispatchTensorStoreOp storeOp,
+    tensor::InsertSliceOp insertSliceOp, Value target) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
                           << *insertSliceOp.getOperation() << "\n");
   if (!insertSliceOp->hasOneUse()) {
@@ -282,11 +343,14 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
     // Kills the SSA use-def chain.
     usedResult.replaceAllUsesWith(dest);
 
-    b.create<IREE::Flow::DispatchTensorStoreOp>(
-        insertSliceOp->getLoc(), insertSliceOp.source(), target,
-        insertSliceOp.offsets(), insertSliceOp.sizes(), insertSliceOp.strides(),
-        insertSliceOp.static_offsets(), insertSliceOp.static_sizes(),
-        insertSliceOp.static_strides());
+    SmallVector<OpFoldResult> offsets, sizes, strides;
+    if (failed(computeSliceOffsetsSizesStrides(storeOp, insertSliceOp, offsets,
+                                               sizes, strides, b)))
+      return failure();
+
+    b.create<IREE::Flow::DispatchTensorStoreOp>(insertSliceOp->getLoc(),
+                                                insertSliceOp.source(), target,
+                                                offsets, sizes, strides);
 
     return success();
   }
@@ -295,10 +359,9 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
 
 // Return true if any control flow is found in the DispatchWorkgroupsOp besides
 // scf::ForOp.
-static bool hasNonScfForControlFlow(
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
-  return dispatchOp
-      .walk([&](Operation *op) {
+static bool hasNonScfForControlFlow(Operation *regionOp) {
+  return regionOp
+      ->walk([&](Operation *op) {
         if (isa<BranchOpInterface>(op) || isa<RegionBranchOpInterface>(op)) {
           if (!isa<scf::ForOp>(op) &&
               !isa<IREE::Flow::DispatchWorkgroupsOp>(op))
@@ -310,7 +373,8 @@ static bool hasNonScfForControlFlow(
 }
 
 static LogicalResult rewriteDestructiveUpdateInPlace(
-    OpBuilder &b, SpecialTerminatorOpCapture &capture, Value target) {
+    OpBuilder &b, DispatchTensorStoreOp storeOp,
+    SpecialTerminatorOpCapture &capture, Value target) {
   Operation *outermostProducingOp = (capture.loops.empty())
                                         ? capture.rootDestructiveUpdate
                                         : capture.loops.front();
@@ -322,7 +386,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
       TypeSwitch<Operation *, LogicalResult>(capture.rootDestructiveUpdate)
           .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp,
                 tensor::InsertSliceOp>([&](auto op) {
-            return rewriteDestructiveUpdateInPlace(b, op, target);
+            return rewriteDestructiveUpdateInPlace(b, storeOp, op, target);
           })
           .Default([&](Operation *) { return failure(); });
   if (failed(status)) return failure();
@@ -334,22 +398,21 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
   return success();
 }
 
-LogicalResult rewriteLinalgDestructiveUpdates(
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
+LogicalResult rewriteLinalgDestructiveUpdates(Operation *regionOp) {
   // Bail on any control-flow for now.
-  if (hasNonScfForControlFlow(dispatchOp)) return success();
+  if (hasNonScfForControlFlow(regionOp)) return success();
 
-  MLIRContext *context = dispatchOp->getContext();
+  MLIRContext *context = regionOp->getContext();
   OpBuilder b(context);
   SmallVector<IREE::Flow::DispatchTensorStoreOp> processedStores;
   // For each tensor store op, look for destructive updates and replace the
   // destructive pattern by a custom inplace update pattern.
-  auto walkResult = dispatchOp.walk([&](IREE::Flow::DispatchTensorStoreOp op) {
+  auto walkResult = regionOp->walk([&](IREE::Flow::DispatchTensorStoreOp op) {
     SpecialTerminatorOpCapture capture;
     capture.initValue = op.value();
     Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
     if (!sourceValue) return WalkResult::advance();
-    if (failed(rewriteDestructiveUpdateInPlace(b, capture, op.target()))) {
+    if (failed(rewriteDestructiveUpdateInPlace(b, op, capture, op.target()))) {
       return WalkResult::interrupt();
     }
     processedStores.push_back(op);
@@ -364,7 +427,7 @@ LogicalResult rewriteLinalgDestructiveUpdates(
   // affineminscf and others as needed.
   OwningRewritePatternList canonicalizationPatterns(context);
   scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  (void)applyPatternsAndFoldGreedily(dispatchOp,
+  (void)applyPatternsAndFoldGreedily(regionOp,
                                      std::move(canonicalizationPatterns));
   return success();
 }

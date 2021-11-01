@@ -85,8 +85,7 @@ namespace Flow {
 //     tensor<...> -> !flow.dispatch.tensor<writeonly:...>
 // ```
 // is elided.
-LogicalResult rewriteLinalgDestructiveUpdates(
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp);
+LogicalResult rewriteLinalgDestructiveUpdates(Operation *regionOp);
 
 }  // namespace Flow
 }  // namespace IREE

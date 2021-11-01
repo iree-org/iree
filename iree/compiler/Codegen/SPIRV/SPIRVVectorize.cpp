@@ -133,6 +133,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
 
     LLVM_DEBUG({

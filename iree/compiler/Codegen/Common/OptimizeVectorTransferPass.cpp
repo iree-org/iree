@@ -85,26 +85,59 @@ static void loopInvariantCodeMotion(FuncOp funcOp) {
   });
 }
 
+static void populateTransferCanonicalizationPatterns(
+    RewritePatternSet& patterns) {
+  MLIRContext* context = patterns.getContext();
+  tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
+  tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
+  vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
+  vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+}
+
 struct OptimizeVectorTransferPass
     : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
   void runOnOperation() override {
+    MLIRContext* context = &getContext();
     FuncOp funcOp = getOperation();
+
+    // Apply general vector transfer read/write canonicalizations first to
+    // increase the chance we can apply the following optimizations.
+    {
+      RewritePatternSet patterns(context);
+      populateTransferCanonicalizationPatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    }
+
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
-    OwningRewritePatternList patterns(&getContext());
-    mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-    patterns.add<TransposeUnitDimToShapeCast>(&getContext());
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    {
+      RewritePatternSet patterns(context);
+      vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      patterns.add<TransposeUnitDimToShapeCast>(context);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    }
+
     // Workaround, run loop invariant code motion before hoist redudant vector
     // transfer to workaround a bug upstream.
     // TODO(thomasraoux): Remove it once the fix is merged.
     loopInvariantCodeMotion(funcOp);
+
+    linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
+
     vector::transferOpflowOpt(funcOp);
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
     eraseDeadAllocAndStores(funcOp);
+
+    // Apply general vector transfer read/write canonicalizations again as the
+    // above transformations may expose new opportunities.
+    {
+      RewritePatternSet patterns(context);
+      populateTransferCanonicalizationPatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    }
   }
 };
 
