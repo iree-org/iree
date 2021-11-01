@@ -83,8 +83,17 @@ ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
 RUN apt-get update && apt-get install -y libxml2-dev
 
 ######################## Python and PyYaml for traces ##########################
-RUN apt-get update && apt-get install -y \
-  python3 \
-  python3-pip \
+
+# Avoid apt-add-repository, which requires software-properties-common, which is
+# a rabbit hole of python version compatibility issues. See
+# https://mondwan.blogspot.com/2018/05/alternative-for-add-apt-repository-for.html
+RUN echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu xenial main" >> /etc/apt/sources.list \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys BA6932366A755776 \
+  && apt-get update \
+  && apt-get install -y \
+    python3.7 \
+    python3-pip \
+  && rm /usr/bin/python3 \
+  && ln -s /usr/bin/python3.7 /usr/bin/python3 \
   && python3 -m pip install --upgrade pip \
   && python3 -m pip install PyYAML==5.4.1
