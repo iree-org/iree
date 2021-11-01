@@ -71,13 +71,7 @@ class RiscvLinkerTool : public LinkerTool {
 
     // Statically link all dependencies so we don't have any runtime deps.
     // We cannot have any imports in the module we produce.
-    // flags.push_back("-static");
-
-    // HACK: we insert mallocs and libm calls. This is *not good*.
-    // We need hermetic binaries that pull in no imports; the MLIR LLVM
-    // lowering paths introduce a bunch, though, so this is what we are
-    // stuck with.
-    flags.push_back("-shared");
+    flags.push_back("-static");
 
     // Strip debug information (only, no relocations) when not requested.
     if (!targetOptions.debugSymbols) {

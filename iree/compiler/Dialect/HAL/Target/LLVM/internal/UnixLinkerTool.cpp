@@ -65,11 +65,6 @@ class UnixLinkerTool : public LinkerTool {
       flags.push_back(
           "-L /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib "
           "-lSystem");
-
-      // HACK: we insert libm calls. This is *not good*.
-      // Until the MLIR LLVM lowering paths no longer introduce these,
-      // we are stuck with this.
-      flags.push_back("-undefined suppress");
     } else {
       // Avoids including any libc/startup files that initialize the CRT as
       // we don't use any of that. Our shared libraries must be freestanding.
@@ -77,14 +72,7 @@ class UnixLinkerTool : public LinkerTool {
 
       // Statically link all dependencies so we don't have any runtime deps.
       // We cannot have any imports in the module we produce.
-      // flags.push_back("-static");
-
-      // HACK: we insert mallocs and libm calls. This is *not good*.
-      // We need hermetic binaries that pull in no imports; the MLIR LLVM
-      // lowering paths introduce a bunch, though, so this is what we are
-      // stuck with.
-      flags.push_back("-shared");
-      flags.push_back("-undefined suppress");
+      flags.push_back("-static");
     }
 
     // Strip debug information (only, no relocations) when not requested.
