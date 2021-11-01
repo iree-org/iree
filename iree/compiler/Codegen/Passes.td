@@ -52,6 +52,12 @@ def LinalgBufferize :
   let constructor = "mlir::iree_compiler::createLinalgBufferizePass(nullptr)";
 }
 
+def IREEComprehensiveBufferize :
+    Pass<"iree-codegen-iree-comprehensive-bufferize", "ModuleOp"> {
+  let summary = "Convert from to Linalg ops on tensors to buffers";
+  let constructor = "mlir::iree_compiler::createIREEComprehensiveBufferizePass()";
+}
+
 def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "FuncOp"> {
   let summary =
