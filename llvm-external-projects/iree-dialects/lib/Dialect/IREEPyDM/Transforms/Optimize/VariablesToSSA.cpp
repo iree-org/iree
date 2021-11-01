@@ -73,7 +73,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
   }
 
   void elideDeadFreeVarStores() {
-    getOperation().walk([](AllocFreeVarOp allocOp) {
+    SmallVector<Operation *> deadOps;
+    getOperation().walk([&](AllocFreeVarOp allocOp) {
       bool canElide = true;
       SmallVector<Operation *> storeOps;
       for (auto &use : allocOp.getResult().getUses()) {
@@ -86,12 +87,18 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
         }
       }
       if (canElide) {
-        for (auto *storeOp : storeOps) {
-          storeOp->erase();
-        }
-        allocOp->erase();
+        deadOps.append(storeOps);
+        deadOps.push_back(allocOp);
       }
     });
+
+    // Note that we cannot erase in the walk, even though it is post-order
+    // because in addition to erasing the root op, we also erase uses of it.
+    // If one of these is immediately after the root op, it is an access
+    // violation if erased during walk.
+    for (auto *deadOp : deadOps) {
+      deadOp->erase();
+    }
   }
 
   // This pass must operate before any CFG operations have been performed

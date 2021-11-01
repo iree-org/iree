@@ -7,11 +7,11 @@
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
+#include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/InitAllPasses.h"
 #include "mlir/Support/MlirOptMain.h"
 #include "mlir/Transforms/Passes.h"
 
