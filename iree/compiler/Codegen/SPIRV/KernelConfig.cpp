@@ -543,15 +543,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       // indicator of that. Need a better way of information flow from flow
       // dialect to hal.
       if (!tiledLoops.empty()) {
-        const int64_t subgroupSize =
-            limits.subgroup_size().getValue().getSExtValue();
-        std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
-        SmallVector<int64_t> workloadPerWorkgroup(tiledLoops.size(), 1);
-        workloadPerWorkgroup.front() = subgroupSize * 4;
-        setTranslationInfo(
-            funcOp,
-            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute,
-            workloadPerWorkgroup, workgroupSize);
+        // XXX: HACK to enable bufferization after vectorization.
         return success();
       }
       return funcOp.emitError("contains no root Linalg operation");

@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/SPIRV/MemorySpace.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -74,6 +75,47 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
       getAllEntryPoints(moduleOp);
   Optional<IREE::Codegen::DispatchLoweringPassPipeline> passPipeline;
+  for (auto &it : entryPoints) {
+    auto entryPointOp = it.second;
+    if (IREE::Codegen::TranslationInfoAttr translationInfo =
+            getTranslationInfo(entryPointOp)) {
+      IREE::Codegen::DispatchLoweringPassPipeline currPipeline =
+          translationInfo.getDispatchLoweringPassPipeline();
+      if (passPipeline) {
+        if (currPipeline != passPipeline.getValue()) {
+          moduleOp.emitError(
+              "unhandled compilation of entry point function with different "
+              "pass pipelines within a module");
+          return signalPassFailure();
+        }
+        continue;
+      }
+      passPipeline = currPipeline;
+    }
+  }
+
+  if (!passPipeline) {
+    // XXX: HACK to enable bufferization after vectorization.
+    OpPassManager bufferizePipeline(
+        IREE::HAL::ExecutableVariantOp::getOperationName());
+    OpPassManager &nestedPM = bufferizePipeline.nest<ModuleOp>();
+    auto allocFn = [](OpBuilder &builder, Location loc,
+                      ArrayRef<int64_t> staticShape, Type elementType,
+                      ArrayRef<Value> dynamicSizes) {
+      MemRefType allocType = MemRefType::get(staticShape, elementType, {},
+                                             getWorkgroupMemorySpace());
+      return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
+    };
+    addLinalgBufferizePasses(nestedPM, allocFn);
+    if (failed(runPipeline(bufferizePipeline, variantOp))) {
+      return signalPassFailure();
+    }
+  }
+
+  if (failed(initSPIRVLaunchConfig(moduleOp))) {
+    return signalPassFailure();
+  }
+
   for (auto &it : entryPoints) {
     auto entryPointOp = it.second;
     if (IREE::Codegen::TranslationInfoAttr translationInfo =
