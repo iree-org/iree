@@ -18,6 +18,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 
@@ -395,8 +396,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   for (auto pair : llvm::zip(llvm::reverse(partitionedLoops), tiledLoopInfo)) {
     unsigned loopIndex = std::get<0>(pair);
     const TiledLoopInfo &loopInfo = std::get<1>(pair);
-    if (auto attr = loopInfo.ub.dyn_cast<Attribute>()) {
-      loopBounds[loopIndex] = attr.cast<IntegerAttr>().getInt();
+    Optional<int64_t> attrValue = getConstantIntValue(loopInfo.ub);
+    if (attrValue) {
+      loopBounds[loopIndex] = *attrValue;
     } else {
       loopBounds[loopIndex] = ShapedType::kDynamicSize;
     }
