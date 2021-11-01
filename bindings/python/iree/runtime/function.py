@@ -303,10 +303,12 @@ def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   return _ndarray_to_vm(inv, t, np.asarray(x), desc)
 
 
-class MissingArgument:
+class _MissingArgument:
   """Placeholder for missing kwargs in the function input."""
-  pass
+  def __repr__(self):
+    return "<mising argument>"
 
+MissingArgument = _MissingArgument()
 
 PYTHON_TO_VM_CONVERTERS = {
     bool: _bool_to_vm,
@@ -496,7 +498,7 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
     descs = [None] * len(py_list)
   else:
     len_py_list = sum(
-        [1 for x in py_list if not isinstance(x, MissingArgument.__class__)])
+        [1 for x in py_list if x is not MissingArgument])
     if len(py_list) != len_py_list:
       _raise_argument_error(
           inv, f"mismatched function call arity: "
