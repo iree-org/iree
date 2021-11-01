@@ -436,6 +436,18 @@ def IREEPyDM_BoolToPredOp : IREEPyDM_PureOp<"bool_to_pred"> {
   let hasFolder = 1;
 }
 
+def IREEPyDM_MakeListOp : IREEPyDM_PureOp<"make_list"> {
+  let summary = "Makes a list from a static list of values";
+  let description = [{
+    Constructs a list from elements.
+  }];
+  let arguments = (ins Variadic<IREEPyDM_AnyValueType>:$elements);
+  let results = (outs IREEPyDM_ListType:$list);
+  let assemblyFormat = [{
+    ($elements^ `:` type($elements))? `->` type(results) attr-dict
+  }];
+}
+
 def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
   let summary = "Makes a tuple from a static list of values";
   let description = [{
@@ -670,6 +682,26 @@ def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare"> {
     $dunder_name `,` $left `,` $right `:` type(operands) attr-dict
   }];
   let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Object method/feature access
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"dynamic_subscript"> {
+  let summary = "Evaluates a subscript operation against a value";
+  let description = [{
+    This fully dynamic form of subscript can handle an arbitrarily general
+    subscript operation, consisting of either a single numeric index or a Slice.
+    In typical usage, it should canonicalize into specific special form.
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$value,
+    IREEPyDM_AnyValueType:$slice);
+  let results = (outs IREEPyDM_AnyValueType:$result);
+  let assemblyFormat = [{
+    $value `[` $slice `->` type($slice) `]` `:` type($value) `->` type($result) attr-dict
+  }];
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_OPS_TD

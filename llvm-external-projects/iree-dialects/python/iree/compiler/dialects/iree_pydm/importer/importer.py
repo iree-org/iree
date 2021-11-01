@@ -697,6 +697,33 @@ class ExpressionImporter(BaseNodeVisitor):
     fctx.update_loc(node)
     self._set_result(func_expr.get_call_result(args=args))
 
+  def visit_List(self, node: ast.List):
+    fctx = self.fctx
+    ic = fctx.ic
+
+    element_values: List[ir.Value] = []
+    for elt in node.elts:
+      sub_expression = ExpressionImporter(fctx)
+      sub_expression.visit(elt)
+      element_values.append(sub_expression.get_immediate())
+    fctx.update_loc(node)
+
+    with ic.ip, ic.loc:
+      self._set_result(d.MakeListOp(d.ListType.get(), element_values).result)
+
+  def visit_Subscript(self, node: ast.Subscript):
+    fctx = self.fctx
+    ic = fctx.ic
+    value = ExpressionImporter(fctx)
+    value.visit(node.value)
+    slice = ExpressionImporter(fctx)
+    slice.visit(node.slice)
+
+    fctx.update_loc(node)
+    self._set_result(
+        d.SubscriptOp(d.ObjectType.get(), value.get_immediate(),
+                      slice.get_immediate()).result)
+
   def visit_Tuple(self, node: ast.Tuple):
     fctx = self.fctx
     ic = fctx.ic
