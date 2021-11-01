@@ -18,6 +18,58 @@
   IREE_HAL_VTABLE_DISPATCH(buffer, iree_hal_buffer, method_name)
 
 //===----------------------------------------------------------------------===//
+// String utils
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_string_view_t iree_hal_memory_type_format(
+    iree_hal_memory_type_t value, iree_bitfield_string_temp_t* out_temp) {
+  static const iree_bitfield_string_mapping_t mappings[] = {
+      // Combined:
+      {IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_SVL("HOST_LOCAL")},
+      {IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL, IREE_SVL("DEVICE_LOCAL")},
+      // Separate:
+      {IREE_HAL_MEMORY_TYPE_TRANSIENT, IREE_SVL("TRANSIENT")},
+      {IREE_HAL_MEMORY_TYPE_HOST_VISIBLE, IREE_SVL("HOST_VISIBLE")},
+      {IREE_HAL_MEMORY_TYPE_HOST_COHERENT, IREE_SVL("HOST_COHERENT")},
+      {IREE_HAL_MEMORY_TYPE_HOST_CACHED, IREE_SVL("HOST_CACHED")},
+      {IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE, IREE_SVL("DEVICE_VISIBLE")},
+  };
+  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+                                     out_temp);
+}
+
+IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
+    iree_hal_memory_access_t value, iree_bitfield_string_temp_t* out_temp) {
+  static const iree_bitfield_string_mapping_t mappings[] = {
+      // Combined:
+      {IREE_HAL_MEMORY_ACCESS_ALL, IREE_SVL("ALL")},
+      {IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, IREE_SVL("DISCARD_WRITE")},
+      // Separate:
+      {IREE_HAL_MEMORY_ACCESS_READ, IREE_SVL("READ")},
+      {IREE_HAL_MEMORY_ACCESS_WRITE, IREE_SVL("WRITE")},
+      {IREE_HAL_MEMORY_ACCESS_DISCARD, IREE_SVL("DISCARD")},
+      {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, IREE_SVL("MAY_ALIAS")},
+  };
+  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+                                     out_temp);
+}
+
+IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
+    iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp) {
+  static const iree_bitfield_string_mapping_t mappings[] = {
+      // Combined:
+      {IREE_HAL_BUFFER_USAGE_ALL, IREE_SVL("ALL")},
+      // Separate:
+      {IREE_HAL_BUFFER_USAGE_CONSTANT, IREE_SVL("CONSTANT")},
+      {IREE_HAL_BUFFER_USAGE_TRANSFER, IREE_SVL("TRANSFER")},
+      {IREE_HAL_BUFFER_USAGE_MAPPING, IREE_SVL("MAPPING")},
+      {IREE_HAL_BUFFER_USAGE_DISPATCH, IREE_SVL("DISPATCH")},
+  };
+  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+                                     out_temp);
+}
+
+//===----------------------------------------------------------------------===//
 // Subspan indirection buffer
 //===----------------------------------------------------------------------===//
 
@@ -116,12 +168,17 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
   if (IREE_UNLIKELY(
           !iree_all_bits_set(actual_memory_type, expected_memory_type))) {
     // Missing one or more bits.
+    iree_bitfield_string_temp_t temp0, temp1;
+    iree_string_view_t actual_memory_type_str =
+        iree_hal_memory_type_format(actual_memory_type, &temp0);
+    iree_string_view_t expected_memory_type_str =
+        iree_hal_memory_type_format(expected_memory_type, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "buffer memory type is not compatible with the requested operation; "
-        "buffer has %s, operation requires %s",
-        iree_hal_memory_type_string(actual_memory_type),
-        iree_hal_memory_type_string(expected_memory_type));
+        "buffer has %.*s, operation requires %.*s",
+        (int)actual_memory_type_str.size, actual_memory_type_str.data,
+        (int)expected_memory_type_str.size, expected_memory_type_str.data);
   }
   return iree_ok_status();
 }
@@ -139,12 +196,17 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_access(
   } else if (IREE_UNLIKELY(!iree_all_bits_set(allowed_memory_access,
                                               required_memory_access))) {
     // Bits must match exactly.
+    iree_bitfield_string_temp_t temp0, temp1;
+    iree_string_view_t allowed_memory_access_str =
+        iree_hal_memory_access_format(allowed_memory_access, &temp0);
+    iree_string_view_t required_memory_access_str =
+        iree_hal_memory_access_format(required_memory_access, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "buffer does not support the requested access "
-        "type; buffer allows %s, operation requires %s",
-        iree_hal_memory_access_string(allowed_memory_access),
-        iree_hal_memory_access_string(required_memory_access));
+        "type; buffer allows %.*s, operation requires %.*s",
+        (int)allowed_memory_access_str.size, allowed_memory_access_str.data,
+        (int)required_memory_access_str.size, required_memory_access_str.data);
   }
   return iree_ok_status();
 }
@@ -154,12 +216,17 @@ iree_hal_buffer_validate_usage(iree_hal_buffer_usage_t allowed_usage,
                                iree_hal_buffer_usage_t required_usage) {
   if (IREE_UNLIKELY(!iree_all_bits_set(allowed_usage, required_usage))) {
     // Missing one or more bits.
+    iree_bitfield_string_temp_t temp0, temp1;
+    iree_string_view_t allowed_usage_str =
+        iree_hal_buffer_usage_format(allowed_usage, &temp0);
+    iree_string_view_t required_usage_str =
+        iree_hal_buffer_usage_format(required_usage, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "requested usage was not specified when the buffer was allocated; "
-        "buffer allows %s, operation requires %s",
-        iree_hal_buffer_usage_string(allowed_usage),
-        iree_hal_buffer_usage_string(required_usage));
+        "buffer allows %.*s, operation requires %.*s",
+        (int)allowed_usage_str.size, allowed_usage_str.data,
+        (int)required_usage_str.size, required_usage_str.data);
   }
   return iree_ok_status();
 }

@@ -13,7 +13,7 @@ ARG CMAKE_MAJOR_VERSION=3
 ARG CMAKE_MINOR_VERSION=16
 ARG CMAKE_PATCH_VERSION=3
 
-FROM gcr.io/iree-oss/util@sha256:40846b4aea5886af3250399d6adfdb3e1195a8b0177706bb0375e812d62dc49c AS install-cmake
+FROM gcr.io/iree-oss/util@sha256:c9691ba3cd4287cee61be42103888d7c6f02c44c7c7b7d30a3dca7fc73ee92cb AS install-cmake
 ARG CMAKE_MAJOR_VERSION
 ARG CMAKE_MINOR_VERSION
 ARG CMAKE_PATCH_VERSION
@@ -35,3 +35,20 @@ COPY --from=install-cmake \
   "/usr/share/cmake-${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}"
 
 RUN apt-get update && apt-get install -y ninja-build
+
+# At this point, everything requires Python.
+RUN apt-get update \
+  && apt-get install -y \
+    python3.7 \
+    python3.7-dev \
+  && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 1 \
+  && apt-get install -y \
+    python3-pip \
+    python3-setuptools \
+    python3-distutils \
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install \
+    numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
+    pybind11==2.6.1
+
+ENV PYTHON_BIN /usr/bin/python3

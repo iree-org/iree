@@ -17,9 +17,9 @@
 
 #include <array>
 
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {

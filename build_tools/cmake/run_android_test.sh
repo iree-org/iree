@@ -15,7 +15,7 @@
 # This script reads the following environment variables:
 # - TEST_ANDROID_ABS_DIR: the absolute path on Android device for the build
 #   artifacts.
-# - TEST_DATA: optional; the data file to push to the Android device.
+# - TEST_DATA: optional; the files to push to the Android device. Space-separated.
 # - TEST_EXECUTABLE: the executable file to push to the Android device.
 # - TEST_TMPDIR: optional; temporary directory on the Android device for
 #   running tests.
@@ -30,7 +30,10 @@ set -e
 adb push $TEST_EXECUTABLE $TEST_ANDROID_ABS_DIR/$(basename $TEST_EXECUTABLE)
 
 if [ -n "$TEST_DATA" ]; then
-  adb push $TEST_DATA $TEST_ANDROID_ABS_DIR/$(basename $TEST_DATA)
+  for datafile in $TEST_DATA
+  do
+    adb push "$datafile" "$TEST_ANDROID_ABS_DIR/$(basename "$datafile")"
+  done
 fi
 
 if [ -n "$TEST_TMPDIR" ]; then

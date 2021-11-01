@@ -42,12 +42,13 @@ hal.executable private @dispatch_0  {
 // -----
 
 // CHECK-LABEL: func @workgroup_tile_loop()
+#translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [32]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @workgroup_tile_loop attributes {
       interface = @io,
       ordinal = 0 : index,
-      translation.info = {passPipeline = "LLVMGPUDistribute", workloadPerWorkgroup = [32]}
+      translation.info = #translation
     }
     builtin.module {
       builtin.func @workgroup_tile_loop() {
@@ -71,12 +72,13 @@ hal.executable private @workgroup_tile_loop  {
 // -----
 
 // CHECK-LABEL: func @workgroup_tile_loop_negative()
+#translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [16]>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @workgroup_tile_loop_negative attributes {
       interface = @io,
       ordinal = 0 : index,
-      translation.info = {passPipeline = "LLVMGPUDistribute", workloadPerWorkgroup = [16]}
+      translation.info = #translation
     }
     builtin.module {
       builtin.func @workgroup_tile_loop_negative() {

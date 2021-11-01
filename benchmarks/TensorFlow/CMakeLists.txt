@@ -7,49 +7,69 @@
 
 ################################################################################
 #                                                                              #
-# Benchmark models                                                             #
+# Benchmark models from TensorFlow                                             #
 #                                                                              #
-# Each module specification should be a list that contains the following       #
-# fields: MODULE_NAME, MODULE_TAGS, MLIR_SOURCE, ENTRY_FUNCTION,               #
-# FUNCTION_INPUTS. See iree_mlir_benchmark_suite definition for details about  #
-# these fields.                                                                #
+# Each module specification should be a list containing alternating keys and   #
+# values. The fields are: NAME, TAGS, SOURCE, ENTRY_FUNCTION, and              #
+# FUNCTION_INPUTS. See the iree_benchmark_suite definition for details         #
+# about these fields. Note that these must be quoted when used as arguments.   #
 #                                                                              #
 ################################################################################
 
 set(MOBILEBERT_FP16_MODULE
-  "MobileBertSquad"               # MODULE_NAME
-  "fp16"                          # MODULE_TAGS
+  NAME
+    "MobileBertSquad"
+  TAGS
+    "fp16"
   # This uses the same input MLIR source as fp32 to save download time.
   # It requires users to have "--iree-flow-demote-f32-to-f16".
-  "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.tar.gz" # MLIR_SOURCE
-  "serving_default"               # ENTRY_FUNCTION
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.mlir.gz"
+  ENTRY_FUNCTION
+    "serving_default"
   # The conversion done by "--iree-flow-demote-f32-to-f16" won't change the
   # original input signature.
-  "1x384xi32,1x384xi32,1x384xi32" # FUNCTION_INPUTS
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
 )
 
 set(MOBILEBERT_FP32_MODULE
-  "MobileBertSquad"               # MODULE_NAME
-  "fp32"                          # MODULE_TAGS
-  "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.tar.gz" # MLIR_SOURCE
-  "serving_default"               # ENTRY_FUNCTION
-  "1x384xi32,1x384xi32,1x384xi32" # FUNCTION_INPUTS
+  NAME
+    "MobileBertSquad"
+  TAGS
+    "fp32"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/MobileBertSquad-89edfa50d.mlir.gz"
+  ENTRY_FUNCTION
+    "serving_default"
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
 )
 
 set(MOBILENET_V2_MODULE
-  "MobileNetV2"     # MODULE_NAME
-  "fp32,imagenet"   # MODULE_TAGS
-  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-89edfa50d.tar.gz" # MLIR_SOURCE
-  "call"            # ENTRY_FUNCTION
-  "1x224x224x3xf32" # FUNCTION_INPUTS
+  NAME
+    "MobileNetV2"
+  TAGS
+    "fp32,imagenet"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV2-89edfa50d.mlir.gz"
+  ENTRY_FUNCTION
+    "call"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
 )
 
 set(MOBILENET_V3SMALL_MODULE
-  "MobileNetV3Small" # MODULE_NAME
-  "fp32,imagenet"    # MODULE_TAGS
-  "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-89edfa50d.tar.gz" # MLIR_SOURCE
-  "call"             # ENTRY_FUNCTION
-  "1x224x224x3xf32"  # FUNCTION_INPUTS
+  NAME
+    "MobileNetV3Small"
+  TAGS
+    "fp32,imagenet"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3Small-89edfa50d.mlir.gz"
+  ENTRY_FUNCTION
+    "call"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
 )
 
 ################################################################################
@@ -63,10 +83,10 @@ set(MOBILENET_V3SMALL_MODULE
 ################################################################################
 
 # CPU, VMVX, 3-thread, little-core, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "3-thread,little-core,full-inference"
@@ -84,10 +104,10 @@ iree_mlir_benchmark_suite(
 )
 
 # CPU, Dylib-Sync, big/little-core, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "big-core,full-inference"
@@ -107,10 +127,10 @@ iree_mlir_benchmark_suite(
 )
 
 # CPU, Dylib, 1-thread, big/little-core, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference"
@@ -131,10 +151,10 @@ iree_mlir_benchmark_suite(
 )
 
 # CPU, Dylib, 3-thread, big/little-core, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "3-thread,big-core,full-inference"
@@ -155,11 +175,11 @@ iree_mlir_benchmark_suite(
 )
 
 # GPU, Vulkan, Adreno, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILEBERT_FP32_MODULE}
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "full-inference"
@@ -177,10 +197,10 @@ iree_mlir_benchmark_suite(
 )
 
 # GPU, Vulkan, Adreno, kernel-execution
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "kernel-execution"
@@ -201,11 +221,11 @@ iree_mlir_benchmark_suite(
 )
 
 # GPU, Vulkan, Mali, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILEBERT_FP32_MODULE}
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "full-inference"
@@ -223,10 +243,10 @@ iree_mlir_benchmark_suite(
 )
 
 # GPU, Vulkan, Mali, kernel-execution
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILENET_V2_MODULE}
-    ${MOBILENET_V3SMALL_MODULE}
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "kernel-execution"
@@ -247,9 +267,9 @@ iree_mlir_benchmark_suite(
 )
 
 # GPU, Vulkan, Mali, kernel-execution
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILEBERT_FP16_MODULE}
+    "${MOBILEBERT_FP16_MODULE}"
 
   BENCHMARK_MODES
     "kernel-execution"
@@ -271,9 +291,9 @@ iree_mlir_benchmark_suite(
 )
 
 # GPU, Vulkan, Mali, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILEBERT_FP16_MODULE}
+    "${MOBILEBERT_FP16_MODULE}"
 
   BENCHMARK_MODES
     "full-inference"
@@ -301,9 +321,9 @@ iree_mlir_benchmark_suite(
 ################################################################################
 
 # CPU, Dylib-Sync, big/little-core, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILEBERT_FP32_MODULE}
+    "${MOBILEBERT_FP32_MODULE}"
 
   BENCHMARK_MODES
     "big-core,full-inference"
@@ -323,9 +343,9 @@ iree_mlir_benchmark_suite(
 )
 
 # CPU, Dylib, 1-thread, big/little-core, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILEBERT_FP32_MODULE}
+    "${MOBILEBERT_FP32_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference"
@@ -346,9 +366,9 @@ iree_mlir_benchmark_suite(
 )
 
 # CPU, Dylib, 3-thread, big/little-core, full-inference
-iree_mlir_benchmark_suite(
+iree_benchmark_suite(
   MODULES
-    ${MOBILEBERT_FP32_MODULE}
+    "${MOBILEBERT_FP32_MODULE}"
 
   BENCHMARK_MODES
     "3-thread,big-core,full-inference"

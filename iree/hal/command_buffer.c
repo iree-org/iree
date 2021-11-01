@@ -17,6 +17,39 @@
 #define _VTABLE_DISPATCH(command_buffer, method_name) \
   IREE_HAL_VTABLE_DISPATCH(command_buffer, iree_hal_command_buffer, method_name)
 
+//===----------------------------------------------------------------------===//
+// String utils
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_string_view_t
+iree_hal_command_buffer_mode_format(iree_hal_command_buffer_mode_t value,
+                                    iree_bitfield_string_temp_t* out_temp) {
+  static const iree_bitfield_string_mapping_t mappings[] = {
+      {IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT, IREE_SVL("ONE_SHOT")},
+      {IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
+       IREE_SVL("ALLOW_INLINE_EXECUTION")},
+  };
+  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+                                     out_temp);
+}
+
+IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
+    iree_hal_command_category_t value, iree_bitfield_string_temp_t* out_temp) {
+  static const iree_bitfield_string_mapping_t mappings[] = {
+      // Combined:
+      {IREE_HAL_COMMAND_CATEGORY_ANY, IREE_SVL("ANY")},
+      // Separate:
+      {IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_SVL("TRANSFER")},
+      {IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_SVL("DISPATCH")},
+  };
+  return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
+                                     out_temp);
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_command_buffer_t
+//===----------------------------------------------------------------------===//
+
 IREE_HAL_API_RETAIN_RELEASE(command_buffer);
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
@@ -39,12 +72,33 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
     }
   }
 
-  iree_status_t status =
-      IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_command_buffer)(
-          device, mode, command_categories, queue_affinity, out_command_buffer);
+  iree_hal_command_buffer_t* base_command_buffer = NULL;
+  iree_status_t status = IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device,
+                                                  create_command_buffer)(
+      device, mode, command_categories, queue_affinity, &base_command_buffer);
+
+#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+  // Wrap the command buffer with the validation layer if enabled in the build.
+  // It may be disabled to save code size and per-command overhead (only when
+  // inputs are trusted!).
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_wrap_validation(
+        device, base_command_buffer, out_command_buffer);
+    iree_hal_command_buffer_release(base_command_buffer);
+  }
+#else
+  *out_command_buffer = base_command_buffer;
+#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
 
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+IREE_API_EXPORT void* iree_hal_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  if (iree_hal_resource_is(command_buffer, vtable)) return command_buffer;
+  return _VTABLE_DISPATCH(command_buffer, dyn_cast)(command_buffer, vtable);
 }
 
 IREE_API_EXPORT iree_hal_command_buffer_mode_t

@@ -41,6 +41,13 @@ CMAKE_ARGS=(
   # Enable building the python bindings on CI. Most heavy targets are gated on
   # IREE_ENABLE_TENSORFLOW, so what's left here should be fast.
   "-DIREE_BUILD_PYTHON_BINDINGS=ON"
+
+  # Enable assertions. We wouldn't want to be testing *only* with assertions
+  # enabled, but at the moment only certain CI builds are using this script,
+  # e.g. ASan builds are not using this, so by enabling assertions here, we
+  # get a reasonable mix of {builds with asserts, builds with other features
+  # such as ASan but without asserts}.
+  "-DIREE_ENABLE_ASSERTIONS=ON"
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" ..

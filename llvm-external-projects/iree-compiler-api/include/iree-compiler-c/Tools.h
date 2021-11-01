@@ -17,6 +17,12 @@ extern "C" {
 /// binaries that link against a common shared library.
 MLIR_CAPI_EXPORTED int ireeCompilerRunMain(int argc, char **argv);
 
+/// Runs LLD in "generic" mode (i.e. as `lld`, requiring a -flavor command line
+/// option). This does *not* mean that we support invoking LLD as a library,
+/// but we do support creating busybox style tools that invoke it standalone
+/// by linking against the CAPI.
+MLIR_CAPI_EXPORTED int ireeCompilerRunLldMain(int argc, char **argv);
+
 #ifdef __cplusplus
 }
 #endif

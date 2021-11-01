@@ -1,5 +1,12 @@
 # Python bindings
 
+!!! info
+
+    API reference pages for IREE's runtime and compiler Python APIs are hosted on
+    [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
+
+## Overview
+
 IREE offers Python bindings split into several packages, covering different
 components:
 
@@ -19,10 +26,6 @@ towards various targets, and executing compiled code on IREE's backends.
     The TensorFlow, TensorFlow Lite, and XLA packages are currently only
     available on Linux and macOS. They are not available on Windows yet (see
     [this issue](https://github.com/google/iree/issues/6417)).
-
-<!-- TODO(??): API references for packages/modules -->
-<!-- TODO(??): at least link to source code and sample Colab notebooks for now -->
-<!-- TODO(??): link to frontend docs -->
 
 ## Prerequisites
 
@@ -104,11 +107,14 @@ page for instructions for building from source.
 
 ## Using the Python bindings
 
-<!-- TODO(??): general flow: import, compile, run -->
-<!-- TODO(??): high level API vs low level API -->
-<!-- TODO(??): examples split by TF/TFLite/XLA/JAX (and link to frontend docs) -->
+API reference pages for IREE's runtime and compiler Python APIs are hosted on
+[readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
+
+Check out the samples in IREE's
+[colab/ directory](https://github.com/google/iree/tree/main/colab) and the
+[iree-samples repository](https://github.com/google/iree-samples) for examples
+using the Python APIs.
 
 ## Troubleshooting
 
 <!-- TODO(scotttodd): update python, update pip, search GitHub issues -->
-<!-- TODO(scotttodd): add note about frontend tools not being published for Windows -->

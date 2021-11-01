@@ -36,9 +36,9 @@ func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
 // CHECK-LABEL: func @sort_cst_capture(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
+// CHECK:         %[[SCALAR:.+]] = arith.constant 0 : i32
 // CHECK:         %[[SORT:.+]] = linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
 // CHECK:         ^bb0(%[[ARG1:.+]]: i32, %{{.*}}: i32)
-// CHECK:           %[[SCALAR:.+]] = arith.constant 0 : i32
 // CHECK:           %[[RES:.+]] = arith.cmpi slt, %[[ARG1]], %[[SCALAR]] : i32
 // CHECK:           linalg_ext.yield %[[RES]] : i1
 // CHECK:         } -> tensor<1x10xi32>
@@ -59,9 +59,9 @@ func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -> ten
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
+// CHECK:         %[[SCALAR:.+]] = tensor.extract %[[ARG1]][] : tensor<i32>
 // CHECK:         %[[SORT:.+]] = linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
 // CHECK:         ^bb0(%[[ARG2:.+]]: i32, %{{.*}}: i32)
-// CHECK:           %[[SCALAR:.+]] = tensor.extract %[[ARG1]][] : tensor<i32>
 // CHECK:           %[[RES:.+]] = arith.cmpi slt, %[[ARG2]], %[[SCALAR]] : i32
 // CHECK:           linalg_ext.yield %[[RES]] : i1
 // CHECK:         } -> tensor<1x10xi32>
@@ -131,13 +131,13 @@ func @sort_unsigned_cst_capture(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[UI32:.+]] = mhlo.constant dense<2> : tensor<ui32>
+// CHECK:         %[[CONVERSION_CAST_CST:.+]] = builtin.unrealized_conversion_cast %[[UI32]] : tensor<ui32> to tensor<i32>
+// CHECK:         %[[EXTRACT_CST:.+]] = tensor.extract %[[CONVERSION_CAST_CST]][] : tensor<i32>
 // CHECK:         %[[SORT:.+]] = linalg_ext.sort
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<1x5xf32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK:             %[[CAST1:.+]] = arith.bitcast %[[ARG1]] : f32 to i32
-// CHECK:             %[[CONVERSION_CAST_CST:.+]] = builtin.unrealized_conversion_cast %[[UI32]] : tensor<ui32> to tensor<i32>
-// CHECK:             %[[EXTRACT_CST:.+]] = tensor.extract %[[CONVERSION_CAST_CST]][] : tensor<i32>
 // CHECK:             %[[CMP:.+]] = arith.cmpi ult, %[[CAST1]], %[[EXTRACT_CST]] : i32
 // CHECK:             linalg_ext.yield %[[CMP]]
 // CHECK:         return %[[SORT]]

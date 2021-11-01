@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -77,11 +78,8 @@ static SmallVector<int64_t> getNumWorkgroup(
   auto translationInfo = getTranslationInfo(entryPointOp);
   if (!translationInfo) return SmallVector<int64_t>();
 
-  ArrayAttr workloadPerWorkgroupAttr = translationInfo.workloadPerWorkgroup();
-  if (!workloadPerWorkgroupAttr) return SmallVector<int64_t>();
-  auto workloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
-      workloadPerWorkgroupAttr,
-      [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+  SmallVector<int64_t> workloadPerWorkgroup =
+      translationInfo.getWorkloadPerWorkgroupVals();
   if (workloadSize.size() != workloadPerWorkgroup.size())
     return SmallVector<int64_t>();
   SmallVector<int64_t> numWorkgroups;

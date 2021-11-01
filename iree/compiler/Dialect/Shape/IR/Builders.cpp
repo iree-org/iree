@@ -141,8 +141,8 @@ SmallVector<Value, 4> buildOrFindDynamicDimsForValue(Location loc, Value value,
   // This is the first step on the path: we are going to gradually start
   // removing the implementation of the ShapeCarryingInterface on ops and use
   // the new ShapeAwareOpInterface.
-  auto dynamicDims =
-      IREE::Util::findDynamicDims(value, &*builder.getInsertionPoint());
+  auto dynamicDims = IREE::Util::findDynamicDims(value, builder.getBlock(),
+                                                 builder.getInsertionPoint());
   if (dynamicDims.hasValue()) {
     return llvm::to_vector<4>(dynamicDims.getValue());
   }

@@ -1,5 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-spirv-vectorize %s | IreeFileCheck %s
 
+#config = #iree_codegen.lowering.config<tile_sizes = [[2, 128], [], [1, 4], [0, 0, 4]], native_vector_size = []>
 func @matmul_2x128x4() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
@@ -25,10 +26,10 @@ func @matmul_2x128x4() {
       %11 = "gpu.thread_id"() {dimension = "y"} : () -> index
       %12 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%10]
       %13 = memref.subview %9[%11, %12] [1, 4] [1, 1] : memref<2x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>> to memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-      linalg.fill(%cst, %13) {__internal_linalg_transform__ = "vectorize", lowering.config = {tileSizes = [[2, 128], [], [1, 4], [0, 0, 4]]}} : f32, memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
+      linalg.fill(%cst, %13) {__internal_linalg_transform__ = "vectorize", lowering.config = #config} : f32, memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
       %17 = memref.subview %7[%11, 0] [1, 4] [1, 1] : memref<2x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>> to memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>
       %18 = memref.subview %8[0, %12] [4, 4] [1, 1] : memref<4x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>> to memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-      linalg.matmul {__internal_linalg_transform__ = "vectorize", lowering.config = {tileSizes = [[2, 128], [], [1, 4], [0, 0, 4]]}}
+      linalg.matmul {__internal_linalg_transform__ = "vectorize", lowering.config = #config}
         ins(%17, %18 : memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 4 + s0 + d1)>>, memref<4x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
         outs(%13 : memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
     }
@@ -53,36 +54,28 @@ func @matmul_2x128x4() {
 //       CHECK:       %[[RHS_TILE:.+]] = memref.subview %{{.+}}[0, %{{.+}}] [4, 4]
 //       CHECK:       %[[LHS_VECTOR:.+]] = vector.transfer_read %[[LHS_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
 //       CHECK:       %[[RHS_0_READ:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
-//       CHECK:       %[[RHS_0_T0:.+]] = vector.transpose %[[RHS_0_READ]], [1, 0]
 //       CHECK:       %[[RHS_1_READ:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C1]], %[[C0]]], %[[PAD]]
-//       CHECK:       %[[RHS_1_T0:.+]] = vector.transpose %[[RHS_1_READ]], [1, 0]
 //       CHECK:       %[[RHS_2_READ:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C2]], %[[C0]]], %[[PAD]]
-//       CHECK:       %[[RHS_2_T0:.+]] = vector.transpose %[[RHS_2_READ]], [1, 0]
 //       CHECK:       %[[RHS_3_READ:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C3]], %[[C0]]], %[[PAD]]
-//       CHECK:       %[[RHS_3_T0:.+]] = vector.transpose %[[RHS_3_READ]], [1, 0]
 //       CHECK:       %[[ACC_0:.+]] = vector.transfer_read %[[ACC_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
 //       CHECK:       %[[LHS_0:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0, 0], sizes = [1, 1], strides = [1, 1]}
-//       CHECK:       %[[RHS_0_T1:.+]] = vector.transpose %[[RHS_0_T0]], [1, 0]
-//       CHECK:       %[[RHS_0_VECTOR:.+]] = vector.extract %[[RHS_0_T1]][0] : vector<1x4xf32>
+//       CHECK:       %[[RHS_0_VECTOR:.+]] = vector.extract %[[RHS_0_READ]][0] : vector<1x4xf32>
 //       CHECK:       %[[LHS_0_SCALAR:.+]] = vector.extract %[[LHS_0]][0, 0] : vector<1x1xf32>
 //       CHECK:       %[[LHS_0_VECTOR:.+]] = splat %[[LHS_0_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[ACC_0_VECTOR:.+]] = vector.extract %[[ACC_0]][0] : vector<1x4xf32>
 //       CHECK:       %[[FMA_0:.+]] = vector.fma %[[LHS_0_VECTOR]], %[[RHS_0_VECTOR]], %[[ACC_0_VECTOR]] : vector<4xf32>
 //       CHECK:       %[[LHS_1:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0, 1], sizes = [1, 1], strides = [1, 1]}
-//       CHECK:       %[[RHS_1_T1:.+]] = vector.transpose %[[RHS_1_T0]], [1, 0]
-//       CHECK:       %[[RHS_1_VECTOR:.+]] = vector.extract %[[RHS_1_T1]][0] : vector<1x4xf32>
+//       CHECK:       %[[RHS_1_VECTOR:.+]] = vector.extract %[[RHS_1_READ]][0] : vector<1x4xf32>
 //       CHECK:       %[[LHS_1_SCALAR:.+]] = vector.extract %[[LHS_1]][0, 0] : vector<1x1xf32>
 //       CHECK:       %[[LHS_1_VECTOR:.+]] = splat %[[LHS_1_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[FMA_1:.+]] = vector.fma %[[LHS_1_VECTOR]], %[[RHS_1_VECTOR]], %[[FMA_0]] : vector<4xf32>
 //       CHECK:       %[[LHS_2:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0, 2], sizes = [1, 1], strides = [1, 1]}
-//       CHECK:       %[[RHS_2_T1:.+]] = vector.transpose %[[RHS_2_T0]], [1, 0]
-//       CHECK:       %[[RHS_2_VECTOR:.+]] = vector.extract %[[RHS_2_T1]][0] : vector<1x4xf32>
+//       CHECK:       %[[RHS_2_VECTOR:.+]] = vector.extract %[[RHS_2_READ]][0] : vector<1x4xf32>
 //       CHECK:       %[[LHS_2_SCALAR:.+]] = vector.extract %[[LHS_2]][0, 0] : vector<1x1xf32>
 //       CHECK:       %[[LHS_2_VECTOR:.+]] = splat %[[LHS_2_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[FMA_2:.+]] = vector.fma %[[LHS_2_VECTOR]], %[[RHS_2_VECTOR]], %[[FMA_1]] : vector<4xf32>
 //       CHECK:       %[[LHS_3:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0, 3], sizes = [1, 1], strides = [1, 1]}
-//       CHECK:       %[[RHS_3_T1:.+]] = vector.transpose %[[RHS_3_T0]], [1, 0]
-//       CHECK:       %[[RHS_3_VECTOR:.+]] = vector.extract %[[RHS_3_T1]][0] : vector<1x4xf32>
+//       CHECK:       %[[RHS_3_VECTOR:.+]] = vector.extract %[[RHS_3_READ]][0] : vector<1x4xf32>
 //       CHECK:       %[[LHS_3_SCALAR:.+]] = vector.extract %[[LHS_3]][0, 0] : vector<1x1xf32>
 //       CHECK:       %[[LHS_3_VECTOR:.+]] = splat %[[LHS_3_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[FMA_3:.+]] = vector.fma %[[LHS_3_VECTOR]], %[[RHS_3_VECTOR]], %[[FMA_2]] : vector<4xf32>

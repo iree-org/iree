@@ -37,11 +37,6 @@ extern "C" {
 #define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
 #define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
 
-// Returns true if any bit from |rhs| is set in |lhs|.
-#define iree_any_bit_set(lhs, rhs) (((lhs) & (rhs)) != 0)
-// Returns true iff all bits from |rhs| are set in |lhs|.
-#define iree_all_bits_set(lhs, rhs) (((lhs) & (rhs)) == (rhs))
-
 #if IREE_STATISTICS_ENABLE
 // Evalutes the expression code only if statistics are enabled.
 //

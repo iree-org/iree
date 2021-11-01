@@ -17,6 +17,14 @@ IREE_API_EXPORT void iree_string_builder_initialize(
   out_builder->allocator = allocator;
 }
 
+IREE_API_EXPORT void iree_string_builder_initialize_with_storage(
+    char* buffer, iree_host_size_t buffer_capacity,
+    iree_string_builder_t* out_builder) {
+  iree_string_builder_initialize(iree_allocator_null(), out_builder);
+  out_builder->buffer = buffer;
+  out_builder->capacity = buffer_capacity;
+}
+
 IREE_API_EXPORT void iree_string_builder_deinitialize(
     iree_string_builder_t* builder) {
   if (builder->buffer != NULL) {

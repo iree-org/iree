@@ -19,6 +19,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===----------------------------------------------------------------------===//
+// Utility functions to get entry point(s)
+//===----------------------------------------------------------------------===//
+
 bool isEntryPoint(FuncOp func) { return func.isPublic(); }
 
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
@@ -41,21 +45,9 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
   return entryPointOps;
 }
 
-IREE::HAL::TranslationInfo getTranslationInfo(FuncOp funcOp) {
-  auto entryPointOp = getEntryPoint(funcOp);
-  if (!entryPointOp) return nullptr;
-  return getTranslationInfo(entryPointOp);
-}
-
-void setTranslationInfo(FuncOp entryPointFn,
-                        IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-                        ArrayRef<int64_t> workgroupSize,
-                        ArrayRef<int64_t> workloadPerWorkgroup) {
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  auto translationInfo = buildTranslationInfo(
-      passPipeline, workloadPerWorkgroup, entryPointFn.getContext());
-  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
-}
+//===----------------------------------------------------------------------===//
+// Utility functions used in setting default configurations.
+//===----------------------------------------------------------------------===//
 
 SmallVector<unsigned> getPartitionedLoops(Operation *op) {
   if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
@@ -78,45 +70,6 @@ SmallVector<unsigned> getPartitionedLoops(Operation *op) {
     return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
   }
   return {};
-}
-
-LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op, IREE::HAL::LoweringConfig config,
-    IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize) {
-  auto partitionedLoops = getPartitionedLoops(op);
-  SmallVector<int64_t, 3> workloadPerWorkgroup;
-  auto tileSizes = getTileSizes(config, 0);
-  if (!tileSizes.empty() && !partitionedLoops.empty()) {
-    for (unsigned depth : partitionedLoops) {
-      if (depth >= tileSizes.size()) {
-        return op->emitOpError(
-                   "illegal configuration for lowering op, expect first level "
-                   "tile size to contain at least ")
-               << partitionedLoops.back() << " elements";
-      }
-      if (tileSizes[depth] == 0) {
-        return op->emitOpError("illegal to set tilesize of loop ")
-               << depth
-               << " to zero since it is set to be partitioned at the flow "
-                  "level";
-      }
-      workloadPerWorkgroup.push_back(tileSizes[depth]);
-    }
-    if (!workloadPerWorkgroup.empty()) {
-      workloadPerWorkgroup =
-          llvm::to_vector<3>(llvm::reverse(workloadPerWorkgroup));
-    }
-  }
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  if (!entryPointOp) {
-    return entryPointFn.emitOpError(
-        "unable to find entry point op for entry point function");
-  }
-  IREE::HAL::TranslationInfo translationInfo = buildTranslationInfo(
-      passPipeline, workloadPerWorkgroup, entryPointOp->getContext());
-  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
-  return success();
 }
 
 /// Walk up the defs of the view, to get the untiled value. Either walks up

@@ -8,9 +8,7 @@
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -227,8 +225,8 @@ static LogicalResult setDefaultLaunchConfig(
       getDefaultWorkloadPerWorkgroup(tiledLoops, nativeVectorSizeInElements);
 
   setTranslationInfo(
-      entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUDefault,
-      /*workgroupSize =*/ArrayRef<int64_t>{}, workloadPerWorkgroup);
+      entryPointFn, IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault,
+      workloadPerWorkgroup, /*workgroupSize =*/ArrayRef<int64_t>{});
   return success();
 }
 
@@ -299,8 +297,9 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
                     vectorSizeVals[i]);
   }
   setTranslationInfo(
-      entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors,
-      /*workgroupSize =*/ArrayRef<int64_t>{}, workloadPerWorkgroup);
+      entryPointFn,
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors,
+      workloadPerWorkgroup, /*workgroupSize =*/ArrayRef<int64_t>{});
 
   SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;
   if (isBatchMatmul) {
@@ -321,8 +320,8 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
                             // level tiling.
   tileSizes.emplace_back(std::move(l1TileSizes));
   tileSizes.emplace_back(std::move(vectorTileSizes));
-  IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, vectorSizeVals, entryPointFn.getContext());
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes, vectorSizeVals);
   setLoweringConfig(contractionOp, config);
   return success();
 }
@@ -368,14 +367,14 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, linalg::Mmt4DOp mmt4dOp,
     return {1, 1, 1, M0, N0, K0};
   };
 
-  SmallVector<int64_t, 4> nativeVectorSize = getVectorSizes();
+  SmallVector<int64_t> nativeVectorSize = getVectorSizes();
 
   TileSizesListType tileSizes = {getWorkgroupTileSizes(), getL1TileSizes(),
                                  nativeVectorSize};
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
-      IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUVectorization);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
@@ -384,8 +383,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, linalg_ext::FftOp fftOp,
                                    ArrayRef<TiledLoopInfo> tiledLoops) {
   auto partitionedLoops = getPartitionedLoops(fftOp);
   unsigned maxDepth = partitionedLoops.back() + 1;
-  SmallVector<int64_t, 4> workgroupTileSizes(maxDepth,
-                                             defaultWorkgroupTileSize);
+  SmallVector<int64_t> workgroupTileSizes(maxDepth, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
   for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
@@ -412,7 +410,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, linalg_ext::FftOp fftOp,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, fftOp, tileSizes,
       /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      IREE::HAL::DispatchLoweringPassPipeline::CPUDefault);
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault);
 }
 
 /// Finds the root operation in the given list of linalg operations and sets
@@ -454,11 +452,8 @@ static LogicalResult setTranslationInfoAndRootConfig(
   for (auto computeOp : computeOps) {
     if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
 
-    if (auto config = getLoweringConfig(computeOp)) {
-      // Check if the op has a preset pipeline.
-      auto passPipeline = getLoweringPassPipeline(config);
-      if (!passPipeline) continue;
-
+    if (IREE::Codegen::CompilationInfoAttr compilationInfo =
+            getCompilationInfo(computeOp)) {
       // If the function already has a translation, error out.
       if (auto translationInfo = getTranslationInfo(entryPointFn)) {
         return computeOp->emitOpError(
@@ -466,17 +461,12 @@ static LogicalResult setTranslationInfoAndRootConfig(
             "info");
       }
 
-      SmallVector<int64_t, 4> workgroupSize;
-      if (auto workgroupSizeAttr = config.workgroupSize()) {
-        workgroupSize = llvm::to_vector<4>(
-            llvm::map_range(workgroupSizeAttr, [](Attribute intAttr) {
-              return intAttr.cast<IntegerAttr>().getInt();
-            }));
-      }
-      if (failed(setOpConfigAndEntryPointFnTranslation(
-              entryPointFn, computeOp, config, *passPipeline, workgroupSize))) {
-        return failure();
-      }
+      SmallVector<int64_t> workgroupSize =
+          compilationInfo.getWorkgroupSizeVals();
+      setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
+                         workgroupSize);
+      setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
+      eraseCompilationInfo(computeOp);
     }
   }
 

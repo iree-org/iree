@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_
 
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {

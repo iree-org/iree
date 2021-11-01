@@ -28,7 +28,6 @@ iree_lit_test_suite(
             "config_mali_matmul.mlir",
             "config_nvidia_matmul_cooperative_ops.mlir",
             "convert_to_spirv.mlir",
-            "distribute_to_global_id.mlir",
             "fold_gpu_procid_uses.mlir",
             "pipeline_matmul_cooperative_ops.mlir",
             "pipeline_matmul_vectorization.mlir",
@@ -47,7 +46,10 @@ iree_lit_test_suite(
             "vectorize_load_store.mlir",
         ],
         include = ["*.mlir"],
-        exclude = ["promote_workgroup_memory.mlir"],
+        # TODO(b/203528778) reenable
+        exclude = [
+            "promote_workgroup_memory.mlir",
+        ],
     ),
     data = [
         "//iree/tools:IreeFileCheck",

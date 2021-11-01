@@ -112,11 +112,6 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
       return failure();
     }
 
-    // This is for float only matmul for now. Integer data type might require
-    // r.h.s layout change.
-    if (!lhsType.getElementType().isF32() || !rhsType.getElementType().isF32())
-      return failure();
-
     int m = lhsType.getShape()[0];
     int k = rhsType.getShape()[0];
     int n = rhsType.getShape()[1];

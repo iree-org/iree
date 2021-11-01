@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[8, 64], [8, 4], [0, 0, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @matmul_static_shape_f16  {
   hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -12,7 +12,7 @@ hal.executable private @matmul_static_shape_f16  {
     hal.executable.entry_point @matmul_static_shape_f16 attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
+      translation.info = #translation
     }
     builtin.module {
       func @matmul_static_shape_f16() {
@@ -66,8 +66,8 @@ hal.executable private @matmul_static_shape_f16  {
 
 // -----
 
-#config = {tileSizes = [[8, 64], [8, 4], [0, 0, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @matmul_static_shape_f32  {
   hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -78,7 +78,7 @@ hal.executable private @matmul_static_shape_f32  {
     hal.executable.entry_point @matmul_static_shape_f32 attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
+      translation.info = #translation
     }
     builtin.module {
       func @matmul_static_shape_f32() {

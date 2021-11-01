@@ -45,6 +45,7 @@ cd build-host
 # Configure, build, install.
 "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_INSTALL_PREFIX=./install \
+  -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
@@ -74,6 +75,7 @@ cd build-android
   -DANDROID_ABI="${ANDROID_ABI?}" \
   -DANDROID_PLATFORM=android-29 \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
+  -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF
