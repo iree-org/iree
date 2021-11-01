@@ -72,9 +72,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
     }
   }
 
-  iree_status_t status =
-      IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_command_buffer)(
-          device, mode, command_categories, queue_affinity, out_command_buffer);
+  iree_hal_command_buffer_t* base_command_buffer = NULL;
+  iree_status_t status = IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device,
+                                                  create_command_buffer)(
+      device, mode, command_categories, queue_affinity, &base_command_buffer);
 
 #if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
   // Wrap the command buffer with the validation layer if enabled in the build.
@@ -82,8 +83,11 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
   // inputs are trusted!).
   if (iree_status_is_ok(status)) {
     status = iree_hal_command_buffer_wrap_validation(
-        device, *out_command_buffer, out_command_buffer);
+        device, base_command_buffer, out_command_buffer);
+    iree_hal_command_buffer_release(base_command_buffer);
   }
+#else
+  *out_command_buffer = base_command_buffer;
 #endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
 
   IREE_TRACE_ZONE_END(z0);
