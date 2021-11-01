@@ -53,9 +53,9 @@ iree_pydm.func @elide_promote_numeric_identity(%arg0: !iree_pydm.integer) -> (!i
 // -----
 // CHECK-LABEL: @fold_promote_numeric_true_to_integer
 iree_pydm.func @fold_promote_numeric_true_to_integer() -> (!iree_pydm.exception_result, !iree_pydm.none) {
-  // CHECK: %[[CST:.*]] = arith.constant 1 : i64 -> !iree_pydm.integer
+  // CHECK: %[[CST:.*]] = constant 1 : i64 -> !iree_pydm.integer
   // CHECK: "custom.donotoptimize"(%[[CST]])
-  %0 = arith.constant true -> !iree_pydm.bool
+  %0 = constant true -> !iree_pydm.bool
   %1 = promote_numeric %0 : !iree_pydm.bool -> !iree_pydm.integer
   "custom.donotoptimize"(%1) : (!iree_pydm.integer) -> ()
   %none = none
@@ -65,9 +65,9 @@ iree_pydm.func @fold_promote_numeric_true_to_integer() -> (!iree_pydm.exception_
 // -----
 // CHECK-LABEL: @fold_promote_numeric_false_to_integer
 iree_pydm.func @fold_promote_numeric_false_to_integer() -> (!iree_pydm.exception_result, !iree_pydm.none) {
-  // CHECK: %[[CST:.*]] = arith.constant 0 : i64 -> !iree_pydm.integer
+  // CHECK: %[[CST:.*]] = constant 0 : i64 -> !iree_pydm.integer
   // CHECK: "custom.donotoptimize"(%[[CST]])
-  %0 = arith.constant false -> !iree_pydm.bool
+  %0 = constant false -> !iree_pydm.bool
   %1 = promote_numeric %0 : !iree_pydm.bool -> !iree_pydm.integer
   "custom.donotoptimize"(%1) : (!iree_pydm.integer) -> ()
   %none = none
@@ -77,9 +77,9 @@ iree_pydm.func @fold_promote_numeric_false_to_integer() -> (!iree_pydm.exception
 // -----
 // CHECK-LABEL: @fold_promote_numeric_true_to_real
 iree_pydm.func @fold_promote_numeric_true_to_real() -> (!iree_pydm.exception_result, !iree_pydm.none) {
-  // CHECK: %[[CST:.*]] = arith.constant 1.000000e+00 : f64 -> !iree_pydm.real
+  // CHECK: %[[CST:.*]] = constant 1.000000e+00 : f64 -> !iree_pydm.real
   // CHECK: "custom.donotoptimize"(%[[CST]])
-  %0 = arith.constant true -> !iree_pydm.bool
+  %0 = constant true -> !iree_pydm.bool
   %1 = promote_numeric %0 : !iree_pydm.bool -> !iree_pydm.real
   "custom.donotoptimize"(%1) : (!iree_pydm.real) -> ()
   %none = none
@@ -89,9 +89,9 @@ iree_pydm.func @fold_promote_numeric_true_to_real() -> (!iree_pydm.exception_res
 // -----
 // CHECK-LABEL: @fold_promote_numeric_false_to_real
 iree_pydm.func @fold_promote_numeric_false_to_real() -> (!iree_pydm.exception_result, !iree_pydm.none) {
-  // CHECK: %[[CST:.*]] = arith.constant 0.000000e+00 : f64 -> !iree_pydm.real
+  // CHECK: %[[CST:.*]] = constant 0.000000e+00 : f64 -> !iree_pydm.real
   // CHECK: "custom.donotoptimize"(%[[CST]])
-  %0 = arith.constant false -> !iree_pydm.bool
+  %0 = constant false -> !iree_pydm.bool
   %1 = promote_numeric %0 : !iree_pydm.bool -> !iree_pydm.real
   "custom.donotoptimize"(%1) : (!iree_pydm.real) -> ()
   %none = none
@@ -101,9 +101,9 @@ iree_pydm.func @fold_promote_numeric_false_to_real() -> (!iree_pydm.exception_re
 // -----
 // CHECK-LABEL: @fold_promote_numeric_integet_to_real
 iree_pydm.func @fold_promote_numeric_integet_to_real() -> (!iree_pydm.exception_result, !iree_pydm.none) {
-  // CHECK: %[[CST:.*]] = arith.constant 2.000000e+00 : f64 -> !iree_pydm.real
+  // CHECK: %[[CST:.*]] = constant 2.000000e+00 : f64 -> !iree_pydm.real
   // CHECK: "custom.donotoptimize"(%[[CST]])
-  %0 = arith.constant 2 : i64 -> !iree_pydm.integer
+  %0 = constant 2 : i64 -> !iree_pydm.integer
   %1 = promote_numeric %0 : !iree_pydm.integer -> !iree_pydm.real
   "custom.donotoptimize"(%1) : (!iree_pydm.real) -> ()
   %none = none

@@ -278,7 +278,7 @@ static void pullInProducersInSameGroup(
         auto maybeFusionInfo = linalg::fuseProducerOfTensor(
             rewriter, clonedOrigProducer->getResult(opResult.getResultNumber()),
             tiledOp->getOpOperand(en.index()));
-        if (!maybeFusionInfo.hasValue()) {
+        if (failed(maybeFusionInfo)) {
           LLVM_DEBUG(llvm::dbgs() << "failed to fuse with tensor\n");
           rewriter.replaceOp(clonedOrigProducer, producer->getResults());
         } else {

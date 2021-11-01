@@ -339,15 +339,9 @@ function(iree_validate_required_arguments
             "No values for field(s) '${${PREFIX}_KEYWORDS_MISSING_VALUES}'")
   endif()
 
-  foreach(_ONE_VALUE_KEYWORD IN LISTS REQUIRED_ONE_VALUE_KEYWORDS)
-    if(NOT DEFINED ${PREFIX}_${_ONE_VALUE_KEYWORD})
-      message(SEND_ERROR "Missing required argument ${_ONE_VALUE_KEYWORD}")
-    endif()
-  endforeach()
-
-  foreach(_MULTI_VALUE_KEYWORD IN LISTS REQUIRED_MULTI_VALUE_KEYWORDS)
-    if(NOT DEFINED ${PREFIX}_${_MULTI_VALUE_KEYWORD})
-      message(SEND_ERROR "Missing required argument ${_MULTI_VALUE_KEYWORD}")
+  foreach(_KEYWORD IN LISTS REQUIRED_ONE_VALUE_KEYWORDS REQUIRED_MULTI_VALUE_KEYWORDS)
+    if(NOT DEFINED ${PREFIX}_${_KEYWORD})
+      message(SEND_ERROR "Missing required argument ${_KEYWORD}")
     endif()
   endforeach()
 endfunction()

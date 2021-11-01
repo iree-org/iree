@@ -155,6 +155,8 @@ void populateVectorizationPatterns(MLIRContext *context,
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), context)));
+  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+  vector::populateVectorReductionToContractPatterns(patterns);
 }
 
 /// Returns vector shape matching native cooperative op sizes for unrolling

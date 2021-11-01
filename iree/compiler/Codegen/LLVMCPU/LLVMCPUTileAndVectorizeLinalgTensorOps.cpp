@@ -181,6 +181,9 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
         vectorizationPatterns, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
             Identifier::get(getVectorizeMarker(), context)));
+    vector::populateVectorTransferPermutationMapLoweringPatterns(
+        vectorizationPatterns);
+    vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorizationPatterns)))) {
       return signalPassFailure();
@@ -216,10 +219,10 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
     OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
-    vectorContractLoweringPatterns
-        .insert<ContractionOpToOuterProductOpLowering,
-                ContractionOpToMatmulOpLowering, ContractionOpLowering>(
-            vectorTransformsOptions, context);
+    vectorContractLoweringPatterns.insert<
+        vector::ContractionOpToOuterProductOpLowering,
+        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
+        vectorTransformsOptions, context);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
     if (failed(applyPatternsAndFoldGreedily(

@@ -231,6 +231,9 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         vectorizationPatterns, linalg::LinalgVectorizationOptions(),
         linalg::LinalgTransformationFilter(
             Identifier::get(getVectorizeMarker(), context)));
+    vector::populateVectorTransferPermutationMapLoweringPatterns(
+        vectorizationPatterns);
+    vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(vectorizationPatterns));
   }
@@ -258,10 +261,10 @@ void LLVMCPUVectorizationPass::runOnOperation() {
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
     RewritePatternSet vectorContractLoweringPatterns(context);
-    vectorContractLoweringPatterns
-        .insert<ContractionOpToOuterProductOpLowering,
-                ContractionOpToMatmulOpLowering, ContractionOpLowering>(
-            vectorTransformsOptions, context);
+    vectorContractLoweringPatterns.insert<
+        vector::ContractionOpToOuterProductOpLowering,
+        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
+        vectorTransformsOptions, context);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
     (void)applyPatternsAndFoldGreedily(
@@ -274,7 +277,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
   // Programmatic controlled lowering of vector.transfer only.
   {
     VectorTransferToSCFOptions vectorToSCFOptions =
-        VectorTransferToSCFOptions().setUnroll(true);
+        VectorTransferToSCFOptions().enableFullUnroll();
     RewritePatternSet vectorToLoopsPatterns(context);
     populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);

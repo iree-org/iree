@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/ToIREE/Patterns.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/ToIREE/TypeConverter.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -38,8 +39,9 @@ struct ConvertIREEPyDMToIREEPass
     target.addIllegalDialect<IREEPyDMDialect>();
     target.addLegalDialect<BuiltinDialect>();
     target.addLegalDialect<mlir::iree::IREEDialect>();
+    target.addLegalDialect<mlir::arith::ArithmeticDialect>();
     target.addLegalDialect<mlir::math::MathDialect>();
-    target.addLegalDialect<StandardOpsDialect>();
+    target.addLegalDialect<mlir::StandardOpsDialect>();
 
     // Some CFG ops can be present in the original pydm program. Need to
     // verify legality based on types.

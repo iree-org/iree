@@ -371,6 +371,20 @@ class ProcessInterfaceBinding final
   }
 };
 
+template <typename OpT>
+class PassThroughConversion : public OpConversionPattern<OpT> {
+ public:
+  using OpConversionPattern<OpT>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      OpT op, typename OpT::Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.updateRootInPlace(op,
+                               [&] { op->setOperands(adaptor.getOperands()); });
+    return success();
+  }
+};
+
 /// Scalarizes remaining vector transfer that couldn't be converted to
 /// vevtor load operations.
 
@@ -450,7 +464,6 @@ LogicalResult ProcessFuncArg::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
   TypeConverter::SignatureConversion signatureConverter(
       funcOp.getType().getNumInputs());
-  TypeConverter typeConverter;
   for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
     if (memrefUsageAnalysis.vectorizeMemRef(arg.value())) {
       if (auto memrefType = getVectorizedMemRefType(rewriter, arg.value())) {
@@ -461,9 +474,7 @@ LogicalResult ProcessFuncArg::matchAndRewrite(
     signatureConverter.addInputs(arg.index(), arg.value().getType());
   }
   // Creates a new function with the update signature.
-  if (failed(rewriter.convertRegionTypes(&funcOp.getBody(), typeConverter,
-                                         &signatureConverter)))
-    return failure();
+  rewriter.applySignatureConversion(&funcOp.getBody(), signatureConverter);
 
   // Creates a new function with the update signature.
   rewriter.updateRootInPlace(funcOp, [&] {
@@ -486,6 +497,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       .add<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
            ProcessAlloc, ProcessInterfaceBinding>(context,
                                                   *memrefUsageAnalysis);
+  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>>(context);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
@@ -503,6 +515,8 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
   target.markUnknownOpDynamicallyLegal([&](Operation *op) {
     if (isa<vector::TransferWriteOp, vector::TransferReadOp>(op))
       return !memrefUsageAnalysis->transferConvert(op);
+    if (auto dealloc = dyn_cast<memref::DeallocOp>(op))
+      return !memrefUsageAnalysis->vectorizeMemRef(dealloc.memref());
     return true;
   });
   if (failed(applyPartialConversion(module, target,

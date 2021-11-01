@@ -253,15 +253,15 @@ flow.executable @attributes_ex_0 {
 flow.executable @attributes_ex_1 {
   flow.dispatch.entry @attributes_entry_1
   builtin.module {
-    func @attributes_entry_1(%input: tensor<1x4xi32>) -> tensor<1xi32> {
+    func @attributes_entry_1(%input: tensor<1x4xi32>) -> tensor<4xi32> {
       %0 = arith.constant dense<0> : tensor<i32>
       %1 = "mhlo.reduce"(%input, %0) ( {
       ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
         %3 = "mhlo.maximum"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
         "mhlo.return"(%3) : (tensor<i32>) -> ()
         // @attributes_ex_0 but with a different attribute.
-      }) {dimensions = dense<2> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<1xi32>
-      return %1 : tensor<1xi32>
+      }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<4xi32>
+      return %1 : tensor<4xi32>
     }
   }
 }

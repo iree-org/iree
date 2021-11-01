@@ -109,7 +109,7 @@ class ConvertHALInterfaceWorkgroupIDOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupIDOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupIDOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -132,7 +132,7 @@ class ConvertHALInterfaceWorkgroupSizeOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupSizeOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupSizeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -155,7 +155,7 @@ class ConvertHALInterfaceWorkgroupCountOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupCountOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupCountOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -177,7 +177,7 @@ class ConvertHALInterfaceLoadConstantOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceLoadConstantOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceLoadConstantOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
     auto constantsArg =
@@ -205,7 +205,7 @@ class ConvertHALInterfaceBindingSubspanOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // NOTE: we expect FoldSubViewOps to have run and zeroed out the offset.
     APInt byteOffset;
@@ -252,7 +252,7 @@ class RemoveHALInterfaceOpPattern
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return success();

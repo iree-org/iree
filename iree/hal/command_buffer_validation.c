@@ -25,9 +25,11 @@ typedef struct iree_hal_validating_command_buffer_t {
   iree_hal_resource_t resource;
   iree_hal_device_t* device;
   iree_hal_command_buffer_t* target_command_buffer;
+  iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
 
   bool is_recording;
+  int32_t debug_group_depth;
   // TODO(benvanik): current executable layout/descriptor set layout info.
   // TODO(benvanik): valid push constant bit ranges.
 } iree_hal_validating_command_buffer_t;
@@ -35,17 +37,37 @@ typedef struct iree_hal_validating_command_buffer_t {
 static const iree_hal_command_buffer_vtable_t
     iree_hal_validating_command_buffer_vtable;
 
+static iree_hal_validating_command_buffer_t*
+iree_hal_validating_command_buffer_cast(iree_hal_command_buffer_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_validating_command_buffer_vtable);
+  return (iree_hal_validating_command_buffer_t*)base_value;
+}
+
+static const iree_hal_validating_command_buffer_t*
+iree_hal_validating_command_buffer_const_cast(
+    const iree_hal_command_buffer_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_validating_command_buffer_vtable);
+  return (const iree_hal_validating_command_buffer_t*)base_value;
+}
+
 // Returns success iff the queue supports the given command categories.
 static iree_status_t iree_hal_command_buffer_validate_categories(
     const iree_hal_validating_command_buffer_t* command_buffer,
     iree_hal_command_category_t required_categories) {
   if (!iree_all_bits_set(command_buffer->allowed_categories,
                          required_categories)) {
+    iree_bitfield_string_temp_t temp0, temp1;
+    iree_string_view_t required_categories_str =
+        iree_hal_command_category_format(required_categories, &temp0);
+    iree_string_view_t allowed_categories_str =
+        iree_hal_command_category_format(command_buffer->allowed_categories,
+                                         &temp1);
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "operation requires categories %s but command buffer only supports %s",
-        iree_hal_command_category_string(required_categories),
-        iree_hal_command_category_string(command_buffer->allowed_categories));
+        "operation requires categories %.*s but command buffer only supports "
+        "%.*s",
+        (int)required_categories_str.size, required_categories_str.data,
+        (int)allowed_categories_str.size, allowed_categories_str.data);
   }
   return iree_ok_status();
 }
@@ -64,12 +86,17 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
           iree_hal_buffer_allocation_size(buffer));
   if (!iree_all_bits_set(allowed_compatibility, required_compatibility)) {
     // Buffer cannot be used on the queue for the given usage.
+    iree_bitfield_string_temp_t temp0, temp1;
+    iree_string_view_t allowed_usage_str = iree_hal_buffer_usage_format(
+        iree_hal_buffer_allowed_usage(buffer), &temp0);
+    iree_string_view_t intended_usage_str =
+        iree_hal_buffer_usage_format(intended_usage, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "requested buffer usage is not supported for the buffer on this queue; "
-        "buffer allows %s, operation requires %s",
-        iree_hal_buffer_usage_string(iree_hal_buffer_allowed_usage(buffer)),
-        iree_hal_buffer_usage_string(intended_usage));
+        "buffer allows %.*s, operation requires %.*s",
+        (int)allowed_usage_str.size, allowed_usage_str.data,
+        (int)intended_usage_str.size, intended_usage_str.data);
   }
   return iree_ok_status();
 }
@@ -104,6 +131,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wrap_validation(
     iree_hal_device_retain(command_buffer->device);
     command_buffer->target_command_buffer = target_command_buffer;
     iree_hal_command_buffer_retain(command_buffer->target_command_buffer);
+    command_buffer->mode =
+        iree_hal_command_buffer_mode(command_buffer->target_command_buffer);
     command_buffer->allowed_categories =
         iree_hal_command_buffer_allowed_categories(
             command_buffer->target_command_buffer);
@@ -120,7 +149,7 @@ static void iree_hal_validating_command_buffer_destroy(
     iree_hal_command_buffer_t* base_command_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
   iree_allocator_t host_allocator =
       iree_hal_device_host_allocator(command_buffer->device);
   iree_hal_command_buffer_release(command_buffer->target_command_buffer);
@@ -129,18 +158,37 @@ static void iree_hal_validating_command_buffer_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static void* iree_hal_validating_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* base_command_buffer, const void* vtable) {
+  if (vtable == &iree_hal_validating_command_buffer_vtable) {
+    IREE_HAL_ASSERT_TYPE(base_command_buffer, vtable);
+    return base_command_buffer;
+  }
+  iree_hal_validating_command_buffer_t* command_buffer =
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
+  return iree_hal_command_buffer_dyn_cast(command_buffer->target_command_buffer,
+                                          vtable);
+}
+
+static iree_hal_command_buffer_mode_t iree_hal_validating_command_buffer_mode(
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  const iree_hal_validating_command_buffer_t* command_buffer =
+      iree_hal_validating_command_buffer_const_cast(base_command_buffer);
+  return command_buffer->mode;
+}
+
 static iree_hal_command_category_t
 iree_hal_validating_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+  const iree_hal_validating_command_buffer_t* command_buffer =
+      iree_hal_validating_command_buffer_const_cast(base_command_buffer);
   return command_buffer->allowed_categories;
 }
 
 static iree_status_t iree_hal_validating_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   if (command_buffer->is_recording) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
@@ -154,8 +202,13 @@ static iree_status_t iree_hal_validating_command_buffer_begin(
 static iree_status_t iree_hal_validating_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
+  if (command_buffer->debug_group_depth != 0) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "unbalanced debug group depth (expected 0, is %d)",
+                            command_buffer->debug_group_depth);
+  }
   if (!command_buffer->is_recording) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command buffer is not in a recording state");
@@ -163,6 +216,25 @@ static iree_status_t iree_hal_validating_command_buffer_end(
   command_buffer->is_recording = false;
 
   return iree_hal_command_buffer_end(command_buffer->target_command_buffer);
+}
+
+static void iree_hal_validating_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  iree_hal_validating_command_buffer_t* command_buffer =
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
+  iree_hal_command_buffer_begin_debug_group(
+      command_buffer->target_command_buffer, label, label_color, location);
+}
+
+static void iree_hal_validating_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_validating_command_buffer_t* command_buffer =
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
+  --command_buffer->debug_group_depth;
+  iree_hal_command_buffer_end_debug_group(
+      command_buffer->target_command_buffer);
 }
 
 static iree_status_t iree_hal_validating_command_buffer_execution_barrier(
@@ -175,7 +247,7 @@ static iree_status_t iree_hal_validating_command_buffer_execution_barrier(
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_ANY));
@@ -192,7 +264,7 @@ static iree_status_t iree_hal_validating_command_buffer_signal_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -207,7 +279,7 @@ static iree_status_t iree_hal_validating_command_buffer_reset_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -228,7 +300,7 @@ static iree_status_t iree_hal_validating_command_buffer_wait_events(
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -244,7 +316,7 @@ static iree_status_t iree_hal_validating_command_buffer_wait_events(
 static iree_status_t iree_hal_validating_command_buffer_discard_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* buffer) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
@@ -263,7 +335,7 @@ static iree_status_t iree_hal_validating_command_buffer_fill_buffer(
     iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
@@ -274,7 +346,7 @@ static iree_status_t iree_hal_validating_command_buffer_fill_buffer(
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(target_buffer),
-      IREE_HAL_MEMORY_ACCESS_WRITE));
+      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
       iree_hal_buffer_allowed_access(target_buffer),
       IREE_HAL_MEMORY_ACCESS_WRITE));
@@ -312,7 +384,7 @@ static iree_status_t iree_hal_validating_command_buffer_update_buffer(
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
@@ -344,7 +416,7 @@ static iree_status_t iree_hal_validating_command_buffer_copy_buffer(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
@@ -382,13 +454,17 @@ static iree_status_t iree_hal_validating_command_buffer_copy_buffer(
                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE) &&
       !iree_any_bit_set(iree_hal_buffer_memory_type(target_buffer),
                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    iree_bitfield_string_temp_t temp0, temp1;
+    iree_string_view_t source_memory_type_str = iree_hal_memory_type_format(
+        iree_hal_buffer_memory_type(source_buffer), &temp0);
+    iree_string_view_t target_memory_type_str = iree_hal_memory_type_format(
+        iree_hal_buffer_memory_type(target_buffer), &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "at least one buffer must be device-visible for a copy; "
-        "source_buffer=%s, target_buffer=%s",
-        iree_hal_memory_type_string(iree_hal_buffer_memory_type(source_buffer)),
-        iree_hal_memory_type_string(
-            iree_hal_buffer_memory_type(target_buffer)));
+        "source_buffer=%.*s, target_buffer=%.*s",
+        (int)source_memory_type_str.size, source_memory_type_str.data,
+        (int)target_memory_type_str.size, target_memory_type_str.data);
   }
 
   // Check for overlap - just like memcpy we don't handle that.
@@ -410,7 +486,7 @@ static iree_status_t iree_hal_validating_command_buffer_push_constants(
     iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -434,7 +510,7 @@ static iree_status_t iree_hal_validating_command_buffer_push_descriptor_set(
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -455,7 +531,7 @@ static iree_status_t iree_hal_validating_command_buffer_bind_descriptor_set(
     iree_host_size_t dynamic_offset_count,
     const iree_device_size_t* dynamic_offsets) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -473,7 +549,7 @@ static iree_status_t iree_hal_validating_command_buffer_dispatch(
     iree_hal_executable_t* executable, int32_t entry_point,
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -491,7 +567,7 @@ static iree_status_t iree_hal_validating_command_buffer_dispatch_indirect(
     iree_hal_buffer_t* workgroups_buffer,
     iree_device_size_t workgroups_offset) {
   iree_hal_validating_command_buffer_t* command_buffer =
-      (iree_hal_validating_command_buffer_t*)base_command_buffer;
+      iree_hal_validating_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -523,10 +599,15 @@ static iree_status_t iree_hal_validating_command_buffer_dispatch_indirect(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_validating_command_buffer_vtable = {
         .destroy = iree_hal_validating_command_buffer_destroy,
+        .dyn_cast = iree_hal_validating_command_buffer_dyn_cast,
+        .mode = iree_hal_validating_command_buffer_mode,
         .allowed_categories =
             iree_hal_validating_command_buffer_allowed_categories,
         .begin = iree_hal_validating_command_buffer_begin,
         .end = iree_hal_validating_command_buffer_end,
+        .begin_debug_group =
+            iree_hal_validating_command_buffer_begin_debug_group,
+        .end_debug_group = iree_hal_validating_command_buffer_end_debug_group,
         .execution_barrier =
             iree_hal_validating_command_buffer_execution_barrier,
         .signal_event = iree_hal_validating_command_buffer_signal_event,

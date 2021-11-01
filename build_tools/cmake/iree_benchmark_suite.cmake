@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# iree_mlir_benchmark_suite()
+# iree_benchmark_suite()
 #
 # Generates benchmark suites for MLIR input modules. The generated artifacts
 # will be placed in the "<binary-root>/benchmark_suites/<category>" directory,
@@ -13,18 +13,21 @@
 # `iree-benchmark-module`.
 #
 # Parameters:
-#   MODULES: A list for model specification. Due to CMake's lack of nested list
-#       support, all model's specification is put in the same list, where each
-#       model takes six consecutive elements for the following information:
-#       - MODULE_NAMES: The input module's name.
-#       - MODULE_TAGS: A list of comma-separated tags for the input module.
-#       - MLIR_SOURCES: The input file for each input module. It can be a file
-#           checked in the repository; it can also be a URL for downloading
-#           from the web. When it's a URL, the file should be a a direct .mlir
-#           file or a tarball containing a .mlir file; for both cases, the .mlir
-#           file should have a name matching the one in MODULE_NAMES.
-#       - ENTRY_FUNCTIONS: The entry function name for the input module.
-#       - FUNCTION_INPUTS: A list of comma-separated entry function inputs for
+#   MODULES: A list for model specification. Due to CMake's lack of data
+#       structures, each module is represented as a list suitable to be parsed
+#       by cmake_parse_arguments:
+#       - NAME: The input module's name.
+#       - TAGS: comma-separated tags for the input module.
+#       - SOURCE: The input file for the input module. Supported formats are
+#           MLIR files in the IREE input format (which should have a .mlir
+#           extension) or TFLite flatbuffers (with a .tflite extension). In
+#           addition to permitting a source file, this can be a URL ("http://"
+#           or "https://") from which to download the file. This URL should
+#           point to a file in one of the appropriate input formats, optionally
+#           compressed in the gzip format, in which case it should have a
+#           trailing ".gz" extension in addition to other extensions.
+#       - ENTRY_FUNCTION: The entry function name for the input module.
+#       - FUNCTION_INPUT: A list of comma-separated entry function inputs for
 #           the input module.
 #   BENCHMARK_MODES: A list strings, where ech one of them is a comma-
 #       separated list of benchmark mode tags.
@@ -42,12 +45,10 @@
 #
 # 1)
 #
-# MODULE_NAMES, MODULE_TAGS, MLIR_SOURCES, ENTRY_FUNCTIONS, and FUNCTION_INPUTS
-# together provide good flexiblity for specifying the MLIRinput module and its
-# metadata. For example, we can generate modules with idential name from
-# different sources (TensorFlow, TFLite, PyTorch, etc.), and we can transform
-# the same input module differently for benchmarking different aspects like
-# fp32 vs fp16.
+# The MODULES provide information about the input module and its metadata. For
+# example, we can generate modules with idential names from different sources
+# (TensorFlow, TFLite, PyTorch, etc.), and we can transform the same input
+# module differently for benchmarking different aspects like fp32 vs fp16.
 #
 # 2)
 #
@@ -58,7 +59,7 @@
 # (e.g., full-inference vs. kernel-execution) and specify more contextual
 # requirements (e.g., big-core vs. little-core).
 #
-function(iree_mlir_benchmark_suite)
+function(iree_benchmark_suite)
   if(NOT IREE_BUILD_BENCHMARKS)
     return()
   endif()
@@ -81,13 +82,13 @@ function(iree_mlir_benchmark_suite)
     cmake_parse_arguments(
       _MODULE
       ""
-      "NAME;TAGS;MLIR_SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
+      "NAME;TAGS;SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
       ""
       ${_MODULE}
     )
     iree_validate_required_arguments(
       _MODULE
-      "NAME;TAGS;MLIR_SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
+      "NAME;TAGS;SOURCE;ENTRY_FUNCTION;FUNCTION_INPUTS"
       ""
     )
 
@@ -95,39 +96,70 @@ function(iree_mlir_benchmark_suite)
     set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_CATEGORY}")
     set(_VMFB_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/vmfb")
 
-    # The CMake target's name if we need to download from the web.
-    set(_DOWNLOAD_TARGET_NAME "")
+    # The name of any custom target that drives creation of the final source
+    # MLIR file. Depending on the format of the source, this will get updated.
+    set(_MODULE_SOURCE_TARGET "")
 
     # If the source file is from the web, create a custom command to download
     # it and wrap that with a custom target so later we can use for dependency.
-    #
-    # Note: We actually should not do this; instead, we should directly compile
-    # from the initial source (i.e., TensorFlow Python models). But that is
-    # tangled with the pending Python testing infrastructure revamp so we'd
-    # prefer to not do that right now.
-    if("${_MODULE_MLIR_SOURCE}" MATCHES "^https?://")
+    if("${_MODULE_SOURCE}" MATCHES "^https?://")
+      set(_SOURCE_URL "${_MODULE_SOURCE}")
       # Update the source file to the downloaded-to place.
-      string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_MODULE_MLIR_SOURCE}")
+      string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_SOURCE_URL}")
       list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
-      set(_DOWNLOAD_TARGET_NAME "iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
+      set(_DOWNLOAD_TARGET "iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
-      string(REPLACE "tar.gz" "mlir" _FILE_NAME "${_LAST_URL_SEGMENT}")
-      set(_SOURCE_FILE "${_ROOT_ARTIFACTS_DIR}/${_MODULE_NAME}.mlir")
-
-      if (NOT TARGET "${_DOWNLOAD_TARGET_NAME}")
+      # Strip off gzip suffix if present (downloader unzips if necessary)
+      string(REGEX REPLACE "\.gz$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
+      set(_MODULE_SOURCE "${_ROOT_ARTIFACTS_DIR}/${_SOURCE_FILE_BASENAME}")
+      if (NOT TARGET "${_DOWNLOAD_TARGET}")
         add_custom_command(
-          OUTPUT "${_SOURCE_FILE}"
+          OUTPUT "${_MODULE_SOURCE}"
           COMMAND
             "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/download_file.py"
-            "${_MODULE_MLIR_SOURCE}" -o "${_ROOT_ARTIFACTS_DIR}"
+            "${_SOURCE_URL}" -o "${_MODULE_SOURCE}"
           DEPENDS
             "${IREE_ROOT_DIR}/scripts/download_file.py"
-          COMMENT "Downloading ${_MODULE_MLIR_SOURCE}"
+          COMMENT "Downloading ${_SOURCE_URL}"
         )
-        add_custom_target("${_DOWNLOAD_TARGET_NAME}"
-          DEPENDS "${_SOURCE_FILE}"
+        add_custom_target("${_DOWNLOAD_TARGET}"
+          DEPENDS "${_MODULE_SOURCE}"
         )
       endif()
+      set(_MODULE_SOURCE_TARGET "${_DOWNLOAD_TARGET}")
+    endif()
+
+    # If the source is a TFLite file, import it.
+    if("${_MODULE_SOURCE}" MATCHES "\.tflite$")
+      if (NOT IREE_BUILD_TFLITE_COMPILER)
+        message(WARNING "Skipping benchmark for ${_MODULE_SOURCE} because"
+                        " IREE_BUILD_TFLITE_COMPILER if OFF")
+        continue()
+      endif()
+      set(_TFLITE_FILE "${_MODULE_SOURCE}")
+      set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
+      get_filename_component(_TFLITE_FILE_BASENAME "${_TFLITE_FILE}" NAME)
+      set(_TFLITE_IMPORT_TARGET "iree-import-tflite-${_TFLITE_FILE_BASENAME}")
+      if (NOT TARGET "${_TFLITE_IMPORT_TARGET}")
+        add_custom_command(
+          OUTPUT "${_MODULE_SOURCE}"
+          COMMAND
+            "$<TARGET_FILE:integrations::tensorflow::iree_tf_compiler::iree-import-tflite>"
+            "${_TFLITE_FILE}"
+            "-o=${_MODULE_SOURCE}"
+          DEPENDS
+            integrations::tensorflow::iree_tf_compiler::iree-import-tflite
+            "${_TFLITE_FILE}"
+          COMMENT "Importing TFLite file ${_TFLITE_FILE_BASENAME}"
+        )
+        add_custom_target("${_TFLITE_IMPORT_TARGET}"
+          DEPENDS
+            "${_MODULE_SOURCE}"
+          COMMENT
+            "Importing ${_TFLITE_FILE_BASENAME} into MLIR"
+        )
+      endif()
+      set(_MODULE_SOURCE_TARGET "${_TFLITE_IMPORT_TARGET}")
     endif()
 
     # Next create the command and target for compiling the input module into
@@ -153,25 +185,31 @@ function(iree_mlir_benchmark_suite)
 
       # Get a unique identifier for this IREE module file by hashing the command
       # line flags and input file. We will also use this for the CMake target.
-      string(SHA1 _VMFB_HASH "${_TRANSLATION_ARGS};${_SOURCE_FILE}")
-
-      set(_TRANSLATION_TARGET_NAME "iree-generate-benchmark-artifact-${_VMFB_HASH}")
+      # Note that this is NOT A SECURE HASHING ALGORITHM. We just want
+      # uniqueness and MD5 is fast. If that changes, switch to something much
+      # better (like SHA256).
+      string(MD5 _VMFB_HASH "${_TRANSLATION_ARGS};${_MODULE_SOURCE}")
+      get_filename_component(_MODULE_SOURCE_BASENAME "${_MODULE_SOURCE}" NAME)
+      set(_VMFB_FILE "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}.vmfb")
 
       # Register the target once and share across all benchmarks having the same
       # MLIR source and translation flags.
+      set(
+        _TRANSLATION_TARGET_NAME
+        "iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}"
+      )
       if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
-        set(_VMFB_FILE "${_VMFB_ARTIFACTS_DIR}/compiled-${_VMFB_HASH}.vmfb")
         add_custom_command(
           OUTPUT "${_VMFB_FILE}"
           COMMAND
-            "$<TARGET_FILE:iree_tools_iree-translate>"
+            "$<TARGET_FILE:iree::tools::iree-translate>"
               ${_TRANSLATION_ARGS}
-              "${_SOURCE_FILE}"
+              "${_MODULE_SOURCE}"
               -o "${_VMFB_FILE}"
           WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"
           DEPENDS
-            iree_tools_iree-translate
-            "${_DOWNLOAD_TARGET_NAME}"
+            iree::tools::iree-translate
+            "${_MODULE_SOURCE_TARGET}"
             COMMENT "Generating VMFB for ${_COMMON_NAME_SEGMENTS}"
         )
 
@@ -183,24 +221,28 @@ function(iree_mlir_benchmark_suite)
         add_dependencies(iree-benchmark-suites "${_TRANSLATION_TARGET_NAME}")
       endif(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
 
-      # Add a friendly target alias for this particular benchmark.
+      # Add a friendly target name to drive this benchmark and any others that
+      # share the same easily-describable properties.
       set(_FRIENDLY_TARGET_NAME_LIST "iree-generate-benchmark-artifact")
       list(APPEND _FRIENDLY_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
       list(JOIN _FRIENDLY_TARGET_NAME_LIST "__" _FRIENDLY_TARGET_NAME)
-      add_custom_target("${_FRIENDLY_TARGET_NAME}"
-        DEPENDS "${_TRANSLATION_TARGET_NAME}"
-      )
+
+      if (NOT TARGET "${_FRIENDLY_TARGET_NAME}")
+        add_custom_target("${_FRIENDLY_TARGET_NAME}")
+      endif()
+      add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_TRANSLATION_TARGET_NAME}")
 
       # Finally create the command and target for the flagfile used to execute the
       # generated artifacts.
       set(_FLAGFILE_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
       set(_FLAG_FILE "${_FLAGFILE_ARTIFACTS_DIR}/flagfile")
       set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\"")
+      file(RELATIVE_PATH _MODULE_FILE_FLAG "${_FLAGFILE_ARTIFACTS_DIR}" "${_VMFB_FILE}")
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
         COMMAND
           "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
-            --module_file="../../vmfb/compiled-${_VMFB_HASH}.vmfb"
+            --module_file="${_MODULE_FILE_FLAG}"
             --driver=${_RULE_DRIVER}
             --entry_function=${_MODULE_ENTRY_FUNCTION}
             --function_inputs=${_MODULE_FUNCTION_INPUTS}
@@ -225,4 +267,4 @@ function(iree_mlir_benchmark_suite)
     endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
 
   endforeach(_MODULE IN LISTS _RULE_MODULES)
-endfunction(iree_mlir_benchmark_suite)
+endfunction(iree_benchmark_suite)

@@ -100,6 +100,9 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 # These tests currently have asan failures
 # TODO(#5715): Fix these
 declare -a excluded_tests=(
+  "iree/base/internal/file_io_test"
+  "iree/samples/static_library/static_library_demo_test"
+  "bindings/tflite/smoke_test"
   "iree/hal/cts/allocator_test"
   "iree/hal/cts/buffer_mapping_test"
   "iree/hal/cts/command_buffer_test"
@@ -107,10 +110,9 @@ declare -a excluded_tests=(
   "iree/hal/cts/driver_test"
   "iree/hal/cts/event_test"
   "iree/hal/cts/executable_layout_test"
-  "iree/hal/cts/semaphore_test"
   "iree/hal/cts/semaphore_submission_test"
+  "iree/hal/cts/semaphore_test"
   "iree/modules/check/check_test"
-  "bindings/tflite/smoke_test"
   "iree/samples/simple_embedding/simple_embedding_vulkan_test"
 )
 
