@@ -155,6 +155,14 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Enables optional HAL features. Each of these may add several KB to the final
 // binary when linked dynamically.
 
+#if !defined(IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE)
+// Enables additional validation of commands issued against command buffers.
+// This adds small amounts of per-command overhead but in all but the most
+// constrained environments it's recommended to keep it enabled in order to get
+// the really nice error messages.
+#define IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE 1
+#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+
 #if !defined(IREE_HAL_MODULE_STRING_UTIL_ENABLE)
 // Enables HAL module methods that perform string printing/parsing.
 // This functionality pulls in a large amount of string manipulation code that

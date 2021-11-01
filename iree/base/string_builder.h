@@ -55,6 +55,12 @@ typedef struct iree_string_builder_t {
 IREE_API_EXPORT void iree_string_builder_initialize(
     iree_allocator_t allocator, iree_string_builder_t* out_builder);
 
+// Initializes a string builder in |out_builder| using the given storage.
+// Once the capacity is reached further appending will fail.
+IREE_API_EXPORT void iree_string_builder_initialize_with_storage(
+    char* buffer, iree_host_size_t buffer_capacity,
+    iree_string_builder_t* out_builder);
+
 // Deinitializes |builder| and releases allocated storage.
 IREE_API_EXPORT void iree_string_builder_deinitialize(
     iree_string_builder_t* builder);

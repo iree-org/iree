@@ -56,6 +56,9 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
 // Returns a string view initialized with the given cstring.
 #define IREE_SV(cstr) iree_make_cstring_view(cstr)
 
+// Returns a string view initialized with the given string literal.
+#define IREE_SVL(cstr) iree_string_view_literal(cstr)
+
 // Returns true if the two strings are equal (compare == 0).
 IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
                                             iree_string_view_t rhs);

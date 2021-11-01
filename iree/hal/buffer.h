@@ -183,34 +183,20 @@ typedef struct iree_hal_buffer_mapping_t {
   uint64_t reserved[4];
 } iree_hal_buffer_mapping_t;
 
-// TODO(benvanik): replace with tables for iree_string_builder_*.
-#define iree_hal_memory_type_string(...) "TODO"
-//     // Combined:
-//     {IREE_HAL_MEMORY_TYPE_HOST_LOCAL, "HOST_LOCAL"},
-//     {IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL, "DEVICE_LOCAL"},
-//     // Separate:
-//     {IREE_HAL_MEMORY_TYPE_TRANSIENT, "TRANSIENT"},
-//     {IREE_HAL_MEMORY_TYPE_HOST_VISIBLE, "HOST_VISIBLE"},
-//     {IREE_HAL_MEMORY_TYPE_HOST_COHERENT, "HOST_COHERENT"},
-//     {IREE_HAL_MEMORY_TYPE_HOST_CACHED, "HOST_CACHED"},
-//     {IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE, "DEVICE_VISIBLE"},
-#define iree_hal_memory_access_string(...) "TODO"
-//     // Combined:
-//     {IREE_HAL_MEMORY_ACCESS_ALL, "ALL"},
-//     {IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, "DISCARD_WRITE"},
-//     // Separate:
-//     {IREE_HAL_MEMORY_ACCESS_READ, "READ"},
-//     {IREE_HAL_MEMORY_ACCESS_WRITE, "WRITE"},
-//     {IREE_HAL_MEMORY_ACCESS_DISCARD, "DISCARD"},
-//     {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, "MAY_ALIAS"},
-#define iree_hal_buffer_usage_string(...) "TODO"
-//     // Combined:
-//     {IREE_HAL_BUFFER_USAGE_ALL, "ALL"},
-//     // Separate:
-//     {IREE_HAL_BUFFER_USAGE_CONSTANT, "CONSTANT"},
-//     {IREE_HAL_BUFFER_USAGE_TRANSFER, "TRANSFER"},
-//     {IREE_HAL_BUFFER_USAGE_MAPPING, "MAPPING"},
-//     {IREE_HAL_BUFFER_USAGE_DISPATCH, "DISPATCH"},
+// Formats a memory type bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_memory_type_format(
+    iree_hal_memory_type_t value, iree_bitfield_string_temp_t* out_temp);
+
+// Formats a memory access bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
+    iree_hal_memory_access_t value, iree_bitfield_string_temp_t* out_temp);
+
+// Formats a buffer usage bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
+    iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_t
