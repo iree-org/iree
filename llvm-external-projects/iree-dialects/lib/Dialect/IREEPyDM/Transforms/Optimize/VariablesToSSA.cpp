@@ -121,7 +121,12 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
   }
 
   // Canonicalizes variable accesses within a block such that:
-  //   - Redundant loads are eliminated.
+  //   - Redundant loads are eliminated (there is at most one load of a var).
+  //   - If a store dominates loads, then all loads are eliminated.
+  // Note that this is likely only viable for Free Variables, which can be
+  // treated as registers. Other variable types (once they exist), will have
+  // more involved requirements.
+  // Note that stores are never eliminated at this phase.
   bool canonicalizeBlockVariableAccess(Block &block, BlockAccessInfo &info) {
     bool changed = false;
     SmallVector<Operation *> elidedOps;
