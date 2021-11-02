@@ -123,9 +123,41 @@ void AllocFreeVarOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 // ApplyBinaryOp
 //===----------------------------------------------------------------------===//
 
+namespace {
+struct ApplyBinaryToSequenceClone : public OpRewritePattern<ApplyBinaryOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ApplyBinaryOp op,
+                                PatternRewriter &rewriter) const override {
+    Value listOperand;
+    Value countOperand;
+    if (isBuiltinSequence(op.left()) && isInteger(op.right())) {
+      listOperand = op.left();
+      countOperand = op.right();
+    } else if (isInteger(op.left()) && isBuiltinSequence(op.right())) {
+      countOperand = op.left();
+      listOperand = op.right();
+    } else {
+      return failure();
+    }
+    Type resultType = op.getResult().getType();
+    rewriter.replaceOpWithNewOp<SequenceCloneOp>(op, resultType, listOperand,
+                                                 countOperand);
+    return success();
+  }
+
+  static bool isBuiltinSequence(Value operand) {
+    return operand.getType().isa<PYDM::ListType, PYDM::TupleType>();
+  }
+  static bool isInteger(Value operand) {
+    return operand.getType().isa<PYDM::IntegerType>();
+  }
+};
+}  // namespace
+
 void ApplyBinaryOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                                 MLIRContext *context) {
   patterns.add<UnboxOperands>(getOperationName(), context);
+  patterns.add<ApplyBinaryToSequenceClone>(context);
 }
 
 bool ApplyBinaryOp::refineResultTypes() {
@@ -659,6 +691,18 @@ OpFoldResult SelectOp::fold(ArrayRef<Attribute> operands) {
     return true_value();
   else
     return false_value();
+}
+
+//===----------------------------------------------------------------------===//
+// SequenceCloneOp
+//===----------------------------------------------------------------------===//
+
+bool SequenceCloneOp::refineResultTypes() {
+  if (sequence().getType() != getResult().getType()) {
+    getResult().setType(sequence().getType());
+    return true;
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

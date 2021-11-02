@@ -733,4 +733,36 @@ def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"subscript", [
   let hasCanonicalizer = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// Sequence ops
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_SequenceCloneOp : IREEPyDM_PureOp<"sequence_clone", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
+  ]> {
+  let summary = "Clones a sequence, potentially duplicating it";
+  let description = [{
+    This is intended to be used as a lowering for higher level ops and as a
+    primitive to be used by the runtime library. Given a sequence and a `count`,
+    it produces a sequence of the same fundamental type and storage,
+    duplicated `count` times.
+
+    It is expected that the runtime can emit direct lowerings for variations
+    operating on builtin sequence types.
+
+    The input and result sequence type can be different (i.e. in case if the
+    type bounds for elements is different).
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$sequence,
+    IREEPyDM_IntegerType:$count
+  );
+  let results = (outs
+    IREEPyDM_AnyValueType
+  );
+  let assemblyFormat = [{
+    $sequence `*` $count `:` type(operands) `->` type(results) attr-dict
+  }];
+}
+
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_OPS_TD

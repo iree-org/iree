@@ -173,156 +173,6 @@ class AllocFreeVarOpConversion
   }
 };
 
-/// Does a (list|tuple, int) multiplication. This is silly but remarkably
-/// hard to implement in a higher level fashion in a type agnostic way.
-class ApplyBinaryListMulIntConversion
-    : public OpConversionPattern<PYDM::ApplyBinaryOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      PYDM::ApplyBinaryOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (srcOp.dunder_name() != "mul") return failure();
-    // Detect (list, int) operands in any order.
-    Type origListType;
-    Value listOperand;
-    Value integerOperand;
-    if (isSupportedList(srcOp.left().getType()) &&
-        srcOp.right().getType().isa<PYDM::IntegerType>()) {
-      origListType = srcOp.left().getType();
-      listOperand = adaptor.left();
-      integerOperand = adaptor.right();
-    } else if (isSupportedList(srcOp.right().getType()) &&
-               srcOp.left().getType().isa<PYDM::IntegerType>()) {
-      origListType = srcOp.right().getType();
-      listOperand = adaptor.right();
-      integerOperand = adaptor.left();
-    } else {
-      return failure();
-    }
-    if (srcOp.getResult().getType() != origListType) {
-      return rewriter.notifyMatchFailure(
-          srcOp, "result type does not match operand list type");
-    }
-    Type resultType = typeConverter->convertType(srcOp.result().getType());
-    if (!resultType) {
-      return rewriter.notifyMatchFailure(srcOp, "cannot convert result type");
-    }
-    Type listElementType =
-        typeConverter->convertType(getElementAccessType(origListType));
-    if (!listElementType) {
-      return rewriter.notifyMatchFailure(srcOp,
-                                         "cannot convert list element type");
-    }
-
-    auto loc = srcOp.getLoc();
-    // Compute the new size, clamping count to >= 0 and construct list.
-    Type indexType = rewriter.getType<IndexType>();
-    Type listType = listOperand.getType();
-    Value subListSize =
-        rewriter.create<iree::ListSizeOp>(loc, indexType, listOperand);
-    Value countInteger = integerOperand;
-    Value countIndex =
-        rewriter.create<arith::IndexCastOp>(loc, indexType, integerOperand);
-    Value zeroIndex = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value oneIndex = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    Value zeroInteger =
-        rewriter.create<arith::ConstantIntOp>(loc, 0, countInteger.getType());
-    Value countClampsToZero = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::sle, countInteger, zeroInteger);
-    Value clampedCountIndex = rewriter.create<mlir::SelectOp>(
-        loc, countClampsToZero, zeroIndex, countIndex);
-    Value newListSize =
-        rewriter.create<arith::MulIOp>(loc, subListSize, clampedCountIndex);
-    Value newList =
-        rewriter.create<iree::ListCreateOp>(loc, listType, clampedCountIndex);
-    rewriter.create<iree::ListResizeOp>(loc, newList, newListSize);
-
-    // Split blocks to loop.
-    // TODO: Use a new list.copy op instead of an inner loop.
-    // OuterCond: (newListIt : index)
-    // InnerCond: (newListIt : index, subListIt: index)
-    // InnerBody: (newListIt : index, subListIt: index)
-    Block *entryBlock = rewriter.getInsertionBlock();
-    Block *continuationBlock = rewriter.splitBlock(
-        rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
-    Block *outerCond = rewriter.createBlock(continuationBlock);
-    outerCond->addArgument(indexType);
-    Block *innerCond = rewriter.createBlock(continuationBlock);
-    innerCond->addArguments({indexType, indexType});
-    Block *innerBody = rewriter.createBlock(continuationBlock);
-    innerBody->addArguments({indexType, indexType});
-
-    // Entry block.
-    {
-      rewriter.setInsertionPointToEnd(entryBlock);
-      rewriter.create<BranchOp>(loc, outerCond, ValueRange{zeroIndex});
-    }
-
-    // Outer cond.
-    {
-      rewriter.setInsertionPointToEnd(outerCond);
-      Value newListIt = outerCond->getArgument(0);
-      Value inBounds = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::ult, newListIt, newListSize);
-      rewriter.create<CondBranchOp>(loc, inBounds, innerCond,
-                                    ValueRange{newListIt, zeroIndex},
-                                    continuationBlock, ValueRange{});
-    }
-
-    // Inner cond.
-    {
-      rewriter.setInsertionPointToEnd(innerCond);
-      Value newListIt = innerCond->getArgument(0);
-      Value subListIt = innerCond->getArgument(1);
-      Value inBounds = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::ult, subListIt, subListSize);
-      rewriter.create<CondBranchOp>(loc, inBounds, innerBody,
-                                    ValueRange{newListIt, subListIt}, outerCond,
-                                    ValueRange{newListIt});
-    }
-
-    // Inner body.
-    {
-      rewriter.setInsertionPointToEnd(innerBody);
-      Value newListIt = innerBody->getArgument(0);
-      Value subListIt = innerBody->getArgument(1);
-
-      Value elementValue = rewriter.create<iree::ListGetOp>(
-          loc, listElementType, listOperand, subListIt);
-      rewriter.create<iree::ListSetOp>(loc, newList, newListIt, elementValue);
-
-      newListIt = rewriter.create<arith::AddIOp>(loc, newListIt, oneIndex);
-      subListIt = rewriter.create<arith::AddIOp>(loc, subListIt, oneIndex);
-      rewriter.create<BranchOp>(loc, innerCond,
-                                ValueRange{newListIt, subListIt});
-    }
-
-    // Continuation.
-    {
-      rewriter.setInsertionPointToEnd(continuationBlock);
-      rewriter.replaceOp(srcOp, {newList});
-    }
-
-    return success();
-  }
-
-  bool isSupportedList(Type t) const {
-    // Both lists and tuples have the same physical representation and can
-    // be supported interchangeably here.
-    return t.isa<PYDM::ListType>() || t.isa<PYDM::TupleType>();
-  }
-
-  Type getElementAccessType(Type t) const {
-    if (auto listType = t.dyn_cast<PYDM::ListType>())
-      return listType.getElementStorageType();
-    else if (auto tupleType = t.dyn_cast<PYDM::TupleType>())
-      return tupleType.getElementStorageType();
-
-    llvm_unreachable("unsupported list type");
-  }
-};
-
 class ApplyBinaryNumericConversion
     : public OpConversionPattern<PYDM::ApplyBinaryOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -890,6 +740,138 @@ class ReturnOpConversion : public OpConversionPattern<PYDM::ReturnOp> {
   }
 };
 
+/// Implements sequence duplication over built-in list, tuple types.
+class SequenceCloneBuiltinConversion
+    : public OpConversionPattern<PYDM::SequenceCloneOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      PYDM::SequenceCloneOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    Type origListType = srcOp.sequence().getType();
+    if (!isSupportedList(origListType)) return failure();
+    if (origListType != srcOp.getResult().getType()) return failure();
+    Type resultType = typeConverter->convertType(srcOp.getResult().getType());
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(srcOp, "cannot convert result type");
+    }
+    Type listElementType =
+        typeConverter->convertType(getElementAccessType(origListType));
+    if (!listElementType) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "cannot convert list element type");
+    }
+
+    Value listOperand = adaptor.sequence();
+    Value countOperand = adaptor.count();
+    auto loc = srcOp.getLoc();
+    // Compute the new size, clamping count to >= 0 and construct list.
+    Type indexType = rewriter.getType<IndexType>();
+    Type listType = listOperand.getType();
+    Value subListSize =
+        rewriter.create<iree::ListSizeOp>(loc, indexType, listOperand);
+    Value countInteger = countOperand;
+    Value countIndex =
+        rewriter.create<arith::IndexCastOp>(loc, indexType, countOperand);
+    Value zeroIndex = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value oneIndex = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    Value zeroInteger =
+        rewriter.create<arith::ConstantIntOp>(loc, 0, countInteger.getType());
+    Value countClampsToZero = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::sle, countInteger, zeroInteger);
+    Value clampedCountIndex = rewriter.create<mlir::SelectOp>(
+        loc, countClampsToZero, zeroIndex, countIndex);
+    Value newListSize =
+        rewriter.create<arith::MulIOp>(loc, subListSize, clampedCountIndex);
+    Value newList =
+        rewriter.create<iree::ListCreateOp>(loc, listType, clampedCountIndex);
+    rewriter.create<iree::ListResizeOp>(loc, newList, newListSize);
+
+    // Split blocks to loop.
+    // TODO: Use a new list.copy op instead of an inner loop.
+    // OuterCond: (newListIt : index)
+    // InnerCond: (newListIt : index, subListIt: index)
+    // InnerBody: (newListIt : index, subListIt: index)
+    Block *entryBlock = rewriter.getInsertionBlock();
+    Block *continuationBlock = rewriter.splitBlock(
+        rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
+    Block *outerCond = rewriter.createBlock(continuationBlock);
+    outerCond->addArgument(indexType);
+    Block *innerCond = rewriter.createBlock(continuationBlock);
+    innerCond->addArguments({indexType, indexType});
+    Block *innerBody = rewriter.createBlock(continuationBlock);
+    innerBody->addArguments({indexType, indexType});
+
+    // Entry block.
+    {
+      rewriter.setInsertionPointToEnd(entryBlock);
+      rewriter.create<BranchOp>(loc, outerCond, ValueRange{zeroIndex});
+    }
+
+    // Outer cond.
+    {
+      rewriter.setInsertionPointToEnd(outerCond);
+      Value newListIt = outerCond->getArgument(0);
+      Value inBounds = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::ult, newListIt, newListSize);
+      rewriter.create<CondBranchOp>(loc, inBounds, innerCond,
+                                    ValueRange{newListIt, zeroIndex},
+                                    continuationBlock, ValueRange{});
+    }
+
+    // Inner cond.
+    {
+      rewriter.setInsertionPointToEnd(innerCond);
+      Value newListIt = innerCond->getArgument(0);
+      Value subListIt = innerCond->getArgument(1);
+      Value inBounds = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::ult, subListIt, subListSize);
+      rewriter.create<CondBranchOp>(loc, inBounds, innerBody,
+                                    ValueRange{newListIt, subListIt}, outerCond,
+                                    ValueRange{newListIt});
+    }
+
+    // Inner body.
+    {
+      rewriter.setInsertionPointToEnd(innerBody);
+      Value newListIt = innerBody->getArgument(0);
+      Value subListIt = innerBody->getArgument(1);
+
+      Value elementValue = rewriter.create<iree::ListGetOp>(
+          loc, listElementType, listOperand, subListIt);
+      rewriter.create<iree::ListSetOp>(loc, newList, newListIt, elementValue);
+
+      newListIt = rewriter.create<arith::AddIOp>(loc, newListIt, oneIndex);
+      subListIt = rewriter.create<arith::AddIOp>(loc, subListIt, oneIndex);
+      rewriter.create<BranchOp>(loc, innerCond,
+                                ValueRange{newListIt, subListIt});
+    }
+
+    // Continuation.
+    {
+      rewriter.setInsertionPointToEnd(continuationBlock);
+      rewriter.replaceOp(srcOp, {newList});
+    }
+
+    return success();
+  }
+
+  bool isSupportedList(Type t) const {
+    // Both lists and tuples have the same physical representation and can
+    // be supported interchangeably here.
+    return t.isa<PYDM::ListType>() || t.isa<PYDM::TupleType>();
+  }
+
+  Type getElementAccessType(Type t) const {
+    if (auto listType = t.dyn_cast<PYDM::ListType>())
+      return listType.getElementStorageType();
+    else if (auto tupleType = t.dyn_cast<PYDM::TupleType>())
+      return tupleType.getElementStorageType();
+
+    llvm_unreachable("unsupported list type");
+  }
+};
+
 class StoreVarOpConversion : public OpConversionPattern<PYDM::StoreVarOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -1152,17 +1134,16 @@ void PYDM::populatePyDMToIREELoweringPatterns(MLIRContext *context,
                                               TypeConverter &typeConverter,
                                               RewritePatternSet &patterns) {
   // PyDM conversions.
-  patterns
-      .insert<AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
-              ApplyBinaryListMulIntConversion, ApplyCompareNumericConversion,
-              BoolToPredConversion, BoxOpConversion, MakeListOpBoxedConversion,
-              CallOpConversion, ConstantOpConversion, DynamicUnpackOpConversion,
-              ElideStaticInfoCast, FailureOpConversion, FuncOpConversion,
-              GetTypeCodeConversion, LoadVarOpConversion, MakeTupleOpConversion,
-              NegIntegerOpConversion, RaiseOnFailureOpConversion,
-              ReturnOpConversion, StoreVarOpConversion,
-              SubscriptOpBuiltinSequenceConversion, UnboxOpConversion>(
-          typeConverter, context);
+  patterns.insert<
+      AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
+      ApplyCompareNumericConversion, BoolToPredConversion, BoxOpConversion,
+      MakeListOpBoxedConversion, CallOpConversion, ConstantOpConversion,
+      DynamicUnpackOpConversion, ElideStaticInfoCast, FailureOpConversion,
+      FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
+      MakeTupleOpConversion, NegIntegerOpConversion, RaiseOnFailureOpConversion,
+      ReturnOpConversion, SequenceCloneBuiltinConversion, StoreVarOpConversion,
+      SubscriptOpBuiltinSequenceConversion, UnboxOpConversion>(typeConverter,
+                                                               context);
 
   // External CFG ops.
   patterns.insert<BuiltinBranchConversion, BuiltinCondBranchConversion,
