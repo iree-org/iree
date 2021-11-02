@@ -29,4 +29,19 @@ iree_c_embed_data(
   PUBLIC
 )
 
+iree_c_embed_data(
+  NAME
+    librt64
+  SRCS
+    "bin/librt64.bc"
+  C_FILE_OUTPUT
+    "librt64.c"
+  H_FILE_OUTPUT
+    "librt64.h"
+  IDENTIFIER
+    "iree_compiler_librt64"
+  FLATTEN
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

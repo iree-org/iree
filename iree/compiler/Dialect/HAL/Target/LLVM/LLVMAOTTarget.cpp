@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/librt/librt.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/librt/librt64.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -329,14 +330,22 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       os.close();
       objectFiles.push_back(std::move(objectFile));
     }
-
     // Optionally append additional object files that provide functionality that
     // may otherwise have been runtime-dynamic (like libc/libm calls).
     // For now we only do this for embedded uses.
     if (options_.linkEmbedded) {
       if (failed(buildLibraryObjects(variantOp.getLoc(), targetMachine.get(),
-                                     objectFiles, context))) {
+                                     objectFiles, context,
+                                     iree_compiler_librt_create(), "librt"))) {
         return variantOp.emitError() << "failed generating library objects";
+      }
+      if (targetMachine->getTargetTriple().isArch64Bit()) {
+        if (failed(buildLibraryObjects(
+                variantOp.getLoc(), targetMachine.get(), objectFiles, context,
+                iree_compiler_librt64_create(), "librt64"))) {
+          return variantOp.emitError()
+                 << "failed generating 64-bit library objects";
+        }
       }
     }
 
@@ -582,14 +591,15 @@ class LLVMAOTTargetBackend final : public TargetBackend {
   LogicalResult buildLibraryObjects(Location loc,
                                     llvm::TargetMachine *targetMachine,
                                     SmallVector<Artifact> &objectFiles,
-                                    llvm::LLVMContext &context) {
+                                    llvm::LLVMContext &context,
+                                    const iree_file_toc_t *librtFile,
+                                    StringRef fileNamePrefix) {
     assert(!objectFiles.empty() && "libraries must come after the base object");
 
     // Load the generic bitcode file contents.
+    std::string bcFileName = fileNamePrefix.str() + ".bc";
     llvm::MemoryBufferRef bitcodeBufferRef(
-        llvm::StringRef(iree_compiler_librt_create()->data,
-                        iree_compiler_librt_create()->size),
-        "librt.bc");
+        llvm::StringRef(librtFile->data, librtFile->size), bcFileName);
     auto bitcodeModuleValue = llvm::parseBitcodeFile(bitcodeBufferRef, context);
     if (!bitcodeModuleValue) {
       return mlir::emitError(loc)
@@ -621,8 +631,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
 
     // Write the object file to disk with a similar name to the base file.
+    std::string objectFileName = std::string(".") + fileNamePrefix.str() + ".o";
     auto objectFile =
-        Artifact::createVariant(objectFiles.front().path, ".librt.o");
+        Artifact::createVariant(objectFiles.front().path, objectFileName);
     auto &os = objectFile.outputFile->os();
     os << objectData;
     os.flush();

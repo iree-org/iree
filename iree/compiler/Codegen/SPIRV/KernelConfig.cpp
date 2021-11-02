@@ -11,12 +11,14 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 
@@ -214,9 +216,9 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   int64_t residualTilingFactor = (bestThreadM + bestThreadK) * bestThreadN;
 
   SmallVector<int64_t, 3> workgroupSize(3, 1);            // (X, Y, Z)
-  SmallVector<int64_t> workgroupTileSizes(2 + isBM, 0);   // (B, M, N, K)
-  SmallVector<int64_t> invocationTileSizes(2 + isBM, 0);  // (B, M, N, K)
-  SmallVector<int64_t> reductionTileSizes(3 + isBM, 0);   // (B, M, N, K)
+  SmallVector<int64_t> workgroupTileSizes(2 + isBM, 0);   // ([B,] M, N)
+  SmallVector<int64_t> invocationTileSizes(2 + isBM, 0);  // ([B,] M, N)
+  SmallVector<int64_t> reductionTileSizes(3 + isBM, 0);   // ([B,] M, N, K)
 
   if (isBM) workgroupTileSizes[0] = invocationTileSizes[0] = 1;
 
@@ -287,8 +289,8 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
 // FFT Default Configuration
 //===----------------------------------------------------------------------===//
 
-static LogicalResult setOpConfig(spirv::ResourceLimitsAttr limits,
-                                 linalg_ext::FftOp op) {
+static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
+                                    linalg_ext::FftOp op) {
   const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
@@ -319,24 +321,88 @@ static LogicalResult setOpConfig(spirv::ResourceLimitsAttr limits,
 }
 
 //===----------------------------------------------------------------------===//
-// Default Configuration
+// Everything Default Configuration
 //===----------------------------------------------------------------------===//
 
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op) {
+  LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
+  FuncOp funcOp = op->getParentOfType<FuncOp>();
   auto partitionedLoops = getPartitionedLoops(op);
+
+  // Special case for not tiled ops.
   if (partitionedLoops.empty()) {
+    // No tiled loops means we cannot tile (and distribute) at all. Use just one
+    // single thread to run everything.
     auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-    auto funcOp = op->getParentOfType<FuncOp>();
     return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, {}, pipeline,
                                                  workgroupSize);
   }
 
-  const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
-  int64_t numElementsPerWorkgroup = subgroupSize;
-  int64_t numElementsPerThread = 1;
-  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
+  const int subgroupSize = limits.subgroup_size().getValue().getSExtValue();
+  const unsigned loopDepth = partitionedLoops.back() + 1;
+
+  // Configurations we need to decide.
+  std::array<int64_t, 3> workgroupSize;
+  SmallVector<int64_t> workgroupTileSizes;
+  SmallVector<int64_t> threadTileSizes;
+
+  // Initialize the configuration.
+  auto initConfiguration = [&]() {
+    workgroupSize = {subgroupSize, 1, 1};
+    workgroupTileSizes.resize(loopDepth, 0);
+    threadTileSizes.resize(loopDepth, 0);
+
+    // Initialize tiling along all partitioned loops with size 1.
+    for (int64_t loopIndex : partitionedLoops) {
+      workgroupTileSizes[loopIndex] = threadTileSizes[loopIndex] = 1;
+    }
+    // Override the innermost dimension to distribute to threads in a subgroup.
+    workgroupTileSizes.back() = subgroupSize;
+    threadTileSizes.back() = 1;
+  };
+
+  // Special case for non-linalg ops.
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp || linalgOp.getNumOutputs() != 1) {
+    auto pipeline =
+        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
+
+    initConfiguration();
+    TileSizesListType tileSizes;
+    tileSizes.push_back(workgroupTileSizes);
+    tileSizes.push_back(threadTileSizes);
+
+    return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, {},
+                                                 pipeline, workgroupSize);
+  }
+
+  // Common case for all linalg ops.
+
+  // The core idea is to distribute the partitioned loops to the workgroup
+  // dimensions. The goal is to fill up the GPU as much as possible, which means
+  // 1) distributing to as many threads as possible, and 2) avoid assigning too
+  // many threads to handle out-of-bound elements (thus idle).
+
+  SmallVector<TiledLoopInfo> tiledLoopInfo = getTiledLoopInfo(funcOp);
+  // The number of linalg implicit loops to partition and tiled loops
+  // surrounding the op should match. Otherwise, something is incorrect.
+  assert(partitionedLoops.size() == tiledLoopInfo.size());
+
+  // The upper bound for each implicit loop: 0 - untiled, negative - dynamic.
+  SmallVector<int64_t> loopBounds(loopDepth, 0);
+  // tiledLoopInfo uses the reverse order of partitionedLoops.
+  for (auto pair : llvm::zip(llvm::reverse(partitionedLoops), tiledLoopInfo)) {
+    unsigned loopIndex = std::get<0>(pair);
+    const TiledLoopInfo &loopInfo = std::get<1>(pair);
+    Optional<int64_t> attrValue = getConstantIntValue(loopInfo.ub);
+    if (attrValue) {
+      loopBounds[loopIndex] = *attrValue;
+    } else {
+      loopBounds[loopIndex] = ShapedType::kDynamicSize;
+    }
+  }
 
   // Returns true if the given `operand` has 32-bit element type.
   auto has32BitElementType = [](Value operand) {
@@ -346,70 +412,129 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     return elementType.isa<FloatType>() || elementType.isInteger(32);
   };
 
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    bool vectorize = false;
-    auto outputShape = getUntiledResultShape(linalgOp, 0);
+  // Whether we can try to use the vectorization pipeline.
+  bool vectorizable =
+      !linalgOp.hasIndexSemantics() &&
+      // Skip vectorization for non-minor identity inputs as it generates
+      // vector.transfer_read ops with permutation maps that we currently
+      // cannot lower.
+      // TODO: Remove this restriction once the lowering of the permutation
+      // map is supported in core.
+      llvm::all_of(linalgOp.getIndexingMaps(),
+                   [](AffineMap &map) { return map.isMinorIdentity(); }) &&
+      // TODO: Lowering of integers other than i32 may require emulation.
+      // This is currently not supported for vector operation.
+      llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
+      llvm::none_of(getUntiledResultShape(linalgOp, 0), ShapedType::isDynamic);
 
-    if (!linalgOp.hasIndexSemantics() &&
-        // Skip vectorization for non-minor identity inputs as it generates
-        // vector.transfer_read ops with permutation maps that we currently
-        // cannot lower.
-        // TODO: Remove this restriction once the lowering of the permutation
-        // map is supported in core.
-        llvm::all_of(linalgOp.getIndexingMaps(),
-                     [](AffineMap &map) { return map.isMinorIdentity(); }) &&
-        // TODO(thomasraoux): Lowering of integers other than i32 may require
-        // emulation. This is currently not supported for vector operation.
-        // Re-enable this when the bug is fixed on SPIR-V lowering side.
-        llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
-        llvm::all_of(outputShape,
-                     [](int64_t dim) { return !ShapedType::isDynamic(dim); })) {
-      vectorize = true;
+  LLVM_DEBUG({
+    llvm::dbgs() << "Linalg op " << linalgOp << "\n  partitioned loops: [";
+    llvm::interleaveComma(partitionedLoops, llvm::dbgs());
+    llvm::dbgs() << "]\n  loop bounds: [";
+    llvm::interleaveComma(loopBounds, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
+
+  // Distribute workload to the given `numThreads` by allowing a potental loss.
+  auto distributeToThreads = [&](int64_t numThreads,
+                                 Optional<int64_t> lossFactor = llvm::None) {
+    LLVM_DEBUG(llvm::dbgs() << "\nLoss factor: " << lossFactor << "\n");
+    initConfiguration();
+
+    // Scan from the innermost shape dimension and try to deduce the
+    // configuration for the corresponding GPU workgroup dimension.
+    for (int shapeDim = loopDepth - 1, wgDim = 0; shapeDim >= 0; --shapeDim) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "Remaining threads: " << numThreads << "\n";
+        llvm::dbgs() << "Shape dim #" << shapeDim << "=";
+        llvm::dbgs() << loopBounds[shapeDim] << "\n"
+                     << "Workgroup dim #" << wgDim << "\n";
+      });
+      // Skip dynamic/untiled/size-1 dimensions.
+      if (loopBounds[shapeDim] <= 1) continue;
+
+      // Try to find some power of two that can devide the current shape dim
+      // size. This vector keeps the candidate tile sizes.
+      SmallVector<int64_t, 8> candidates;
+
+      // For the inner most workgroup dim, try to see if we can have 4
+      // elements per thread. This enables vectorization.
+      if (vectorizable && wgDim == 0) candidates.push_back(4 * numThreads);
+      // Try all power of two numbers upto the subgroup size.
+      for (unsigned i = numThreads; i >= 1; i >>= 1) {
+        candidates.push_back(i);
+      }
+      LLVM_DEBUG({
+        llvm::dbgs() << "Candidates tile sizes: [";
+        llvm::interleaveComma(candidates, llvm::dbgs());
+        llvm::dbgs() << "]\n";
+      });
+
+      for (int64_t candidate : candidates) {
+        if (loopBounds[shapeDim] % candidate != 0) {
+          if (!lossFactor) continue;
+          // Skip this candidate if it causes many threads to be idle.
+          int64_t idleThreads = candidate - (loopBounds[shapeDim] % candidate);
+          if (idleThreads > candidate / *lossFactor) continue;
+        }
+        LLVM_DEBUG(llvm::dbgs() << "Chosen Candiate " << candidate << "\n");
+
+        // Found a suitable candidate. Try to let each thread handle 4
+        // elements if this is the workgroup x dimension.
+        workgroupTileSizes[shapeDim] = candidate;
+        if (vectorizable && wgDim == 0 && candidate % 4 == 0) {
+          threadTileSizes[shapeDim] = 4;
+          workgroupSize[wgDim++] = candidate / 4;
+          assert(numThreads % (candidate / 4) == 0);
+          numThreads /= candidate / 4;
+        } else {
+          if (wgDim == 0) vectorizable = false;
+          threadTileSizes[shapeDim] = 1;
+          workgroupSize[wgDim++] = candidate;
+          assert(numThreads % candidate == 0);
+          numThreads /= candidate;
+        }
+        assert(numThreads >= 1);
+        break;
+      }
+
+      // Check if we have distributed all threads in this subgroup all used
+      // up all distribution dims.
+      if (numThreads == 1 || wgDim > 3) break;
     }
+    return numThreads;
+  };
 
-    SmallVector<int64_t, 4> candidateTileSizes;
-    if (vectorize) candidateTileSizes.push_back(4 * subgroupSize);
-    candidateTileSizes.push_back(subgroupSize);
+  // First try to see if we can use up all threads without any loss.
+  if (distributeToThreads(subgroupSize) != 1) {
+    // Otherwise, allow larger and larger loss factor.
 
-    for (int64_t size : candidateTileSizes) {
-      if (outputShape.back() % size != 0) continue;
-      numElementsPerWorkgroup = size;
-      break;
-    }
+    // Threads for distribution Use 32 at least.
+    int64_t numThreads = std::max(subgroupSize, 32);
+    // We can tolerate (1 / lossFactor) of threads in the workgroup to be idle.
+    int64_t lossFactor = 32;
 
-    if (numElementsPerWorkgroup <= subgroupSize ||
-        outputShape.back() % numElementsPerWorkgroup != 0) {
-      vectorize = false;
-    }
-
-    if (vectorize) {
-      numElementsPerThread = numElementsPerWorkgroup / subgroupSize;
-      pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+    for (; lossFactor >= 1; lossFactor >>= 1) {
+      if (distributeToThreads(numThreads, lossFactor) == 1) break;
     }
   }
 
-  std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
-
-  unsigned loopDepth = partitionedLoops.back() + 1;
-  SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
-  SmallVector<int64_t> threadTileSize(loopDepth, 0);
-
-  // Tiling along partitioned loops with size 1.
-  for (int64_t loopIndex : partitionedLoops) {
-    workgroupTileSize[loopIndex] = threadTileSize[loopIndex] = 1;
-  }
-  // Overwrite the configuration for the innermost dimension.
-  workgroupTileSize.back() = numElementsPerWorkgroup;
-  threadTileSize.back() = numElementsPerThread;
+  auto pipeline =
+      vectorizable
+          ? IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize
+          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
   TileSizesListType tileSizes;
-  tileSizes.push_back(workgroupTileSize);
-  tileSizes.push_back(threadTileSize);
+  tileSizes.push_back(workgroupTileSizes);
+  tileSizes.push_back(threadTileSizes);
 
-  return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
-                                               op, tileSizes, {}, pipeline,
-                                               workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, {},
+                                               pipeline, workgroupSize);
 }
+
+//===----------------------------------------------------------------------===//
+// Configuration Dispatcher
+//===----------------------------------------------------------------------===//
 
 /// Sets the CodeGen configuration as attributes to the given `rootOp` if it's a
 /// known Linalg matmul/convolution op with good configurations.
@@ -451,8 +576,6 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
       })
-      .Case<linalg_ext::FftOp>(
-          [limits](auto op) { return setOpConfig(limits, op); })
       .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
           [limits](auto op) {
             // Try to tile and vectorize first. It's common to see 32 threads
@@ -465,9 +588,12 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
             // If unsuccessful, try to tile and distribute.
             return setDefaultOpConfig(limits, op);
           })
-      .Case<linalg::GenericOp>([limits](auto op) {
-        // If generic op has reduction iterator types, it is a root as
-        // well. Just set the default configuration, which marks it as a root.
+      .Case<linalg_ext::FftOp>(
+          [limits](linalg_ext::FftOp op) { return setFftOpConfig(limits, op); })
+      .Case<linalg::GenericOp>([limits](linalg::GenericOp op) {
+        // If a generic op has reduction iterator types, it can be treated as a
+        // root op for configuration as well. Use the default configuration,
+        // which will mark it as a root.
         if (op.getNumLoops() != op.getNumParallelLoops()) {
           return setDefaultOpConfig(limits, op);
         }
