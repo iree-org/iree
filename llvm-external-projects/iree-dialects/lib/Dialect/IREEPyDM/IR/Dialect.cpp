@@ -206,6 +206,18 @@ bool PYDM::ListType::isRefinable() const {
   return false;
 }
 
+Type PYDM::ListType::getElementStorageType() const {
+  switch (getStorageClass()) {
+    case CollectionStorageClass::Boxed:
+    case CollectionStorageClass::Empty:
+      return ObjectType::get(getContext());
+    case CollectionStorageClass::Unboxed:
+      assert(getUniformElementType() &&
+             "unboxed list should have uniform element type");
+      return getUniformElementType();
+  }
+}
+
 // NoneType
 StringRef PYDM::NoneType::getPythonTypeName() const { return "None"; }
 
@@ -289,6 +301,11 @@ BuiltinTypeCode PYDM::TypeType::getTypeCode() const {
 }
 
 StringRef PYDM::TypeType::getPythonTypeName() const { return "type"; }
+
+Type PYDM::TupleType::getElementStorageType() const {
+  // TODO: When it implements unboxed storage, switch here.
+  return ObjectType::get(getContext());
+}
 
 //------------------------------------------------------------------------------
 // Union type implementation

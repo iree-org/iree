@@ -271,6 +271,13 @@ def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List", ["isRefinable"]> {
     }
     return get($_ctxt, storageClass, t);
   }];
+
+  let extraClassDeclaration = [{
+    /// Gets the type used to store elements in the backing list.
+    /// For empty or boxed lists, this will be a generic ObjectType.
+    /// For unboxed lists, it will be the uniform element type.
+    Type getElementStorageType() const;
+  }];
 }
 
 def IREEPyDM_NoneType : IREEPyDM_PrimitiveTypeDef<"None"> {
@@ -367,6 +374,12 @@ def IREEPyDM_TupleType : IREEPyDM_PrimitiveTypeDef<"Tuple"> {
 
   let description = [{
     Corresponds to the "Tuples" type in the data model.
+  }];
+  let extraClassDeclaration = [{
+    /// Gets the type used to store elements in the backing list.
+    /// For empty or boxed lists, this will be a generic ObjectType.
+    /// For unboxed lists, it will be the uniform element type.
+    Type getElementStorageType() const;
   }];
 }
 
