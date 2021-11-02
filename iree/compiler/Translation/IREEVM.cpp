@@ -10,7 +10,6 @@
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -29,16 +28,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-// TODO(#7277): remove flag when on by default.
-static bool getExperimentalStreamsModeFromFlags() {
-  static llvm::cl::opt<bool> *enableFlag = new llvm::cl::opt<bool>{
-      "iree-experimental-streams",
-      llvm::cl::desc("Enables experimental stream dialect pipelines."),
-      llvm::cl::init(false),
-  };
-  return *enableFlag;
-}
 
 static BindingOptions getBindingOptionsFromFlags() {
   static llvm::cl::OptionCategory bindingOptionsCategory(
@@ -83,6 +72,59 @@ static InputDialectOptions getInputDialectOptionsFromFlags() {
   return options;
 }
 
+// Performs initial dialect conversion to get the canonical input lowered into
+// the IREE execution/dataflow dialect.
+//
+// This will fail if we cannot support the input yet. The hope is that any
+// error that happens after this point is either backend-specific (like
+// unsupported SPIR-V lowering) or a bug.
+static LogicalResult convertToFlowModule(ModuleOp moduleOp) {
+  PassManager passManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
+  passManager.addInstrumentation(std::make_unique<PassTracing>());
+  IREE::Flow::TransformOptions flowOptions;
+  IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
+  if (failed(passManager.run(moduleOp))) {
+    return moduleOp.emitError()
+           << "failed to run flow transformation pass pipeline";
+  }
+  return success();
+}
+
+// Runs the flow->HAL transform pipeline to lower a flow module and compile
+// executables for the specified target backends.
+static LogicalResult convertToHALModule(
+    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions) {
+  PassManager passManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
+  passManager.addInstrumentation(std::make_unique<PassTracing>());
+  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+  if (failed(passManager.run(moduleOp))) {
+    return moduleOp.emitError()
+           << "failed to run HAL transformation pass pipeline";
+  }
+  return success();
+}
+
+// Converts the lowered module to a canonical vm.module containing only vm ops.
+// This uses patterns to convert from standard ops and other dialects to their
+// vm ABI form.
+static LogicalResult convertToVMModule(ModuleOp moduleOp,
+                                       IREE::VM::TargetOptions targetOptions) {
+  PassManager passManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(passManager);
+  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
+  passManager.addInstrumentation(std::make_unique<PassTracing>());
+  IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
+  if (failed(passManager.run(moduleOp))) {
+    return moduleOp.emitError()
+           << "failed to run VM transformation pass pipeline";
+  }
+  return success();
+}
+
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     IREE::HAL::TargetOptions executableOptions,
@@ -105,18 +147,11 @@ void buildIREEVMTransformPassPipeline(
       break;
   }
 
-  bool enableNewStreamsDialect = getExperimentalStreamsModeFromFlags();
+  IREE::Flow::TransformOptions flowOptions;
 
   buildCommonInputConversionPassPipeline(passManager);
-  IREE::Flow::TransformOptions flowOptions;
-  flowOptions.streamFormation = !enableNewStreamsDialect;
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
-  if (enableNewStreamsDialect) {
-    IREE::Stream::TransformOptions streamOptions;
-    IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
-  } else {
-    IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
-  }
+  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());
 }
@@ -206,7 +241,6 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
 #endif  // IREE_HAVE_EMITC_DIALECT
 
 void registerIREEVMTranslationFlags() {
-  getExperimentalStreamsModeFromFlags();
   getBindingOptionsFromFlags();
   getInputDialectOptionsFromFlags();
 }
