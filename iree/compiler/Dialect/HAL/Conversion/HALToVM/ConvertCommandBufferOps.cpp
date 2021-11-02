@@ -38,15 +38,21 @@ class CommandBufferFillBufferOpConversion
         newOperands.length(),
     };
 
-    // Record the original pattern length then extend it to a 32 bit type.
-    auto patternBitWidth = op.pattern().getType().getIntOrFloatBitWidth();
+    // Record the original pattern length then extend it to a 32 bit integer.
+    auto originalPatternType = op.pattern().getType();
+    auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
     auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternBitWidth / 8, 32);
-    auto patternInt = rewriter.createOrFold<arith::BitcastOp>(
-        op.getLoc(), rewriter.getIntegerType(patternBitWidth), op.pattern());
-    auto patternExtended = rewriter.createOrFold<arith::ExtUIOp>(
-        op.getLoc(), patternInt, rewriter.getIntegerType(32));
-    callOperands.push_back(patternExtended);
+    Value pattern = op.pattern();
+    if (originalPatternType.isF16() || originalPatternType.isF32()) {
+      pattern = rewriter.createOrFold<arith::BitcastOp>(
+          op.getLoc(), rewriter.getIntegerType(patternBitWidth), pattern);
+    }
+    if (patternBitWidth < 32) {
+      pattern = rewriter.createOrFold<arith::ExtUIOp>(
+          op.getLoc(), pattern, rewriter.getIntegerType(32));
+    }
+    callOperands.push_back(pattern);
     callOperands.push_back(patternLength);
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
