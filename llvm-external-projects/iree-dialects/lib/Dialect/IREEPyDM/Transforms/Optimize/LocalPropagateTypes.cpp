@@ -35,8 +35,10 @@ struct LocalPropagateTypesPass
     BoxOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     DynamicBinaryPromoteOp::getCanonicalizationPatterns(canonicalizePatterns,
                                                         context);
+    NegOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     PromoteNumericOp::getCanonicalizationPatterns(canonicalizePatterns,
                                                   context);
+    SubscriptOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     UnboxOp::getCanonicalizationPatterns(canonicalizePatterns, context);
     FrozenRewritePatternSet frozenCanonicalizePatterns(
         std::move(canonicalizePatterns));
@@ -54,6 +56,7 @@ struct LocalPropagateTypesPass
                                    rewriterConfig);
       changed = false;
       if (sinkStaticInfoCasts()) changed = true;
+      if (refineResultTypes()) changed = true;
       permuteRefinedBlocks(propagator);
       if (!changed) break;
     }
@@ -103,7 +106,6 @@ struct LocalPropagateTypesPass
           changed = true;
           LLVM_DEBUG(dbgs()
                      << "Sink refined type into: " << *use->getOwner() << "\n");
-          // TODO: Add to worklist to refine further.
         } else if (auto branchOp =
                        llvm::dyn_cast<BranchOpInterface>(use->getOwner())) {
           // We just update it directly and rely on the fix-up step after
@@ -121,6 +123,53 @@ struct LocalPropagateTypesPass
         castOp->erase();
       }
     }
+    return changed;
+  }
+
+  bool refineResultTypes() {
+    // Process any refinable ops we encountered in the main walk.
+    bool changed = false;
+    LLVM_DEBUG(dbgs() << "-- Refining result types:\n");
+    getOperation()->walk([&](TypeRefinableOpInterface refinable) {
+      Operation *refinableOp = refinable.getOperation();
+      SmallVector<Type> originalResultTypes(refinableOp->getResultTypes());
+      LLVM_DEBUG(dbgs() << "  refineResultTypes: " << *refinableOp << "\n");
+      if (!refinable.refineResultTypes()) return;
+      LLVM_DEBUG(dbgs() << "  refineResultTypes changed results: "
+                        << *refinableOp << "\n");
+      OpBuilder builder(refinableOp);
+      builder.setInsertionPointAfter(refinableOp);
+      for (auto it :
+           llvm::zip(originalResultTypes, refinableOp->getOpResults())) {
+        Type origType = std::get<0>(it);
+        OpResult result = std::get<1>(it);
+        Type newType = result.getType();
+        if (origType == newType) continue;
+        // Insert a static info cast.
+        // In the future, we could further query the use for refinable
+        // support and skip creating the op.
+        LLVM_DEBUG(dbgs() << "    changed result type " << origType << " -> "
+                          << newType << "\n");
+
+        Value newResult = result;
+        Operation *replaceExcept = nullptr;
+        // It is possible to refine from an object (boxed) to an unboxed type.
+        // In order to keep the type algebra safe, we must box back.
+        if (origType.isa<ObjectType>() && newType.isa<PYDM::PrimitiveType>()) {
+          auto boxed = builder.create<BoxOp>(
+              refinableOp->getLoc(),
+              builder.getType<ObjectType>(newType.cast<PYDM::PrimitiveType>()),
+              newResult);
+          replaceExcept = boxed;
+          newResult = boxed;
+        }
+        auto casted = builder.create<StaticInfoCastOp>(refinableOp->getLoc(),
+                                                       origType, newResult);
+        if (!replaceExcept) replaceExcept = casted;
+        result.replaceAllUsesExcept(casted, replaceExcept);
+        changed = true;
+      }
+    });
     return changed;
   }
 

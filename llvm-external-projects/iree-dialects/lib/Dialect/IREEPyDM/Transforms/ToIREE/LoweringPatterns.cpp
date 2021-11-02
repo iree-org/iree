@@ -173,6 +173,44 @@ class AllocFreeVarOpConversion
   }
 };
 
+// class ApplyBinaryListIntConversion
+//     : public OpConversionPattern<PYDM::ApplyBinaryOp> {
+//   using OpConversionPattern::OpConversionPattern;
+
+//   LogicalResult matchAndRewrite(
+//       PYDM::ApplyBinaryOp srcOp, OpAdaptor adaptor,
+//       ConversionPatternRewriter &rewriter) const override {
+//     Type origListType;
+//     Value listOperand;
+//     Value integerOperand;
+//     if (isSupportedList(srcOp.left().getType()) &&
+//         srcOp.right().getType().isa<PYDM::IntegerType>()) {
+//       origListType = srcOp.left().getType();
+//       listOperand = adaptor.left();
+//       integerOperand = adaptor.right();
+//     } else if (isSupportedList(srcOp.right().getType()) &&
+//                srcOp.left().getType().isa<PYDM::IntegerType>()) {
+//       origListType = srcOp.right().getType();
+//       listOperand = adaptor.right();
+//       integerOperand = adaptor.left();
+//     } else {
+//       return failure();
+//     }
+//     if (srcOp.getResultType() != listOperand.getType()) {
+//       return rewriter.notifyMatchFailure(srcOp, "result type does not match
+//       operand list type");
+//     }
+//     Type resultType = typeConverter->convertType(srcOp.result().getType());
+//     if (!resultType) {
+//       return rewriter.notifyMatchFailure(srcOp,
+//                                          "cannot convert result type");
+//     }
+
+//     // Construct the new list.
+
+//   }
+// };
+
 class ApplyBinaryNumericConversion
     : public OpConversionPattern<PYDM::ApplyBinaryOp> {
   using OpConversionPattern::OpConversionPattern;

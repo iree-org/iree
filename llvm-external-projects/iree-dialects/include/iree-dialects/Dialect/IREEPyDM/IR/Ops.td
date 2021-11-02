@@ -645,7 +645,9 @@ def IREEPyDM_PromoteNumericOp : IREEPyDM_PureOp<"promote_numeric"> {
   let hasCanonicalizeMethod = 1;
 }
 
-def IREEPyDM_ApplyBinaryOp : IREEPyDM_PureOp<"apply_binary"> {
+def IREEPyDM_ApplyBinaryOp : IREEPyDM_PureOp<"apply_binary", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
+  ]> {
   let summary = "Applies one of Python's binary operations";
   let description = [{
     The operation to apply is specified as per the data model:
@@ -666,7 +668,9 @@ def IREEPyDM_ApplyBinaryOp : IREEPyDM_PureOp<"apply_binary"> {
   let hasCanonicalizer = 1;
 }
 
-def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare"> {
+def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Performs a binary comparison";
   let description = [{
     Performs a comparison between two operands.
