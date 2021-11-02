@@ -1,4 +1,4 @@
-// Copyright 2020 The IREE Authors
+// Copyright 2021 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,7 +6,7 @@
 
 //===- IREEComprehensiveBufferizePass.cpp.cpp - -------------------------===//
 //
-// Wrapper pass to use MLIRs IREEComprehensiveBufferization pass.
+// Wrapper pass to use MLIRs ComprehensiveBufferization pass.
 //
 //===----------------------------------------------------------------------===//
 
@@ -80,37 +80,6 @@ class IREEComprehensiveBufferizePass
 };
 }  // namespace
 
-/// Assume we always want to bufferize exactly the whole block immediately
-/// enclosing a IREE::Flow::DispatchTensorStoreOp. Outline all the ops in such a
-/// block into an scf::ExecuteRegionOp for further processing.
-/// This very simple heuristic does not support any kind of nesting of
-/// Flow::Dispatch ops.
-static LogicalResult outlineInExecuteRegion(
-    FuncOp funcOp, SmallVector<scf::ExecuteRegionOp> &opsToBufferize) {
-  DominanceInfo domInfo(funcOp);
-
-  DenseSet<Block *> storeEnclosingBlocks;
-  funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
-    storeEnclosingBlocks.insert(storeOp->getBlock());
-  });
-
-  for (Block *block : storeEnclosingBlocks) {
-    OpBuilder b(block->getParentOp());
-    scf::ExecuteRegionOp containerOp = b.create<scf::ExecuteRegionOp>(
-        block->getParentOp()->getLoc(), TypeRange{});
-    Block *body = b.createBlock(&containerOp->getRegion(0),
-                                /*insertPt=*/{},
-                                /*argTypes=*/{});
-    // Splice funky semantics are worth documenting at every use:
-    // new_list.splice(new_list.begin(), old_list, old_list.begin, old_list.end)
-    body->getOperations().splice(body->begin(), block->getOperations(),
-                                 block->begin(), block->end());
-    containerOp->moveBefore(block, block->end());
-    opsToBufferize.push_back(containerOp);
-  }
-  return success();
-}
-
 static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 
 /// Stitch comprehensive bufferization inside of IREE by proceeding as follows:
@@ -149,9 +118,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
       b.setInsertionPoint(op);
       // 1.a. Just change the result type of the InterfaceBindingSubspanOp to
       // from the base buffer.
-      auto tensorType =
-          op.result().getType().cast<IREE::Flow::DispatchTensorType>();
-      auto memRefType = getMemrefTypeForTensor(tensorType);
+      auto memRefType = getMemrefTypeForTensor(shapedType);
       auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
           op->getLoc(), memRefType, op.binding(), op.byte_offset(),
           op.byte_length(), op.dynamic_dims());
@@ -161,18 +128,14 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
       // effecting semantics. It cannot be added to BufferizationAliasInfo.
       // Instead:
       // 1.b. Insert a memref::TensorLoad to serve as glue between the buffer
-      // and
-      //      tensor worlds.
+      // and tensor worlds.
       Value tensor = b.create<memref::TensorLoadOp>(op->getLoc(), baseBuffer);
       // 1.c. Insert a new entry manually into the existing aliasInfo.
       aliasInfo.createAliasInfoEntry(op.result());
       aliasInfo.createAliasInfoEntry(tensor);
       tensorLoads.map(op.result(), tensor);
       // 1.d. Mark tensors that bufferize to writeable memory as such.
-      if (op.result()
-              .getType()
-              .cast<IREE::Flow::DispatchTensorType>()
-              .getAccess() != IREE::Flow::TensorAccess::ReadOnly) {
+      if (shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly) {
         aliasInfo.setBufferizesToWritableMemory(tensor);
       }
       // 1.e. Save tensor -> baseBuffer into BVM.
@@ -213,26 +176,28 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
     DominanceInfo domInfo(funcOp);
     SmallVector<Operation *> ops;
     ops.reserve(funcOp.body().front().getOperations().size());
-    WalkResult opsSelected = funcOp.body().walk([&](Operation *op) {
-      if (isa<IREE::HAL::InterfaceBindingSubspanOp,
-              IREE::Flow::DispatchTensorLoadOp,
-              IREE::Flow::DispatchTensorStoreOp>(op)) {
-        return WalkResult::advance();
-      }
-      if (llvm::none_of(op->getOperandTypes(), isaTensor) &&
-          llvm::none_of(op->getResultTypes(), isaTensor)) {
-        return WalkResult::advance();
-      }
-      if (op->getParentOfType<linalg::LinalgOp>()) return WalkResult::advance();
-      // TODO: if we want to bufferize function calls, we need FuncOp
-      // and to pass a proper bufferizedFunctionTypes.
-      if (isa<CallOpInterface>(op)) {
-        op->emitError("CallOpInterface bufferization not supported in IREE");
-        return WalkResult::interrupt();
-      }
-      ops.push_back(op);
-      return WalkResult::advance();
-    });
+    WalkResult opsSelected =
+        funcOp.body().walk([&](Operation *op) -> WalkResult {
+          if (isa<IREE::HAL::InterfaceBindingSubspanOp,
+                  IREE::Flow::DispatchTensorLoadOp,
+                  IREE::Flow::DispatchTensorStoreOp>(op)) {
+            return WalkResult::advance();
+          }
+          if (llvm::none_of(op->getOperandTypes(), isaTensor) &&
+              llvm::none_of(op->getResultTypes(), isaTensor)) {
+            return WalkResult::advance();
+          }
+          if (op->getParentOfType<linalg::LinalgOp>())
+            return WalkResult::advance();
+          // TODO: if we want to bufferize function calls, we need FuncOp
+          // and to pass a proper bufferizedFunctionTypes.
+          if (isa<CallOpInterface>(op)) {
+            return static_cast<LogicalResult>(op->emitError(
+                "CallOpInterface bufferization not supported in IREE"));
+          }
+          ops.push_back(op);
+          return WalkResult::advance();
+        });
 
     // 4. Perform inplaceability analysis of `ops`.
     if (opsSelected.wasInterrupted() ||
