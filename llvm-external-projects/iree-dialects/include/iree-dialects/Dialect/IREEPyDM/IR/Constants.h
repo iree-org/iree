@@ -12,6 +12,21 @@ namespace iree_compiler {
 namespace IREE {
 namespace PYDM {
 
+/// Built-in collection types (lists, tuples, dicts) can be implemented in terms
+/// of empty, boxed, or unboxed storage. Generally at program construction
+/// time, the storage will be empty or boxed, as there is seldom sufficient
+/// information to determine whether object identity can be dropped at this
+/// phase. The collection may be converted to unboxed storage during type
+/// refinement if it is safe to do so.
+///
+/// The empty storage class is used for collections that are known empty,
+/// which can help type refinement to ignore them.
+enum class CollectionStorageClass {
+  Boxed,
+  Empty,
+  Unboxed,
+};
+
 /// Category of the numeric type. These are arranged such that during promotion,
 /// the type with the largest category value determines the category of
 /// promotion.

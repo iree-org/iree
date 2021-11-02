@@ -198,13 +198,78 @@ def IREEPyDM_IntegerType : IREEPyDM_PrimitiveTypeDef<"Integer", [
   }];
 }
 
-def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List"> {
+def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List", ["isRefinable"]> {
   let mnemonic = "list";
 
-  let summary = "Mutable sequence of boxed values";
+  let summary = "Mutable sequence of elements";
 
   let description = [{
     Corresponds to the "Lists" type in the data model.
+  }];
+
+  let parameters = (ins
+    "CollectionStorageClass":$storageClass,
+    "Type":$uniformElementType
+  );
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return Base::get($_ctxt, CollectionStorageClass::Boxed, nullptr);
+    }]>
+  ];
+
+  let printer = [{
+    $_printer << getMnemonic();
+    if (getImpl()->uniformElementType ||
+        getImpl()->storageClass != CollectionStorageClass::Boxed) {
+      $_printer << "<";
+      switch (getImpl()->storageClass) {
+        case CollectionStorageClass::Boxed:
+          $_printer << "boxed";
+          break;
+        case CollectionStorageClass::Empty:
+          $_printer << "empty";
+          break;
+        case CollectionStorageClass::Unboxed:
+          $_printer << "unboxed";
+          break;
+      }
+
+      if (getImpl()->uniformElementType) {
+        $_printer << ",";
+        $_printer << getImpl()->uniformElementType;
+      }
+      $_printer << ">";
+    }
+  }];
+
+  let parser = [{
+    if (parser.parseOptionalLess())
+      return get($_ctxt, CollectionStorageClass::Boxed, nullptr);
+
+    Type t;
+    StringRef storageClassKeyword;
+    if ($_parser.parseKeyword(storageClassKeyword))
+      return Type();
+    if ($_parser.parseComma())
+      return Type();
+    if ($_parser.parseType(t))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+
+    CollectionStorageClass storageClass;
+    if (storageClassKeyword == "boxed")
+      storageClass = CollectionStorageClass::Boxed;
+    else if (storageClassKeyword == "empty")
+      storageClass = CollectionStorageClass::Empty;
+    else if (storageClassKeyword == "unboxed")
+      storageClass = CollectionStorageClass::Unboxed;
+    else {
+      $_parser.emitError($_parser.getCurrentLocation(), "expected one of 'boxed', 'empty', 'unboxed'");
+      return Type();
+    }
+    return get($_ctxt, storageClass, t);
   }];
 }
 
@@ -321,7 +386,9 @@ def IREEPyDM_TypeType : IREEPyDM_PrimitiveTypeDef<"Type"> {
 //===----------------------------------------------------------------------===//
 
 def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
-    "Object", [DeclareTypeInterfaceMethods<PythonTypeInterface>]> {
+    "Object", [
+      DeclareTypeInterfaceMethods<PythonTypeInterface, ["isRefinable"]>
+    ]> {
   let mnemonic = "object";
 
   let summary = "Core data type having an identity, type and value";
@@ -341,6 +408,12 @@ def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
   let parameters = (ins
     "::mlir::iree_compiler::IREE::PYDM::PrimitiveType":$primitiveType
   );
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return Base::get($_ctxt, nullptr);
+    }]>
+  ];
 
   let printer = [{
     $_printer << getMnemonic();

@@ -8,6 +8,7 @@
 #define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_IREEPYDM_IR_OPS_H
 
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "iree-dialects/Dialect/IREEPyDM/IR/Interfaces.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"

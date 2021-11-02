@@ -57,6 +57,8 @@ LoweringTypeConverter::LoweringTypeConverter() {
   });
 
   // Tuple, List.
+  // TODO: Fork these based on CollectionStorageClass as they can avoid
+  // using variant lists.
   addConversion([&](PYDM::ListType t) -> Optional<Type> {
     Builder b(t.getContext());
     return getVariantListType(b);

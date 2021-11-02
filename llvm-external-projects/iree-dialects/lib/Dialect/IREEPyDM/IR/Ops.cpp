@@ -25,9 +25,48 @@ using PyRealType = PYDM::RealType;
 using PyCallOp = PYDM::CallOp;
 using PyFuncOp = PYDM::FuncOp;
 
+static LogicalResult verify(Operation *) { return success(); }
+
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Generic pattern to unbox any operands that are a specific object
+/// type (i.e. object<integer>).
+struct UnboxOperands : public RewritePattern {
+  UnboxOperands(StringRef rootName, MLIRContext *context)
+      : RewritePattern(rootName, 1, context) {}
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op->getLoc();
+    bool changed = false;
+    SmallVector<Value> operands(op->getOperands());
+    auto excResultType = rewriter.getType<ExceptionResultType>();
+    for (Value &operand : operands) {
+      if (auto objectType = operand.getType().dyn_cast<ObjectType>()) {
+        Type primitiveType = objectType.getPrimitiveType();
+        if (primitiveType) {
+          // Unbox.
+          auto unboxOp = rewriter.create<UnboxOp>(
+              loc, TypeRange{excResultType, primitiveType}, operand);
+          operand = unboxOp.primitive();
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      rewriter.updateRootInPlace(op, [&]() { op->setOperands(operands); });
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+}  // namespace
 
 static Value getNumericZeroConstant(Location loc, Type numericType,
                                     OpBuilder &builder) {
@@ -315,46 +354,12 @@ struct ResolveNumericDynamicBinaryPromote
   }
 };
 
-/// Generic pattern to unbox any operands that are a specific object
-/// type (i.e. object<integer>).
-struct UnboxOperands : public RewritePattern {
-  UnboxOperands(StringRef rootName, MLIRContext *context)
-      : RewritePattern(rootName, 1, context) {}
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    Location loc = op->getLoc();
-    bool changed = false;
-    SmallVector<Value> operands(op->getOperands());
-    auto excResultType = rewriter.getType<ExceptionResultType>();
-    for (Value &operand : operands) {
-      if (auto objectType = operand.getType().dyn_cast<ObjectType>()) {
-        Type primitiveType = objectType.getPrimitiveType();
-        if (primitiveType) {
-          // Unbox.
-          auto unboxOp = rewriter.create<UnboxOp>(
-              loc, TypeRange{excResultType, primitiveType}, operand);
-          operand = unboxOp.primitive();
-          changed = true;
-        }
-      }
-    }
-
-    if (changed) {
-      rewriter.updateRootInPlace(op, [&]() { op->setOperands(operands); });
-      return success();
-    }
-
-    return failure();
-  }
-};
-
 }  // namespace
 
 void DynamicBinaryPromoteOp::getCanonicalizationPatterns(
     RewritePatternSet &patterns, MLIRContext *context) {
   patterns.add<ResolveNumericDynamicBinaryPromote>(context);
-  patterns.add<UnboxOperands>(DynamicBinaryPromoteOp::getOperationName(),
-                              context);
+  patterns.add<UnboxOperands>(getOperationName(), context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -493,6 +498,51 @@ static LogicalResult verify(PyFuncOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// MakeListOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verify(MakeListOp op) {
+  auto listType = op.list().getType().cast<ListType>();
+  switch (listType.getStorageClass()) {
+    case CollectionStorageClass::Boxed:
+      for (auto element : op.elements()) {
+        if (!element.getType().isa<ObjectType>()) {
+          return op.emitOpError() << "making a list with boxed storage class "
+                                     "must have object elements. Got: "
+                                  << element.getType();
+        }
+      }
+      break;
+    case CollectionStorageClass::Unboxed:
+      for (auto element : op.elements()) {
+        if (element.getType().isa<ObjectType>()) {
+          return op.emitOpError() << "making a list with unboxed storage class "
+                                     "must not have object elements. Got: "
+                                  << element.getType();
+        }
+      }
+      break;
+    case CollectionStorageClass::Empty:
+      if (!op.elements().empty()) {
+        return op.emitOpError()
+               << "making a list with empty storage class must have zero "
+                  "elements";
+      }
+      break;
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// NegOp
+//===----------------------------------------------------------------------===//
+
+void NegOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                        MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
+}
+
+//===----------------------------------------------------------------------===//
 // PatternMatchCallOp
 //===----------------------------------------------------------------------===//
 
@@ -591,6 +641,15 @@ OpFoldResult SelectOp::fold(ArrayRef<Attribute> operands) {
     return true_value();
   else
     return false_value();
+}
+
+//===----------------------------------------------------------------------===//
+// SubscriptOp
+//===----------------------------------------------------------------------===//
+
+void SubscriptOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                              MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
 }
 
 //===----------------------------------------------------------------------===//

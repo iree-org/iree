@@ -158,7 +158,6 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
 
   let parser = [{ return ::parseFuncOp(parser, result); }];
   let printer = [{ return ::print(*this, p); }];
-  let verifier = [{ return ::verify(*this); }];
 }
 
 def IREEPyDM_ReturnOp : IREEPyDM_Op<"return", [
@@ -299,7 +298,9 @@ def IREEPyDM_DynamicCallOp : IREEPyDM_PureOp<"dynamic_call", [
 // Boxing/unboxing
 //===----------------------------------------------------------------------===//
 
-def IREEPyDM_BoxOp : IREEPyDM_PureOp<"box"> {
+def IREEPyDM_BoxOp : IREEPyDM_PureOp<"box", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Boxes a primitive into an object";
   let description = [{
     Given a PrimitiveType, boxes it into an appropriate !object, establishing
@@ -326,7 +327,9 @@ def IREEPyDM_BoxOp : IREEPyDM_PureOp<"box"> {
   let hasCanonicalizeMethod = 1;
 }
 
-def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox"> {
+def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Unboxes an object to a specific primitive type";
   let description = [{
     Unboxes to a primitive, returning a failure result and a default initialized
@@ -436,7 +439,9 @@ def IREEPyDM_BoolToPredOp : IREEPyDM_PureOp<"bool_to_pred"> {
   let hasFolder = 1;
 }
 
-def IREEPyDM_MakeListOp : IREEPyDM_PureOp<"make_list"> {
+def IREEPyDM_MakeListOp : IREEPyDM_PureOp<"make_list", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Makes a list from a static list of values";
   let description = [{
     Constructs a list from elements.
@@ -577,7 +582,6 @@ def FunctionalIfOp : IREEPyDM_Op<"functional_if", [
   let regions = (region SizedRegion<1>:$thenRegion, AnyRegion:$elseRegion);
 
   let printer = [{ return ::print(p, *this); }];
-  let verifier = [{ return ::verify(*this); }];
   let parser = [{ return ::parse$cppClass(parser, result); }];
 }
 
@@ -593,7 +597,9 @@ def YieldOp : IREEPyDM_Op<"yield", [NoSideEffect, ReturnLike, Terminator,
 // Computation
 //===----------------------------------------------------------------------===//
 
-def IREEPyDM_DynamicBinaryPromoteOp : IREEPyDM_PureOp<"dynamic_binary_promote"> {
+def IREEPyDM_DynamicBinaryPromoteOp : IREEPyDM_PureOp<"dynamic_binary_promote", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Promotes two arguments that may be of numeric types";
   let description = [{
     Takes two values of arbitrary type which may be input to a following
@@ -684,11 +690,27 @@ def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare"> {
   let hasCanonicalizer = 1;
 }
 
+def IREEPyDM_NegOp : IREEPyDM_PureOp<"neg"> {
+  let summary = "Unary negation";
+  let description = [{
+    Performs unary negation (i.e. `-3`) in a type independent way.
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$value);
+  let results = (outs IREEPyDM_AnyValueType:$result);
+  let assemblyFormat = [{
+    $value `:` type($value) `->` type($result) attr-dict
+  }];
+  let hasCanonicalizer = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Object method/feature access
 //===----------------------------------------------------------------------===//
 
-def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"dynamic_subscript"> {
+def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"subscript", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Evaluates a subscript operation against a value";
   let description = [{
     This fully dynamic form of subscript can handle an arbitrarily general
@@ -698,10 +720,13 @@ def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"dynamic_subscript"> {
   let arguments = (ins
     IREEPyDM_AnyValueType:$value,
     IREEPyDM_AnyValueType:$slice);
-  let results = (outs IREEPyDM_AnyValueType:$result);
+  let results = (outs
+    IREEPyDM_ExceptionResultType:$exc_result,
+    IREEPyDM_AnyValueType:$result);
   let assemblyFormat = [{
     $value `[` $slice `->` type($slice) `]` `:` type($value) `->` type($result) attr-dict
   }];
+  let hasCanonicalizer = 1;
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_OPS_TD

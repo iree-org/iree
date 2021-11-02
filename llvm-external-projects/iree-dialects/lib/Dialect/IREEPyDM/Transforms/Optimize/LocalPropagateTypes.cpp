@@ -97,13 +97,13 @@ struct LocalPropagateTypesPass
       for (auto *use : uses) {
         // Most of our ops which accept objects are internally tolerant of
         // receiving a refinement.
-        // TODO: Replace this with an interface query.
-        if (llvm::isa<BoxOp, DynamicBinaryPromoteOp, UnboxOp>(
-                use->getOwner())) {
+        if (auto refinable =
+                llvm::dyn_cast<TypeRefinableOpInterface>(use->getOwner())) {
           use->set(fromValue);
           changed = true;
           LLVM_DEBUG(dbgs()
                      << "Sink refined type into: " << *use->getOwner() << "\n");
+          // TODO: Add to worklist to refine further.
         } else if (auto branchOp =
                        llvm::dyn_cast<BranchOpInterface>(use->getOwner())) {
           // We just update it directly and rely on the fix-up step after

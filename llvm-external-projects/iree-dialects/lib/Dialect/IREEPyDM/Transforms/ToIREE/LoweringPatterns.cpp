@@ -586,6 +586,39 @@ class LoadVarOpConversion : public OpConversionPattern<PYDM::LoadVarOp> {
   }
 };
 
+class MakeListOpBoxedConversion : public OpConversionPattern<PYDM::MakeListOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      PYDM::MakeListOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loc = srcOp.getLoc();
+    auto listType = srcOp.list().getType().cast<PYDM::ListType>();
+    if (listType.getStorageClass() != CollectionStorageClass::Boxed ||
+        listType.getStorageClass() == CollectionStorageClass::Empty)
+      return rewriter.notifyMatchFailure(srcOp, "unboxed list");
+    auto resultType = getTypeConverter()->convertType(listType);
+    if (!resultType)
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "could not convert result type");
+
+    auto size = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getIndexAttr(adaptor.elements().size()));
+    auto list =
+        rewriter.create<iree::ListCreateOp>(loc, getVariantListType(rewriter),
+                                            /*capacity=*/size);
+    rewriter.create<iree::ListResizeOp>(loc, list, size);
+    for (auto it : enumerate(adaptor.elements())) {
+      auto index = rewriter.create<arith::ConstantOp>(
+          loc, rewriter.getIndexAttr(it.index()));
+      rewriter.create<iree::ListSetOp>(loc, list, index, it.value());
+    }
+
+    rewriter.replaceOp(srcOp, ValueRange{list});
+    return success();
+  }
+};
+
 class MakeTupleOpConversion : public OpConversionPattern<PYDM::MakeTupleOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -611,6 +644,23 @@ class MakeTupleOpConversion : public OpConversionPattern<PYDM::MakeTupleOp> {
     }
 
     rewriter.replaceOp(srcOp, ValueRange{list});
+    return success();
+  }
+};
+
+/// Converts the `neg` op on integer operand/result to a corresponding sub.
+class NegIntegerOpConversion : public OpConversionPattern<PYDM::NegOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      PYDM::NegOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    Type valueType = adaptor.value().getType();
+    Type resultType = getTypeConverter()->convertType(srcOp.result().getType());
+    if (!valueType.isa<mlir::IntegerType>() || valueType != resultType)
+      return rewriter.notifyMatchFailure(srcOp, "not an integer neg");
+    Location loc = srcOp.getLoc();
+    Value zero = rewriter.create<arith::ConstantIntOp>(loc, 0, resultType);
+    rewriter.replaceOpWithNewOp<arith::SubIOp>(srcOp, zero, adaptor.value());
     return success();
   }
 };
@@ -709,6 +759,117 @@ class StoreVarOpConversion : public OpConversionPattern<PYDM::StoreVarOp> {
     auto newValue = adaptor.getOperands()[1];
     resetObjectList(loc, rewriter, list, typeCode, newValue);
     rewriter.eraseOp(srcOp);
+    return success();
+  }
+};
+
+/// Lowers the subscript operator on builtin sequence types (list, tuple)
+/// based on a statically determined scalar slice (which can be positive or
+/// negative).
+class SubscriptOpBuiltinSequenceConversion
+    : public OpConversionPattern<PYDM::SubscriptOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      PYDM::SubscriptOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto pySequence = srcOp.value();
+    if (!pySequence.getType().isa<PYDM::ListType, PYDM::TupleType>())
+      return rewriter.notifyMatchFailure(srcOp, "not builtin sequence");
+    auto pySlice = srcOp.slice();
+    if (!pySlice.getType().isa<PYDM::IntegerType>())
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "slice is not static integer type");
+    Type resultType = getTypeConverter()->convertType(srcOp.result().getType());
+    if (!resultType)
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "could not convert result type");
+
+    auto loc = srcOp.getLoc();
+    auto sequence = adaptor.value();
+    auto slice = adaptor.slice();
+    auto indexType = rewriter.getType<IndexType>();
+    Type statusType =
+        getTypeConverter()->convertType(srcOp.exc_result().getType());
+
+    Value zero = rewriter.create<arith::ConstantIntOp>(loc, 0, slice.getType());
+    Value listSizeIndex =
+        rewriter.create<iree::ListSizeOp>(loc, indexType, adaptor.value());
+    Value listSizeInteger = rewriter.create<arith::IndexCastOp>(
+        loc, slice.getType(), listSizeIndex);
+
+    // Split blocks:
+    //   indexLtZeroBlock
+    //   indexCheckBlock(sliceIndex : IndexType)
+    //   getElementBlock(sliceIndex : IndexType)
+    //   continuationBlock(exc_result, result)
+    //   failureBlock
+    Block *entryBlock = rewriter.getInsertionBlock();
+    Block *continuationBlock = rewriter.splitBlock(
+        rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
+    Block *indexLtZeroBlock = rewriter.createBlock(continuationBlock);
+    Block *indexCheckBlock = rewriter.createBlock(continuationBlock);
+    indexCheckBlock->addArgument(indexType);
+    Block *getElementBlock = rewriter.createBlock(continuationBlock);
+    getElementBlock->addArgument(indexType);
+    Block *failureBlock = createSlowPathBlock(rewriter);
+    continuationBlock->addArguments({statusType, resultType});
+    rewriter.replaceOp(srcOp, continuationBlock->getArguments());
+
+    // Comparison index < 0.
+    {
+      rewriter.setInsertionPointToEnd(entryBlock);
+      Value ltZero = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, slice, zero);
+      auto sliceIndex =
+          rewriter.create<arith::IndexCastOp>(loc, indexType, slice);
+      rewriter.create<mlir::CondBranchOp>(loc, ltZero, indexLtZeroBlock,
+                                          indexCheckBlock,
+                                          ValueRange{sliceIndex});
+    }
+
+    // Handle index < 0.
+    {
+      rewriter.setInsertionPointToEnd(indexLtZeroBlock);
+      Value positiveSlice =
+          rewriter.create<arith::AddIOp>(loc, slice, listSizeInteger);
+      Value positiveSliceIndex =
+          rewriter.create<arith::IndexCastOp>(loc, indexType, positiveSlice);
+      rewriter.create<mlir::BranchOp>(loc, ValueRange{positiveSliceIndex},
+                                      indexCheckBlock);
+    }
+
+    // Index check.
+    {
+      rewriter.setInsertionPointToEnd(indexCheckBlock);
+      Value sliceIndex = indexCheckBlock->getArgument(0);
+      Value ltSize = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::ult, sliceIndex, listSizeIndex);
+      rewriter.create<mlir::CondBranchOp>(loc, ltSize, getElementBlock,
+                                          ValueRange{sliceIndex}, failureBlock,
+                                          ValueRange{});
+    }
+
+    // Get element.
+    {
+      rewriter.setInsertionPointToEnd(getElementBlock);
+      Value successResult = getSuccessStatusValue(loc, rewriter);
+      Value resultValue = rewriter.create<iree::ListGetOp>(
+          loc, resultType, adaptor.value(), getElementBlock->getArgument(0));
+      rewriter.create<mlir::BranchOp>(loc, continuationBlock,
+                                      ValueRange{successResult, resultValue});
+    }
+
+    // Failure.
+    {
+      rewriter.setInsertionPointToEnd(failureBlock);
+      Value failureResult =
+          getFailureStatusValue(loc, rewriter, ExceptionCode::IndexError);
+      Value nullResult = getNullValue(loc, rewriter, resultType);
+      rewriter.create<mlir::BranchOp>(loc, continuationBlock,
+                                      ValueRange{failureResult, nullResult});
+    }
+
     return success();
   }
 };
@@ -841,15 +1002,16 @@ void PYDM::populatePyDMToIREELoweringPatterns(MLIRContext *context,
                                               TypeConverter &typeConverter,
                                               RewritePatternSet &patterns) {
   // PyDM conversions.
-  patterns.insert<AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
-                  ApplyCompareNumericConversion, BoolToPredConversion,
-                  BoxOpConversion, CallOpConversion, ConstantOpConversion,
-                  DynamicUnpackOpConversion, ElideStaticInfoCast,
-                  FailureOpConversion, FuncOpConversion, GetTypeCodeConversion,
-                  LoadVarOpConversion, MakeTupleOpConversion,
-                  RaiseOnFailureOpConversion, ReturnOpConversion,
-                  StoreVarOpConversion, UnboxOpConversion>(typeConverter,
-                                                           context);
+  patterns.insert<
+      AllocFreeVarOpConversion, ApplyBinaryNumericConversion,
+      ApplyCompareNumericConversion, BoolToPredConversion, BoxOpConversion,
+      MakeListOpBoxedConversion, CallOpConversion, ConstantOpConversion,
+      DynamicUnpackOpConversion, ElideStaticInfoCast, FailureOpConversion,
+      FuncOpConversion, GetTypeCodeConversion, LoadVarOpConversion,
+      MakeTupleOpConversion, NegIntegerOpConversion, RaiseOnFailureOpConversion,
+      ReturnOpConversion, StoreVarOpConversion,
+      SubscriptOpBuiltinSequenceConversion, UnboxOpConversion>(typeConverter,
+                                                               context);
 
   // External CFG ops.
   patterns.insert<BuiltinBranchConversion, BuiltinCondBranchConversion,

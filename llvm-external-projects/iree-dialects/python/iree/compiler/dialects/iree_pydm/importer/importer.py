@@ -705,7 +705,7 @@ class ExpressionImporter(BaseNodeVisitor):
     for elt in node.elts:
       sub_expression = ExpressionImporter(fctx)
       sub_expression.visit(elt)
-      element_values.append(sub_expression.get_immediate())
+      element_values.append(ic.box(sub_expression.get_immediate()))
     fctx.update_loc(node)
 
     with ic.ip, ic.loc:
@@ -720,9 +720,12 @@ class ExpressionImporter(BaseNodeVisitor):
     slice.visit(node.slice)
 
     fctx.update_loc(node)
-    self._set_result(
-        d.SubscriptOp(d.ObjectType.get(), value.get_immediate(),
-                      slice.get_immediate()).result)
+    exc_result, result = d.SubscriptOp(d.ExceptionResultType.get(),
+                                       d.ObjectType.get(),
+                                       value.get_immediate(),
+                                       slice.get_immediate()).results
+    d.RaiseOnFailureOp(exc_result)
+    self._set_result(result)
 
   def visit_Tuple(self, node: ast.Tuple):
     fctx = self.fctx
@@ -758,6 +761,9 @@ class ExpressionImporter(BaseNodeVisitor):
         self._set_result(
             d.SelectOp(d.BoolType.get(), bool_value, false_value,
                        true_value).result)
+      elif isinstance(op, ast.USub):
+        self._set_result(
+          d.NegOp(operand_value.type, operand_value).result)
       else:
         ic.abort(f"Unknown unary op {ast.dump(op)}")
 

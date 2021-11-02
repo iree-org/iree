@@ -19,9 +19,9 @@ namespace PYDM = mlir::iree_compiler::IREE::PYDM;
 using namespace PYDM;
 
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.cpp.inc"
-
-#define GET_TYPEDEF_CLASSES
+#include "iree-dialects/Dialect/IREEPyDM/IR/OpInterfaces.cpp.inc"
 #include "iree-dialects/Dialect/IREEPyDM/IR/TypeInterfaces.cpp.inc"
+#define GET_TYPEDEF_CLASSES
 #include "iree-dialects/Dialect/IREEPyDM/IR/Types.cpp.inc"
 
 //------------------------------------------------------------------------------
@@ -92,6 +92,7 @@ void IREEPyDMDialect::printType(Type type, DialectAsmPrinter &printer) const {
 // Python type implementation
 //------------------------------------------------------------------------------
 
+// BoolType
 BuiltinTypeCode PYDM::BoolType::getTypeCode() const {
   return static_cast<BuiltinTypeCode>(
       makeNumericTypeCode(*getNumericCategory(), *getNumericSubTypeCode()));
@@ -109,12 +110,14 @@ Optional<int> PYDM::BoolType::getNumericPromotionOrder() const {
   return static_cast<int>(getTypeCode());
 }
 
+// BytesType
 BuiltinTypeCode PYDM::BytesType::getTypeCode() const {
   return BuiltinTypeCode::Bytes;
 }
 
 StringRef PYDM::BytesType::getPythonTypeName() const { return "bytes"; }
 
+// ExceptionResultType
 BuiltinTypeCode PYDM::ExceptionResultType::getTypeCode() const {
   return BuiltinTypeCode::ExceptionResult;
 }
@@ -123,6 +126,7 @@ StringRef PYDM::ExceptionResultType::getPythonTypeName() const {
   return "Exception";
 }
 
+// IntegerType
 LogicalResult PYDM::IntegerType::verify(
     function_ref<InFlightDiagnostic()> emitError, Optional<int> bitWidth) {
   if (!bitWidth) return success();
@@ -184,20 +188,44 @@ BuiltinTypeCode PYDM::ListType::getTypeCode() const {
   return BuiltinTypeCode::List;
 }
 
+// ListType
 StringRef PYDM::ListType::getPythonTypeName() const { return "list"; }
 
 BuiltinTypeCode PYDM::NoneType::getTypeCode() const {
-  return BuiltinTypeCode::None;
+  return BuiltinTypeCode::List;
 }
 
+bool PYDM::ListType::isRefinable() const {
+  if (getStorageClass() == CollectionStorageClass::Empty) return false;
+
+  if (!getUniformElementType()) return true;
+
+  if (auto pyType = getUniformElementType().dyn_cast<PythonTypeInterface>())
+    return pyType.isRefinable();
+
+  return false;
+}
+
+// NoneType
 StringRef PYDM::NoneType::getPythonTypeName() const { return "None"; }
 
+// ObjectType
 BuiltinTypeCode PYDM::ObjectType::getTypeCode() const {
   return BuiltinTypeCode::Object;
 }
 
 StringRef PYDM::ObjectType::getPythonTypeName() const { return "object"; }
 
+bool PYDM::ObjectType::isRefinable() const {
+  if (!getPrimitiveType()) return true;
+
+  if (auto pyType = getPrimitiveType().dyn_cast<PythonTypeInterface>())
+    return pyType.isRefinable();
+
+  return false;
+}
+
+// RealType
 LogicalResult PYDM::RealType::verify(
     function_ref<InFlightDiagnostic()> emitError, FloatType floatType) {
   if (!floatType) return success();
@@ -241,18 +269,21 @@ Optional<int> PYDM::RealType::getNumericPromotionOrder() const {
 
 bool PYDM::RealType::isWeak() const { return !getImpl()->floatType; }
 
+// StrType
 BuiltinTypeCode PYDM::StrType::getTypeCode() const {
   return BuiltinTypeCode::Str;
 }
 
 StringRef PYDM::StrType::getPythonTypeName() const { return "str"; }
 
+// TupleType
 BuiltinTypeCode PYDM::TupleType::getTypeCode() const {
   return BuiltinTypeCode::Tuple;
 }
 
 StringRef PYDM::TupleType::getPythonTypeName() const { return "tuple"; }
 
+// TypeType
 BuiltinTypeCode PYDM::TypeType::getTypeCode() const {
   return BuiltinTypeCode::Type;
 }
