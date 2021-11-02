@@ -737,11 +737,12 @@ class ExpressionImporter(BaseNodeVisitor):
     slice.visit(node.slice)
 
     fctx.update_loc(node)
-    exc_result, result = d.SubscriptOp(d.ExceptionResultType.get(),
-                                       d.ObjectType.get(),
-                                       value.get_immediate(),
-                                       slice.get_immediate()).results
-    d.RaiseOnFailureOp(exc_result)
+    with ic.ip, ic.loc:
+      exc_result, result = d.SubscriptOp(d.ExceptionResultType.get(),
+                                        d.ObjectType.get(),
+                                        value.get_immediate(),
+                                        slice.get_immediate()).results
+      d.RaiseOnFailureOp(exc_result)
     self._set_result(result)
 
   def visit_Tuple(self, node: ast.Tuple):
