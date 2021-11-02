@@ -1,8 +1,8 @@
-// RUN: iree-opt -iree-codegen-affinemin-scf-canonicalization %s | IreeFileCheck %s
+// RUN: iree-opt -iree-codegen-affinemin-scf-canonicalization -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: scf_for_distributed
 func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
-                      %id2 : index, %count2 : index) {
+                          %id2 : index, %count2 : index) {
   %c1020 = arith.constant 1020 : index
   %c1024 = arith.constant 1024 : index
   %0 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%id1]
@@ -63,5 +63,24 @@ func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
     }
   }
 
+  return
+}
+
+// -----
+
+// CHECK-LABEL: scf_distributed_for_small_shape
+func @scf_distributed_for_small_shape(%A : memref<i64>) {
+  %c4 = arith.constant 4 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  //      CHECK: scf.for
+  // CHECK-NEXT:     %[[C4:.*]] = arith.constant 4 : index
+  // CHECK-NEXT:     %[[C4I64:.*]] = arith.index_cast %[[C4:.*]]
+  // CHECK-NEXT:     memref.store %[[C4I64]], %{{.*}}[] : memref<i64>
+  scf.for %arg0 = %c0 to %c4 step %c1 {
+    %0 = affine.min affine_map<(d0)[] -> (16, -d0 + 4)>(%arg0)[]
+    %1 = arith.index_cast %0: index to i64
+    memref.store %1, %A[]: memref<i64>
+  }
   return
 }
