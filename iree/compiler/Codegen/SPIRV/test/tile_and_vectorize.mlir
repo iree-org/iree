@@ -54,7 +54,7 @@ hal.executable private @matmul  {
           %16 = memref.dim %arg2, %c1 : memref<?x?xf32>
           %17 = affine.min #map1()[%1, %16]
           %18 = memref.subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
-          linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config}
+          linalg.matmul {lowering.config = #config}
             ins(%7, %13 : memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
             outs(%18 : memref<?x?xf32, #map3>)
         }
@@ -119,7 +119,7 @@ hal.executable private @conv_1d  {
         %15 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 1)>()[%3]
         %16 = memref.subview %0[%5, %12, %14] [1, %13, %15] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
         %17 = memref.subview %0[%5, %12, %9] [1, %13, %10] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
-        linalg.conv_1d_nwc_wcf { __internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
+        linalg.conv_1d_nwc_wcf { lowering.config = #config, dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
         return
       }
       hal.interface private @io  {
@@ -232,7 +232,6 @@ hal.executable private @conv_no_padding  {
               %27 = memref.subview %arg2[%arg3, %arg4, %arg5, 0] [%23, %24, %25, %26] [1, 1, 1, 1]
                       : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map5>
               linalg.conv_2d_nhwc_hwcf {
-                __internal_linalg_transform__ = "workgroup",
                 lowering.config = #config,
                 dilations = dense<1> : tensor<2xi64>,
                 strides = dense<2> : tensor<2xi64>}
@@ -328,7 +327,7 @@ hal.executable private @conv_3d  {
         %14 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 7)>()[%3]
         %15 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
         %16 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
-        linalg.conv_3d_ndhwc_dhwcf {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
+        linalg.conv_3d_ndhwc_dhwcf {lowering.config = #config, dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
         return
       }
       hal.interface private @io  {
@@ -397,7 +396,7 @@ module  {
           %10 = affine.min #map5()[%4]
           %11 = affine.min #map6()[%3]
           %12 = memref.subview %2[0, %5, %7, 0] [2, %10, %11, 6] [1, 1, 1, 1] : memref<2x14x13x6xf32> to memref<2x?x?x6xf32, #map7>
-          linalg.pooling_nhwc_max {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>) outs(%12 : memref<2x?x?x6xf32, #map7>)
+          linalg.pooling_nhwc_max {lowering.config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>) outs(%12 : memref<2x?x?x6xf32, #map7>)
           return
         }
         hal.interface private @io  {

@@ -41,11 +41,9 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
               : memref<1024x1024xf32> to memref<1024x256xf32, #map4>
           %11 = memref.subview %2[%arg0, %arg1] [2, 256] [1, 1]
               : memref<1024x1024xf32> to memref<2x256xf32, #map4>
-          linalg.fill(%cst, %11) {
-              __internal_linalg_transform__ = "workgroup", lowering.config = #config}
+          linalg.fill(%cst, %11) {lowering.config = #config}
               : f32, memref<2x256xf32, #map4>
-          linalg.matmul {
-              __internal_linalg_transform__ = "workgroup", lowering.config = #config}
+          linalg.matmul {lowering.config = #config}
               ins(%8, %10 : memref<2x1024xf32, #map4>, memref<1024x256xf32, #map4>)
               outs(%11 : memref<2x256xf32, #map4>)
         }

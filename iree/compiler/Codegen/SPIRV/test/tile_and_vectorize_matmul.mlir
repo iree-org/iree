@@ -39,8 +39,8 @@ hal.executable private @matmul_static_shape_f16  {
             %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4096)>(%arg1)[%workgroup_size_x]
             %10 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<4096x4096xf16> to memref<?x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
             %11 = memref.subview %1[0, %arg1] [4096, %9] [1, 1] : memref<4096x4096xf16> to memref<4096x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            linalg.fill(%cst, %10) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f16, memref<?x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%8, %11 : memref<?x4096xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<4096x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>) outs(%10 : memref<?x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
+            linalg.fill(%cst, %10) {lowering.config = #config} : f16, memref<?x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
+            linalg.matmul {lowering.config = #config} ins(%8, %11 : memref<?x4096xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<4096x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>) outs(%10 : memref<?x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
           }
         }
         return
@@ -105,8 +105,8 @@ hal.executable private @matmul_static_shape_f32  {
             %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4096)>(%arg1)[%workgroup_size_x]
             %10 = memref.subview %1[0, %arg1] [4096, %9] [1, 1] : memref<4096x4096xf32> to memref<4096x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
             %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<4096x4096xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup", lowering.config = #config}: f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%8, %10 : memref<?x4096xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<4096x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
+            linalg.fill(%cst, %11) {lowering.config = #config}: f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
+            linalg.matmul {lowering.config = #config} ins(%8, %10 : memref<?x4096xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<4096x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
           }
         }
         return

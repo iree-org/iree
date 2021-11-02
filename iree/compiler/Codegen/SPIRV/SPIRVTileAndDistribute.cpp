@@ -99,8 +99,7 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  SmallVector<StringRef, 2> matchMarkers = {getWorkgroupMemoryMarker(),
-                                            getWorkgroupMarker()};
+  SmallVector<StringRef, 2> matchMarkers = {getWorkgroupMemoryMarker()};
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::CopyOp>,
                   linalg::LinalgTilingPattern<linalg::Conv1DNwcWcfOp>,
@@ -113,7 +112,8 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
                   linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
-                                     context));
+                                     context)
+          .setMatchByDefault());
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
@@ -121,11 +121,14 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
                   linalg::LinalgTilingPattern<linalg::MatmulOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(matchMarkers, getTileReductionMarker(),
-                                     context));
+                                     context)
+          .setMatchByDefault());
 
   patterns.insert<linalg_ext::TiledOpInterfaceTilingPattern>(
       context, tilingOptions,
-      getLinalgMatchAndReplaceMarker(matchMarkers, llvm::None, context));
+      getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
+                                     context)
+          .setMatchByDefault());
 }
 
 /// Returns the corresponding range for the given `processorValue` is a GPU
