@@ -686,3 +686,17 @@ iree_status_t iree_vm_list_register_types(void) {
   iree_vm_list_descriptor.type_name = iree_make_cstring_view("vm.list");
   return iree_vm_ref_register_type(&iree_vm_list_descriptor);
 }
+
+iree_status_t iree_vm_list_swap(iree_vm_list_t* list0, iree_vm_list_t* list1) {
+  printf("i am here~~~~~~swap\n");
+  return iree_ok_status();
+}
+
+iree_status_t iree_vm_list_copy(const iree_vm_list_t* src_list,
+                                iree_host_size_t src_index,
+                                iree_vm_list_t* dst_list,
+                                iree_host_size_t dst_index,
+                                iree_host_size_t length) {
+  printf("i am here~~~~~~copy\n");
+  return iree_ok_status();
+}

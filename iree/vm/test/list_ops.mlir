@@ -1,5 +1,37 @@
 vm.module @list_ops {
 
+// time cmake --build . -t bytecode_module_test
+// ./iree/vm/bytecode_module_test
+// iree/tools/iree-translate -split-input-file -iree-vm-ir-to-bytecode-module -iree-vm-bytecode-module-output-format=flatbuffer-text /home/cycheng/iree/iree/vm/test/list_ops.mlir -print-ir-after-all
+// iree/tools/iree-translate -iree-vm-ir-to-c-module -o list_ops.h /home/cycheng/iree/iree/vm/test/list_ops.mlir
+
+  vm.export @test_swap_lists
+  vm.func @test_swap_lists() {
+    %c0 = vm.const.i32 0 : i32
+    %c1 = vm.const.i32 1 : i32
+    %c27 = vm.const.i32 27 : i32
+    %c42 = vm.const.i32 42 : i32
+
+    // These allocs shouldn't be CSE'd.
+    %list0 = vm.list.alloc %c1 : (i32) -> !vm.list<i8>
+    %list1 = vm.list.alloc %c1 : (i32) -> !vm.list<i8>
+    vm.list.resize %list0, %c1 : (!vm.list<i8>, i32)
+    vm.list.resize %list1, %c1 : (!vm.list<i8>, i32)
+    vm.list.set.i32 %list0, %c0, %c27 : (!vm.list<i8>, i32, i32)
+    vm.list.set.i32 %list1, %c0, %c42 : (!vm.list<i8>, i32, i32)
+
+    vm.list.swap %list0, %list1 : (!vm.list<i8>, !vm.list<i8>)
+
+    %res0 = vm.list.get.i32 %list0, %c0 : (!vm.list<i8>, i32) -> i32
+    %res1 = vm.list.get.i32 %list1, %c0 : (!vm.list<i8>, i32) -> i32
+    vm.check.eq %res0, %c27, "list0.get(0)=42" : i32
+    vm.check.eq %res1, %c42, "list1.get(0)=27" : i32
+
+    vm.list.copy %list0, %c0, %list1, %c0, %c1 : (!vm.list<i8>, i32, !vm.list<i8>, i32, i32)
+
+    vm.return
+  }
+
   //===--------------------------------------------------------------------===//
   // vm.list.* with I8 types
   //===--------------------------------------------------------------------===//

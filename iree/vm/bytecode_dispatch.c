@@ -1199,6 +1199,46 @@ iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
+    DISPATCH_OP(CORE, ListCopy, {
+      bool list_is_move;
+      iree_vm_ref_t* src_list_ref =
+          VM_DecOperandRegRef("src_list", &list_is_move);
+      iree_vm_list_t* src_list = iree_vm_list_deref(*src_list_ref);
+      if (IREE_UNLIKELY(!src_list)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "src_list is null");
+      }
+      uint32_t src_index = VM_DecOperandRegI32("src_index");
+      iree_vm_ref_t* dst_list_ref =
+          VM_DecOperandRegRef("dst_list", &list_is_move);
+      iree_vm_list_t* dst_list = iree_vm_list_deref(*dst_list_ref);
+      if (IREE_UNLIKELY(!dst_list)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "dst_list is null");
+      }
+      uint32_t dst_index = VM_DecOperandRegI32("dst_index");
+      uint32_t length = VM_DecOperandRegI32("length");
+
+      IREE_RETURN_IF_ERROR(
+          iree_vm_list_copy(src_list, src_index, dst_list, dst_index, length));
+    });
+
+    DISPATCH_OP(CORE, ListSwap, {
+      bool list_is_move;
+      iree_vm_ref_t* list0_ref = VM_DecOperandRegRef("list0", &list_is_move);
+      iree_vm_list_t* list0 = iree_vm_list_deref(*list0_ref);
+      if (IREE_UNLIKELY(!list0)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list0 is null");
+      }
+      iree_vm_ref_t* list1_ref = VM_DecOperandRegRef("list1", &list_is_move);
+      iree_vm_list_t* list1 = iree_vm_list_deref(*list1_ref);
+      if (IREE_UNLIKELY(!list1)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list1 is null");
+      }
+
+      IREE_RETURN_IF_ERROR(iree_vm_list_swap(list0, list1));
+    });
+
     //===------------------------------------------------------------------===//
     // Conditional assignment
     //===------------------------------------------------------------------===//

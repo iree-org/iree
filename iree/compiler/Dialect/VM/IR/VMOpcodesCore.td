@@ -78,6 +78,8 @@ def VM_OPC_ListSetRef            : VM_OPC<0x17, "ListSetRef">;
 // RESERVED: 0x1B slice clone into new list
 // RESERVED: 0x1C read byte buffer?
 // RESERVED: 0x1D write byte buffer?
+def VM_OPC_ListCopy              : VM_OPC<0x1A, "ListCopy">;
+def VM_OPC_ListSwap              : VM_OPC<0x1C, "ListSwap">;
 
 // Conditional assignment:
 def VM_OPC_SelectI32             : VM_OPC<0x1E, "SelectI32">;
@@ -209,6 +211,8 @@ def VM_CoreOpcodeAttr :
     VM_OPC_ListSetI32,
     VM_OPC_ListGetRef,
     VM_OPC_ListSetRef,
+    VM_OPC_ListCopy,
+    VM_OPC_ListSwap,
 
     VM_OPC_SelectI32,
     VM_OPC_SelectRef,

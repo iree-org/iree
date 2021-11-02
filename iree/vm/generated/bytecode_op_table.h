@@ -33,9 +33,9 @@ typedef enum {
   IREE_VM_OP_CORE_ListSetRef = 0x17,
   IREE_VM_OP_CORE_RSV_0x18,
   IREE_VM_OP_CORE_RSV_0x19,
-  IREE_VM_OP_CORE_RSV_0x1A,
+  IREE_VM_OP_CORE_ListCopy = 0x1A, //IREE_VM_OP_CORE_RSV_0x1A,
   IREE_VM_OP_CORE_RSV_0x1B,
-  IREE_VM_OP_CORE_RSV_0x1C,
+  IREE_VM_OP_CORE_ListSwap = 0x1C, //IREE_VM_OP_CORE_RSV_0x1C,
   IREE_VM_OP_CORE_RSV_0x1D,
   IREE_VM_OP_CORE_SelectI32 = 0x1E,
   IREE_VM_OP_CORE_SelectRef = 0x1F,
@@ -292,9 +292,9 @@ typedef enum {
     OPC(0x17, ListSetRef) \
     RSV(0x18) \
     RSV(0x19) \
-    RSV(0x1A) \
+    OPC(0x1A, ListCopy) \
     RSV(0x1B) \
-    RSV(0x1C) \
+    OPC(0x1C, ListSwap) \
     RSV(0x1D) \
     OPC(0x1E, SelectI32) \
     OPC(0x1F, SelectRef) \

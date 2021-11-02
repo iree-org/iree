@@ -1479,6 +1479,66 @@ def VM_ListResizeOp :
   ];
 }
 
+// cy
+def VM_ListSwapOp :
+    VM_Op<"list.swap", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemWrite]>,
+    ]> {
+  let summary = [{swap the list}];
+  let description = [{
+    swap...
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list0,
+    VM_AnyList:$list1
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list0) `,` type($list1) `)`";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListSwap>,
+    VM_EncOperand<"list0", 0>,
+    VM_EncOperand<"list1", 1>,
+  ];
+}
+
+// TODO(benvanik): vm.list.copy(src_list, src_index, dst_list, dst_index, length)
+def VM_ListCopyOp :
+    VM_Op<"list.copy", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemWrite]>,
+    ]> {
+  let summary = [{copy the list}];
+  let description = [{
+    copy...
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$src_list,
+    VM_Index:$src_index,
+    VM_AnyList:$dst_list,
+    VM_Index:$dst_index,
+    VM_Index:$length
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` `(` type($src_list) `,` type($src_index)
+                           `,` type($dst_list) `,` type($dst_index)
+                           `,` type($length) `)`
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListCopy>,
+    VM_EncOperand<"src_list", 0>,
+    VM_EncOperand<"src_index", 1>,
+    VM_EncOperand<"dst_list", 2>,
+    VM_EncOperand<"dst_index", 3>,
+    VM_EncOperand<"length", 4>
+  ];
+}
+
 class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
                             list<OpTrait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
