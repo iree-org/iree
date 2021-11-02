@@ -207,10 +207,6 @@ iree_status_t iree_dynamic_library_load_from_memory(
   iree_status_t status = iree_dynamic_library_load_from_file(
       temp_path, flags, allocator, out_library);
 
-  // Unlink the temp file - it's still open by the loader but won't be
-  // accessible to anyone else and will be deleted once the library is
-  // unloaded.
-  remove(temp_path);
   iree_allocator_free(allocator, temp_path);
 
   IREE_TRACE_ZONE_END(z0);
