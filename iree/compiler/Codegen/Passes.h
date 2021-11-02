@@ -10,6 +10,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Linalg/Transforms/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
@@ -39,6 +40,9 @@ using WorkgroupMemoryAllocationFn = std::function<Value(
 void addLinalgBufferizePasses(
     OpPassManager &passManager,
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
+void addIREEComprehensiveBufferizePasses(
+    OpPassManager &passManager,
+    linalg::AllocationCallbacks allocationFn = linalg::AllocationCallbacks());
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -72,6 +76,8 @@ std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
 /// and default memory space.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
+std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
+    linalg::AllocationCallbacks = linalg::AllocationCallbacks());
 
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();

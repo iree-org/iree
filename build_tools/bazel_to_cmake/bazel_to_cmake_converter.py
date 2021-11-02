@@ -15,7 +15,7 @@ See bazel_to_cmake.py for usage.
 # pylint: disable=exec-used
 
 import itertools
-import textwrap
+import re
 
 import bazel_to_cmake_targets
 
@@ -611,8 +611,11 @@ class BuildFileFunctions(object):
       drivers = [it[1] for it in target_backends_and_drivers]
 
     name_block = _convert_string_arg_block("NAME", name, quote=False)
+    # For now we assume that the generator target is a py_binary with a single
+    # source .py file named like it.
+    generator_py = f"{generator.split(':')[-1]}.py"
     generator_block = _convert_string_arg_block("GENERATOR",
-                                                generator,
+                                                generator_py,
                                                 quote=True)
     generator_args_block = _convert_string_list_block("GENERATOR_ARGS",
                                                       generator_args)
@@ -638,6 +641,7 @@ class BuildFileFunctions(object):
                             f"{labels_block}"
                             f"{opt_flags_block}"
                             f")\n\n")
+
 
   def iree_e2e_cartesian_product_test_suite(self,
                                             name,

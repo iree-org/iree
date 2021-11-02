@@ -172,6 +172,7 @@ FAILING_STATIC = [
             "MaxPool2D",
             "Conv3D",  #TODO(#5150): Enable the test.
             "Conv3DTranspose",  #TODO(#5150): Enable the test.
+            "UpSampling3D",  #TODO(#7481): rank-reducing memref folder generates invalid linalg.copy ops for SwiftShader.
         ],
         "target_backends": "iree_vulkan",
     },

@@ -7,57 +7,46 @@
 # An image for cross-compiling IREE's TFLite Java Bindings with Gradle and
 # CMake.
 
+FROM gcr.io/iree-oss/base@sha256:b8d9863c6ac913f167c6fab319d7cd883ab099312488709ee30b29976d63eb22
+
+### Java ###
+WORKDIR /install-jdk
+# Download and install openjdk-11
 ARG JDK_VERSION=11
+RUN apt-get update && apt-get install -y openjdk-11-jdk
+
+### Gradle ###
+WORKDIR /install-gradle
 
 ARG GRADLE_VERSION=7.1.1
 ARG GRADLE_DIST=bin
 
-ARG ANDROID_SDK_VERSION=7583922
-ARG ANDROID_NDK_VERSION=21.4.7075529
-
-FROM gcr.io/iree-oss/util@sha256:c9691ba3cd4287cee61be42103888d7c6f02c44c7c7b7d30a3dca7fc73ee92cb AS install-deps
-ARG GRADLE_VERSION
-ARG GRADLE_DIST
-ARG ANDROID_SDK_VERSION
-
 # Download and install Gradle
-RUN cd /opt && \
-    wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
-    unzip gradle*.zip && \
-    rm gradle*.zip && \
-    ln -s /opt/gradle-${GRADLE_VERSION}/bin/gradle /usr/bin/gradle
+RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-${GRADLE_DIST}.zip && \
+    unzip -q gradle*.zip -d /opt/ && \
+    ln -s /opt/gradle-${GRADLE_VERSION}/bin/gradle /usr/bin/gradle \
+    rm -rf /install-gradle
+
+### Android ###
+WORKDIR /install-android
 
 # Download and install Android SDK
 # Note: Uses the latest SDK version from https://developer.android.com/studio,
 # however Gradle will automatically download any additional SDK/tooling versions
 # as necessary.
+ARG ANDROID_SDK_VERSION=7583922
+ARG ANDROID_NDK_VERSION=21.4.7075529
+
 ENV ANDROID_SDK_ROOT /opt/android-sdk
-RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
-    wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_VERSION}_latest.zip && \
-    unzip *tools*linux*.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools && \
-    mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/tools && \
-    rm *tools*linux*.zip
-
-FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 as final
-ARG ANDROID_SDK_VERSION
-ARG ANDROID_NDK_VERSION
-ARG GRADLE_VERSION
-ENV ANDROID_SDK_ROOT /opt/android-sdk
-
-# Download and install openjdk-11
-ARG JDK_VERSION
-RUN apt-get update && apt-get install -y openjdk-11-jdk
-
-# Copy /opt/ (Gradle + Android SDK) thenlink Gradle bin
-COPY --from=install-deps /opt/ /opt/
-RUN  ln -s /opt/gradle-${GRADLE_VERSION}/bin/gradle /usr/bin/gradle
-
-# Accept the license agreements of the Android SDK components
-RUN yes | ${ANDROID_SDK_ROOT}/cmdline-tools/tools/bin/sdkmanager --licenses
-
-# Install the Android NDK
-RUN /opt/android-sdk/cmdline-tools/tools/bin/sdkmanager --install "ndk;$ANDROID_NDK_VERSION"
-
-# Define environment variables for the NDK/SDK
 ENV ANDROID_HOME ${ANDROID_SDK_ROOT}
 ENV ANDROID_NDK /opt/android-sdk/ndk/${ANDROID_NDK_VERSION}
+
+RUN mkdir -p "${ANDROID_SDK_ROOT?}/cmdline-tools" \
+    && wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_VERSION?}_latest.zip" \
+    && unzip -q *tools*linux*.zip -d "${ANDROID_SDK_ROOT?}/cmdline-tools" \
+    && mv "${ANDROID_SDK_ROOT?}/cmdline-tools/cmdline-tools" "${ANDROID_SDK_ROOT?}/cmdline-tools/tools" \
+    && yes | "${ANDROID_SDK_ROOT?}/cmdline-tools/tools/bin/sdkmanager" --licenses \
+    && /opt/android-sdk/cmdline-tools/tools/bin/sdkmanager --install "ndk;${ANDROID_NDK_VERSION?}" \
+    && rm -rf /install-android
+
+WORKDIR /

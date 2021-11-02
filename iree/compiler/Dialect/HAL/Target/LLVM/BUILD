@@ -42,6 +42,7 @@ cc_library(
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Target/LLVM/librt",
+        "//iree/compiler/Dialect/HAL/Target/LLVM/librt:librt64",
         "@llvm-project//llvm:AArch64AsmParser",
         "@llvm-project//llvm:AArch64CodeGen",
         "@llvm-project//llvm:ARMAsmParser",

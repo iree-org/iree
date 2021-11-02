@@ -7,7 +7,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Cross-compile the project towards riscv with the
-# gcr.io/iree-oss/cmake-riscv image using Kokoro.
+# gcr.io/iree-oss/riscv image using Kokoro.
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -24,7 +24,7 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-riscv@sha256:2b8ade4c8aa47637160994f07134e51c1e68f5422118499f86236e255471b818 \
+  gcr.io/iree-oss/riscv@sha256:d1a4d8e5dafac00e5b582c9ef120a3c5cb81287a768662aed1c3466b1cdc4dd5 \
   build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

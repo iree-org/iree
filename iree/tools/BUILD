@@ -336,6 +336,25 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-e2e-matmul-test",
+    srcs = ["iree-e2e-matmul-test.c"],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+        "//iree/base/internal:file_path",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/drivers",
+        "//iree/modules/hal",
+        "//iree/tools/utils:trace_replay",
+        "//iree/tools/utils:yaml_util",
+        "//iree/vm",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
+
+cc_binary(
     name = "iree-tblgen",
     srcs = [
         "//iree/compiler/Dialect/Util/Tools:GenSrcs",

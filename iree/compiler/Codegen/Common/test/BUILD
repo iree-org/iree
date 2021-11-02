@@ -22,6 +22,7 @@ iree_lit_test_suite(
             "affinemin_canonicalization.mlir",
             "canonicalize_interface_load_store.mlir",
             "dead_alloc.mlir",
+            "iree_comprehensive_bufferize.mlir",
             "f32Tof16.mlir",
             "flatten_memref_subspan.mlir",
             "fold_tensor_extract_op.mlir",
