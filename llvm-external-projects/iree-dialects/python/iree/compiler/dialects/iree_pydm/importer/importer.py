@@ -295,7 +295,6 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
           target_id = target.id
           d.StoreVarOp(fctx.find_variable(target_id), boxed)
       elif isinstance(target, ast.Subscript):
-        print(f"ASSIGN: value={target.value}, slice={target.slice}")
         subscript_target_expr = ExpressionImporter(fctx)
         subscript_target_expr.visit(target.value)
         subscript_slice_expr = ExpressionImporter(fctx)
