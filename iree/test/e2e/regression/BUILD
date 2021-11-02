@@ -105,9 +105,14 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
+py_binary(
+    name = "generate_e2e_matmul_tests",
+    srcs = ["generate_e2e_matmul_tests.py"],
+)
+
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_%s_small" % lhs_rhs_type,
-    generator = "generate_e2e_matmul_tests.py",
+    generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=small",
@@ -124,7 +129,7 @@ iree_check_single_backend_test_suite(
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_small" % lhs_rhs_type,
-    generator = "generate_e2e_matmul_tests.py",
+    generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=small",
@@ -144,7 +149,7 @@ iree_check_single_backend_test_suite(
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
-    generator = "generate_e2e_matmul_tests.py",
+    generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=large",

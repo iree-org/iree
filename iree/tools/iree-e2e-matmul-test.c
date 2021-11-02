@@ -14,7 +14,6 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
-#include "iree/hal/buffer_view.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tools/utils/trace_replay.h"
