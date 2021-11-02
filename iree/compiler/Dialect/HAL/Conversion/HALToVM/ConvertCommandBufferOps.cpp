@@ -38,26 +38,15 @@ class CommandBufferFillBufferOpConversion
         newOperands.length(),
     };
 
-    // The pattern will be promoted as needed to a 32 bit type, but we still
-    // need to bitcast from float to int and track the original pattern length.
-    auto originalPatternType = op.pattern().getType();
-    auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
+    // Record the original pattern length then extend it to a 32 bit type.
+    auto patternBitWidth = op.pattern().getType().getIntOrFloatBitWidth();
     auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternBitWidth / 8, 32);
-    Value pattern;
-    if (originalPatternType.isInteger(8) || originalPatternType.isInteger(16) ||
-        originalPatternType.isInteger(32)) {
-      pattern = op.pattern();
-    } else if (originalPatternType.isF32()) {
-      pattern = rewriter.createOrFold<arith::BitcastOp>(
-          op.getLoc(), rewriter.getIntegerType(patternBitWidth), op.pattern());
-    } else {
-      // Note: f16 in particular would need special handling since a promotion
-      // to f32 changes the bit representation.
-      return op.emitOpError()
-             << "unhandled fill buffer type: " << originalPatternType;
-    }
-    callOperands.push_back(pattern);
+    auto patternInt = rewriter.createOrFold<arith::BitcastOp>(
+        op.getLoc(), rewriter.getIntegerType(patternBitWidth), op.pattern());
+    auto patternExtended = rewriter.createOrFold<arith::ExtUIOp>(
+        op.getLoc(), patternInt, rewriter.getIntegerType(32));
+    callOperands.push_back(patternExtended);
     callOperands.push_back(patternLength);
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
