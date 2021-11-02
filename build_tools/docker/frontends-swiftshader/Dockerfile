@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/frontends@sha256:3c2d4eee30a0db549402217f5b874f3f47fa257310d75a2700b14b070ed8e0c8
+FROM gcr.io/iree-oss/frontends@sha256:f9490f31ff09c2053a9972a002f6af65fcace41d834583754ea93c6df35ff1f4
 COPY --from=gcr.io/iree-oss/swiftshader@sha256:715bdde46dbf454c8b20b9f193ff5ca4b02c1e33a1bfbe83d60921aa21d64664 \
   /swiftshader /swiftshader
 

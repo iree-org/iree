@@ -48,7 +48,7 @@ IMAGES_TO_DEPENDENCIES = {
     'nvidia': ['base'],
     'riscv': ['base'],
     'gradle-android': ['base'],
-    'frontends': ['base'],
+    'frontends': ['android'],
     'rbe-toolchain': ['base'],
     'swiftshader': ['base'],
     'samples': ['swiftshader'],
