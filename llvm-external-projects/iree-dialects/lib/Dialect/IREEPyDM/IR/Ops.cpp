@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/IREEPyDM/IR/Ops.h"
 
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/Builders.h"
@@ -39,15 +40,19 @@ namespace {
 /// Generic pattern to unbox any operands that are a specific object
 /// type (i.e. object<integer>).
 struct UnboxOperands : public RewritePattern {
-  UnboxOperands(StringRef rootName, MLIRContext *context)
-      : RewritePattern(rootName, 1, context) {}
+  UnboxOperands(StringRef rootName, MLIRContext *context,
+                Optional<llvm::SmallSet<int, 4>> operandIndices = None)
+      : RewritePattern(rootName, 1, context), operandIndices(operandIndices) {}
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     Location loc = op->getLoc();
     bool changed = false;
     SmallVector<Value> operands(op->getOperands());
     auto excResultType = rewriter.getType<ExceptionResultType>();
-    for (Value &operand : operands) {
+    for (int operandIndex = 0, e = operands.size(); operandIndex < e;
+         ++operandIndex) {
+      Value &operand = operands[operandIndex];
+      if (operandIndices && !operandIndices->contains(operandIndex)) continue;
       if (auto objectType = operand.getType().dyn_cast<ObjectType>()) {
         Type primitiveType = objectType.getPrimitiveType();
         if (primitiveType) {
@@ -67,6 +72,7 @@ struct UnboxOperands : public RewritePattern {
 
     return failure();
   }
+  Optional<llvm::SmallSet<int, 4>> operandIndices;
 };
 
 }  // namespace
@@ -262,6 +268,18 @@ OpFoldResult AsBoolOp::fold(ArrayRef<Attribute> operands) {
   }
 
   return {};
+}
+
+//===----------------------------------------------------------------------===//
+// AssignSubscriptOp
+//===----------------------------------------------------------------------===//
+
+void AssignSubscriptOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                    MLIRContext *context) {
+  llvm::SmallSet<int, 4> unboxIndices;
+  unboxIndices.insert(0);
+  unboxIndices.insert(1);
+  patterns.add<UnboxOperands>(getOperationName(), context, unboxIndices);
 }
 
 //===----------------------------------------------------------------------===//

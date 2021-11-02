@@ -280,6 +280,8 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     expr.visit(node.value)
     for target in node.targets:
       fctx.update_loc(target)
+      # All assignment nodes (Attribute, Subscript, Starred, Name, List, Tuple)
+      # have a `ctx`.
       target_ctx = target.ctx  # pytype: disable=attribute-error
       if not isinstance(target_ctx, ast.Store):
         # TODO: Del, AugStore, etc
@@ -287,11 +289,26 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
             f"unsupported assignment context type {target_ctx.__class__.__name__}"
         )
 
-      # TODO: Support assignment to non-free slots.
-      boxed = ic.box(expr.get_immediate())
-      with ic.loc, ic.ip:
-        target_id = target.id  # pytype: disable=attribute-error
-        d.StoreVarOp(fctx.find_variable(target_id), boxed)
+      if isinstance(target, ast.Name):
+        boxed = ic.box(expr.get_immediate())
+        with ic.loc, ic.ip:
+          target_id = target.id
+          d.StoreVarOp(fctx.find_variable(target_id), boxed)
+      elif isinstance(target, ast.Subscript):
+        print(f"ASSIGN: value={target.value}, slice={target.slice}")
+        subscript_target_expr = ExpressionImporter(fctx)
+        subscript_target_expr.visit(target.value)
+        subscript_slice_expr = ExpressionImporter(fctx)
+        subscript_slice_expr.visit(target.slice)
+        fctx.update_loc(node)
+        with ic.loc, ic.ip:
+          exc_result = d.AssignSubscriptOp(
+              d.ExceptionResultType.get(),
+              subscript_target_expr.get_immediate(),
+              subscript_slice_expr.get_immediate(), expr.get_immediate()).result
+          d.RaiseOnFailureOp(exc_result)
+      else:
+        ic.abort(f"unsupported assignment target: {target.__class__.__name__}")
 
   def visit_Break(self, node: ast.Break):
     if self.terminated:

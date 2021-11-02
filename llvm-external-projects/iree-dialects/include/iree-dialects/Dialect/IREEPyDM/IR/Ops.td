@@ -15,6 +15,31 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 //===----------------------------------------------------------------------===//
+// Non-variable assignment
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_AssignSubscriptOp : IREEPyDM_Op<"assign_subscript", [
+    MemoryEffects<[MemWrite]>,
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
+  let summary = "Assign to a subscript";
+  let description = [{
+    This implements the subscripted assignment form. In Python this is:
+      foo[index] = bar
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$lhs,
+    IREEPyDM_AnyValueType:$slice,
+    IREEPyDM_AnyValueType:$rhs
+  );
+  let results = (outs IREEPyDM_ExceptionResultType:$exc_result);
+  let assemblyFormat = [{
+    $lhs `[` $slice `]` `=` $rhs `:` type(operands) attr-dict
+  }];
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Variable access
 //===----------------------------------------------------------------------===//
 
