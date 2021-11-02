@@ -55,7 +55,7 @@ class EmbeddedLinkerTool : public LinkerTool {
 
     // No explicit linker specified, search the environment for common tools.
     std::string environmentPath =
-        findToolInEnvironment({"lld", "ld.lld", "lld-link"});
+        findToolInEnvironment({"iree-lld", "lld", "ld.lld", "lld-link"});
     if (!environmentPath.empty()) return environmentPath;
 
     llvm::errs() << "LLD (ld.lld) not found on path; specify with the "
