@@ -135,6 +135,7 @@ iree_check_single_backend_test_suite(
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
+            "pow.mlir",
             "reduce.mlir",
             "reduce_window.mlir",
             "remainder.mlir",
@@ -160,7 +161,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             #TODO(#7415): Enable this after failures with bazel bot
             #and cmake-swiftshared bot are addressed
-            "pow.mlir",
             "round.mlir",
         ],
     ),

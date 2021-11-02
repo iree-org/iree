@@ -11,7 +11,7 @@ IREE_BASE_SRCS = $(addprefix $(srcdir)/, \
 	src/math/powf.c \
 	src/math/powf_data.c \
 	src/math/exp2f_data.c \
-	src/math/__math_invalid.c \
+	src/math/__math_invalidf.c \
 	src/math/__math_oflowf.c \
 	src/math/__math_uflowf.c \
 	src/math/__math_xflowf.c)
