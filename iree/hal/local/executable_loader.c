@@ -34,7 +34,7 @@ iree_status_t iree_hal_executable_import_provider_resolve(
   iree_status_t status =
       import_provider.resolve(import_provider.self, symbol_name, out_fn_ptr);
   if (!iree_status_is_ok(status) && is_weak) {
-    iree_status_ignore(status);  // ok to fail on weak symbols
+    status = iree_status_ignore(status);  // ok to fail on weak symbols
   }
 
   return status;

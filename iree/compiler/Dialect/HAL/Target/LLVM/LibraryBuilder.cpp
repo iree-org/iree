@@ -276,20 +276,39 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ImportTable(
     std::string libraryName) {
   auto &context = module->getContext();
   auto *importTableType = makeImportTableType(context);
-  auto *i8PtrType = llvm::IntegerType::getInt8Ty(context);
+  auto *i8Type = llvm::IntegerType::getInt8Ty(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  llvm::Constant *zero = llvm::ConstantInt::get(i32Type, 0);
 
-  // Not yet implemented; we'd want to sort all the imports alphabetically first
-  // before encoding and add the `?` suffix for weak symbols.
+  llvm::Constant *symbolNames =
+      llvm::Constant::getNullValue(i8Type->getPointerTo());
+  if (!imports.empty()) {
+    SmallVector<llvm::Constant *, 4> symbolNameValues;
+    for (auto &import : imports) {
+      auto symbolName = import.symbol_name;
+      if (import.weak) {
+        symbolName += "?";
+      }
+      symbolNameValues.push_back(getStringConstant(symbolName, module));
+    }
+    auto *symbolNamesType =
+        llvm::ArrayType::get(i8Type->getPointerTo(), symbolNameValues.size());
+    auto *global = new llvm::GlobalVariable(
+        *module, symbolNamesType, /*isConstant=*/true,
+        llvm::GlobalVariable::PrivateLinkage,
+        llvm::ConstantArray::get(symbolNamesType, symbolNameValues),
+        /*Name=*/libraryName + "_import_names");
+    symbolNames = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        symbolNamesType, global, ArrayRef<llvm::Constant *>{zero, zero});
+  }
 
   return llvm::ConstantStruct::get(
-      importTableType,
-      {
-          // count=
-          llvm::ConstantInt::get(i32Type, 0),
-          // symbols=
-          llvm::Constant::getNullValue(i8PtrType->getPointerTo()),
-      });
+      importTableType, {
+                           // count=
+                           llvm::ConstantInt::get(i32Type, imports.size()),
+                           // symbols=
+                           symbolNames,
+                       });
 }
 
 llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
