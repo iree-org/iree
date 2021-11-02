@@ -43,27 +43,17 @@ DOCKER_DIR = 'build_tools/docker/'.replace('/', os.sep)
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
     'base': [],
-    'bazel': ['base', 'util'],
-    'cmake': ['base', 'util'],
-    'cmake-android': ['cmake', 'util'],
-    'cmake-emscripten': ['cmake'],
-    'cmake-gcc': ['cmake'],
-    'cmake-vulkan': ['cmake', 'vulkan'],
-    'cmake-swiftshader': ['cmake-vulkan', 'swiftshader'],
-    'cmake-nvidia': ['cmake-vulkan', 'util'],
-    'cmake-riscv': ['cmake', 'util'],
-    'cmake-bazel-frontends': ['cmake', 'bazel'],
-    'cmake-bazel-frontends-vulkan': ['cmake-bazel-frontends', 'vulkan'],
-    'cmake-bazel-frontends-swiftshader': [
-        'cmake-bazel-frontends-vulkan', 'swiftshader'
-    ],
-    'cmake-bazel-frontends-nvidia': ['cmake-bazel-frontends-vulkan'],
-    'gradle-android': ['cmake'],
-    'rbe-toolchain': ['vulkan'],
-    'samples': ['cmake-swiftshader'],
-    'swiftshader': ['cmake'],
-    'util': [],
-    'vulkan': ['util'],
+    'android': ['base'],
+    'emscripten': ['base'],
+    'nvidia': ['base'],
+    'riscv': ['base'],
+    'gradle-android': ['base'],
+    'frontends': ['android'],
+    'rbe-toolchain': ['base'],
+    'swiftshader': ['base'],
+    'samples': ['swiftshader'],
+    'frontends-swiftshader': ['frontends', 'swiftshader'],
+    'frontends-nvidia': ['frontends'],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}

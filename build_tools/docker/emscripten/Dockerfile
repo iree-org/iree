@@ -4,9 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# An image for building IREE through Emscripten using CMake.
+# An image for building IREE through Emscripten.
 
-FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 AS final
+FROM gcr.io/iree-oss/base@sha256:b8d9863c6ac913f167c6fab319d7cd883ab099312488709ee30b29976d63eb22
 
 # See also
 #   * https://github.com/emscripten-core/emsdk/blob/main/docker/Dockerfile
@@ -15,9 +15,11 @@ FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a
 ARG EMSDK_COMMIT=5c0e31a03a72136ccaa761c408baf5a640f942ec
 ARG SDK_VERSION=2.0.25
 
+WORKDIR /
+
 # Follow https://emscripten.org/docs/getting_started/downloads.html.
-RUN git clone https://github.com/emscripten-core/emsdk
-RUN cd emsdk && git checkout "${EMSDK_COMMIT?}" && \
+RUN git clone https://github.com/emscripten-core/emsdk \
+    && cd emsdk && git checkout "${EMSDK_COMMIT?}" && \
     ./emsdk install ${SDK_VERSION?} && \
     ./emsdk activate ${SDK_VERSION?}
 
@@ -36,9 +38,9 @@ ENV EM_PORTS=${EM_DATA}/ports
 # Since (A) requires less configuration, we'll do that. If multiple tools would
 # want a user directory (like Bazel), we should switch to (B).
 # See https://github.com/emscripten-core/emsdk/issues/535
-RUN mkdir -p ${EM_CACHE} && chmod -R 777 ${EM_CACHE}
+RUN mkdir -p "${EM_CACHE?}" && chmod -R 777 "${EM_CACHE?}"
 
 # Normally we'd run `source emsdk_env.sh`, but that doesn't integrate with
 # Docker's environment properties model. Instead, we directly extend the path
 # to include the directories suggested by `emsdk activate`.
-ENV PATH="$PWD/emsdk:$PWD/emsdk/node/14.15.5_64bit/bin:$PWD/emsdk/upstream/emscripten:$PATH"
+ENV PATH="${EMSDK?}:${EMSDK?}/node/14.15.5_64bit/bin:${EMSDK?}/upstream/emscripten:$PATH"
