@@ -100,6 +100,7 @@ cc_library(
     deps = [
         "//iree/compiler/Bindings/Native/Transforms",
         "//iree/compiler/Bindings/TFLite/Transforms",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
@@ -327,6 +328,25 @@ cc_binary(
         "//iree/base/internal:flags",
         "//iree/hal",
         "//iree/hal/drivers",
+        "//iree/tools/utils:trace_replay",
+        "//iree/tools/utils:yaml_util",
+        "//iree/vm",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
+
+cc_binary(
+    name = "iree-e2e-matmul-test",
+    srcs = ["iree-e2e-matmul-test.c"],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+        "//iree/base/internal:file_path",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/drivers",
+        "//iree/modules/hal",
         "//iree/tools/utils:trace_replay",
         "//iree/tools/utils:yaml_util",
         "//iree/vm",

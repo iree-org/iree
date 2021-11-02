@@ -499,6 +499,155 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
   return status;
 }
 
+// Writes an element of the given |element_type| with the given integral |value|
+// to |dst|.
+static void iree_trace_replay_write_element(
+    iree_hal_element_type_t element_type, int value, void* dst) {
+#define IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(ETYPE, CTYPE) \
+  case IREE_HAL_ELEMENT_TYPE_##ETYPE:                      \
+    *(CTYPE*)dst = (CTYPE)value;                           \
+    break;
+
+  switch (element_type) {
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_8, int8_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_16, int16_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_32, int32_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_64, int64_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_8, uint8_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_16, uint16_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_32, uint32_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_64, uint64_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_32, float)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_64, double)
+    default:
+      IREE_ASSERT(false, "unhandled element type");
+      break;
+  }
+
+#undef IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE
+}
+
+// Writes an identity matrix, with matrix elements of the given |element_type|,
+// to the destination |span|. The matrix shape is inferred from |inner_size|
+// and the span's length.
+//
+// Here by 'identity matrix' we mean any two-dimensional array of integers
+// of the form
+//
+//   array[i, j] = ((i == j) ? 1 : 0)
+//
+// Technically they are only called 'identity matrix' for square shapes.
+//
+// These identity matrices are useful in matrix multiplication tests to
+// generate testcases that are easy to debug numerically, as the identity
+// matrix is the neutral element for matrix multiplication.
+static void iree_trace_replay_generate_identity_matrix(
+    iree_hal_element_type_t element_type, iree_byte_span_t span,
+    iree_hal_dim_t inner_size) {
+  iree_host_size_t element_byte_count =
+      iree_hal_element_byte_count(element_type);
+  uint8_t* data_end = span.data + span.data_length;
+  iree_host_size_t inner_index = 0;
+  iree_host_size_t outer_index = 0;
+  for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
+    int value = inner_index == outer_index ? 1 : 0;
+    iree_trace_replay_write_element(element_type, value, data);
+    ++inner_index;
+    if (inner_index == inner_size) {
+      inner_index = 0;
+      ++outer_index;
+    }
+  }
+}
+
+// Simple deterministic pseudorandom generator.
+// Typically in tests we want reproducible results both across runs and across
+// machines.
+static uint8_t iree_trace_replay_pseudorandom_uint8(uint32_t* state) {
+  // Same as C++'s std::minstd_rand.
+  *state = (*state * 48271) % 2147483647;
+  // return the second-least-signicant out of the 4 bytes of state. it avoids
+  // some mild issues with the least-significant and most-significant bytes.
+  return *state >> 8;
+}
+
+// Fills the destination span with pseudorandom values of the given
+// |element_type|. The given |seed| is passed to the pseudorandom generator.
+// The pseudorandom values are reproducible both across runs and across
+// machines.
+static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
+    iree_hal_element_type_t element_type, iree_byte_span_t span,
+    uint32_t seed) {
+  const bool is_unsigned = iree_hal_element_numerical_type(element_type) ==
+                           IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED;
+  iree_host_size_t element_byte_count =
+      iree_hal_element_byte_count(element_type);
+  uint8_t* data_end = span.data + span.data_length;
+  uint32_t state = seed;
+  for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
+    int value_in_uint8_range = iree_trace_replay_pseudorandom_uint8(&state);
+    int value = value_in_uint8_range + (is_unsigned ? 0 : -128);
+    iree_trace_replay_write_element(element_type, value, data);
+  }
+}
+
+// Generates the destination |buffer| using the generator specified by
+// |contents_generator_node|.
+static iree_status_t iree_trace_replay_generate_hal_buffer(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* contents_generator_node, iree_hal_element_type_t element_type,
+    iree_hal_buffer_t* buffer, iree_hal_dim_t* shape,
+    iree_host_size_t shape_size) {
+  if (!contents_generator_node) {
+    return iree_ok_status();
+  } else if (contents_generator_node->type != YAML_SCALAR_NODE) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "(%zu): expected scalar node for buffer contents_generator",
+        contents_generator_node->start_mark.line);
+  }
+
+  iree_hal_buffer_mapping_t mapping;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_map_range(buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0,
+                                IREE_WHOLE_BUFFER, &mapping));
+  iree_status_t status = iree_ok_status();
+  if (strcmp(contents_generator_node->tag, "!tag:iree:identity_matrix") == 0) {
+    if (shape_size == 2) {
+      iree_hal_dim_t inner_size = shape[shape_size - 1];
+      iree_trace_replay_generate_identity_matrix(element_type, mapping.contents,
+                                                 inner_size);
+    } else {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "the identity_matrix generator is only for 2D shapes (matrices)");
+    }
+  } else if (strcmp(contents_generator_node->tag,
+                    "!tag:iree:fully_specified_pseudorandom") == 0) {
+    // To enable pseudorandom tests that are both reproducible and invariant
+    // under reordering and filtering testcases, the seed is explicitly
+    // passed as argument in the contents_generator tag.
+    iree_string_view_t seed_str = iree_string_view_trim(
+        iree_yaml_node_as_string(contents_generator_node));
+    uint32_t seed;
+    if (iree_string_view_atoi_uint32(seed_str, &seed)) {
+      iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
+          element_type, mapping.contents, seed);
+    } else {
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "could not parse the seed argument ('%s') of "
+                                "the fully_specified_pseudorandom tag",
+                                seed_str.data);
+    }
+  } else {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED, "(%zu): unimplemented buffer generator '%s'",
+        contents_generator_node->start_mark.line, contents_generator_node->tag);
+  }
+  iree_hal_buffer_unmap_range(&mapping);
+  return status;
+}
+
 // Parses a !hal.buffer_view and appends it to |target_list|.
 //
 // ```yaml
@@ -541,6 +690,18 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
       document, value_node, iree_make_cstring_view("contents"),
       &contents_node));
 
+  yaml_node_t* contents_generator_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
+      document, value_node, iree_make_cstring_view("contents_generator"),
+      &contents_generator_node));
+
+  if (contents_node && contents_generator_node) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "(%zu): cannot have both contents and contents_generator",
+        contents_generator_node->start_mark.line);
+  }
+
   iree_device_size_t allocation_size = 0;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_compute_view_size(
       shape, shape_rank, element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
@@ -551,8 +712,15 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
       iree_hal_device_allocator(replay->device),
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
       IREE_HAL_BUFFER_USAGE_ALL, allocation_size, &buffer));
-  iree_status_t status = iree_trace_replay_parse_hal_buffer(
-      replay, document, contents_node, element_type, buffer);
+  iree_status_t status = iree_trace_replay_generate_hal_buffer(
+      replay, document, contents_generator_node, element_type, buffer, shape,
+      shape_rank);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_buffer_release(buffer);
+    return status;
+  }
+  status = iree_trace_replay_parse_hal_buffer(replay, document, contents_node,
+                                              element_type, buffer);
   if (!iree_status_is_ok(status)) {
     iree_hal_buffer_release(buffer);
     return status;

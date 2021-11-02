@@ -1,5 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute))))' %s | IreeFileCheck %s
 
+#config = #iree_codegen.lowering.config<tile_sizes = [[1, 16], [1, 1]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [16, 1]>
 hal.executable private @static_scatter_update_slice  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -10,7 +12,7 @@ hal.executable private @static_scatter_update_slice  {
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb"> {
     hal.executable.entry_point @static_scatter_update_slice attributes {
       interface = @io, ordinal = 0 : index,
-      translation.info = {passPipeline = 5 : i32, workloadPerWorkgroup = [16, 1]},
+      translation.info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }
 
@@ -36,7 +38,7 @@ hal.executable private @static_scatter_update_slice  {
             %8 = memref.subview %1[%arg0, 0] [1, 1] [1, 1] : memref<40x1xi32> to memref<1x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>
             %9 = memref.cast %8 : memref<1x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>> to memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>
             %10 = memref.subview %2[0, %arg1] [100, %5] [1, 1] : memref<100x500xi32> to memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>
-            linalg_ext.scatter {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[1, 16], [1, 1]]}} ins(%7, %9 : memref<?x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>, memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>) outs(%10 : memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>)  {
+            linalg_ext.scatter {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%7, %9 : memref<?x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>, memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>) outs(%10 : memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
               linalg_ext.yield %arg2 : i32
             }

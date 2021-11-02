@@ -13,26 +13,19 @@
 // MALI: #spv.target_env<#spv.vce<v1.4, [Shader, Float16, Int16, Int8, StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformClustered, GroupNonUniformQuad, VariablePointers, VariablePointersStorageBuffer], [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, ARM:IntegratedGPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 32768 : i32, max_compute_workgroup_invocations = 512 : i32, max_compute_workgroup_size = dense<512> : vector<3xi32>, subgroup_size = 16 : i32}>
 // TURINGT4: #spv.target_env<#spv.vce<v1.5, [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative, GroupNonUniformClustered, GroupNonUniformQuad, VariablePointers, VariablePointersStorageBuffer, CooperativeMatrixNV], [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU, {cooperative_matrix_properties_nv = [{a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32, m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32}, {a_type = f16, b_type = f16, c_type = f16, k_size = 16 : i32, m_size = 16 : i32, n_size = 16 : i32, result_type = f16, scope = 3 : i32}, {a_type = f16, b_type = f16, c_type = f32, k_size = 16 : i32, m_size = 16 : i32, n_size = 16 : i32, result_type = f32, scope = 3 : i32}], max_compute_shared_memory_size = 49152 : i32, max_compute_workgroup_invocations = 1024 : i32, max_compute_workgroup_size = dense<[1024, 1024, 64]> : vector<3xi32>, subgroup_size = 32 : i32}>
 // AMD5700XT: #spv.target_env<#spv.vce<v1.5, [Shader, Float64, Float16, Int64, Int16, Int8, StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8, GroupNonUniform, GroupNonUniformVote, GroupNonUniformArithmetic, GroupNonUniformBallot, GroupNonUniformShuffle, GroupNonUniformShuffleRelative, GroupNonUniformClustered, GroupNonUniformQuad, VariablePointers, VariablePointersStorageBuffer], [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, AMD:DiscreteGPU, {cooperative_matrix_properties_nv = [], max_compute_shared_memory_size = 65536 : i32, max_compute_workgroup_invocations = 1024 : i32, max_compute_workgroup_size = dense<1024> : vector<3xi32>, subgroup_size = 64 : i32}>
-#map0 = affine_map<(d0) -> (d0)>
-flow.executable @simpleMath_dispatch_0 {
-  flow.dispatch.entry @simpleMath_dispatch_0 attributes {workgroup_rank = 3 : index}
+
+flow.executable @reduce_dispatch {
+  flow.dispatch.entry @reduce_dispatch attributes {workgroup_rank = 3 : index}
   builtin.module {
-    func @simpleMath_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4xf32>) {
-      %c4 = arith.constant 4 : index
-      %c1 = arith.constant 1 : index
-      %c0 = arith.constant 0 : index
-      %0 = flow.dispatch.tensor.load %arg0, offsets = [%c0], sizes = [%c4], strides = [%c1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
-      %1 = linalg.init_tensor [4] : tensor<4xf32>
-      %2 = linalg.generic {
-        indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-        iterator_types = ["parallel"]}
-        ins(%0 : tensor<4xf32>)
-        outs(%1 : tensor<4xf32>)  {
-      ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
-        %3 = arith.addf %arg3, %arg3 : f32
-        linalg.yield %3 : f32
-      } -> tensor<4xf32>
-      flow.dispatch.tensor.store %2, %arg1, offsets = [%c0], sizes = [%c4], strides = [%c1] : tensor<4xf32> -> !flow.dispatch.tensor<writeonly:4xf32>
+    func @reduce_dispatch(%arg0: !flow.dispatch.tensor<readonly:16xf32>, %arg1: !flow.dispatch.tensor<writeonly:f32>) {
+      %0 = linalg.init_tensor [] : tensor<f32>
+      %1 = flow.dispatch.tensor.load %arg0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%1 : tensor<16xf32>) outs(%0 : tensor<f32>) {
+      ^bb0(%arg2: f32, %arg3: f32):
+        %4 = arith.addf %arg2, %arg3 : f32
+        linalg.yield %4 : f32
+      } -> tensor<f32>
+      flow.dispatch.tensor.store %3, %arg1, offsets=[], sizes=[], strides=[] : tensor<f32> -> !flow.dispatch.tensor<writeonly:f32>
       return
     }
   }

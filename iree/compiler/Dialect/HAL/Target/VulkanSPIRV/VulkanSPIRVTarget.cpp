@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -119,8 +120,8 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   std::string name() const override { return "vulkan"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<Vulkan::VulkanDialect, spirv::SPIRVDialect, gpu::GPUDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, Vulkan::VulkanDialect,
+                    spirv::SPIRVDialect, gpu::GPUDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(

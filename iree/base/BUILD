@@ -23,6 +23,8 @@ cc_library(
         "allocator.h",
         "api.c",
         "assert.h",
+        "bitfield.c",
+        "bitfield.h",
         "status.c",
         "status.h",
         "string_builder.c",
@@ -53,6 +55,16 @@ cc_library(
         ":base",
         ":core_headers",
         ":logging",
+    ],
+)
+
+cc_test(
+    name = "bitfield_test",
+    srcs = ["bitfield_test.cc"],
+    deps = [
+        ":base",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 

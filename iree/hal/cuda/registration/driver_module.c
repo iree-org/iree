@@ -41,15 +41,14 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
                             driver_id);
   }
   IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_hal_cuda_device_params_t default_params;
   iree_hal_cuda_device_params_initialize(&default_params);
-  // TODO(jinchen62): set up default_params.use_deferred_submission by flag
-  // When we expose more than one driver (different cuda versions, etc) we
-  // can name them here:
-  iree_string_view_t identifier = iree_make_cstring_view("cuda");
 
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);
+
+  iree_string_view_t identifier = iree_make_cstring_view("cuda");
   iree_status_t status = iree_hal_cuda_driver_create(
       identifier, &default_params, &driver_options, allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);

@@ -1114,3 +1114,17 @@ func @dynamic_slice(%arg0 : i32, %arg1 : i32, %arg2 : tensor<?xi32>,
 //  CHECK-SAME:       tensor<?x?xi32>{%[[D1]], %[[D2]]}, tensor<?xi32>{%[[D0]]}
 //  CHECK-NEXT:     %[[ARG4:.+]]: !flow.dispatch.tensor<readwrite:?x?xi32>
 //  CHECK-SAME:     %[[ARG5:.+]]: !flow.dispatch.tensor<readonly:?xi32>
+
+// -----
+
+func @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
+    %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index) -> tensor<?x?xf32> {
+  %0 = tensor.extract_slice %arg0[%arg1, %arg2] [%arg3, %arg4] [%arg5, %arg6] :
+      tensor<?x?xf32> to tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+//      CHECK: flow.dispatch.workgroups
+// CHECK-NEXT:   %[[INPUT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
+//      CHECK:   %[[SLICE:.+]] = flow.dispatch.tensor.load %[[INPUT]]
+//      CHECK:   flow.dispatch.tensor.store %[[SLICE]], %[[OUTPUT]]

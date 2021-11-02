@@ -279,9 +279,8 @@ struct TieShapeTypeConversionPattern : public OpConversionPattern<TieShapeOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      TieShapeOp srcOp, ArrayRef<Value> operands,
+      TieShapeOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    TieShapeOp::Adaptor adaptor(operands);
     Type operandType = adaptor.operand().getType();
     if (operandType == srcOp.getType()) {
       return failure();

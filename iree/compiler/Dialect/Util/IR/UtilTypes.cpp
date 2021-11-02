@@ -294,34 +294,38 @@ void excludeTiedOperandAndResultIndices(
 // IREE::Util::SizeAwareTypeInterface
 //===----------------------------------------------------------------------===//
 
-static bool isValueUsableForOp(Value value, Operation *forOp) {
-  if (forOp->getBlock() == nullptr) {
+static bool isValueUsableForOp(Value value, Block *block,
+                               Block::iterator insertionPoint) {
+  if (block == nullptr) {
     // Op is not in a block; can't analyze (maybe?).
     return false;
   }
   auto *definingBlock = value.getParentBlock();
-  if (definingBlock == forOp->getBlock()) {
+  if (definingBlock == block) {
     // Defined in the same block; ensure block order.
     if (value.isa<BlockArgument>()) return true;
-    if (value.getDefiningOp()->isBeforeInBlock(forOp)) return true;
+    if (insertionPoint == block->end()) return true;
+    if (value.getDefiningOp()->isBeforeInBlock(&*insertionPoint)) {
+      return true;
+    }
   } else if (definingBlock->isEntryBlock()) {
     // Entry block always dominates - fast path for constants.
     return true;
   } else {
     // See if block the value is defined in dominates the forOp block.
     // TODO(benvanik): optimize this, it's terribly expensive to recompute.
-    DominanceInfo dominanceInfo(forOp->getParentOp());
-    return dominanceInfo.dominates(definingBlock, forOp->getBlock());
+    DominanceInfo dominanceInfo(block->getParentOp());
+    return dominanceInfo.dominates(definingBlock, block);
   }
   return false;
 }
 
 // static
-Value SizeAwareTypeInterface::findSizeValue(Value resourceValue,
-                                            Operation *forOp) {
+Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
+                                            Block::iterator insertionPoint) {
   // See if the value is produced by a size-aware op; we can just ask for the
   // size it has tied. Walking upward is always good as we know any size we find
-  // dominates |forOp|.
+  // dominates {|block|, |insertionPoint|}.
   SmallVector<Value> worklist;
   worklist.push_back(resourceValue);
   while (!worklist.empty()) {
@@ -347,7 +351,8 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue,
               use.getOwner())) {
         auto sizeValue = sizeAwareOp.getOperandSize(use.getOperandNumber());
         if (sizeValue) {
-          if (isValueUsableForOp(sizeValue, forOp)) return sizeValue;
+          if (isValueUsableForOp(sizeValue, block, insertionPoint))
+            return sizeValue;
         }
       }
       if (auto tiedOp =
@@ -369,8 +374,8 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
     return {};  // Not a sized type.
   }
   if (!builder.getInsertionPoint().getNodePtr()->isKnownSentinel()) {
-    Operation &insertionPt = *builder.getInsertionPoint();
-    auto sizeValue = sizeAwareType.findSizeValue(resourceValue, &insertionPt);
+    auto sizeValue = sizeAwareType.findSizeValue(
+        resourceValue, builder.getBlock(), builder.getInsertionPoint());
     if (sizeValue) {
       return sizeValue;  // Found in IR.
     }
@@ -414,9 +419,10 @@ ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
   return dynamicDims.slice(offset, shapedType.getNumDynamicDims());
 }
 
-Optional<ValueRange> findDynamicDims(Value shapedValue, Operation *forOp) {
+Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
+                                     Block::iterator insertionPoint) {
   // Look up the use-def chain: always safe, as any value we reach dominates
-  // |forOp| implicitly.
+  // {|block|, |insertionPoint|} implicitly.
   SmallVector<Value> worklist;
   worklist.push_back(shapedValue);
   while (!worklist.empty()) {
@@ -432,16 +438,16 @@ Optional<ValueRange> findDynamicDims(Value shapedValue, Operation *forOp) {
     }
   }
 
-  // Look down the use-def chain: not safe at some point because we'll move
-  // past where |forOp| is dominated. This is often fine for a bit, though, as
-  // |forOp| may be a user of |shapedValue| and be able to provide the shape
-  // itself.
+  // Look down the use-def chain: not safe at some point because we'll move past
+  // where {|block|, |insertionPoint|} is dominated. This is often fine for a
+  // bit, though, as {|block|, |insertionPoint|} may be a user of |shapedValue|
+  // and be able to provide the shape itself.
   for (auto &use : shapedValue.getUses()) {
     if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(use.getOwner())) {
       auto dynamicDims =
           shapeAwareOp.getOperandDynamicDims(use.getOperandNumber());
       if (llvm::all_of(dynamicDims, [&](Value dim) {
-            return isValueUsableForOp(dim, forOp);
+            return isValueUsableForOp(dim, block, insertionPoint);
           })) {
         return dynamicDims;
       }

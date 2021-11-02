@@ -8,11 +8,11 @@
 # This image provides the Vulkan SDK. Requires a child image to provide
 # a Vulkan ICD.
 
-FROM gcr.io/iree-oss/cmake-python@sha256:7e31103ee35f52e6d6019adf474bc60758710e95f20ee33ed94aee3f8780edbd AS final
+FROM gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 AS final
 
 ARG VULKAN_SDK_VERSION=1.2.154.0
 
-COPY --from=gcr.io/iree-oss/vulkan@sha256:5812ee64806a7f3df0739ccf0930c27cabce346901488eceb1ee66c9c0a5ae96 \
+COPY --from=gcr.io/iree-oss/vulkan@sha256:e1c1c5ddbe6b130ff0577572b97094e7a64a3aa003fdd4a91d1b21be705ddf8a \
   /opt/vulkan-sdk/ /opt/vulkan-sdk/
 
 ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"

@@ -32,6 +32,7 @@ static SmallVector<uint8_t, 32> cloneBufferIntoContiguousBytes(
   void *result =
       flatcc_builder_copy_buffer(fbb, packedData.data(), packedData.size());
   assert(result && "flatcc_emitter_t impl failed (non-default?)");
+  (void)result;
   return packedData;
 }
 

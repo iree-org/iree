@@ -278,7 +278,7 @@ static void pullInProducersInSameGroup(
         auto maybeFusionInfo = linalg::fuseProducerOfTensor(
             rewriter, clonedOrigProducer->getResult(opResult.getResultNumber()),
             tiledOp->getOpOperand(en.index()));
-        if (!maybeFusionInfo.hasValue()) {
+        if (failed(maybeFusionInfo)) {
           LLVM_DEBUG(llvm::dbgs() << "failed to fuse with tensor\n");
           rewriter.replaceOp(clonedOrigProducer, producer->getResults());
         } else {
@@ -476,7 +476,8 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
                 // block argument. Single use can potentially be relaxed.
                 auto loadArg =
                     loadOp.source().template dyn_cast<BlockArgument>();
-                if (!loadArg || !loadArg.hasOneUse()) {
+                if (!loadArg || !loadArg.hasOneUse() ||
+                    loadArg.use_begin()->get() != storeOp.target()) {
                   return nullptr;
                 }
                 return loadArg;

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -mlir-print-local-scope -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
 
 // Conv - large OC - distribute to only one workgroup dimension.
 
@@ -74,18 +74,20 @@ hal.executable @conv_112x112x512 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @conv_112x112x512
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [256, 8, 1]}
-//           CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C2:.+]] = arith.constant 2 : index
-//           CHECK-NEXT:   %[[C14:.+]] = arith.constant 14 : index
-//           CHECK-NEXT:   %[[C112:.+]] = arith.constant 112 : index
-//           CHECK-NEXT:   hal.return %[[C2]], %[[C14]], %[[C112]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 1, 8, 256], [0, 1, 8, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [256, 8, 1]>
+//      CHECK: hal.executable.entry_point public @conv_112x112x512
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[C2:.+]] = arith.constant 2 : index
+// CHECK-NEXT:   %[[C14:.+]] = arith.constant 14 : index
+// CHECK-NEXT:   %[[C112:.+]] = arith.constant 112 : index
+// CHECK-NEXT:   hal.return %[[C2]], %[[C14]], %[[C112]]
 
-//                CHECK: func @conv_112x112x512()
-//                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 1, 8, 256], [0, 1, 8, 4], [0, 0, 0, 0, 1, 1, 4]]}
+//      CHECK: func @conv_112x112x512()
+//      CHECK:   linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -163,18 +165,20 @@ hal.executable @conv_112x112x32 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @conv_112x112x32
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 16, 4]}
-//           CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[C7:.+]] = arith.constant 7 : index
-//           CHECK-NEXT:   %[[C28:.+]] = arith.constant 28 : index
-//           CHECK-NEXT:   hal.return %[[C1]], %[[C7]], %[[C28]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 16, 32], [0, 4, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 16, 4]>
+//      CHECK: hal.executable.entry_point public @conv_112x112x32
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[C7:.+]] = arith.constant 7 : index
+// CHECK-NEXT:   %[[C28:.+]] = arith.constant 28 : index
+// CHECK-NEXT:   hal.return %[[C1]], %[[C7]], %[[C28]]
 
-//                CHECK: func @conv_112x112x32()
-//                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 16, 32], [0, 4, 2, 4], [0, 0, 0, 0, 1, 1, 4]]}
+//      CHECK: func @conv_112x112x32()
+//      CHECK:   linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -251,17 +255,19 @@ hal.executable @conv_16x16x16 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @conv_16x16x16
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 8, 8]}
-//           CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[C2:.+]] = arith.constant 2 : index
-//           CHECK-NEXT:   hal.return %[[C1]], %[[C2]], %[[C2]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 8, 8, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 8, 8]>
+//      CHECK: hal.executable.entry_point public @conv_16x16x16
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[C2:.+]] = arith.constant 2 : index
+// CHECK-NEXT:   hal.return %[[C1]], %[[C2]], %[[C2]]
 
-//                CHECK: func @conv_16x16x16()
-//                CHECK:   linalg.conv_2d_nhwc_hwcf
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 8, 8, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]]}
+//      CHECK: func @conv_16x16x16()
+//      CHECK:   linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -340,17 +346,19 @@ hal.executable @dwconv_28x28x144 {
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @dwconv_28x28x144
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
-//           CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C9:.+]] = arith.constant 9 : index
-//           CHECK-NEXT:   %[[C7:.+]] = arith.constant 7 : index
-//           CHECK-NEXT:   hal.return %[[C9]], %[[C7]], %[[C7]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
+//      CHECK: hal.executable.entry_point public @dwconv_28x28x144
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[C9:.+]] = arith.constant 9 : index
+// CHECK-NEXT:   %[[C7:.+]] = arith.constant 7 : index
+// CHECK-NEXT:   hal.return %[[C9]], %[[C7]], %[[C7]]
 
-//                CHECK: func @dwconv_28x28x144()
-//                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
+//      CHECK: func @dwconv_28x28x144()
+//      CHECK:   linalg.depthwise_conv2D_nhw
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -428,14 +436,15 @@ hal.executable @dwconv_4x4x8 {
     }
   }
 }
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 4, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [8, 4, 4]>
+//      CHECK: hal.executable.entry_point public @dwconv_4x4x8
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [2 : index, 4 : index, 4 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   hal.return %[[C1]], %[[C1]], %[[C1]]
 
-//          CHECK-LABEL: hal.executable.entry_point public @dwconv_4x4x8
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 4, 4]}
-//           CHECK-SAME:   workgroup_size = [2 : index, 4 : index, 4 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   hal.return %[[C1]], %[[C1]], %[[C1]]
-
-//                CHECK: func @dwconv_4x4x8()
-//                CHECK:   linalg.depthwise_conv2D_nhw
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[0, 4, 4, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
+//      CHECK: func @dwconv_4x4x8()
+//      CHECK:   linalg.depthwise_conv2D_nhw
+// CHECK-SAME:     lowering.config = #[[CONFIG]]

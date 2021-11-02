@@ -14,12 +14,12 @@ iree_py_library(
     tf
   SRCS ${_srcs}
   DEPS
-  iree_tf_compiler_iree-import-tf
+  integrations::tensorflow::iree_tf_compiler::iree-import-tf
 )
 
 iree_symlink_tool(
   TARGET tf
-  FROM_TOOL_TARGET iree_tf_compiler_iree-import-tf
+  FROM_TOOL_TARGET integrations::tensorflow::iree_tf_compiler::iree-import-tf
   TO_EXE_NAME iree-import-tf
 )
 
@@ -29,13 +29,13 @@ iree_py_install_package(
   MODULE_PATH iree/tools/tf
   FILES_MATCHING ${_srcs}
   DEPS
-    iree_tf_compiler_iree-import-tf
+    integrations::tensorflow::iree_tf_compiler::iree-import-tf
 )
 
 # Since imported, need to resolve the TARGET_FILE ourselves instead of
 # install TARGETS form.
 install(
-  PROGRAMS "$<TARGET_FILE:iree_tf_compiler_iree-import-tf>"
+  PROGRAMS "$<TARGET_FILE:integrations::tensorflow::iree_tf_compiler::iree-import-tf>"
   DESTINATION "${PY_INSTALL_MODULE_DIR}"
   COMPONENT "${PY_INSTALL_COMPONENT}"
 )

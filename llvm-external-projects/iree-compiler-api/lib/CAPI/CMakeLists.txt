@@ -1,5 +1,6 @@
 add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
   Compiler.cpp
+  Lld.cpp
   Tools.cpp
   # TODO: If installing, complains about IREEVM not being in any export set.
   DISABLE_INSTALL
@@ -16,6 +17,15 @@ add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
 
     # Tools.
     iree::tools::iree_translate_lib
+
+    # LLD.
+    lldCommon
+    lldCOFF
+    lldDriver
+    lldELF
+    lldMachO
+    lldMinGW
+    lldWasm
 )
 
 # TODO: Fix upstream so there is a way to know what the actual compile target

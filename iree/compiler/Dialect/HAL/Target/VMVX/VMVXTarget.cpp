@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
@@ -35,7 +36,8 @@ class VMVXTargetBackend final : public TargetBackend {
   std::string name() const override { return "vmvx"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<VM::VMDialect, VMVX::VMVXDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, VM::VMDialect,
+                    VMVX::VMVXDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(

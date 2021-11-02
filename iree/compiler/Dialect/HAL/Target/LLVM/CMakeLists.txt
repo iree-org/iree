@@ -46,11 +46,13 @@ iree_cc_library(
     MLIRLLVMToLLVMIRTranslation
     MLIRTargetLLVMIRExport
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::librt
+    iree::compiler::Dialect::HAL::Target::LLVM::librt::librt64
   PUBLIC
 )
 

@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -90,14 +89,9 @@ void SetNumWorkgroupsPass::runOnOperation() {
     if (!workloadPerWorkgroup.empty()) {
       currWorkloadPerWorkgroup.assign(workloadPerWorkgroup.begin(),
                                       workloadPerWorkgroup.end());
-    } else if (IREE::HAL::TranslationInfo translationInfo =
+    } else if (IREE::Codegen::TranslationInfoAttr translationInfo =
                    getTranslationInfo(entryPointOp)) {
-      if (ArrayAttr workloadPerWorkgroupAttr =
-              translationInfo.workloadPerWorkgroup()) {
-        currWorkloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
-            workloadPerWorkgroupAttr,
-            [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-      }
+      currWorkloadPerWorkgroup = translationInfo.getWorkloadPerWorkgroupVals();
     }
 
     if (!currWorkloadPerWorkgroup.empty()) {

@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8, 1]>
 hal.executable private @batch_matmul_static_shape  {
   hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -12,7 +12,7 @@ hal.executable private @batch_matmul_static_shape  {
     hal.executable.entry_point @batch_matmul_static_shape attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8, 1]}
+      translation.info = #translation
     }
     builtin.module {
       func @batch_matmul_static_shape() {
@@ -183,39 +183,20 @@ hal.executable private @batch_matmul_static_shape  {
 //  CHECK-DAG:    %[[READ_LHS_7_1:.+]] = vector.extract_strided_slice %[[READ_LHS_7]] {offsets = [0, 0, 1]
 //  CHECK-DAG:    %[[READ_LHS_7_2:.+]] = vector.extract_strided_slice %[[READ_LHS_7]] {offsets = [0, 0, 2]
 //  CHECK-DAG:    %[[READ_LHS_7_3:.+]] = vector.extract_strided_slice %[[READ_LHS_7]] {offsets = [0, 0, 3]
-// Vectorization and lowering generates a lot of transpose and shape_cast that
-// are only  simplified later. We could probably improve the pass organization to
-// avoid it.
-//  CHECK-DAG:    %[[READ_RHS_0_T:.+]] = vector.transpose %[[READ_RHS_0]], [0, 2, 1]
-//  CHECK-DAG:    %[[READ_RHS_1_T:.+]] = vector.transpose %[[READ_RHS_1]], [0, 2, 1]
-//  CHECK-DAG:    %[[READ_RHS_2_T:.+]] = vector.transpose %[[READ_RHS_2]], [0, 2, 1]
-//  CHECK-DAG:    %[[READ_RHS_3_T:.+]] = vector.transpose %[[READ_RHS_3]], [0, 2, 1]
-
-//  CHECK-DAG:    %[[READ_RHS_0_T_1:.+]] = vector.shape_cast %[[READ_RHS_0_T]] : vector<1x4x1xf32> to vector<4x1xf32>
-//  CHECK-DAG:    %[[READ_RHS_0_T_2:.+]] = vector.transpose %[[READ_RHS_0_T_1]], [1, 0] : vector<4x1xf32> to vector<1x4xf32>
-//  CHECK-DAG:    %[[READ_RHS_0_T_3:.+]] = vector.shape_cast %[[READ_RHS_0_T_2]] : vector<1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[READ_RHS_0_T_3:.+]] = vector.shape_cast %[[READ_RHS_0]] : vector<1x1x4xf32> to vector<4xf32>
 //  CHECK-DAG:    %[[READ_LHS_0_0_E:.+]] = vector.extract %[[READ_LHS_0_0]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_0_0_S:.+]] = splat %[[READ_LHS_0_0_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[ACC_0_C:.+]] = vector.shape_cast %[[ACC_0]] : vector<1x1x4xf32> to vector<4xf32>
 //  CHECK-DAG:    %[[FMA_0_0:.+]] = vector.fma %[[READ_LHS_0_0_S]], %[[READ_RHS_0_T_3]], %[[ACC_0_C]] : vector<4xf32>
-
-//  CHECK-DAG:    %[[READ_RHS_1_T_1:.+]] = vector.shape_cast %[[READ_RHS_1_T]] : vector<1x4x1xf32> to vector<4x1xf32>
-//  CHECK-DAG:    %[[READ_RHS_1_T_2:.+]] = vector.transpose %[[READ_RHS_1_T_1]], [1, 0] : vector<4x1xf32> to vector<1x4xf32>
-//  CHECK-DAG:    %[[READ_RHS_1_T_3:.+]] = vector.shape_cast %[[READ_RHS_1_T_2]] : vector<1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[READ_RHS_1_T_3:.+]] = vector.shape_cast %[[READ_RHS_1]] : vector<1x1x4xf32> to vector<4xf32>
 //  CHECK-DAG:    %[[READ_LHS_0_1_E:.+]] = vector.extract %[[READ_LHS_0_1]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_0_1_S:.+]] = splat %[[READ_LHS_0_1_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_0_1:.+]] = vector.fma %[[READ_LHS_0_1_S]], %[[READ_RHS_1_T_3]], %[[FMA_0_0]] : vector<4xf32>
-
-//  CHECK-DAG:    %[[READ_RHS_2_T_1:.+]] = vector.shape_cast %[[READ_RHS_2_T]] : vector<1x4x1xf32> to vector<4x1xf32>
-//  CHECK-DAG:    %[[READ_RHS_2_T_2:.+]] = vector.transpose %[[READ_RHS_2_T_1]], [1, 0] : vector<4x1xf32> to vector<1x4xf32>
-//  CHECK-DAG:    %[[READ_RHS_2_T_3:.+]] = vector.shape_cast %[[READ_RHS_2_T_2]] : vector<1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[READ_RHS_2_T_3:.+]] = vector.shape_cast %[[READ_RHS_2]] : vector<1x1x4xf32> to vector<4xf32>
 //  CHECK-DAG:    %[[READ_LHS_0_2_E:.+]] = vector.extract %[[READ_LHS_0_2]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_0_2_S:.+]] = splat %[[READ_LHS_0_2_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_0_2:.+]] = vector.fma %[[READ_LHS_0_2_S]], %[[READ_RHS_2_T_3]], %[[FMA_0_1]] : vector<4xf32>
-
-//  CHECK-DAG:    %[[READ_RHS_3_T_1:.+]] = vector.shape_cast %[[READ_RHS_3_T]] : vector<1x4x1xf32> to vector<4x1xf32>
-//  CHECK-DAG:    %[[READ_RHS_3_T_2:.+]] = vector.transpose %[[READ_RHS_3_T_1]], [1, 0] : vector<4x1xf32> to vector<1x4xf32>
-//  CHECK-DAG:    %[[READ_RHS_3_T_3:.+]] = vector.shape_cast %[[READ_RHS_3_T_2]] : vector<1x4xf32> to vector<4xf32>
+//  CHECK-DAG:    %[[READ_RHS_3_T_3:.+]] = vector.shape_cast %[[READ_RHS_3]] : vector<1x1x4xf32> to vector<4xf32>
 //  CHECK-DAG:    %[[READ_LHS_0_3_E:.+]] = vector.extract %[[READ_LHS_0_3]][0, 0, 0] : vector<1x1x1xf32>
 //  CHECK-DAG:    %[[READ_LHS_0_3_S:.+]] = splat %[[READ_LHS_0_3_E]] : vector<4xf32>
 //  CHECK-DAG:    %[[FMA_0_3:.+]] = vector.fma %[[READ_LHS_0_3_S]], %[[READ_RHS_3_T_3]], %[[FMA_0_2]] : vector<4xf32>
@@ -370,8 +351,8 @@ hal.executable private @batch_matmul_static_shape  {
 
 // -----
 
-#config = {tileSizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8, 1]>
 hal.executable private @fused_fill_batch_matmul  {
   hal.interface private @io  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -382,7 +363,7 @@ hal.executable private @fused_fill_batch_matmul  {
     hal.executable.entry_point @fused_fill_batch_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8, 1]}
+      translation.info = #translation
     }
     builtin.module {
       func @fused_fill_batch_matmul() {

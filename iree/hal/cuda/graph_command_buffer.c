@@ -121,6 +121,21 @@ CUgraphExec iree_hal_cuda_graph_command_buffer_handle(
   return command_buffer->exec;
 }
 
+bool iree_hal_cuda_graph_command_buffer_isa(
+    iree_hal_command_buffer_t* command_buffer) {
+  return iree_hal_command_buffer_dyn_cast(
+      command_buffer, &iree_hal_cuda_graph_command_buffer_vtable);
+}
+
+static void* iree_hal_cuda_graph_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
+  if (vtable == &iree_hal_cuda_graph_command_buffer_vtable) {
+    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
+    return command_buffer;
+  }
+  return NULL;
+}
+
 static iree_hal_command_buffer_mode_t iree_hal_cuda_graph_command_buffer_mode(
     const iree_hal_command_buffer_t* base_command_buffer) {
   const iree_hal_cuda_graph_command_buffer_t* command_buffer =
@@ -410,7 +425,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
 
   int32_t block_size_x, block_size_y, block_size_z;
   IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
@@ -447,15 +461,18 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch_indirect(
 }
 
 CUgraphExec iree_hal_cuda_graph_command_buffer_exec(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  const iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      (const iree_hal_cuda_graph_command_buffer_t*)(base_command_buffer);
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_cuda_graph_command_buffer_t* command_buffer =
+      (iree_hal_cuda_graph_command_buffer_t*)iree_hal_command_buffer_dyn_cast(
+          base_command_buffer, &iree_hal_cuda_graph_command_buffer_vtable);
+  IREE_ASSERT_TRUE(command_buffer);
   return command_buffer->exec;
 }
 
 const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable = {
         .destroy = iree_hal_cuda_graph_command_buffer_destroy,
+        .dyn_cast = iree_hal_cuda_graph_command_buffer_dyn_cast,
         .mode = iree_hal_cuda_graph_command_buffer_mode,
         .allowed_categories =
             iree_hal_cuda_graph_command_buffer_allowed_categories,

@@ -306,7 +306,9 @@ void ResourceDeallocaOp::getCanonicalizationPatterns(
 OpFoldResult ResourceSizeOp::fold(ArrayRef<Attribute> operands) {
   auto sizeAwareType =
       operand().getType().cast<IREE::Util::SizeAwareTypeInterface>();
-  return sizeAwareType.findSizeValue(operand(), *this);
+  Operation *op = this->getOperation();
+  return sizeAwareType.findSizeValue(operand(), op->getBlock(),
+                                     Block::iterator(op));
 }
 
 //===----------------------------------------------------------------------===//

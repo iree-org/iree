@@ -11,12 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
@@ -79,11 +79,7 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
                                                RewritePatternSet &patterns) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *op) {
-        SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
-        return llvm::to_vector<4>(
-            llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-              return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
-            }));
+        return getTileSizes(builder, op, 1);
       };
 
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
@@ -161,11 +157,7 @@ static void populateTilingReductionPatterns(
     MLIRContext *context, RewritePatternSet &patterns,
     linalg::LinalgTransformationFilter marker) {
   auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    SmallVector<int64_t> tileSizes = getTileSizes(op, 2);
-    return llvm::to_vector<4>(
-        llvm::map_range(tileSizes, [&](int64_t v) -> Value {
-          return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
-        }));
+    return getTileSizes(builder, op, 2);
   };
 
   auto tilingOptions = linalg::LinalgTilingOptions()

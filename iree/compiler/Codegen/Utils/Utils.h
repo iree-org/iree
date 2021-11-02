@@ -8,7 +8,6 @@
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -17,6 +16,10 @@ namespace mlir {
 namespace iree_compiler {
 
 static constexpr unsigned kNumMaxParallelDims = 3;
+
+//===----------------------------------------------------------------------===//
+// Utility functions to get entry point(s)
+//===----------------------------------------------------------------------===//
 
 /// Returns true if the given `func` is a kernel dispatch entry point.
 bool isEntryPoint(FuncOp func);
@@ -28,41 +31,15 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
-/// Returns the translation info for the `funcOp` (by looking at the entry
-/// point). Returns `nullptr` on failure.
-IREE::HAL::TranslationInfo getTranslationInfo(FuncOp funcOp);
-
-/// Sets the translation info on the `hal.executable.entry_point` op
-/// corresponding to the `entryPointFn`. Returns failure if a translation info
-/// is already set on the entry point op and is incompatible with what is being
-/// set.
-void setTranslationInfo(FuncOp entryPointFn,
-                        IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-                        ArrayRef<int64_t> workgroupSize,
-                        ArrayRef<int64_t> workloadPerWorkgroup);
+//===----------------------------------------------------------------------===//
+// Utility functions used in setting default configurations.
+//===----------------------------------------------------------------------===//
 
 /// Returns the loops that are partitioned during dispatch region formations, in
 /// order, i.e. starting from the outer-most to innermost.
 /// Note that this is the same method that is used at the Flow dispatch region
 /// formation to tile and distribute the ops.
 SmallVector<unsigned> getPartitionedLoops(Operation *op);
-
-/// Sets translation for the entry-point function based on op configuration.
-LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op, IREE::HAL::LoweringConfig config,
-    IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {});
-inline LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
-    ArrayRef<int64_t> nativeVectorSize,
-    IREE::HAL::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {}) {
-  IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, nativeVectorSize, op->getContext());
-  setLoweringConfig(op, config);
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, config,
-                                               passPipeline, workgroupSize);
-}
 
 /// Returns the untiled type of a tiled view for both tensor and memref
 /// types. Either walks the `ViewOpInterface` chain (for memrefs) or the

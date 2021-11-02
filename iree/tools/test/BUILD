@@ -22,7 +22,6 @@ iree_lit_test_suite(
             "iree-benchmark-module.mlir",
             "iree-run-mlir.mlir",
             "iree-run-module.mlir",
-            "iree-run-trace.mlir",
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "repeated_return.mlir",
@@ -31,16 +30,16 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     data = [
-        ":iree-run-trace.yaml",
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-run-module",
-        "//iree/tools:iree-run-trace",
         "//iree/tools:iree-translate",
         "@llvm-project//lld:lld",
     ],
-    tags = ["hostonly"],
+    tags = [
+        "hostonly",
+    ],
 )
 
 iree_lit_test_suite(
@@ -51,5 +50,7 @@ iree_lit_test_suite(
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-translate",
     ],
-    tags = ["hostonly"],
+    tags = [
+        "hostonly",
+    ],
 )

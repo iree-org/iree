@@ -30,7 +30,7 @@ class RemoveExecutableOpConversion
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::ExecutableOp op, ArrayRef<Value> operands,
+      IREE::HAL::ExecutableOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return success();
@@ -49,10 +49,9 @@ class ExecutableCreateOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::ExecutableCreateOp createOp, llvm::ArrayRef<Value> operands,
+      IREE::HAL::ExecutableCreateOp createOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = createOp.getLoc();
-    IREE::HAL::ExecutableCreateOp::Adaptor newOperands(operands);
 
     // Materialize vm.rodata for the binary.
     auto executableBinaryOp =
@@ -87,15 +86,14 @@ class ExecutableCreateOpConversion
         /*executable_format=*/-1,
         /*executable_data=*/-1,
         /*executable_layouts=*/
-        static_cast<int16_t>(llvm::size(newOperands.layouts())),
+        static_cast<int16_t>(llvm::size(adaptor.layouts())),
     };
     SmallVector<Value, 8> callOperands = {
-        newOperands.device(),
+        adaptor.device(),
         executableFormatString.getValue().front(),
         rewriter.createOrFold<IREE::VM::ConstRefRodataOp>(loc, rodataOp),
     };
-    callOperands.append(newOperands.layouts().begin(),
-                        newOperands.layouts().end());
+    callOperands.append(adaptor.layouts().begin(), adaptor.layouts().end());
 
     auto importType = importOp.getType();
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(

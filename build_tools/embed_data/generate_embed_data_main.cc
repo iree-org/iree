@@ -5,21 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
-
-#include "iree/base/internal/flags.h"
-
-IREE_FLAG(string, identifier, "resources", "name of the resources function");
-IREE_FLAG(string, output_header, "", "output header file");
-IREE_FLAG(string, output_impl, "", "output impl file");
-IREE_FLAG(string, strip_prefix, "", "strip prefix from filenames");
-IREE_FLAG(bool, flatten, false,
-          "whether to flatten the directory structure (only include basename)");
 
 static std::string CEscape(const std::string& src) {
   static const char kHexChar[] = "0123456789ABCDEF";
@@ -92,15 +85,16 @@ static void GenerateTocStruct(std::ofstream& f) {
   f << "#endif  // IREE_FILE_TOC\n";
 }
 
-static bool GenerateHeader(const std::string& header_file,
+static bool GenerateHeader(const std::string& identifier,
+                           const std::string& header_file,
                            const std::vector<std::string>& toc_files) {
   std::ofstream f(header_file, std::ios::out | std::ios::trunc);
   f << "#pragma once\n";  // Pragma once isn't great but is the best we can do.
   f << "#include <stddef.h>\n";
   GenerateTocStruct(f);
   GenerateExternCOpen(f);
-  f << "const iree_file_toc_t* " << FLAG_identifier << "_create();\n";
-  f << "static inline size_t " << FLAG_identifier << "_size() {\n";
+  f << "const iree_file_toc_t* " << identifier << "_create();\n";
+  f << "static inline size_t " << identifier << "_size() {\n";
   f << "  return " << toc_files.size() << ";\n";
   f << "}\n";
   GenerateExternCClose(f);
@@ -129,7 +123,8 @@ static bool SlurpFile(const std::string& file_name, std::string* contents) {
   return f.good();
 }
 
-static bool GenerateImpl(const std::string& impl_file,
+static bool GenerateImpl(const std::string& identifier,
+                         const std::string& impl_file,
                          const std::vector<std::string>& input_files,
                          const std::vector<std::string>& toc_files) {
   std::ofstream f(impl_file, std::ios::out | std::ios::trunc);
@@ -180,26 +175,82 @@ static bool GenerateImpl(const std::string& impl_file,
   }
   f << "  {NULL, NULL, 0},\n";
   f << "};\n";
-  f << "const struct iree_file_toc_t* " << FLAG_identifier << "_create() {\n";
+  f << "const struct iree_file_toc_t* " << identifier << "_create() {\n";
   f << "  return &toc[0];\n";
   f << "}\n";
   f.close();
   return f.good();
 }
 
+static void SplitArgument(const char* arg, bool& is_option, std::string& value,
+                          std::string& key) {
+  // Handle non-option.
+  if (*arg != '-') {
+    is_option = false;
+    key.clear();
+    value = std::string(arg);
+    return;
+  }
+
+  // Eat leading hyphens.
+  is_option = true;
+  while (*arg == '-') arg++;
+
+  // Parse key=value.
+  key = std::string(arg);
+  value.clear();
+  auto eqPos = key.find('=');
+  if (eqPos == std::string::npos) {
+    // No '='.
+    return;
+  }
+
+  // Split.
+  value.append(key.begin() + eqPos + 1, key.end());
+  key.resize(eqPos);
+}
+
 int main(int argc, char** argv) {
-  // Parse flags, updating argc/argv with position arguments.
-  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
+  // Parse command line options. As part of the build which needs to not depend
+  // on anything, we do this the manual way vs using a flag library.
   std::vector<std::string> input_files;
-  input_files.reserve(argc - 1);
-  for (size_t i = 1, e = argc; i < e; ++i) {  // Skip program name.
-    input_files.push_back(std::string(argv[i]));
+  std::string identifier("resources");
+  std::string output_header;
+  std::string output_impl;
+  std::string strip_prefix;
+  bool flatten = false;
+
+  for (size_t i = 1, e = argc; i < e; ++i) {
+    const char* arg = argv[i];
+    bool is_option;
+    std::string value;
+    std::string key;
+    SplitArgument(arg, is_option, value, key);
+
+    if (!is_option) {
+      input_files.push_back(std::move(value));
+      continue;
+    }
+
+    if (key == "identifier") {
+      identifier = value;
+    } else if (key == "output_header") {
+      output_header = value;
+    } else if (key == "output_impl") {
+      output_impl = value;
+    } else if (key == "strip_prefix") {
+      strip_prefix = value;
+    } else if (key == "flatten") {
+      flatten = true;
+    } else {
+      std::cerr << "Unrecognized command line argument: " << arg << "\n";
+      return 100;
+    }
   }
 
   // Generate TOC files by optionally removing a prefix.
   std::vector<std::string> toc_files;
   toc_files.reserve(input_files.size());
-  const std::string& strip_prefix = FLAG_strip_prefix;
   for (const auto& input_file : input_files) {
     std::string toc_file = input_file;
     if (!strip_prefix.empty()) {
@@ -207,7 +258,7 @@ int main(int argc, char** argv) {
         toc_file = toc_file.substr(strip_prefix.size());
       }
     }
-    if (FLAG_flatten) {
+    if (flatten) {
       size_t slash_pos = toc_file.find_last_of("/\\");
       if (slash_pos != std::string::npos) {
         toc_file = toc_file.substr(slash_pos + 1);
@@ -215,15 +266,15 @@ int main(int argc, char** argv) {
     }
     toc_files.push_back(toc_file);
   }
-  if (strlen(FLAG_output_header) != 0) {
-    if (!GenerateHeader(FLAG_output_header, toc_files)) {
+  if (!output_header.empty()) {
+    if (!GenerateHeader(identifier, output_header, toc_files)) {
       std::cerr << "Error generating headers.\n";
       return 1;
     }
   }
 
-  if (strlen(FLAG_output_impl) != 0) {
-    if (!GenerateImpl(FLAG_output_impl, input_files, toc_files)) {
+  if (!output_impl.empty()) {
+    if (!GenerateImpl(identifier, output_impl, input_files, toc_files)) {
       std::cerr << "Error generating impl.\n";
       return 2;
     }

@@ -162,8 +162,7 @@ LogicalResult distributeCopyOp(linalg::CopyOp copyOp, scf::ParallelOp pLoopOp,
 
 // Applies tiling followed to load/store optimized size then distribute on
 // incovations.
-LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp,
-                                    ArrayRef<Value> operands,
+LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp, ValueRange operands,
                                     ConversionPatternRewriter &rewriter) {
   linalg::LinalgTilingOptions options;
   // Tile to memory access of 128bits as those tend to be optimal on most GPUs.
@@ -187,12 +186,13 @@ LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp,
 struct TileAndDistributeCopyOp : public OpConversionPattern<linalg::CopyOp> {
   using OpConversionPattern<linalg::CopyOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      linalg::CopyOp linalgOp, ArrayRef<Value> operands,
+      linalg::CopyOp linalgOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!hasMarker(linalgOp, getCopyToWorkgroupMemoryMarker())) {
       return failure();
     }
-    if (failed(tileAndDistributeCopy(linalgOp, operands, rewriter))) {
+    if (failed(
+            tileAndDistributeCopy(linalgOp, adaptor.getOperands(), rewriter))) {
       return failure();
     }
 
@@ -222,7 +222,7 @@ struct SerializeAndDistributeCopy : public OpConversionPattern<linalg::CopyOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      linalg::CopyOp copyOp, ArrayRef<Value> operands,
+      linalg::CopyOp copyOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!hasMarker(copyOp, {getCopyToWorkgroupMemoryMarker()}))
       return failure();

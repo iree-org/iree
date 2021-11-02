@@ -6,6 +6,57 @@
 
 include(CMakeParseArguments)
 
+# Helper for iree_check_test and iree_trace_runner_test.
+# Just a thin wrapper around iree_bytecode_module, passing it some
+# common flags, including the appropriate --iree-llvm-target-triple in the
+# Android case.
+function(iree_bytecode_module_for_iree_check_test_and_friends)
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "MODULE_NAME;SRC;TARGET_BACKEND;OPT_TOOL;MODULE_FILE_NAME"
+    "FLAGS;OPT_FLAGS"
+    ${ARGN}
+  )
+
+  if(ANDROID)
+    # Android's CMake toolchain defines some variables that we can use to infer
+    # the appropriate target triple from the configured settings:
+    # https://developer.android.com/ndk/guides/cmake#android_platform
+    #
+    # In typical CMake fashion, the various strings are pretty fuzzy and can
+    # have multiple values like "latest", "android-25"/"25"/"android-N-MR1".
+    #
+    # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
+    # should pretty consistently be just a number we can use for target triple.
+    set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
+    list(APPEND _RULE_FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
+  endif()
+
+  iree_bytecode_module(
+    NAME
+      "${_RULE_MODULE_NAME}"
+    MODULE_FILE_NAME
+      "${_RULE_MODULE_FILE_NAME}"
+    SRC
+      "${_RULE_SRC}"
+    FLAGS
+      "-iree-mlir-to-vm-bytecode-module"
+      "-mlir-print-op-on-diagnostic=false"
+      "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
+      ${_RULE_FLAGS}
+    OPT_TOOL
+      ${_RULE_OPT_TOOL}
+    OPT_FLAGS
+      ${_RULE_OPT_FLAGS}
+    TESTONLY
+  )
+endfunction()
+
 # iree_check_test()
 #
 # Creates a test using iree-check-module for the specified source file.
@@ -23,6 +74,12 @@ include(CMakeParseArguments)
 #       and input file are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
+#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
+#       if OPT_FLAGS is specified.
+#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
+#       these flags.
+#   MODULE_FILE_NAME: Optional, specifies the absolute path to the filename
+#       to use for the generated IREE module (.vmfb).
 function(iree_check_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -51,8 +108,8 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;OPT_TOOL;MODULE_FILE_NAME"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
     ${ARGN}
   )
 
@@ -61,49 +118,28 @@ function(iree_check_test)
 
   set(_MODULE_NAME "${_RULE_NAME}_module")
 
-  if(ANDROID)
-    # Android's CMake toolchain defines some variables that we can use to infer
-    # the appropriate target triple from the configured settings:
-    # https://developer.android.com/ndk/guides/cmake#android_platform
-    #
-    # In typical CMake fashion, the various strings are pretty fuzzy and can
-    # have multiple values like "latest", "android-25"/"25"/"android-N-MR1".
-    #
-    # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
-    # should pretty consistently be just a number we can use for target triple.
-    set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
+  if(DEFINED _RULE_MODULE_FILE_NAME)
+    set(_MODULE_FILE_NAME "${_RULE_MODULE_FILE_NAME}")
+  else(DEFINED _RULE_MODULE_FILE_NAME)
+    set(_MODULE_FILE_NAME "${_MODULE_NAME}.vmfb")
+  endif(DEFINED _RULE_MODULE_FILE_NAME)
 
-    iree_bytecode_module(
-      NAME
-        "${_MODULE_NAME}"
-      SRC
-        "${_RULE_SRC}"
-      FLAGS
-        "-iree-mlir-to-vm-bytecode-module"
-        "-mlir-print-op-on-diagnostic=false"
-        "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
-        "--iree-llvm-target-triple=${_TARGET_TRIPLE}"
-        ${_RULE_COMPILER_FLAGS}
-      TESTONLY
-    )
-  else(ANDROID)
-    iree_bytecode_module(
-      NAME
-        "${_MODULE_NAME}"
-      SRC
-        "${_RULE_SRC}"
-      FLAGS
-        "-iree-mlir-to-vm-bytecode-module"
-        "-mlir-print-op-on-diagnostic=false"
-        "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
-        ${_RULE_COMPILER_FLAGS}
-      TESTONLY
-    )
-  endif(ANDROID)
-
-  # TODO(b/146898896): It would be nice if this were something we could query
-  # rather than having to know the conventions used by iree_bytecode_module.
-  set(_MODULE_FILE_NAME "${_MODULE_NAME}.vmfb")
+  iree_bytecode_module_for_iree_check_test_and_friends(
+    MODULE_NAME
+      "${_MODULE_NAME}"
+    MODULE_FILE_NAME
+      "${_MODULE_FILE_NAME}"
+    SRC
+      "${_RULE_SRC}"
+    TARGET_BACKEND
+      "${_RULE_TARGET_BACKEND}"
+    FLAGS
+      ${_RULE_COMPILER_FLAGS}
+    OPT_TOOL
+      ${_RULE_OPT_TOOL}
+    OPT_FLAGS
+      ${_RULE_OPT_FLAGS}
+  )
 
   # iree_bytecode_module does not define a target, only a custom command.
   # We need to create a target that depends on the command to ensure the
@@ -117,68 +153,32 @@ function(iree_check_test)
        "${_MODULE_FILE_NAME}"
   )
 
+  set(_RUNNER_TARGET "iree_tools_iree-check-module")
+
   # A target specifically for the test. We could combine this with the above,
   # but we want that one to get pulled into iree_bytecode_module.
   add_custom_target("${_NAME}" ALL)
   add_dependencies(
     "${_NAME}"
     "${_MODULE_TARGET_NAME}"
-    iree_tools_iree-check-module
+    "${_RUNNER_TARGET}"
   )
 
-  iree_package_ns(_PACKAGE_NS)
-  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-  set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
-
-  # Case for cross-compiling towards Android.
-  if(ANDROID)
-    set(_ANDROID_EXE_REL_DIR "iree/modules/check")
-    set(_ANDROID_REL_DIR "${_PACKAGE_PATH}/${_RULE_NAME}")
-    set(_ANDROID_ABS_DIR "/data/local/tmp/${_ANDROID_REL_DIR}")
-
-    # Define a custom target for pushing and running the test on Android device.
-    set(_TEST_NAME ${_TEST_NAME}_on_android_device)
-    add_test(
-      NAME
-        ${_TEST_NAME}
-      COMMAND
-        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:iree_tools_iree-check-module>"
-        "--driver=${_RULE_DRIVER}"
-        "${_ANDROID_REL_DIR}/${_MODULE_FILE_NAME}"
-        ${_RULE_RUNNER_ARGS}
-    )
-    # Use environment variables to instruct the script to push artifacts
-    # onto the Android device before running the test. This needs to match
-    # with the expectation of the run_android_test.{sh|bat|ps1} script.
-    set(
-      _ENVIRONMENT_VARS
-        TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}
-        TEST_DATA=${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}
-        TEST_EXECUTABLE=$<TARGET_FILE:iree_tools_iree-check-module>
-    )
-    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
-    iree_add_test_environment_properties(${_TEST_NAME})
-  else(ANDROID)
-    add_test(
-      NAME
-        "${_TEST_NAME}"
-      COMMAND
-        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-        "$<TARGET_FILE:iree_tools_iree-check-module>"
-        "--driver=${_RULE_DRIVER}"
-        "${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
-        ${_RULE_RUNNER_ARGS}
-    )
-    set_property(TEST "${_TEST_NAME}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
-    iree_add_test_environment_properties(${_TEST_NAME})
-  endif(ANDROID)
-
-  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}" "driver=${_RULE_DRIVER}")
-  set_property(TEST "${_TEST_NAME}" PROPERTY REQUIRED_FILES "${_MODULE_FILE_NAME}")
-  set_property(TEST "${_TEST_NAME}" PROPERTY LABELS "${_RULE_LABELS}")
+  iree_run_binary_test(
+    NAME
+      "${_RULE_NAME}"
+    DRIVER
+      "${_RULE_DRIVER}"
+    TEST_BINARY
+      "${_RUNNER_TARGET}"
+    TEST_INPUT_FILE_ARG
+      "${_MODULE_FILE_NAME}"
+    ARGS
+      ${_RULE_RUNNER_ARGS}
+    LABELS
+      ${_RULE_LABELS}
+  )
 endfunction()
-
 
 # iree_check_single_backend_test_suite()
 #
@@ -199,6 +199,10 @@ endfunction()
 #       different args per test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
+#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
+#       if OPT_FLAGS is specified.
+#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
+#       these flags.
 function(iree_check_single_backend_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -211,8 +215,8 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS"
+    "NAME;TARGET_BACKEND;DRIVER;OPT_TOOL"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
     ${ARGN}
   )
 
@@ -258,6 +262,10 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_RUNNER_ARGS}
       LABELS
         ${_RULE_LABELS}
+      OPT_TOOL
+        ${_RULE_OPT_TOOL}
+      OPT_FLAGS
+        ${_RULE_OPT_FLAGS}
     )
   endforeach()
 endfunction()
@@ -286,6 +294,10 @@ endfunction()
 #       test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
+#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
+#       if OPT_FLAGS is specified.
+#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
+#       these flags.
 function(iree_check_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -332,6 +344,10 @@ function(iree_check_test_suite)
         ${_RULE_RUNNER_ARGS}
       LABELS
         ${_RULE_LABELS}
+      OPT_TOOL
+        ${_RULE_OPT_TOOL}
+      OPT_FLAGS
+        ${_RULE_OPT_FLAGS}
     )
   endforeach()
 endfunction()

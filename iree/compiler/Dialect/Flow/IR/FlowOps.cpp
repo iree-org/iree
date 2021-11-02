@@ -336,7 +336,7 @@ static bool canDispatchRegionContainOp(Operation *op) {
       return true;
     } else if (auto denseAttr =
                    constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      // TODO(GH-4897): Non-splat constants seems to have an issue on the LLVM
+      // TODO(#4897): Non-splat constants seems to have an issue on the LLVM
       // side. Uncomment after that is fixed.
       auto shapedType = constantOp.getType().cast<ShapedType>();
       uint64_t estimatedByteLength =
