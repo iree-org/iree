@@ -502,7 +502,7 @@ class TransposeReshapeGenericDotGeneral
  public:
   using OpRewritePattern<mhlo::DotGeneralOp>::OpRewritePattern;
 
-  Value TransposeIfNonConsecutive(OpBuilder& b, Location loc, Value src,
+  Value TransposeIfNonConsecutive(OpBuilder &b, Location loc, Value src,
                                   ArrayRef<int64_t> targetOrder) const {
     if (isConsecutive(targetOrder)) return src;
     auto type = src.getType().cast<RankedTensorType>();
@@ -515,7 +515,7 @@ class TransposeReshapeGenericDotGeneral
         b.getI64TensorAttr(targetOrder));
   }
 
-  Value ReshapeIfMorethan3D(OpBuilder& b, Location loc, Value src,
+  Value ReshapeIfMorethan3D(OpBuilder &b, Location loc, Value src,
                             size_t dimsBorder0, size_t dimsBorder1) const {
     auto type = src.getType().cast<RankedTensorType>();
     if (type.getRank() <= 3) return src;
