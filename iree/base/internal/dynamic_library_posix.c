@@ -31,6 +31,17 @@ struct iree_dynamic_library_t {
   void* handle;
 };
 
+// Returns true if the temp files we extract should be kept after the library
+// is closed. This is useful for tooling such as perf that need to find the
+// shared libraries after the program has exited or atexit tools like tracy that
+// require the library still be loaded.
+//
+// To override:
+//   IREE_PRESERVE_DYLIB_TEMP_FILES=1 iree-run-module ...
+static bool iree_dynamic_library_should_preserve_temp_files() {
+  return getenv("IREE_PRESERVE_DYLIB_TEMP_FILES") != NULL;
+}
+
 // Allocate a new string from |allocator| returned in |out_file_path| containing
 // a path to a unique file on the filesystem.
 static iree_status_t iree_dynamic_library_make_temp_file_path(
@@ -209,8 +220,11 @@ iree_status_t iree_dynamic_library_load_from_memory(
 
   // Unlink the temp file - it's still open by the loader but won't be
   // accessible to anyone else and will be deleted once the library is
-  // unloaded.
-  remove(temp_path);
+  // unloaded. Note that we don't remove the file if the user requested we keep
+  // it around for tooling to access.
+  if (!iree_dynamic_library_should_preserve_temp_files()) {
+    remove(temp_path);
+  }
   iree_allocator_free(allocator, temp_path);
 
   IREE_TRACE_ZONE_END(z0);

@@ -115,6 +115,8 @@ nav:
       - C API: 'bindings/c-api.md'
       - Python: 'bindings/python.md'
       - TensorFlow Lite: 'bindings/tensorflow-lite.md'
+  - 'Extensions':
+      - 'extensions/index.md'
   - 'Community':
       - Projects: 'community/projects.md'
   - 'Blog':

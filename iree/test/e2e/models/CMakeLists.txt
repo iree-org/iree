@@ -24,6 +24,7 @@ iree_lit_test_suite(
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
+    lld
   LABELS
     "hostonly"
     "optonly"

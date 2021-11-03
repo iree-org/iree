@@ -102,13 +102,6 @@ your environment. See
 [the Microsoft documentation](https://docs.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=vs-2019)
 for details on configuring the toolchain.
 
-If you want to manually specify the linker used, set the
-`IREE_LLVMAOT_LINKER_PATH` environment variable to the path of the linker:
-
-```powershell
-> set IREE_LLVMAOT_LINKER_PATH="C:\Tools\LLVM\bin\lld-link.exe"
-```
-
 Translate a source MLIR file into an IREE module:
 
 ```powershell

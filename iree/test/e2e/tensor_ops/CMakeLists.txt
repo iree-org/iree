@@ -26,7 +26,7 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_dylib_embedded-llvm-aot_dylib
+    check_dylib-llvm-aot_dylib
   SRCS
     "extract_slice.mlir"
     "tensor_insert_slice.mlir"
@@ -34,8 +34,6 @@ iree_check_single_backend_test_suite(
     "dylib-llvm-aot"
   DRIVER
     "dylib"
-  COMPILER_FLAGS
-    "-iree-llvm-link-embedded=true"
 )
 
 iree_check_single_backend_test_suite(
@@ -48,8 +46,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
-  COMPILER_FLAGS
-    "-iree-llvm-link-embedded=true"
   LABELS
     "noasan"
     "nomsan"
@@ -68,8 +64,6 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-  COMPILER_FLAGS
-    "-iree-llvm-link-embedded=true"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

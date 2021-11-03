@@ -141,3 +141,33 @@ func @large_dot_general2() {
   check.expect_almost_eq_const(%res, dense<409.596> : tensor<4x32x64xf32>) : tensor<4x32x64xf32>
   return
 }
+
+func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
+  %lhs = util.unfoldable_constant dense<[
+    [[[0.0], [1.0]], [[2.0], [3.0]], [[ 4.0], [ 5.0]]], 
+    [[[6.0], [7.0]], [[8.0], [9.0]], [[10.0], [11.0]]]
+  ]> : tensor<2x3x2x1xf32>
+  %rhs = util.unfoldable_constant dense<[
+    [[0.0], [1.0]], [[2.0], [3.0]]
+  ]> : tensor<2x2x1xf32>
+  %res = "mhlo.dot_general"(%lhs, %rhs) {
+    dot_dimension_numbers = #mhlo.dot<
+      lhs_batching_dimensions = [2],
+      rhs_batching_dimensions = [1],
+      lhs_contracting_dimensions = [3],
+      rhs_contracting_dimensions = [2]
+    >,
+    precision_config = ["DEFAULT", "DEFAULT"]
+  } : (tensor<2x3x2x1xf32>, tensor<2x2x1xf32>) -> tensor<2x2x3x2xf32>
+  check.expect_almost_eq_const(%res, dense<[
+    [
+      [[0.0,  0.0], [0.0,  4.0], [0.0,  8.0]],
+      [[0.0, 12.0], [0.0, 16.0], [0.0, 20.0]]
+    ],
+    [
+      [[1.0,  3.0], [3.0,  9.0], [ 5.0, 15.0]],
+      [[7.0, 21.0], [9.0, 27.0], [11.0, 33.0]]
+    ]
+  ]> : tensor<2x2x3x2xf32>) : tensor<2x2x3x2xf32>
+  return
+}

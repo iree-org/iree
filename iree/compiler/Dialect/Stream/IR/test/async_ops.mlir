@@ -89,6 +89,26 @@ func @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index) -> !stream.
 
 // -----
 
+// CHECK-LABEL: @asyncLoad
+func @asyncLoad(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  // CHECK: = stream.async.load %arg0[%c0] : !stream.resource<staging>{%arg1} -> f32
+  %0 = stream.async.load %arg0[%c0] : !stream.resource<staging>{%arg1} -> f32
+  return %0 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @asyncStore
+func @asyncStore(%arg0: !stream.resource<staging>, %arg1: index, %arg2: f32) -> !stream.resource<staging> {
+  %c0 = arith.constant 0 : index
+  // CHECK: = stream.async.store %arg2, %arg0[%c0] : f32 -> %arg0 as !stream.resource<staging>{%arg1}
+  %0 = stream.async.store %arg2, %arg0[%c0] : f32 -> %arg0 as !stream.resource<staging>{%arg1}
+  return %0 : !stream.resource<staging>
+}
+
+// -----
+
 // CHECK-LABEL: @asyncDispatch
 func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c1 = arith.constant 1 : index
