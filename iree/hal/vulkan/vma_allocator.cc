@@ -236,12 +236,15 @@ static iree_status_t iree_hal_vulkan_vma_allocator_make_compatible(
 static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     iree_hal_vulkan_vma_allocator_t* allocator,
     iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_memory_access_t allowed_access, size_t allocation_size,
+    iree_hal_memory_access_t allowed_access, iree_host_size_t allocation_size,
     VmaAllocationCreateFlags flags, iree_hal_buffer_t** out_buffer) {
   // Guard against the corner case where the requested buffer size is 0. The
   // application is unlikely to do anything when requesting a 0-byte buffer; but
   // it can happen in real world use cases. So we should at least not crash.
   if (allocation_size == 0) allocation_size = 4;
+  // Align allocation sizes to 4 bytes so shaders operating on 32 bit types can
+  // act safely even on buffer ranges that are not naturally aligned.
+  allocation_size = iree_host_align(allocation_size, 4);
 
   VkBufferCreateInfo buffer_create_info;
   buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
