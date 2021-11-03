@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineUtils
     MLIRAnalysis
+    MLIRArithmetic
     MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
