@@ -19,6 +19,7 @@ EXPLICIT_TARGET_MAPPING = {
 
     # LLVM
     "@llvm-project//llvm:IPO": ["LLVMipo"],
+    "@llvm-project//lld:lld": ["lld"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],

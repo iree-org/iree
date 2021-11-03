@@ -40,7 +40,7 @@ class EmbeddedLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
-  std::string getToolPath() const override {
+  std::string getEmbeddedToolPath() const {
     // Always try to use the tool specified for this exact configuration first.
     // Hopefully some day soon we'll be able to statically link LLD in and call
     // a C function to do the linking instead of needing a separate tool.
@@ -49,18 +49,18 @@ class EmbeddedLinkerTool : public LinkerTool {
     }
 
     // Fall back to check for setting the linker explicitly via environment
-    // variables or flags. Users may do this to use their own lld with custom
-    // architectures built in.
-    auto toolPath = LinkerTool::getToolPath();
-    if (!toolPath.empty()) return toolPath;
+    // variables.
+    char *envVarPath = std::getenv("IREE_LLVMAOT_EMBEDDED_LINKER_PATH");
+    if (envVarPath && envVarPath[0] != '\0') return std::string(envVarPath);
 
     // No explicit linker specified, search the environment for common tools.
-    toolPath = findToolInEnvironment({"ld.lld"});
-    if (!toolPath.empty()) return toolPath;
+    std::string environmentPath =
+        findToolInEnvironment({"iree-lld", "lld", "ld.lld", "lld-link"});
+    if (!environmentPath.empty()) return environmentPath;
 
     llvm::errs() << "LLD (ld.lld) not found on path; specify with the "
-                    "IREE_LLVMAOT_LINKER_PATH environment variable or "
-                    "-iree-llvm-linker-path=\n";
+                    "IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment variable or "
+                    "-iree-llvm-embedded-linker-path=\n";
     return "";
   }
 
@@ -89,7 +89,7 @@ class EmbeddedLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
-        getToolPath(),
+        getEmbeddedToolPath(),
 
         // Forces LLD to act like gnu ld and produce ELF files.
         // If not specified then lld tries to figure out what it is by progname

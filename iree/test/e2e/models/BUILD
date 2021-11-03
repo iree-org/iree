@@ -41,6 +41,7 @@ iree_lit_test_suite(
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
+        "@llvm-project//lld:lld",
     ],
     tags = [
         "hostonly",

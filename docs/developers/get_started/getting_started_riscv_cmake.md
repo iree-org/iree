@@ -60,9 +60,6 @@ $ cmake -G Ninja -B ../iree-build-host/ \
 $ cmake --build ../iree-build-host/ --target install
 ```
 
-Debugging note: if `IREE_LLVMAOT_LINKER_PATH` is set for targeting RISC-V then
-the build above will fail, and you should run `unset IREE_LLVMAOT_LINKER_PATH`.
-
 ### Target configuration
 
 The following instruction shows how to build for the RISC-V 64-bit Linux machine

@@ -132,16 +132,17 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   targetOptions.debugSymbols = clDebugSymbols;
 
   static llvm::cl::opt<std::string> clLinkerPath(
-      "iree-llvm-linker-path",
-      llvm::cl::desc("Tool used to link shared libraries produced by IREE."),
+      "iree-llvm-system-linker-path",
+      llvm::cl::desc("Tool used to link system shared libraries produced by "
+                     "IREE (for -iree-llvm-link-embedded=false)."),
       llvm::cl::init(""));
   targetOptions.linkerPath = clLinkerPath;
 
   static llvm::cl::opt<std::string> clEmbeddedLinkerPath(
       "iree-llvm-embedded-linker-path",
       llvm::cl::desc("Tool used to link embedded ELFs produced by IREE (for "
-                     "-iree-llvm-link-embedded)."),
-      llvm::cl::init("ld.lld"));
+                     "-iree-llvm-link-embedded=true)."),
+      llvm::cl::init(""));
   targetOptions.embeddedLinkerPath = clEmbeddedLinkerPath;
 
   static llvm::cl::opt<bool> clLinkEmbedded(

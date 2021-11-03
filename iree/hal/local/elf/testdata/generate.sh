@@ -40,7 +40,6 @@ function compile_and_extract_library() {
       -o=simple_embedding_test_dylib_llvm_scratch.vmfb
 
       -iree-hal-target-backends=dylib-llvm-aot
-      -iree-llvm-link-embedded=true
       -iree-llvm-debug-symbols=false
 
       "${translate_args[@]}"

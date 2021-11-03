@@ -84,8 +84,9 @@ class LinkerTool {
 
   virtual ~LinkerTool() = default;
 
-  // Returns the path to the linker tool binary.
-  virtual std::string getToolPath() const;
+  // Returns the path to the system linker tool binary, or empty string if none
+  // was discovered.
+  virtual std::string getSystemToolPath() const;
 
   // Configures a module prior to compilation with any additional
   // functions/exports it may need, such as shared object initializer functions.

@@ -106,15 +106,15 @@ void Artifacts::keepAllFiles() {
   }
 }
 
-std::string LinkerTool::getToolPath() const {
-  // Always use the -iree-llvm-linker-path flag when specified as it's
+std::string LinkerTool::getSystemToolPath() const {
+  // Always use the -iree-llvm-system-linker-path flag when specified as it's
   // explicitly telling us what to use.
   if (!targetOptions.linkerPath.empty()) {
     return targetOptions.linkerPath;
   }
 
   // Allow users to override the automatic search with an environment variable.
-  char *linkerPath = std::getenv("IREE_LLVMAOT_LINKER_PATH");
+  char *linkerPath = std::getenv("IREE_LLVMAOT_SYSTEM_LINKER_PATH");
   if (linkerPath) {
     return std::string(linkerPath);
   }

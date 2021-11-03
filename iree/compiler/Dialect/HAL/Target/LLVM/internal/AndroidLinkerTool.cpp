@@ -24,7 +24,7 @@ using llvm::Triple;
 //   https://developer.android.com/ndk/guides/other_build_systems
 //
 // If we want to support self-built variants we'll need an env var (or just make
-// the user set IREE_LLVMAOT_LINKER_PATH).
+// the user set IREE_LLVMAOT_SYSTEM_LINKER_PATH).
 static const char *getNDKHostPlatform() {
   auto hostTriple = Triple(llvm::sys::getProcessTriple());
   if (hostTriple.isOSLinux() && hostTriple.getArch() == Triple::x86_64) {
@@ -68,8 +68,8 @@ class AndroidLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
-  std::string getToolPath() const override {
-    auto toolPath = LinkerTool::getToolPath();
+  std::string getSystemToolPath() const override {
+    auto toolPath = LinkerTool::getSystemToolPath();
     if (!toolPath.empty()) return toolPath;
 
     // ANDROID_NDK must be set for us to infer the tool path.
@@ -114,7 +114,7 @@ class AndroidLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
-        getToolPath(),
+        getSystemToolPath(),
 
         // Avoids including any libc/startup files that initialize the CRT as
         // we don't use any of that. Our shared libraries must be freestanding.
