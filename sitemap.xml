@@ -96,6 +96,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://google.github.io/iree/extensions/</loc>
+         <lastmod>2021-11-03</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://google.github.io/iree/ml-frameworks/</loc>
          <lastmod>2021-11-03</lastmod>
          <changefreq>daily</changefreq>
