@@ -33,6 +33,17 @@ events) and software events from the kernel (such as page faults and context
 switches). Anyone may use this system call to implement a profiler, but Linux
 readily offers one, [`perf`](https://perf.wiki.kernel.org/index.php/Main_Page).
 
+### Preserving Artifacts
+
+By default IREE cleans up any temporary files it creates while running. Tools
+like perf, however, require those files exist even after the process has exited.
+The environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES` can be set to preserve
+the files. This is only needed for the CPU path when using the system loader.
+
+```shell
+export IREE_PRESERVE_DYLIB_TEMP_FILES=1
+```
+
 ### Desktop Linux
 
 On desktop Linux we can use

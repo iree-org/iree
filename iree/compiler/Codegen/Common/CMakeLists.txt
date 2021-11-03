@@ -28,6 +28,7 @@ iree_cc_library(
     "FlattenMemRefSubspanPass.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "IREEComprehensiveBufferizePass.cpp"
     "LinalgBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
     "SetNumWorkgroupsPass.cpp"

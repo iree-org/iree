@@ -98,7 +98,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_dylib_embedded-llvm-aot_dylib",
+    name = "check_dylib-llvm-aot_dylib",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -161,79 +161,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             #TODO(#7415): Enable this after failures with bazel bot
             #and cmake-swiftshared bot are addressed
-            "round.mlir",
-        ],
-    ),
-    compiler_flags = [
-        "-iree-input-type=mhlo",
-        "-iree-llvm-link-embedded=true",
-    ],
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_dylib-llvm-aot_dylib",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "abs.mlir",
-            "add.mlir",
-            "batch_norm_inference.mlir",
-            "bitcast_convert.mlir",
-            "broadcast.mlir",
-            "broadcast_add.mlir",
-            "broadcast_in_dim.mlir",
-            "clamp.mlir",
-            "compare.mlir",
-            "concatenate.mlir",
-            "constant.mlir",
-            "convert.mlir",
-            "convolution.mlir",
-            "cosine.mlir",
-            "divide.mlir",
-            "dot.mlir",
-            "dot_general.mlir",
-            "dynamic_slice.mlir",
-            "dynamic_update_slice.mlir",
-            "exponential.mlir",
-            "exponential_minus_one.mlir",
-            "fft.mlir",
-            "finite.mlir",
-            "floor.mlir",
-            "gather.mlir",
-            "iota.mlir",
-            "log.mlir",
-            "log_plus_one.mlir",
-            "maximum.mlir",
-            "minimum.mlir",
-            "multiply.mlir",
-            "negate.mlir",
-            "pad.mlir",
-            "pow.mlir",
-            "reduce.mlir",
-            "reduce_window.mlir",
-            "remainder.mlir",
-            "reshape.mlir",
-            "reverse.mlir",
-            "rng_normal.mlir",
-            "rng_uniform.mlir",
-            "rsqrt.mlir",
-            "scatter.mlir",
-            "scatter_dynamic.mlir",
-            "select.mlir",
-            "sine.mlir",
-            "slice.mlir",
-            "sort.mlir",
-            "sqrt.mlir",
-            "subtract.mlir",
-            "tanh.mlir",
-            "torch_index_select.mlir",
-            "transpose.mlir",
-            "while.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
             "round.mlir",
         ],
     ),

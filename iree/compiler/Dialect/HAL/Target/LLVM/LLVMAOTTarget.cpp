@@ -385,7 +385,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       return mlir::emitError(variantOp.getLoc())
              << "failed to link executable and generate target dylib using "
                 "linker toolchain "
-             << linkerTool->getToolPath();
+             << linkerTool->getSystemToolPath();
     }
     auto &linkArtifacts = linkArtifactsOr.getValue();
     if (options_.keepLinkerArtifacts) {

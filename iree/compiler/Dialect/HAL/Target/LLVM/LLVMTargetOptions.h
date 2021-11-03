@@ -49,7 +49,7 @@ struct LLVMTargetOptions {
   std::string embeddedLinkerPath;
 
   // Build for the IREE embedded platform-agnostic ELF loader.
-  bool linkEmbedded = false;
+  bool linkEmbedded = true;
 
   // Link any required runtime libraries into the produced binaries statically.
   // This increases resulting binary size but enables the binaries to be used on

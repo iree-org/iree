@@ -21,9 +21,9 @@ class WindowsLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
-  std::string getToolPath() const override {
+  std::string getSystemToolPath() const override {
     // First check for setting the linker explicitly.
-    auto toolPath = LinkerTool::getToolPath();
+    auto toolPath = LinkerTool::getSystemToolPath();
     if (!toolPath.empty()) return toolPath;
 
     // No explicit linker specified, search the environment for common tools.
@@ -101,7 +101,7 @@ class WindowsLinkerTool : public LinkerTool {
     llvm::sys::path::replace_extension(pdbPath, "pdb");
 
     SmallVector<std::string, 8> flags = {
-        getToolPath(),
+        getSystemToolPath(),
 
         // Hide the linker banner message printed each time.
         "/nologo",

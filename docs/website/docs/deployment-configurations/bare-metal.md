@@ -27,11 +27,10 @@ to retrieve the IREE compiler.
 The model can be compiled with the following command from the IREE compiler
 build directory
 
-``` shell hl_lines="3 4 5 6"
+``` shell hl_lines="3 4 5"
 iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=dylib-llvm-aot \
-    -iree-llvm-link-embedded=true \
     -iree-llvm-target-triple=x86_64-pc-linux-elf \
     -iree-llvm-debug-symbols=false \
     iree/samples/models/simple_abs.mlir \
@@ -43,10 +42,6 @@ In which
 
 * `iree-hal-target-backends=dylib-llvm-aot`: Build the model for the dynamic
 library CPU HAL driver
-* `iree-llvm-link-embedded=true`: Generate the dynamic library with
-[LLD](https://lld.llvm.org/) and the artifact can be loaded with the
-[embedded library loader](https://github.com/google/iree/blob/main/iree/hal/local/loaders/embedded_library_loader.h)
-without invoking the dynamic library support
 * `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple so
 the artifact has a fixed ABI to be rendered by the
 [elf_module library](https://github.com/google/iree/tree/main/iree/hal/local/elf)

@@ -200,6 +200,7 @@ def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
@@ -949,7 +950,6 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
     Variadic<Stream_Dim>:$start_indices,
     Variadic<Stream_Dim>:$lengths,
     Stream_PrimitiveType:$value,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -963,7 +963,7 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
     `->`
     $target_encoding (`` `{` $target_encoding_dims^ `}`)?
     `in`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1009,7 +1009,6 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
     TypeAttr:$update_encoding,
     Stream_ShapeDynamicDims:$update_encoding_dims,
     Stream_Size:$update_size,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1025,7 +1024,7 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
     `->`
     $target_encoding (`` `{` $target_encoding_dims^ `}`)?
     `in`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1090,7 +1089,7 @@ def Stream_TensorLoadOp : Stream_PureOp<"tensor.load", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_TensorStoreOp : Stream_Op<"tensor.store", [
+def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
   AttrSizedOperandSegments,
   AllTypesMatch<["target", "result"]>,
   Stream_TensorPhaseOp,
@@ -1113,8 +1112,7 @@ def Stream_TensorStoreOp : Stream_Op<"tensor.store", [
     Stream_ShapeDynamicDims:$target_encoding_dims,
     Stream_Size:$target_size,
     Variadic<Stream_Dim>:$indices,
-    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value
   );
   let results = (outs
     Stream_StagingResource:$result
@@ -1127,7 +1125,7 @@ def Stream_TensorStoreOp : Stream_Op<"tensor.store", [
     `->`
     $target_encoding (`` `{` $target_encoding_dims^ `}`)?
     `in`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1385,7 +1383,6 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
     Stream_Offset:$target_end,
     Stream_Size:$target_length,
     Stream_PrimitiveType:$value,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1397,7 +1394,7 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
     $value `,`
     $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
     type($value) `->`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1439,7 +1436,6 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
     Stream_Offset:$target_end,
     Stream_AnyStreamResource:$update,
     Stream_Size:$update_size,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1451,7 +1447,7 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
     $update `,`
     $target `[` $target_offset `to` $target_end `]` `:`
     type($update) `` `{` $update_size `}` `->`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1500,7 +1496,6 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
     Stream_Offset:$source_offset,
     Stream_Offset:$source_end,
     Stream_Size:$length,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1513,7 +1508,7 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
     $target `[` $target_offset `to` $target_end `]` `,`
     $length `:`
     type($source) `` `{` $source_size `}` `->`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1578,6 +1573,87 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
+}
+
+def Stream_AsyncLoadOp : Stream_PureOp<"async.load", [
+  Stream_AsyncPhaseOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{loads a value from a resource}];
+  let description = [{
+    Returns the element at the given location from within the resource.
+  }];
+
+  let arguments = (ins
+    Stream_StagingResource:$source,
+    Stream_Size:$source_size,
+    Stream_Offset:$source_offset
+  );
+  let results = (outs
+    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$result
+  );
+
+  let assemblyFormat = [{
+    $source `[` $source_offset `]` `:`
+    type($source) `` `{` $source_size `}`
+    `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return source_size(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let verifier = [{ return verifyOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
+  AllTypesMatch<["target", "result"]>,
+  Stream_AsyncPhaseOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{stores a value into a resource}];
+  let description = [{
+    Returns a resource with the element at the given offset set to the given
+    value.
+  }];
+
+  let arguments = (ins
+    Stream_StagingResource:$target,
+    Stream_Size:$target_size,
+    Stream_Offset:$target_offset,
+    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value
+  );
+  let results = (outs
+    Stream_StagingResource:$result
+  );
+
+  let assemblyFormat = [{
+    $value `,`
+    $target `[` $target_offset `]` `:`
+    type($value)
+    `->`
+    custom<ShapedTiedResult>(type($target), $target_size)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return target_size(); }
+    Value getResultSize(unsigned idx) { return target_size(); }
+  }];
+
+  let verifier = [{ return verifyOp(*this); }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [

@@ -13,6 +13,23 @@ func @FoldResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index) -> (ind
 
 // -----
 
+// CHECK-LABEL: @SelectResourceSizeOp
+func @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index, %arg4: i1) -> (!stream.resource<staging>, index) {
+  // CHECK: %[[ARG0_T:.+]] = stream.async.transfer %arg0 {{.+}} -> !stream.resource<*>{%[[ARG0_SZ:.+]]}
+  %0 = stream.async.transfer %arg0 : !stream.resource<staging>{%arg1} -> !stream.resource<*>{%arg1}
+  // CHECK: %[[ARG2_T:.+]] = stream.async.transfer %arg2 {{.+}} -> !stream.resource<*>{%[[ARG2_SZ:.+]]}
+  %1 = stream.async.transfer %arg2 : !stream.resource<staging>{%arg3} -> !stream.resource<*>{%arg3}
+  // CHECK: %[[RET_T:.+]] = select %arg4, %[[ARG0_T]], %[[ARG2_T]] : !stream.resource<*>
+  %2 = select %arg4, %0, %1 : !stream.resource<*>
+  // CHECK: %[[RET_SIZE:.+]] = select %arg4, %[[ARG0_SZ]], %[[ARG2_SZ]] : index
+  %3 = stream.resource.size %2 : !stream.resource<*>
+  // CHECK: = stream.async.transfer %[[RET_T]] : !stream.resource<*>{%[[RET_SIZE]]}
+  %4 = stream.async.transfer %2 : !stream.resource<*>{%3} -> !stream.resource<staging>{%3}
+  return %4, %3 : !stream.resource<staging>, index
+}
+
+// -----
+
 // CHECK-LABEL: @FoldSubviewIntoLoadOp
 func @FoldSubviewIntoLoadOp(%arg0: !stream.resource<staging>, %arg1: index) -> i32 {
   %c64 = arith.constant 64 : index
