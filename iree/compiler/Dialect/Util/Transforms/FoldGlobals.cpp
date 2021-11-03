@@ -386,7 +386,8 @@ class FoldGlobalsPass
 
     auto moduleOp = getOperation();
     beforeFoldingGlobals =
-        llvm::to_vector<8>(moduleOp.getOps<IREE::Util::GlobalOp>()).size();
+        llvm::count_if(moduleOp.getOps<IREE::Util::GlobalOp>(),
+                       [](IREE::Util::GlobalOp op) { return true; });
     for (int i = 0; i < 10; ++i) {
       // TODO(benvanik): determine if we need this expensive folding.
       if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns))) {
@@ -436,7 +437,8 @@ class FoldGlobalsPass
     }
 
     afterFoldingGlobals =
-        llvm::to_vector<8>(moduleOp.getOps<IREE::Util::GlobalOp>()).size();
+        llvm::count_if(moduleOp.getOps<IREE::Util::GlobalOp>(),
+                       [](IREE::Util::GlobalOp op) { return true; });
   }
 
  private:
