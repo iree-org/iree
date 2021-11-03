@@ -356,7 +356,7 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
 class FoldGlobalsPass
     : public PassWrapper<FoldGlobalsPass, OperationPass<mlir::ModuleOp>> {
  public:
-  explicit FoldGlobalsPass() {}
+  explicit FoldGlobalsPass() = default;
   FoldGlobalsPass(const FoldGlobalsPass &pass) {}
 
   StringRef getArgument() const override { return "iree-util-fold-globals"; }
