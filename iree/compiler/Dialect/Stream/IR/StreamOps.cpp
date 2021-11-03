@@ -1091,6 +1091,41 @@ static LogicalResult verifyOp(AsyncTransferOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.load
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyOp(AsyncLoadOp op) {
+  if (failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.store
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyOp(AsyncStoreOp op) {
+  if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncStoreOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+}
+
+::llvm::Optional<unsigned> AsyncStoreOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // target
+}
+
+SmallVector<int64_t, 4> AsyncStoreOp::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.dispatch
 //===----------------------------------------------------------------------===//
 
