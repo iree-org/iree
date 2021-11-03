@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "convert_to_stream.mlir"
+    "encode_tensors.mlir"
     "outline_constants.mlir"
   DATA
     iree::tools::IreeFileCheck

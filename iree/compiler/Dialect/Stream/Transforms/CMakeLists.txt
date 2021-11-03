@@ -18,6 +18,7 @@ iree_cc_library(
     "Passes.h.inc"
   SRCS
     "ConvertToStream.cpp"
+    "EncodeTensors.cpp"
     "OutlineConstants.cpp"
     "PassDetail.h"
     "Passes.cpp"

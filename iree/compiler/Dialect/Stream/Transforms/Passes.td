@@ -34,6 +34,18 @@ def ConvertToStream :
 }
 
 //===----------------------------------------------------------------------===//
+// Placement/affinity management
+//===----------------------------------------------------------------------===//
+
+def EncodeTensors :
+    Pass<"iree-stream-encode-tensors", ""> {
+  let summary = "Encodes tensors into binary formats based on affinity and target support.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createEncodeTensorsPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 
