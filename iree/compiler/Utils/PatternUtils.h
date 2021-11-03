@@ -66,9 +66,9 @@ static void insertConversionPattern(OwningRewritePatternList &patterns,
             PatternBenefit benefit)
         : OpConversionPattern<OpTy>(context, benefit), f(f) {}
     LogicalResult matchAndRewrite(
-        OpTy op, ArrayRef<Value> operands,
+        OpTy op, typename OpTy::Adaptor adaptor,
         ConversionPatternRewriter &rewriter) const override {
-      return f(op, typename OpTy::Adaptor(operands), rewriter);
+      return f(op, adaptor, rewriter);
     }
     GenericOpRewritePattern<OpTy> f;
   };

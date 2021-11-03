@@ -25,24 +25,22 @@ class TensorCastPattern : public OpConversionPattern<IREE::HAL::TensorCastOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::HAL::TensorCastOp op, llvm::ArrayRef<Value> rawOperands,
+      IREE::HAL::TensorCastOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::TensorCastOpAdaptor newOperands(
-        rawOperands, op.getOperation()->getAttrDictionary());
     Value newValue = {};
     auto targetType = op.target().getType();
     if (targetType.isa<TensorType>()) {
       // HAL type -> tensor<...>
-      newValue = newOperands.source();
+      newValue = adaptor.source();
     } else if (targetType.isa<IREE::HAL::BufferType>()) {
       // tensor<...> -> !hal.buffer
-      auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
-          op.getLoc(), op.source(), newOperands.source(), rewriter);
-      newValue = adaptor.getBuffer();
+      auto rewriteAdaptor = IREE::HAL::TensorRewriteAdaptor::get(
+          op.getLoc(), op.source(), adaptor.source(), rewriter);
+      newValue = rewriteAdaptor.getBuffer();
     } else if (targetType.isa<IREE::HAL::BufferViewType>()) {
       // tensor<...> -> !hal.buffer_view
-      auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
-          op.getLoc(), op.source(), newOperands.source(), rewriter);
+      auto rewriteAdaptor = IREE::HAL::TensorRewriteAdaptor::get(
+          op.getLoc(), op.source(), adaptor.source(), rewriter);
 
       // Note that the buffer view cannot just be returned here: it's backing
       // buffer will be correct, but the cast may be doing a metadata change,
@@ -54,12 +52,13 @@ class TensorCastPattern : public OpConversionPattern<IREE::HAL::TensorCastOp> {
       if (auto sourceType =
               originalValue.getType().dyn_cast<RankedTensorType>()) {
         auto shapeDims = getShapeDims(rewriter, op.getLoc(), sourceType,
-                                      newOperands.source_dims());
+                                      adaptor.source_dims());
         newValue = rewriter.create<IREE::HAL::BufferViewCreateOp>(
-            op.getLoc(), adaptor.getBuffer(), adaptor.getElementType(),
-            adaptor.getEncodingType(), shapeDims);
+            op.getLoc(), rewriteAdaptor.getBuffer(),
+            rewriteAdaptor.getElementType(), rewriteAdaptor.getEncodingType(),
+            shapeDims);
       } else {
-        newValue = adaptor.getBufferView();
+        newValue = rewriteAdaptor.getBufferView();
       }
     }
     if (!newValue) {

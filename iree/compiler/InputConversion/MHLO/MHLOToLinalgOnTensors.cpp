@@ -58,7 +58,7 @@ struct ConcatenateOpConversion
   using OpConversionPattern<mhlo::ConcatenateOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mhlo::ConcatenateOp op, ArrayRef<Value> args,
+      mhlo::ConcatenateOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto resultType = this->typeConverter->convertType(op.getResult().getType())
                           .dyn_cast<RankedTensorType>();
@@ -73,11 +73,12 @@ struct ConcatenateOpConversion
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0; i < rank; ++i) {
       offsets.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
-      sizes.push_back(rewriter.create<tensor::DimOp>(loc, args[0], i));
+      sizes.push_back(
+          rewriter.create<tensor::DimOp>(loc, adaptor.getOperands()[0], i));
       strides.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
     }
     Value resultDimSize = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    for (auto arg : args) {
+    for (auto arg : adaptor.getOperands()) {
       auto size = rewriter.create<tensor::DimOp>(loc, arg, dim);
       resultDimSize = rewriter.create<arith::AddIOp>(loc, resultDimSize, size);
     }
@@ -90,7 +91,7 @@ struct ConcatenateOpConversion
         rewriter.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
     Value accBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    for (auto arg : args) {
+    for (auto arg : adaptor.getOperands()) {
       offsets[dim] = accBound;
       sizes[dim] = rewriter.create<tensor::DimOp>(loc, arg, dim);
       result = rewriter.create<tensor::InsertSliceOp>(loc, arg, result, offsets,
@@ -167,14 +168,13 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   using OpConversionPattern<mhlo::FftOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mhlo::FftOp op, ArrayRef<Value> args,
+      mhlo::FftOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (op.fft_type() != "RFFT") {
       return rewriter.notifyMatchFailure(op,
                                          "non RFFT types are supported yet");
     }
 
-    mhlo::FftOpAdaptor adaptor(args);
     auto inputType = adaptor.operand().getType().dyn_cast<RankedTensorType>();
     if (!inputType || !inputType.hasStaticShape() || inputType.getRank() > 2) {
       return rewriter.notifyMatchFailure(op, "only static 1D or 2D dft ops");
@@ -253,7 +253,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
 struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mhlo::ConstOp op, ArrayRef<Value> /*operands*/,
+      mhlo::ConstOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto valueAttr = op.value();
     Type oldElType = valueAttr.getType().getElementType();

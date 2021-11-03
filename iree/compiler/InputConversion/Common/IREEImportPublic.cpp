@@ -90,9 +90,8 @@ class BufferViewToTensorPattern
   using OpConversionPattern<
       IREEPublic::BufferViewToTensorOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREEPublic::BufferViewToTensorOp srcOp, ArrayRef<Value> operands,
+      IREEPublic::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREEPublic::BufferViewToTensorOpAdaptor adaptor(operands);
     Type resultType = typeConverter->convertType(srcOp.target().getType());
     if (!resultType) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorCastOp>(
@@ -106,9 +105,8 @@ class TensorToBufferViewPattern
   using OpConversionPattern<
       IREEPublic::TensorToBufferViewOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREEPublic::TensorToBufferViewOp srcOp, ArrayRef<Value> operands,
+      IREEPublic::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREEPublic::TensorToBufferViewOpAdaptor adaptor(operands);
     Type resultType = typeConverter->convertType(srcOp.target().getType());
     if (!resultType) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorCastOp>(
@@ -120,7 +118,7 @@ class TensorToBufferViewPattern
 class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      FuncOp srcOp, ArrayRef<Value> operands,
+      FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getType();
     TypeConverter::SignatureConversion signatureConversion(
@@ -178,7 +176,7 @@ class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
 class GlobalOpPattern : public OpConversionPattern<IREEPublic::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREEPublic::GlobalOp srcOp, ArrayRef<Value> operands,
+      IREEPublic::GlobalOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Type newType = typeConverter->convertType(srcOp.type());
     if (!newType) return failure();

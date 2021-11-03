@@ -343,7 +343,7 @@ struct HALInterfaceWorkgroupOpsConverter final
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      InterfaceOpTy op, ArrayRef<Value> operands,
+      InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Type i32Type = rewriter.getI32Type();

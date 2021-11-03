@@ -144,9 +144,9 @@ class VMImportOpConversion : public OpConversionPattern<T> {
   }
 
   LogicalResult matchAndRewrite(
-      T op, llvm::ArrayRef<Value> operands,
+      T op, typename T::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto results = rewriteToCall(op, Adaptor{operands}, importOp,
+    auto results = rewriteToCall(op, adaptor, importOp,
                                  *this->getTypeConverter(), rewriter);
     if (!results.hasValue()) return failure();
     rewriter.replaceOp(op, results.getValue());

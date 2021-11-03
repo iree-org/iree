@@ -18,12 +18,11 @@ class StatusCheckOkOpConversion
       : OpConversionPattern(context) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::StatusCheckOkOp op, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::StatusCheckOkOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Util::StatusCheckOkOp::Adaptor operands(newOperands);
     // If status value is non-zero, fail.
     rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(
-        op, operands.status(), op.message().getValueOr(""));
+        op, adaptor.status(), op.message().getValueOr(""));
     return success();
   }
 };
