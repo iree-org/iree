@@ -254,7 +254,32 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
   iree_hal_buffer_release(host_buffer);
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length1) {
+TEST_P(CommandBufferTest, FillBuffer_pattern1_size1_offset0_length1) {
+  iree_device_size_t buffer_size = 1;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 1;
+  uint8_t pattern = 0x07;
+  std::vector<uint8_t> reference_buffer{0x07};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern1_size5_offset0_length5) {
+  iree_device_size_t buffer_size = 5;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 5;
+  uint8_t pattern = 0x07;
+  std::vector<uint8_t> reference_buffer{0x07, 0x07, 0x07, 0x07,  //
+                                        0x07};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length1) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 1;
@@ -269,7 +294,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length1) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length3) {
+TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length3) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 3;
@@ -284,7 +309,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length3) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length8) {
+TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
@@ -299,7 +324,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_offset2_length8) {
+TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset2_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 2;
   iree_device_size_t fill_length = 8;
@@ -314,7 +339,19 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_offset2_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern2_offset0_length8) {
+TEST_P(CommandBufferTest, FillBuffer_pattern2_size2_offset0_length2) {
+  iree_device_size_t buffer_size = 2;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 2;
+  uint16_t pattern = 0xAB23;
+  std::vector<uint8_t> reference_buffer{0x23, 0xAB};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
@@ -329,7 +366,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern2_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern2_offset0_length10) {
+TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset0_length10) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 10;
@@ -344,7 +381,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern2_offset0_length10) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern2_offset2_length8) {
+TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset2_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 2;
   iree_device_size_t fill_length = 8;
@@ -359,7 +396,19 @@ TEST_P(CommandBufferTest, FillBuffer_pattern2_offset2_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern4_offset0_length8) {
+TEST_P(CommandBufferTest, FillBuffer_pattern4_size4_offset0_length4) {
+  iree_device_size_t buffer_size = 4;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t fill_length = 4;
+  uint32_t pattern = 0xAB23CD45;
+  std::vector<uint8_t> reference_buffer{0x45, 0xCD, 0x23, 0xAB};
+  std::vector<uint8_t> actual_buffer =
+      RunFillBufferTest(buffer_size, target_offset, fill_length,
+                        (void*)&pattern, sizeof(pattern));
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
+}
+
+TEST_P(CommandBufferTest, FillBuffer_pattern4_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
