@@ -102,8 +102,12 @@ def OutlineDispatchRegions :
 def OutlineLargeConstants :
     Pass<"iree-flow-outline-large-constants", "mlir::ModuleOp"> {
   let summary = "Outlines large tensor constants into util.globals at the module level.";
-  // TODO(#5493): add a flag for this.
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass(25)";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass()";
+  let options = [
+    Option<"minStorageSize", "min-storage-size",
+           "int64_t", /*default=*/"64",
+           "Outlines constants with storage sizes > than this byte size.">
+  ];
 }
 
 def PadLinalgOps :

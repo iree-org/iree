@@ -29,11 +29,15 @@ namespace Flow {
 // more efficient and fewer bindings.
 static bool isConstantLarge(arith::ConstantOp constantOp,
                             size_t minLargeConstantSize) {
+  if (constantOp.value().isa<SplatElementsAttr>()) {
+    // Never outline splats; we want those transient within streams.
+    return false;
+  }
   auto type = constantOp.getType();
   if (auto shapedType = type.dyn_cast<RankedTensorType>()) {
     size_t unpackedByteLength =
         (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) / 8;
-    if (unpackedByteLength >= minLargeConstantSize) {
+    if (unpackedByteLength > minLargeConstantSize) {
       return true;
     }
   }
@@ -63,8 +67,6 @@ class OutlineLargeConstantsPass
     : public OutlineLargeConstantsBase<OutlineLargeConstantsPass> {
  public:
   OutlineLargeConstantsPass() = default;
-  OutlineLargeConstantsPass(size_t minLargeConstantSize)
-      : minLargeConstantSize(minLargeConstantSize){};
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, IREE::Util::UtilDialect>();
@@ -84,7 +86,7 @@ class OutlineLargeConstantsPass
     std::vector<std::pair<arith::ConstantOp, IREE::Util::GlobalOp>>
         replacements;
     for (auto &largeConstantOp :
-         findLargeConstantsInModule(moduleOp, minLargeConstantSize)) {
+         findLargeConstantsInModule(moduleOp, minStorageSize.getValue())) {
       std::string name;
       do {
         name = baseName + std::to_string(uniqueId++);
@@ -114,14 +116,11 @@ class OutlineLargeConstantsPass
       constantOp.erase();
     }
   }
-
- private:
-  size_t minLargeConstantSize;
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineLargeConstantsPass(
-    size_t minLargeConstantSize) {
-  return std::make_unique<OutlineLargeConstantsPass>(minLargeConstantSize);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOutlineLargeConstantsPass() {
+  return std::make_unique<OutlineLargeConstantsPass>();
 }
 
 }  // namespace Flow
