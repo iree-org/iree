@@ -154,6 +154,22 @@ static Optional<arith::CmpFPredicate> convertFpComparePredicate(
   return {};
 }
 
+/// Does a low-level boxing operation on the given `convertedValue`, which
+/// has already been subject to type conversion. This is based on the original
+/// `pythonType` which must implement PythonTypeInterface.
+/// If `pythonType` is already boxed, then this does nothing.
+/// Returns nullptr for unsupported cases, not emitting diagnostics.
+static Value boxConvertedValue(Location loc, Type pythonType,
+                               Value convertedValue, OpBuilder &builder) {
+  if (pythonType.isa<PYDM::ObjectType>()) return convertedValue;
+  auto ptiType = pythonType.dyn_cast<PYDM::PythonTypeInterface>();
+  if (!ptiType) return {};
+  auto typeCode = ptiType.getTypeCode();
+  auto list = createObjectList(loc, builder, static_cast<int>(typeCode),
+                               convertedValue);
+  return list;
+}
+
 namespace {
 
 class AllocFreeVarOpConversion
@@ -305,6 +321,13 @@ class AssignSubscriptListConversion
     auto indexType = rewriter.getType<IndexType>();
     Type statusType =
         getTypeConverter()->convertType(srcOp.exc_result().getType());
+    Value valueToSet =
+        boxIfNecessary(loc, pySequence.getType().cast<PYDM::ListType>(),
+                       srcOp.rhs().getType(), adaptor.rhs(), rewriter);
+    if (!valueToSet) {
+      return rewriter.notifyMatchFailure(
+          srcOp, "unsupported list assignment boxing mode");
+    }
 
     Value zero = rewriter.create<arith::ConstantIntOp>(loc, 0, slice.getType());
     Value listSizeIndex =
@@ -362,7 +385,7 @@ class AssignSubscriptListConversion
       rewriter.setInsertionPointToEnd(setElementBlock);
       Value successResult = getSuccessStatusValue(loc, rewriter);
       rewriter.create<iree::ListSetOp>(
-          loc, sequence, setElementBlock->getArgument(0), adaptor.rhs());
+          loc, sequence, setElementBlock->getArgument(0), valueToSet);
       rewriter.create<mlir::BranchOp>(loc, continuationBlock,
                                       ValueRange{successResult});
     }
@@ -377,6 +400,20 @@ class AssignSubscriptListConversion
     }
 
     return success();
+  }
+
+  Value boxIfNecessary(Location loc, PYDM::ListType listType, Type origRhsType,
+                       Value rhs, ConversionPatternRewriter &rewriter) const {
+    switch (listType.getStorageClass()) {
+      case CollectionStorageClass::Boxed:
+      case CollectionStorageClass::Empty: {
+        return boxConvertedValue(loc, origRhsType, rhs, rewriter);
+        break;
+      }
+      case CollectionStorageClass::Unboxed:
+        // TODO: Implement.
+        return nullptr;
+    }
   }
 };
 
@@ -398,15 +435,12 @@ class BoxOpConversion : public OpConversionPattern<PYDM::BoxOp> {
       PYDM::BoxOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
-    auto origType =
-        srcOp.primitive().getType().dyn_cast<PYDM::PythonTypeInterface>();
-    if (!origType)
+    Value boxedValue = boxConvertedValue(loc, srcOp.primitive().getType(),
+                                         adaptor.primitive(), rewriter);
+    if (!boxedValue)
       return rewriter.notifyMatchFailure(srcOp,
-                                         "not a PythonTypeInterface type");
-    auto typeCode = origType.getTypeCode();
-    auto list = createObjectList(loc, rewriter, static_cast<int>(typeCode),
-                                 adaptor.getOperands()[0]);
-    rewriter.replaceOp(srcOp, list);
+                                         "not a supported type for boxing");
+    rewriter.replaceOp(srcOp, boxedValue);
     return success();
   }
 };
