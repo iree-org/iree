@@ -121,6 +121,12 @@ def LLVMCPUTileAndVectorize
   let constructor = "mlir::iree_compiler::createLLVMCPUTileAndVectorizePass()";
 }
 
+def LLVMCPUTileAndVectorize2
+    : Pass<"iree-llvmcpu-tile-and-vectorize2", "FuncOp"> {
+  let summary = "Tile and vectorize workgroups tiles (v2)";
+  let constructor = "mlir::iree_compiler::createLLVMCPUTileAndVectorizePass2()";
+}
+
 def LLVMCPUUnfuseFMAOps :
     Pass<"iree-llvmcpu-unfuse-fma-pass", "FuncOp"> {
   let summary = "Convert llvm.fma into unfused mulf and addf ops";

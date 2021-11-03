@@ -16,6 +16,8 @@ def CPU_Vectorization
     : StrEnumAttrCase<"CPUVectorization">;
 def CPU_TensorToVectors
     : StrEnumAttrCase<"CPUTensorToVectors">;
+def CPU_TensorToVectors2
+    : StrEnumAttrCase<"CPUTensorToVectors2">;
 
 def LLVMGPU_SimpleDistribute
     : StrEnumAttrCase<"LLVMGPUDistribute">;
@@ -39,7 +41,7 @@ def None
 def DispatchLoweringPassPipelineEnum : StrEnumAttr<
     "DispatchLoweringPassPipeline",
     "identifier for pass pipeline use to lower dispatch region",
-    [CPU_Default, CPU_TensorToVectors, CPU_Vectorization,
+    [CPU_Default, CPU_TensorToVectors, CPU_TensorToVectors2, CPU_Vectorization,
      LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
      SPIRV_SimpleDistribute, SPIRV_Vectorize,
      SPIRV_VectorizeToCooperativeOps, None]> {

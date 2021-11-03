@@ -21,6 +21,7 @@ iree_cc_library(
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
+    "LLVMCPUTileAndVectorizeLinalgTensorOps2.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorization.cpp"
     "Passes.cpp"
