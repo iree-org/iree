@@ -234,6 +234,13 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims) {
+  ArrayAttr tiedOperands;
+  return parseShapedTiedResult(parser, resultType, resultDims, tiedOperands);
+}
+
+ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
     SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
     ArrayAttr &tiedOperands) {
   OpAsmParser::OperandType tiedResult;
@@ -270,7 +277,7 @@ ParseResult parseShapedTiedResult(
 }
 
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
-                           ValueRange resultDims, ArrayAttr tiedOperands) {
+                           ValueRange resultDims) {
   auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
   auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(0);
   if (tiedOperandIndex.hasValue()) {
@@ -299,6 +306,11 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
     p << "}";
     resultDims = resultDims.drop_front(1);
   }
+}
+
+void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
+                           ValueRange resultDims, ArrayAttr tiedOperands) {
+  printShapedTiedResult(p, op, resultType, resultDims);
 }
 
 //===----------------------------------------------------------------------===//
