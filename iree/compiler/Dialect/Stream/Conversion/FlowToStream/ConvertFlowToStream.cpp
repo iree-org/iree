@@ -47,10 +47,8 @@ struct ConvertHALTensorCastOp
     : public OpConversionPattern<IREE::HAL::TensorCastOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::HAL::TensorCastOp op, ArrayRef<Value> newOperands,
+      IREE::HAL::TensorCastOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::TensorCastOpAdaptor operands(newOperands,
-                                            op->getAttrDictionary());
     if (op.source().getType().isa<IREE::HAL::BufferViewType>()) {
       // Import (buffer view to stream resource).
       auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
@@ -103,10 +101,8 @@ struct ConvertTensorReshapeOp
     : public OpConversionPattern<IREE::Flow::TensorReshapeOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorReshapeOp op, ArrayRef<Value> newOperands,
+      IREE::Flow::TensorReshapeOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorReshapeOpAdaptor operands(newOperands,
-                                                op->getAttrDictionary());
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto source =
         consumeTensorOperand(op.getLoc(), operands.source(), rewriter);
@@ -125,9 +121,8 @@ struct ConvertTensorSplatOp
     : public OpConversionPattern<IREE::Flow::TensorSplatOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorSplatOp op, ArrayRef<Value> newOperands,
+      IREE::Flow::TensorSplatOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorSplatOpAdaptor operands(newOperands);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto resultSize =
         buildResultSizeOf(op.getLoc(), op.result(), op.result_dims(), rewriter);
@@ -143,9 +138,8 @@ struct ConvertTensorCloneOp
     : public OpConversionPattern<IREE::Flow::TensorCloneOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorCloneOp op, ArrayRef<Value> newOperands,
+      IREE::Flow::TensorCloneOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorCloneOpAdaptor operands(newOperands);
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto operand =
         consumeTensorOperand(op.getLoc(), operands.operand(), rewriter);
@@ -162,10 +156,8 @@ struct ConvertTensorSliceOp
     : public OpConversionPattern<IREE::Flow::TensorSliceOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorSliceOp op, ArrayRef<Value> newOperands,
+      IREE::Flow::TensorSliceOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorSliceOpAdaptor operands(newOperands,
-                                              op->getAttrDictionary());
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto source =
         consumeTensorOperand(op.getLoc(), operands.source(), rewriter);
@@ -185,10 +177,8 @@ struct ConvertTensorUpdateOp
     : public OpConversionPattern<IREE::Flow::TensorUpdateOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorUpdateOp op, ArrayRef<Value> newOperands,
+      IREE::Flow::TensorUpdateOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorUpdateOpAdaptor operands(newOperands,
-                                               op->getAttrDictionary());
     auto update =
         consumeTensorOperand(op.getLoc(), operands.update(), rewriter);
     auto target =
@@ -207,10 +197,8 @@ struct ConvertTensorLoadOp
     : public OpConversionPattern<IREE::Flow::TensorLoadOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorLoadOp op, ArrayRef<Value> newOperands,
+      IREE::Flow::TensorLoadOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorLoadOpAdaptor operands(newOperands,
-                                             op->getAttrDictionary());
     auto resultType = getTypeConverter()->convertType(op.result().getType());
     auto source =
         consumeTensorOperand(op.getLoc(), operands.source(), rewriter);
@@ -237,10 +225,8 @@ struct ConvertTensorStoreOp
     : public OpConversionPattern<IREE::Flow::TensorStoreOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorStoreOp op, ArrayRef<Value> newOperands,
+      IREE::Flow::TensorStoreOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorStoreOpAdaptor operands(newOperands,
-                                              op->getAttrDictionary());
     auto target =
         consumeTensorOperand(op.getLoc(), operands.target(), rewriter);
 
@@ -277,11 +263,8 @@ struct ConvertTensorStoreOp
 struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchOp op, ArrayRef<Value> newOperands,
+      IREE::Flow::DispatchOp op, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::DispatchOpAdaptor operands(newOperands,
-                                           op->getAttrDictionary());
-
     // Query and resolve all operands and their sizes.
     SmallVector<Value> dispatchOperands;
     SmallVector<Value> dispatchOperandSizes;
@@ -365,7 +348,7 @@ struct ConvertExecutableOp
     : public OpConversionPattern<IREE::Flow::ExecutableOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::ExecutableOp flowOp, ArrayRef<Value> newOperands,
+      IREE::Flow::ExecutableOp flowOp, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
     // flow.executable -> stream.executable
     auto streamOp = rewriter.create<IREE::Stream::ExecutableOp>(

@@ -165,7 +165,7 @@ class AllocFreeVarOpConversion
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::AllocFreeVarOp srcOp, ArrayRef<Value> operands,
+      pydm_d::AllocFreeVarOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO: We may want to initialize the list structurally in some way.
     // This will fail either way on read from unassigned variable, but we need
@@ -275,9 +275,8 @@ class BoolToPredConversion : public OpConversionPattern<pydm_d::BoolToPredOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::BoolToPredOp srcOp, ArrayRef<Value> operands,
+      pydm_d::BoolToPredOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    pydm_d::BoolToPredOp::Adaptor adaptor(operands);
     rewriter.replaceOp(srcOp, adaptor.value());
     return success();
   }
@@ -287,7 +286,7 @@ class BoxOpConversion : public OpConversionPattern<pydm_d::BoxOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::BoxOp srcOp, ArrayRef<Value> operands,
+      pydm_d::BoxOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     auto origType =
@@ -297,7 +296,7 @@ class BoxOpConversion : public OpConversionPattern<pydm_d::BoxOp> {
                                          "not a PythonTypeInterface type");
     auto typeCode = origType.getTypeCode();
     auto list = createObjectList(loc, rewriter, static_cast<int>(typeCode),
-                                 operands[0]);
+                                 adaptor.getOperands()[0]);
     rewriter.replaceOp(srcOp, list);
     return success();
   }
@@ -307,9 +306,8 @@ class CallOpConversion : public OpConversionPattern<pydm_d::CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::CallOp srcOp, ArrayRef<Value> operands,
+      pydm_d::CallOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    pydm_d::CallOp::Adaptor adaptor(operands);
     SmallVector<Type> resultTypes;
     if (failed(getTypeConverter()->convertTypes(srcOp.getResultTypes(),
                                                 resultTypes))) {
@@ -389,7 +387,7 @@ class FuncOpConversion : public OpConversionPattern<pydm_d::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::FuncOp srcOp, ArrayRef<Value> operands,
+      pydm_d::FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getType();
     TypeConverter::SignatureConversion signatureConversion(
@@ -464,7 +462,7 @@ class LoadVarOpConversion : public OpConversionPattern<pydm_d::LoadVarOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::LoadVarOp srcOp, ArrayRef<Value> operands,
+      pydm_d::LoadVarOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     auto resultType =
@@ -472,7 +470,7 @@ class LoadVarOpConversion : public OpConversionPattern<pydm_d::LoadVarOp> {
     if (!resultType)
       return rewriter.notifyMatchFailure(
           srcOp, "could not convert load_var result type");
-    auto list = operands[0];
+    auto list = adaptor.getOperands()[0];
     auto index1 =
         rewriter.create<arith_d::ConstantOp>(loc, rewriter.getIndexAttr(1));
     rewriter.replaceOpWithNewOp<iree_d::ListGetOp>(srcOp, resultType, list,
@@ -488,7 +486,7 @@ class NoneOpConversion : public OpConversionPattern<pydm_d::NoneOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::NoneOp srcOp, ArrayRef<Value> operands,
+      pydm_d::NoneOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Type i32 = rewriter.getI32Type();
     rewriter.replaceOpWithNewOp<arith_d::ConstantOp>(
@@ -505,11 +503,11 @@ class RaiseOnFailureOpConversion
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::RaiseOnFailureOp srcOp, ArrayRef<Value> operands,
+      pydm_d::RaiseOnFailureOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
 
-    Value status = operands[0];
+    Value status = adaptor.getOperands()[0];
     // Get the containing function return type so that we can create a
     // suitable null return value.
     auto parentFunc = srcOp->getParentOfType<builtin_d::FuncOp>();
@@ -545,13 +543,13 @@ class ReturnOpConversion : public OpConversionPattern<pydm_d::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::ReturnOp srcOp, ArrayRef<Value> operands,
+      pydm_d::ReturnOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     auto zeroResult = rewriter.create<arith_d::ConstantOp>(
         loc, rewriter.getI32IntegerAttr(0));
     rewriter.replaceOpWithNewOp<std_d::ReturnOp>(
-        srcOp, ValueRange{zeroResult, operands[0]});
+        srcOp, ValueRange{zeroResult, adaptor.getOperands()[0]});
     return success();
   }
 };
@@ -560,7 +558,7 @@ class StoreVarOpConversion : public OpConversionPattern<pydm_d::StoreVarOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::StoreVarOp srcOp, ArrayRef<Value> operands,
+      pydm_d::StoreVarOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
 
@@ -571,8 +569,8 @@ class StoreVarOpConversion : public OpConversionPattern<pydm_d::StoreVarOp> {
                                          "not a python type for value()");
     int typeCode = static_cast<int>(origStoreType.getTypeCode());
 
-    auto list = operands[0];
-    auto newValue = operands[1];
+    auto list = adaptor.getOperands()[0];
+    auto newValue = adaptor.getOperands()[1];
     resetObjectList(loc, rewriter, list, typeCode, newValue);
     rewriter.eraseOp(srcOp);
     return success();
@@ -583,10 +581,10 @@ class UnboxOpConversion : public OpConversionPattern<pydm_d::UnboxOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      pydm_d::UnboxOp srcOp, ArrayRef<Value> operands,
+      pydm_d::UnboxOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
-    auto list = operands[0];
+    auto list = adaptor.getOperands()[0];
 
     // Target exception result type.
     Type statusType = getTypeConverter()->convertType(srcOp.status().getType());

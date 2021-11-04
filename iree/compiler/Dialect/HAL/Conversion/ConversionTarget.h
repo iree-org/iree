@@ -26,7 +26,7 @@ class HALConversionTarget : public ConversionTarget {
   // Attempts to rewrite an op that may use tensor values into an op using HAL
   // buffers. See HALOpConversion for more information.
   static LogicalResult applyDefaultBufferRewrite(
-      Operation *srcOp, ArrayRef<Value> operands, StringRef dstOpName,
+      Operation *srcOp, ValueRange operands, StringRef dstOpName,
       TypeConverter &typeConverter, ConversionPatternRewriter &rewriter);
 };
 
@@ -53,10 +53,11 @@ class HALOpConversion : public OpConversionPattern<SRC> {
       : OpConversionPattern<SRC>(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      SRC srcOp, ArrayRef<Value> operands,
+      SRC srcOp, typename SRC::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     return HALConversionTarget::applyDefaultBufferRewrite(
-        srcOp, operands, DST::getOperationName(), typeConverter, rewriter);
+        srcOp, adaptor.getOperands(), DST::getOperationName(), typeConverter,
+        rewriter);
   }
 
  protected:

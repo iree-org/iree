@@ -1122,11 +1122,8 @@ class ExStreamFragmentOpConversion
   using OpConversionPattern<
       IREE::Flow::ExStreamFragmentOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Flow::ExStreamFragmentOp streamOp, ArrayRef<Value> newOperands,
+      IREE::Flow::ExStreamFragmentOp streamOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::ExStreamFragmentOp::Adaptor adaptor(
-        newOperands, streamOp->getAttrDictionary());
-
     auto valueAliases = computeValueAliases(streamOp);
     auto livenessIntervals = computeLivenessIntervals(streamOp, valueAliases);
 

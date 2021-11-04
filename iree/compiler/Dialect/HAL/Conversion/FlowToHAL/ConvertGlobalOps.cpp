@@ -45,7 +45,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
       : OpConversionPattern(ctx), converter(converter) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalOp globalOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalOp globalOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple globals.
     Optional<Attribute> initialValue = globalOp.initial_value();
@@ -83,7 +83,7 @@ class GlobalAddressOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalAddressOp addressOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalAddressOp addressOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple globals.
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalAddressOp>(
@@ -103,7 +103,7 @@ class GlobalLoadOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalLoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple globals.
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalLoadOp>(
@@ -123,14 +123,12 @@ class GlobalLoadIndirectOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalLoadIndirectOp loadOp,
-      llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalLoadIndirectOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Util::GlobalLoadIndirectOp::Adaptor operands(newOperands);
     // TODO(benvanik): multiple converted type results to multiple globals.
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalLoadIndirectOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
-        operands.global());
+        adaptor.global());
     return success();
   }
 
@@ -166,9 +164,8 @@ class GlobalStoreOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalStoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Util::GlobalStoreOp::Adaptor operands(newOperands);
     auto globalOp = storeOp.getGlobalOp();
     if (!globalOp) return failure();
 
@@ -177,7 +174,7 @@ class GlobalStoreOpConversion
       return rewriter.notifyMatchFailure(storeOp, "illegal global op type");
     }
     Value storeValue = implicitCastGlobalStore(
-        storeOp.getLoc(), operands.value(), globalType, rewriter);
+        storeOp.getLoc(), adaptor.value(), globalType, rewriter);
     if (!storeValue) {
       return rewriter.notifyMatchFailure(storeOp,
                                          "mismatched store and global type");
@@ -199,15 +196,12 @@ class GlobalStoreIndirectOpConversion
       : OpConversionPattern(ctx) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalStoreIndirectOp storeOp,
-      llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalStoreIndirectOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Util::GlobalStoreIndirectOp::Adaptor operands(newOperands);
-
     Type globalType =
-        operands.global().getType().cast<IREE::Util::PtrType>().getTargetType();
+        adaptor.global().getType().cast<IREE::Util::PtrType>().getTargetType();
     Value storeValue = implicitCastGlobalStore(
-        storeOp.getLoc(), operands.value(), globalType, rewriter);
+        storeOp.getLoc(), adaptor.value(), globalType, rewriter);
     if (!storeValue) {
       return rewriter.notifyMatchFailure(storeOp,
                                          "mismatched store and global type");
@@ -215,7 +209,7 @@ class GlobalStoreIndirectOpConversion
 
     // TODO(benvanik): multiple converted type results to multiple globals.
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalStoreIndirectOp>(
-        storeOp, storeValue, operands.global());
+        storeOp, storeValue, adaptor.global());
     return success();
   }
 };

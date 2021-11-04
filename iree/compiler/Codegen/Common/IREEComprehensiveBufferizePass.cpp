@@ -28,6 +28,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/ComprehensiveBufferize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -69,9 +70,11 @@ class IREEComprehensiveBufferizePass
       linalg::AllocationCallbacks allocationFn = linalg::AllocationCallbacks())
       : allocationFn(allocationFn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Util::UtilDialect, linalg::LinalgDialect,
-                memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect>();
+    registry.insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
+                    linalg::LinalgDialect, memref::MemRefDialect,
+                    scf::SCFDialect, StandardOpsDialect, tensor::TensorDialect,
+                    vector::VectorDialect>();
+    linalg::registerBufferiableOpInterfaceExternalModels(registry);
   }
   void runOnOperation() override;
 

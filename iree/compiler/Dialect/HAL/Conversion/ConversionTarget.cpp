@@ -58,7 +58,7 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
 
 // static
 LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
-    Operation *srcOp, ArrayRef<Value> operands, StringRef dstOpName,
+    Operation *srcOp, ValueRange operands, StringRef dstOpName,
     TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
   OperationState state{srcOp->getLoc(), dstOpName};
   state.addAttributes(srcOp->getAttrs());

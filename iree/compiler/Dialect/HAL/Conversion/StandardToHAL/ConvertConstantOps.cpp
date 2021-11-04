@@ -29,7 +29,7 @@ class ConstantTensorOpConversion
       : OpConversionPattern(ctx) {}
 
   LogicalResult matchAndRewrite(
-      mlir::arith::ConstantOp constantOp, llvm::ArrayRef<Value> newOperands,
+      mlir::arith::ConstantOp constantOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!constantOp.getType().isa<TensorType>()) return failure();
 

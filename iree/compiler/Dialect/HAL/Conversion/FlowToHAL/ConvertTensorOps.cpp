@@ -31,17 +31,15 @@ class TensorLoadOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Flow::TensorLoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorLoadOp::Adaptor operands(newOperands,
-                                               loadOp->getAttrDictionary());
     auto source = IREE::HAL::TensorRewriteAdaptor::getChecked(
-        loadOp.getLoc(), loadOp.source(), operands.source(), rewriter);
+        loadOp.getLoc(), loadOp.source(), adaptor.source(), rewriter);
     if (!source.hasValue()) {
       return loadOp.emitOpError() << "cannot create adaptor for source";
     }
 
-    auto sourceOffset = source->computeOffset(operands.indices());
+    auto sourceOffset = source->computeOffset(adaptor.indices());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
         source->getBuffer(), sourceOffset);
@@ -59,21 +57,19 @@ class TensorStoreOpConversion
       : OpConversionPattern(ctx) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Flow::TensorStoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Flow::TensorStoreOp::Adaptor operands(newOperands,
-                                                storeOp->getAttrDictionary());
     auto target = IREE::HAL::TensorRewriteAdaptor::getChecked(
-        storeOp.getLoc(), storeOp.target(), operands.target(), rewriter);
+        storeOp.getLoc(), storeOp.target(), adaptor.target(), rewriter);
 
     if (!target.hasValue()) {
       return storeOp.emitOpError() << "cannot create adaptor for target";
     }
 
-    auto targetOffset = target->computeOffset(operands.indices());
+    auto targetOffset = target->computeOffset(adaptor.indices());
     rewriter.create<IREE::HAL::BufferStoreOp>(
-        storeOp.getLoc(), operands.value(), target->getBuffer(), targetOffset);
-    rewriter.replaceOp(storeOp, {operands.value()});
+        storeOp.getLoc(), adaptor.value(), target->getBuffer(), targetOffset);
+    rewriter.replaceOp(storeOp, {adaptor.value()});
     return success();
   }
 };
@@ -85,11 +81,11 @@ class TensorTraceOpConversion
       : OpConversionPattern(ctx) {}
 
   LogicalResult matchAndRewrite(
-      IREE::Flow::TensorTraceOp traceOp, llvm::ArrayRef<Value> rawOperands,
+      IREE::Flow::TensorTraceOp traceOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Location loc = traceOp.getLoc();
     SmallVector<Value, 4> bufferViews;
-    for (auto operand : llvm::enumerate(rawOperands)) {
+    for (auto operand : llvm::enumerate(adaptor.getOperands())) {
       auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
           loc, traceOp.getOperand(operand.index()), operand.value(), rewriter);
       bufferViews.emplace_back(adaptor.getBufferView());
