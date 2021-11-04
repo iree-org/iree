@@ -88,20 +88,16 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
       passBuilder.registerOptimizerLastEPCallback(
           [](llvm::ModulePassManager &modulePassManager,
              llvm::OptimizationLevel Level) {
-            bool compileKernel = false;
-            bool recover = false;
-            bool useAfterScope = true;
+            llvm::AddressSanitizerOptions Opts;
             bool moduleUseAfterScope = false;
             bool useOdrIndicator = false;
             modulePassManager.addPass(
                 llvm::RequireAnalysisPass<llvm::ASanGlobalsMetadataAnalysis,
                                           llvm::Module>());
             modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(
-                compileKernel, recover, moduleUseAfterScope, useOdrIndicator));
-            modulePassManager.addPass(
-                createModuleToFunctionPassAdaptor(llvm::AddressSanitizerPass(
-                    {compileKernel, recover, useAfterScope,
-                     llvm::AsanDetectStackUseAfterReturnMode::Runtime})));
+                Opts, moduleUseAfterScope, useOdrIndicator));
+            modulePassManager.addPass(createModuleToFunctionPassAdaptor(
+                llvm::AddressSanitizerPass(Opts)));
           });
     } break;
   }
