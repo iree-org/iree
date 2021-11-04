@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2020 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
