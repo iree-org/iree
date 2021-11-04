@@ -861,9 +861,9 @@ class ReturnOpConversion : public OpConversionPattern<PYDM::ReturnOp> {
       PYDM::ReturnOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
-    auto zeroResult = rewriter.create<arith_d::ConstantOp>(
+    auto zeroResult = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getI32IntegerAttr(0));
-    rewriter.replaceOpWithNewOp<std_d::ReturnOp>(
+    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(
         srcOp, ValueRange{zeroResult, adaptor.getOperands()[0]});
     return success();
   }
