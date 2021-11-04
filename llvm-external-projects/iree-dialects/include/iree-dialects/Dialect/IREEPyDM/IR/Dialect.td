@@ -249,7 +249,7 @@ def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List", ["isRefinable"]> {
 
     Type t;
     StringRef storageClassKeyword;
-    if ($_parser.parseKeyword(storageClassKeyword))
+    if ($_parser.parseKeyword(&storageClassKeyword))
       return Type();
     if ($_parser.parseComma())
       return Type();
