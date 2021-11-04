@@ -552,7 +552,7 @@ class VM_GlobalStoreIndirectPrimitiveOp<Type type, string mnemonic,
   }];
 
   let encoding = [
-    VM_EncOpcode<VM_OPC_GlobalStoreIndirectI64>,
+    VM_EncOpcode<opcode>,
     VM_EncOperand<"global", 0>,
     VM_EncOperand<"value", 1>,
   ];
