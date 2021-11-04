@@ -134,8 +134,7 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
           .setDistributionOptions(distributionOptions);
 
   auto filter = linalg::LinalgTransformationFilter(
-      {Identifier::get(getWorkgroupMarker(), context)},
-      Identifier::get(getVectorizeMarker(), context));
+      ArrayRef<Identifier>{}, Identifier::get(getVectorizeMarker(), context));
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::FillOp>,
                   linalg::LinalgTilingPattern<linalg::MatmulOp>,

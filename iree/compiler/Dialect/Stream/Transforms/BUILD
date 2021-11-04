@@ -16,7 +16,9 @@ cc_library(
     name = "Transforms",
     srcs = [
         "ConvertToStream.cpp",
+        "ElideAsyncCopies.cpp",
         "EncodeTensors.cpp",
+        "MaterializeCopyOnWrite.cpp",
         "OutlineConstants.cpp",
         "PassDetail.h",
         "Passes.cpp",
@@ -36,6 +38,8 @@ cc_library(
         "//iree/compiler/Dialect/Stream/Conversion/StandardToStream",
         "//iree/compiler/Dialect/Stream/Conversion/UtilToStream",
         "//iree/compiler/Dialect/Stream/IR",
+        "//iree/compiler/Dialect/Util/Analysis",
+        "//iree/compiler/Dialect/Util/Analysis/DFX",
         "//iree/compiler/Dialect/Util/Conversion",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/Util/Transforms",

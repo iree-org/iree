@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2020 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -11,8 +12,7 @@
 # Host binaries (e.g. compiler tools) will be built and installed in build-host/
 # Android binaries (e.g. tests) will be built in build-android/.
 
-set -x
-set -e
+set -xeuo pipefail
 
 if [ "$#" -ne 1 ]; then
   echo "usage: $0 <android-abi>"
@@ -23,12 +23,13 @@ ANDROID_ABI=$1
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-
-"${CMAKE_BIN?}" --version
+CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
+"${CMAKE_BIN}" --version
+"${CC}" --version
+"${CXX}" --version
 ninja --version
 
-cd ${ROOT_DIR?}
+cd "${ROOT_DIR}"
 
 # --------------------------------------------------------------------------- #
 # Build for the host.
@@ -43,19 +44,17 @@ fi
 cd build-host
 
 # Configure, build, install.
-"${CMAKE_BIN?}" -G Ninja .. \
+"${CMAKE_BIN}" -G Ninja .. \
   -DCMAKE_INSTALL_PREFIX=./install \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
-  -DIREE_BUILD_BENCHMARKS=ON \
+  -DIREE_BUILD_BENCHMARKS=OFF \
   -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN?}" --build . --target install
-# Also make sure that we can generate artifacts for benchmarking on Android.
-"${CMAKE_BIN?}" --build . --target iree-benchmark-suites
+"${CMAKE_BIN}" --build . --target install
 # --------------------------------------------------------------------------- #
 
-cd ${ROOT_DIR?}
+cd "${ROOT_DIR}"
 
 # --------------------------------------------------------------------------- #
 # Build for the target (Android).
@@ -70,13 +69,13 @@ fi
 cd build-android
 
 # Configure towards 64-bit Android 10, then build.
-"${CMAKE_BIN?}" -G Ninja .. \
-  -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK?}/build/cmake/android.toolchain.cmake \
-  -DANDROID_ABI="${ANDROID_ABI?}" \
+"${CMAKE_BIN}" -G Ninja .. \
+  -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK}/build/cmake/android.toolchain.cmake" \
+  -DANDROID_ABI="${ANDROID_ABI}" \
   -DANDROID_PLATFORM=android-29 \
-  -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
+  -DIREE_HOST_BINARY_ROOT="${PWD}/../build-host/install" \
   -DIREE_ENABLE_ASSERTIONS=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN?}" --build .
+"${CMAKE_BIN}" --build .

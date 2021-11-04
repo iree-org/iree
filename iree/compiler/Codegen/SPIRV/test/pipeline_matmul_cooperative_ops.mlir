@@ -77,8 +77,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
             %26 = linalg.matmul ins(%19, %21 : tensor<?x128xf16>, tensor<128x?xf16>) outs(%25 : tensor<?x?xf16>) -> tensor<?x?xf16>
             %27 = linalg.generic {indexing_maps = [#map5, #map5, #map5, #map5], iterator_types = ["parallel", "parallel"]}
               ins(%26, %11, %14 : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>)
-              outs(%17 : tensor<?x?xf16>)
-              attrs =  {__internal_linalg_transform__ = "workgroup"} {
+              outs(%17 : tensor<?x?xf16>) {
             ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
               %28 = arith.divf %arg2, %arg3 : f16
               %29 = arith.subf %28, %arg4 : f16

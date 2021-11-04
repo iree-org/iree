@@ -56,7 +56,7 @@ static void populateTilingReductionPatterns(
                   linalg::LinalgTilingPattern<linalg::GenericOp>>(
       context, tilingOptions,
       linalg::LinalgTransformationFilter(
-          {Identifier::get(getWorkgroupMarker(), context)},
+          ArrayRef<Identifier>{},
           Identifier::get(getWorkgroupKTiledMarker(), context)));
 }
 
@@ -118,14 +118,14 @@ static void populateTilingToInvocationPatterns(
                   linalg_ext::TiledOpInterfaceTilingPattern>(
       context, tilingOptions,
       linalg::LinalgTransformationFilter(
-          {Identifier::get(getWorkgroupMarker(), context),
-           Identifier::get(getWorkgroupKTiledMarker(), context),
+          {Identifier::get(getWorkgroupKTiledMarker(), context),
            Identifier::get(getWorkgroupMemoryMarker(), context)},
           Identifier::get(getVectorizeMarker(), context))
           .addFilter([](Operation *op) {
             // FFT doesn't support second level of tiling yet.
             return success(!isa<linalg_ext::FftOp>(op));
-          }));
+          })
+          .setMatchByDefault());
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {

@@ -28,7 +28,8 @@ Explorer::Explorer(Operation *rootOp, TraversalAction defaultAction)
     : rootOp(rootOp),
       asmState(rootOp, OpPrintingFlags().elideLargeElementsAttrs()),
       callGraph(rootOp),
-      defaultAction(defaultAction) {}
+      defaultAction(defaultAction),
+      analysisManager(rootOp, /*passInstrumentor=*/nullptr) {}
 
 Explorer::~Explorer() = default;
 

@@ -13,6 +13,59 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+class CommandBufferFillBufferOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferFillBufferOp> {
+ public:
+  CommandBufferFillBufferOpConversion(MLIRContext *context,
+                                      SymbolTable &importSymbols,
+                                      TypeConverter &typeConverter,
+                                      StringRef importName)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::CommandBufferFillBufferOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getType();
+
+    SmallVector<Value, 8> callOperands = {
+        adaptor.command_buffer(),
+        adaptor.target_buffer(),
+        adaptor.target_offset(),
+        adaptor.length(),
+    };
+
+    // Record the original pattern length then extend it to a 32 bit integer.
+    auto originalPatternType = op.pattern().getType();
+    auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
+    auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
+        op.getLoc(), patternBitWidth / 8, 32);
+    Value pattern = op.pattern();
+    if (originalPatternType.isF16() || originalPatternType.isF32()) {
+      pattern = rewriter.createOrFold<arith::BitcastOp>(
+          op.getLoc(), rewriter.getIntegerType(patternBitWidth), pattern);
+    }
+    if (patternBitWidth < 32) {
+      pattern = rewriter.createOrFold<arith::ExtUIOp>(
+          op.getLoc(), pattern, rewriter.getIntegerType(32));
+    }
+    callOperands.push_back(pattern);
+    callOperands.push_back(patternLength);
+
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(),
+        callOperands);
+
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+ private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 class CommandBufferPushDescriptorSetOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferPushDescriptorSetOp> {
  public:
@@ -84,7 +137,7 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       .insert<VMImportOpConversion<IREE::HAL::CommandBufferExecutionBarrierOp>>(
           context, importSymbols, typeConverter,
           "hal.command_buffer.execution_barrier");
-  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferFillBufferOp>>(
+  patterns.insert<CommandBufferFillBufferOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");

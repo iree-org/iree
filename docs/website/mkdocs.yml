@@ -118,7 +118,7 @@ nav:
   - 'Extensions':
       - 'extensions/index.md'
   - 'Community':
-      - Projects: 'community/projects.md'
+      - 'community/index.md'
   - 'Blog':
       - 'blog/index.md'
       - CUDA backend: 'blog/2021-10-15-cuda-backend.md'

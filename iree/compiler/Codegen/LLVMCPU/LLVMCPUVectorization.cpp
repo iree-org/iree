@@ -74,12 +74,6 @@ struct LLVMCPUVectorizationPass
   /// handle vector instructions, drop this options.
   bool lowerToVectors;
 
-  Option<bool> enablePromoteWorkgroupToFullTiles{
-      *this, "promote-workgroup-to-full-tiles",
-      llvm::cl::desc("Enable promoting wokgroup memory to full tiles allocated "
-                     "on the stack."),
-      llvm::cl::init(false)};
-
   Option<bool> enableVectorContractToAarch64Asm{
       *this, "vector-contract-to-aarch64-asm",
       llvm::cl::desc("Enable promoting wokgroup memory to full tiles allocated "
@@ -88,77 +82,9 @@ struct LLVMCPUVectorizationPass
 };
 }  // namespace
 
-namespace {
-/// Pattern to promote all matmul operands to memory.
-struct PromoteMatmulSubviewsPattern
-    : public linalg::LinalgPromotionPattern<linalg::MatmulOp> {
-  PromoteMatmulSubviewsPattern(MLIRContext *context,
-                               linalg::LinalgPromotionOptions options,
-                               linalg::LinalgTransformationFilter marker,
-                               PatternBenefit benefit = 1)
-      : linalg::LinalgPromotionPattern<linalg::MatmulOp>(
-            context,
-            options.setOperandsToPromote({0, 1, 2})
-                .setUseFullTileBuffersByDefault(true),
-            marker, benefit) {}
-};
-}  // namespace
-
-namespace {
-
-// TODO(ataei): Refactor this into a common utility with LinalgToSPIRV.
-Optional<Value> allocateWorkgroupMemoryOnStack(
-    OpBuilder &b, memref::SubViewOp subview,
-    ArrayRef<Value> boundingSubViewSize, DataLayout &layout) {
-  // Allocate the memory into the entry block of the parent FuncOp. This better
-  // aligns with the semantics of this memory which is available at the entry of
-  // the function.
-  OpBuilder::InsertionGuard guard(b);
-  FuncOp funcOp = subview->getParentOfType<FuncOp>();
-  if (!funcOp) {
-    subview.emitError("expected op to be within std.func");
-    return llvm::None;
-  }
-  b.setInsertionPointToStart(&(*funcOp.getBody().begin()));
-  // The bounding subview size is expected to be constant. This specified the
-  // shape of the allocation.
-  SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
-      llvm::map_range(boundingSubViewSize, [](Value v) -> int64_t {
-        APInt value;
-        if (matchPattern(v, m_ConstantInt(&value))) return value.getSExtValue();
-        return -1;
-      }));
-  if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
-  MemRefType allocType =
-      MemRefType::get(shape, subview.getType().getElementType(), AffineMap());
-  Value buffer = b.create<memref::AllocaOp>(subview.getLoc(), allocType);
-  return buffer;
-}
-
-LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  MemRefType bufferType = buffer.getType().dyn_cast<MemRefType>();
-  if (!bufferType) return failure();
-  return success();
-}
-
-}  // namespace
-
 void LLVMCPUVectorizationPass::runOnOperation() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
-  // Promotes workgroups subviews to a full-tile allocated on the stack.
-  if (enablePromoteWorkgroupToFullTiles) {
-    RewritePatternSet promotionPatterns(context);
-    promotionPatterns.insert<PromoteMatmulSubviewsPattern>(
-        context,
-        linalg::LinalgPromotionOptions().setAllocationDeallocationFns(
-            allocateWorkgroupMemoryOnStack, deallocateWorkgroupMemory),
-        linalg::LinalgTransformationFilter(
-            Identifier::get(getWorkgroupMarker(), context),
-            Identifier::get(getWorkgroupMemoryMarker(), context)));
-    memref::ViewOp::getCanonicalizationPatterns(promotionPatterns, context);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
-  }
 
   // Workgroup first level of tiling.
   {
@@ -172,10 +98,7 @@ void LLVMCPUVectorizationPass::runOnOperation() {
                                   static_cast<unsigned>(TilingLevel::L1Tiles));
             }),
         linalg::LinalgTransformationFilter(
-            Identifier::get(enablePromoteWorkgroupToFullTiles
-                                ? getWorkgroupMemoryMarker()
-                                : getWorkgroupMarker(),
-                            context),
+            ArrayRef<Identifier>{},
             Identifier::get(getWorkgroupL1TileMarker(), context)));
 
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns));

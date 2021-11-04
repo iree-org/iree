@@ -130,12 +130,12 @@ ${QEMU_BIN} \
 
 * RISC-V toolchain is built from
 [https://github.com/llvm/llvm-project](https://github.com/llvm/llvm-project) (main branch).
-  * Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
-    GNU linker, and C libraries. You need to build GNU toolchain first.
-  * Clone GNU toolchain from:
-  [https://github.com/riscv/riscv-gnu-toolchain](https://github.com/riscv/riscv-gnu-toolchain)
-    (master branch). Switch the "riscv-binutils" submodule to `rvv-1.0.x-zfh`
-    branch manually.
+    * Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
+      GNU linker, and C libraries. You need to build GNU toolchain first.
+    * Clone GNU toolchain from:
+      [https://github.com/riscv/riscv-gnu-toolchain](https://github.com/riscv/riscv-gnu-toolchain)
+      (master branch). Switch the "riscv-binutils" submodule to `rvv-1.0.x-zfh`
+      branch manually.
 * RISC-V QEMU is built from
 [https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
 

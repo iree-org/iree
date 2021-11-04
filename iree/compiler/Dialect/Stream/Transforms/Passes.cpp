@@ -113,6 +113,17 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Stream::createEncodeTensorsPass());
   addCleanupPatterns(passManager);
+
+  // This will insert a lot of copies, so follow it up with a pass that elides
+  // ones that aren't needed. This is easier to verify than if there was one
+  // pass attempting to do both. Note that copy-on-write materialization is
+  // required for correct execution while copy elision is for performance only
+  // (though it's critical enough that it is not optional).
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createMaterializeCopyOnWritePass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createMaterializeCopyOnWritePass());
+  passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
 }
 
 //===----------------------------------------------------------------------===//

@@ -717,7 +717,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_execution_barrier,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
                    iree_hal_module_state_t,                     //
-                   rriii, v) {
+                   rriiii, v) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
@@ -726,12 +726,13 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
   iree_vm_size_t target_offset = (iree_vm_size_t)args->i2;
   iree_vm_size_t length = (iree_vm_size_t)args->i3;
   uint32_t pattern = (uint32_t)args->i4;
+  uint32_t pattern_length = (uint32_t)args->i5;
 
   iree_hal_module_ex_defer_release(state, args->r1);
 
   return iree_hal_command_buffer_fill_buffer(command_buffer, target_buffer,
                                              target_offset, length, &pattern,
-                                             sizeof(pattern));
+                                             pattern_length);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer,  //

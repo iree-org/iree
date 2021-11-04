@@ -1049,10 +1049,7 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
     assert(linalgTilingOptions.distribution.hasValue());
 
     patterns.insert<TileAndDistributeLinalgOpsPattern, TiledOpInterfacePattern>(
-        context, linalgTilingOptions,
-        // TODO(nicolavasilache): use refactored `getWorkgroupMarker()`
-        linalg::LinalgTransformationFilter(
-            ArrayRef<Identifier>(), Identifier::get("workgroup", context)));
+        context, linalgTilingOptions, linalg::LinalgTransformationFilter());
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return failure();
     }

@@ -132,9 +132,8 @@ function(iree_benchmark_suite)
     # If the source is a TFLite file, import it.
     if("${_MODULE_SOURCE}" MATCHES "\.tflite$")
       if (NOT IREE_BUILD_TFLITE_COMPILER)
-        message(WARNING "Skipping benchmark for ${_MODULE_SOURCE} because"
-                        " IREE_BUILD_TFLITE_COMPILER if OFF")
-        continue()
+        message(SEND_ERROR "Benchmarks of ${_MODULE_SOURCE} require"
+                          " IREE_BUILD_TFLITE_COMPILER to be ON")
       endif()
       set(_TFLITE_FILE "${_MODULE_SOURCE}")
       set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
@@ -204,6 +203,7 @@ function(iree_benchmark_suite)
           COMMAND
             "$<TARGET_FILE:iree::tools::iree-translate>"
               ${_TRANSLATION_ARGS}
+              "--mlir-print-op-on-diagnostic=false"
               "${_MODULE_SOURCE}"
               -o "${_VMFB_FILE}"
           WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"

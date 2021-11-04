@@ -31,6 +31,11 @@ namespace IREE {
 namespace Util {
 namespace {
 
+template <typename R>
+static size_t count(R &&range) {
+  return std::distance(range.begin(), range.end());
+}
+
 struct Global {
   size_t ordinal = 0;
   IREE::Util::GlobalOp op;
@@ -356,6 +361,9 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
 class FoldGlobalsPass
     : public PassWrapper<FoldGlobalsPass, OperationPass<mlir::ModuleOp>> {
  public:
+  explicit FoldGlobalsPass() = default;
+  FoldGlobalsPass(const FoldGlobalsPass &pass) {}
+
   StringRef getArgument() const override { return "iree-util-fold-globals"; }
 
   StringRef getDescription() const override {
@@ -382,6 +390,7 @@ class FoldGlobalsPass
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
     auto moduleOp = getOperation();
+    beforeFoldingGlobals = count(moduleOp.getOps<IREE::Util::GlobalOp>());
     for (int i = 0; i < 10; ++i) {
       // TODO(benvanik): determine if we need this expensive folding.
       if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns))) {
@@ -429,7 +438,15 @@ class FoldGlobalsPass
 
       if (!didChange) break;
     }
+
+    afterFoldingGlobals = count(moduleOp.getOps<IREE::Util::GlobalOp>());
   }
+
+ private:
+  Statistic beforeFoldingGlobals{this, "global ops before folding",
+                                 "Number of util.global ops before folding"};
+  Statistic afterFoldingGlobals{this, "global ops after folding",
+                                "Number of util.global ops after folding"};
 };
 
 }  // namespace

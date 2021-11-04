@@ -902,7 +902,6 @@ func @scatter(
 //  CHECK-DAG:           %[[INDICES_TILE:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [%[[IV0]], 0]
 //  CHECK-DAG:           %[[ORIGINAL_TILE:.+]] = flow.dispatch.tensor.load %[[ARG5]], offsets = [0, %[[IV1]]]
 //  CHECK-DAG:           %[[SCATTER_TILE:.+]] = linalg_ext.scatter
-// CHECK-SAME:               {__internal_linalg_transform__ = "workgroup"}
 // CHECK-SAME:               ins(%[[UPDATE_TILE]], %[[INDICES_TILE]] : tensor<?x?xf32>, tensor<?x1xi32>)
 // CHECK-SAME:               outs(%[[ORIGINAL_TILE]] : tensor<?x?xf32>)
 //      CHECK:           flow.dispatch.tensor.store %[[SCATTER_TILE]], %[[ARG5]], offsets = [0, %[[IV1]]]
@@ -958,7 +957,6 @@ func @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
 // CHECK-SAME:             offsets = [0, %[[IV0]], %[[IV1]]]
 // CHECK-SAME:             sizes = [%[[D0]], %[[TS_Y]], %[[TS_X]]]
 //      CHECK:         %[[RESULT_TILE:.+]]:2 = linalg_ext.sort dimension(0)
-// CHECK-SAME:             {__internal_linalg_transform__ = "workgroup"}
 // CHECK-SAME:             outs(%[[OUT1_TILE]], %[[OUT2_TILE]] :   tensor<?x?x?xi32>, tensor<?x?x?xf32>)
 //  CHECK-DAG:         flow.dispatch.tensor.store %[[RESULT_TILE]]#0
 // CHECK-SAME:             offsets = [0, %[[IV0]], %[[IV1]]]
@@ -995,7 +993,6 @@ func @sort_1d(%arg0: tensor<?xi32>, %arg1 : tensor<?xf32>)
 //  CHECK-DAG:     %[[OUT1_TILE:.+]] = flow.dispatch.tensor.load %[[ARG2]], offsets = [], sizes = []
 //  CHECK-DAG:     %[[OUT2_TILE:.+]] = flow.dispatch.tensor.load %[[ARG3]], offsets = [], sizes = []
 //      CHECK:     %[[RESULT_TILE:.+]]:2 = linalg_ext.sort dimension(0)
-// CHECK-SAME:         {__internal_linalg_transform__ = "workgroup"}
 // CHECK-SAME:         outs(%[[OUT1_TILE]], %[[OUT2_TILE]] : tensor<?xi32>, tensor<?xf32>)
 //  CHECK-DAG:     flow.dispatch.tensor.store %[[RESULT_TILE]]#0, %[[ARG2]]
 //  CHECK-DAG:     flow.dispatch.tensor.store %[[RESULT_TILE]]#1, %[[ARG3]]

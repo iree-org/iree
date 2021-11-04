@@ -90,7 +90,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
                                   static_cast<unsigned>(TilingLevel::L1Tiles));
             }),
         linalg::LinalgTransformationFilter(
-            Identifier::get(getWorkgroupMarker(), context),
+            ArrayRef<Identifier>{},
             Identifier::get(getWorkgroupL1TileMarker(), context)));
 
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
