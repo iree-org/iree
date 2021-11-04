@@ -753,7 +753,7 @@ def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"subscript", [
     IREEPyDM_ExceptionResultType:$exc_result,
     IREEPyDM_AnyValueType:$result);
   let assemblyFormat = [{
-    $value `[` $slice `->` type($slice) `]` `:` type($value) `->` type($result) attr-dict
+    $value `[` $slice `]` `:` type(operands) `->` type($result) attr-dict
   }];
   let hasCanonicalizer = 1;
 }

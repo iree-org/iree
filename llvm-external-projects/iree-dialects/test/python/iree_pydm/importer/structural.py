@@ -44,6 +44,6 @@ def pass_statement():
 def subscript(lst: list, index: int):
   # CHECK: %[[LIST:.*]] = load_var %lst : !iree_pydm.free_var_ref -> !iree_pydm.object
   # CHECK: %[[INDEX:.*]] = load_var %index : !iree_pydm.free_var_ref -> !iree_pydm.object
-  # CHECK: %exc_result, %result = subscript %[[LIST]][%[[INDEX]] -> !iree_pydm.object] : !iree_pydm.object -> !iree_pydm.object
+  # CHECK: %exc_result, %result = subscript %[[LIST]][%[[INDEX]]] : !iree_pydm.object, !iree_pydm.object -> !iree_pydm.object
   # CHECK: raise_on_failure %exc_result : !iree_pydm.exception_result
   return lst[index]

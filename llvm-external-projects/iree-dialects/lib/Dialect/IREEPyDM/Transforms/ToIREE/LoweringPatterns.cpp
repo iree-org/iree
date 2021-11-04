@@ -177,7 +177,7 @@ class AllocFreeVarOpConversion
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      PYDM::AllocFreeVarOp srcOp,  OpAdaptor adaptor,
+      PYDM::AllocFreeVarOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO: We may want to initialize the list structurally in some way.
     // This will fail either way on read from unassigned variable, but we need
@@ -196,15 +196,18 @@ class ApplyBinaryNumericConversion
   LogicalResult matchAndRewrite(
       PYDM::ApplyBinaryOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    Type pyLeftType = srcOp.left().getType();
+    Type pyRightType = srcOp.right().getType();
     Type leftType = adaptor.left().getType();
     Type rightType = adaptor.right().getType();
     Type resultType = typeConverter->convertType(srcOp.result().getType());
-    if (!resultType || leftType != rightType || leftType != resultType) {
+    if (!resultType || pyLeftType != pyRightType || leftType != rightType ||
+        leftType != resultType) {
       return rewriter.notifyMatchFailure(srcOp,
                                          "not same type operands/results");
     }
-    if (leftType.isa<mlir::IntegerType>()) {
-      bool isSigned = true;  // TODO: Unsigned.
+    if (auto pyIntegerType = pyLeftType.dyn_cast<PYDM::IntegerType>()) {
+      bool isSigned = pyIntegerType.isSigned();
       Value converted =
           convertIntegerOp(srcOp.getLoc(), adaptor.dunder_name().getValue(),
                            adaptor.left(), adaptor.right(), isSigned, rewriter);
@@ -861,8 +864,8 @@ class ReturnOpConversion : public OpConversionPattern<PYDM::ReturnOp> {
       PYDM::ReturnOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
-    auto zeroResult = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getI32IntegerAttr(0));
+    auto zeroResult =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
     rewriter.replaceOpWithNewOp<mlir::ReturnOp>(
         srcOp, ValueRange{zeroResult, adaptor.getOperands()[0]});
     return success();
