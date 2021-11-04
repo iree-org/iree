@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "materialize_launch_configuration.mlir"
     "matmul_vectorization.mlir"
     "synchronize_symbol_visibility.mlir"
+    "test_config_mmt4d.mlir"
     "tile_and_vectorize.mlir"
     "unfused_fma.mlir"
     "vector_contract_to_aarch64_asm.mlir"
