@@ -22,6 +22,12 @@ namespace TFL {
 // IREE core should go here.
 void buildTFLImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
+  // Guarantee the call once functions are preserved.
+  //----------------------------------------------------------------------------
+
+  pm.addPass(createRetainCallOnceFuncsPass());
+
+  //----------------------------------------------------------------------------
   // Input IR cleanup
   //----------------------------------------------------------------------------
 
@@ -41,6 +47,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
 
   mlir::tosa::TOSATFLLegalizationPipelineOptions tosaOptions;
+  pm.addPass(createLowerGlobalTensorsPass());
   mlir::tosa::createTFLtoTOSALegalizationPipeline(pm, tosaOptions);
   pm.nest<FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
   pm.addPass(createCanonicalizerPass());

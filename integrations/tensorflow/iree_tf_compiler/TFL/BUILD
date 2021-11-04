@@ -14,7 +14,9 @@ cc_library(
     name = "TFL",
     srcs = [
         "ConvertMetadata.cpp",
+        "LowerGlobalTensors.cpp",
         "Passes.cpp",
+        "RetainCallOnceFuncs.cpp",
         "StripMetadata.cpp",
         "VerifyFullyConverted.cpp",
     ],
