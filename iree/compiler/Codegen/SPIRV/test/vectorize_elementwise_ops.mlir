@@ -24,7 +24,6 @@ hal.executable private @elementwise_static_shape  {
         %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<128xf32>
         %ret0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128xf32>
         linalg.generic {
-          __internal_linalg_transform__ = "workgroup",
           lowering.config = #config,
           indexing_maps = [affine_map<(i) -> (i)>,
                            affine_map<(i) -> (i)>,
@@ -74,7 +73,6 @@ hal.executable private @elementwise_transpose  {
         %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<128xf32>
         %ret0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<128x8xf32>
         linalg.generic {
-          __internal_linalg_transform__ = "workgroup",
           lowering.config = #config,
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                            affine_map<(d0, d1) -> (d0)>,

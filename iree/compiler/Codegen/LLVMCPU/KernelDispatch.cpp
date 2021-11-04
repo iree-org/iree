@@ -420,8 +420,6 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
                                    ArrayRef<TiledLoopInfo> tiledLoops) {
   Operation *rootOp = nullptr;
   for (auto computeOp : computeOps) {
-    if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
-
     auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
       return TypeSwitch<Operation *, LogicalResult>(op)
           .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
@@ -450,8 +448,6 @@ static LogicalResult setTranslationInfoAndRootConfig(
     ArrayRef<TiledLoopInfo> tiledLoops) {
   // First check if the operations have a preset pipeline.
   for (auto computeOp : computeOps) {
-    if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
-
     if (IREE::Codegen::CompilationInfoAttr compilationInfo =
             getCompilationInfo(computeOp)) {
       // If the function already has a translation, error out.

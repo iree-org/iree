@@ -22,10 +22,6 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Marker to denote that a linalg operation has been partitioned to
-/// workgroups.
-StringRef getWorkgroupMarker();
-
-/// Marker to denote that a linalg operation has been partitioned to
 /// workgroups and tiled along reduction dimennsions.
 StringRef getWorkgroupKTiledMarker();
 

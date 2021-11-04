@@ -1,5 +1,4 @@
 // RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization)'}))" -split-input-file %s | IreeFileCheck %s
-// RUN: iree-opt -pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{use-lowering-pipeline='builtin.func(iree-llvmcpu-vectorization{promote-workgroup-to-full-tiles}),cse'}))" -split-input-file %s | IreeFileCheck %s -check-prefix=CHECK-PROMOTED
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[64, 64], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>
 hal.executable private @dynamic_matmul  {
@@ -33,7 +32,7 @@ hal.executable private @dynamic_matmul  {
             %7 = memref.subview %0[%arg0, 0] [64, 128] [1, 1] : memref<128x128xf32> to memref<64x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %8 = memref.subview %1[0, %arg1] [128, 64] [1, 1] : memref<128x128xf32> to memref<128x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %9 = memref.subview %2[%arg0, %arg1] [64, 64] [1, 1] : memref<128x128xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%7, %8 : memref<64x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
+            linalg.matmul {lowering.config = #config} ins(%7, %8 : memref<64x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
           }
         }
         return
@@ -71,47 +70,6 @@ hal.executable private @dynamic_matmul  {
 //       CHECK:                   %[[VEC_B_2:.+]] = vector.transfer_read %[[ARG1]]
 //       CHECK:                   %[[VEC_B_3:.+]] = vector.transfer_read %[[ARG1]]
 
-//     CHECK-PROMOTED: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 64)>
-//     CHECK-PROMOTED: #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>
-//     CHECK-PROMOTED: func @matmul_128x128x128
-// CHECK-PROMOTED-DAG:   %[[KDIM_SIZE:.+]] = arith.constant 128 : index
-// CHECK-PROMOTED-DAG:   %[[WORGKROUP_SIZE:.+]] = arith.constant 64 : index
-// CHECK-PROMOTED-DAG:   %[[VECTOR_SIZE:.+]] = arith.constant 4 : index
-// CHECK-PROMOTED-DAG:   %[[L1_SIZE:.+]] = arith.constant 32 : index
-// CHECK-PROMOTED-DAG:   %[[START:.+]] = arith.constant 0 : index
-// CHECK-PROMOTED-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-PROMOTED-DAG:   %[[C1:.+]] = arith.constant 2 : index
-// CHECK-PROMOTED-DAG:   %[[C1:.+]] = arith.constant 3 : index
-// CHECK-PROMOTED-DAG:   %[[C_PROMOTED_TILE:.+]] = memref.alloca() : memref<64x64xf32>
-// CHECK-PROMOTED-DAG:   %[[B_PROMOTED_TILE:.+]] = memref.alloca() : memref<128x64xf32>
-// CHECK-PROMOTED-DAG:   %[[A_PROMOTED_TILE:.+]] = memref.alloca() : memref<64x128xf32>
-// CHECK-PROMOTED-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
-// CHECK-PROMOTED-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
-// CHECK-PROMOTED-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-// CHECK-PROMOTED-DAG:   %[[A_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[A_PROMOTED_TILE]][0, 0] [64, 128]
-// CHECK-PROMOTED-DAG:   %[[B_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[B_PROMOTED_TILE]][0, 0] [128, 64]
-// CHECK-PROMOTED-DAG:   %[[C_PROMOTED_TILE_VIEW:.+]] = memref.subview %[[C_PROMOTED_TILE]][0, 0] [64, 64]
-//     CHECK-PROMOTED:   scf.for %[[IV0:.+]] =
-//     CHECK-PROMOTED:     %[[A_TILE:.+]] = memref.subview %[[ARG0]][%[[IV0]], 0] [64, 128]
-//     CHECK-PROMOTED:     scf.for %[[IV1:.+]] =
-// CHECK-PROMOTED-DAG:       %[[B_TILE:.+]] = memref.subview %[[ARG1]][0, %[[IV1]]] [128, 64]
-// CHECK-PROMOTED-DAG:       %[[C_TILE:.+]] = memref.subview %[[RET0]][%[[IV0]], %[[IV1]]] [64, 64]
-// CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[A_PROMOTED_TILE]])
-// CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[B_PROMOTED_TILE]])
-// CHECK-PROMOTED_DAG:       linalg.fill(%{{.+}}, %[[C_PROMOTED_TILE]])
-//     CHECK-PROMOTED:       linalg.copy(%[[A_TILE]], %[[A_PROMOTED_TILE_VIEW]])
-//     CHECK-PROMOTED:       linalg.copy(%[[B_TILE]], %[[B_PROMOTED_TILE_VIEW]])
-//     CHECK-PROMOTED:       linalg.copy(%[[C_TILE]], %[[C_PROMOTED_TILE_VIEW]])
-//     CHECK-PROMOTED:       scf.for {{.*}} = %[[START]] to %[[WORGKROUP_SIZE]] step %[[L1_SIZE]] {
-//     CHECK-PROMOTED:         scf.for {{.*}} = %[[START]] to %[[WORGKROUP_SIZE]] step %[[L1_SIZE]] {
-//     CHECK-PROMOTED:           scf.for {{.*}} = %[[START]] to %[[KDIM_SIZE]] step %[[L1_SIZE]] {
-//     CHECK-PROMOTED:             scf.for {{.*}} = %[[START]] to %[[L1_SIZE]] step %[[VECTOR_SIZE]] {
-//     CHECK-PROMOTED:               scf.for {{.*}} = %[[START]] to %[[L1_SIZE]] step %[[VECTOR_SIZE]] {
-//     CHECK-PROMOTED:                 %[[VEC_C_0:.+]] = vector.transfer_read %[[C_PROMOTED_TILE]]
-//     CHECK-PROMOTED:                 %[[VEC_C_1:.+]] = vector.transfer_read %[[C_PROMOTED_TILE]]
-//     CHECK-PROMOTED:                 %[[VEC_C_2:.+]] = vector.transfer_read %[[C_PROMOTED_TILE]]
-//     CHECK-PROMOTED:                 %[[VEC_C_3:.+]] = vector.transfer_read %[[C_PROMOTED_TILE]]
-
 // -----
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[64, 64], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>
@@ -146,7 +104,7 @@ hal.executable private @matmul_i8_i8_i32  {
             %7 = memref.subview %0[%arg0, 0] [64, 128] [1, 1] : memref<128x128xi8> to memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %8 = memref.subview %1[0, %arg1] [128, 64] [1, 1] : memref<128x128xi8> to memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %9 = memref.subview %2[%arg0, %arg1] [64, 64] [1, 1] : memref<128x128xi32> to memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%7, %8 : memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
+            linalg.matmul {lowering.config = #config} ins(%7, %8 : memref<64x128xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x64xi8, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) outs(%9 : memref<64x64xi32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>)
           }
         }
         return

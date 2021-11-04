@@ -84,7 +84,7 @@ hal.executable @dot_dispatch_0 {
             %14 = affine.min #map2(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
             %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %17 = linalg.matmul ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x1024xf32>
           }
         }
@@ -172,7 +172,7 @@ hal.executable @dot_dispatch_0 {
             %14 = affine.min #map2(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
             %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.generic #matmul_trait {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>)  {
+            %17 = linalg.generic #matmul_trait ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>)  {
               ^bb(%a: f32, %b: f32, %c: f32) :
               %d = arith.mulf %a, %b: f32
               %e = arith.addf %c, %d: f32
@@ -250,7 +250,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
             %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 1, s0)>(%arg2)[%workgroup_size_x]
             %20 = linalg.init_tensor [1, %17, %18, %19] : tensor<1x?x?x?xf32>
             %21 = linalg.fill(%cst, %20) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
-            %22 = linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%11, %13 : tensor<1x?x?x2xf32>, tensor<3x2x2x?xf32>) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+            %22 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%11, %13 : tensor<1x?x?x2xf32>, tensor<3x2x2x?xf32>) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
             flow.dispatch.tensor.store %22, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %14, %15, %16], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x2x3x1xf32>
           }
         }
@@ -335,7 +335,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
         %7 = affine.min affine_map<(d0)[s0] -> (-d0 + 96, s0)>(%arg0)[%workgroup_size_x]
         %8 = linalg.init_tensor [%7] : tensor<?xf32>
         %9 = linalg.fill(%cst, %8) : f32, tensor<?xf32> -> tensor<?xf32>
-        %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%5 : tensor<14x14x?xf32>) outs(%9 : tensor<?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%5 : tensor<14x14x?xf32>) outs(%9 : tensor<?xf32>) {
         ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
           %11 = arith.addf %arg1, %arg2 : f32
           linalg.yield %11 : f32
@@ -380,7 +380,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
         %8 = flow.dispatch.tensor.load %1, offsets = [%arg0], sizes = [%7], strides = [1] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<?xf32>
         %9 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 16384)>(%arg0)[%workgroup_size_x]
         %10 = linalg.init_tensor [%9] : tensor<?xf32>
-        %11 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %8 : tensor<?xf32>, tensor<?xf32>) outs(%10 : tensor<?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        %11 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %8 : tensor<?xf32>, tensor<?xf32>) outs(%10 : tensor<?xf32>) {
         ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
           %12 = arith.addf %arg1, %arg2 : f32
           linalg.yield %12 : f32
@@ -433,7 +433,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
             %7 = affine.min #map2(%arg0)[%workgroup_size_x]
             %8 = linalg.init_tensor [%7] : tensor<?xf32>
             %9 = linalg.fill(%cst, %8) : f32, tensor<?xf32> -> tensor<?xf32>
-            %10 = linalg.generic {indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]} ins(%5 : tensor<512x?xf32>) outs(%9 : tensor<?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+            %10 = linalg.generic {indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]} ins(%5 : tensor<512x?xf32>) outs(%9 : tensor<?xf32>) {
             ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
               %11 = arith.addf %arg1, %arg2 : f32
               linalg.yield %11 : f32

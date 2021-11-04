@@ -65,14 +65,14 @@ hal.executable public @matmul_256x1024x128_div_sub {
             %11 = memref.subview %2[%arg0, 0] [16, 128] [1, 1] : memref<256x128xf16> to memref<16x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %12 = memref.subview %3[0, %arg1] [128, 16] [1, 1] : memref<128x1024xf16> to memref<128x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
             %13 = memref.subview %4[%arg0, %arg1] [16, 16] [1, 1] : memref<256x1024xf16> to memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-            linalg.fill(%cst, %13) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f16, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config}
+            linalg.fill(%cst, %13) {lowering.config = #config} : f16, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+            linalg.matmul {lowering.config = #config}
               ins(%11, %12 : memref<16x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
               outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
             linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
               ins(%13, %9, %10 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
               outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
-              attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = #config} {
+              attrs =  {lowering.config = #config} {
             ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
               %14 = arith.divf %arg2, %arg3 : f16
               %15 = arith.subf %14, %arg4 : f16
