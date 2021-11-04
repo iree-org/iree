@@ -1,19 +1,25 @@
-# Optional features
+# Python bindings and importers
 
-This page details the optional features and build modes for the project.
-Most of these are controlled by various CMake options, sometimes requiring
-extra setup or preparation. Each section extends the basic build steps
-in the [getting started](./getting-started.md) page.
+!!! Attention
+    These components are more complicated to build from source than the rest of
+    the project. If your usage does not require making source changes, prefer to
+    [install from the official binary distributions](../bindings/python.md#installing-iree-packages)
+    instead.
 
-## Building Python Bindings
+This page covers how to build IREE's Python-based bindings and import tools from
+source. These components are built using CMake as well as other dependencies and
+each section extends the basic build steps in the
+[getting started](./getting-started.md) page.
+
+## Building Python bindings
 
 This section describes how to build and interactively use built-from-source
 Python bindings for the following packages:
 
-| Python Import             | Description                                                                 |
-|------------------------------|-----------------------------------------------------------------------------|
-| `import iree.compiler`     | IREE's generic compiler tools and helpers                                   |
-| `import iree.runtime`      | IREE's runtime, including CPU and GPU backends                              |
+| Python Import          | Description                                    |
+|------------------------|------------------------------------------------|
+| `import iree.compiler` | IREE's generic compiler tools and helpers      |
+| `import iree.runtime`  | IREE's runtime, including CPU and GPU backends |
 
 Also see [instructions for installing pre-built binaries](../bindings/python.md).
 
@@ -38,7 +44,7 @@ Also see [instructions for installing pre-built binaries](../bindings/python.md)
     with multiple Python versions. Explicitly setting this is recommended.
     Note that mixed case of the option.
 
-### Setup
+### Environment setup
 
 We recommend using virtual environments to manage python packages, such
 as through `venv`, which may need to be installed via your system
@@ -82,7 +88,7 @@ package manager ([about](https://docs.python.org/3/library/venv.html),
 When you are done with the venv, you can close it by closing your shell
 or running `deactivate`.
 
-### Usage
+### Building with CMake
 
 From the `iree-build` directory:
 
@@ -120,8 +126,7 @@ From the `iree-build` directory:
 
 Tests can now be run individually via python or via ctest.
 
-
-## Building TensorFlow Frontend Bindings
+## Building TensorFlow frontend bindings
 
 This section describes how to build compiler tools and Python bindings for
 importing models from various TensorFlow-ecosystem frontends, including
@@ -132,8 +137,8 @@ ends, but this section describes the canonical method that the core
 developers recommend. Upon completing these steps, you will have access to
 additional Python packages:
 
-| Python Import             | Description                                                                 |
-|------------------------------|-----------------------------------------------------------------------------|
+| Python Import                       | Description                                                                 |
+|-------------------------------------|-----------------------------------------------------------------------------|
 | `import iree.compiler.tools.tf`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
 | `import iree.compiler.tools.tflite` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
 | `import iree.compiler.tools.xla`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |
@@ -142,23 +147,18 @@ These tools packages are needed in order for the frontend specific, high-level
 APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
 `import iree.compiler.xla`, and `import iree.jax` to be fully functional.
 
-### Setup
+### Environment setup
 
-A relatively recent `tf-nightly` release is needed to run tests.
+The
+[build_requirements.txt](https://github.com/google/iree/blob/main/integrations/tensorflow/bindings/python/build_requirements.txt)
+file lists prerequisites, such as a recent version of `tf-nightly`:
 
-=== "Linux and MacOS"
+```shell
+python -m pip install -r \
+    ./integrations/tensorflow/bindings/python/build_requirements.txt
+```
 
-    ``` shell
-    python -m pip install -r ./integrations/tensorflow/bindings/python/build_requirements.txt
-    ```
-
-=== "Windows"
-
-    ``` powershell
-    python -m pip install -r integrations\tensorflow\bindings\python\build_requirements.txt
-    ```
-
-### TensorFlow
+### Building TensorFlow components with Bazel
 
 TensorFlow frontends can only be built with [Bazel](https://bazel.build/),
 and this must be done as a manual step (we used to have automation for this,
@@ -211,7 +211,7 @@ be used from the command line if desired.
 
     We can't set these for you because of other inscrutable reasons.
 
-### IREE
+### Building IREE components with CMake
 
 The main IREE build will embed binaries built above and enable additional
 Python APIs. Within the build, the binaries are symlinked, so can be
