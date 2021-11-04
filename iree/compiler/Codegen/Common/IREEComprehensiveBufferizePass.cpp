@@ -74,7 +74,7 @@ class IREEComprehensiveBufferizePass
                     linalg::LinalgDialect, memref::MemRefDialect,
                     scf::SCFDialect, StandardOpsDialect, tensor::TensorDialect,
                     vector::VectorDialect>();
-    linalg::registerBufferiableOpInterfaceExternalModels(registry);
+    linalg::registerBufferizableOpInterfaceExternalModels(registry);
   }
   void runOnOperation() override;
 
