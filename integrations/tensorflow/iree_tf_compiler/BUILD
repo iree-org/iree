@@ -68,6 +68,7 @@ cc_binary(
         "@llvm-project//mlir:TosaDialect",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_tfl_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
@@ -105,6 +106,7 @@ cc_binary(
         "@llvm-project//mlir:TosaDialect",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:flatbuffer_import",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",
     ],
 )
 

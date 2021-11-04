@@ -11,7 +11,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
-#include "tensorflow/compiler/mlir/tosa/tfl_passes.h"
+#include "tensorflow/compiler/mlir/tosa/tf_tfl_passes.h"
 #include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
 namespace mlir {
@@ -51,9 +51,9 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   // Convert all TFL ops to TOSA ops
   //----------------------------------------------------------------------------
 
-  mlir::tosa::TOSATFLLegalizationPipelineOptions tosaOptions;
+  mlir::tosa::TOSATFTFLLegalizationPipelineOptions tosaOptions;
   pm.addPass(createLowerGlobalTensorsPass());
-  mlir::tosa::createTFLtoTOSALegalizationPipeline(pm, tosaOptions);
+  mlir::tosa::createTFTFLtoTOSALegalizationPipeline(pm, tosaOptions);
   pm.nest<FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
   pm.addPass(createCanonicalizerPass());
 
@@ -71,8 +71,8 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   // Remove the rest of the TFL goo and verify that all ops converted
   //----------------------------------------------------------------------------
 
+  pm.nest<FuncOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createStripModuleMetadataPass());
-  pm.nest<ModuleOp>().addPass(createStripFunctionMetadataPass());
   pm.addPass(createVerifyFullyConvertedPass());
 }
 
