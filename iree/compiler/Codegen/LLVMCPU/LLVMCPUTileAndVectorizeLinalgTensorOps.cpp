@@ -173,6 +173,16 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     return;
   }
 
+  // Op specific conversion.
+  {
+    RewritePatternSet vectorizeOpsPattenrs(context);
+    populateLinalgToVectorVectorizeMMT4dPatterns(context, vectorizeOpsPattenrs);
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(vectorizeOpsPattenrs)))) {
+      return signalPassFailure();
+    }
+  }
+
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns(&getContext());
