@@ -59,7 +59,7 @@ struct GlobalOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalOp globalOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalOp globalOp, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(globalOp.type())) return failure();
@@ -145,11 +145,8 @@ struct GlobalLoadOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalLoadOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalLoadOp loadOp, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Util::GlobalLoadOpAdaptor operands(newOperands,
-                                             loadOp->getAttrDictionary());
-
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(loadOp.getType())) return failure();
     auto &expandedGlobal =
@@ -180,11 +177,8 @@ struct GlobalStoreOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalStoreOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
+      IREE::Util::GlobalStoreOp storeOp, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::Util::GlobalStoreOpAdaptor operands(newOperands,
-                                              storeOp->getAttrDictionary());
-
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(storeOp.value().getType())) return failure();
     auto &expandedGlobal =

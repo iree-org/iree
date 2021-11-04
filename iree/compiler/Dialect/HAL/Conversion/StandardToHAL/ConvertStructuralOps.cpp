@@ -25,7 +25,7 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::FuncOp funcOp, llvm::ArrayRef<Value> operands,
+      mlir::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto &typeConverter = *getTypeConverter();
 
@@ -68,9 +68,8 @@ class CallOpConversion : public OpConversionPattern<mlir::CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::CallOp op, llvm::ArrayRef<Value> operands,
+      mlir::CallOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::CallOpAdaptor adaptor(operands);
     SmallVector<Type, 4> resultTypes;
     if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
                                                 resultTypes))) {
@@ -87,9 +86,8 @@ class BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::BranchOp op, llvm::ArrayRef<Value> operands,
+      mlir::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::BranchOpAdaptor adaptor(operands);
     rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.dest(),
                                                 adaptor.destOperands());
     return success();
@@ -101,10 +99,8 @@ class CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::CondBranchOp op, llvm::ArrayRef<Value> operands,
+      mlir::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::CondBranchOpAdaptor adaptor(operands,
-                                      op.getOperation()->getAttrDictionary());
     rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
         op, adaptor.condition(), op.trueDest(), adaptor.trueDestOperands(),
         op.falseDest(), adaptor.falseDestOperands());
@@ -117,9 +113,10 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::ReturnOp returnOp, llvm::ArrayRef<Value> operands,
+      mlir::ReturnOp returnOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, operands);
+    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp,
+                                                adaptor.getOperands());
     return success();
   }
 };
@@ -129,9 +126,8 @@ class SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::SelectOp selectOp, llvm::ArrayRef<Value> operands,
+      mlir::SelectOp selectOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::SelectOp::Adaptor adaptor(operands);
     rewriter.replaceOpWithNewOp<mlir::SelectOp>(selectOp, adaptor.condition(),
                                                 adaptor.true_value(),
                                                 adaptor.false_value());

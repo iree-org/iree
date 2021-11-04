@@ -124,7 +124,7 @@ template <typename OpTy>
 struct LinalgExtRegionHLOOpConversion : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      OpTy op, ArrayRef<Value> args,
+      OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!isInBodyOfLinalgExtOps(op)) return failure();
     TensorType origRetType = op.getType().template dyn_cast<TensorType>();
@@ -132,8 +132,8 @@ struct LinalgExtRegionHLOOpConversion : public OpConversionPattern<OpTy> {
     SmallVector<Value> scalarArgs;
     Type newRetType = getElementTypeOrSelf(
         this->typeConverter->convertType(origRetType.getElementType()));
-    Value result =
-        lmhlo::HloOpToStdScalarOp::map<OpTy>(op, newRetType, args, &rewriter);
+    Value result = lmhlo::HloOpToStdScalarOp::map<OpTy>(
+        op, newRetType, adaptor.getOperands(), &rewriter);
     rewriter.replaceOp(op, result);
     return success();
   }
@@ -143,10 +143,10 @@ struct LinalgExtRegionReturnOpConversion
     : public OpConversionPattern<mhlo::ReturnOp> {
   using OpConversionPattern<mhlo::ReturnOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mhlo::ReturnOp op, ArrayRef<Value> args,
+      mhlo::ReturnOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!isInBodyOfLinalgExtOps(op)) return failure();
-    rewriter.replaceOpWithNewOp<linalg_ext::YieldOp>(op, args);
+    rewriter.replaceOpWithNewOp<linalg_ext::YieldOp>(op, adaptor.getOperands());
     return success();
   }
 };
@@ -159,11 +159,12 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
   using OpConversionPattern<mhlo::SortOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mhlo::SortOp mhloSortOp, ArrayRef<Value> args,
+      mhlo::SortOp mhloSortOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     auto sortOp = rewriter.create<linalg_ext::SortOp>(
         mhloSortOp.getLoc(), mhloSortOp.getResultTypes(),
-        /*inputs=*/ValueRange{}, args, mhloSortOp.dimensionAttr());
+        /*inputs=*/ValueRange{}, adaptor.getOperands(),
+        mhloSortOp.dimensionAttr());
     rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.region(),
                                 sortOp.region().begin());
     Region &region = sortOp.region();
@@ -226,8 +227,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     return true;
   }
 
-  static SmallVector<int64_t> getTiedResultOperandIndices(
-      ArrayRef<Value> args) {
+  static SmallVector<int64_t> getTiedResultOperandIndices(ValueRange operands) {
     // Mark linalg_ext.scatter::orinigal as readwrite tensor.
     return {0};
   }
@@ -273,12 +273,11 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
   }
 
   LogicalResult matchAndRewrite(
-      mhlo::ScatterOp op, ArrayRef<Value> args,
+      mhlo::ScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!hasCanonicalDimensionNumbers(op)) return failure();
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-    mhlo::ScatterOpAdaptor adaptor(args);
 
     Value original = adaptor.operand();
     Value indices = adaptor.scatter_indices();
@@ -389,10 +388,9 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   }
 
   LogicalResult matchAndRewrite(
-      mhlo::FftOp op, ArrayRef<Value> args,
+      mhlo::FftOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     // Only handle 2^n fft length.
-    mhlo::FftOpAdaptor adaptor(args);
     auto operandType = adaptor.operand().getType().dyn_cast<RankedTensorType>();
     if (!operandType || !operandType.hasStaticShape()) {
       return failure();
@@ -451,23 +449,24 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
   using OpConversionPattern<mhlo::ReverseOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mhlo::ReverseOp op, ArrayRef<Value> args,
+      mhlo::ReverseOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
-    auto ty = args[0].getType().dyn_cast<RankedTensorType>();
+    auto ty = adaptor.getOperands()[0].getType().dyn_cast<RankedTensorType>();
     if (!ty) return failure();
 
     Location loc = op.getLoc();
     SmallVector<Value> dynSizes;
     for (auto en : llvm::enumerate(ty.getShape())) {
       if (en.value() == ShapedType::kDynamicSize) {
-        dynSizes.push_back(
-            rewriter.create<tensor::DimOp>(loc, args[0], en.index()));
+        dynSizes.push_back(rewriter.create<tensor::DimOp>(
+            loc, adaptor.getOperands()[0], en.index()));
       }
     }
     Value initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, dynSizes, ty.getShape(), ty.getElementType());
     rewriter.replaceOpWithNewOp<linalg_ext::ReverseOp>(
-        op, op->getResultTypes(), args, initTensor, op.dimensions());
+        op, op->getResultTypes(), adaptor.getOperands(), initTensor,
+        op.dimensions());
     return success();
   }
 };

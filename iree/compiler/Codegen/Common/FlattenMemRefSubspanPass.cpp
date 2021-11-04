@@ -132,7 +132,7 @@ struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
   using OpConversionPattern<AllocOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      AllocOpTy allocOp, ArrayRef<Value> operands,
+      AllocOpTy allocOp, typename AllocOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = allocOp.getType().template dyn_cast<MemRefType>();
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
@@ -163,7 +163,7 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
   }
 
   LogicalResult matchAndRewrite(
-      memref::GlobalOp globalOp, ArrayRef<Value> operands,
+      memref::GlobalOp globalOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = globalOp.type().dyn_cast<MemRefType>();
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
@@ -189,7 +189,7 @@ struct FlattenGetGlobal final
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      memref::GetGlobalOp getOp, ArrayRef<Value> operands,
+      memref::GetGlobalOp getOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = getOp.getType().dyn_cast<MemRefType>();
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
@@ -213,7 +213,7 @@ struct FlattenBindingSubspan final
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp subspanOp, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = subspanOp.getType().dyn_cast<MemRefType>();
     // IREE subspan ops only use memref types with the default identity
@@ -419,11 +419,11 @@ struct AdjustConversionCast final
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      UnrealizedConversionCastOp castOp, ArrayRef<Value> operands,
+      UnrealizedConversionCastOp castOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (castOp->getNumOperands() != 1) return failure();
 
-    Value input = operands.front();
+    Value input = adaptor.getOperands().front();
     // We only want to handle cases where the cast op handles memref types.
     if (!input.getType().isa<BaseMemRefType>()) return failure();
 

@@ -22,7 +22,7 @@ struct ConvertTensorConstantOp : public OpConversionPattern<arith::ConstantOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      arith::ConstantOp constantOp, llvm::ArrayRef<Value> newOperands,
+      arith::ConstantOp constantOp, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
     // Only handle tensor types - other arith.constant types (like i32) are
     // ignored.

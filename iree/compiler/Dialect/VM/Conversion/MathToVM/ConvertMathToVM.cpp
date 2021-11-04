@@ -29,19 +29,19 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, typename SrcOpTy::Adaptor srcAdaptor,
+      SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
     if (srcOp.result().getType().template isa<VectorType>()) return failure();
 
-    switch (srcAdaptor.operand().getType().getIntOrFloatBitWidth()) {
+    switch (adaptor.operand().getType().getIntOrFloatBitWidth()) {
       case 32:
         rewriter.replaceOpWithNewOp<Dst32OpTy>(
-            srcOp, srcAdaptor.operand().getType(), srcAdaptor.operand());
+            srcOp, adaptor.operand().getType(), adaptor.operand());
         break;
       case 64:
         rewriter.replaceOpWithNewOp<Dst64OpTy>(
-            srcOp, srcAdaptor.operand().getType(), srcAdaptor.operand());
+            srcOp, adaptor.operand().getType(), adaptor.operand());
         break;
       default:
         llvm_unreachable("invalid target type");
@@ -55,21 +55,19 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      SrcOpTy srcOp, typename SrcOpTy::Adaptor srcAdaptor,
+      SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
     if (srcOp.result().getType().template isa<VectorType>()) return failure();
 
-    switch (srcAdaptor.lhs().getType().getIntOrFloatBitWidth()) {
+    switch (adaptor.lhs().getType().getIntOrFloatBitWidth()) {
       case 32:
-        rewriter.replaceOpWithNewOp<Dst32OpTy>(
-            srcOp, srcAdaptor.lhs().getType(), srcAdaptor.lhs(),
-            srcAdaptor.rhs());
+        rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, adaptor.lhs().getType(),
+                                               adaptor.lhs(), adaptor.rhs());
         break;
       case 64:
-        rewriter.replaceOpWithNewOp<Dst64OpTy>(
-            srcOp, srcAdaptor.lhs().getType(), srcAdaptor.lhs(),
-            srcAdaptor.rhs());
+        rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, adaptor.lhs().getType(),
+                                               adaptor.lhs(), adaptor.rhs());
         break;
       default:
         llvm_unreachable("invalid target type");

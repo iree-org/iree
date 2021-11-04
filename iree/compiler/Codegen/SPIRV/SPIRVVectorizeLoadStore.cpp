@@ -178,7 +178,7 @@ class ProcessFuncArg final : public MemRefConversionPattern<FuncOp> {
  public:
   using MemRefConversionPattern<FuncOp>::MemRefConversionPattern;
   LogicalResult matchAndRewrite(
-      FuncOp funcOp, ArrayRef<Value> operands,
+      FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override;
 };
 
@@ -188,7 +188,7 @@ class ProcessTransferRead final
   using MemRefConversionPattern<
       vector::TransferReadOp>::MemRefConversionPattern;
   LogicalResult matchAndRewrite(
-      vector::TransferReadOp read, ArrayRef<Value> operands,
+      vector::TransferReadOp read, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!memrefUsageAnalysis.transferConvert(read)) {
       return rewriter.notifyMatchFailure(
@@ -196,8 +196,6 @@ class ProcessTransferRead final
     }
 
     Location loc = read.getLoc();
-    vector::TransferReadOp::Adaptor adaptor(operands,
-                                            read->getAttrDictionary());
 
     auto scalarMemrefType = read.source().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
@@ -246,7 +244,7 @@ class ProcessTransferWrite final
   using MemRefConversionPattern<
       vector::TransferWriteOp>::MemRefConversionPattern;
   LogicalResult matchAndRewrite(
-      vector::TransferWriteOp write, ArrayRef<Value> operands,
+      vector::TransferWriteOp write, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!memrefUsageAnalysis.transferConvert(write)) {
       return rewriter.notifyMatchFailure(
@@ -254,8 +252,6 @@ class ProcessTransferWrite final
     }
 
     Location loc = write.getLoc();
-    vector::TransferWriteOp::Adaptor adaptor(operands,
-                                             write->getAttrDictionary());
 
     auto scalarMemrefType = write.source().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
@@ -333,7 +329,7 @@ class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
  public:
   using MemRefConversionPattern<memref::AllocOp>::MemRefConversionPattern;
   LogicalResult matchAndRewrite(
-      memref::AllocOp alloc, ArrayRef<Value> operands,
+      memref::AllocOp alloc, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = getVectorizedMemRefType(rewriter, alloc.getResult());
     if (!memrefType) return failure();
@@ -350,7 +346,7 @@ class ProcessInterfaceBinding final
       IREE::HAL::InterfaceBindingSubspanOp>::MemRefConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp bindingOp, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceBindingSubspanOp bindingOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = bindingOp.getType().dyn_cast<MemRefType>();
     if (!memrefType) return failure();
@@ -460,7 +456,7 @@ class SPIRVVectorizeLoadStorePass final
 }  // namespace
 
 LogicalResult ProcessFuncArg::matchAndRewrite(
-    FuncOp funcOp, ArrayRef<Value> operands,
+    FuncOp funcOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
   TypeConverter::SignatureConversion signatureConverter(
       funcOp.getType().getNumInputs());

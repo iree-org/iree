@@ -26,10 +26,10 @@ class LegalizeTieShapePattern : public OpConversionPattern<Shape::TieShapeOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      Shape::TieShapeOp op, llvm::ArrayRef<Value> operands,
+      Shape::TieShapeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<Shape::TieShapeOp>(op, operands[0],
-                                                   operands[1]);
+    rewriter.replaceOpWithNewOp<Shape::TieShapeOp>(op, adaptor.getOperands()[0],
+                                                   adaptor.getOperands()[1]);
     return success();
   }
 };
@@ -42,22 +42,22 @@ class BackingBufferBufferViewDimPattern
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      tensor::DimOp dimOp, llvm::ArrayRef<Value> rawOperands,
+      tensor::DimOp dimOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    tensor::DimOp::Adaptor operands(rawOperands);
     if (!IREE::HAL::TensorRewriteAdaptor::isValidNewType(
-            operands.source().getType())) {
+            adaptor.source().getType())) {
       return failure();
     }
-    auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
-        dimOp.getLoc(), dimOp.source(), operands.source(), rewriter);
+    auto rewriteAdaptor = IREE::HAL::TensorRewriteAdaptor::get(
+        dimOp.getLoc(), dimOp.source(), adaptor.source(), rewriter);
 
     Optional<int64_t> index = dimOp.getConstantIndex();
     assert(index.hasValue() && "expect constant index in `std.dim` operation");
 
     auto dimIndex = rewriter.getIndexAttr(index.getValue());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewDimOp>(
-        dimOp, dimOp.getResult().getType(), adaptor.getBufferView(), dimIndex);
+        dimOp, dimOp.getResult().getType(), rewriteAdaptor.getBufferView(),
+        dimIndex);
     return success();
   }
 };
@@ -69,17 +69,18 @@ class BackingBufferBufferViewRankPattern : public OpConversionPattern<RankOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      RankOp rankOp, llvm::ArrayRef<Value> rawOperands,
+      RankOp rankOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!IREE::HAL::TensorRewriteAdaptor::isValidNewType(
-            rawOperands[0].getType())) {
+            adaptor.getOperands()[0].getType())) {
       return failure();
     }
-    auto adaptor = IREE::HAL::TensorRewriteAdaptor::get(
-        rankOp.getLoc(), rankOp.getOperand(), rawOperands[0], rewriter);
+    auto rewriteAdaptor = IREE::HAL::TensorRewriteAdaptor::get(
+        rankOp.getLoc(), rankOp.getOperand(), adaptor.getOperands()[0],
+        rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewRankOp>(
-        rankOp, rankOp.getResult().getType(), adaptor.getBufferView());
+        rankOp, rankOp.getResult().getType(), rewriteAdaptor.getBufferView());
     return success();
   }
 };
