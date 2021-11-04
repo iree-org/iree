@@ -26,16 +26,15 @@ class CommandBufferFillBufferOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferFillBufferOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::CommandBufferFillBufferOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getType();
-    IREE::HAL::CommandBufferFillBufferOp::Adaptor newOperands(operands);
 
     SmallVector<Value, 8> callOperands = {
-        newOperands.command_buffer(),
-        newOperands.target_buffer(),
-        newOperands.target_offset(),
-        newOperands.length(),
+        adaptor.command_buffer(),
+        adaptor.target_buffer(),
+        adaptor.target_offset(),
+        adaptor.length(),
     };
 
     // Record the original pattern length then extend it to a 32 bit integer.
