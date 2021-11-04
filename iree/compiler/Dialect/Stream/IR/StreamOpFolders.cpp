@@ -646,7 +646,6 @@ OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
 void TensorImportOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   // TODO(benvanik): check operand and dedupe imports.
-  results.insert<MaterializeCOW<TensorImportOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -836,7 +835,6 @@ void AsyncAllocaOp::getCanonicalizationPatterns(
   // TODO(benvanik): alloca (staging) -> non-staging change to target.
   // TODO(benvanik): alloca (non-staging) -> staging change to target.
   // TODO(benvanik): sink to first user.
-  results.insert<MaterializeCOW<AsyncAllocaOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -847,7 +845,6 @@ void AsyncConstantOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   // TODO(benvanik): if value is a splat turn into splat.
   // TODO(benvanik): if value is _mostly_ a splat, turn into splat + updates.
-  results.insert<MaterializeCOW<AsyncConstantOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -923,7 +920,6 @@ void AsyncSplatOp::getCanonicalizationPatterns(
   // TODO(#6972): clone instead of sinking to common dominator.
   results.insert<SinkSplatsToConsumers>(context);
   results.insert<ElideUnusedOp<AsyncSplatOp>>(context);
-  results.insert<MaterializeCOW<AsyncSplatOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -973,7 +969,6 @@ void AsyncCloneOp::getCanonicalizationPatterns(
   // TODO(benvanik): some way to reduce deep clone->clone->clone chains.
   results.insert<PropagateClonableOps>(context);
   results.insert<ElideUnusedOp<AsyncCloneOp>>(context);
-  results.insert<MaterializeCOW<AsyncCloneOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1020,7 +1015,6 @@ void AsyncSliceOp::getCanonicalizationPatterns(
   //                 affinity/lifetime differ.
   results.insert<PropagateSplatsThroughSlices>(context);
   results.insert<ElideUnusedOp<AsyncSliceOp>>(context);
-  results.insert<MaterializeCOW<AsyncSliceOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1057,7 +1051,6 @@ void AsyncFillOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
   results.insert<FlattenFullFillToSplat>(context);
   results.insert<ElideUnusedOp<AsyncFillOp>>(context);
-  results.insert<MaterializeCOW<AsyncFillOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1147,7 +1140,6 @@ void AsyncUpdateOp::getCanonicalizationPatterns(
   results.insert<CombineSplatUpdateFromToFill>(context);
   results.insert<CombineSliceUpdateFromToCopy>(context);
   results.insert<ElideUnusedOp<AsyncUpdateOp>>(context);
-  results.insert<MaterializeCOW<AsyncUpdateOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1185,7 +1177,6 @@ void AsyncCopyOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
   results.insert<AsyncCopyFullSourceToUpdate>(context);
   results.insert<ElideUnusedOp<AsyncCopyOp>>(context);
-  results.insert<MaterializeCOW<AsyncCopyOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1227,7 +1218,6 @@ void AsyncTransferOp::getCanonicalizationPatterns(
   // TODO(benvanik): staging propagation (fill of staging -> fill on device).
   results.insert<RedundantTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
-  results.insert<MaterializeCOW<AsyncTransferOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1261,7 +1251,6 @@ void AsyncDispatchOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   // TODO(benvanik): nothing? maybe tied type/lifetime updates?
   results.insert<ElideUnusedOp<AsyncDispatchOp>>(context);
-  results.insert<MaterializeCOW<AsyncDispatchOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1452,7 +1441,6 @@ void AsyncExecuteOp::getCanonicalizationPatterns(
       context);
   results.insert<TieRegionResults<AsyncExecuteOp>>(context);
   results.insert<ElideUnusedOp<AsyncExecuteOp>>(context);
-  results.insert<MaterializeCOW<AsyncExecuteOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1465,7 +1453,6 @@ void AsyncConcurrentOp::getCanonicalizationPatterns(
       context);
   results.insert<TieRegionResults<AsyncConcurrentOp>>(context);
   results.insert<ElideUnusedOp<AsyncConcurrentOp>>(context);
-  results.insert<MaterializeCOW<AsyncConcurrentOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//

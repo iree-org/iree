@@ -429,7 +429,7 @@ struct PotentialValuesState : AbstractState {
   }
 
   // Maximum number of potential values to be tracked.
-  static unsigned maxPotentialValues;
+  static constexpr unsigned maxPotentialValues = 32;
 
   // Returns empty set as the best state of potential values.
   static PotentialValuesState getBestState() {

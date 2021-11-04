@@ -52,6 +52,7 @@ class Solver {
         asmState(explorer.getAsmState()),
         allocator(allocator),
         depGraph(explorer.getAsmState()) {}
+  ~Solver();
 
   // Initialized explorer for walking the IR.
   Explorer &getExplorer() { return explorer; }

@@ -15,6 +15,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
@@ -118,6 +119,9 @@ class Explorer {
   // Initializes the explorer. Must be called after all dialect/op actions have
   // been specified.
   void initialize();
+
+  // Returns a cached analysis manager for the root op.
+  AnalysisManager getAnalysisManager() { return analysisManager; }
 
   // Cached information about a global variable.
   struct GlobalInfo {
@@ -288,6 +292,7 @@ class Explorer {
   DenseMap<OperationName, TraversalAction> opActions;
 
   DenseMap<Operation *, GlobalInfo> globalInfos;
+  ModuleAnalysisManager analysisManager;
 };
 
 }  // namespace iree_compiler
