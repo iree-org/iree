@@ -22,7 +22,7 @@ ANDROID_ABI=$1
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 "${CMAKE_BIN}" --version
 "${CC}" --version
 "${CXX}" --version

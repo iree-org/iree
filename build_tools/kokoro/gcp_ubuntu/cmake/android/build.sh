@@ -22,9 +22,9 @@ ANDROID_ABI="$1"
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-ROOT_DIR=$(git rev-parse --show-toplevel)
+ROOT_DIR="$(git rev-parse --show-toplevel)"
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 
 # Check these exist and print the versions for later debugging
 "${CMAKE_BIN}" --version
@@ -38,7 +38,7 @@ echo "Android NDK path: $ANDROID_NDK"
 echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
-cd ${ROOT_DIR}
+cd "${ROOT_DIR}"
 
 # BUILD the iree-import-tflite binary for importing models to benchmark from
 # TFLite flatbuffers.
@@ -80,7 +80,7 @@ cd build-host
 # --------------------------------------------------------------------------- #
 # Build for the target (Android).
 
-cd ${ROOT_DIR}
+cd "${ROOT_DIR}"
 
 if [ -d "build-android" ]
 then
