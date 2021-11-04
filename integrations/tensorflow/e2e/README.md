@@ -5,7 +5,7 @@
 > Note:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;The TensorFlow integrations are currently being
   refactored. The `bazel` build is deprecated. Refer to
-  https://google.github.io/iree/building-from-source/optional-features/ for a general
+  https://google.github.io/iree/building-from-source/python-bindings-and-importers/ for a general
   overview of how to build and execute the e2e tests.
 
 This is a collection of e2e tests that compile a TensorFlow model with IREE (and
