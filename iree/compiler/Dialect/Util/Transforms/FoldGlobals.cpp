@@ -31,6 +31,11 @@ namespace IREE {
 namespace Util {
 namespace {
 
+template <typename R>
+static size_t count(R &&range) {
+  return std::distance(range.begin(), range.end());
+}
+
 struct Global {
   size_t ordinal = 0;
   IREE::Util::GlobalOp op;
@@ -385,9 +390,7 @@ class FoldGlobalsPass
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
     auto moduleOp = getOperation();
-    beforeFoldingGlobals =
-        llvm::count_if(moduleOp.getOps<IREE::Util::GlobalOp>(),
-                       [](IREE::Util::GlobalOp op) { return true; });
+    beforeFoldingGlobals = count(moduleOp.getOps<IREE::Util::GlobalOp>());
     for (int i = 0; i < 10; ++i) {
       // TODO(benvanik): determine if we need this expensive folding.
       if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns))) {
@@ -436,9 +439,7 @@ class FoldGlobalsPass
       if (!didChange) break;
     }
 
-    afterFoldingGlobals =
-        llvm::count_if(moduleOp.getOps<IREE::Util::GlobalOp>(),
-                       [](IREE::Util::GlobalOp op) { return true; });
+    afterFoldingGlobals = count(moduleOp.getOps<IREE::Util::GlobalOp>());
   }
 
  private:
