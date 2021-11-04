@@ -2,8 +2,9 @@
 
 !!! Attention
     These components are more complicated to build from source than the rest of
-    the project. If your usage does not require making source changes, prefer
-    to install from the official binary distributions instead.
+    the project. If your usage does not require making source changes, prefer to
+    [install from the official binary distributions](../bindings/python.md#installing-iree-packages)
+    instead.
 
 This page covers how to build IREE's Python-based bindings and import tools from
 source. These components are built using CMake as well as other dependencies and
