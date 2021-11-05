@@ -22,7 +22,7 @@ set(DEEPLABV3_FP32_MODULE
   TAGS
     "fp32"
   SOURCE
-    # No significant compression of tflite files by gzip
+    # Mirror of https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/default/1
     "https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite"
   ENTRY_FUNCTION
     "main"
@@ -36,7 +36,7 @@ set(MOBILESSD_FP32_MODULE
   TAGS
     "fp32"
   SOURCE
-    # No significant compression of tflite files by gzip
+    # Mirror of https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/mobile_ssd_v2_float_coco.tflite
     "https://storage.googleapis.com/iree-model-artifacts/mobile_ssd_v2_float_coco.tflite"
   ENTRY_FUNCTION
     "main"
@@ -50,13 +50,75 @@ set(POSENET_FP32_MODULE
   TAGS
     "fp32"
   SOURCE
-    # No significant compression of tflite files by gzip
+    # Mirror of https://tfhub.dev/tensorflow/lite-model/posenet/mobilenet/float/075/1/default/1
     "https://storage.googleapis.com/iree-model-artifacts/posenet.tflite"
   ENTRY_FUNCTION
     "main"
   FUNCTION_INPUTS
     "1x353x257x3xf32"
 )
+
+set(MOBILEBERT_FP32_MODULE
+  NAME
+    "MobileBertSquad"
+  TAGS
+    "fp32"
+  SOURCE
+    # Mirror of https://tfhub.dev/tensorflow/lite-model/mobilebert/1/default/1
+    "https://storage.googleapis.com/iree-model-artifacts/mobilebertsquad.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
+)
+
+set(MOBILEBERT_FP16_MODULE
+  NAME
+    "MobileBertSquad"
+  TAGS
+    "fp16"
+  # This uses the same input MLIR source as fp32 to save download time.
+  # It requires users to have "--iree-flow-demote-f32-to-f16".
+  SOURCE
+    # Mirror of https://tfhub.dev/tensorflow/lite-model/mobilebert/1/default/1
+    "https://storage.googleapis.com/iree-model-artifacts/mobilebertsquad.tflite"
+  ENTRY_FUNCTION
+    "main"
+  # The conversion done by "--iree-flow-demote-f32-to-f16" won't change the
+  # original input signature.
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
+)
+
+set(MOBILENET_V2_MODULE
+  NAME
+    "MobileNetV2"
+  TAGS
+    "fp32,imagenet"
+  SOURCE
+    # Mirror https://github.com/tensorflow/tflite-support/blob/master/tensorflow_lite_support/metadata/python/tests/testdata/image_classifier/mobilenet_v2_1.0_224.tflite
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+)
+
+set(MOBILENET_V3SMALL_MODULE
+  NAME
+    "MobileNetV3Small"
+  TAGS
+    "fp32,imagenet"
+  SOURCE
+    # https://tfhub.dev/google/imagenet/mobilenet_v3_small_100_224/classification/5
+    # Manually exported to tflite with static batch dimension
+    "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallStaticBatch.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+)
+
 
 ################################################################################
 #                                                                              #
@@ -80,6 +142,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "big-core,full-inference,default-flags"
@@ -100,6 +165,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference,default-flags"
@@ -122,6 +190,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "2-thread,little-core,full-inference,default-flags"
@@ -142,6 +213,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "3-thread,little-core,full-inference,default-flags"
@@ -162,6 +236,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,little-core,full-inference,default-flags"
@@ -183,6 +260,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -203,6 +283,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -213,6 +296,27 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
+  DRIVER
+    "vulkan"
+)
+
+# GPU, Vulkan, Mali, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${MOBILEBERT_FP16_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    # This isn't a special optimization flag. It's so we can reuse the same f32
+    # model file. See comments on MOBILEBERT_FP16_MODULE
+    "--iree-flow-demote-f32-to-f16"
   DRIVER
     "vulkan"
 )
@@ -261,6 +365,7 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference,experimental-flags"
