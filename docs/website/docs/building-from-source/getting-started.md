@@ -1,7 +1,5 @@
 # Getting started
 
-<!-- TODO(scotttodd): Introduction, when to build from source -->
-
 ## Prerequisites
 
 You will need to install [CMake](https://cmake.org/), the

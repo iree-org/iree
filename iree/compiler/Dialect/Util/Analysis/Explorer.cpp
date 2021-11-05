@@ -772,10 +772,11 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
     return TraversalResult::COMPLETE;
   };
 
-  // Returns true if the branch operand is passed to a successor (vs being used
-  // by the op itself, such as the cond_br condition).
-  auto isSuccessorOperand = [&](BranchOpInterface branchOp,
-                                unsigned operandIdx) {
+  // Returns the remapped successor operand index if the branch operand is
+  // passed to a successor (vs being used by the op itself, such as the cond_br
+  // condition).
+  auto mapSuccessorOperand = [&](BranchOpInterface branchOp,
+                                 unsigned operandIdx) -> Optional<unsigned> {
     // I don't know if there's a better way to do this - the interface doesn't
     // help.
     for (unsigned i = 0; i < branchOp->getNumSuccessors(); ++i) {
@@ -787,17 +788,18 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
       if (operandIdx >= beginIdx &&
           operandIdx < beginIdx + operandRange.size()) {
         // Covered.
-        return true;
+        return operandIdx - beginIdx;
       }
     }
-    return false;
+    return llvm::None;
   };
 
   // Move across a branch to all successors.
   auto traverseBranchOp = [&](BranchOpInterface branchOp, unsigned operandIdx) {
     // First check to see if the operand is for a successor edge. Ops like
     // cond_br have operands that are not carried along outgoing edges.
-    if (!isSuccessorOperand(branchOp, operandIdx)) {
+    auto successorOperandIdx = mapSuccessorOperand(branchOp, operandIdx);
+    if (!successorOperandIdx) {
       LLVM_DEBUG(llvm::dbgs() << "  -- ignoring non-succesor branch operand "
                               << operandIdx << "\n");
       return TraversalResult::COMPLETE;
@@ -805,7 +807,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
     return walkOutgoingBranchArguments(
         branchOp->getBlock(),
         [&](Block *targetBlock, Block::BlockArgListType args) {
-          auto branchArg = args[operandIdx];
+          auto branchArg = args[*successorOperandIdx];
           LLVM_DEBUG({
             llvm::dbgs() << "   + queuing ";
             targetBlock->printAsOperand(llvm::dbgs(), asmState);

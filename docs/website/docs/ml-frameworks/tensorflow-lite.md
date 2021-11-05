@@ -12,9 +12,8 @@ Download a pre-trained TFLite model from the list of
 [TensorFlow Lite converter](https://www.tensorflow.org/lite/convert) to convert
 a TensorFlow model to a .tflite flatbuffer.
 
-
 Install IREE pip packages, either from pip or by
-[building from source](../building-from-source/optional-features.md#building-python-bindings):
+[building from source](../building-from-source/python-bindings-and-importers.md):
 
 ```shell
 python -m pip install \

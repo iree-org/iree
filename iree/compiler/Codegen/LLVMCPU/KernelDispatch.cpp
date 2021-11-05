@@ -374,7 +374,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, linalg::Mmt4DOp mmt4dOp,
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUVectorization);
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
