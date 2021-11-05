@@ -60,20 +60,27 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
 /// of element per workgroups.
 static SmallVector<int64_t> getNumWorkgroup(
     FuncOp funcOp, IREE::HAL::ExecutableEntryPointOp entryPointOp) {
-  SmallVector<TiledLoopInfo> tiledLoopInfo = getTiledLoopInfo(funcOp);
+  SmallVector<LoopTilingAndDistributionInfo> tiledLoopInfo =
+      getTiledAndDistributedLoopInfo(funcOp);
   SmallVector<int64_t> workloadSize(tiledLoopInfo.size());
-  for (TiledLoopInfo &tileInfo : tiledLoopInfo) {
-    if (tileInfo.distributionDim >= workloadSize.size())
+  for (LoopTilingAndDistributionInfo &tileInfo : tiledLoopInfo) {
+    if (tileInfo.processorDistributionDim >= workloadSize.size())
       return SmallVector<int64_t>();
-    if (!tileInfo.lb.is<Attribute>() || !tileInfo.ub.is<Attribute>() ||
-        !tileInfo.step.is<Attribute>()) {
+    if (!tileInfo.untiledLowerBound.is<Attribute>() ||
+        !tileInfo.untiledUpperBound.is<Attribute>() ||
+        !tileInfo.untiledStep.is<Attribute>()) {
       continue;
     }
-    int64_t lb = tileInfo.lb.get<Attribute>().cast<IntegerAttr>().getInt();
-    int64_t ub = tileInfo.ub.get<Attribute>().cast<IntegerAttr>().getInt();
-    int64_t step = tileInfo.step.get<Attribute>().cast<IntegerAttr>().getInt();
+    int64_t lb = tileInfo.untiledLowerBound.get<Attribute>()
+                     .cast<IntegerAttr>()
+                     .getInt();
+    int64_t ub = tileInfo.untiledUpperBound.get<Attribute>()
+                     .cast<IntegerAttr>()
+                     .getInt();
+    int64_t step =
+        tileInfo.untiledStep.get<Attribute>().cast<IntegerAttr>().getInt();
     if (step == 0) return SmallVector<int64_t>();
-    workloadSize[tileInfo.distributionDim] = (ub - lb) / step;
+    workloadSize[tileInfo.processorDistributionDim] = (ub - lb) / step;
   }
   auto translationInfo = getTranslationInfo(entryPointOp);
   if (!translationInfo) return SmallVector<int64_t>();

@@ -12,9 +12,12 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/SymbolTable.h"
+
+#define DEBUG_TYPE "iree-codegen-utils"
 
 namespace mlir {
 namespace iree_compiler {
@@ -163,7 +166,7 @@ static bool isaAffineExprOfType(AffineExpr expr) {
   return isaAffineExprOfType<T2, T3...>(expr);
 }
 
-/// Returns a Value that repreesnts the value for symbol or dim expr for the map
+/// Returns a Value that represents the value for symbol or dim expr for the map
 /// in the `applyOp`.
 static Value getValueForDimOrSymbol(AffineApplyOp applyOp, AffineExpr expr) {
   unsigned numDims = applyOp.getAffineMap().getNumDims();
@@ -233,7 +236,8 @@ namespace {
 class LowerBoundExprVisitor
     : public AffineExprVisitor<LowerBoundExprVisitor, LogicalResult> {
  public:
-  LowerBoundExprVisitor(AffineApplyOp applyOp, TiledLoopInfo &loopInfo)
+  LowerBoundExprVisitor(AffineApplyOp applyOp,
+                        LoopTilingAndDistributionInfo &loopInfo)
       : applyOp(applyOp), loopInfo(loopInfo) {}
 
   LogicalResult visitSymbolExpr(AffineSymbolExpr /*expr*/) { return failure(); }
@@ -260,10 +264,10 @@ class LowerBoundExprVisitor
       if (!v) {
         return failure();
       }
-      loopInfo.lb = getAsOpFoldResult(v);
+      loopInfo.untiledLowerBound = getAsOpFoldResult(v);
     } else if (auto constExpr = lbExpr.dyn_cast<AffineConstantExpr>()) {
-      loopInfo.lb = IntegerAttr::get(IndexType::get(applyOp.getContext()),
-                                     constExpr.getValue());
+      loopInfo.untiledLowerBound = IntegerAttr::get(
+          IndexType::get(applyOp.getContext()), constExpr.getValue());
     } else {
       return failure();
     }
@@ -279,7 +283,7 @@ class LowerBoundExprVisitor
       if (vals.size() != 1 || !vals[0]) {
         return failure();
       }
-      loopInfo.workgroupSize = wgSize.getValue();
+      loopInfo.tileSize = wgSize.getValue();
       dimension = checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp>(vals);
     } else {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
@@ -292,16 +296,17 @@ class LowerBoundExprVisitor
     if (!dimension) {
       return failure();
     }
-    loopInfo.distributionDim = dimension.getValue();
-    if (!loopInfo.lb) {
-      loopInfo.lb = IntegerAttr::get(IndexType::get(applyOp.getContext()), 0);
+    loopInfo.processorDistributionDim = dimension.getValue();
+    if (!loopInfo.untiledLowerBound) {
+      loopInfo.untiledLowerBound =
+          IntegerAttr::get(IndexType::get(applyOp.getContext()), 0);
     }
     return success();
   }
 
  private:
   AffineApplyOp applyOp;
-  TiledLoopInfo &loopInfo;
+  LoopTilingAndDistributionInfo &loopInfo;
 };
 
 /// Visitor to walk the `step` of a distributed loop. Expected the expression to
@@ -311,7 +316,8 @@ class LowerBoundExprVisitor
 class StepExprVisitor
     : public AffineExprVisitor<StepExprVisitor, LogicalResult> {
  public:
-  StepExprVisitor(AffineApplyOp applyOp, TiledLoopInfo &loopInfo)
+  StepExprVisitor(AffineApplyOp applyOp,
+                  LoopTilingAndDistributionInfo &loopInfo)
       : applyOp(applyOp), loopInfo(loopInfo) {}
 
   LogicalResult visitSymbolExpr(AffineSymbolExpr /*expr*/) { return failure(); }
@@ -335,28 +341,28 @@ class StepExprVisitor
       }
       expr = e.cast<AffineBinaryOpExpr>();
     } else {
-      // Check if WorkgroupSizeOp is folded.
-      if (loopInfo.workgroupSize) {
-        if (auto stepBySize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
-          loopInfo.step =
+      // Check if the workgroup tile size is folded into the affine map itself.
+      if (loopInfo.tileSize) {
+        if (auto stepCst = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
+          loopInfo.untiledStep =
               IntegerAttr::get(IndexType::get(applyOp.getContext()),
-                               stepBySize.getValue() / *loopInfo.workgroupSize);
+                               stepCst.getValue() / *loopInfo.tileSize);
         }
       } else {
-        loopInfo.step =
+        loopInfo.untiledStep =
             IntegerAttr::get(IndexType::get(applyOp.getContext()), 1);
       }
     }
 
     if (failed(processSentinel(expr.getLHS(), sentinels)) ||
-        (!loopInfo.workgroupSize &&
+        (!loopInfo.tileSize &&
          failed(processSentinel(expr.getRHS(), sentinels)))) {
       return failure();
     }
     // Either there are 3 sentinels and step isnt set, or there are two
     // sentinels and the step is set.
     if (sentinels.size() == 3) {
-      if (loopInfo.step) {
+      if (loopInfo.untiledStep) {
         return failure();
       }
       auto it = sentinels.begin();
@@ -364,7 +370,7 @@ class StepExprVisitor
         Value v = getValueForDimOrSymbol(applyOp, *it);
         if (!v.getDefiningOp<IREE::HAL::InterfaceWorkgroupSizeOp>() &&
             !v.getDefiningOp<IREE::HAL::InterfaceWorkgroupCountOp>()) {
-          loopInfo.step = getAsOpFoldResult(v);
+          loopInfo.untiledStep = getAsOpFoldResult(v);
           break;
         }
       }
@@ -373,18 +379,18 @@ class StepExprVisitor
       }
     }
 
-    if ((sentinels.size() != 2 || !loopInfo.step) &&
-        (sentinels.size() != 1 || !loopInfo.workgroupSize)) {
+    if ((sentinels.size() != 2 || !loopInfo.untiledStep) &&
+        (sentinels.size() != 1 || !loopInfo.tileSize)) {
       return failure();
     }
     SmallVector<Value> vals = getValuesForDimsOrSymbols(applyOp, sentinels);
-    if ((loopInfo.workgroupSize &&
+    if ((loopInfo.tileSize &&
          !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp>(
-             vals, loopInfo.distributionDim)) ||
-        (!loopInfo.workgroupSize &&
+             vals, loopInfo.processorDistributionDim)) ||
+        (!loopInfo.tileSize &&
          !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp,
                           IREE::HAL::InterfaceWorkgroupSizeOp>(
-             vals, loopInfo.distributionDim))) {
+             vals, loopInfo.processorDistributionDim))) {
       return failure();
     }
     return success();
@@ -397,18 +403,18 @@ class StepExprVisitor
       sentinels.push_back(e);
       return success();
     } else if (auto constExpr = e.dyn_cast<AffineConstantExpr>()) {
-      if (loopInfo.step) {
+      if (loopInfo.untiledStep) {
         return failure();
       }
-      loopInfo.step = IntegerAttr::get(IndexType::get(applyOp.getContext()),
-                                       constExpr.getValue());
+      loopInfo.untiledStep = IntegerAttr::get(
+          IndexType::get(applyOp.getContext()), constExpr.getValue());
       return success();
     }
     return failure();
   }
 
   AffineApplyOp applyOp;
-  TiledLoopInfo &loopInfo;
+  LoopTilingAndDistributionInfo &loopInfo;
 };
 }  // namespace
 
@@ -419,17 +425,16 @@ class StepExprVisitor
 ///   %id = flow.dispatch.workgroup.id[%dim]
 ///   %count = flow.dispatch.workgroup.count[%dim]
 ///   %size = flow.dispatch.workgroup.size[%dim]
-///   %offset = affine.apply affine_map<(d0)[s0, s1] -> (d0 + s0 *
-///   s1)>(%lb)[%id, %size] %new_step = affine.apply affine_map<(d0)[s0, s1] ->
-///   (d0 * s0 * s1)>(%step)[%id, %size] scf.for %iv = %offset to %ub step
-///   %new_step {
-///     ...
-///   }
+///   %offset = affine.apply
+///     affine_map<(d0)[s0, s1] -> (d0 + s0 * s1)>(%lb)[%id, %size]
+///   %new_step = affine.apply
+///     affine_map<(d0)[s0, s1] -> (d0 * s0 * s1)>(%step)[%id, %size]
+///   scf.for %iv = %offset to %ub step %new_step { ... }
 /// ```
-static Optional<TiledLoopInfo> isTiledLoop(MLIRContext *context,
-                                           scf::ForOp forOp) {
-  TiledLoopInfo loopInfo;
-  loopInfo.tiledLoop = forOp;
+Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
+    scf::ForOp forOp) {
+  LoopTilingAndDistributionInfo loopInfo;
+  loopInfo.loop = forOp;
   auto lbApplyOp = forOp.lowerBound().getDefiningOp<AffineApplyOp>();
   if (!lbApplyOp) {
     return llvm::None;
@@ -444,27 +449,27 @@ static Optional<TiledLoopInfo> isTiledLoop(MLIRContext *context,
       failed(stepVisitor.visit(stepApplyOp.getAffineMap().getResults()[0]))) {
     return llvm::None;
   }
-  if (!loopInfo.lb || !loopInfo.step) {
+  if (!loopInfo.untiledLowerBound || !loopInfo.untiledStep) {
     return llvm::None;
   }
-  loopInfo.ub = getAsOpFoldResult(forOp.upperBound());
+  loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.upperBound());
   return loopInfo;
 }
 
-LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
-                             SmallVectorImpl<Operation *> &filteredOps,
-                             SmallVectorImpl<TiledLoopInfo> &tiledLoops) {
+LogicalResult getFilteredOps(
+    FuncOp funcOp, RootOpFilteringFn filteringFn,
+    SmallVectorImpl<Operation *> &filteredOps,
+    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
   Region &region = funcOp.body();
   if (!llvm::hasSingleElement(region)) {
     return funcOp.emitError("unable dispatch function with multiple blocks");
   }
   Block *body = &region.front();
-  MLIRContext *context = funcOp.getContext();
   auto forOps = body->getOps<scf::ForOp>();
   while (!forOps.empty()) {
     if (!llvm::hasSingleElement(forOps)) return failure();
     scf::ForOp forOp = *(forOps.begin());
-    if (auto tiledLoopInfo = isTiledLoop(context, forOp)) {
+    if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
       tiledLoops.emplace_back(std::move(tiledLoopInfo.getValue()));
     }
     body = forOp.getBody();
@@ -478,9 +483,9 @@ LogicalResult getFilteredOps(FuncOp funcOp, RootOpFilteringFn filteringFn,
   return success();
 }
 
-LogicalResult getComputeOps(FuncOp funcOp,
-                            SmallVectorImpl<Operation *> &computeOps,
-                            SmallVectorImpl<TiledLoopInfo> &tiledLoops) {
+LogicalResult getComputeOps(
+    FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
+    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
   if (failed(getFilteredOps(
           funcOp,
           [](Operation *op) {
@@ -492,10 +497,11 @@ LogicalResult getComputeOps(FuncOp funcOp,
   return success();
 }
 
-SmallVector<TiledLoopInfo> getTiledLoopInfo(FuncOp funcOp) {
-  SmallVector<TiledLoopInfo> info;
+SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
+    FuncOp funcOp) {
+  SmallVector<LoopTilingAndDistributionInfo> info;
   funcOp.walk([&](scf::ForOp forOp) {
-    if (auto tiledLoopInfo = isTiledLoop(forOp.getContext(), forOp)) {
+    if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
       info.emplace_back(std::move(tiledLoopInfo.getValue()));
     }
   });
