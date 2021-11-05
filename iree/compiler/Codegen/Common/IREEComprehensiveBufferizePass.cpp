@@ -68,7 +68,7 @@ class IREEComprehensiveBufferizePass
  public:
   explicit IREEComprehensiveBufferizePass(
       linalg::AllocationCallbacks allocationFn)
-          : allocationFn(allocationFn) {}
+      : allocationFn(allocationFn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
                     linalg::LinalgDialect, memref::MemRefDialect,
