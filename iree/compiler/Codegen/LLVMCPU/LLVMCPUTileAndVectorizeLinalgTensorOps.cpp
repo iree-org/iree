@@ -53,10 +53,11 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 namespace {
 struct LLVMCPUTileAndVectorizePass
     : public LLVMCPUTileAndVectorizeBase<LLVMCPUTileAndVectorizePass> {
-  LLVMCPUTileAndVectorizePass(bool vectorize = true)
-      : lowerToVectors(vectorize) {}
+  LLVMCPUTileAndVectorizePass(bool vectorize = true, bool lowerMMT4D = false)
+      : lowerToVectors(vectorize), lowerMMT4D(lowerMMT4D) {}
   LLVMCPUTileAndVectorizePass(const LLVMCPUTileAndVectorizePass &pass) {
     lowerToVectors = pass.lowerToVectors;
+    lowerMMT4D = pass.lowerMMT4D;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
@@ -66,6 +67,7 @@ struct LLVMCPUTileAndVectorizePass
 
  private:
   bool lowerToVectors;
+  bool lowerMMT4D;
 };
 }  // namespace
 
@@ -79,7 +81,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  // First level of tiling patterns
+  // First level of tiling patterns.
   {
     OwningRewritePatternList l1patterns(&getContext());
     l1patterns.insert<TileWorkgroups>(
@@ -104,7 +106,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     });
   }
 
-  // Apply canoncalization
+  // Apply canonicalization.
   {
     OwningRewritePatternList canonicalizationPatterns(&getContext());
     linalg::populateLinalgTilingCanonicalizationPatterns(
@@ -124,7 +126,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     });
   }
 
-  // Second level of tiling patterns{
+  // Second level of tiling patterns.
   {
     OwningRewritePatternList l2patterns(&getContext());
     l2patterns.insert<TileWorkgroups>(
@@ -149,7 +151,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     });
   }
 
-  // Apply canoncalization
+  // Apply canonicalization.
   {
     OwningRewritePatternList canonicalizationPatterns(&getContext());
     linalg::populateLinalgTilingCanonicalizationPatterns(
@@ -174,7 +176,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
   }
 
   // Op specific conversion.
-  {
+  if (lowerMMT4D) {
     RewritePatternSet vectorizeOpsPattenrs(context);
     populateLinalgToVectorVectorizeMMT4dPatterns(context, vectorizeOpsPattenrs);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
@@ -249,8 +251,9 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
-    bool lowerToVectors) {
-  return std::make_unique<LLVMCPUTileAndVectorizePass>(lowerToVectors);
+    bool lowerToVectors, bool lowerMMT4D) {
+  return std::make_unique<LLVMCPUTileAndVectorizePass>(lowerToVectors,
+                                                       lowerMMT4D);
 }
 
 }  // namespace iree_compiler

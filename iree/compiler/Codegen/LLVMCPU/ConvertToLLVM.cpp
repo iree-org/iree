@@ -711,6 +711,7 @@ void ConvertToLLVMPass::runOnOperation() {
                              dataLayoutAnalysis.getAtOrAbove(module));
   options.dataLayout = llvm::DataLayout(dataLayoutStr);
   options.overrideIndexBitwidth(options.dataLayout.getPointerSizeInBits());
+  options.useBarePtrCallConv = true;  // don't use memref descriptor structs
   LLVMTypeConverter converter(&getContext(), options, &dataLayoutAnalysis);
 
   OwningRewritePatternList patterns(&getContext());

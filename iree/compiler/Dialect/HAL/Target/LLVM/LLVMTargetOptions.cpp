@@ -175,6 +175,13 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::init(targetOptions.staticLibraryOutput));
   targetOptions.staticLibraryOutput = clStaticLibraryOutputPath;
 
+  // EXPERIMENTAL
+  static llvm::cl::opt<bool> clLinkMMT4D(
+      "iree-llvm-link-mmt4d",
+      llvm::cl::desc("Link MMT4D kernels when available"),
+      llvm::cl::init(true));  // DO NOT SUBMIT
+  targetOptions.linkMMT4D = clLinkMMT4D;
+
   static llvm::cl::opt<bool> clListTargets(
       "iree-llvm-list-targets",
       llvm::cl::desc("Lists all registered targets that the LLVM backend can "

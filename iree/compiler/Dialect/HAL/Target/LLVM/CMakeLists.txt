@@ -35,6 +35,7 @@ iree_cc_library(
     LLVMBitReader
     LLVMBitWriter
     LLVMCore
+    LLVMLinker
     LLVMRISCVAsmParser
     LLVMRISCVCodeGen
     LLVMSupport
@@ -45,12 +46,14 @@ iree_cc_library(
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
     MLIRTargetLLVMIRExport
+    iree::builtins::libmmt4d::bin::libmmt4d
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::LLVM::Builtins
     iree::compiler::Dialect::HAL::Target::LLVM::librt
     iree::compiler::Dialect::HAL::Target::LLVM::librt::librt64
   PUBLIC

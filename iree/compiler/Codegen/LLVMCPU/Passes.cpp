@@ -52,9 +52,12 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors) {
   passManager.addPass(createCanonicalizerPass());
 
+  // DO NOT SUBMIT how to plumb?
+  bool externalizeMMT4D = true;
+
   // Tile and vectorize linalg ops on tensors.
-  passManager.addNestedPass<FuncOp>(
-      createLLVMCPUTileAndVectorizePass(lowerToVectors));
+  passManager.addNestedPass<FuncOp>(createLLVMCPUTileAndVectorizePass(
+      lowerToVectors, /*lowerMMT4D=*/!externalizeMMT4D));
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
@@ -62,6 +65,11 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+
+  // EXPERIMENTAL
+  if (externalizeMMT4D) {
+    passManager.addPass(createLLVMCPUExternalizeMMT4DPass());
+  }
 
   passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 

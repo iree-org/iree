@@ -65,6 +65,9 @@ struct LLVMTargetOptions {
   //
   // This option is incompatible with the linkEmbedded option.
   std::string staticLibraryOutput;
+
+  // EXPERIMENTAL: link in mmt4d bitcode files, when available.
+  bool linkMMT4D = false;
 };
 
 // Returns LLVMTargetOptions struct intialized with the iree-llvm-* flags.

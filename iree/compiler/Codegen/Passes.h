@@ -115,6 +115,10 @@ void populateLinalgToVectorVectorizeMMT4dPatterns(
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 
+/// Converts MMT4D ops into external function calls.
+/// The functions will be provided during linking.
+std::unique_ptr<OperationPass<ModuleOp>> createLLVMCPUExternalizeMMT4DPass();
+
 /// Pass to lower the module an hal.executable.variant operation to external
 /// dialect. Currently this pass lowers to LLVM dialect, but could be
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
@@ -127,7 +131,7 @@ createLLVMCPUSynchronizeSymbolVisibilityPass();
 
 /// Multi-level tiling and vectorization of linalg ops on tensors.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
-    bool lowerToVectors = true);
+    bool lowerToVectors = true, bool lowerMMT4D = true);
 
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUVectorizationPass(

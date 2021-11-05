@@ -100,6 +100,12 @@ def ConvertToLLVM :
   let constructor = "mlir::iree_compiler::createConvertToLLVMPass()";
 }
 
+def LLVMCPUExternalizeMMT4D :
+    Pass<"iree-llvmcpu-externalize-mmt4d", "ModuleOp"> {
+  let summary = "Converts MMT4D ops into external function calls";
+  let constructor = "mlir::iree_compiler::createLLVMCPUExternalizeMMT4DPass()";
+}
+
 def LLVMCPULowerExecutableTarget :
     Pass<"iree-llvmcpu-lower-executable-target",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {

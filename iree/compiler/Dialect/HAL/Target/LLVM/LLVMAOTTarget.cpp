@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVM/Builtins/LibMMT4D.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMIRPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LibraryBuilder.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
@@ -21,6 +22,7 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -289,8 +291,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
              << "failed to configure LLVM module for target linker";
     }
 
-    // LLVM opt passes that perform code generation optimizations/transformation
-    // similar to what a frontend would do before passing to linking.
+    // Specialize the module to our target machine.
     auto targetMachine = createTargetMachine(options_);
     if (!targetMachine) {
       return mlir::emitError(variantOp.getLoc())
@@ -299,6 +300,21 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     }
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetMachine->getTargetTriple().str());
+
+    // Statically link libraries into our module.
+    // Note that if producing a static library then the symbols we add must be
+    // weak such that we don't trigger ODR issues.
+    llvm::Linker moduleLinker(*llvmModule);
+    if (options_.linkMMT4D) {
+      if (failed(linkMMT4DLibrary(variantOp.getLoc(), targetMachine.get(),
+                                  moduleLinker, context))) {
+        return variantOp.emitError()
+               << "failed generating MMT4D library objects";
+      }
+    }
+
+    // LLVM opt passes that perform code generation optimizations/transformation
+    // similar to what a frontend would do.
     if (failed(
             runLLVMIRPasses(options_, targetMachine.get(), llvmModule.get()))) {
       return variantOp.emitError()
@@ -330,6 +346,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       os.close();
       objectFiles.push_back(std::move(objectFile));
     }
+
     // Optionally append additional object files that provide functionality that
     // may otherwise have been runtime-dynamic (like libc/libm calls).
     // For now we only do this for embedded uses.
@@ -639,6 +656,38 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     os.flush();
     os.close();
     objectFiles.push_back(std::move(objectFile));
+
+    return success();
+  }
+
+  // EXPERIMENTAL
+  LogicalResult linkMMT4DLibrary(Location loc,
+                                 llvm::TargetMachine *targetMachine,
+                                 llvm::Linker &linker,
+                                 llvm::LLVMContext &context) {
+    // Load the MMT4D bitcode file contents.
+    auto bitcodeModuleValue = loadMMT4DBitcode(targetMachine, context);
+    if (!bitcodeModuleValue) {
+      return mlir::emitError(loc)
+             << "failed to parse libmmt4d bitcode: "
+             << llvm::toString(bitcodeModuleValue.takeError());
+    }
+    auto bitcodeModule = std::move(bitcodeModuleValue.get());
+
+    // Inject target-specific flags.
+    // TODO(benvanik): move this entire function to another file that can do
+    // more complex logic cleanly. This is just an example.
+    overridePlatformGlobal(*bitcodeModule, "libmmt4d_platform_example_flag",
+                           0u);
+
+    // Link the bitcode into the base module. This will merge in any required
+    // symbols and override declarations that may exist.
+    if (!linker.linkInModule(
+            std::move(bitcodeModule),
+            llvm::Linker::OverrideFromSrc | llvm::Linker::LinkOnlyNeeded)) {
+      return mlir::emitError(loc) << "failed to link libmmt4d bitcode for '"
+                                  << options_.targetTriple << "'";
+    }
 
     return success();
   }

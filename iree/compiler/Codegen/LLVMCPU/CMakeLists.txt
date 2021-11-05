@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
+    "LLVMCPUExternalizeMMT4D.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
