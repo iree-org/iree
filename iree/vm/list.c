@@ -687,16 +687,123 @@ iree_status_t iree_vm_list_register_types(void) {
   return iree_vm_ref_register_type(&iree_vm_list_descriptor);
 }
 
-iree_status_t iree_vm_list_swap(iree_vm_list_t* list0, iree_vm_list_t* list1) {
-  printf("i am here~~~~~~swap\n");
+#define std_swap(a, b) \
+  do {                 \
+    typeof(a) t = a;   \
+    a = b;             \
+    b = t;             \
+  } while (0);
+
+static bool iree_vm_list_is_the_same_type(const iree_vm_list_t* list_a,
+                                          const iree_vm_list_t* list_b) {
+  return list_a->element_type.value_type == list_b->element_type.value_type &&
+         list_a->element_type.ref_type == list_b->element_type.ref_type;
+}
+
+static bool iree_vm_list_is_compatiable_allocator(
+    const iree_vm_list_t* list_a, const iree_vm_list_t* list_b) {
+  // Reject if both lists are allocated on the stack. The allocator is
+  // iree_allocator_null if the list is allocated on the stack.
+  //
+  // benvanik: swapping between stack allocated lists is probably fine, though
+  // to be conservative we could just fail.
+  if (iree_allocator_is_null(list_a->allocator) ||
+      iree_allocator_is_null(list_b->allocator))
+    return false;
+
+  return list_a->allocator.ctl == list_b->allocator.ctl;
+}
+
+iree_status_t iree_vm_list_swap(iree_vm_list_t* list_a,
+                                iree_vm_list_t* list_b) {
+  if (!iree_vm_list_is_the_same_type(list_a, list_b))
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "try to swap two different types of lists.");
+
+  if (!iree_vm_list_is_compatiable_allocator(list_a, list_b))
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "try to swap two incompatible allocators of lists.");
+
+  // FIXME: can we exchange ref_object?
+  std_swap(list_a->ref_object, list_b->ref_object);
+  // FIXME: can we exchange allocator.self?
+  std_swap(list_a->allocator.self, list_b->allocator.self);
+
+  std_swap(list_a->capacity, list_b->capacity);
+  std_swap(list_a->count, list_b->count);
+  std_swap(list_a->element_size, list_b->element_size);
+  std_swap(list_a->storage_mode, list_b->storage_mode);
+  std_swap(list_a->storage, list_b->storage);
+
   return iree_ok_status();
 }
 
 iree_status_t iree_vm_list_copy(const iree_vm_list_t* src_list,
-                                iree_host_size_t src_index,
+                                iree_host_size_t src_offset,
                                 iree_vm_list_t* dst_list,
-                                iree_host_size_t dst_index,
-                                iree_host_size_t length) {
-  printf("i am here~~~~~~copy\n");
+                                iree_host_size_t dst_offset,
+                                iree_host_size_t count) {
+  if (!iree_vm_list_is_the_same_type(src_list, dst_list))
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "try to copy two different types of lists.");
+
+  if (src_offset + count > src_list->count) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "try to copy %zu elements with offset %zu which is out of bounds (%zu)",
+        count, src_offset, src_list->count);
+  }
+
+  if (dst_offset + count > dst_list->count) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "try to copy %zu elements with offset %zu which is out of bounds (%zu)",
+        count, dst_offset, dst_list->count);
+  }
+
+  switch (src_list->storage_mode) {
+    case IREE_VM_LIST_STORAGE_MODE_VALUE: {
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_get_value(src_list, i + src_offset, &value));
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_set_value(dst_list, i + dst_offset, &value));
+      }
+      break;
+    }
+    case IREE_VM_LIST_STORAGE_MODE_REF: {
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        iree_vm_ref_t value;
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_get_ref_assign(src_list, i + src_offset, &value));
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_set_ref_retain(dst_list, i + dst_offset, &value));
+      }
+      break;
+    }
+    case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
+      iree_vm_variant_t* variant_storage =
+          (iree_vm_variant_t*)src_list->storage;
+      for (iree_host_size_t i = 0; i < count; ++i) {
+        if (iree_vm_type_def_is_ref(&variant_storage[i + src_offset].type)) {
+          iree_vm_ref_t value;
+          IREE_RETURN_IF_ERROR(
+              iree_vm_list_get_ref_assign(src_list, i + src_offset, &value));
+          IREE_RETURN_IF_ERROR(
+              iree_vm_list_set_ref_retain(dst_list, i + dst_offset, &value));
+        } else {
+          iree_vm_value_t value;
+          IREE_RETURN_IF_ERROR(
+              iree_vm_list_get_value(src_list, i + src_offset, &value));
+          IREE_RETURN_IF_ERROR(
+              iree_vm_list_set_value(dst_list, i + dst_offset, &value));
+        }
+      }
+      break;
+    }
+  }
+
   return iree_ok_status();
 }

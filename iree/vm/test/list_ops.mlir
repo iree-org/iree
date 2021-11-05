@@ -9,6 +9,9 @@ vm.module @list_ops {
   vm.func @test_swap_lists() {
     %c0 = vm.const.i32 0 : i32
     %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
+    %c3 = vm.const.i32 3 : i32
+    %c4 = vm.const.i32 4 : i32
     %c27 = vm.const.i32 27 : i32
     %c42 = vm.const.i32 42 : i32
 
@@ -16,7 +19,7 @@ vm.module @list_ops {
     %list0 = vm.list.alloc %c1 : (i32) -> !vm.list<i8>
     %list1 = vm.list.alloc %c1 : (i32) -> !vm.list<i8>
     vm.list.resize %list0, %c1 : (!vm.list<i8>, i32)
-    vm.list.resize %list1, %c1 : (!vm.list<i8>, i32)
+    vm.list.resize %list1, %c4 : (!vm.list<i8>, i32)
     vm.list.set.i32 %list0, %c0, %c27 : (!vm.list<i8>, i32, i32)
     vm.list.set.i32 %list1, %c0, %c42 : (!vm.list<i8>, i32, i32)
 
@@ -24,10 +27,21 @@ vm.module @list_ops {
 
     %res0 = vm.list.get.i32 %list0, %c0 : (!vm.list<i8>, i32) -> i32
     %res1 = vm.list.get.i32 %list1, %c0 : (!vm.list<i8>, i32) -> i32
-    vm.check.eq %res0, %c27, "list0.get(0)=42" : i32
-    vm.check.eq %res1, %c42, "list1.get(0)=27" : i32
+    vm.check.eq %res0, %c42, "list0.get(0)=42" : i32
+    vm.check.eq %res1, %c27, "list1.get(0)=27" : i32
 
-    vm.list.copy %list0, %c0, %list1, %c0, %c1 : (!vm.list<i8>, i32, !vm.list<i8>, i32, i32)
+    // list0 = 42, 27
+    vm.list.set.i32 %list0, %c1, %c27 : (!vm.list<i8>, i32, i32)
+    // overlapped copy.
+    // list0 = 42, 42, 42, 42
+    vm.list.copy %list0, %c0, %list0, %c1, %c3 : (!vm.list<i8>, i32, !vm.list<i8>, i32, i32)
+
+    %res0_2 = vm.list.get.i32 %list0, %c2 : (!vm.list<i8>, i32) -> i32
+    %res0_3 = vm.list.get.i32 %list0, %c3 : (!vm.list<i8>, i32) -> i32
+    vm.check.eq %res0_2, %c42, "list0.get(2)=42" : i32
+    vm.check.eq %res0_3, %c42, "list1.get(3)=42" : i32
+
+    //vm.list.copy %list0, %c0, %list1, %c0, %c1 : (!vm.list<i8>, i32, !vm.list<i8>, i32, i32)
 
     vm.return
   }

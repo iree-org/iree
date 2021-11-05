@@ -185,15 +185,15 @@ IREE_API_EXPORT iree_status_t
 iree_vm_list_push_variant(iree_vm_list_t* list, const iree_vm_variant_t* value);
 
 // iree_vm_list_swap!!!!!
-IREE_API_EXPORT iree_status_t iree_vm_list_swap(iree_vm_list_t* list0,
-                                                iree_vm_list_t* list1);
+IREE_API_EXPORT iree_status_t iree_vm_list_swap(iree_vm_list_t* list_a,
+                                                iree_vm_list_t* list_b);
 
 // iree_vm_list_copy!!!!!
 IREE_API_EXPORT iree_status_t iree_vm_list_copy(const iree_vm_list_t* src_list,
-                                                iree_host_size_t src_index,
+                                                iree_host_size_t src_offset,
                                                 iree_vm_list_t* dst_list,
-                                                iree_host_size_t dst_index,
-                                                iree_host_size_t length);
+                                                iree_host_size_t dst_offset,
+                                                iree_host_size_t count);
 
 #ifdef __cplusplus
 }  // extern "C"
