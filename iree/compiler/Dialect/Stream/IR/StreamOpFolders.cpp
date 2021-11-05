@@ -841,9 +841,33 @@ void AsyncAllocaOp::getCanonicalizationPatterns(
 // stream.async.constant
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Converts constants with splat values into splats.
+struct ConvertSplatConstantsIntoSplats
+    : public OpRewritePattern<AsyncConstantOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncConstantOp constantOp,
+                                PatternRewriter &rewriter) const override {
+    auto value = constantOp.value();
+    if (!value.isSplat()) return failure();
+
+    auto splatElementAttr =
+        value.dyn_cast<SplatElementsAttr>().getSplatValue<Attribute>();
+    auto splatValue = rewriter.create<arith::ConstantOp>(
+        constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
+        constantOp, constantOp.result().getType(), splatValue,
+        constantOp.result_size(), constantOp.affinityAttr());
+    return success();
+  }
+};
+
+}  // namespace
+
 void AsyncConstantOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  // TODO(benvanik): if value is a splat turn into splat.
+  results.insert<ConvertSplatConstantsIntoSplats>(context);
   // TODO(benvanik): if value is _mostly_ a splat, turn into splat + updates.
 }
 

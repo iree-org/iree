@@ -56,6 +56,19 @@ func @PropagateClonableOps(%arg0: index) -> !stream.resource<*> {
 
 // -----
 
+// CHECK-LABEL: @ConvertSplatConstantsIntoSplats
+func @ConvertSplatConstantsIntoSplats(%arg0: index) -> (!stream.resource<transient>, !stream.resource<transient>) {
+  // CHECK-NOT: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[3]> : tensor<8xi32>
+  // CHECK: %[[CST:.+]] = arith.constant 3 : i32
+  // CHECK: %0 = stream.async.splat %[[CST]] : i32 -> !stream.resource<transient>{%arg0}
+  %0 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<3> : tensor<8xi32>
+  // CHECK: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[1, 2, 3, 4, 5, 6, 7, 8]> : tensor<8xi32>
+  %1 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[1, 2, 3, 4, 5, 6, 7, 8]> : tensor<8xi32>
+  return %0, %1 : !stream.resource<transient>, !stream.resource<transient>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldAsyncSliceOp
 func @FoldAsyncSliceOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
