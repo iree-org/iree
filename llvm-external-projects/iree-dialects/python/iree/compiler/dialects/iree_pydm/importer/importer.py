@@ -738,9 +738,9 @@ class ExpressionImporter(BaseNodeVisitor):
     fctx.update_loc(node)
     with ic.ip, ic.loc:
       exc_result, result = d.SubscriptOp(d.ExceptionResultType.get(),
-                                        d.ObjectType.get(),
-                                        value.get_immediate(),
-                                        slice.get_immediate()).results
+                                         d.ObjectType.get(),
+                                         value.get_immediate(),
+                                         slice.get_immediate()).results
       d.RaiseOnFailureOp(exc_result)
     self._set_result(result)
 
@@ -779,8 +779,7 @@ class ExpressionImporter(BaseNodeVisitor):
             d.SelectOp(d.BoolType.get(), bool_value, false_value,
                        true_value).result)
       elif isinstance(op, ast.USub):
-        self._set_result(
-          d.NegOp(operand_value.type, operand_value).result)
+        self._set_result(d.NegOp(operand_value.type, operand_value).result)
       else:
         ic.abort(f"Unknown unary op {ast.dump(op)}")
 
