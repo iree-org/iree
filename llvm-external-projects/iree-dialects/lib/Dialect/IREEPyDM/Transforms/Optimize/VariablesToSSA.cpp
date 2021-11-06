@@ -166,6 +166,9 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
   // load up to the predecessors. This assumes that the function is in a
   // legal form where all allocs are done in the entry block.
   void hoistLoadsFromBlock(Block &block, BlockAccessInfo &info) {
+    // Entry block: nowhere to hoist.
+    if (block.isEntryBlock()) return;
+
     SmallVector<std::tuple<Location, Value, Type>> loadVarTypes;
     // Redirect each live load to a block argument.
     for (Operation *genericLoadOp : info.liveLoads) {
