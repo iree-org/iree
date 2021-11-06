@@ -25,7 +25,10 @@ def IREEPyDM_AssignSubscriptOp : IREEPyDM_Op<"assign_subscript", [
   let summary = "Assign to a subscript";
   let description = [{
     This implements the subscripted assignment form. In Python this is:
+
+    ```
       foo[index] = bar
+    ```
   }];
   let arguments = (ins
     IREEPyDM_AnyValueType:$lhs,

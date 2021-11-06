@@ -33,7 +33,7 @@ def LocalPropagateTypes : Pass<"pydm-local-propagate-types", "mlir::iree_compile
 def VariablesToSSA : Pass<"pydm-variables-to-ssa", "mlir::iree_compiler::IREE::PYDM::FuncOp"> {
   let summary = "Variables to SSA";
   let description = [{
-    Attempts to variable loads and stores to SSA form, where possible.
+    Attempts to convert loads and stores to SSA form, where possible.
   }];
   let constructor = "mlir::iree_compiler::IREE::PYDM::createVariablesToSSAPass()";
 }

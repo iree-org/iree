@@ -84,13 +84,13 @@ void resetObjectList(Location loc, OpBuilder &builder, Value list, int typeCode,
   // Note: The list can record optional runtime state at positions > 1, so
   // to truly reset, we have to resize. Low level optimizations should be able
   // to elide this if it turns out to be unnecessary.
-  auto size = builder.create<arith::ConstantOp>(loc, builder.getIndexAttr(2));
+  auto size = builder.create<arith::ConstantIndexOp>(loc, 2);
   builder.create<iree::ListResizeOp>(loc, list, size);
-  auto index0 = builder.create<arith::ConstantOp>(loc, builder.getIndexAttr(0));
+  auto index0 = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value typeCodeValue = builder.create<arith::ConstantOp>(
       loc, builder.getI32IntegerAttr(typeCode));
   builder.create<iree::ListSetOp>(loc, list, index0, typeCodeValue);
-  auto index1 = builder.create<arith::ConstantOp>(loc, builder.getIndexAttr(1));
+  auto index1 = builder.create<arith::ConstantIndexOp>(loc, 1);
   builder.create<iree::ListSetOp>(loc, list, index1, data);
 }
 

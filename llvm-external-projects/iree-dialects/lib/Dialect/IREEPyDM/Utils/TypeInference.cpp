@@ -16,8 +16,7 @@ using namespace PYDM;
 PermutedTypePropagator::PermutedBlockInfo *
 PermutedTypePropagator::addPermutedBlockToParent(ParentBlockInfo *parentInfo,
                                                  Block *block) {
-  auto *permutedInfo = allocator.Allocate<PermutedBlockInfo>();
-  new (permutedInfo) PermutedBlockInfo();
+  auto *permutedInfo = new (allocator) PermutedBlockInfo();
   permutedInfo->permutedBlock = block;
   permutedInfo->parentInfo = parentInfo;
   permutedInfo->signature =
