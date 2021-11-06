@@ -2657,11 +2657,12 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
  public:
   ListOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                   StringRef funcName, size_t listArgumentIndex, bool failable,
-                   VMAnalysisCache &vmAnalysisCache)
+                   StringRef funcName,
+                   std::initializer_list<size_t> listArgumentIndices,
+                   bool failable, VMAnalysisCache &vmAnalysisCache)
       : OpConversionPattern<SrcOpTy>(typeConverter, context),
         funcName(funcName),
-        listArgumentIndex(listArgumentIndex),
+        listArgumentIndices(listArgumentIndices),
         failable(failable),
         vmAnalysisCache(vmAnalysisCache) {}
 
@@ -2672,39 +2673,39 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    if (listArgumentIndex >= adaptor.getOperands().size()) {
-      return op.emitError() << " index for list argument out of range";
+    SmallVector<Value, 2> listDerefValues;
+    for (size_t index : listArgumentIndices) {
+      if (index >= adaptor.getOperands().size()) {
+        return op.emitError() << " index for list argument out of range";
+      }
+      Value listOperand = adaptor.getOperands()[index];
+
+      // deref
+      auto refOp = rewriter.create<emitc::ApplyOp>(
+          /*location=*/loc,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+          /*applicableOperator=*/StringAttr::get(ctx, "*"),
+          /*operand=*/listOperand);
+
+      auto listDerefOp = failListNull(
+          /*rewriter=*/rewriter,
+          /*location=*/loc,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+          /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{refOp.getResult()},
+          /*vmAnalysisCache=*/vmAnalysisCache);
+
+      listDerefValues.push_back(listDerefOp.getResult(0));
     }
-
-    Value listOperand = adaptor.getOperands()[listArgumentIndex];
-
-    // deref
-    auto refOp = rewriter.create<emitc::ApplyOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*applicableOperator=*/StringAttr::get(ctx, "*"),
-        /*operand=*/listOperand);
-
-    auto listDerefOp = failListNull(
-        /*rewriter=*/rewriter,
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
-        /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refOp.getResult()},
-        /*vmAnalysisCache=*/vmAnalysisCache);
 
     // Replace the one list argument (which is wrapped in a ref) with the
     // unwrapped list.
-    SmallVector<Value, 4> updatedOperands;
-    for (auto &operand : llvm::enumerate(adaptor.getOperands())) {
-      if (operand.index() == listArgumentIndex) {
-        updatedOperands.push_back(listDerefOp.getResult(0));
-      } else {
-        updatedOperands.push_back(operand.value());
-      }
-    }
+    SmallVector<Value, 4> updatedOperands(adaptor.getOperands().begin(),
+                                          adaptor.getOperands().end());
+    for (auto index : llvm::enumerate(listArgumentIndices))
+      updatedOperands[index.value()] = listDerefValues[index.index()];
 
     if (failable) {
       returnIfError(
@@ -2732,8 +2733,8 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
   StringRef funcName;
 
-  // The index of the list argument. This gets replaced in the conversion.
-  size_t listArgumentIndex;
+  // The indices of the list arguments. These get replaced in the conversion.
+  const SmallVector<size_t, 2> listArgumentIndices;
 
   // Whether the function call can fail, i.e. it returns an iree_status_t.
   bool failable;
@@ -3305,14 +3306,24 @@ void populateVMToEmitCPatterns(MLIRContext *context,
                                               vmAnalysisCache);
 
   // List ops
+  using listArgIndices = std::initializer_list<size_t>;
   patterns.insert<ListAllocOpConversion>(typeConverter, context,
                                          vmAnalysisCache);
   patterns.insert<ListOpConversion<IREE::VM::ListReserveOp>>(
-      typeConverter, context, "iree_vm_list_reserve", 0, true, vmAnalysisCache);
+      typeConverter, context, "iree_vm_list_reserve", listArgIndices{0}, true,
+      vmAnalysisCache);
   patterns.insert<ListOpConversion<IREE::VM::ListResizeOp>>(
-      typeConverter, context, "iree_vm_list_resize", 0, true, vmAnalysisCache);
+      typeConverter, context, "iree_vm_list_resize", listArgIndices{0}, true,
+      vmAnalysisCache);
   patterns.insert<ListOpConversion<IREE::VM::ListSizeOp>>(
-      typeConverter, context, "iree_vm_list_size", 0, false, vmAnalysisCache);
+      typeConverter, context, "iree_vm_list_size", listArgIndices{0}, false,
+      vmAnalysisCache);
+  patterns.insert<ListOpConversion<IREE::VM::ListSwapOp>>(
+      typeConverter, context, "iree_vm_list_swap", listArgIndices{0, 1}, true,
+      vmAnalysisCache);
+  patterns.insert<ListOpConversion<IREE::VM::ListCopyOp>>(
+      typeConverter, context, "iree_vm_list_copy", listArgIndices{0, 2}, true,
+      vmAnalysisCache);
   patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(
       typeConverter, context, vmAnalysisCache);
   patterns.insert<ListGetRefOpConversion>(typeConverter, context,
