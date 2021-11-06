@@ -134,6 +134,7 @@ struct ApplyBinaryToSequenceClone : public OpRewritePattern<ApplyBinaryOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ApplyBinaryOp op,
                                 PatternRewriter &rewriter) const override {
+    if (op.dunder_name() != "mul") return failure();
     Value listOperand;
     Value countOperand;
     if (isBuiltinSequence(op.left()) && isInteger(op.right())) {
