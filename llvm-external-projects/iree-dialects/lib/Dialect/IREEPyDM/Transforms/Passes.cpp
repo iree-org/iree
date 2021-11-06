@@ -41,9 +41,15 @@ void PYDM::buildLowerToIREEPassPipeline(OpPassManager& passManager,
   passManager.addPass(createCSEPass());
 }
 
-void PYDM::registerPasses() {
-  registerIREEPyDMTransformsPasses();
+namespace PYDM_generated {
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h.inc"
+}  // namespace
+}  // namespace PYDM_generated
 
+void PYDM::registerPasses() {
+  PYDM_generated::registerPasses();
   PassPipelineRegistration<> postImportPassPipeline(
       "pydm-post-import-pipeline",
       "Runs passes to cleanup PyDM immediately post-import",

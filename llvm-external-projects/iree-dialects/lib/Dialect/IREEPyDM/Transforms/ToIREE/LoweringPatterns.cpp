@@ -1050,7 +1050,6 @@ class SubscriptOpBuiltinSequenceConversion
                                          "could not convert result type");
 
     auto loc = srcOp.getLoc();
-    auto sequence = adaptor.value();
     auto slice = adaptor.slice();
     auto indexType = rewriter.getType<IndexType>();
     Type statusType =

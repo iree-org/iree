@@ -52,8 +52,12 @@ struct LocalPropagateTypesPass
     for (int i = 0; i < 500; ++i) {
       LLVM_DEBUG(dbgs() << "--- Local type propagation iteration " << i
                         << "\n");
-      applyPatternsAndFoldGreedily(getOperation(), frozenCanonicalizePatterns,
-                                   rewriterConfig);
+      if (failed(applyPatternsAndFoldGreedily(
+              getOperation(), frozenCanonicalizePatterns, rewriterConfig))) {
+        emitError(getOperation().getLoc())
+            << "failed to converge type propagation canonicalizations";
+        return signalPassFailure();
+      }
       changed = false;
       if (sinkStaticInfoCasts()) changed = true;
       if (refineResultTypes()) changed = true;
@@ -67,8 +71,12 @@ struct LocalPropagateTypesPass
     // Note that because we are still using a subset of dialect-specific
     // patterns, this is less than a full canonicalization pass will do.
     rewriterConfig.enableRegionSimplification = true;
-    applyPatternsAndFoldGreedily(getOperation(), frozenCanonicalizePatterns,
-                                 rewriterConfig);
+    if (failed(applyPatternsAndFoldGreedily(
+            getOperation(), frozenCanonicalizePatterns, rewriterConfig))) {
+      emitError(getOperation().getLoc())
+          << "failed to converge type propagation canonicalizations";
+      return signalPassFailure();
+    }
   }
 
   // Moving things around the CFG often creates unresolved static info casts.

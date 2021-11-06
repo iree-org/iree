@@ -65,8 +65,6 @@ static bool checkAllBlockArgsMapped(Block *block,
 Block *PermutedTypePropagator::createBlockPermutation(
     ParentBlockInfo *parentInfo, TypeRange newArgumentTypes,
     BlockPermuteCallback initializeCallback) {
-  FunctionType signature =
-      FunctionType::get(context, newArgumentTypes, TypeRange{});
   Block *parentBlock = parentInfo->parentBlock;
   Block *newBlock = new Block();
   newBlock->addArguments(newArgumentTypes);

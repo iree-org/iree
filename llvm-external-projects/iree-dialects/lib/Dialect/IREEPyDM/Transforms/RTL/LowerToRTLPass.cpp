@@ -163,7 +163,6 @@ struct ApplyBinaryPattern
   LogicalResult matchAndRewrite(PYDM::ApplyBinaryOp srcOp,
                                 PatternRewriter &rewriter) const override {
     // Only match object-object binary apply.
-    auto objectType = rewriter.getType<PYDM::ObjectType>(nullptr);
     if (!srcOp.left().getType().isa<PYDM::ObjectType>() ||
         !srcOp.right().getType().isa<PYDM::ObjectType>())
       return rewriter.notifyMatchFailure(srcOp, "not (object, object) variant");
@@ -182,7 +181,6 @@ struct ApplyComparePattern
   LogicalResult matchAndRewrite(PYDM::ApplyCompareOp srcOp,
                                 PatternRewriter &rewriter) const override {
     // Only match object-object binary apply.
-    auto objectType = rewriter.getType<PYDM::ObjectType>(nullptr);
     if (!srcOp.left().getType().isa<PYDM::ObjectType>() ||
         !srcOp.right().getType().isa<PYDM::ObjectType>())
       return rewriter.notifyMatchFailure(srcOp, "not (object, object) variant");

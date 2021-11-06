@@ -49,9 +49,6 @@ void buildPostImportPassPipeline(OpPassManager& passManager);
 void buildLowerToIREEPassPipeline(OpPassManager& passManager,
                                   const LowerToIREEOptions& options);
 
-#define GEN_PASS_REGISTRATION
-#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h.inc"
-
 /// Register all passes and pass pipelines.
 void registerPasses();
 

@@ -37,8 +37,6 @@ struct BlockAccessInfo {
 
 struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
-
     // Verify that the structure we need is valid.
     for (auto &block : getOperation().getBody().getBlocks()) {
       if (failed(verifyBlockIsLegal(block))) {
