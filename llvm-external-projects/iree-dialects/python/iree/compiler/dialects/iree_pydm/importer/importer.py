@@ -213,17 +213,23 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
   """
   IMPORTER_TYPE = "statement"
   __slots__ = [
+      "break_block",
+      "continue_block",
       "successor_block",
-      "_last_was_return",
+      "terminated",
   ]
 
   def __init__(self,
                fctx: FunctionContext,
                *,
-               successor_block: Optional[ir.Block] = None):
+               successor_block: Optional[ir.Block] = None,
+               break_block: Optional[ir.Block] = None,
+               continue_block: Optional[ir.Block] = None):
     super().__init__(fctx)
     self.successor_block = successor_block
-    self._last_was_return = False
+    self.break_block = break_block
+    self.continue_block = continue_block
+    self.terminated = False
 
   def declare_variables(self):
     fctx = self.fctx
@@ -242,10 +248,10 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
   def import_block(self, stmts: Sequence[ast.AST]):
     ic = self.fctx.ic
     for ast_stmt in stmts:
-      self._last_was_return = False
+      self.terminated = False
       logging.debug("STMT: %s", ast.dump(ast_stmt, include_attributes=True))
       self.visit(ast_stmt)
-    if not self._last_was_return:
+    if not self.terminated:
       with ic.ip, ic.loc:
         # Add a default terminator.
         if self.successor_block:
@@ -265,24 +271,17 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     with ic.loc, ic.ip:
       d.StoreVarOp(fctx.find_variable(name), arg_value)
 
-  def visit_Pass(self, ast_node):
-    pass
-
-  def visit_Return(self, ast_node):
-    ic = self.fctx.ic
-    with ic.loc, ic.ip:
-      expr = ExpressionImporter(self.fctx)
-      expr.visit(ast_node.value)
-      d.ReturnOp(self.fctx.cast_to_return_type(expr.get_immediate()))
-      self._last_was_return = True
-
   def visit_Assign(self, node: ast.Assign):
+    if self.terminated:
+      return
     fctx = self.fctx
     ic = fctx.ic
     expr = ExpressionImporter(fctx)
     expr.visit(node.value)
     for target in node.targets:
       fctx.update_loc(target)
+      # All assignment nodes (Attribute, Subscript, Starred, Name, List, Tuple)
+      # have a `ctx`.
       target_ctx = target.ctx  # pytype: disable=attribute-error
       if not isinstance(target_ctx, ast.Store):
         # TODO: Del, AugStore, etc
@@ -290,13 +289,51 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
             f"unsupported assignment context type {target_ctx.__class__.__name__}"
         )
 
-      # TODO: Support assignment to non-free slots.
-      boxed = ic.box(expr.get_immediate())
-      with ic.loc, ic.ip:
-        target_id = target.id  # pytype: disable=attribute-error
-        d.StoreVarOp(fctx.find_variable(target_id), boxed)
+      if isinstance(target, ast.Name):
+        boxed = ic.box(expr.get_immediate())
+        with ic.loc, ic.ip:
+          target_id = target.id
+          d.StoreVarOp(fctx.find_variable(target_id), boxed)
+      elif isinstance(target, ast.Subscript):
+        subscript_target_expr = ExpressionImporter(fctx)
+        subscript_target_expr.visit(target.value)
+        subscript_slice_expr = ExpressionImporter(fctx)
+        subscript_slice_expr.visit(target.slice)
+        fctx.update_loc(node)
+        with ic.loc, ic.ip:
+          exc_result = d.AssignSubscriptOp(
+              d.ExceptionResultType.get(),
+              subscript_target_expr.get_immediate(),
+              subscript_slice_expr.get_immediate(), expr.get_immediate()).result
+          d.RaiseOnFailureOp(exc_result)
+      else:
+        ic.abort(f"unsupported assignment target: {target.__class__.__name__}")
+
+  def visit_Break(self, node: ast.Break):
+    if self.terminated:
+      return
+    fctx = self.fctx
+    ic = fctx.ic
+    if not self.break_block:
+      ic.abort(f"cannot 'break' outside of a loop")
+    with ic.ip, ic.loc:
+      std_d.BranchOp([], self.break_block)
+    self.terminated = True
+
+  def visit_Continue(self, node: ast.Continue):
+    if self.terminated:
+      return
+    fctx = self.fctx
+    ic = fctx.ic
+    if not self.continue_block:
+      ic.abort(f"cannot 'continue' outside of a loop")
+    with ic.ip, ic.loc:
+      std_d.BranchOp([], self.continue_block)
+    self.terminated = True
 
   def visit_Expr(self, node: ast.Expr):
+    if self.terminated:
+      return
     fctx = self.fctx
     ic = fctx.ic
 
@@ -306,6 +343,8 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
       d.ExprStatementDiscardOp(expr.get_immediate())
 
   def visit_If(self, node: ast.If):
+    if self.terminated:
+      return
     fctx = self.fctx
     ic = fctx.ic
     # Emit the test.
@@ -329,14 +368,20 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
       # Emit the false body.
       false_block = predecessor_block.create_after()
       with ic.scoped_ip(ir.InsertionPoint(false_block)):
-        else_importer = FunctionDefBodyImporter(fctx,
-                                                successor_block=successor_block)
+        else_importer = FunctionDefBodyImporter(
+            fctx,
+            successor_block=successor_block,
+            break_block=self.break_block,
+            continue_block=self.continue_block)
         else_importer.import_block(node.orelse)
     # Emit the true body.
     true_block = predecessor_block.create_after()
     with ic.scoped_ip(ir.InsertionPoint(true_block)):
-      body_importer = FunctionDefBodyImporter(fctx,
-                                              successor_block=successor_block)
+      body_importer = FunctionDefBodyImporter(
+          fctx,
+          successor_block=successor_block,
+          break_block=self.break_block,
+          continue_block=self.continue_block)
       body_importer.import_block(node.body)
 
     # Now that we have true/false blocks, emit the cond_br in the original
@@ -350,6 +395,80 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
                          falseDest=false_block)
 
     # And emission continues here.
+    ic.reset_ip(ir.InsertionPoint(successor_block))
+
+  def visit_Pass(self, ast_node):
+    if self.terminated:
+      return
+    pass
+
+  def visit_Return(self, ast_node):
+    if self.terminated:
+      return
+    ic = self.fctx.ic
+    with ic.loc, ic.ip:
+      expr = ExpressionImporter(self.fctx)
+      expr.visit(ast_node.value)
+      d.ReturnOp(self.fctx.cast_to_return_type(expr.get_immediate()))
+    self.terminated = True
+
+  def visit_While(self, node: ast.While):
+    if self.terminated:
+      return
+    fctx = self.fctx
+    ic = fctx.ic
+
+    # Blocks:
+    #   entry: branch to condition
+    #   condition: evalute the test expression and branch to body or orelse
+    #   body: main body of the loop
+    #   orelse: optional block to execute when condition is no longer true
+    #   successor: statements following the loop
+    predecessor_block = ic.ip.block
+    condition_block = predecessor_block.create_after()
+    body_block = condition_block.create_after()
+    if node.orelse:
+      orelse_block = body_block.create_after()
+      successor_block = orelse_block.create_after()
+    else:
+      successor_block = body_block.create_after()
+
+    # Unconditional branch to the condition block.
+    with ic.ip, ic.loc:
+      std_d.BranchOp([], condition_block)
+
+    # Emit test.
+    with ic.scoped_ip(ir.InsertionPoint(condition_block)):
+      test_expr = ExpressionImporter(fctx)
+      test_expr.visit(node.test)
+      with ic.ip, ic.loc:
+        test_bool = d.AsBoolOp(d.BoolType.get(),
+                               test_expr.get_immediate()).result
+        test_pred = d.BoolToPredOp(ir.IntegerType.get_signless(1),
+                                   test_bool).result
+        std_d.CondBranchOp(
+            condition=test_pred,
+            trueDestOperands=[],
+            falseDestOperands=[],
+            trueDest=body_block,
+            falseDest=orelse_block if node.orelse else successor_block)
+
+    # Emit body.
+    with ic.scoped_ip(ir.InsertionPoint(body_block)):
+      body_importer = FunctionDefBodyImporter(fctx,
+                                              successor_block=condition_block,
+                                              break_block=successor_block,
+                                              continue_block=condition_block)
+      body_importer.import_block(node.body)
+
+    # Emit orelse.
+    if node.orelse:
+      with ic.scoped_ip(ir.InsertionPoint(orelse_block)):
+        orelse_importer = FunctionDefBodyImporter(
+            fctx, successor_block=successor_block)
+        orelse_importer.import_block(node.orelse)
+
+    # Done.
     ic.reset_ip(ir.InsertionPoint(successor_block))
 
 
@@ -594,6 +713,37 @@ class ExpressionImporter(BaseNodeVisitor):
     fctx.update_loc(node)
     self._set_result(func_expr.get_call_result(args=args))
 
+  def visit_List(self, node: ast.List):
+    fctx = self.fctx
+    ic = fctx.ic
+
+    element_values: List[ir.Value] = []
+    for elt in node.elts:
+      sub_expression = ExpressionImporter(fctx)
+      sub_expression.visit(elt)
+      element_values.append(ic.box(sub_expression.get_immediate()))
+    fctx.update_loc(node)
+
+    with ic.ip, ic.loc:
+      self._set_result(d.MakeListOp(d.ListType.get(), element_values).result)
+
+  def visit_Subscript(self, node: ast.Subscript):
+    fctx = self.fctx
+    ic = fctx.ic
+    value = ExpressionImporter(fctx)
+    value.visit(node.value)
+    slice = ExpressionImporter(fctx)
+    slice.visit(node.slice)
+
+    fctx.update_loc(node)
+    with ic.ip, ic.loc:
+      exc_result, result = d.SubscriptOp(d.ExceptionResultType.get(),
+                                         d.ObjectType.get(),
+                                         value.get_immediate(),
+                                         slice.get_immediate()).results
+      d.RaiseOnFailureOp(exc_result)
+    self._set_result(result)
+
   def visit_Tuple(self, node: ast.Tuple):
     fctx = self.fctx
     ic = fctx.ic
@@ -628,6 +778,8 @@ class ExpressionImporter(BaseNodeVisitor):
         self._set_result(
             d.SelectOp(d.BoolType.get(), bool_value, false_value,
                        true_value).result)
+      elif isinstance(op, ast.USub):
+        self._set_result(d.NegOp(operand_value.type, operand_value).result)
       else:
         ic.abort(f"Unknown unary op {ast.dump(op)}")
 

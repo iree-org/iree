@@ -12,38 +12,34 @@
 #include "mlir/IR/BuiltinTypes.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
-
-namespace iree_d = mlir::iree;
-namespace builtin_d = mlir;
-namespace pydm_d = mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
 static Type getVariantListType(Builder &builder) {
-  return builder.getType<iree_d::ListType>(
-      builder.getType<iree_d::VariantType>());
+  return builder.getType<iree::ListType>(builder.getType<iree::VariantType>());
 }
 
 LoweringTypeConverter::LoweringTypeConverter() {
-  addConversion([](pydm_d::NoneType t) -> Optional<Type> {
+  addConversion([](PYDM::NoneType t) -> Optional<Type> {
     // TODO: This should really be a zero-width opaque value in the VM. Just
     // making it an integer now.
-    return builtin_d::IntegerType::get(t.getContext(), 32);
+    return mlir::IntegerType::get(t.getContext(), 32);
   });
-  addConversion([](pydm_d::ExceptionResultType t) -> Optional<Type> {
-    return builtin_d::IntegerType::get(t.getContext(), 32);
+  addConversion([](PYDM::ExceptionResultType t) -> Optional<Type> {
+    return mlir::IntegerType::get(t.getContext(), 32);
   });
-  addConversion([](pydm_d::ObjectType t) -> Optional<Type> {
+  addConversion([](PYDM::ObjectType t) -> Optional<Type> {
     Builder b(t.getContext());
     return getVariantListType(b);
   });
 
   // Bool.
-  addConversion([&](pydm_d::BoolType t) -> Optional<Type> {
-    return builtin_d::IntegerType::get(t.getContext(), 1);
+  addConversion([&](PYDM::BoolType t) -> Optional<Type> {
+    return mlir::IntegerType::get(t.getContext(), 1);
   });
 
   // Integer type hierarchy.
-  addConversion([&](pydm_d::IntegerType t) -> Optional<Type> {
+  addConversion([&](PYDM::IntegerType t) -> Optional<Type> {
     Builder b(t.getContext());
     if (t.isWeak()) {
       return getWeakIntegerType(b);
@@ -52,7 +48,7 @@ LoweringTypeConverter::LoweringTypeConverter() {
   });
 
   // Real type hierarchy.
-  addConversion([&](pydm_d::RealType t) -> Optional<Type> {
+  addConversion([&](PYDM::RealType t) -> Optional<Type> {
     Builder b(t.getContext());
     if (t.isWeak()) {
       return getWeakFloatType(b);
@@ -60,8 +56,20 @@ LoweringTypeConverter::LoweringTypeConverter() {
     return t.getFloatType();
   });
 
+  // Tuple, List.
+  // TODO: Fork these based on CollectionStorageClass as they can avoid
+  // using variant lists.
+  addConversion([&](PYDM::ListType t) -> Optional<Type> {
+    Builder b(t.getContext());
+    return getVariantListType(b);
+  });
+  addConversion([&](PYDM::TupleType t) -> Optional<Type> {
+    Builder b(t.getContext());
+    return getVariantListType(b);
+  });
+
   // Variable references.
-  addConversion([](pydm_d::FreeVarRefType t) -> Optional<Type> {
+  addConversion([](PYDM::FreeVarRefType t) -> Optional<Type> {
     // Just an object record.
     Builder b(t.getContext());
     return getVariantListType(b);
@@ -69,9 +77,11 @@ LoweringTypeConverter::LoweringTypeConverter() {
 
   // Explicit conversions for allowed built-in types (avoids default conversion
   // which can mask issues).
-  addConversion([](builtin_d::IntegerType t) -> Optional<Type> { return t; });
-  addConversion([](builtin_d::FloatType t) -> Optional<Type> { return t; });
-  addConversion([](builtin_d::IndexType t) -> Optional<Type> { return t; });
+  addConversion([](mlir::IndexType t) -> Optional<Type> { return t; });
+  addConversion([](mlir::IntegerType t) -> Optional<Type> { return t; });
+  addConversion([](mlir::FloatType t) -> Optional<Type> { return t; });
+  addConversion([](mlir::IndexType t) -> Optional<Type> { return t; });
+  addConversion([](iree::ListType t) -> Optional<Type> { return t; });
 }
 
 Type LoweringTypeConverter::getBoolType(Builder b) const {
@@ -92,8 +102,8 @@ Type LoweringTypeConverter::getWeakFloatType(Builder b) const {
 }
 
 bool LoweringTypeConverter::isTypeLegal(Type t) const {
-  return t.isa<builtin_d::IntegerType, builtin_d::FloatType,
-               builtin_d::IndexType, iree_d::ListType>();
+  return t.isa<mlir::IntegerType, mlir::FloatType, mlir::IndexType,
+               iree::ListType>();
 }
 
 bool LoweringTypeConverter::areTypesLegal(TypeRange types) const {

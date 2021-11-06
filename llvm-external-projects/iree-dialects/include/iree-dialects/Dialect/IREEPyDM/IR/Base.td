@@ -29,14 +29,19 @@ def IREEPyDM_Dialect : Dialect {
       - Makes IR decisions conducive to progress typeification, enabling
         optimization benefits compared to fully untyped programs.
   }];
-  let cppNamespace = "::mlir::iree_pydm";
+  let cppNamespace = "::mlir::iree_compiler::IREE::PYDM";
   let hasConstantMaterializer = 1;
 }
 
 class IREEPyDM_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<IREEPyDM_Dialect, mnemonic, traits>;
+    Op<IREEPyDM_Dialect, mnemonic, traits> {
+  let verifier = [{ return ::verify(*this); }];
+}
+
 class IREEPyDM_PureOp<string mnemonic, list<OpTrait> traits = []> :
-    Op<IREEPyDM_Dialect, mnemonic, !listconcat(traits, [NoSideEffect])>;
+    Op<IREEPyDM_Dialect, mnemonic, !listconcat(traits, [NoSideEffect])> {
+  let verifier = [{ return ::verify(*this); }];
+}
 class IREEPyDM_TypeDef<string name, list<Trait> traits = []> : TypeDef<IREEPyDM_Dialect, name, traits>;
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_BASE_TD

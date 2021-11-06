@@ -17,7 +17,8 @@
 #include "mlir/IR/BuiltinDialect.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
 namespace {
 
@@ -68,6 +69,6 @@ struct ConvertIREEPyDMToIREEPass
 }  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
-mlir::iree_pydm::createConvertIREEPyDMToIREEPass() {
+PYDM::createConvertIREEPyDMToIREEPass() {
   return std::make_unique<ConvertIREEPyDMToIREEPass>();
 }

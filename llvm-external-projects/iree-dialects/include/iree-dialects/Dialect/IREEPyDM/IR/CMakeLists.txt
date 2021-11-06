@@ -1,5 +1,7 @@
 function(_add_interfaces)
   set(LLVM_TARGET_DEFINITIONS Interfaces.td)
+  mlir_tablegen(OpInterfaces.h.inc -gen-op-interface-decls)
+  mlir_tablegen(OpInterfaces.cpp.inc -gen-op-interface-defs)
   mlir_tablegen(TypeInterfaces.h.inc -gen-type-interface-decls)
   mlir_tablegen(TypeInterfaces.cpp.inc -gen-type-interface-defs)
   add_public_tablegen_target(MLIRIREEPyDMInterfacesIncGen)

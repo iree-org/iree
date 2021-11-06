@@ -18,6 +18,7 @@
 #include "mlir/Support/LLVM.h"
 
 using namespace mlir;
+using namespace mlir::iree_compiler::IREE;
 
 //===----------------------------------------------------------------------===//
 // IREEDialect
@@ -30,22 +31,23 @@ MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREE, iree, mlir::iree::IREEDialect)
 //===----------------------------------------------------------------------===//
 
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREEPyDM, iree_pydm,
-                                      mlir::iree_pydm::IREEPyDMDialect)
+                                      PYDM::IREEPyDMDialect)
 
-DEFINE_C_API_PTR_METHODS(IREEPyDMSourceBundle, mlir::iree_pydm::SourceBundle)
-DEFINE_C_API_PTR_METHODS(IREEPyDMLoweringOptions,
-                         mlir::iree_pydm::LowerToIREEOptions)
+DEFINE_C_API_PTR_METHODS(IREEPyDMSourceBundle, PYDM::SourceBundle)
+DEFINE_C_API_PTR_METHODS(IREEPyDMLoweringOptions, PYDM::LowerToIREEOptions)
+
+void mlirIREEPyDMRegisterPasses() { PYDM::registerPasses(); }
 
 bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type) {
-  return unwrap(type).isa<mlir::iree_pydm::PrimitiveType>();
+  return unwrap(type).isa<PYDM::PrimitiveType>();
 }
 
-#define IREEPYDM_DEFINE_NULLARY_TYPE(Name)                      \
-  bool mlirTypeIsAIREEPyDM##Name(MlirType type) {               \
-    return unwrap(type).isa<mlir::iree_pydm::Name##Type>();     \
-  }                                                             \
-  MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx) {       \
-    return wrap(mlir::iree_pydm::Name##Type::get(unwrap(ctx))); \
+#define IREEPYDM_DEFINE_NULLARY_TYPE(Name)                \
+  bool mlirTypeIsAIREEPyDM##Name(MlirType type) {         \
+    return unwrap(type).isa<PYDM::Name##Type>();          \
+  }                                                       \
+  MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx) { \
+    return wrap(PYDM::Name##Type::get(unwrap(ctx)));      \
   }
 
 IREEPYDM_DEFINE_NULLARY_TYPE(Bool)
@@ -63,41 +65,50 @@ IREEPYDM_DEFINE_NULLARY_TYPE(Type)
 // Non-nullary Type constructors from the above.
 MlirType mlirIREEPyDMIntegerTypeGetExplicit(MlirContext ctx, int bitWidth,
                                             bool isSigned) {
-  return wrap(
-      mlir::iree_pydm::IntegerType::get(unwrap(ctx), bitWidth, isSigned));
+  return wrap(PYDM::IntegerType::get(unwrap(ctx), bitWidth, isSigned));
+}
+
+MlirType mlirIREEPyDMRealTypeGetExplicit(MlirType fpType) {
+  auto fpTypeCpp = unwrap(fpType).cast<FloatType>();
+  return wrap(PYDM::RealType::get(fpTypeCpp.getContext(), fpTypeCpp));
 }
 
 // ObjectType.
 bool mlirTypeIsAIREEPyDMObject(MlirType type) {
-  return unwrap(type).isa<mlir::iree_pydm::ObjectType>();
+  return unwrap(type).isa<PYDM::ObjectType>();
 }
 
 MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
   if (!primitive.ptr) {
-    return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), nullptr));
+    return wrap(PYDM::ObjectType::get(unwrap(ctx), nullptr));
   }
 
-  auto cppType = unwrap(primitive).cast<mlir::iree_pydm::PrimitiveType>();
-  return wrap(mlir::iree_pydm::ObjectType::get(unwrap(ctx), cppType));
+  auto cppType = unwrap(primitive).cast<PYDM::PrimitiveType>();
+  return wrap(PYDM::ObjectType::get(unwrap(ctx), cppType));
+}
+
+MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildPostImportPassPipeline(
+    MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  PYDM::buildPostImportPassPipeline(*passManagerCpp);
 }
 
 // LowerToIREE Pass Pipeline.
 void mlirIREEPyDMBuildLowerToIREEPassPipeline(MlirOpPassManager passManager,
                                               IREEPyDMLoweringOptions options) {
   auto *passManagerCpp = unwrap(passManager);
-  mlir::iree_pydm::buildLowerToIREEPassPipeline(*passManagerCpp,
-                                                *unwrap(options));
+  PYDM::buildLowerToIREEPassPipeline(*passManagerCpp, *unwrap(options));
 }
 
 // SourceBundle
 IREEPyDMSourceBundle ireePyDMSourceBundleCreateAsm(MlirStringRef asmString) {
-  auto bundle = std::make_unique<mlir::iree_pydm::SourceBundle>();
+  auto bundle = std::make_unique<PYDM::SourceBundle>();
   bundle->asmBlob = std::make_shared<std::string>(unwrap(asmString));
   return wrap(bundle.release());
 }
 
 IREEPyDMSourceBundle ireePyDMSourceBundleCreateFile(MlirStringRef filePath) {
-  auto bundle = std::make_unique<mlir::iree_pydm::SourceBundle>();
+  auto bundle = std::make_unique<PYDM::SourceBundle>();
   bundle->asmFilePath = std::string(unwrap(filePath));
   return wrap(bundle.release());
 }
@@ -108,7 +119,7 @@ void ireePyDMSourceBundleDestroy(IREEPyDMSourceBundle bundle) {
 
 // LoweringOptions
 IREEPyDMLoweringOptions ireePyDMLoweringOptionsCreate() {
-  return wrap(new mlir::iree_pydm::LowerToIREEOptions);
+  return wrap(new PYDM::LowerToIREEOptions);
 }
 
 void ireePyDMLoweringOptionsLinkRtl(IREEPyDMLoweringOptions options,

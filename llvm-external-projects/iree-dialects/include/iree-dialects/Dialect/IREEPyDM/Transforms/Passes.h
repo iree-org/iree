@@ -19,7 +19,11 @@ namespace iree {
 class IREEDialect;
 }
 
-namespace iree_pydm {
+namespace iree_compiler {
+namespace IREE {
+namespace PYDM {
+
+class FuncOp;
 
 /// References sources, either passed literally or by reference to a file.
 /// One of `asmBlob` or `asmFilePath` should be populated.
@@ -34,18 +38,23 @@ struct LowerToIREEOptions {
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertIREEPyDMToIREEPass();
+std::unique_ptr<OperationPass<FuncOp>> createLocalPropagateTypesPass();
+std::unique_ptr<OperationPass<FuncOp>> createVariablesToSSAPass();
 std::unique_ptr<OperationPass<>> createFixateWeakNumericPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLinkIREEPyDMRTLPass(
     Optional<SourceBundle> linkRtlSourceBundle = None);
 std::unique_ptr<OperationPass<ModuleOp>> createLowerIREEPyDMToRTLPass();
 
+void buildPostImportPassPipeline(OpPassManager& passManager);
 void buildLowerToIREEPassPipeline(OpPassManager& passManager,
                                   const LowerToIREEOptions& options);
 
-#define GEN_PASS_REGISTRATION
-#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h.inc"
+/// Register all passes and pass pipelines.
+void registerPasses();
 
-}  // namespace iree_pydm
+}  // namespace PYDM
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_PASSES_H

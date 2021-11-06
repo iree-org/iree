@@ -31,3 +31,14 @@ iree_pydm.func private @integer_types(
 iree_pydm.func private @real_types(
     !iree_pydm.real,
     !iree_pydm.real<f32>)-> (!iree_pydm.exception_result, !iree_pydm.bool)
+
+// CHECK-LABEL: @list_types
+// CHECK-SAME:     !iree_pydm.list
+// CHECK-SAME:     !iree_pydm.list<boxed,!iree_pydm.integer>
+// CHECK-SAME:     !iree_pydm.list<unboxed,!iree_pydm.integer>
+// CHECK-SAME:     !iree_pydm.list<empty,!iree_pydm.integer>
+iree_pydm.func private @list_types(
+    !iree_pydm.list,
+    !iree_pydm.list<boxed,!iree_pydm.integer>,
+    !iree_pydm.list<unboxed,!iree_pydm.integer>,
+    !iree_pydm.list<empty,!iree_pydm.integer>)-> (!iree_pydm.exception_result, !iree_pydm.bool)

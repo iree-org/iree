@@ -15,6 +15,34 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 //===----------------------------------------------------------------------===//
+// Non-variable assignment
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_AssignSubscriptOp : IREEPyDM_Op<"assign_subscript", [
+    MemoryEffects<[MemWrite]>,
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
+  let summary = "Assign to a subscript";
+  let description = [{
+    This implements the subscripted assignment form. In Python this is:
+
+    ```
+      foo[index] = bar
+    ```
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$lhs,
+    IREEPyDM_AnyValueType:$slice,
+    IREEPyDM_AnyValueType:$rhs
+  );
+  let results = (outs IREEPyDM_ExceptionResultType:$exc_result);
+  let assemblyFormat = [{
+    $lhs `[` $slice `]` `=` $rhs `:` type(operands) attr-dict
+  }];
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Variable access
 //===----------------------------------------------------------------------===//
 
@@ -158,7 +186,6 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
 
   let parser = [{ return ::parseFuncOp(parser, result); }];
   let printer = [{ return ::print(*this, p); }];
-  let verifier = [{ return ::verify(*this); }];
 }
 
 def IREEPyDM_ReturnOp : IREEPyDM_Op<"return", [
@@ -299,7 +326,9 @@ def IREEPyDM_DynamicCallOp : IREEPyDM_PureOp<"dynamic_call", [
 // Boxing/unboxing
 //===----------------------------------------------------------------------===//
 
-def IREEPyDM_BoxOp : IREEPyDM_PureOp<"box"> {
+def IREEPyDM_BoxOp : IREEPyDM_PureOp<"box", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Boxes a primitive into an object";
   let description = [{
     Given a PrimitiveType, boxes it into an appropriate !object, establishing
@@ -326,7 +355,9 @@ def IREEPyDM_BoxOp : IREEPyDM_PureOp<"box"> {
   let hasCanonicalizeMethod = 1;
 }
 
-def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox"> {
+def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Unboxes an object to a specific primitive type";
   let description = [{
     Unboxes to a primitive, returning a failure result and a default initialized
@@ -337,7 +368,7 @@ def IREEPyDM_UnboxOp : IREEPyDM_PureOp<"unbox"> {
     IREEPyDM_ObjectType:$object
   );
   let results = (outs
-    IREEPyDM_ExceptionResultType:$status,
+    IREEPyDM_ExceptionResultType:$exc_result,
     IREEPyDM_AnyPrimitiveType:$primitive
   );
 
@@ -436,6 +467,20 @@ def IREEPyDM_BoolToPredOp : IREEPyDM_PureOp<"bool_to_pred"> {
   let hasFolder = 1;
 }
 
+def IREEPyDM_MakeListOp : IREEPyDM_PureOp<"make_list", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
+  let summary = "Makes a list from a static list of values";
+  let description = [{
+    Constructs a list from elements.
+  }];
+  let arguments = (ins Variadic<IREEPyDM_AnyValueType>:$elements);
+  let results = (outs IREEPyDM_ListType:$list);
+  let assemblyFormat = [{
+    ($elements^ `:` type($elements))? `->` type(results) attr-dict
+  }];
+}
+
 def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
   let summary = "Makes a tuple from a static list of values";
   let description = [{
@@ -444,7 +489,7 @@ def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
   let arguments = (ins Variadic<IREEPyDM_AnyValueType>:$slots);
   let results = (outs IREEPyDM_TupleType:$tuple);
   let assemblyFormat = [{
-    $slots `:` type($slots) `->` type(results) attr-dict
+    ($slots^ `:` type($slots))? `->` type(results) attr-dict
   }];
 }
 
@@ -456,8 +501,10 @@ def IREEPyDM_DynamicUnpackOp : IREEPyDM_PureOp<"dynamic_unpack"> {
     known, this op will generally decay into a more statically verifiable
     form or be elided entirely.
 
-    This op includes dynamic result casting so as to keep everything related
-    to the unpack local to a single op until/if more information is known.
+    This operation allows a tuple to be unpacked to slots of arbitrary type,
+    but no type checking is done. Typically, slot types will be of `ObjectType`
+    at the outset of program capture, and they may only be narrowed by
+    optimizations which have adequately proven correctness.
   }];
   let arguments = (ins IREEPyDM_AnyValueType:$sequence);
   let results = (outs
@@ -500,6 +547,22 @@ def IREEPyDM_GetNumericPromotionOrderOp : IREEPyDM_PureOp<"get_numeric_promotion
   }];
 }
 
+def IREEPyDM_StaticInfoCastOp : IREEPyDM_PureOp<"static_info_cast"> {
+  let summary = "Adds or removes static type information";
+  let description = [{
+    This is often inserted as an artifact of type refinement where static
+    information is added to a type locally and a follow-on step is required
+    to resolve it.
+  }];
+  let arguments = (ins IREEPyDM_AnyValueType:$value);
+  let results = (outs IREEPyDM_AnyValueType);
+  let assemblyFormat = [{
+    $value `:` type($value) `->` type(results) attr-dict
+  }];
+  // TODO: Add verifier.
+  // let verifier = 1;
+}
+
 //===----------------------------------------------------------------------===//
 // Control flow
 //===----------------------------------------------------------------------===//
@@ -533,7 +596,7 @@ def IREEPyDM_ExprStatementDiscardOp : IREEPyDM_Op<"expr_statement_discard"> {
 
 def FunctionalIfOp : IREEPyDM_Op<"functional_if", [
     DeclareOpInterfaceMethods<RegionBranchOpInterface>,
-    SingleBlockImplicitTerminator<"iree_pydm::YieldOp">, RecursiveSideEffects,
+    SingleBlockImplicitTerminator<"YieldOp">, RecursiveSideEffects,
     NoRegionArguments,
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
   let summary = "A functional if construct";
@@ -547,7 +610,6 @@ def FunctionalIfOp : IREEPyDM_Op<"functional_if", [
   let regions = (region SizedRegion<1>:$thenRegion, AnyRegion:$elseRegion);
 
   let printer = [{ return ::print(p, *this); }];
-  let verifier = [{ return ::verify(*this); }];
   let parser = [{ return ::parse$cppClass(parser, result); }];
 }
 
@@ -563,7 +625,9 @@ def YieldOp : IREEPyDM_Op<"yield", [NoSideEffect, ReturnLike, Terminator,
 // Computation
 //===----------------------------------------------------------------------===//
 
-def IREEPyDM_DynamicBinaryPromoteOp : IREEPyDM_PureOp<"dynamic_binary_promote"> {
+def IREEPyDM_DynamicBinaryPromoteOp : IREEPyDM_PureOp<"dynamic_binary_promote", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Promotes two arguments that may be of numeric types";
   let description = [{
     Takes two values of arbitrary type which may be input to a following
@@ -591,7 +655,7 @@ def IREEPyDM_DynamicBinaryPromoteOp : IREEPyDM_PureOp<"dynamic_binary_promote"> 
   let assemblyFormat = [{
     $left `,` $right `:` type($left) `,` type($right) attr-dict
   }];
-  let hasCanonicalizeMethod = 1;
+  let hasCanonicalizer = 1;
 }
 
 def IREEPyDM_PromoteNumericOp : IREEPyDM_PureOp<"promote_numeric"> {
@@ -609,7 +673,9 @@ def IREEPyDM_PromoteNumericOp : IREEPyDM_PureOp<"promote_numeric"> {
   let hasCanonicalizeMethod = 1;
 }
 
-def IREEPyDM_ApplyBinaryOp : IREEPyDM_PureOp<"apply_binary"> {
+def IREEPyDM_ApplyBinaryOp : IREEPyDM_PureOp<"apply_binary", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
+  ]> {
   let summary = "Applies one of Python's binary operations";
   let description = [{
     The operation to apply is specified as per the data model:
@@ -627,9 +693,12 @@ def IREEPyDM_ApplyBinaryOp : IREEPyDM_PureOp<"apply_binary"> {
   let assemblyFormat = [{
     $dunder_name `,` $left `,` $right `:` type(operands) `->` type(results) attr-dict
   }];
+  let hasCanonicalizer = 1;
 }
 
-def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare"> {
+def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
   let summary = "Performs a binary comparison";
   let description = [{
     Performs a comparison between two operands.
@@ -651,6 +720,79 @@ def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare"> {
     $dunder_name `,` $left `,` $right `:` type(operands) attr-dict
   }];
   let hasCanonicalizer = 1;
+}
+
+def IREEPyDM_NegOp : IREEPyDM_PureOp<"neg", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
+  ]> {
+  let summary = "Unary negation";
+  let description = [{
+    Performs unary negation (i.e. `-3`) in a type independent way.
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$value);
+  let results = (outs IREEPyDM_AnyValueType:$result);
+  let assemblyFormat = [{
+    $value `:` type($value) `->` type($result) attr-dict
+  }];
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Object method/feature access
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"subscript", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
+  let summary = "Evaluates a subscript operation against a value";
+  let description = [{
+    This fully dynamic form of subscript can handle an arbitrarily general
+    subscript operation, consisting of either a single numeric index or a Slice.
+    In typical usage, it should canonicalize into specific special form.
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$value,
+    IREEPyDM_AnyValueType:$slice);
+  let results = (outs
+    IREEPyDM_ExceptionResultType:$exc_result,
+    IREEPyDM_AnyValueType:$result);
+  let assemblyFormat = [{
+    $value `[` $slice `]` `:` type(operands) `->` type($result) attr-dict
+  }];
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Sequence ops
+//===----------------------------------------------------------------------===//
+
+def IREEPyDM_SequenceCloneOp : IREEPyDM_PureOp<"sequence_clone", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
+  ]> {
+  let summary = "Clones a sequence, potentially duplicating it";
+  let description = [{
+    This is intended to be used as a lowering for higher level ops and as a
+    primitive to be used by the runtime library. Given a sequence and a `count`,
+    it produces a sequence of the same fundamental type and storage,
+    duplicated `count` times.
+
+    It is expected that the runtime can emit direct lowerings for variations
+    operating on builtin sequence types.
+
+    The input and result sequence type can be different (i.e. in case if the
+    type bounds for elements is different).
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$sequence,
+    IREEPyDM_IntegerType:$count
+  );
+  let results = (outs
+    IREEPyDM_AnyValueType
+  );
+  let assemblyFormat = [{
+    $sequence `*` $count `:` type(operands) `->` type(results) attr-dict
+  }];
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_IR_OPS_TD

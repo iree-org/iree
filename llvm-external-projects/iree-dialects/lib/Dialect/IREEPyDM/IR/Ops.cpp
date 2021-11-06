@@ -7,7 +7,9 @@
 #include "iree-dialects/Dialect/IREEPyDM/IR/Ops.h"
 
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/FunctionImplementation.h"
@@ -15,18 +17,65 @@
 #include "mlir/IR/TypeUtilities.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
-using PyBoolType = mlir::iree_pydm::BoolType;
-using PyConstantOp = mlir::iree_pydm::ConstantOp;
-using PyIntegerType = mlir::iree_pydm::IntegerType;
-using PyRealType = mlir::iree_pydm::RealType;
-using PyCallOp = mlir::iree_pydm::CallOp;
-using PyFuncOp = mlir::iree_pydm::FuncOp;
+using llvm::dbgs;
+
+using PyBoolType = PYDM::BoolType;
+using PyConstantOp = PYDM::ConstantOp;
+using PyIntegerType = PYDM::IntegerType;
+using PyRealType = PYDM::RealType;
+using PyCallOp = PYDM::CallOp;
+using PyFuncOp = PYDM::FuncOp;
+
+static LogicalResult verify(Operation *) { return success(); }
 
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Generic pattern to unbox any operands that are a specific object
+/// type (i.e. object<integer>).
+struct UnboxOperands : public RewritePattern {
+  UnboxOperands(StringRef rootName, MLIRContext *context,
+                Optional<llvm::SmallSet<int, 4>> operandIndices = None)
+      : RewritePattern(rootName, 1, context), operandIndices(operandIndices) {}
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op->getLoc();
+    bool changed = false;
+    SmallVector<Value> operands(op->getOperands());
+    auto excResultType = rewriter.getType<ExceptionResultType>();
+    for (int operandIndex = 0, e = operands.size(); operandIndex < e;
+         ++operandIndex) {
+      Value &operand = operands[operandIndex];
+      if (operandIndices && !operandIndices->contains(operandIndex)) continue;
+      if (auto objectType = operand.getType().dyn_cast<ObjectType>()) {
+        Type primitiveType = objectType.getPrimitiveType();
+        if (primitiveType) {
+          // Unbox.
+          auto unboxOp = rewriter.create<UnboxOp>(
+              loc, TypeRange{excResultType, primitiveType}, operand);
+          operand = unboxOp.primitive();
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      rewriter.updateRootInPlace(op, [&]() { op->setOperands(operands); });
+      return success();
+    }
+
+    return failure();
+  }
+  Optional<llvm::SmallSet<int, 4>> operandIndices;
+};
+
+}  // namespace
 
 static Value getNumericZeroConstant(Location loc, Type numericType,
                                     OpBuilder &builder) {
@@ -77,36 +126,93 @@ void AllocFreeVarOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 }
 
 //===----------------------------------------------------------------------===//
-// ApplyCompareOp
+// ApplyBinaryOp
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-/// Matches an `apply_compare` op where both operands are defined by
-/// `box` ops that have the same operand type. Replaces the operands with the
-/// operands of the `box`.
-struct UnboxApplyCompareOperands : public OpRewritePattern<ApplyCompareOp> {
- public:
+struct ApplyBinaryToSequenceClone : public OpRewritePattern<ApplyBinaryOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(ApplyCompareOp op,
+  LogicalResult matchAndRewrite(ApplyBinaryOp op,
                                 PatternRewriter &rewriter) const override {
-    auto boxLeft = op.left().getDefiningOp<BoxOp>();
-    auto boxRight = op.right().getDefiningOp<BoxOp>();
-    if (!boxLeft || !boxRight) return failure();
-    if (boxLeft.primitive().getType() != boxRight.primitive().getType())
+    if (op.dunder_name() != "mul") return failure();
+    Value listOperand;
+    Value countOperand;
+    if (isBuiltinSequence(op.left()) && isInteger(op.right())) {
+      listOperand = op.left();
+      countOperand = op.right();
+    } else if (isInteger(op.left()) && isBuiltinSequence(op.right())) {
+      countOperand = op.left();
+      listOperand = op.right();
+    } else {
       return failure();
-    rewriter.replaceOpWithNewOp<ApplyCompareOp>(
-        op, rewriter.getType<BoolType>(), op.dunder_nameAttr(),
-        boxLeft.primitive(), boxRight.primitive());
+    }
+    Type resultType = op.getResult().getType();
+    rewriter.replaceOpWithNewOp<SequenceCloneOp>(op, resultType, listOperand,
+                                                 countOperand);
     return success();
   }
-};
 
+  static bool isBuiltinSequence(Value operand) {
+    return operand.getType().isa<PYDM::ListType, PYDM::TupleType>();
+  }
+  static bool isInteger(Value operand) {
+    return operand.getType().isa<PYDM::IntegerType>();
+  }
+};
 }  // namespace
+
+void ApplyBinaryOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
+  patterns.add<ApplyBinaryToSequenceClone>(context);
+}
+
+bool ApplyBinaryOp::refineResultTypes() {
+  auto leftType = left().getType();
+  auto rightType = right().getType();
+  auto applyUpdates = [&](Type newResultType) -> bool {
+    if (newResultType != getResult().getType()) {
+      getResult().setType(newResultType);
+      return true;
+    }
+    return false;
+  };
+
+  // Both numeric types. It is only dynamically legal for statically known
+  // numeric types to be the same, in which case the result type must be the
+  // same as well.
+  auto ptLeft = leftType.dyn_cast<PythonTypeInterface>();
+  auto ptRight = rightType.dyn_cast<PythonTypeInterface>();
+  if (ptLeft && ptRight && ptLeft.getNumericPromotionOrder() &&
+      ptRight.getNumericPromotionOrder()) {
+    if (leftType == rightType) {
+      return applyUpdates(leftType);
+    }
+  }
+
+  // (list, integer) or (integer, list) refine to the list type.
+  if (dunder_name() == "mul") {
+    auto leftList = leftType.dyn_cast<ListType>();
+    auto rightList = rightType.dyn_cast<ListType>();
+    auto leftInteger = leftType.dyn_cast<IntegerType>();
+    auto rightInteger = rightType.dyn_cast<IntegerType>();
+    if (leftList && rightInteger) {
+      return applyUpdates(leftList);
+    } else if (leftInteger && rightList) {
+      return applyUpdates(rightList);
+    }
+  }
+
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+// ApplyCompareOp
+//===----------------------------------------------------------------------===//
 
 void ApplyCompareOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                                  MLIRContext *context) {
-  patterns.add<UnboxApplyCompareOperands>(context);
+  patterns.add<UnboxOperands>(getOperationName(), context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -168,6 +274,18 @@ OpFoldResult AsBoolOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// AssignSubscriptOp
+//===----------------------------------------------------------------------===//
+
+void AssignSubscriptOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                    MLIRContext *context) {
+  llvm::SmallSet<int, 4> unboxIndices;
+  unboxIndices.insert(0);
+  unboxIndices.insert(1);
+  patterns.add<UnboxOperands>(getOperationName(), context, unboxIndices);
+}
+
+//===----------------------------------------------------------------------===//
 // BoolToPredOp
 //===----------------------------------------------------------------------===//
 
@@ -186,6 +304,20 @@ LogicalResult BoxOp::canonicalize(BoxOp op, PatternRewriter &rewriter) {
   // Sometimes boxes are emitted when the input is an object. Just remove.
   if (op.primitive().getType().isa<ObjectType>()) {
     rewriter.replaceOp(op, op.primitive());
+    return success();
+  }
+
+  // Box to an appropriate type and static info cast.
+  ObjectType objectType = rewriter.getType<ObjectType>(nullptr);
+  if (op.object().getType() == objectType &&
+      !op.primitive().getType().isa<ObjectType>()) {
+    auto refinedBox = rewriter.create<BoxOp>(
+        op.getLoc(),
+        rewriter.getType<ObjectType>(
+            op.primitive().getType().cast<PrimitiveType>()),
+        op.primitive());
+    rewriter.replaceOpWithNewOp<StaticInfoCastOp>(op, op.object().getType(),
+                                                  refinedBox);
     return success();
   }
 
@@ -215,44 +347,90 @@ LogicalResult UnboxOp::canonicalize(UnboxOp unboxOp,
 // DynamicBinaryPromoteOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult DynamicBinaryPromoteOp::canonicalize(DynamicBinaryPromoteOp op,
-                                                   PatternRewriter &rewriter) {
-  auto loc = op.getLoc();
-  auto leftType = op.left().getType();
-  auto rightType = op.right().getType();
-  auto leftResultType = op.getResultTypes()[0];
-  auto rightResultType = op.getResultTypes()[1];
-  auto leftPt = leftType.dyn_cast<PythonTypeInterface>();
-  auto rightPt = rightType.dyn_cast<PythonTypeInterface>();
-  if (!leftPt || !rightPt) return failure();
+namespace {
 
-  Optional<int> leftOrder = leftPt.getNumericPromotionOrder();
-  Optional<int> rightOrder = rightPt.getNumericPromotionOrder();
-  Value newLeft = op.left();
-  Value newRight = op.right();
+/// Resolves a DynamicBinaryPromote over numeric operands to either elide
+/// or insert specific PromoteNumeric ops.
+struct ResolveNumericDynamicBinaryPromote
+    : public OpRewritePattern<DynamicBinaryPromoteOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DynamicBinaryPromoteOp op,
+                                PatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    auto leftType = op.left().getType();
+    auto rightType = op.right().getType();
+    auto leftResultType = op.getResultTypes()[0];
+    auto rightResultType = op.getResultTypes()[1];
+    auto leftPt = leftType.dyn_cast<PythonTypeInterface>();
+    auto rightPt = rightType.dyn_cast<PythonTypeInterface>();
+    if (!leftPt || !rightPt) return failure();
 
-  // Simple case: same types pass through.
-  if (leftType == rightType) {
-    // Nothing - pass-through rewrite.
-  } else if (leftOrder && rightOrder) {
-    // Both numeric.
-    if (*leftOrder > *rightOrder) {
-      newRight = rewriter.create<PromoteNumericOp>(loc, leftType, newRight);
+    Optional<int> leftOrder = leftPt.getNumericPromotionOrder();
+    Optional<int> rightOrder = rightPt.getNumericPromotionOrder();
+    Value newLeft = op.left();
+    Value newRight = op.right();
+
+    if (leftOrder && rightOrder) {
+      // Both numeric.
+      if (*leftOrder > *rightOrder) {
+        newRight = rewriter.create<PromoteNumericOp>(loc, leftType, newRight);
+      }
+      if (*rightOrder > *leftOrder) {
+        newLeft = rewriter.create<PromoteNumericOp>(loc, rightType, newLeft);
+      }
+    } else {
+      return failure();
     }
-    if (*rightOrder > *leftOrder) {
-      newLeft = rewriter.create<PromoteNumericOp>(loc, rightType, newLeft);
-    }
-  } else {
-    return failure();
+
+    // Need to box back to the original type (which will always be a generic
+    // object).
+    newLeft = rewriter.create<BoxOp>(loc, leftResultType, newLeft);
+    newRight = rewriter.create<BoxOp>(loc, rightResultType, newRight);
+
+    rewriter.replaceOp(op, {newLeft, newRight});
+    return success();
+  }
+};
+
+/// If we statically determine one of the arguments to be a concrete, non
+/// numeric type, then the op has no meaning and is elided.
+struct ElideNonNumericDynamicBinaryPromote
+    : public OpRewritePattern<DynamicBinaryPromoteOp> {
+ public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DynamicBinaryPromoteOp op,
+                                PatternRewriter &rewriter) const override {
+    if ((!isConcreteNonNumericType(op.left().getType()) &&
+         !isConcreteNonNumericType(op.right().getType())))
+      return failure();
+
+    // Since DynamicBinaryPromote already returns object, and we only match
+    // non-object operands, box them back.
+    auto loc = op.getLoc();
+    auto leftResultType = op.getResultTypes()[0];
+    auto rightResultType = op.getResultTypes()[1];
+    Value newLeft = rewriter.create<BoxOp>(loc, leftResultType, op.left());
+    Value newRight = rewriter.create<BoxOp>(loc, rightResultType, op.right());
+    rewriter.replaceOp(op, {newLeft, newRight});
+    return success();
   }
 
-  // Need to box back to the original type (which will always be a generic
-  // object).
-  newLeft = rewriter.create<BoxOp>(loc, leftResultType, newLeft);
-  newRight = rewriter.create<BoxOp>(loc, rightResultType, newRight);
+  static bool isConcreteNonNumericType(Type t) {
+    if (t.isa<ObjectType>()) return false;
+    auto pt = t.dyn_cast<PythonTypeInterface>();
+    if (!pt || pt.getNumericPromotionOrder()) return false;
+    return true;
+  }
+};
 
-  rewriter.replaceOp(op, {newLeft, newRight});
-  return success();
+}  // namespace
+
+void DynamicBinaryPromoteOp::getCanonicalizationPatterns(
+    RewritePatternSet &patterns, MLIRContext *context) {
+  patterns.add<ResolveNumericDynamicBinaryPromote>(context);
+  patterns.add<UnboxOperands>(getOperationName(), context);
+  patterns.add<ElideNonNumericDynamicBinaryPromote>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -391,6 +569,59 @@ static LogicalResult verify(PyFuncOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// MakeListOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verify(MakeListOp op) {
+  auto listType = op.list().getType().cast<ListType>();
+  switch (listType.getStorageClass()) {
+    case CollectionStorageClass::Boxed:
+      for (auto element : op.elements()) {
+        if (!element.getType().isa<ObjectType>()) {
+          return op.emitOpError() << "making a list with boxed storage class "
+                                     "must have object elements. Got: "
+                                  << element.getType();
+        }
+      }
+      break;
+    case CollectionStorageClass::Unboxed:
+      for (auto element : op.elements()) {
+        if (element.getType().isa<ObjectType>()) {
+          return op.emitOpError() << "making a list with unboxed storage class "
+                                     "must not have object elements. Got: "
+                                  << element.getType();
+        }
+      }
+      break;
+    case CollectionStorageClass::Empty:
+      if (!op.elements().empty()) {
+        return op.emitOpError()
+               << "making a list with empty storage class must have zero "
+                  "elements";
+      }
+      break;
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// NegOp
+//===----------------------------------------------------------------------===//
+
+void NegOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                        MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
+}
+
+bool NegOp::refineResultTypes() {
+  if (value().getType() != getResult().getType()) {
+    getResult().setType(value().getType());
+    return true;
+  }
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
 // PatternMatchCallOp
 //===----------------------------------------------------------------------===//
 
@@ -466,7 +697,7 @@ LogicalResult PromoteNumericOp::canonicalize(PromoteNumericOp op,
 // RaiseOnFailureOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult iree_pydm::RaiseOnFailureOp::fold(
+LogicalResult PYDM::RaiseOnFailureOp::fold(
     ArrayRef<Attribute> operands, SmallVectorImpl<OpFoldResult> &results) {
   assert(operands.size() == 1 && "expected one fold operand");
   // Unit exception result is success. Just elide.
@@ -489,6 +720,27 @@ OpFoldResult SelectOp::fold(ArrayRef<Attribute> operands) {
     return true_value();
   else
     return false_value();
+}
+
+//===----------------------------------------------------------------------===//
+// SequenceCloneOp
+//===----------------------------------------------------------------------===//
+
+bool SequenceCloneOp::refineResultTypes() {
+  if (sequence().getType() != getResult().getType()) {
+    getResult().setType(sequence().getType());
+    return true;
+  }
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+// SubscriptOp
+//===----------------------------------------------------------------------===//
+
+void SubscriptOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                              MLIRContext *context) {
+  patterns.add<UnboxOperands>(getOperationName(), context);
 }
 
 //===----------------------------------------------------------------------===//
