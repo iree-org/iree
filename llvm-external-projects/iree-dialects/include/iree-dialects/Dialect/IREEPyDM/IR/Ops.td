@@ -719,7 +719,9 @@ def IREEPyDM_ApplyCompareOp : IREEPyDM_PureOp<"apply_compare", [
   let hasCanonicalizer = 1;
 }
 
-def IREEPyDM_NegOp : IREEPyDM_PureOp<"neg"> {
+def IREEPyDM_NegOp : IREEPyDM_PureOp<"neg", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface, ["refineResultTypes"]>
+  ]> {
   let summary = "Unary negation";
   let description = [{
     Performs unary negation (i.e. `-3`) in a type independent way.

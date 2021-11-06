@@ -191,14 +191,16 @@ bool ApplyBinaryOp::refineResultTypes() {
   }
 
   // (list, integer) or (integer, list) refine to the list type.
-  auto leftList = leftType.dyn_cast<ListType>();
-  auto rightList = rightType.dyn_cast<ListType>();
-  auto leftInteger = leftType.dyn_cast<IntegerType>();
-  auto rightInteger = rightType.dyn_cast<IntegerType>();
-  if (leftList && rightInteger) {
-    return applyUpdates(leftList);
-  } else if (leftInteger && rightList) {
-    return applyUpdates(rightList);
+  if (dunder_name() == "mul") {
+    auto leftList = leftType.dyn_cast<ListType>();
+    auto rightList = rightType.dyn_cast<ListType>();
+    auto leftInteger = leftType.dyn_cast<IntegerType>();
+    auto rightInteger = rightType.dyn_cast<IntegerType>();
+    if (leftList && rightInteger) {
+      return applyUpdates(leftList);
+    } else if (leftInteger && rightList) {
+      return applyUpdates(rightList);
+    }
   }
 
   return false;
@@ -609,6 +611,14 @@ static LogicalResult verify(MakeListOp op) {
 void NegOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                         MLIRContext *context) {
   patterns.add<UnboxOperands>(getOperationName(), context);
+}
+
+bool NegOp::refineResultTypes() {
+  if (value().getType() != getResult().getType()) {
+    getResult().setType(value().getType());
+    return true;
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
