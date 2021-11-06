@@ -103,7 +103,7 @@ class SPIRVRemoveOneTripTiledLoopPass
     // This pass seems to be only needed for the convolution vectorization. So
     // filter out the necessary conv ops.
     SmallVector<Operation *> rootOp;
-    SmallVector<TiledLoopInfo> tiledLoops;
+    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     auto isConvOp = [](Operation *op) {
       return isa<linalg::DepthwiseConv2DNhwOp, linalg::Conv2DNhwcHwcfOp>(op);
     };
