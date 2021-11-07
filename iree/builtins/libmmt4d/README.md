@@ -212,6 +212,58 @@ intrinsics are used this will generally not be a problem however inline assembly
 may need compiler-specific variants or at least exclusions that fall back to
 generic paths.
 
+### Compile-time Configuration
+
+Preprocessor statements used to control behavior must only use information known
+when the bitcode files are being compiled. This means that if the bitcode file
+being produced is for AArch64 it is safe to use the `__aarch64__` macro.
+Information that is only available after the bitcode file is produced - such as
+in the IREE compiler pipelines - must use link-time configuration.
+
+### Link-time Configuration
+
+As we are producing bitcode files we cannot rely on the C preprocessor for
+changing behavior based on some information only known during linking. In other
+cases we may want to specialize code paths based on knowledge about the context
+in which the kernels are used. To provide this link-time modification ability
+there is support for flags by way of `extern` globals. These globals are either
+specified by the IREE compiler when linking the bitcode or by the hosting
+application when linked statically.
+
+Each flag is defined in `mmt4d.h`; for example:
+```c
+extern int libmmt4d_platform_example_flag;
+```
+
+Any code may then use this flag to condition/control behavior:
+```c
+if (libmmt4d_platform_example_flag >= 1) {
+  // Do something special.
+}
+```
+
+When linking libmmt4d statically the flags can be provided by the hosting
+application:
+```c
+#include "mmt4d.h"
+int libmmt4d_platform_example_flag = 123;  // should be constant
+void main() {
+  mmt4d_foo_bar();
+}
+```
+
+If the flag is defined as a constant and LTO is enabled then the compiler will
+handle the flag similar to as if it was done via a preprocessor statement.
+
+When producing bitcode the flags are left symbolic and the IREE compiler
+provides their values:
+```c++
+overridePlatformGlobal(*bitcodeModule, "libmmt4d_platform_example_flag", 123u);
+```
+
+What flags are useful and how to handle cases where flags are arch-dependent are
+still TBD.
+
 ## Testing and Benchmarking
 
 [`tools/mmt4d_test.cc`](tools/mmt4d_test.cc) provides a gtest runner that
