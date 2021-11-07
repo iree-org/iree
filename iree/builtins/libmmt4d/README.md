@@ -69,7 +69,25 @@ call @mmt4d_8x4x8_i8i8i32(%k_size_i32, %lhs, %rhs, %dst) :
     (i32, memref<?x?x8x4xi8>, memref<?x?x8x4xi8>, memref<?x?x8x8xi32>) -> ()
 ```
 
-And then links the functions directly into the binary allowing for inlining.
+Finally the compiler links the functions directly into the executable binary
+allowing for inlining and other optimizations.
+
+### Why Not a C++ Pass?
+
+This approach of an external library that is linked in via bitcode is a tradeoff
+that favors a familiar environment for architecture-specific implementations and
+reusable code to custom MLIR passes that directly construct the IR. It will
+always be better from a technical standpoint to directly perform these
+specializations inside compiler passes as all information is available, multiple
+levels of optimization at MLIR `vector` and `llvm` dialect levels can hoist and
+fold aggressively, and specialization is possible using the entire context. It's
+encouraged that work is done there when possible and some of the cases handled
+by this library may end up being done in that environment.
+
+As a reusable library this approach allows for other backends - such as the IREE
+VMVX backend - to share the same optimized implementations. Having standalone
+tests and benchmarks also allows for fast iteration without needing to modify
+the compiler.
 
 ## Bitcode Files
 
@@ -141,6 +159,11 @@ line in [`mmt4d_generic.c`](mmt4d_generic.c). In addition for each architecture
 where no specialized implementation will be provided a `MMT4D_GENERIC` should be
 added to the respective architecture file.
 
+The compiler needs to be taught about the new variant by adding a case to the
+`isSupported` method in [`iree/compiler/Dialect/HAL/Target/LLVM/Builtins/LibMMT4D.cpp`](/iree/compiler/Dialect/HAL/Target/LLVM/Builtins/LibMMT4D.cpp).
+Any case not handled there will fall back to the expanded compiler forms of the
+implementation.
+
 Ergonomic improvements here would allow for weak linkage/overrides such that
 new generic functions could be added without needing to add the generic versions
 to each file, however that's TBD (C/C++ weak linkage in static libraries is...
@@ -159,8 +182,18 @@ source files are globbed.
 Now as needed start replacing the `MMT4D_GENERIC` versions with specialized
 implementations using intrinsics, inline assembly, or other magic.
 
-Finally update the `LibMMT4D.cpp` file in the compiler to select the new bitcode
-file based on the `llvm::TargetMachine`.
+To build the new bitcode file add a `make_arch_bc` call to [`bin/build.sh`](bin/build.sh).
+The flags provided are passed directly to clang and can be used to control the
+compilation environment with the requirement being that the corresponding
+selection logic is updated in `LibMMT4D.cpp`.
+
+Finally update the [`iree/compiler/Dialect/HAL/Target/LLVM/Builtins/LibMMT4D.cpp`](/iree/compiler/Dialect/HAL/Target/LLVM/Builtins/LibMMT4D.cpp)
+file in the compiler to select the new bitcode file based on the
+`llvm::TargetMachine` in the same way that it is produced with `make_arch_bc`.
+
+Ergonomic improvements here would allow for function-level multiversioning such
+that bitcode files per architecture could be used instead of requiring
+per-feature variants of each bitcode file.
 
 ## Engineering Requirements
 
