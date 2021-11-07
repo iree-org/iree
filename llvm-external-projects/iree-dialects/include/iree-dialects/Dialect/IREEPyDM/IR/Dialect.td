@@ -290,6 +290,49 @@ def IREEPyDM_NoneType : IREEPyDM_PrimitiveTypeDef<"None"> {
   }];
 }
 
+def IREEPyDM_RangeType : IREEPyDM_TypeDef<
+    "Range"> {
+  let mnemonic = "range";
+
+  let summary = "Result type of the Python 'range' function";
+  let description = [{
+    Represents an object with 'start', 'end' and 'step' integer slots.
+  }];
+  let parameters = (ins
+    "::mlir::iree_compiler::IREE::PYDM::IntegerType":$integerType
+  );
+  let builders = [
+    TypeBuilder<(ins), [{
+      return Base::get($_ctxt,
+        ::mlir::iree_compiler::IREE::PYDM::IntegerType::get($_ctxt));
+    }]>
+  ];
+
+  let printer = [{
+    $_printer << getMnemonic();
+    if (getImpl()->integerType)
+      $_printer << "<" << getImpl()->integerType << ">";
+  }];
+
+  let parser = [{
+    if (parser.parseOptionalLess())
+      return get($_ctxt, nullptr);
+
+    Type t;
+    if ($_parser.parseType(t))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+    if (auto integerType = t.dyn_cast<IntegerType>())
+      return get($_ctxt, integerType);
+    else {
+      $_parser.emitError(
+          $_parser.getNameLoc(), "expected an integer type");
+      return Type();
+    }
+  }];
+}
+
 def IREEPyDM_RealType : IREEPyDM_PrimitiveTypeDef<"Real",
     ["getNumericPromotionOrder", "getNumericCategory", "getNumericSubTypeCode"]> {
   let mnemonic = "real";

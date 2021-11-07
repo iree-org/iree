@@ -412,6 +412,109 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
       d.ReturnOp(self.fctx.cast_to_return_type(expr.get_immediate()))
     self.terminated = True
 
+  def visit_For(self, node: ast.For):
+    # 'for' statement will have:
+    #   'target' of 'Name' or 'Tuple' of 'Name' which needs to be unpacked
+    #   'iter' of an expression that can yield an iterator
+    if self.terminated:
+      return
+    fctx = self.fctx
+    ic = fctx.ic
+    i32_type = d.IntegerType.get_explicit(32, context=ic.context)
+    builtin_i32_type = ir.IntegerType.get_signless(32, context=ic.context)
+    object_type = d.ObjectType.get(context=ic.context)
+    exception_result_type = d.ExceptionResultType.get(context=ic.context)
+
+    # Blocks:
+    #   entry: set up the iterator
+    #   iternext: get the next item from the iterator, bind it to
+    #     names and bracnh to 'body' or 'orelse' block.
+    #   orelse: block to branch to when there are no further items
+    #   successor: statements following the loop
+    # Note that unlike other loops, we always create the orelse block for
+    # normal termination since we need to unconditionally stash some exception
+    # handling here.
+    predecessor_block = ic.ip.block
+    iternext_block = predecessor_block.create_after()
+    body_block = iternext_block.create_after()
+    orelse_block = body_block.create_after()
+    successor_block = orelse_block.create_after()
+
+    # Setup.
+    iterable_expr = ExpressionImporter(fctx)
+    iterable_expr.visit(node.iter)
+    with ic.ip, ic.loc:
+      exc_result, iterator = d.IterGetOp(exception_result_type, object_type,
+                                         iterable_expr.get_immediate()).results
+      d.RaiseOnFailureOp(exc_result)
+      std_d.BranchOp([], iternext_block)
+
+    # Iternext.
+    with ic.scoped_ip(ir.InsertionPoint(iternext_block)):
+      with ic.ip, ic.loc:
+        iter_next_exc_result, next_value = d.IterNextOp(exception_result_type,
+                                                        object_type,
+                                                        iterator).results
+        iter_next_exc_code = d.GetExceptionResultCodeOp(
+            i32_type, iter_next_exc_result).result
+        # -1 is the exception code for (synchronous) stop iteration.
+        stop_iteration_code = d.ConstantOp(
+            i32_type, ir.IntegerAttr.get(builtin_i32_type, -1)).result
+        is_stop = d.ApplyCompareOp(d.BoolType.get(), ir.StringAttr.get("eq"),
+                                   iter_next_exc_code,
+                                   stop_iteration_code).result
+        is_stop_pred = d.BoolToPredOp(ir.IntegerType.get_signless(1), is_stop)
+        std_d.CondBranchOp(
+            condition=is_stop_pred,
+            # End.
+            trueDest=orelse_block,
+            trueDestOperands=[],
+            # Not end.
+            falseDest=body_block,
+            falseDestOperands=[])
+
+    # Body.
+    with ic.scoped_ip(ir.InsertionPoint(body_block)):
+      with ic.ip, ic.loc:
+        # Handle the iterator exception and bind to names.
+        d.RaiseOnFailureOp(iter_next_exc_result)
+        if isinstance(node.target, ast.Name):
+          # Bind single.
+          d.StoreVarOp(fctx.find_variable(node.target.id), ic.box(next_value))
+        elif isinstance(node.target, ast.Tuple):
+          unpack_exc, target_slots = d.DynamicUnpackOp(
+              exception_result_type, [object_type] * node.target.elts,
+              next_value)
+          d.RaiseOnFailureOp(unpack_exc)
+          for bind_name, bind_value in zip(node.target.elts, target_slots):
+            if not isinstance(bind_name, ast.Name):
+              ic.abort("expected Name node for for-loop Tuple target")
+            d.StoreVarOp(fctx.find_variable(bind_name.id), bind_value)
+        else:
+          ic.abort(
+              f"unsupported for-loop target: {node.target.__class__.__name__}")
+        # Import the body.
+        body_importer = FunctionDefBodyImporter(fctx,
+                                                successor_block=iternext_block,
+                                                break_block=successor_block,
+                                                continue_block=iternext_block)
+        body_importer.import_block(node.body)
+
+    # Orelse.
+    with ic.scoped_ip(ir.InsertionPoint(orelse_block)):
+      with ic.ip, ic.loc:
+        # Handle the iterator exception and bind names.
+        d.RaiseOnFailureOp(iter_next_exc_result)
+        if node.orelse:
+          orelse_importer = FunctionDefBodyImporter(
+              fctx, successor_block=successor_block)
+          orelse_importer.import_block(node.orelse)
+        else:
+          std_d.BranchOp([], successor_block)
+
+    # Done.
+    ic.reset_ip(ir.InsertionPoint(successor_block))
+
   def visit_While(self, node: ast.While):
     if self.terminated:
       return

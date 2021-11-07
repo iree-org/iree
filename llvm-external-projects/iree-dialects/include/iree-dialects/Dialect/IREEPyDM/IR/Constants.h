@@ -144,6 +144,23 @@ enum class BuiltinTypeCode : int {
   FirstCustom = 0x101,
 };
 
+/// Every exception result has a code which represents its category.
+/// 0 is success and negative values are reserved for built-in exception
+/// categories.
+enum class ExceptionResultCode : int {
+  Success = 0,
+  StopIteration = -1,
+  StopAsyncIteration = -2,
+  RuntimeError = -3,
+  ValueError = -4,
+  NotImplementedError = -5,
+  KeyError = -6,
+  IndexError = -7,
+  AttributeError = -8,
+  TypeError = -9,
+  UnboundLocalError = -10,
+};
+
 }  // namespace PYDM
 }  // namespace IREE
 }  // namespace iree_compiler

@@ -481,6 +481,24 @@ def IREEPyDM_MakeListOp : IREEPyDM_PureOp<"make_list", [
   }];
 }
 
+def IREEPyDM_MakeRangeOp : IREEPyDM_PureOp<"make_range", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
+  let summary = "Makes a range object";
+  let description = [{
+    Creates a range object, parameterized with some integer type.
+  }];
+  let arguments = (ins
+    IREEPyDM_AnyValueType:$start,
+    IREEPyDM_AnyValueType:$end,
+    IREEPyDM_AnyValueType:$step
+  );
+  let results = (outs IREEPyDM_RangeType:$range);
+  let assemblyFormat = [{
+    $start `to` $end `by` $step type(operands) `->` type(results) attr-dict
+  }];
+}
+
 def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
   let summary = "Makes a tuple from a static list of values";
   let description = [{
@@ -525,6 +543,18 @@ def IREEPyDM_GetTypeCodeOp : IREEPyDM_PureOp<"get_type_code"> {
   let results = (outs IREEPyDM_IntegerType);
   let assemblyFormat = [{
     $value `:` type($value) `->` type(results) attr-dict
+  }];
+}
+
+def IREEPyDM_GetExceptionResultCodeOp : IREEPyDM_PureOp<"get_exception_result_code"> {
+  let summary = "Gets the numeric code value for the exception result";
+  let description = [{
+    See the enumeration 'ExceptionResultCode'.
+  }];
+  let arguments = (ins IREEPyDM_ExceptionResultType:$exc_result);
+  let results = (outs IREEPyDM_IntegerType);
+  let assemblyFormat = [{
+    $exc_result `:` type(operands) `->` type(results) attr-dict
   }];
 }
 
@@ -741,6 +771,38 @@ def IREEPyDM_NegOp : IREEPyDM_PureOp<"neg", [
 //===----------------------------------------------------------------------===//
 // Object method/feature access
 //===----------------------------------------------------------------------===//
+
+def IREEPyDM_IterGetOp : IREEPyDM_PureOp<"iter_get", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
+  let summary = "Gets the iterator associated with an object";
+  let description = [{
+    Effectively, implements the __iter__ method of the iterator protocol.
+  }];
+  let arguments = (ins IREEPyDM_AnyValueType:$container);
+  let results = (outs
+    IREEPyDM_ExceptionResultType:$exc_result,
+    IREEPyDM_AnyValueType:$iterator);
+  let assemblyFormat = [{
+    $container `:` type(operands) `->` type(results) attr-dict
+  }];
+}
+
+def IREEPyDM_IterNextOp : IREEPyDM_Op<"iter_next", [
+    DeclareOpInterfaceMethods<TypeRefinableOpInterface>
+  ]> {
+  let summary = "Returns the next iterator value and advances";
+  let description = [{
+    Effectively, implements the __next__ method of the iterator protocol.
+  }];
+  let arguments = (ins IREEPyDM_AnyValueType:$iterator);
+  let results = (outs
+    IREEPyDM_ExceptionResultType:$exc_result,
+    IREEPyDM_AnyValueType:$next);
+  let assemblyFormat = [{
+    $iterator `:` type(operands) `->` type(results) attr-dict
+  }];
+}
 
 def IREEPyDM_SubscriptOp : IREEPyDM_PureOp<"subscript", [
     DeclareOpInterfaceMethods<TypeRefinableOpInterface>

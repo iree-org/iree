@@ -569,6 +569,32 @@ static LogicalResult verify(PyFuncOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// GetTypeCodeOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verify(GetTypeCodeOp *op) {
+  if (op->getResult().getType() !=
+      PYDM::IntegerType::get(op->getContext(), 32, true)) {
+    return op->emitOpError(
+        "exception result code must be signed 32 bit integer");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GetExceptionResultCodeOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verify(GetExceptionResultCodeOp *op) {
+  if (op->getResult().getType() !=
+      PYDM::IntegerType::get(op->getContext(), 32, true)) {
+    return op->emitOpError(
+        "exception result code must be signed 32 bit integer");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // MakeListOp
 //===----------------------------------------------------------------------===//
 
