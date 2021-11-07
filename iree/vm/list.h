@@ -184,16 +184,22 @@ IREE_API_EXPORT iree_status_t iree_vm_list_set_variant(
 IREE_API_EXPORT iree_status_t
 iree_vm_list_push_variant(iree_vm_list_t* list, const iree_vm_variant_t* value);
 
-// iree_vm_list_swap!!!!!
-IREE_API_EXPORT iree_status_t iree_vm_list_swap(iree_vm_list_t* list_a,
-                                                iree_vm_list_t* list_b);
-
-// iree_vm_list_copy!!!!!
+// Copy |count| elements of src_list starting from src_offset to dst_list
+// beginning with dst_offset.
+// Copy is invalid and will be aborted when:
+// - list_a and list_b have different types
 IREE_API_EXPORT iree_status_t iree_vm_list_copy(const iree_vm_list_t* src_list,
                                                 iree_host_size_t src_offset,
                                                 iree_vm_list_t* dst_list,
                                                 iree_host_size_t dst_offset,
                                                 iree_host_size_t count);
+
+// Swap (exchange) the content of list_a with the same type of list_b.
+// Swap is invalid and will be aborted when:
+// - list_a and list_b have different allocators
+// - list_a and list_b have different types
+IREE_API_EXPORT iree_status_t iree_vm_list_swap(iree_vm_list_t* list_a,
+                                                iree_vm_list_t* list_b);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -1372,7 +1372,6 @@ def VM_BufferStoreF64Op :
 //===----------------------------------------------------------------------===//
 
 // TODO(benvanik): vm.list.push.i32 / vm.list.pop.i32 (variadic)
-// TODO(benvanik): vm.list.copy(src_list, src_index, dst_list, dst_index, length)
 // TODO(benvanik): vm.list.slice(list, index, length) -> list
 // TODO(benvanik): export into a rwdata buffer
 
@@ -1479,63 +1478,67 @@ def VM_ListResizeOp :
   ];
 }
 
-// cy
-def VM_ListSwapOp :
-    VM_Op<"list.swap", [
-      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-      MemoryEffects<[MemWrite]>,
-    ]> {
-  let summary = [{swap the list}];
-  let description = [{
-    swap...
-  }];
-
-  let arguments = (ins
-    VM_AnyList:$list0,
-    VM_AnyList:$list1
-  );
-
-  let assemblyFormat = "operands attr-dict `:` `(` type($list0) `,` type($list1) `)`";
-
-  let encoding = [
-    VM_EncOpcode<VM_OPC_ListSwap>,
-    VM_EncOperand<"list0", 0>,
-    VM_EncOperand<"list1", 1>,
-  ];
-}
-
-// TODO(benvanik): vm.list.copy(src_list, src_index, dst_list, dst_index, length)
 def VM_ListCopyOp :
     VM_Op<"list.copy", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
     ]> {
-  let summary = [{copy the list}];
+  let summary = [{copy src_list to dst_list with given offset and count}];
   let description = [{
-    copy...
+    Copy #count elements of src_list starting from src_offset to dst_list
+    beginning with dst_offset.
+    Copy is invalid and will be aborted when:
+    - list_a and list_b have different types
   }];
 
   let arguments = (ins
     VM_AnyList:$src_list,
-    VM_Index:$src_index,
+    VM_Index:$src_offset,
     VM_AnyList:$dst_list,
-    VM_Index:$dst_index,
-    VM_Index:$length
+    VM_Index:$dst_offset,
+    VM_Index:$count
   );
 
   let assemblyFormat = [{
-    operands attr-dict `:` `(` type($src_list) `,` type($src_index)
-                           `,` type($dst_list) `,` type($dst_index)
-                           `,` type($length) `)`
+    operands attr-dict `:` `(` type($src_list) `,` type($src_offset)
+                           `,` type($dst_list) `,` type($dst_offset)
+                           `,` type($count) `)`
   }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListCopy>,
     VM_EncOperand<"src_list", 0>,
-    VM_EncOperand<"src_index", 1>,
+    VM_EncOperand<"src_offset", 1>,
     VM_EncOperand<"dst_list", 2>,
-    VM_EncOperand<"dst_index", 3>,
-    VM_EncOperand<"length", 4>
+    VM_EncOperand<"dst_offset", 3>,
+    VM_EncOperand<"count", 4>
+  ];
+}
+
+def VM_ListSwapOp :
+    VM_Op<"list.swap", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemWrite]>,
+    ]> {
+  let summary = [{swap (exchange) two lists}];
+  let description = [{
+    Swap (exchange) the content of list_a with the same type of list_b.
+    Swap is invalid and will be aborted when:
+    - list_a and list_b have different allocators
+    - list_a and list_b have different types
+  }];
+
+  let arguments = (ins
+    VM_AnyList:$list_a,
+    VM_AnyList:$list_b
+  );
+
+  let assemblyFormat = "operands attr-dict `:` `(` type($list_a) `,` type($list_b) `)`";
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_ListSwap>,
+    VM_EncOperand<"list_a", 0>,
+    VM_EncOperand<"list_b", 1>,
   ];
 }
 
