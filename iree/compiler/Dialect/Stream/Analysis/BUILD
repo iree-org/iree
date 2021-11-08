@@ -13,9 +13,12 @@ package(
 cc_library(
     name = "Analysis",
     srcs = [
+        "Partitioning.cpp",
+        "Partitioning/ReferencePartitioning.cpp",
         "ResourceUsage.cpp",
     ],
     hdrs = [
+        "Partitioning.h",
         "ResourceUsage.h",
     ],
     deps = [
