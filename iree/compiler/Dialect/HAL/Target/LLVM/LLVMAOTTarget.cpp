@@ -253,8 +253,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       int64_t localMemorySize = entryPointOp.workgroup_local_memory()
                                     .getValueOr(APInt(64, 0))
                                     .getSExtValue();
+      // Grab source IR code here to pass it down as a string for dispatch user tags.
+      const char* source_code = "test tag";
 
-      libraryBuilder.addExport(entryPointOp.getName(), "",
+      libraryBuilder.addExport(entryPointOp.getName(), source_code,
                                LibraryBuilder::DispatchAttrs{localMemorySize},
                                llvmFunc);
     }

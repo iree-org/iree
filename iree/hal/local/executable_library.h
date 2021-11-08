@@ -271,6 +271,15 @@ typedef struct iree_hal_executable_dispatch_attrs_v0_t {
   // behavior/synchronization requirements.
   uint16_t reserved;
 } iree_hal_executable_dispatch_attrs_v0_t;
+
+typedef struct iree_hal_executable_dispatch_src_locs_v0_t {
+  const char* const* file_name;
+  // Source line number.
+  uint32_t line_num;
+  // Source IR code.
+  const char* const* func_name;
+} iree_hal_executable_dispatch_src_locs_v0_t;
+
 static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) == 4, "uint32_t");
 
 // A table of exported functions arranged as a struct-of-arrays for more
@@ -298,6 +307,10 @@ typedef struct iree_hal_executable_export_table_v0_t {
   // verbose logging. The string values, when present, may be attached to
   // tracing/debugging events related to the entry point.
   const char* const* tags;
+
+  // Optional table of source location info to be included as tags.
+  const iree_hal_executable_dispatch_src_locs_v0_t* src_locs;
+
 } iree_hal_executable_export_table_v0_t;
 
 // Structure used for v0 library interfaces.

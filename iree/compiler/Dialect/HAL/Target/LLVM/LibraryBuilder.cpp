@@ -130,10 +130,33 @@ static llvm::StructType *makeDispatchAttrsType(llvm::LLVMContext &context) {
   return type;
 }
 
+// %struct_iree_hal_executable_dispatch_src_locs_v0_t = type {
+//   i8**,
+// }
+static llvm::StructType *makeDispatchSrc_locsType(llvm::LLVMContext &context) {
+  if (auto *existingType = llvm::StructType::getTypeByName(
+	  context, "iree_hal_executable_dispatch_src_locs_v0_t")) {
+    return existingType;
+  }
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
+  auto *type = 
+      llvm::StructType::create(context,
+		               {
+			           i8PtrType->getPointerTo(),
+			           i32Type,
+				   i8PtrType->getPointerTo(),
+			       },
+			       "iree_hal_executable_dispatch_attrs_v0_t",
+			       /*isPacked=*/false);
+  return type;
+}
+
 // %struct.iree_hal_executable_export_table_v0_t = type {
 //   i32,
 //   %struct.iree_hal_executable_dispatch_attrs_v0_t*,
 //   i32*,
+//   i8**,
 //   i8**,
 //   i8**
 // }
@@ -145,6 +168,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
   auto *dispatchFunctionType = makeDispatchFunctionType(context);
   auto *dispatchAttrsType = makeDispatchAttrsType(context);
+  auto *dispatchSrc_locsType = makeDispatchSrc_locsType(context);
   auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
   auto *type = llvm::StructType::create(
       context,
@@ -152,6 +176,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
           i32Type,
           dispatchFunctionType->getPointerTo()->getPointerTo(),
           dispatchAttrsType->getPointerTo(),
+	  dispatchSrc_locsType->getPointerTo(),
           i8PtrType->getPointerTo(),
           i8PtrType->getPointerTo(),
       },
@@ -317,6 +342,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
   auto *exportTableType = makeExportTableType(context);
   auto *dispatchFunctionType = makeDispatchFunctionType(context);
   auto *dispatchAttrsType = makeDispatchAttrsType(context);
+  auto *dispatchSrc_locsType = makeDispatchSrc_locsType(context);
   auto *i8Type = llvm::IntegerType::getInt8Ty(context);
   auto *i16Type = llvm::IntegerType::getInt16Ty(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
@@ -415,6 +441,33 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
         exportTagsType, global, ArrayRef<llvm::Constant *>{zero, zero});
   }
 
+  // iree_hal_executable_export_table_v0_t::src_locs (Work in Progress!)
+  llvm::Constant *exportSrc_locs = 
+      llvm::Constant::getNullValue(i32Type->getPointerTo());
+  if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
+    SmallVector<llvm::Constant *, 4> exportSrc_locValues;
+    for (auto dispatch : exports) {
+       exportSrc_locValues.push_back(llvm::ConstantStruct::get(
+	   dispatchSrc_locsType,
+	   {
+	       // line=
+	       llvm::ConstantInt::get(i32Type, 0),
+	       // source_code=
+	       getStringConstant(dispatch.tag, module),
+	   }));
+    }
+    auto *exportSrc_locsType = 
+	llvm::ArrayType::get(dispatchSrc_locsType, exportSrc_locValues.size());
+    auto *global = new llvm::GlobalVariable(
+	*module, exportSrc_locsType, /*isConstant=*/true,
+	llvm::GlobalVariable::PrivateLinkage,
+	llvm::ConstantArray::get(exportSrc_locsType, exportSrc_locValues),
+	/*Name=*/libraryName + "_src_locs");
+
+    exportSrc_locs = llvm::ConstantExpr::getInBoundsGetElementPtr(
+	exportSrc_locsType, global, ArrayRef<llvm::Constant *>{zero, zero});
+  }
+
   return llvm::ConstantStruct::get(
       exportTableType, {
                            // count=
@@ -427,6 +480,8 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
                            exportNames,
                            // tags=
                            exportTags,
+			   // src_locs=
+			   exportSrc_locs,
                        });
 }
 
