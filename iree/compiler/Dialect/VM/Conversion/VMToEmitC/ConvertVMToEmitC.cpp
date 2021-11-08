@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/VMAnalysis.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "llvm/ADT/TypeSwitch.h"
