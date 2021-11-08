@@ -29,8 +29,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/Linalg/Transforms/ComprehensiveBufferize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -66,15 +66,15 @@ namespace {
 class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
-  IREEComprehensiveBufferizePass(
-      linalg::AllocationCallbacks allocationFn = linalg::AllocationCallbacks())
+  explicit IREEComprehensiveBufferizePass(
+      linalg::AllocationCallbacks allocationFn)
       : allocationFn(allocationFn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
                     linalg::LinalgDialect, memref::MemRefDialect,
                     scf::SCFDialect, StandardOpsDialect, tensor::TensorDialect,
                     vector::VectorDialect>();
-    linalg::registerBufferiableOpInterfaceExternalModels(registry);
+    linalg::registerBufferizableOpInterfaceExternalModels(registry);
   }
   void runOnOperation() override;
 
@@ -210,8 +210,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 
     // 5. Perform bufferization.
     for (Operation *op : ops) {
-      if (failed(linalg::bufferizeOp(op, bvm, aliasInfo,
-                                     linalg::AllocationCallbacks(),
+      if (failed(linalg::bufferizeOp(op, bvm, aliasInfo, allocationFn,
                                      /*bufferizedFunctionTypes=*/nullptr))) {
         return signalPassFailure();
       }
