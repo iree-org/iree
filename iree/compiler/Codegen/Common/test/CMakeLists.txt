@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "dead_alloc.mlir"
     "f32Tof16.mlir"
     "flatten_memref_subspan.mlir"
+    "fold_affine_min_in_distributed_loops.mlir"
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
     "iree_comprehensive_bufferize.mlir"

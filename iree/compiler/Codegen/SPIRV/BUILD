@@ -20,7 +20,6 @@ cc_library(
         "NVIDIAConfig.cpp",
         "Passes.cpp",
         "SPIRVCopyToWorkgroupMemory.cpp",
-        "SPIRVFoldGPUProcessorIDUses.cpp",
         "SPIRVLowerExecutableTargetPass.cpp",
         "SPIRVRemoveOneTripTiledLoops.cpp",
         "SPIRVTileAndDistribute.cpp",

@@ -35,6 +35,7 @@ cc_library(
         "CleanupBufferAllocViewPass.cpp",
         "DemoteF32ToF16.cpp",
         "FlattenMemRefSubspanPass.cpp",
+        "FoldAffineMinInDistributedLoops.cpp",
         "FoldTensorExtractOpPass.cpp",
         "ForOpCanonicalizationPass.cpp",
         "IREEComprehensiveBufferizePass.cpp",

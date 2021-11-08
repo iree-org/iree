@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
@@ -132,6 +133,24 @@ LogicalResult getFilteredOps(
 LogicalResult getComputeOps(
     FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
+
+/// A struct containing function pointers to query processor information.
+/// TODO: This should be replaced by some interface.
+struct QueryProcessor {
+  /// Returns the id op's dimension if `value` is from a processor id op.
+  std::function<Optional<unsigned>(Value)> getIdDim;
+  /// Returns the count op's dimension if `value` is from a processor count op.
+  std::function<Optional<unsigned>(Value)> getCountDim;
+  /// Returns the size op's dimension if `value` is from a processor size op.
+  std::function<Optional<unsigned>(Value)> getTileSizeDim;
+};
+
+/// If the given `forOp` is a tiled and distributed loop, returns its tiling and
+/// distribution information. The given `queryProcessor` will be used to
+/// identify ops representing processor ID/count and tile sizes; if it's
+/// llvm:None; only IREE HAL interface workgroup ops are recognized.
+Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
+    scf::ForOp forOp, Optional<QueryProcessor> queryProcessor = llvm::None);
 
 /// Collects information about loops matching tiled+distribute pattern.
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(

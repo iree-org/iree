@@ -145,7 +145,7 @@ hal.executable private @conv_1d  {
 //       CHECK: %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //       CHECK: %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //       CHECK: scf.for %[[IV0:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//       CHECK:   %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[TIDZ]], %[[IV0]], 0] [1, %{{.+}}, 1]
+//       CHECK:   %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[TIDZ]], %[[IV0]], 0] [1, 3, 1]
 //       CHECK:   scf.for %[[IV1:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
 //       CHECK:     %[[ARG1SV2:.+]] = memref.subview %[[ARG1SV1]][0, 0, %[[IV1]]] [3, 1, 1]
 //       CHECK:     %[[RETSV2:.+]] = memref.subview %[[RETSV1]][%[[TIDZ]], %[[IV0]], %[[IV1]]] [1, 1, 1]
@@ -430,7 +430,7 @@ module  {
 //         CHECK:   scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
 //         CHECK:     scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //         CHECK:       scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-//         CHECK:         %[[IN:.+]] = memref.subview %[[SV1]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, %{{.+}}, %{{.+}}, 6]
+//         CHECK:         %[[IN:.+]] = memref.subview %[[SV1]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, 3, 4, 6]
 //         CHECK:         %[[OUT:.+]] = memref.subview %[[SV2]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, 1, 1, 6]
 //         CHECK:         linalg.pooling_nhwc_max
 //    CHECK-SAME:           __internal_linalg_transform__ = "vectorize"
