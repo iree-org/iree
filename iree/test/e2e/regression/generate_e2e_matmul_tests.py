@@ -467,8 +467,8 @@ def write_trace_file(traces, filename, module_path):
 
   dumped_yaml = yaml.dump_all(yaml_documents, sort_keys=False)
 
-  # TODO: This regex substitution is a hack as I couldn't figure how have PyYAML
-  # dump our custom contents_generator into the desired format, e.g.
+  # TODO: This regex substitution is a hack as I couldn't figure how to have
+  # PyYAML dump our custom contents_generator into the desired format, e.g.
   #   contents_generator: !tag:iree:fully_specified_pseudorandom 368
   # Someone with better knowledge of YAML is welcome to fix this, possibly by
   # changing that format if that's appropriate! So long as the e2e_matmul tests
