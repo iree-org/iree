@@ -1815,12 +1815,14 @@ class CompareRefNotZeroOpConversion
 };
 
 template <typename ConstOpTy>
-class ConstOpConversion : public OpRewritePattern<ConstOpTy> {
+class ConstOpConversion : public OpConversionPattern<ConstOpTy> {
  public:
-  using OpRewritePattern<ConstOpTy>::OpRewritePattern;
+  using Adaptor = typename ConstOpTy::Adaptor;
+  using OpConversionPattern<ConstOpTy>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(ConstOpTy constOp,
-                                PatternRewriter &rewriter) const final {
+  LogicalResult matchAndRewrite(
+      ConstOpTy constOp, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constOp, constOp.getType(),
                                                    constOp.value());
     return success();
@@ -1828,12 +1830,14 @@ class ConstOpConversion : public OpRewritePattern<ConstOpTy> {
 };
 
 template <typename ConstZeroOpTy>
-class ConstZeroOpConversion : public OpRewritePattern<ConstZeroOpTy> {
+class ConstZeroOpConversion : public OpConversionPattern<ConstZeroOpTy> {
  public:
-  using OpRewritePattern<ConstZeroOpTy>::OpRewritePattern;
+  using Adaptor = typename ConstZeroOpTy::Adaptor;
+  using OpConversionPattern<ConstZeroOpTy>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(ConstZeroOpTy constZeroOp,
-                                PatternRewriter &rewriter) const final {
+  LogicalResult matchAndRewrite(
+      ConstZeroOpTy constZeroOp, Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
     auto type = constZeroOp.getType();
     Attribute value;
 
