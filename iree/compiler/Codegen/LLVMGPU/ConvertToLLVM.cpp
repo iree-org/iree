@@ -337,7 +337,7 @@ class ConvertIREEConstantOp : public ConvertToLLVMPattern {
 
 /// A pattern to convert hal.interface.workgroup.id/count/size into
 /// corresponding GPU ops.
-template <typename InterfaceOpTy, typename NewOp>
+template <typename InterfaceOpTy, typename NewOpTy>
 struct HALInterfaceWorkgroupOpsConverter final
     : public OpConversionPattern<InterfaceOpTy> {
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
@@ -347,7 +347,7 @@ struct HALInterfaceWorkgroupOpsConverter final
       ConversionPatternRewriter &rewriter) const override {
     int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
     std::array<const char *, 3> dimAttr{"x", "y", "z"};
-    rewriter.replaceOpWithNewOp<NewOp>(op, op.getType(), dimAttr[index]);
+    rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
     return success();
   }
 };
@@ -382,7 +382,9 @@ void populateLowerHALInterfaceOp(RewritePatternSet &patterns) {
   patterns.insert<HALInterfaceWorkgroupOpsConverter<
                       IREE::HAL::InterfaceWorkgroupIDOp, gpu::BlockIdOp>,
                   HALInterfaceWorkgroupOpsConverter<
-                      IREE::HAL::InterfaceWorkgroupCountOp, gpu::BlockDimOp>>(
+                      IREE::HAL::InterfaceWorkgroupSizeOp, gpu::BlockDimOp>,
+                  HALInterfaceWorkgroupOpsConverter<
+                      IREE::HAL::InterfaceWorkgroupCountOp, gpu::GridDimOp>>(
       patterns.getContext());
 }
 
