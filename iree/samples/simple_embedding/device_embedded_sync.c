@@ -15,11 +15,17 @@
 #include "iree/hal/local/sync_device.h"
 
 // Compiled module embedded here to avoid file IO:
+#if IREE_ARCH_ARM_32
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_arm_32_c.h"
+#elif IREE_ARCH_ARM_64
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_arm_64_c.h"
+#elif IREE_ARCH_RISCV_32
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_riscv_32_c.h"
+#elif IREE_ARCH_RISCV_64
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_riscv_64_c.h"
+#elif IREE_ARCH_X86_64
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module_dylib_x86_64_c.h"
+#endif
 
 iree_status_t create_sample_device(iree_hal_device_t** device) {
   // Set parameters for the device created in the next step.
