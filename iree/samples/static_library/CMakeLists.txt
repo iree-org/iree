@@ -76,7 +76,7 @@ DEPS
   ::simple_mul_c
   iree::runtime
   iree::hal::local::loaders::static_library_loader
-  iree::hal::local::task_driver
+  iree::hal::local::sync_driver
   iree::task::api
   simple_mul
 )

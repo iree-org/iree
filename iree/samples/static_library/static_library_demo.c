@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 #include "iree/hal/local/loaders/static_library_loader.h"
-#include "iree/hal/local/task_device.h"
+#include "iree/hal/local/sync_device.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
 #include "iree/samples/static_library/simple_mul_c.h"
@@ -27,8 +27,8 @@ iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
   iree_status_t status = iree_ok_status();
 
   // Set paramters for the device created in the next step.
-  iree_hal_task_device_params_t params;
-  iree_hal_task_device_params_initialize(&params);
+  iree_hal_sync_device_params_t params;
+  iree_hal_sync_device_params_initialize(&params);
 
   // Load the statically embedded library
   const iree_hal_executable_library_header_t** static_library =
@@ -44,19 +44,12 @@ iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
         &library_loader);
   }
 
-  iree_task_executor_t* executor = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_task_executor_create_from_flags(iree_allocator_system(),
-                                                  &executor);
-  }
-
   // Create the device and release the executor and loader afterwards.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_task_device_create(iree_make_cstring_view("dylib"),
-                                         &params, executor, 1, &library_loader,
-                                         iree_allocator_system(), device);
+    status = iree_hal_sync_device_create(
+        iree_make_cstring_view("dylib"), &params, /*loader_count=*/1,
+        &library_loader, iree_allocator_system(), device);
   }
-  iree_task_executor_release(executor);
   iree_hal_executable_loader_release(library_loader);
 
   return status;
