@@ -214,6 +214,8 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
 // given |region|. All branches, ops, and nested regions will be processed.
 static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
                          BlockAndValueMapping resourceTimepointMap) {
+  if (region.empty()) return;
+
   // Update all block arguments.
   auto timepointType = IREE::Stream::TimepointType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
@@ -231,7 +233,7 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
 
     // Insert awaits that we've sunk from callers.
     auto builder = OpBuilder::atBlockBegin(&block);
-    for (auto expansion : expansions) {
+    for (auto expansion : llvm::reverse(expansions)) {
       // If we can look down the chain and see the size then we can use that.
       // If it's a constant we can't use it as it may be defined anywhere in the
       // region. Dynamic dimensions usually come from outside or entry arguments
@@ -242,7 +244,12 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
           makeBlockArgResourceSize(region.getLoc(), resource, builder);
       auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
           region.getLoc(), resource, resourceSize, timepoint);
-      resource.replaceAllUsesExcept(awaitOp.results().front(), awaitOp);
+      SmallPtrSet<Operation *, 2> excludedUsers;
+      excludedUsers.insert(awaitOp);
+      if (auto *sizeOp = resourceSize.getDefiningOp()) {
+        excludedUsers.insert(sizeOp);
+      }
+      resource.replaceAllUsesExcept(awaitOp.results().front(), excludedUsers);
     }
   }
 
@@ -510,7 +517,7 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
   if (newTimepoints.empty()) {
     op.await_timepointMutable().clear();
   } else {
-    Value newTimepoint = builder.createOrFold<IREE::Stream::TimepointJoinOp>(
+    auto newTimepoint = builder.createOrFold<IREE::Stream::TimepointJoinOp>(
         op.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
         newTimepoints.takeVector());
     op.await_timepointMutable().assign(newTimepoint);
