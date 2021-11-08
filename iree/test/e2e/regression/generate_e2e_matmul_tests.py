@@ -74,7 +74,7 @@ class TestGenerator:
 # identified by shapes_id.
 def get_test_shapes(shapes_id: ShapesId):
   # Notes:
-  # 1. Be conservative in adding more shapes, as that can include both the
+  # 1. Be conservative in adding more shapes, as that can increase both the
   #    build and execution latency of tests. The build latency is nearly the
   #    same for all shapes, while execution latency grows cubicly i.e.
   #    linearly with m*k*n.
@@ -395,8 +395,8 @@ def generate(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
       # Different testcases may differ only by runtime parameters but
       # share the same code. For example, dynamic-shapes testcases
       # share the same code involing tensor<?x?xf32> even though the runtime
-      # value in the trace are different. That's why we call
-      # generate_function conditionally, and generate_trace unconditionally.
+      # value in the trace are different. That's why we append conditionally
+      # to traces, but unconditionally to function_definitions.
       if function.name not in function_definitions:
         function_definitions[function.name] = function.definition
       traces.append(
@@ -467,6 +467,12 @@ def write_trace_file(traces, filename, module_path):
 
   dumped_yaml = yaml.dump_all(yaml_documents, sort_keys=False)
 
+  # TODO: This regex substitution is a hack as I couldn't figure how to have
+  # PyYAML dump our custom contents_generator into the desired format, e.g.
+  #   contents_generator: !tag:iree:fully_specified_pseudorandom 368
+  # Someone with better knowledge of YAML is welcome to fix this, possibly by
+  # changing that format if that's appropriate! So long as the e2e_matmul tests
+  # pass.
   processed_yaml = re.sub(r"'(![^']*)'", "\\1", dumped_yaml)
 
   with open(filename, "w") as file:
