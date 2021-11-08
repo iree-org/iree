@@ -215,6 +215,9 @@ Type PYDM::ListType::getElementStorageType() const {
       assert(getUniformElementType() &&
              "unboxed list should have uniform element type");
       return getUniformElementType();
+    default:
+      llvm_unreachable("unsupported storage class");
+      return {};
   }
 }
 
