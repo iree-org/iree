@@ -1583,6 +1583,12 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
 
         bool move = ptr->second.isLastValueUse(operand, op.getOperation());
 
+        Optional<Value> operandRef = findRef(funcOp, vmAnalysisCache, operand);
+
+        if (!operandRef.hasValue()) {
+          return op.emitError() << "local ref not found";
+        }
+
         rewriter.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
@@ -1592,7 +1598,8 @@ class CallOpConversion : public OpConversionPattern<IREE::VM::CallOp> {
                 ctx, {rewriter.getBoolAttr(move), rewriter.getIndexAttr(0),
                       rewriter.getIndexAttr(1)}),
             /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{operand, refPtrOp.getResult()});
+            /*operands=*/
+            ArrayRef<Value>{operandRef.getValue(), refPtrOp.getResult()});
 
         updatedOperands.push_back(refPtrOp.getResult());
       } else {
@@ -2130,16 +2137,26 @@ class CondBranchOpConversion
       OpBuilder::InsertionGuard guard(rewriter);
       trueDestDispatch = rewriter.createBlock(trueDest);
 
-      for (Value operand : op.getTrueOperands()) {
+      for (auto pair :
+           llvm::zip(op.getTrueOperands(), trueDest->getArguments())) {
+        Value operand = std::get<0>(pair);
+        BlockArgument blockArg = std::get<1>(pair);
+
         if (isNotRefOperand(operand)) {
           continue;
         }
 
         assert(operand.getType().isa<IREE::VM::RefType>());
+        assert(blockArg.getType().isa<IREE::VM::RefType>());
 
-        Optional<Value> destRef = findRef(funcOp, vmAnalysisCache, operand);
+        Optional<Value> operandRef = findRef(funcOp, vmAnalysisCache, operand);
+        Optional<Value> blockArgRef =
+            findRef(funcOp, vmAnalysisCache, blockArg);
 
-        if (!destRef.hasValue()) {
+        if (!operandRef.hasValue()) {
+          return op.emitError() << "local ref not found";
+        }
+        if (!blockArgRef.hasValue()) {
           return op.emitError() << "local ref not found";
         }
 
@@ -2150,7 +2167,8 @@ class CondBranchOpConversion
             StringAttr::get(ctx, "iree_vm_ref_retain"),
             /*args=*/ArrayAttr{},
             /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{operand, destRef.getValue()});
+            /*operands=*/
+            ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
       rewriter.create<mlir::BranchOp>(loc, op.trueDest(), op.getTrueOperands());
     }
@@ -2160,16 +2178,26 @@ class CondBranchOpConversion
       OpBuilder::InsertionGuard guard(rewriter);
       falseDestDispatch = rewriter.createBlock(falseDest);
 
-      for (Value operand : op.getFalseOperands()) {
+      for (auto pair :
+           llvm::zip(op.getFalseOperands(), falseDest->getArguments())) {
+        Value operand = std::get<0>(pair);
+        BlockArgument blockArg = std::get<1>(pair);
+
         if (isNotRefOperand(operand)) {
           continue;
         }
 
         assert(operand.getType().isa<IREE::VM::RefType>());
+        assert(blockArg.getType().isa<IREE::VM::RefType>());
 
-        Optional<Value> destRef = findRef(funcOp, vmAnalysisCache, operand);
+        Optional<Value> operandRef = findRef(funcOp, vmAnalysisCache, operand);
+        Optional<Value> blockArgRef =
+            findRef(funcOp, vmAnalysisCache, blockArg);
 
-        if (!destRef.hasValue()) {
+        if (!operandRef.hasValue()) {
+          return op.emitError() << "local ref not found";
+        }
+        if (!blockArgRef.hasValue()) {
           return op.emitError() << "local ref not found";
         }
 
@@ -2180,7 +2208,8 @@ class CondBranchOpConversion
             StringAttr::get(ctx, "iree_vm_ref_retain"),
             /*args=*/ArrayAttr{},
             /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{operand, destRef.getValue()});
+            /*operands=*/
+            ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
       rewriter.create<mlir::BranchOp>(loc, op.falseDest(),
                                       op.getFalseOperands());
@@ -3663,11 +3692,24 @@ class ConvertVMToEmitCPass
       return signalPassFailure();
     }
 
-    // Global ops are dead now
-    module.walk([](Operation *op) {
+    SetVector<Operation *> &materializations =
+        typeConverter.sourceMaterializations;
+
+    module.walk([&materializations](Operation *op) {
+      // Global ops are dead now
       if (isa<IREE::VM::GlobalI32Op, IREE::VM::GlobalI64Op,
               IREE::VM::GlobalF32Op, IREE::VM::GlobalRefOp>(op)) {
         op->erase();
+        return;
+      }
+      // Remove dead basic block arguments
+      if (materializations.contains(op)) {
+        assert(isa<emitc::ConstantOp>(op));
+        assert(op->use_empty());
+
+        materializations.remove(op);
+        op->erase();
+        return;
       }
     });
   }
