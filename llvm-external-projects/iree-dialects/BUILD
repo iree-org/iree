@@ -190,6 +190,14 @@ gentbl_cc_library(
     strip_include_prefix = "include",
     tbl_outs = [
         (
+            ["-gen-op-interface-decls"],
+            "include/iree-dialects/Dialect/IREEPyDM/IR/OpInterfaces.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "include/iree-dialects/Dialect/IREEPyDM/IR/OpInterfaces.cpp.inc",
+        ),
+        (
             ["-gen-type-interface-decls"],
             "include/iree-dialects/Dialect/IREEPyDM/IR/TypeInterfaces.h.inc",
         ),
@@ -279,10 +287,12 @@ cc_library(
         "lib/Dialect/IREEPyDM/Transforms/Optimize/*.cpp",
         "lib/Dialect/IREEPyDM/Transforms/RTL/*.cpp",
         "lib/Dialect/IREEPyDM/Transforms/ToIREE/*.cpp",
+        "lib/Dialect/IREEPyDM/Utils/*.cpp",
     ]),
     hdrs = glob([
         "include/iree-dialects/Dialect/IREEPyDM/Transforms/*.h",
         "include/iree-dialects/Dialect/IREEPyDM/Transforms/**/*.h",
+        "include/iree-dialects/Dialect/IREEPyDM/Utils/*.h",
         "lib/Dialect/IREEPyDM/Transforms/*.h",
     ]),
     deps = [
@@ -291,6 +301,7 @@ cc_library(
         ":IREEPyDMTransformsIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Parser",
@@ -318,5 +329,29 @@ cc_library(
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
+    ],
+)
+
+################################################################################
+# Tools
+################################################################################
+
+cc_binary(
+    name = "iree-dialects-opt",
+    srcs = [
+        "tools/iree-dialects-opt/iree-dialects-opt.cpp",
+    ],
+    tags = ["hostonly"],
+    deps = [
+        ":IREEDialect",
+        ":IREEPyDMDialect",
+        ":IREEPyDMTransforms",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
     ],
 )

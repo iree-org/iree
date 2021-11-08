@@ -264,6 +264,15 @@ void IREEImportPublicPass::runOnOperation() {
   auto isIllegalType = [&](Type t) {
     return t.getDialect().getTypeID() == ireeDialect->getTypeID();
   };
+  auto isLegallyTypedOp = [&](Operation *op) -> bool {
+    for (Type type : op->getResultTypes()) {
+      if (isIllegalType(type)) return false;
+    }
+    for (Type type : op->getOperandTypes()) {
+      if (isIllegalType(type)) return false;
+    }
+    return true;
+  };
 
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
     for (Type type : funcOp.getType().getInputs()) {
@@ -272,18 +281,14 @@ void IREEImportPublicPass::runOnOperation() {
     for (Type type : funcOp.getType().getResults()) {
       if (isIllegalType(type)) return false;
     }
-    return true;
-  });
-
-  target.markUnknownOpDynamicallyLegal([&](Operation *op) {
-    for (Type type : op->getResultTypes()) {
-      if (isIllegalType(type)) return false;
-    }
-    for (Type type : op->getOperandTypes()) {
-      if (isIllegalType(type)) return false;
+    for (Block &block : funcOp.body()) {
+      for (Type type : block.getArgumentTypes()) {
+        if (isIllegalType(type)) return false;
+      }
     }
     return true;
   });
+  target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
   IREETypeConverter typeConverter;
   PatternBenefit specific_benefit = 100;

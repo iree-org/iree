@@ -40,13 +40,13 @@ class IREEPyDM_PrimitiveTypeDef<
     TypeDef<IREEPyDM_Dialect, name, /*traits=*/[
       DeclareTypeInterfaceMethods<PythonTypeInterface, overridenMethods>
     ],
-    /*baseCppClass=*/"::mlir::iree_pydm::PrimitiveType"> {
+    /*baseCppClass=*/"::mlir::iree_compiler::IREE::PYDM::PrimitiveType"> {
 }
 
 def IREEPyDM_AnyPrimitiveType : Type<
-    CPred<"$_self.isa<::mlir::iree_pydm::PrimitiveType>()">,
+    CPred<"$_self.isa<::mlir::iree_compiler::IREE::PYDM::PrimitiveType>()">,
     "unboxed primitive type",
-    "::mlir::iree_pydm::PrimitiveType">;
+    "::mlir::iree_compiler::IREE::PYDM::PrimitiveType">;
 
 def IREEPyDM_BoolType : IREEPyDM_PrimitiveTypeDef<"Bool", [
     "getNumericPromotionOrder", "getNumericCategory", "getNumericSubTypeCode"]> {
@@ -198,13 +198,85 @@ def IREEPyDM_IntegerType : IREEPyDM_PrimitiveTypeDef<"Integer", [
   }];
 }
 
-def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List"> {
+def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List", ["isRefinable"]> {
   let mnemonic = "list";
 
-  let summary = "Mutable sequence of boxed values";
+  let summary = "Mutable sequence of elements";
 
   let description = [{
     Corresponds to the "Lists" type in the data model.
+  }];
+
+  let parameters = (ins
+    "CollectionStorageClass":$storageClass,
+    "Type":$uniformElementType
+  );
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return Base::get($_ctxt, CollectionStorageClass::Boxed, nullptr);
+    }]>
+  ];
+
+  let printer = [{
+    $_printer << getMnemonic();
+    if (getImpl()->uniformElementType ||
+        getImpl()->storageClass != CollectionStorageClass::Boxed) {
+      $_printer << "<";
+      switch (getImpl()->storageClass) {
+        case CollectionStorageClass::Boxed:
+          $_printer << "boxed";
+          break;
+        case CollectionStorageClass::Empty:
+          $_printer << "empty";
+          break;
+        case CollectionStorageClass::Unboxed:
+          $_printer << "unboxed";
+          break;
+      }
+
+      if (getImpl()->uniformElementType) {
+        $_printer << ",";
+        $_printer << getImpl()->uniformElementType;
+      }
+      $_printer << ">";
+    }
+  }];
+
+  let parser = [{
+    if (parser.parseOptionalLess())
+      return get($_ctxt, CollectionStorageClass::Boxed, nullptr);
+
+    Type t;
+    StringRef storageClassKeyword;
+    if ($_parser.parseKeyword(&storageClassKeyword))
+      return Type();
+    if ($_parser.parseComma())
+      return Type();
+    if ($_parser.parseType(t))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+
+    CollectionStorageClass storageClass;
+    if (storageClassKeyword == "boxed")
+      storageClass = CollectionStorageClass::Boxed;
+    else if (storageClassKeyword == "empty")
+      storageClass = CollectionStorageClass::Empty;
+    else if (storageClassKeyword == "unboxed")
+      storageClass = CollectionStorageClass::Unboxed;
+    else {
+      $_parser.emitError($_parser.getCurrentLocation(), "expected one of 'boxed', 'empty', 'unboxed'");
+      return Type();
+    }
+    return get($_ctxt, storageClass, t);
+  }];
+
+  let extraClassDeclaration = [{
+    /// Gets the type used to store elements in the backing list.
+    /// For empty or boxed lists, this will be a generic ObjectType.
+    /// For unboxed lists, it will be the uniform element type.
+    Type getElementStorageType() const;
   }];
 }
 
@@ -303,6 +375,12 @@ def IREEPyDM_TupleType : IREEPyDM_PrimitiveTypeDef<"Tuple"> {
   let description = [{
     Corresponds to the "Tuples" type in the data model.
   }];
+  let extraClassDeclaration = [{
+    /// Gets the type used to store elements in the backing list.
+    /// For empty or boxed lists, this will be a generic ObjectType.
+    /// For unboxed lists, it will be the uniform element type.
+    Type getElementStorageType() const;
+  }];
 }
 
 def IREEPyDM_TypeType : IREEPyDM_PrimitiveTypeDef<"Type"> {
@@ -321,7 +399,9 @@ def IREEPyDM_TypeType : IREEPyDM_PrimitiveTypeDef<"Type"> {
 //===----------------------------------------------------------------------===//
 
 def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
-    "Object", [DeclareTypeInterfaceMethods<PythonTypeInterface>]> {
+    "Object", [
+      DeclareTypeInterfaceMethods<PythonTypeInterface, ["isRefinable"]>
+    ]> {
   let mnemonic = "object";
 
   let summary = "Core data type having an identity, type and value";
@@ -339,8 +419,14 @@ def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
   }];
 
   let parameters = (ins
-    "::mlir::iree_pydm::PrimitiveType":$primitiveType
+    "::mlir::iree_compiler::IREE::PYDM::PrimitiveType":$primitiveType
   );
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return Base::get($_ctxt, nullptr);
+    }]>
+  ];
 
   let printer = [{
     $_printer << getMnemonic();
@@ -426,7 +512,7 @@ def IREEPyDM_UnionType : IREEPyDM_TypeDef<"Union"> {
 //===----------------------------------------------------------------------===//
 
 def IREEPyDM_PrimitiveType : Type<CPred<
-  "$_self.isa<::mlir::iree_pydm::PrimitiveType>()">,
+  "$_self.isa<::mlir::iree_compiler::IREE::PYDM::PrimitiveType>()">,
   "Python unboxed primitive type">;
 
 def IREEPyDM_AnyValueType : AnyTypeOf<[
@@ -441,10 +527,10 @@ def IREEPyDM_AnyNumericType : AnyTypeOf<[
 ], "Python numeric type">;
 
 def IREEPyDM_GenericObjectType : Type<
-    CPred<"::mlir::iree_pydm::ObjectType::isGenericObjectType($_self)">,
+    CPred<"::mlir::iree_compiler::IREE::PYDM::ObjectType::isGenericObjectType($_self)">,
     "generic object",
-    "::mlir::iree_pydm::ObjectType">,
-    BuildableType<"$_builder.getType<::mlir::iree_pydm::ObjectType>(nullptr)">;
+    "::mlir::iree_compiler::IREE::PYDM::ObjectType">,
+    BuildableType<"$_builder.getType<::mlir::iree_compiler::IREE::PYDM::ObjectType>(nullptr)">;
 
 // TODO: Upstream this. Missing from OpBase.td.
 def IREEPyDM_FlatSymbolRefArrayAttr :

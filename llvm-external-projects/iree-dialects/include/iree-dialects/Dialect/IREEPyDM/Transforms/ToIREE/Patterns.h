@@ -13,7 +13,9 @@ class MLIRContext;
 class TypeConverter;
 class RewritePatternSet;
 
-namespace iree_pydm {
+namespace iree_compiler {
+namespace IREE {
+namespace PYDM {
 
 /// Populates patterns to lower from the iree_pydm dialect to the IREE
 // standard input dialects for core language structures.
@@ -21,7 +23,9 @@ void populatePyDMToIREELoweringPatterns(MLIRContext *context,
                                         TypeConverter &typeConverter,
                                         RewritePatternSet &patterns);
 
-}  // namespace iree_pydm
+}  // namespace PYDM
+}  // namespace IREE
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_TOIREE_LOWERING_PATTERNS_H

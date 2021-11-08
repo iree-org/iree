@@ -9,7 +9,8 @@
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
 namespace {
 
@@ -18,7 +19,6 @@ struct FixateWeakNumericPass
   void runOnOperation() override {
     Operation *rootOp = getOperation();
     rootOp->walk([&](Operation *op) {
-      op->dump();
       convertOperation(op);
       return WalkResult::advance();
     });
@@ -40,7 +40,7 @@ struct FixateWeakNumericPass
     }
 
     // Special cases for operations.
-    if (auto funcOp = llvm::dyn_cast<iree_pydm::FuncOp>(op)) {
+    if (auto funcOp = llvm::dyn_cast<PYDM::FuncOp>(op)) {
       FunctionType existingFt = funcOp.getType();
       FunctionType newFt = convertFunctionType(existingFt);
       if (newFt != existingFt) {
@@ -56,23 +56,22 @@ struct FixateWeakNumericPass
   Type convertType(Type type) {
     // TODO: The specific types we promote to need to be configured by the
     // lowering options.
-    if (auto integerType = type.dyn_cast<iree_pydm::IntegerType>()) {
+    if (auto integerType = type.dyn_cast<PYDM::IntegerType>()) {
       if (integerType.isWeak()) {
-        return iree_pydm::IntegerType::get(type.getContext(), 32);
+        return PYDM::IntegerType::get(type.getContext(), 32);
       }
-    } else if (auto realType = type.dyn_cast<iree_pydm::RealType>()) {
+    } else if (auto realType = type.dyn_cast<PYDM::RealType>()) {
       if (realType.isWeak()) {
-        return iree_pydm::RealType::get(
-            type.getContext(), mlir::Float32Type::get(type.getContext()));
+        return PYDM::RealType::get(type.getContext(),
+                                   mlir::Float32Type::get(type.getContext()));
       }
-    } else if (auto objectType = type.dyn_cast<iree_pydm::ObjectType>()) {
+    } else if (auto objectType = type.dyn_cast<PYDM::ObjectType>()) {
       Type primitiveType = objectType.getPrimitiveType();
       if (primitiveType) {
         Type newPrimitiveType = convertType(primitiveType);
         if (newPrimitiveType != primitiveType) {
-          return iree_pydm::ObjectType::get(
-              type.getContext(),
-              newPrimitiveType.cast<iree_pydm::PrimitiveType>());
+          return PYDM::ObjectType::get(
+              type.getContext(), newPrimitiveType.cast<PYDM::PrimitiveType>());
         }
       }
     }
@@ -107,7 +106,6 @@ struct FixateWeakNumericPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<>>
-mlir::iree_pydm::createFixateWeakNumericPass() {
+std::unique_ptr<OperationPass<>> PYDM::createFixateWeakNumericPass() {
   return std::make_unique<FixateWeakNumericPass>();
 }

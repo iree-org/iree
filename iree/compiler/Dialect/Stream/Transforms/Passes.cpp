@@ -131,6 +131,22 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // move across devices. We do it before scheduling waves as lifetime doesn't
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
+
+  //----------------------------------------------------------------------------
+  // Stream formation and scheduling
+  //----------------------------------------------------------------------------
+
+  // Combine async work into execution regions.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createScheduleExecutionPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createScheduleExecutionPass());
+
+  // Group concurrently executable work into waves.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createScheduleConcurrencyPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createScheduleConcurrencyPass());
 }
 
 //===----------------------------------------------------------------------===//

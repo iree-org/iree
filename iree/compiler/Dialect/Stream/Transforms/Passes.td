@@ -70,6 +70,26 @@ def RefineUsage :
 }
 
 //===----------------------------------------------------------------------===//
+// Stream formation and scheduling
+//===----------------------------------------------------------------------===//
+
+def ScheduleExecution :
+    Pass<"iree-stream-schedule-execution", ""> {
+  let summary = "Identifies and groups asynchronous operations into executable regions within function-like regions.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createScheduleExecutionPass()
+  }];
+}
+
+def ScheduleConcurrency :
+    Pass<"iree-stream-schedule-concurrency", ""> {
+  let summary = "Identifies and groups asynchronous operations within executable regions that can run concurrently and groups them into streams.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createScheduleConcurrencyPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 

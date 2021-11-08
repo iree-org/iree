@@ -20,9 +20,8 @@
 #define DEBUG_TYPE "iree_pydm"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
-
-namespace pydm_d = mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
 static StringRef safeModuleName(Operation *op) {
   if (auto moduleOp = dyn_cast<ModuleOp>(op)) {
@@ -210,8 +209,7 @@ class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>>
-mlir::iree_pydm::createLinkIREEPyDMRTLPass(
+std::unique_ptr<OperationPass<ModuleOp>> PYDM::createLinkIREEPyDMRTLPass(
     Optional<SourceBundle> linkRtlSourceBundle) {
   return std::make_unique<LinkIREEPyDMRTLPass>(std::move(linkRtlSourceBundle));
 }

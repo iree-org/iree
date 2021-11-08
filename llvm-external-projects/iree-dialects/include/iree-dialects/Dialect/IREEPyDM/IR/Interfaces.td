@@ -14,7 +14,7 @@ def PythonTypeInterface : TypeInterface<"PythonTypeInterface"> {
     Interface implemented by all Python types which represent a value in the
     data model.
   }];
-  let cppNamespace = "::mlir::iree_pydm";
+  let cppNamespace = "::mlir::iree_compiler::IREE::PYDM";
 
   let methods = [
     InterfaceMethod<[{
@@ -27,6 +27,14 @@ def PythonTypeInterface : TypeInterface<"PythonTypeInterface"> {
       This is used for both diagnostic messages and sorting order. No two
       MLIR types can have the same name.
     }], "llvm::StringRef", "getPythonTypeName", (ins)>,
+
+    InterfaceMethod<[{
+      Returns whether the type can be refined any further or whether it is
+      already in the most refined form. Most types default to false.
+    }], "bool", "isRefinable", (ins),
+    /*methodBody=*/[{}], /*defaultImplementation=*/[{
+      return false;
+    }]>,
 
     InterfaceMethod<[{
       For numeric types, returns the NumericCategory.
@@ -51,6 +59,25 @@ def PythonTypeInterface : TypeInterface<"PythonTypeInterface"> {
     }], "llvm::Optional<int>", "getNumericPromotionOrder", (ins),
     /*methodBody=*/[{}], /*defaultImplementation=*/[{
       return {};
+    }]>
+  ];
+}
+
+def TypeRefinableOpInterface : OpInterface<"TypeRefinableOpInterface"> {
+  let description = [{
+    Implemented by ops which can cooperate with type inference/refinement.
+  }];
+  let cppNamespace = "::mlir::iree_compiler::IREE::PYDM";
+
+  let methods = [
+    InterfaceMethod<[{
+      Performs an in-place refinement of the result types, returning whether
+      any changes were made. As a general rule, it is only legal to *refine*
+      types into a more specialized form which is suitable for a
+      static_info_cast.
+    }], "bool", "refineResultTypes", (ins),
+    /*methodBody=*/[{}], /*defaultImplementation=*/[{
+      return false;
     }]>
   ];
 }

@@ -17,7 +17,25 @@ def FixateWeakNumeric : Pass<"fixate-weak-numeric", ""> {
     This can also be a useful thing to do early in development in order to
     eliminate these weak types.
   }];
-  let constructor = "mlir::iree_pydm::createFixateWeakNumericPass()";
+  let constructor = "mlir::iree_compiler::IREE::PYDM::createFixateWeakNumericPass()";
+}
+
+def LocalPropagateTypes : Pass<"pydm-local-propagate-types", "mlir::iree_compiler::IREE::PYDM::FuncOp"> {
+  let summary = "Performs some local type propagation";
+  let description = [{
+    This pass does some very basic, post import type propagation. It isn't very
+    good and is basically sufficient to de-dynamize some core parts of the RTL.
+    It should be replaced with a real implementation as part of optimization.
+  }];
+  let constructor = "mlir::iree_compiler::IREE::PYDM::createLocalPropagateTypesPass()";
+}
+
+def VariablesToSSA : Pass<"pydm-variables-to-ssa", "mlir::iree_compiler::IREE::PYDM::FuncOp"> {
+  let summary = "Variables to SSA";
+  let description = [{
+    Attempts to convert loads and stores to SSA form, where possible.
+  }];
+  let constructor = "mlir::iree_compiler::IREE::PYDM::createVariablesToSSAPass()";
 }
 
 def LowerIREEPyDMToRTL : Pass<"lower-iree-pydm-to-rtl", "ModuleOp"> {
@@ -27,7 +45,7 @@ def LowerIREEPyDMToRTL : Pass<"lower-iree-pydm-to-rtl", "ModuleOp"> {
     generic (object-based) ops need to be lowered to runtime library calls.
     This pass makes such conversions and emits imports.
   }];
-  let constructor = "mlir::iree_pydm::createLowerIREEPyDMToRTLPass()";
+  let constructor = "mlir::iree_compiler::IREE::PYDM::createLowerIREEPyDMToRTLPass()";
 }
 
 def LinkIREEPyDMRTL : Pass<"link-iree-pydm-rtl", "ModuleOp"> {
@@ -41,7 +59,7 @@ def LinkIREEPyDMRTL : Pass<"link-iree-pydm-rtl", "ModuleOp"> {
     Option<"rtlFile", "rtl-file", "std::string", /*default=*/"std::string()",
            "File containing the RTL to link. Required for non-API use.">,
   ];
-  let constructor = "mlir::iree_pydm::createLinkIREEPyDMRTLPass()";
+  let constructor = "mlir::iree_compiler::IREE::PYDM::createLinkIREEPyDMRTLPass()";
 }
 
 def ConvertIREEPyDMToIREE : Pass<"convert-iree-pydm-to-iree", "ModuleOp"> {
@@ -50,7 +68,7 @@ def ConvertIREEPyDMToIREE : Pass<"convert-iree-pydm-to-iree", "ModuleOp"> {
     Converts whole modules from Python in the iree_pydm dialect to the IREE
     dialect + various standard dialects.
   }];
-  let constructor = "mlir::iree_pydm::createConvertIREEPyDMToIREEPass()";
+  let constructor = "mlir::iree_compiler::IREE::PYDM::createConvertIREEPyDMToIREEPass()";
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREEPYDM_CONVERSION_TO_IREE_PASSES_TD

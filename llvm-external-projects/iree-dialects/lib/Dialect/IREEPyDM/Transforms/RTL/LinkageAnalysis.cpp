@@ -10,12 +10,11 @@
 #include "mlir/IR/SymbolTable.h"
 
 using namespace mlir;
-using namespace mlir::iree_pydm;
-
-namespace pydm_d = mlir::iree_pydm;
+namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+using namespace PYDM;
 
 LinkageAnalysis::LinkageAnalysis(Operation *moduleOp) {
-  moduleOp->walk<WalkOrder::PreOrder>([&](pydm_d::FuncOp f) {
+  moduleOp->walk<WalkOrder::PreOrder>([&](PYDM::FuncOp f) {
     if (f.empty()) externFuncOps.push_back(f);
     // We don't need to descend into functions so just skip them.
     return WalkResult::skip();

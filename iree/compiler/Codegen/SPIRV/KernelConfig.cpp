@@ -385,7 +385,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // 1) distributing to as many threads as possible, and 2) avoid assigning too
   // many threads to handle out-of-bound elements (thus idle).
 
-  SmallVector<TiledLoopInfo> tiledLoopInfo = getTiledLoopInfo(funcOp);
+  SmallVector<LoopTilingAndDistributionInfo> tiledLoopInfo =
+      getTiledAndDistributedLoopInfo(funcOp);
   // The number of linalg implicit loops to partition and tiled loops
   // surrounding the op should match. Otherwise, something is incorrect.
   assert(partitionedLoops.size() == tiledLoopInfo.size());
@@ -395,8 +396,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // tiledLoopInfo uses the reverse order of partitionedLoops.
   for (auto pair : llvm::zip(llvm::reverse(partitionedLoops), tiledLoopInfo)) {
     unsigned loopIndex = std::get<0>(pair);
-    const TiledLoopInfo &loopInfo = std::get<1>(pair);
-    Optional<int64_t> attrValue = getConstantIntValue(loopInfo.ub);
+    const LoopTilingAndDistributionInfo &loopInfo = std::get<1>(pair);
+    Optional<int64_t> attrValue =
+        getConstantIntValue(loopInfo.untiledUpperBound);
     if (attrValue) {
       loopBounds[loopIndex] = *attrValue;
     } else {
@@ -624,7 +626,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     if (getTranslationInfo(entryPointOp)) continue;
 
     SmallVector<Operation *> computeOps;
-    SmallVector<TiledLoopInfo> tiledLoops;
+    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return funcOp.emitOpError("failed to get compute ops");
     }
