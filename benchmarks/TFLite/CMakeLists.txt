@@ -91,6 +91,32 @@ iree_benchmark_suite(
     "dylib-sync"
 )
 
+# CPU, Dylib, 1-thread, big/little-core, full-inference. These benchmarks only
+# configure IREE translation and runtime flags for the target architecture and
+# runtime characteristics and do *not* include any non-default flags. No
+# non-default flags should be added here.
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "1-thread,big-core,full-inference,default-flags"
+    "1-thread,little-core,full-inference,default-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=1"
+)
+
 # CPU, Dylib, 1-thread, big/little-core, full-inference
 iree_benchmark_suite(
   MODULES

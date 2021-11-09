@@ -213,9 +213,12 @@ iree_check_single_backend_test_suite(
             "reshape.mlir",
             "reverse.mlir",
             "rsqrt.mlir",
+            "scatter.mlir",
+            "scatter_dynamic.mlir",
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
+            "sort.mlir",
             "sqrt.mlir",
             "subtract.mlir",
             "tanh.mlir",
@@ -227,9 +230,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "fft.mlir",  # TODO(#6601): Eanble the test.
             "round.mlir",
-            "scatter.mlir",  # TODO(#6601): Enable the test.
-            "scatter_dynamic.mlir",  # TODO(#6601): Enable the test.
-            "sort.mlir",
             "rng_uniform.mlir",  # TODO(#6995): Enable the test.
             "rng_normal.mlir",  # TODO(#6995): Enable the test.
         ],

@@ -89,6 +89,14 @@ def ScheduleConcurrency :
   }];
 }
 
+def PropagateTimepoints :
+    Pass<"iree-stream-propagate-timepoints", "mlir::ModuleOp"> {
+  let summary = "Materializes timepoints and sinks them to consumers throughout the whole program.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPropagateTimepointsPass()
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//

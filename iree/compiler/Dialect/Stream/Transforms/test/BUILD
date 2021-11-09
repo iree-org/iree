@@ -22,6 +22,7 @@ iree_lit_test_suite(
             "encode_tensors.mlir",
             "materialize_copy_on_write.mlir",
             "outline_constants.mlir",
+            "propagate_timepoints.mlir",
             "refine_usage.mlir",
             "schedule_concurrency.mlir",
             "schedule_execution.mlir",

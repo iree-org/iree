@@ -126,15 +126,17 @@ class PackAllocationsPass
 
     Value offset = baseOffset;
     for (auto &slice : slices) {
-      auto sliceSize =
-          IREE::Util::align(loc, slice.dynamicSize, rangeAlignment, builder);
+      auto sliceSize = builder.createOrFold<IREE::Util::AlignOp>(
+          loc, slice.dynamicSize, rangeAlignment);
       slice.packedOffset.replaceAllUsesWith(offset);
-      offset = IREE::Util::align(
-          loc, builder.createOrFold<arith::AddIOp>(loc, offset, sliceSize),
-          offsetAlignment, builder);
+      auto valueToAlign =
+          builder.createOrFold<arith::AddIOp>(loc, offset, sliceSize);
+      offset = builder.createOrFold<IREE::Util::AlignOp>(loc, valueToAlign,
+                                                         offsetAlignment);
     }
 
-    return IREE::Util::align(loc, offset, rangeAlignment, builder);
+    return builder.createOrFold<IREE::Util::AlignOp>(loc, offset,
+                                                     rangeAlignment);
   }
 
   // Packs a set of statically-sized slices by greedy strip packing.
@@ -277,8 +279,8 @@ class PackAllocationsPass
     // reservation.
     Value offset = baseOffset;
     for (auto &sizeBucket : slicesBySize) {
-      auto sliceSize =
-          IREE::Util::align(loc, sizeBucket.first, rangeAlignment, builder);
+      auto sliceSize = builder.createOrFold<IREE::Util::AlignOp>(
+          loc, sizeBucket.first, rangeAlignment);
       auto &slices = sizeBucket.second;
       std::stable_sort(slices.begin(), slices.end());
 
@@ -312,16 +314,19 @@ class PackAllocationsPass
           // Allocate a new bin for this slice.
           bins.push_back({offset, {}});
           targetBin = &bins.back();
-          offset = IREE::Util::align(
-              loc, builder.createOrFold<arith::AddIOp>(loc, offset, sliceSize),
-              offsetAlignment, builder);
+
+          auto valueToAlign =
+              builder.createOrFold<arith::AddIOp>(loc, offset, sliceSize);
+          offset = builder.createOrFold<IREE::Util::AlignOp>(loc, valueToAlign,
+                                                             offsetAlignment);
         }
         targetBin->slices.push_back(slice);
         slice->packedOffset.replaceAllUsesWith(targetBin->offset);
       }
     }
 
-    return IREE::Util::align(loc, offset, rangeAlignment, builder);
+    return builder.createOrFold<IREE::Util::AlignOp>(loc, offset,
+                                                     rangeAlignment);
   }
 };
 
