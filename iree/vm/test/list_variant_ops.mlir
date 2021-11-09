@@ -90,6 +90,63 @@ vm.module @list_variant_ops {
   }
 
   //===--------------------------------------------------------------------===//
+  // vm.list.swap and vm.list.copy with variant types
+  //===--------------------------------------------------------------------===//
+  vm.rodata private @byte_buffer_123 dense<[1, 2, 3]> : tensor<3xi32>
+  vm.rodata private @byte_buffer_456 dense<[4, 5, 6]> : tensor<3xi32>
+
+  vm.export @test_swap_copy_list_variant
+  vm.func @test_swap_copy_list_variant() {
+    %capacity = vm.const.i32 4 : i32
+    %list0 = vm.list.alloc %capacity : (i32) -> !vm.list<?>
+    vm.list.resize %list0, %capacity : (!vm.list<?>, i32)
+
+    %list1 = vm.list.alloc %capacity : (i32) -> !vm.list<?>
+    vm.list.resize %list1, %capacity : (!vm.list<?>, i32)
+
+    // Set list0[0] = (i32)2521, list1[0] = (i32)5953
+    %c0 = vm.const.i32 0 : i32
+    %c2521_i32 = vm.const.i32 2521 : i32
+    %c5953_i32 = vm.const.i32 5953 : i32
+    vm.list.set.i32 %list0, %c0, %c2521_i32 : (!vm.list<?>, i32, i32)
+    vm.list.set.i32 %list1, %c0, %c5953_i32 : (!vm.list<?>, i32, i32)
+
+    // Swap list0 and list1, and check the result: list0[0] = (i32)5953, list1[0] = (i32)2521
+    vm.list.swap %list0, %list1 : !vm.list<?>
+    %list0.v0_i32 = vm.list.get.i32 %list0, %c0 : (!vm.list<?>, i32) -> i32
+    %list1.v0_i32 = vm.list.get.i32 %list1, %c0 : (!vm.list<?>, i32) -> i32
+    vm.check.eq %list0.v0_i32, %c5953_i32 : i32
+    vm.check.eq %list1.v0_i32, %c2521_i32 : i32
+
+    // Set list0[1] = (ref)byte_buffer_123
+    //     list0[2] = (i32)2521
+    //     list0[3] = (ref)byte_buffer_456
+    %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
+    %c3 = vm.const.i32 3 : i32
+    %list0.v1_buf = vm.const.ref.rodata @byte_buffer_123 : !vm.buffer
+    %list0.v3_buf = vm.const.ref.rodata @byte_buffer_456 : !vm.buffer
+    vm.list.set.ref %list0, %c1, %list0.v1_buf : (!vm.list<?>, i32, !vm.buffer)
+    vm.list.set.ref %list0, %c3, %list0.v3_buf : (!vm.list<?>, i32, !vm.buffer)
+    vm.list.set.i32 %list0, %c2, %c2521_i32 : (!vm.list<?>, i32, i32)
+
+    // Copy list0 to list1, and check list1
+    vm.list.copy %list0, %c0, %list1, %c0, %capacity : (!vm.list<?>, i32, !vm.list<?>, i32, i32)
+
+    %list1.copied.v0 = vm.list.get.i32 %list1, %c0 : (!vm.list<?>, i32) -> i32
+    %list1.copied.v1 = vm.list.get.ref %list1, %c1 : (!vm.list<?>, i32) -> !vm.buffer
+    %list1.copied.v2 = vm.list.get.i32 %list1, %c2 : (!vm.list<?>, i32) -> i32
+    %list1.copied.v3 = vm.list.get.ref %list1, %c3 : (!vm.list<?>, i32) -> !vm.buffer
+
+    vm.check.eq %list1.copied.v0, %c5953_i32 : i32
+    vm.check.eq %list1.copied.v1, %list0.v1_buf : !vm.buffer
+    vm.check.eq %list1.copied.v2, %c2521_i32 : i32
+    vm.check.eq %list1.copied.v3, %list0.v3_buf : !vm.buffer
+
+    vm.return
+  }
+
+  //===--------------------------------------------------------------------===//
   // Failure tests
   //===--------------------------------------------------------------------===//
 
