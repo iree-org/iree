@@ -9,8 +9,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
 #include "iree_tf_compiler/TFL/Passes.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -36,7 +34,7 @@ class LowerGlobalTensorsPass
     return "Lowers tflite global tensors to IREE flow dialect variables";
   }
 
-  // Validates that no TFLite frontends ops are in the module.
+  // Converts TFLite state operations to the IREE equivalent.
   void runOnOperation() override {
     auto moduleOp = getOperation();
     mlir::OpBuilder builder(moduleOp.body());
@@ -49,10 +47,11 @@ class LowerGlobalTensorsPass
     DenseMap<StringRef, DenseElementsAttr> sharedNameToConstant;
     DenseMap<StringRef, LocationAttr> sharedNameToLoc;
 
-    llvm::SmallVector<mlir::TFL::VarHandleOp> handleOps;
-    llvm::SmallVector<mlir::TFL::AssignVariableOp> assignOps;
-    llvm::SmallVector<mlir::TFL::ReadVariableOp> readOps;
-    for (auto func : moduleOp.getOps<FuncOp>()) {
+    llvm::SmallVector<mlir::TFL::VarHandleOp, 6> handleOps;
+    llvm::SmallVector<mlir::TFL::AssignVariableOp, 6> assignOps;
+    llvm::SmallVector<mlir::TFL::ReadVariableOp, 6> readOps;
+    for (auto it : symNameToFunction) {
+      auto func = std::get<1>(it);
       // Look through the initialization functions and find the assigned values
       // for each handle, save out the constant value.
       for (auto init : func.getOps<mlir::TFL::CallOnceOp>()) {
@@ -60,12 +59,10 @@ class LowerGlobalTensorsPass
         for (auto assign : initFunc.getOps<mlir::TFL::AssignVariableOp>()) {
           auto handle = dyn_cast<mlir::TFL::VarHandleOp>(
               assign.resource_id().getDefiningOp());
-          auto value = assign.value();
-
           if (!handle) continue;
 
           DenseElementsAttr constant;
-          if (!matchPattern(value, m_Constant(&constant))) continue;
+          if (!matchPattern(assign.value(), m_Constant(&constant))) continue;
           auto name = handle.shared_name();
           sharedNameToConstant[name] = constant;
           sharedNameToLoc[name] = handle.getLoc();
@@ -98,7 +95,12 @@ class LowerGlobalTensorsPass
     for (auto it : sharedNameToConstant) {
       auto name = std::get<0>(it);
       auto attribute = std::get<1>(it);
-      auto loc = sharedNameToLoc[name];
+      auto locIt = sharedNameToLoc.find(name);
+      LocationAttr loc = mlir::UnknownLoc();
+      if (locIt != sharedNameToLoc.end()) {
+        loc = std::get<1>(*locIt);
+      }
+
       std::string flowSymName = "__iree_flow_" + name.str();
 
       // TODO(suderman): Determine the global type based on all store
@@ -114,7 +116,10 @@ class LowerGlobalTensorsPass
     for (auto handle : handleOps) {
       auto name = handle.shared_name();
       auto flowName = sharedNameToFlowName[name];
-      auto attribute = sharedNameToConstant[name];
+      auto constIt = sharedNameToConstant.find(name);
+      if (constIt == sharedNameToConstant.end()) continue;
+
+      auto attribute = std::get<1>(*constIt);
 
       builder.setInsertionPoint(handle);
       auto address = builder.create<iree_compiler::IREE::Util::GlobalAddressOp>(
@@ -127,6 +132,10 @@ class LowerGlobalTensorsPass
 
     // Replace the assign ops with a global store operation.
     for (auto assign : assignOps) {
+      auto address = dyn_cast<iree_compiler::IREE::Util::GlobalAddressOp>(
+          assign.resource_id().getDefiningOp());
+      if (!address) continue;
+
       builder.setInsertionPoint(assign);
       builder.create<iree_compiler::IREE::Util::GlobalStoreIndirectOp>(
           assign.getLoc(), assign.value(), assign.resource_id());
@@ -135,11 +144,14 @@ class LowerGlobalTensorsPass
 
     // Replace the read ops with a global load operation.
     for (auto read : readOps) {
-      auto address = cast<iree_compiler::IREE::Util::GlobalAddressOp>(
+      auto address = dyn_cast<iree_compiler::IREE::Util::GlobalAddressOp>(
           read.resource_id().getDefiningOp());
-      auto type = address.getType()
-                      .cast<iree_compiler::IREE::Util::PtrType>()
-                      .getTargetType();
+      if (!address) continue;
+
+      auto ptrType = address.getType().dyn_cast<iree_compiler::IREE::Util::PtrType>();
+      if (!ptrType) continue;
+
+      auto type = ptrType.getTargetType();
 
       builder.setInsertionPoint(read);
       auto load =
