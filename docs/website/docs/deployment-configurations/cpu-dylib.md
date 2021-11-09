@@ -73,9 +73,6 @@ If you want to explicitly specify HAL drivers to support, you will need to add
 `DYLIB-LLVM-AOT` to the `IREE_TARGET_BACKENDS_TO_BUILD` CMake list variable when
 configuring (for host).
 
-The LLVM-based compiler also needs the `lld` linker, which can be built from
-source or [installed along with LLVM](https://releases.llvm.org/download.html).
-
 ## Compile and run the model
 
 With the compiler and runtime for dynamic libraries, we can now compile a model

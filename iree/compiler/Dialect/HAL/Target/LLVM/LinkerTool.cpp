@@ -165,6 +165,28 @@ std::string LinkerTool::findToolInEnvironment(
     }
   }
 
+  // Then search the build tree.
+  SmallString<256> mainExecutable =
+      llvm::sys::fs::getMainExecutable(nullptr, nullptr);
+  if (!mainExecutable.empty()) {
+    llvm::sys::path::remove_filename(mainExecutable);
+
+    for (auto toolName : toolNames) {
+      std::string normalizedToolName = normalizeToolNameForPlatform(toolName);
+
+      SmallString<256> pathStorage;
+      llvm::sys::path::append(pathStorage, std::string(mainExecutable),
+                              "../../third_party/llvm-project/llvm/bin/",
+                              normalizedToolName);
+
+      if (llvm::sys::fs::exists(std::string(pathStorage))) {
+        llvm::SmallString<256> absolutePath(pathStorage);
+        llvm::sys::fs::make_absolute(absolutePath);
+        return escapeCommandLineComponent(std::string(absolutePath));
+      }
+    }
+  }
+
   // Next search the environment path.
   for (auto toolName : toolNames) {
     toolName = normalizeToolNameForPlatform(toolName);
