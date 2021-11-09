@@ -78,6 +78,8 @@ function(iree_benchmark_suite)
     "BENCHMARK_MODES;MODULES"
   )
 
+  iree_package_name(PACKAGE_NAME)
+
   foreach(_MODULE IN LISTS _RULE_MODULES)
     cmake_parse_arguments(
       _MODULE
@@ -107,7 +109,7 @@ function(iree_benchmark_suite)
       # Update the source file to the downloaded-to place.
       string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_SOURCE_URL}")
       list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
-      set(_DOWNLOAD_TARGET "iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
+      set(_DOWNLOAD_TARGET "${PACKAGE_NAME}_iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
       # Strip off gzip suffix if present (downloader unzips if necessary)
       string(REGEX REPLACE "\.gz$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
@@ -138,7 +140,7 @@ function(iree_benchmark_suite)
       set(_TFLITE_FILE "${_MODULE_SOURCE}")
       set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
       get_filename_component(_TFLITE_FILE_BASENAME "${_TFLITE_FILE}" NAME)
-      set(_TFLITE_IMPORT_TARGET "iree-import-tflite-${_TFLITE_FILE_BASENAME}")
+      set(_TFLITE_IMPORT_TARGET "${PACKAGE_NAME}_iree-import-tflite-${_TFLITE_FILE_BASENAME}")
       if (NOT TARGET "${_TFLITE_IMPORT_TARGET}")
         add_custom_command(
           OUTPUT "${_MODULE_SOURCE}"
@@ -195,7 +197,7 @@ function(iree_benchmark_suite)
       # MLIR source and translation flags.
       set(
         _TRANSLATION_TARGET_NAME
-        "iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}"
+        "${PACKAGE_NAME}_iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}"
       )
       if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
         add_custom_command(
@@ -257,6 +259,7 @@ function(iree_benchmark_suite)
       set(_FLAGFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-flagfile")
       list(APPEND _FLAGFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
       list(JOIN _FLAGFILE_GEN_TARGET_NAME_LIST "__" _FLAGFILE_GEN_TARGET_NAME)
+      set(_FLAGFILE_GEN_TARGET_NAME "${PACKAGE_NAME}_${_FLAGFILE_GEN_TARGET_NAME}")
 
       add_custom_target("${_FLAGFILE_GEN_TARGET_NAME}"
         DEPENDS "${_FLAG_FILE}"
