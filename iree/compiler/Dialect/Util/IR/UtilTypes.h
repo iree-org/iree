@@ -187,9 +187,6 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
   return align(value, alignment.getZExtValue());
 }
 
-// Aligns |value| to |alignment|, rounding up if needed.
-Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder);
-
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler
