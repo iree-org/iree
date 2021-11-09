@@ -142,7 +142,8 @@ class LowerGlobalTensorsPass
           read.resource_id().getDefiningOp());
       if (!address) continue;
 
-      auto ptrType = address.getType().dyn_cast<iree_compiler::IREE::Util::PtrType>();
+      auto ptrType =
+          address.getType().dyn_cast<iree_compiler::IREE::Util::PtrType>();
       if (!ptrType) continue;
 
       auto type = ptrType.getTargetType();
