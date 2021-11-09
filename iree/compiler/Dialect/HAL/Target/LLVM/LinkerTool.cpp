@@ -144,6 +144,7 @@ static std::string normalizeToolNameForPlatform(const std::string &toolName) {
 
 static std::string findToolAtPath(
     SmallVector<std::string, 4> normalizedToolNames, const Twine &path) {
+  LLVM_DEBUG(llvm::dbgs() << "Searching for tool at path '" << path << "'\n");
   for (auto toolName : normalizedToolNames) {
     SmallString<256> pathStorage;
     llvm::sys::path::append(pathStorage, path, toolName);
@@ -176,6 +177,9 @@ std::string LinkerTool::findToolInEnvironment(
   for (auto toolName : toolNames) {
     normalizedToolNames.push_back(normalizeToolNameForPlatform(toolName));
   }
+  LLVM_DEBUG(llvm::dbgs() << "Searching environment for one of these tools: [";
+             llvm::interleaveComma(normalizedToolNames, llvm::dbgs());
+             llvm::dbgs() << "]\n");
 
   std::string mainExecutablePath =
       llvm::sys::fs::getMainExecutable(nullptr, nullptr);
