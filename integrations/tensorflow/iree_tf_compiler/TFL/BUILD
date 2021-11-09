@@ -64,6 +64,6 @@ cc_library(
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TransformUtils",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
-        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
+        "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_tfl_passes",
     ],
 )

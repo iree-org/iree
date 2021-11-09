@@ -18,6 +18,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/MlirOptMain.h"
 #include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
+#include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
 #include "tensorflow/compiler/mlir/tosa/transforms/passes.h"
 
@@ -30,6 +31,8 @@ int main(int argc, char **argv) {
   registry.insert<mlir::TFL::TensorFlowLiteDialect>();
   registry.insert<mlir::StandardOpsDialect>();
   registry.insert<mlir::tosa::TosaDialect>();
+
+  RegisterAllTensorFlowDialects(registry);
 
   mlir::iree_integrations::TFL::registerAllPasses();
   mlir::tosa::registerLegalizeTosaPasses();
