@@ -58,9 +58,11 @@ class EmbeddedLinkerTool : public LinkerTool {
         findToolInEnvironment({"iree-lld", "lld", "ld.lld", "lld-link"});
     if (!environmentPath.empty()) return environmentPath;
 
-    llvm::errs() << "LLD (ld.lld) not found on path; specify with the "
-                    "IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment variable or "
-                    "-iree-llvm-embedded-linker-path=\n";
+    llvm::errs() << "error: embedded linker tool (typically `lld`) not found; "
+                    "either (1) install lld and place it on your PATH, (2) set "
+                    "the IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment "
+                    "variable or (3) set the -iree-llvm-embedded-linker-path= "
+                    "flag\n";
     return "";
   }
 
