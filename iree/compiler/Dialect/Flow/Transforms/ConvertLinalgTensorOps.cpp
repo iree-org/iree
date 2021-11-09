@@ -102,7 +102,8 @@ struct ConvertSplatConstantOp : public OpRewritePattern<mlir::ConstantOp> {
     }
     auto tensorType = op.getType().cast<TensorType>();
     auto elementValue = rewriter.createOrFold<mlir::ConstantOp>(
-        op.getLoc(), tensorType.getElementType(), splatAttr.getSplatValue());
+        op.getLoc(), tensorType.getElementType(),
+        splatAttr.getSplatValue<Attribute>());
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
         op, tensorType, elementValue, ValueRange{});
     return success();

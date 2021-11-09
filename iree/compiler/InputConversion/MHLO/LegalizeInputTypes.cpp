@@ -56,7 +56,7 @@ static Attribute convertAttribute(Location loc, Attribute value,
   } else if (auto attr = value.dyn_cast<SplatElementsAttr>()) {
     return SplatElementsAttr::get(
         newType.cast<ShapedType>(),
-        convertAttribute(loc, attr.getSplatValue(), typeConverter));
+        convertAttribute(loc, attr.getSplatValue<Attribute>(), typeConverter));
   } else if (auto attr = value.dyn_cast<DenseIntElementsAttr>()) {
     auto newElementType = newType.cast<ShapedType>().getElementType();
     auto newElementBitWidth = newElementType.getIntOrFloatBitWidth();

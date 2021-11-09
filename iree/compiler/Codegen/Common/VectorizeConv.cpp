@@ -97,8 +97,8 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 
     int64_t numOutputHeights = outputShape[1];
     int64_t numOutputWidths = outputShape[2];
-    int64_t heightStride = convOp.strides().getValue<int64_t>({0});
-    int64_t widthStride = convOp.strides().getValue<int64_t>({1});
+    int64_t heightStride = convOp.strides().getValues<int64_t>()[0];
+    int64_t widthStride = convOp.strides().getValues<int64_t>()[1];
 
     // This invocation handles a batch of
     // (numOutputHeights * numOutputWidths * numOutputChannels).
@@ -274,8 +274,8 @@ struct VectorizeLinalgDepthwiseConv
 
     int64_t numOutputHeights = outputShape[1];
     int64_t numOutputWidths = outputShape[2];
-    int64_t heightStride = convOp.strides().getValue<int64_t>({0});
-    int64_t widthStride = convOp.strides().getValue<int64_t>({1});
+    int64_t heightStride = convOp.strides().getValues<int64_t>()[0];
+    int64_t widthStride = convOp.strides().getValues<int64_t>()[1];
 
     // This invocation handles a batch of (numOutputHeights * numOutputWidths *
     // numChannels).

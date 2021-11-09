@@ -395,8 +395,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     if (!operandType || !operandType.hasStaticShape()) {
       return failure();
     }
-    int fftLength =
-        op.fft_length().getSplatValue().cast<IntegerAttr>().getInt();
+    int fftLength = op.fft_length().getSplatValue<IntegerAttr>().getInt();
     if (fftLength & (fftLength - 1)) {
       return rewriter.notifyMatchFailure(
           op, "expected FFT length to be a power of two");

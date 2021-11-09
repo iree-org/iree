@@ -183,7 +183,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     int rank = inputType.getRank();
     int n = inputType.getDimSize(rank - 1);
     int fftLength =
-        op.fft_length().getSplatValue().cast<IntegerAttr>().getInt() / 2 + 1;
+        op.fft_length().getSplatValue<IntegerAttr>().getInt() / 2 + 1;
 
     Location loc = op.getLoc();
     auto matrixType =

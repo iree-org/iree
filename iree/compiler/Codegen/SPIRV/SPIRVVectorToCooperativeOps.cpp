@@ -154,7 +154,7 @@ struct ConvertConstantMatrix final
     // Only convert splat integer/float vectors.
     auto values = op.value().dyn_cast<DenseIntOrFPElementsAttr>();
     if (!values || !values.isSplat()) return failure();
-    Attribute value = values.getSplatValue();
+    Attribute value = values.getSplatValue<Attribute>();
 
     auto elementType = values.getType().getElementType();
     Value splatValue = rewriter.create<spirv::ConstantOp>(

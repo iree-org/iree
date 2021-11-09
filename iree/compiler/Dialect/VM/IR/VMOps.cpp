@@ -541,7 +541,8 @@ static Attribute convertConstIntegerValue(Attribute value) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, integerType);
     if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
-      return SplatElementsAttr::get(adjustedType, elements.getSplatValue());
+      return SplatElementsAttr::get(adjustedType,
+                                    elements.getSplatValue<Attribute>());
     } else {
       return DenseElementsAttr::get(
           adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
@@ -577,7 +578,8 @@ static Attribute convertConstFloatValue(Attribute value) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, floatType);
     if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
-      return SplatElementsAttr::get(adjustedType, elements.getSplatValue());
+      return SplatElementsAttr::get(adjustedType,
+                                    elements.getSplatValue<Attribute>());
     } else {
       return DenseElementsAttr::get(
           adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
