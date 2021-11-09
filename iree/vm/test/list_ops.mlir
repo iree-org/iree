@@ -98,36 +98,34 @@ vm.module @list_ops {
     %c1 = vm.const.i32 1 : i32
     %c2 = vm.const.i32 2 : i32
     %c3 = vm.const.i32 3 : i32
-    %c4 = vm.const.i32 4 : i32
     %c27 = vm.const.i32 27 : i32
     %c42 = vm.const.i32 42 : i32
 
-    // These allocs shouldn't be CSE'd.
-    %list0 = vm.list.alloc %c1 : (i32) -> !vm.list<i8>
-    %list1 = vm.list.alloc %c1 : (i32) -> !vm.list<i8>
-    vm.list.resize %list0, %c1 : (!vm.list<i8>, i32)
-    vm.list.resize %list1, %c4 : (!vm.list<i8>, i32)
-    vm.list.set.i32 %list0, %c0, %c27 : (!vm.list<i8>, i32, i32)
+    %list0 = vm.list.alloc %c3 : (i32) -> !vm.list<i8>
+    %list1 = vm.list.alloc %c3 : (i32) -> !vm.list<i8>
+    vm.list.resize %list0, %c3 : (!vm.list<i8>, i32)
+    vm.list.resize %list1, %c3 : (!vm.list<i8>, i32)
+    vm.list.set.i32 %list0, %c0, %c3 : (!vm.list<i8>, i32, i32)
     vm.list.set.i32 %list1, %c0, %c42 : (!vm.list<i8>, i32, i32)
 
     vm.list.swap %list0, %list1 : !vm.list<i8>
-
     %res0 = vm.list.get.i32 %list0, %c0 : (!vm.list<i8>, i32) -> i32
     %res1 = vm.list.get.i32 %list1, %c0 : (!vm.list<i8>, i32) -> i32
     vm.check.eq %res0, %c42, "list0.get(0)=42" : i32
-    vm.check.eq %res1, %c27, "list1.get(0)=27" : i32
+    vm.check.eq %res1, %c3, "list1.get(0)=3" : i32
 
     // list0 = {42, 27}
     vm.list.set.i32 %list0, %c1, %c27 : (!vm.list<i8>, i32, i32)
 
-    // overlapped copy:
-    // list0 [1:3] = list0 [0:2] = {42, 42, 42, 42}
-    vm.list.copy %list0, %c0, %list0, %c1, %c3 : (!vm.list<i8>, i32, !vm.list<i8>, i32, i32)
+    // copy list0 [0:1] to list1 [1:2], list1 will be {3, 42, 27}
+    vm.list.copy %list0, %c0, %list1, %c1, %c2 : (!vm.list<i8>, i32, !vm.list<i8>, i32, i32)
 
-    %res0_2 = vm.list.get.i32 %list0, %c2 : (!vm.list<i8>, i32) -> i32
-    %res0_3 = vm.list.get.i32 %list0, %c3 : (!vm.list<i8>, i32) -> i32
-    vm.check.eq %res0_2, %c42, "list0.get(2)=42" : i32
-    vm.check.eq %res0_3, %c42, "list1.get(3)=42" : i32
+    %res0_0 = vm.list.get.i32 %list1, %c0 : (!vm.list<i8>, i32) -> i32
+    %res0_1 = vm.list.get.i32 %list1, %c1 : (!vm.list<i8>, i32) -> i32
+    %res0_2 = vm.list.get.i32 %list1, %c2 : (!vm.list<i8>, i32) -> i32
+    vm.check.eq %res0_0, %c3, "list1.get(0)=3" : i32
+    vm.check.eq %res0_1, %c42, "list1.get(1)=42" : i32
+    vm.check.eq %res0_2, %c27, "list1.get(2)=27" : i32
 
     vm.return
   }
@@ -161,6 +159,16 @@ vm.module @list_ops {
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<i32>
     vm.list.resize %list, %c1 : (!vm.list<i32>, i32)
     vm.list.set.i32 %list, %c1, %c1 : (!vm.list<i32>, i32, i32)
+    vm.return
+  }
+
+  vm.export @fail_overlapped_copy
+  vm.func @fail_overlapped_copy() {
+    %c1 = vm.const.i32 1 : i32
+    %c3 = vm.const.i32 3 : i32
+    %list0 = vm.list.alloc %c3 : (i32) -> !vm.list<i8>
+    %list1 = vm.list.alloc %c3 : (i32) -> !vm.list<i8>
+    vm.list.copy %list0, %c1, %list0, %c1, %c1 : (!vm.list<i8>, i32, !vm.list<i8>, i32, i32)
     vm.return
   }
 }

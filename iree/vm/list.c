@@ -760,8 +760,10 @@ iree_status_t iree_vm_list_copy(const iree_vm_list_t* src_list,
   if (src_list == dst_list &&
       ((src_offset <= dst_offset && src_offset + count > dst_offset) ||
        (dst_offset <= src_offset && dst_offset + count > src_offset))) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "list copies overlapped");
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "list copies overlapped (src_offset=%zu, dst_offset=%zu, count=%zu)",
+        src_offset, dst_offset, count);
   }
 
   uint8_t* src_ptr =
@@ -772,7 +774,7 @@ iree_status_t iree_vm_list_copy(const iree_vm_list_t* src_list,
   switch (src_list->storage_mode) {
     case IREE_VM_LIST_STORAGE_MODE_VALUE: {
       for (iree_host_size_t i = 0; i < count; ++i) {
-        memcpy(src_ptr, dst_ptr, count * dst_list->element_size);
+        memcpy(dst_ptr, src_ptr, count * dst_list->element_size);
       }
       break;
     }

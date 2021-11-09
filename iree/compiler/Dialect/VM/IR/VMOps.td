@@ -1520,11 +1520,10 @@ def VM_ListSwapOp :
       AllTypesMatch<["list_a", "list_b"]>,
       MemoryEffects<[MemWrite]>,
     ]> {
-  let summary = [{swap (exchange) two lists}];
+  let summary = [{swap the contents of two lists}];
   let description = [{
-    Swap (exchange) the content of list_a with the same type of list_b.
-    Swap is invalid and will be aborted when:
-    - list_a and list_b have different allocators
+    Swaps the contents of list_a with list_b. Fails if list_a and list_b have
+    different allocators or either have been allocated on the stack
   }];
 
   let arguments = (ins
