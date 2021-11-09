@@ -1025,7 +1025,7 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     HAL_BufferType:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
-    AnyTypeOf<[I8, I16, I32, F16, F32]>:$pattern
+    AnyTypeOf<[I1, I8, I16, I32, F16, F32]>:$pattern
   );
 
   let assemblyFormat = [{

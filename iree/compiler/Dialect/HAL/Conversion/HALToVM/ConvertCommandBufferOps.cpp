@@ -40,6 +40,7 @@ class CommandBufferFillBufferOpConversion
     // Record the original pattern length then extend it to a 32 bit integer.
     auto originalPatternType = op.pattern().getType();
     auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
+    if (patternBitWidth < 8) patternBitWidth = 8;
     auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternBitWidth / 8, 32);
     Value pattern = op.pattern();
