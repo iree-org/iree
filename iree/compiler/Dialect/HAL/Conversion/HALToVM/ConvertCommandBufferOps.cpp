@@ -40,9 +40,15 @@ class CommandBufferFillBufferOpConversion
     // Record the original pattern length then extend it to a 32 bit integer.
     auto originalPatternType = op.pattern().getType();
     auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
-    if (patternBitWidth < 8) patternBitWidth = 8;
-    auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
-        op.getLoc(), patternBitWidth / 8, 32);
+    // The pattern length (in bytes) will be used at runtime to issue the fill
+    // command. While the pattern itself will be stored in a 32 bit integer,
+    // the fill operation will use this length to slice a potentially smaller
+    // range of bits from the full pattern.
+    auto patternLengthBytes = patternBitWidth / 8;
+    // i1 will be promoted to a larger type later, so round up to 1 byte.
+    if (patternLengthBytes < 1) patternLengthBytes = 1;
+    auto patternLengthConst = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
+        op.getLoc(), patternLengthBytes, 32);
     Value pattern = op.pattern();
     if (originalPatternType.isF16() || originalPatternType.isF32()) {
       pattern = rewriter.createOrFold<arith::BitcastOp>(
@@ -53,7 +59,7 @@ class CommandBufferFillBufferOpConversion
           op.getLoc(), pattern, rewriter.getIntegerType(32));
     }
     callOperands.push_back(pattern);
-    callOperands.push_back(patternLength);
+    callOperands.push_back(patternLengthConst);
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),
