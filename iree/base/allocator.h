@@ -263,6 +263,12 @@ static inline bool iree_allocator_is_null(iree_allocator_t allocator) {
   return allocator.ctl == NULL;
 }
 
+// Returns true if the two allocators are equal.
+static inline bool iree_allocator_is_equal(iree_allocator_t allocator,
+                                           iree_allocator_t other) {
+  return allocator.ctl == other.ctl && allocator.self == other.self;
+}
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

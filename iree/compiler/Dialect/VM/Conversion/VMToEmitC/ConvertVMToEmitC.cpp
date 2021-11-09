@@ -3318,11 +3318,11 @@ void populateVMToEmitCPatterns(MLIRContext *context,
   patterns.insert<ListOpConversion<IREE::VM::ListSizeOp>>(
       typeConverter, context, "iree_vm_list_size", listArgIndices{0}, false,
       vmAnalysisCache);
-  patterns.insert<ListOpConversion<IREE::VM::ListSwapOp>>(
-      typeConverter, context, "iree_vm_list_swap", listArgIndices{0, 1}, true,
-      vmAnalysisCache);
   patterns.insert<ListOpConversion<IREE::VM::ListCopyOp>>(
       typeConverter, context, "iree_vm_list_copy", listArgIndices{0, 2}, true,
+      vmAnalysisCache);
+  patterns.insert<ListOpConversion<IREE::VM::ListSwapOp>>(
+      typeConverter, context, "iree_vm_list_swap", listArgIndices{0, 1}, true,
       vmAnalysisCache);
   patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(
       typeConverter, context, vmAnalysisCache);

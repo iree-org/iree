@@ -1481,14 +1481,13 @@ def VM_ListResizeOp :
 def VM_ListCopyOp :
     VM_Op<"list.copy", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      AllTypesMatch<["src_list", "dst_list"]>,
       MemoryEffects<[MemWrite]>,
     ]> {
-  let summary = [{copy src_list to dst_list with given offset and count}];
+  let summary = [{copies src_list to dst_list with given offset and count}];
   let description = [{
-    Copy #count elements of src_list starting from src_offset to dst_list
+    Copies `count` elements of src_list starting from src_offset to dst_list
     beginning with dst_offset.
-    Copy is invalid and will be aborted when:
-    - list_a and list_b have different types
   }];
 
   let arguments = (ins
@@ -1518,6 +1517,7 @@ def VM_ListCopyOp :
 def VM_ListSwapOp :
     VM_Op<"list.swap", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      AllTypesMatch<["list_a", "list_b"]>,
       MemoryEffects<[MemWrite]>,
     ]> {
   let summary = [{swap (exchange) two lists}];
@@ -1525,7 +1525,6 @@ def VM_ListSwapOp :
     Swap (exchange) the content of list_a with the same type of list_b.
     Swap is invalid and will be aborted when:
     - list_a and list_b have different allocators
-    - list_a and list_b have different types
   }];
 
   let arguments = (ins
@@ -1533,7 +1532,7 @@ def VM_ListSwapOp :
     VM_AnyList:$list_b
   );
 
-  let assemblyFormat = "operands attr-dict `:` `(` type($list_a) `,` type($list_b) `)`";
+  let assemblyFormat = "operands attr-dict `:` type($list_a)";
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListSwap>,

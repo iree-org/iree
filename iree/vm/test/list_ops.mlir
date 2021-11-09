@@ -110,7 +110,7 @@ vm.module @list_ops {
     vm.list.set.i32 %list0, %c0, %c27 : (!vm.list<i8>, i32, i32)
     vm.list.set.i32 %list1, %c0, %c42 : (!vm.list<i8>, i32, i32)
 
-    vm.list.swap %list0, %list1 : (!vm.list<i8>, !vm.list<i8>)
+    vm.list.swap %list0, %list1 : !vm.list<i8>
 
     %res0 = vm.list.get.i32 %list0, %c0 : (!vm.list<i8>, i32) -> i32
     %res1 = vm.list.get.i32 %list1, %c0 : (!vm.list<i8>, i32) -> i32

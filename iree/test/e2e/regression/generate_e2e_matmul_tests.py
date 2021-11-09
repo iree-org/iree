@@ -465,7 +465,7 @@ def write_trace_file(traces, filename, module_path):
   for trace in traces:
     yaml_documents.append(trace)
 
-  dumped_yaml = yaml.dump_all(yaml_documents, sort_keys=False)
+  dumped_yaml = yaml.dump_all(yaml_documents)
 
   # TODO: This regex substitution is a hack as I couldn't figure how to have
   # PyYAML dump our custom contents_generator into the desired format, e.g.
