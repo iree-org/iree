@@ -58,9 +58,14 @@ class EmbeddedLinkerTool : public LinkerTool {
         findToolInEnvironment({"iree-lld", "lld", "ld.lld", "lld-link"});
     if (!environmentPath.empty()) return environmentPath;
 
-    llvm::errs() << "LLD (ld.lld) not found on path; specify with the "
-                    "IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment variable or "
-                    "-iree-llvm-embedded-linker-path=\n";
+    llvm::errs()
+        << "error: required embedded linker tool (typically `lld`) not found "
+           "after searching:\n"
+           "  * -iree-llvm-embedded-linker-path= flag\n"
+           "  * IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment variable\n"
+           "  * common locations at relative file paths\n"
+           "  * system PATH\n"
+           "Run with -debug-only=llvmaot-linker for search details\n";
     return "";
   }
 
@@ -88,8 +93,11 @@ class EmbeddedLinkerTool : public LinkerTool {
     }
     artifacts.libraryFile.close();
 
+    std::string embeddedToolPath = getEmbeddedToolPath();
+    if (embeddedToolPath.empty()) return llvm::None;
+
     SmallVector<std::string, 8> flags = {
-        getEmbeddedToolPath(),
+        embeddedToolPath,
 
         // Forces LLD to act like gnu ld and produce ELF files.
         // If not specified then lld tries to figure out what it is by progname
