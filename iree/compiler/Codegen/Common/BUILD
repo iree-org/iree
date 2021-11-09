@@ -32,7 +32,9 @@ gentbl_cc_library(
 cc_library(
     name = "Common",
     srcs = [
+        "BufferizationAnalysis.cpp",
         "CleanupBufferAllocViewPass.cpp",
+        "ConvertToDestinationPassingStylePass.cpp",
         "DemoteF32ToF16.cpp",
         "FlattenMemRefSubspanPass.cpp",
         "FoldAffineMinInDistributedLoops.cpp",

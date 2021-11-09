@@ -9,7 +9,7 @@
 // Wrapper pass to use MLIRs ComprehensiveBufferization pass.
 //
 //===----------------------------------------------------------------------===//
-
+#include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -52,6 +52,12 @@
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
 namespace mlir {
+namespace iree_compiler {
+
+//===----------------------------------------------------------------------===//
+// Pass that interfaces with ComprehensiveBufferization in core.
+//===----------------------------------------------------------------------===//
+
 template <typename TensorType>
 static MemRefType getMemrefTypeForTensor(TensorType tensorType,
                                          MemRefLayoutAttrInterface layout = {},
@@ -59,8 +65,6 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
   return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
                          layout, memorySpace);
 }
-
-namespace iree_compiler {
 
 namespace {
 /// Pass to convert from tensor based ops to memref based ops.
@@ -112,6 +116,10 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     OpBuilder b(context);
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "After conversion to destination passing style:\n"
+               << *funcOp << "\n");
 
     // 1. First go over all hal.interface.binding.subspan ops and create
     // counterparts working with memrefs.
@@ -180,6 +188,9 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
           toEraseLate.push_back(op);
         });
 
+    LLVM_DEBUG(llvm::dbgs() << "After rewriting of Flow ops\n"
+                            << *funcOp << "\n");
+
     // TODO: Visit all the operations that return `tensor`s that are not handled
     // by comprehensive bufferize.
 
@@ -217,6 +228,9 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
                                                                 domInfo))) {
       return signalPassFailure();
     }
+
+    LLVM_DEBUG(llvm::dbgs() << "After inplaceability analysis\n"
+                            << *funcOp << "\n");
 
     // 5. Perform bufferization.
     linalg::comprehensive_bufferize::BufferizationState state(

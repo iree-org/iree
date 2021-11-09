@@ -20,6 +20,13 @@ def CleanupBufferAllocView :
   let constructor = "mlir::iree_compiler::createCleanupBufferAllocViewPass()";
 }
 
+def ConvertToDestinationPassingStyle :
+    Pass<"iree-codegen-convert-to-destination-passing-style", "FuncOp"> {
+  let summary =
+      "Transforms the code to make the dispatch use destination-passing style";
+  let constructor = "mlir::iree_compiler::createConvertToDestinationPassingStylePass()";
+}
+
 def DemoteF32ToF16 :
     Pass<"iree-convert-f32-to-f16", "ModuleOp"> {
   let summary = "Convert f32 operations and values into equivalent f16 ones.";

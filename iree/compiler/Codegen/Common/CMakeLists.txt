@@ -23,7 +23,9 @@ iree_cc_library(
   NAME
     Common
   SRCS
+    "BufferizationAnalysis.cpp"
     "CleanupBufferAllocViewPass.cpp"
+    "ConvertToDestinationPassingStylePass.cpp"
     "DemoteF32ToF16.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
