@@ -29,7 +29,7 @@ namespace Flow {
 // more efficient and fewer bindings.
 static bool isConstantLarge(arith::ConstantOp constantOp,
                             size_t minLargeConstantSize) {
-  if (constantOp.value().isa<SplatElementsAttr>()) {
+  if (constantOp.getValue().isa<SplatElementsAttr>()) {
     // Never outline splats; we want those transient within streams.
     return false;
   }
@@ -93,7 +93,7 @@ class OutlineLargeConstantsPass
       } while (moduleSymbols.lookup(name) != nullptr);
       auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
           largeConstantOp.getLoc(), name, /*isMutable=*/false,
-          largeConstantOp.getType(), largeConstantOp.value());
+          largeConstantOp.getType(), largeConstantOp.getValue());
       globalOp.setPrivate();
       replacements.emplace_back(largeConstantOp, globalOp);
 

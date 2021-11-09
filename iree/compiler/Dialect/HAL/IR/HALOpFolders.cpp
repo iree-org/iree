@@ -328,7 +328,7 @@ struct PropagateAllocatorPackBaseOffset
                                                         sliceOffset);
       SmallPtrSet<Operation *, 1> exclusions;
       exclusions.insert(addOp);
-      sliceOffset.replaceAllUsesExcept(addOp.result(), exclusions);
+      sliceOffset.replaceAllUsesExcept(addOp.getResult(), exclusions);
     }
 
     return success();

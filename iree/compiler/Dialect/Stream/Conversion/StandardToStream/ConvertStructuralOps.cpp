@@ -115,7 +115,7 @@ struct CallOpConversion : public OpConversionPattern<mlir::CallOp> {
     // expanded output results. We can't directly replace the original call as
     // the result counts differ.
     auto callOp = rewriter.create<mlir::CallOp>(op.getLoc(), expandedTypes,
-                                                op.callee(), expandedOperands);
+                                                op.getCallee(), expandedOperands);
 
     // Tie all resource results together so we end up with 1:1 results with the
     // original op.
@@ -160,8 +160,8 @@ struct BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto expandedOperands =
-        expandResourceOperands(op.getLoc(), operands.destOperands(), rewriter);
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.dest(),
+        expandResourceOperands(op.getLoc(), operands.getDestOperands(), rewriter);
+    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.getDest(),
                                                 expandedOperands);
     return success();
   }
@@ -174,12 +174,12 @@ struct CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto trueDestOperands = expandResourceOperands(
-        op.getLoc(), operands.trueDestOperands(), rewriter);
+        op.getLoc(), operands.getTrueDestOperands(), rewriter);
     auto falseDestOperands = expandResourceOperands(
-        op.getLoc(), operands.falseDestOperands(), rewriter);
+        op.getLoc(), operands.getFalseDestOperands(), rewriter);
     rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
-        op, operands.condition(), op.trueDest(), trueDestOperands,
-        op.falseDest(), falseDestOperands);
+        op, operands.getCondition(), op.getTrueDest(), trueDestOperands,
+        op.getFalseDest(), falseDestOperands);
     return success();
   }
 };
@@ -190,20 +190,20 @@ struct SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
       mlir::SelectOp op, mlir::SelectOp::Adaptor operands,
       ConversionPatternRewriter &rewriter) const override {
     // Only handle selects where the operands are tensors (resources).
-    if (!op.true_value().getType().isa<TensorType>()) return failure();
+    if (!op.getTrueValue().getType().isa<TensorType>()) return failure();
     auto trueOperand =
-        consumeTensorOperand(op.getLoc(), operands.true_value(), rewriter);
+        consumeTensorOperand(op.getLoc(), operands.getTrueValue(), rewriter);
     auto falseOperand =
-        consumeTensorOperand(op.getLoc(), operands.false_value(), rewriter);
+        consumeTensorOperand(op.getLoc(), operands.getFalseValue(), rewriter);
     auto resourceSelectOp = rewriter.create<mlir::SelectOp>(
-        op.getLoc(), operands.condition(), trueOperand.resource,
+        op.getLoc(), operands.getCondition(), trueOperand.resource,
         falseOperand.resource);
     auto sizeSelectOp = rewriter.create<mlir::SelectOp>(
-        op.getLoc(), operands.condition(), trueOperand.resourceSize,
+        op.getLoc(), operands.getCondition(), trueOperand.resourceSize,
         falseOperand.resourceSize);
     rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
-        op, operands.true_value().getType(),
-        ValueRange{resourceSelectOp.result(), sizeSelectOp.result()});
+        op, operands.getTrueValue().getType(),
+        ValueRange{resourceSelectOp.getResult(), sizeSelectOp.getResult()});
     return success();
   }
 };

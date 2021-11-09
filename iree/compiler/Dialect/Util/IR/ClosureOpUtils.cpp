@@ -126,7 +126,7 @@ static bool isConstantSmall(arith::ConstantOp constantOp) {
   // constants or inlining megabytes.
   static constexpr int kMaxInlinedConstantBytes = 256;
 
-  auto constantValueAttr = constantOp.value();
+  auto constantValueAttr = constantOp.getValue();
   auto constantType = constantOp.getType();
   if (constantValueAttr.isa<SplatElementsAttr>()) {
     // Splats are always small and can often have special handling when we

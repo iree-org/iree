@@ -40,7 +40,7 @@ class ConvertBoolConstantPattern
     // Constant is never used, ignore.
     if (op.getResult().use_empty()) return failure();
 
-    DenseIntElementsAttr attr = op.value().dyn_cast<DenseIntElementsAttr>();
+    DenseIntElementsAttr attr = op.getValue().dyn_cast<DenseIntElementsAttr>();
     if (!attr) return failure();
 
     // Create a new ConstantOp that contains the same values as an int8.

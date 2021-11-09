@@ -53,11 +53,11 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
 
     auto getI8Value = [&](Value v) -> Value {
       if (auto parentOp = v.getDefiningOp<arith::ExtSIOp>()) {
-        if (parentOp.in().getType().cast<VectorType>().getElementType() !=
+        if (parentOp.getIn().getType().cast<VectorType>().getElementType() !=
             I8Type) {
           return nullptr;
         } else {
-          return parentOp.in();
+          return parentOp.getIn();
         }
       }
       return nullptr;

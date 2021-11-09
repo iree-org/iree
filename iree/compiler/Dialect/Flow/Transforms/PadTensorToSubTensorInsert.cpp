@@ -80,7 +80,7 @@ struct PadTensorOpConversion : public OpRewritePattern<linalg::PadTensorOp> {
       Value v = linalg::applyMapToValues(
           rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
       if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
-        outputShape.push_back(cst.value());
+        outputShape.push_back(cst.getValue());
       } else {
         outputShape.push_back(v);
       }

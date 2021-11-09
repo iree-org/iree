@@ -46,7 +46,7 @@ class ConstantTensorOpConversion
         IREE::HAL::BufferUsageBitfield::All |
         IREE::HAL::BufferUsageBitfield::Constant;
 
-    auto elementsAttr = constantOp.value().cast<ElementsAttr>();
+    auto elementsAttr = constantOp.getValue().cast<ElementsAttr>();
     auto elementsTy = elementsAttr.getType().cast<ShapedType>();
 
     // Expand boolean elements to the minimum bit widht supported by the HAL

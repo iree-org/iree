@@ -46,11 +46,11 @@ static SmallVector<ConstantDef> findConstantsInModule(mlir::ModuleOp moduleOp) {
     for (auto &block : *callableOp.getCallableRegion()) {
       for (auto &op : block.getOperations()) {
         if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-          if (isOutlinableValue(constantOp.value())) {
+          if (isOutlinableValue(constantOp.getValue())) {
             results.push_back(ConstantDef{
                 constantOp,
                 constantOp.getType(),
-                constantOp.value().cast<ElementsAttr>(),
+                constantOp.getValue().cast<ElementsAttr>(),
             });
           }
         }
