@@ -496,7 +496,7 @@ struct SerializableDenseElementsAttrModel
     auto elementsAttr = baseAttr.cast<DenseElementsAttr>();
     if (elementsAttr.isSplat()) {
       // Fast-path for splat (no need to convert the value a bunch).
-      return serializeSplatValue(elementsAttr.getSplatValue(),
+      return serializeSplatValue(elementsAttr.getSplatValue<Attribute>(),
                                  elementsAttr.getNumElements(), endian, os);
     }
 

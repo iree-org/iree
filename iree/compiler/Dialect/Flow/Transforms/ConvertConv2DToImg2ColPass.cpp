@@ -98,7 +98,7 @@ class Conv2DImg2ColMatmulConversion
 
     auto s = [&](unsigned i) {
       return rewriter.getAffineConstantExpr(
-          convOp.strides().getValue<int64_t>({i}));
+          convOp.strides().getValues<int64_t>()[i]);
     };
 
     SmallVector<AffineExpr, 4> inputExprs = {n, d(1) * s(0) + k(1),
@@ -263,7 +263,7 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
 
     auto s = [&](unsigned i) {
       return rewriter.getAffineConstantExpr(
-          convOp.strides().getValue<int64_t>({i}));
+          convOp.strides().getValues<int64_t>()[i]);
     };
 
     SmallVector<AffineExpr> inputExprs = {n, ci, d(1) * s(0) + k(1),

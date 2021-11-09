@@ -145,8 +145,8 @@ class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
          llvm::enumerate(op.dimension_numbers().getInputSpatialDimensions())) {
       unsigned idx = iter.index();
       unsigned dim = iter.value();
-      paddingLow[dim] = op.paddingAttr().getValue<int64_t>({idx, 0});
-      paddingHigh[dim] = op.paddingAttr().getValue<int64_t>({idx, 1});
+      paddingLow[dim] = op.paddingAttr().getValues<int64_t>()[{idx, 0}];
+      paddingHigh[dim] = op.paddingAttr().getValues<int64_t>()[{idx, 1}];
     }
     for (unsigned i = 0; i < rank; ++i) {
       // mhlo.pad doesn't support dynamic shape.
@@ -402,8 +402,8 @@ class ExtractReduceWindowOpPaddingAttributes
     SmallVector<int64_t, 4> paddingLow, paddingHigh, interiorPadding, shape;
     for (unsigned i = 0; i < rank; ++i) {
       interiorPadding.push_back(0);
-      paddingLow.push_back(op.paddingAttr().getValue<int64_t>({i, 0}));
-      paddingHigh.push_back(op.paddingAttr().getValue<int64_t>({i, 1}));
+      paddingLow.push_back(op.paddingAttr().getValues<int64_t>()[{i, 0}]);
+      paddingHigh.push_back(op.paddingAttr().getValues<int64_t>()[{i, 1}]);
       int size = inputShape[i];
       shape.push_back(size + paddingLow.back() + paddingHigh.back());
     }

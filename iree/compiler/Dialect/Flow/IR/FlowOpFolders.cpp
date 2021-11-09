@@ -731,10 +731,10 @@ OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute> operands) {
     // Load directly from the constant source tensor.
     auto indices = operands.drop_front();
     if (llvm::count(indices, nullptr) == 0) {
-      return source.getValue(
-          llvm::to_vector<4>(llvm::map_range(indices, [](Attribute value) {
+      return source.getValues<Attribute>()[llvm::to_vector<4>(
+          llvm::map_range(indices, [](Attribute value) {
             return value.cast<IntegerAttr>().getValue().getZExtValue();
-          })));
+          }))];
     }
   }
   return {};
@@ -864,7 +864,7 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
   int64_t numElements = updateType.getNumElements();
   while (numElements--) {
     targetValues[getFlattenedIndex(targetType, targetIndex)] =
-        update.getValue<Attribute>(updateIndex);
+        update.getValues<Attribute>()[updateIndex];
     // Increment the index at last dim.
     ++updateIndex.back();
     ++targetIndex.back();
