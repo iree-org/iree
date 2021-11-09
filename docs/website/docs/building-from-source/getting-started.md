@@ -15,12 +15,12 @@ compilers:
 
 === "Linux and macOS"
 
-    1. Install a compiler/linker (typically "clang" and "lld" package).
+    1. Install a compiler/linker (typically "clang" and "lld" package)
 
-    2. Install [CMake](https://cmake.org/download/) (typically "cmake" package).
+    2. Install [CMake](https://cmake.org/download/) (typically "cmake" package)
 
     3. Install [Ninja](https://ninja-build.org/) (typically "ninja-build"
-       package).
+       package)
 
     On a relatively recent Debian/Ubuntu:
 
@@ -37,7 +37,7 @@ compilers:
        [official downloads page](https://cmake.org/download/)
 
     3. Install Ninja either from the
-       [official site](https://ninja-build.org/).
+       [official site](https://ninja-build.org/)
 
     !!! note
         You will need to initialize MSVC by running `vcvarsall.bat` to use it
