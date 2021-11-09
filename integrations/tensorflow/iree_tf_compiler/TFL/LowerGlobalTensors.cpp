@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
+#include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -17,21 +18,14 @@
 namespace mlir {
 namespace iree_integrations {
 namespace TFL {
+namespace {
 
 class LowerGlobalTensorsPass
-    : public PassWrapper<LowerGlobalTensorsPass, OperationPass<ModuleOp>> {
+    : public LowerGlobalTensorsBase<LowerGlobalTensorsPass> {
  public:
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<mlir::TFL::TensorFlowLiteDialect,
                     iree_compiler::IREE::Util::UtilDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-tflite-lower-global-tensors";
-  }
-
-  StringRef getDescription() const override {
-    return "Lowers tflite global tensors to IREE flow dialect variables";
   }
 
   // Converts TFLite state operations to the IREE equivalent.
@@ -163,7 +157,7 @@ class LowerGlobalTensorsPass
   }
 };
 
-static PassRegistration<LowerGlobalTensorsPass> pass;
+}  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createLowerGlobalTensorsPass() {
   return std::make_unique<LowerGlobalTensorsPass>();

@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -14,6 +15,7 @@
 namespace mlir {
 namespace iree_integrations {
 namespace TFL {
+namespace {
 
 // Extract the input and output names
 static void splitFunctionIONames(StringAttr namesAttr,
@@ -26,15 +28,8 @@ static void splitFunctionIONames(StringAttr namesAttr,
 }
 
 class ConvertModuleMetadataPass
-    : public PassWrapper<ConvertModuleMetadataPass, OperationPass<ModuleOp>> {
+    : public ConvertModuleMetadataBase<ConvertModuleMetadataPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-tflite-convert-module-metadata";
-  }
-
-  StringRef getDescription() const override {
-    return "Converts TFLite attributes to IREE attributes on modules";
-  }
 
   void runOnOperation() override {
     // None currently handled.
@@ -42,15 +37,8 @@ class ConvertModuleMetadataPass
 };
 
 class ConvertFunctionMetadataPass
-    : public PassWrapper<ConvertFunctionMetadataPass, OperationPass<FuncOp>> {
+    : public ConvertFunctionMetadataBase<ConvertFunctionMetadataPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-tflite-convert-function-metadata";
-  }
-
-  StringRef getDescription() const override {
-    return "Converts TFLite attributes to IREE attributes on functions";
-  }
 
   void runOnOperation() override {
     auto funcOp = getOperation();
@@ -104,6 +92,7 @@ class ConvertFunctionMetadataPass
     }
   }
 };
+}  // anonymous namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertModuleMetadataPass() {
   return std::make_unique<ConvertModuleMetadataPass>();
@@ -112,9 +101,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertModuleMetadataPass() {
 std::unique_ptr<OperationPass<FuncOp>> createConvertFunctionMetadataPass() {
   return std::make_unique<ConvertFunctionMetadataPass>();
 }
-
-static PassRegistration<ConvertModuleMetadataPass> modulePass;
-static PassRegistration<ConvertFunctionMetadataPass> funcPass;
 
 }  // namespace TFL
 }  // namespace iree_integrations

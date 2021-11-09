@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -11,6 +12,7 @@
 namespace mlir {
 namespace iree_integrations {
 namespace TFL {
+namespace {
 
 static bool isTFLAttr(NamedAttribute &namedAttr) {
   // NOTE: tflite mixes tf and tfl, for some reason.
@@ -24,15 +26,8 @@ static bool isTFLAttr(NamedAttribute &namedAttr) {
 }
 
 class StripModuleMetadataPass
-    : public PassWrapper<StripModuleMetadataPass, OperationPass<ModuleOp>> {
+    : public StripModuleMetadataBase<StripModuleMetadataPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-tflite-strip-module-metadata";
-  }
-
-  StringRef getDescription() const override {
-    return "Remove unneeded TFLite attributes from module ops";
-  }
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
@@ -46,15 +41,8 @@ class StripModuleMetadataPass
 };
 
 class StripFunctionMetadataPass
-    : public PassWrapper<StripFunctionMetadataPass, OperationPass<FuncOp>> {
+    : public StripFunctionMetadataBase<StripFunctionMetadataPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-tflite-strip-function-metadata";
-  }
-
-  StringRef getDescription() const override {
-    return "Remove unneeded TFLite attributes from func ops";
-  }
 
   void runOnOperation() override {
     auto funcOp = getOperation();
@@ -85,6 +73,8 @@ class StripFunctionMetadataPass
   }
 };
 
+}  // anonymous namespace
+
 std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass() {
   return std::make_unique<StripModuleMetadataPass>();
 }
@@ -92,9 +82,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass() {
 std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass() {
   return std::make_unique<StripFunctionMetadataPass>();
 }
-
-static PassRegistration<StripModuleMetadataPass> modulePass;
-static PassRegistration<StripFunctionMetadataPass> funcPass;
 
 }  // namespace TFL
 }  // namespace iree_integrations

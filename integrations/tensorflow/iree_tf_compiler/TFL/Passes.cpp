@@ -18,6 +18,11 @@ namespace mlir {
 namespace iree_integrations {
 namespace TFL {
 
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree_tf_compiler/TFL/Passes.h.inc"  // IWYU pragma: export
+}  // namespace
+
 // All IREE-specific passes that lower TFL representations before reaching the
 // IREE core should go here.
 void buildTFLImportPassPipeline(OpPassManager &pm) {
@@ -78,6 +83,15 @@ void registerTFLImportPassPipeline() {
       [](OpPassManager &passManager) {
         buildTFLImportPassPipeline(passManager);
       });
+}
+
+void registerAllPasses() {
+  registerTFLImportPassPipeline();
+
+  // Generated.
+  registerPasses();
+
+  createVerifyFullyConvertedPass();
 }
 
 }  // namespace TFL

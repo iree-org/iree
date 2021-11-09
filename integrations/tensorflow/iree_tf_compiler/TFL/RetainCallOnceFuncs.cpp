@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
+#include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -22,18 +23,10 @@ namespace TFL {
 namespace {
 
 class RetainCallOnceFuncsPass
-    : public PassWrapper<RetainCallOnceFuncsPass, OperationPass<ModuleOp>> {
+    : public RetainCallOnceFuncsBase<RetainCallOnceFuncsPass> {
  public:
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<mlir::TFL::TensorFlowLiteDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-tflite-retain-call-once-funcs";
-  }
-
-  StringRef getDescription() const override {
-    return "Guarantees that functions used by tfl.call_once are retained";
   }
 
   void runOnOperation() override {
@@ -55,8 +48,6 @@ class RetainCallOnceFuncsPass
 };
 
 }  // anonymous namespace
-
-static PassRegistration<RetainCallOnceFuncsPass> pass;
 
 std::unique_ptr<OperationPass<ModuleOp>> createRetainCallOnceFuncsPass() {
   return std::make_unique<RetainCallOnceFuncsPass>();

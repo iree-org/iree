@@ -48,17 +48,7 @@ std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass();
 
 void registerTFLImportPassPipeline();
 
-inline void registerAllPasses() {
-  registerTFLImportPassPipeline();
-
-  createRetainCallOnceFuncsPass();
-  createConvertModuleMetadataPass();
-  createConvertFunctionMetadataPass();
-  createLowerGlobalTensorsPass();
-  createStripModuleMetadataPass();
-  createStripFunctionMetadataPass();
-  createVerifyFullyConvertedPass();
-}
+void registerAllPasses();
 
 }  // namespace TFL
 }  // namespace iree_integrations
