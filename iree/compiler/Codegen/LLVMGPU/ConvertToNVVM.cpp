@@ -54,6 +54,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       OwningRewritePatternList patterns(&getContext());
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
+      populateLowerHALInterfaceOp(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
@@ -73,8 +74,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     }
     {
       OwningRewritePatternList llvmPatterns(&getContext());
-      populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter,
-                                     false);
+      populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateStdToLLVMConversionPatterns(converter, llvmPatterns);

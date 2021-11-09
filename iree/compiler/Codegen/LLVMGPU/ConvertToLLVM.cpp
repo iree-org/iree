@@ -336,8 +336,8 @@ class ConvertIREEConstantOp : public ConvertToLLVMPattern {
 };
 
 /// A pattern to convert hal.interface.workgroup.id/count/size into
-/// corresponding NVVM/ROCDL ops.
-template <typename InterfaceOpTy, typename XOp, typename YOp, typename ZOp>
+/// corresponding GPU ops.
+template <typename InterfaceOpTy, typename NewOpTy>
 struct HALInterfaceWorkgroupOpsConverter final
     : public OpConversionPattern<InterfaceOpTy> {
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
@@ -345,27 +345,9 @@ struct HALInterfaceWorkgroupOpsConverter final
   LogicalResult matchAndRewrite(
       InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-    Type i32Type = rewriter.getI32Type();
-    Value newOp;
     int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
-    switch (index) {
-      case 0:
-        newOp = rewriter.create<XOp>(loc, i32Type);
-        break;
-      case 1:
-        newOp = rewriter.create<YOp>(loc, i32Type);
-        break;
-      case 2:
-        newOp = rewriter.create<ZOp>(loc, i32Type);
-        break;
-      default:
-        return failure();
-    }
-
-    newOp =
-        rewriter.create<LLVM::SExtOp>(loc, rewriter.getIntegerType(64), newOp);
-    rewriter.replaceOp(op, {newOp});
+    std::array<const char *, 3> dimAttr{"x", "y", "z"};
+    rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
     return success();
   }
 };
@@ -374,31 +356,9 @@ struct HALInterfaceWorkgroupOpsConverter final
 
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns,
-                                    LLVMTypeConverter &converter,
-                                    bool useROCM) {
+                                    LLVMTypeConverter &converter) {
   patterns.insert<ConvertFunc, ConvertIREEBindingOp, ConvertIREEConstantOp>(
       context, converter);
-  if (useROCM) {
-    patterns.insert<HALInterfaceWorkgroupOpsConverter<
-                        IREE::HAL::InterfaceWorkgroupIDOp, ROCDL::BlockIdXOp,
-                        ROCDL::BlockIdYOp, ROCDL::BlockIdZOp>,
-                    HALInterfaceWorkgroupOpsConverter<
-                        IREE::HAL::InterfaceWorkgroupCountOp, ROCDL::GridDimXOp,
-                        ROCDL::GridDimYOp, ROCDL::GridDimZOp>,
-                    HALInterfaceWorkgroupOpsConverter<
-                        IREE::HAL::InterfaceWorkgroupSizeOp, ROCDL::BlockDimXOp,
-                        ROCDL::BlockDimYOp, ROCDL::BlockDimZOp>>(context);
-  } else {
-    patterns.insert<HALInterfaceWorkgroupOpsConverter<
-                        IREE::HAL::InterfaceWorkgroupIDOp, NVVM::BlockIdXOp,
-                        NVVM::BlockIdYOp, NVVM::BlockIdZOp>,
-                    HALInterfaceWorkgroupOpsConverter<
-                        IREE::HAL::InterfaceWorkgroupCountOp, NVVM::GridDimXOp,
-                        NVVM::GridDimYOp, NVVM::GridDimZOp>,
-                    HALInterfaceWorkgroupOpsConverter<
-                        IREE::HAL::InterfaceWorkgroupSizeOp, NVVM::BlockDimXOp,
-                        NVVM::BlockDimYOp, NVVM::BlockDimZOp>>(context);
-  }
 }
 
 void populateScalarizeMathOps(RewritePatternSet &patterns) {
@@ -416,6 +376,14 @@ void populateScalarizeMathOps(RewritePatternSet &patterns) {
 
 void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {
   patterns.add<ConvertSharedMemAllocOp>(patterns.getContext());
+}
+
+void populateLowerHALInterfaceOp(RewritePatternSet &patterns) {
+  patterns.insert<HALInterfaceWorkgroupOpsConverter<
+                      IREE::HAL::InterfaceWorkgroupIDOp, gpu::BlockIdOp>,
+                  HALInterfaceWorkgroupOpsConverter<
+                      IREE::HAL::InterfaceWorkgroupCountOp, gpu::GridDimOp>>(
+      patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass() {
