@@ -87,7 +87,8 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 
 static llvm::cl::opt<bool> clUseTileAndVectorizeV2(
     "iree-llvmcpu-use-tile-and-vectorize-v2",
-    llvm::cl::desc("Uses tile and vectorize v2"), llvm::cl::init(false));
+    llvm::cl::desc("THIS IS DEVELOPMENT ONLY FLAG. Uses tile and vectorize v2"),
+    llvm::cl::init(false));
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
