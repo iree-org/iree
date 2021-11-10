@@ -238,6 +238,64 @@ struct InsertSliceTiledOpInterface
     return extractSliceOp;
   }
 };
+
+/// Forwards the implementation of `TiledOpInterface` to upstream
+/// `TilingInterface`. Note that this forwarding is only valid when the
+/// iteration space is same as the data space of the result(s). This is due to
+/// the difference in the tiling algorithm being developed around
+/// `TilingInterface` and that used with `TiledOpInterface`. The difference
+/// comes down to the former only needing the tiled operation, and not the value
+/// of the whole tensor.
+template <typename OpTy>
+struct ForwardToTilingInterface
+    : public TiledOpInterface::ExternalModel<ForwardToTilingInterface<OpTy>,
+                                             OpTy> {
+  SmallVector<Value> getDestinationOperands(Operation *op, OpBuilder &b) const {
+    return cast<OpTy>(op).getDestinationOperands(b);
+  }
+
+  SmallVector<StringRef> getLoopIteratorTypes(Operation *op) const {
+    return cast<OpTy>(op).getLoopIteratorTypes();
+  }
+  SmallVector<Range> getLoopBounds(Operation *op, OpBuilder &b) const {
+    return cast<OpTy>(op).getLoopBounds(b);
+  }
+  Operation *getTiledImplementation(Operation *op, OpBuilder &b,
+                                    ValueRange dest,
+                                    ArrayRef<OpFoldResult> offsets,
+                                    ArrayRef<OpFoldResult> sizes,
+                                    SmallVectorImpl<Value> &results) const {
+    Operation *tiledOp =
+        cast<OpTy>(op).getTiledImplementation(b, dest, offsets, sizes);
+    if (!tiledOp) {
+      op->emitOpError("failed to tile operation");
+      return nullptr;
+    }
+    if (tiledOp->getNumResults() != dest.size()) {
+      op->emitOpError(
+          "mismatch in the number of results of the tiled operation and the "
+          "number of results expected");
+      return nullptr;
+    }
+    Location loc = op->getLoc();
+    auto oneAttr = b.getI64IntegerAttr(1);
+    SmallVector<OpFoldResult> strides(offsets.size(), oneAttr);
+    for (auto result : llvm::enumerate(tiledOp->getResults())) {
+      // Assume that the shape of the result is same as the loop bounds of the
+      // op. This implies the result can be inserted into the `dest` at
+      // `offsets` and `sizes`. This would be illegal if that is not the
+      // case. This is a point of difference between the `TiledOpInterface` in
+      // IREE and `TilingInterface` in MLIR, since the latter sees fusion and
+      // tiling as the same things. So it returns just the tiled op, and not the
+      // result of the full tensor as the current tiling algorithm expects.
+      auto tiledInsertOp = b.create<tensor::InsertSliceOp>(
+          loc, result.value(), dest[result.index()], offsets, sizes, strides);
+      results.push_back(tiledInsertOp);
+    }
+    return tiledOp;
+  }
+};
+
 }  // namespace
 
 void registerTiledOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -246,6 +304,8 @@ void registerTiledOpInterfaceExternalModels(DialectRegistry &registry) {
   registry
       .addOpInterface<tensor::ExtractSliceOp, ExtractSliceTiledOpInterface>();
   registry.addOpInterface<tensor::InsertSliceOp, InsertSliceTiledOpInterface>();
+  registry.addOpInterface<linalg::PadTensorOp,
+                          ForwardToTilingInterface<linalg::PadTensorOp>>();
 }
 
 }  // namespace linalg_ext

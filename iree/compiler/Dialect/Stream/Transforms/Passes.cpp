@@ -165,14 +165,85 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 void buildStreamCmdPassPipeline(OpPassManager &passManager,
-                                const TransformOptions &transformOptions) {}
+                                const TransformOptions &transformOptions) {
+  // Schedule fine-grained allocations and insert placeholders for larger/longer
+  // lifetime allocations.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createScheduleAllocationPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createScheduleAllocationPass());
+
+  // TODO(benvanik): passes to convert alloc to alloca and thread through
+  // streams. Ideally all transient allocs become stream-ordered allocas.
+  // createPropagateTransientsPass()
+
+  // Allocate backing storage for fused constant resources.
+  // This expands packed constants into explicit forms with partitioned storage
+  // buffers and upload logic.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createPackConstantsPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createPackConstantsPass());
+
+  // Pack fused allocations based on lifetime.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createPackAllocationsPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createPackAllocationsPass());
+
+  // Layout packed slices to emit the arithmetic required for all resource
+  // offsets. This enables us to propagate the subviews across the program
+  // below.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createLayoutSlicesPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createLayoutSlicesPass());
+
+  // Propagate subviews throughout the program to unify resource storage access.
+  // After propagation many resource SSA values can be deduped or folded by the
+  // cleanup patterns.
+  passManager.addPass(IREE::Stream::createPropagateSubviewsPass());
+  addCleanupPatterns(passManager);
+
+  // TODO(benvanik): outline streams (ala dispatch regions). Note that we may
+  // want to do this earlier to enable better deduplication but that makes the
+  // above passes trickier. Outlining may be more like "find chunks of streams
+  // useful to move into secondary command buffers."
+
+  // Everything must now be in explicit stream.cmd.* form.
+  passManager.addPass(IREE::Stream::createVerifyLoweringToCmdPass());
+}
 
 //===----------------------------------------------------------------------===//
 // -iree-stream-optimization-pipeline
 //===----------------------------------------------------------------------===//
 
 void buildStreamOptimizationPassPipeline(
-    OpPassManager &passManager, const TransformOptions &transformOptions) {}
+    OpPassManager &passManager, const TransformOptions &transformOptions) {
+  //----------------------------------------------------------------------------
+  // Binding optimization
+  //----------------------------------------------------------------------------
+
+  if (transformOptions.optimizeBindings) {
+    // Canonicalizer needs to run so that we have predictable inputs for fusion.
+    passManager.addPass(mlir::createCanonicalizerPass());
+    passManager.addPass(IREE::Stream::createFuseDispatchBindingsPass());
+
+    // Folding operands requires that CSE folds the inputs that we check for.
+    passManager.addPass(mlir::createCSEPass());
+    passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
+
+    // Only want to specialize after we've added all the operands we need above.
+    passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
+
+    // TODO(benvanik): canonicalize bindings: we should sort the bindings by
+    // the block argument order of the parent stream.cmd.execute. This will get
+    // us more regular descriptor set layouts. We could also use some other
+    // heuristics (all constant bindings -> transients -> external etc) to
+    // make partitioning the bindings easier. Note we need to update both the
+    // dispatches and the dispatch function argument order.
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // -iree-stream-transformation-pipeline

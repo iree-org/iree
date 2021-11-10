@@ -197,6 +197,7 @@ iree_status_t Run() {
   iree_hal_device_release(device);
   iree_runtime_session_release(session);
   iree_runtime_instance_release(instance);
+  iree_vm_module_release(bytecode_module);
 
   return status;
 }

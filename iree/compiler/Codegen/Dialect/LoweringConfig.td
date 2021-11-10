@@ -16,6 +16,8 @@ def CPU_Vectorization
     : StrEnumAttrCase<"CPUVectorization">;
 def CPU_TensorToVectors
     : StrEnumAttrCase<"CPUTensorToVectors">;
+def CPU_TileFuseAndVectorize
+    : StrEnumAttrCase<"CPUTileFuseAndVectorize">;
 
 def LLVMGPU_SimpleDistribute
     : StrEnumAttrCase<"LLVMGPUDistribute">;
@@ -39,9 +41,9 @@ def None
 def DispatchLoweringPassPipelineEnum : StrEnumAttr<
     "DispatchLoweringPassPipeline",
     "identifier for pass pipeline use to lower dispatch region",
-    [CPU_Default, CPU_TensorToVectors, CPU_Vectorization,
-     LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
-     SPIRV_SimpleDistribute, SPIRV_Vectorize,
+    [CPU_Default, CPU_TensorToVectors, CPU_TileFuseAndVectorize,
+     CPU_Vectorization, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
+     LLVMGPU_MatmulSimt, SPIRV_SimpleDistribute, SPIRV_Vectorize,
      SPIRV_VectorizeToCooperativeOps, None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
 }
@@ -70,10 +72,9 @@ def IREECodegen_TranslationInfoAttr :
 
   }];
 
-  // TODO(ravishankarm): Commented out till patch D111594 lands.
-  // let assemblyFormat = [{
-  //   `<` $passPipeline `,` `workload_per_wg` `=` $workloadPerWorkgroup `>`
-  // }];
+  let assemblyFormat = [{
+    `<` $passPipeline `,` `workload_per_wg` `=` $workloadPerWorkgroup `>`
+  }];
 
   let parameters = (ins
     AttrParameter<"StringAttr", "">:$passPipeline,
@@ -112,10 +113,9 @@ def IREECodegen_LoweringConfigAttr :
 
   }];
 
-  // TODO(ravishankarm): Commented out till patch D111594 lands.
-  // let assemblyFormat = [{
-  //   `<` `tile_sizes` `=` $tileSizes `,` `native_vector_size` `=` $nativeVectorSize `>`
-  // }];
+  let assemblyFormat = [{
+    `<` `tile_sizes` `=` $tileSizes `,` `native_vector_size` `=` $nativeVectorSize `>`
+  }];
 
   let parameters = (ins
     AttrParameter<"ArrayAttr", "">:$tileSizes,
@@ -166,10 +166,9 @@ def IREECodegen_CompilationInfoAttr :
     AttrParameter<"ArrayAttr", "">:$workgroupSize
   );
 
-  // TODO(ravishankarm): Commented out till patch D111594 lands.
-  // let assemblyFormat = [{
-  //   `<` $loweringConfig `,` $translationInfo `,` `workgroup_size` `=` $workgroupSize `>`
-  // }];
+  let assemblyFormat = [{
+    `<` $loweringConfig `,` $translationInfo `,` `workgroup_size` `=` $workgroupSize `>`
+  }];
 
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,

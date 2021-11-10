@@ -49,12 +49,18 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
 }
 
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
-                                    bool lowerToVectors) {
+                                    bool lowerToVectors,
+                                    bool useTileAndVectorizeV2) {
   passManager.addPass(createCanonicalizerPass());
 
   // Tile and vectorize linalg ops on tensors.
-  passManager.addNestedPass<FuncOp>(
-      createLLVMCPUTileAndVectorizePass(lowerToVectors));
+  if (useTileAndVectorizeV2) {
+    passManager.addNestedPass<FuncOp>(
+        createLLVMCPUTileFuseAndVectorizePass(lowerToVectors));
+  } else {
+    passManager.addNestedPass<FuncOp>(
+        createLLVMCPUTileAndVectorizePass(lowerToVectors));
+  }
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 

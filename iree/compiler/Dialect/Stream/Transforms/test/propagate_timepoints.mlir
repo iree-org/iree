@@ -98,8 +98,8 @@ func @funcResults(%arg0: !stream.resource<external>, %arg1: !stream.resource<tra
 // CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
 func @caller(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. The call
-  // consumes the unready resources and we expect the args to be passed directly
-  // to the call.
+  // consumes the unready resources and we expect the args to be passed
+  // directly.
 
   // CHECK: %[[RET:.+]]:4 = call @callee(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]])
   // CHECK-SAME: : (!stream.timepoint, !stream.resource<external>, !stream.timepoint, !stream.resource<transient>) -> (!stream.timepoint, !stream.resource<external>, !stream.timepoint, !stream.resource<transient>)

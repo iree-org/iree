@@ -25,9 +25,15 @@ void buildTFLImportPassPipeline(OpPassManager &pm);
 // IREE-specific passes for TFLite import
 //===----------------------------------------------------------------------===//
 
+// Retain functions used by tfl.call_once to avoid removal.
+std::unique_ptr<OperationPass<ModuleOp>> createRetainCallOnceFuncsPass();
+
 // Converts TFLite attributes that are useful to corresponding IREE attributes.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertModuleMetadataPass();
 std::unique_ptr<OperationPass<FuncOp>> createConvertFunctionMetadataPass();
+
+// Lowers TFLite's global tensor operations to the Util dialect.
+std::unique_ptr<OperationPass<ModuleOp>> createLowerGlobalTensorsPass();
 
 // Strips all leftover TFLite-related attributes; none are needed by IREE.
 std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass();
@@ -42,15 +48,7 @@ std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass();
 
 void registerTFLImportPassPipeline();
 
-inline void registerAllPasses() {
-  registerTFLImportPassPipeline();
-
-  createConvertModuleMetadataPass();
-  createConvertFunctionMetadataPass();
-  createStripModuleMetadataPass();
-  createStripFunctionMetadataPass();
-  createVerifyFullyConvertedPass();
-}
+void registerAllPasses();
 
 }  // namespace TFL
 }  // namespace iree_integrations

@@ -300,7 +300,7 @@ static bool hasNonScfForControlFlow(
   return dispatchOp
       .walk([&](Operation *op) {
         if (isa<BranchOpInterface>(op) || isa<RegionBranchOpInterface>(op)) {
-          if (!isa<scf::ForOp>(op) &&
+          if (!isa<scf::ForOp, scf::IfOp>(op) &&
               !isa<IREE::Flow::DispatchWorkgroupsOp>(op))
             return WalkResult::interrupt();
         }

@@ -150,3 +150,15 @@ func @asyncExecuteNoCaptures(%arg0: index, %arg1: f32) -> (!stream.resource<*>, 
   } => !stream.timepoint
   return %0#0, %0#1 : !stream.resource<*>, !stream.timepoint
 }
+
+// -----
+
+// CHECK-LABEL: @asyncExecuteNoResults
+func @asyncExecuteNoResults(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.timepoint) {
+  // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) {
+  %0:1 = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) {
+    // CHECK: stream.yield
+    stream.yield
+  } => !stream.timepoint
+  return %0#0 : !stream.timepoint
+}

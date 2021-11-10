@@ -17,6 +17,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
+#define DEBUG_TYPE "iree-llvmgpu-vectorization"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -100,6 +102,11 @@ struct LLVMGPUVectorizationPass
       populateVectorUnrollPatterns(vectorUnrollPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(vectorUnrollPatterns));
+      DEBUG_WITH_TYPE(DEBUG_TYPE, {
+        llvm::dbgs() << "\n--- After Step 1: Vectorization ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
     {
       // Step 2. Lower transfer op to canonical form.
@@ -110,6 +117,12 @@ struct LLVMGPUVectorizationPass
           lowerTransferOpPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(lowerTransferOpPatterns));
+      DEBUG_WITH_TYPE(DEBUG_TYPE, {
+        llvm::dbgs()
+            << "\n--- After Step 2: Lower transfer op to canonical form. ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
     {
@@ -121,6 +134,11 @@ struct LLVMGPUVectorizationPass
           canonicalizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns));
+      DEBUG_WITH_TYPE(DEBUG_TYPE, {
+        llvm::dbgs() << "\n--- After Step 3: Canonicalize. ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
     {
       // Step 4. Lower contract op to outer product.
@@ -137,6 +155,12 @@ struct LLVMGPUVectorizationPass
           vector::VectorMultiReductionLowering::InnerParallel);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(contractLoweringPatterns));
+      DEBUG_WITH_TYPE(DEBUG_TYPE, {
+        llvm::dbgs()
+            << "\n--- After Step 4: Lower contract op to outer product. ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
   }
 };

@@ -18,6 +18,9 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "convert_metadata.mlir",
+            "flex_ops.mlir",
+            "lower_global_tensors.mlir",
+            "retain_call_once_funcs.mlir",
             "strip_metadata.mlir",
             "verify_fully_converted.mlir",
         ],

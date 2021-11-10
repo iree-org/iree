@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -40,8 +41,14 @@ class CommandBufferFillBufferOpConversion
     // Record the original pattern length then extend it to a 32 bit integer.
     auto originalPatternType = op.pattern().getType();
     auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
-    auto patternLength = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
-        op.getLoc(), patternBitWidth / 8, 32);
+    // The pattern length (in bytes) will be used at runtime to issue the fill
+    // command. While the pattern itself will be stored in a 32 bit integer,
+    // the fill operation will use this length to slice a potentially smaller
+    // range of bits from the full pattern.
+    auto patternLengthBytes =
+        IREE::HAL::getRoundedElementByteWidth(originalPatternType);
+    auto patternLengthConst = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
+        op.getLoc(), patternLengthBytes, 32);
     Value pattern = op.pattern();
     if (originalPatternType.isF16() || originalPatternType.isF32()) {
       pattern = rewriter.createOrFold<arith::BitcastOp>(
@@ -52,7 +59,7 @@ class CommandBufferFillBufferOpConversion
           op.getLoc(), pattern, rewriter.getIntegerType(32));
     }
     callOperands.push_back(pattern);
-    callOperands.push_back(patternLength);
+    callOperands.push_back(patternLengthConst);
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),

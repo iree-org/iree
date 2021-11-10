@@ -98,6 +98,92 @@ def PropagateTimepoints :
 }
 
 //===----------------------------------------------------------------------===//
+// Allocation and command issuing
+//===----------------------------------------------------------------------===//
+
+def ScheduleAllocation :
+    Pass<"iree-stream-schedule-allocation", ""> {
+  let summary = "Allocates resources and converts to explicit stream commands.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createScheduleAllocationPass()
+  }];
+}
+
+def PackConstants :
+    Pass<"iree-stream-pack-constants", ""> {
+  let summary = "Packs and allocate backing storage for fused constant resources.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPackConstantsPass()
+  }];
+}
+
+def PackAllocations :
+    Pass<"iree-stream-pack-allocations", ""> {
+  let summary = "Packs fused allocations based on lifetime.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPackAllocationsPass()
+  }];
+}
+
+def LayoutSlices :
+    Pass<"iree-stream-layout-slices", ""> {
+  let summary = "Lays out packed slices and produces arithmetic required for all offsets.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createLayoutSlicesPass()
+  }];
+}
+
+def PropagateSubviews :
+    Pass<"iree-stream-propagate-subviews", "mlir::ModuleOp"> {
+  let summary = "Propagates resource subviews throughout the whole program.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPropagateSubviewsPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Stream memoization
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): outline streams (ala dispatch regions).
+// TODO(benvanik): deduplicate outlined streams.
+
+//===----------------------------------------------------------------------===//
+// Dispatch optimization
+//===----------------------------------------------------------------------===//
+
+def FoldUniformOperands :
+    Pass<"iree-stream-fold-uniform-operands", "mlir::ModuleOp"> {
+  let summary = "Folds redundant and uniformly constant dispatch operands.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createFoldUniformOperandsPass()
+  }];
+}
+
+def FuseDispatchBindings :
+    Pass<"iree-stream-fuse-dispatch-bindings", "mlir::ModuleOp"> {
+  let summary = "Fuses bindings to the same underlying storage to reduce binding count.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createFuseDispatchBindingsPass()
+  }];
+}
+
+def SpecializeDispatches :
+    Pass<"iree-stream-specialize-dispatches", "mlir::ModuleOp"> {
+  let summary = "Specializes executables by inlining/fusing operands based on dispatch sites.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createSpecializeDispatchesPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Stream memoization
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): outline streams (ala dispatch regions).
+// TODO(benvanik): deduplicate outlined streams.
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 
