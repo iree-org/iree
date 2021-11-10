@@ -40,9 +40,6 @@ static LogicalResult verifySupportedTilingOptions(
     return rewriter.notifyMatchFailure(op,
                                        "unsupported interchange during tiling");
   }
-  if (options.paddingValueComputationFunction) {
-    return rewriter.notifyMatchFailure(op, "unsupported tile + pad option");
-  }
   if (options.loopType != linalg::LinalgTilingLoopType::Loops) {
     return rewriter.notifyMatchFailure(op,
                                        "only tiling with scf.for is supported");

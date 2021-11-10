@@ -331,7 +331,6 @@ Attribute ByteRangeAttr::parse(DialectAsmParser &p, Type type) {
 
 void ByteRangeAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic();
   os << "<";
   os << getOffset();
   os << ", ";
@@ -421,7 +420,6 @@ Attribute CompositeAttr::parse(DialectAsmParser &parser, Type type) {
 
 void CompositeAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic();
   os << "<" << getTotalLength() << "xi8, [";
   if (getTotalLength() > 0) {
     os << "\n";
