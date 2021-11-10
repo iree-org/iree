@@ -268,12 +268,14 @@ struct ForwardToTilingInterface
     Operation *tiledOp =
         cast<OpTy>(op).getTiledImplementation(b, dest, offsets, sizes);
     if (!tiledOp) {
-      return op->emitOpError("failed to tile operation");
+      op->emitOpError("failed to tile operation");
+      return nullptr;
     }
     if (tiledOp->getNumResults() != dest.size()) {
-      return op->emitOpError(
+      op->emitOpError(
           "mismatch in the number of results of the tiled operation and the "
           "number of results expected");
+      return nullptr;
     }
     Location loc = op->getLoc();
     auto oneAttr = b.getI64IntegerAttr(1);
