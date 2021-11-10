@@ -1,0 +1,399 @@
+// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-stream-schedule-allocation)' %s | IreeFileCheck %s
+
+// Tests that async constant ops get extracted into a dedicated constant op
+// outside of the execution region. This allows us to handle them in various
+// target-specific ways (such as using staging upload buffers if needed).
+
+// CHECK-LABEL: @extractConstants
+// CHECK-SAME: (%[[OPERAND_TIMEPOINT:.+]]: !stream.timepoint,
+// CHECK-SAME:  %[[OPERAND:.+]]: !stream.resource<transient>,
+// CHECK-SAME   %[[SIZE:.+]]: index)
+func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.resource<transient>, %size: index) {
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+  %c24 = arith.constant 24 : index
+  %c128 = arith.constant 128 : index
+  %cst = arith.constant 5.4 : f32
+
+  // Constants get hoisted into a dedicated op.
+  // CHECK: %[[CST_RETS:.+]]:2, %[[CST_TIMEPOINT:.+]] = stream.resource.constants :
+  // CHECK-NEXT: !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>,
+  // CHECK-NEXT: !stream.resource<constant>{%c16} = dense<4> : tensor<4x2xi16>
+
+  // Remaining ops run in a normal execution region.
+  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute await(%[[OPERAND_TIMEPOINT]])
+  // CHECK-SAME: => with(%[[OPERAND]]
+  // CHECK-NEXT: stream.cmd.fill
+
+  %results:3, %result_timepoint = stream.async.execute await(%timepoint) => with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<transient>{%size}) {
+    %0 = stream.async.constant : !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
+    %1 = stream.async.constant : !stream.resource<constant>{%c16} = dense<4> : tensor<4x2xi16>
+    %2 = stream.async.fill %cst, %capture[%c0 to %c128 for %c128] : f32 -> %capture as !stream.resource<transient>{%size}
+    stream.yield %0, %1, %2 : !stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<transient>{%size}
+  } => !stream.timepoint
+
+  // Join the two async ops (constant upload and execution should overlap).
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[CST_TIMEPOINT]], %[[EXEC_TIMEPOINT]])
+  // CHECK: util.do_not_optimize(%[[JOIN]]) : !stream.timepoint
+  util.do_not_optimize(%result_timepoint) : !stream.timepoint
+
+  // CHECK: util.do_not_optimize(%[[CST_RETS]]#0)
+  util.do_not_optimize(%results#0) : !stream.resource<constant>
+  // CHECK: util.do_not_optimize(%[[CST_RETS]]#1)
+  util.do_not_optimize(%results#1) : !stream.resource<constant>
+  // CHECK: util.do_not_optimize(%[[OPERAND]])
+  util.do_not_optimize(%results#2) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// Tests operands that pass directly through to results.
+// These should be canonicalized away but are still valid.
+
+// CHECK-LABEL: @passthroughOperands
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @passthroughOperands(%operand: !stream.resource<transient>, %size: index) {
+  // CHECK: = stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}) {
+    stream.yield %capture : !stream.resource<transient>{%size}
+  // CHECK-NEXT: } => !stream.timepoint
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[OPERAND]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @capturedOperands
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @capturedOperands(%operand: !stream.resource<transient>, %size: index) {
+  // CHECK: stream.cmd.execute
+  // CHECK-SAME: => with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]}
+  %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) {
+    // CHECK-NEXT: stream.cmd.copy %[[CAPTURE]]
+    %0 = stream.async.clone %capture : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
+    stream.yield
+  } => !stream.timepoint
+  return
+}
+
+// -----
+
+// Tests operands that are tied to results with intermediate operations.
+
+// CHECK-LABEL: @tiedOperands
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %cst = arith.constant 5.4 : f32
+  // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
+    // CHECK-NEXT: stream.cmd.fill %cst, %[[CAPTURE]]
+    %0 = stream.async.fill %cst, %capture[%c0 to %c128 for %c128] : f32 -> %capture as !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[OPERAND]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// Tests results are allocated for external use.
+// We expect them to be allocated with synchronous alloc ops.
+
+// CHECK-LABEL: @producedResults
+// CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index)
+func @producedResults(%size0: index, %size1: index) {
+  %cst = arith.constant 5.4 : f32
+  %cst_0 = arith.constant 6.4 : f32
+  // CHECK: %[[ALLOC_RETS:.+]]:2 = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE0]]}, !stream.resource<transient>{%[[SIZE1]]}
+  // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
+  // CHECK-SAME: with(%[[ALLOC_RETS]]#0 as %[[CAPTURE0:.+]]: !stream.resource<transient>{%[[SIZE0]]},
+  // CHECK-SAME:      %[[ALLOC_RETS]]#1 as %[[CAPTURE1:.+]]: !stream.resource<transient>{%[[SIZE1]]})
+  %results:2, %result_timepoint = stream.async.execute with() -> (!stream.resource<transient>{%size0}, !stream.resource<transient>{%size1}) {
+    // CHECK: stream.cmd.fill %cst, %[[CAPTURE0]]
+    %0 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%size0}
+    // CHECK: stream.cmd.fill %cst_0, %[[CAPTURE1]]
+    %1 = stream.async.splat %cst_0 : f32 -> !stream.resource<transient>{%size1}
+    stream.yield %0, %1 : !stream.resource<transient>{%size0}, !stream.resource<transient>{%size1}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[TIMEPOINT]])
+  util.do_not_optimize(%result_timepoint) : !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[ALLOC_RETS]]#0)
+  util.do_not_optimize(%results#0) : !stream.resource<transient>
+  // CHECK: util.do_not_optimize(%[[ALLOC_RETS]]#1)
+  util.do_not_optimize(%results#1) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// Tests local values that are produced and consumed exclusively within the
+// execution region. We expect them to be placed into packed slices and
+// allocated with the async stream-ordered alloca/dealloca ops.
+
+// CHECK-LABEL: @locals
+// CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index)
+func @locals(%size0: index, %size1: index) {
+  %cst = arith.constant 5.4 : f32
+  %cst_0 = arith.constant 6.4 : f32
+  //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack slices({
+  // CHECK-NEXT:   [0, 0] = %[[SIZE0]],
+  // CHECK-NEXT:   [1, 1] = %[[SIZE1]]
+  // CHECK-NEXT: })
+  // CHECK-NEXT: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized : !stream.resource<transient>{%[[SLICES]]#0}
+  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute await(%[[ALLOCA_TIMEPOINT]])
+  // CHECK-SAME: with(%[[ALLOCA]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SLICES]]#0})
+  %result_timepoint = stream.async.execute with() {
+    // CHECK: stream.cmd.fill %cst, %[[CAPTURE]][%[[SLICES]]#1 for %[[SIZE0]]] : f32 -> !stream.resource<transient>{%[[SLICES]]#0}
+    %0 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%size0}
+    // CHECK: stream.cmd.fill %cst_0, %[[CAPTURE]][%[[SLICES]]#2 for %[[SIZE1]]] : f32 -> !stream.resource<transient>{%[[SLICES]]#0}
+    %1 = stream.async.splat %cst_0 : f32 -> !stream.resource<transient>{%size1}
+    stream.yield
+  } => !stream.timepoint
+  // CHECK: stream.resource.dealloca await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]]
+  return
+}
+
+// -----
+
+// Tests that concurrently executable regions don't introduce new allocations.
+// They should effectively be no-ops with respect to allocation so this looks
+// a lot like like the above tests.
+
+// CHECK-LABEL: @concurrentRegions
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @concurrentRegions(%operand: !stream.resource<transient>, %size: index) {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %cst_0 = arith.constant 5.4 : f32
+  %cst_1 = arith.constant 6.4 : f32
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: stream.cmd.execute
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %results:2, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.concurrent
+    %0:2 = stream.async.concurrent with(%capture as %concurrent_capture: !stream.resource<transient>{%size}) -> (%capture as !stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
+      // CHECK-NEXT: stream.cmd.fill %cst, %[[OPERAND_CAPTURE]]
+      %1 = stream.async.fill %cst_0, %concurrent_capture[%c0 to %c128 for %c128] : f32 -> %concurrent_capture as !stream.resource<transient>{%size}
+      // CHECK-NEXT: stream.cmd.fill %cst_0, %[[ALLOC_CAPTURE]]
+      %2 = stream.async.splat %cst_1 : f32 -> !stream.resource<transient>{%size}
+      stream.yield %1, %2 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
+    }
+    stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[OPERAND]])
+  util.do_not_optimize(%results#0) : !stream.resource<transient>
+  // CHECK: util.do_not_optimize(%[[ALLOC]])
+  util.do_not_optimize(%results#1) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @applyAsyncSplatOp
+// CHECK-SAME: (%[[SIZE:.+]]: index)
+func @applyAsyncSplatOp(%size: index) {
+  %cst = arith.constant 5.4 : f32
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: stream.cmd.execute with(%[[ALLOC]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with() -> (!stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.fill %cst, %[[CAPTURE]][%c0 for %[[SIZE]]] : f32 -> !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[ALLOC]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @applyAsyncCloneOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @applyAsyncCloneOp(%operand: !stream.resource<transient>, %size: index) {
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: stream.cmd.execute
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%size} {
+    // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c0], %[[ALLOC_CAPTURE]][%c0], %[[SIZE]]
+    // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.clone %capture : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[ALLOC]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// TODO(benvanik): place the allocation instead.
+// NOTE: this should be placing the allocation but is currently a copy.
+
+// CHECK-LABEL: @applyAsyncSliceOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @applyAsyncSliceOp(%operand: !stream.resource<transient>, %size: index) {
+  %c16 = arith.constant 16 : index
+  %c128 = arith.constant 128 : index
+  %c144 = arith.constant 144 : index
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%c128}
+  // CHECK: stream.cmd.execute
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%c128} {
+    // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c16_0], %[[ALLOC_CAPTURE]][%c0], %c128
+    // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%c128}
+    %0 = stream.async.slice %capture[%c16 to %c144] : !stream.resource<transient>{%size} -> !stream.resource<transient>{%c128}
+    stream.yield %0 : !stream.resource<transient>{%c128}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[ALLOC]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @applyAsyncFillOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @applyAsyncFillOp(%operand: !stream.resource<transient>, %size: index) {
+  %c16 = arith.constant 16 : index
+  %c128 = arith.constant 128 : index
+  %c144 = arith.constant 144 : index
+  %cst = arith.constant 5.4 : f32
+  // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.fill %cst, %[[CAPTURE]][%c16_0 for %c128] : f32 -> !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.fill %cst, %capture[%c16 to %c144 for %c128] : f32 -> %capture as !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[OPERAND]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// TODO(benvanik): place the allocation instead.
+// NOTE: this should be placing the allocation but is currently a copy.
+
+// CHECK-LABEL: @applyAsyncUpdateOp
+// CHECK-SAME: (%[[UPDATE:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[OPERAND:.+]]: !stream.resource<transient>,
+// CHECK-SAME:  %[[SIZE:.+]]: index)
+func @applyAsyncUpdateOp(%update: !stream.resource<external>, %operand: !stream.resource<transient>, %size: index) {
+  %c16 = arith.constant 16 : index
+  %c128 = arith.constant 128 : index
+  %c144 = arith.constant 144 : index
+  // CHECK: stream.cmd.execute
+  // CHECK-SAME: with(%[[UPDATE]] as %[[UPDATE_CAPTURE:.+]]: !stream.resource<external>{%c128},
+  // CHECK-SAME:      %[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%update as %captured_update: !stream.resource<external>{%c128}, %operand as %captured_operand: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.copy %[[UPDATE_CAPTURE]][%c0], %[[OPERAND_CAPTURE]][%c16_0], %c128
+    // CHECK-SAME: : !stream.resource<external>{%c128} -> !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.update %captured_update, %captured_operand[%c16 to %c144] : !stream.resource<external>{%c128} -> %captured_operand as !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[OPERAND]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @applyAsyncCopyOp
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[TARGET:.+]]: !stream.resource<transient>,
+// CHECK-SAME:  %[[SIZE:.+]]: index)
+func @applyAsyncCopyOp(%source: !stream.resource<external>, %target: !stream.resource<transient>, %size: index) {
+  %c16 = arith.constant 16 : index
+  %c128 = arith.constant 128 : index
+  %c144 = arith.constant 144 : index
+  // CHECK: stream.cmd.execute
+  // CHECK-SAME: with(%[[SOURCE]] as %[[SOURCE_CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]},
+  // CHECK-SAME:      %[[TARGET]] as %[[TARGET_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%source as %captured_source: !stream.resource<external>{%size}, %target as %captured_target: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c16_0], %[[TARGET_CAPTURE]][%c16_1], %c128
+    // CHECK-SAME: : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.copy %captured_source[%c16 to %c144], %captured_target[%c16 to %c144], %c128 : !stream.resource<external>{%size} -> %captured_operand as !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[TARGET]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// TODO(benvanik): test affinity changes that would introduce invalidate/fill.
+
+// CHECK-LABEL: @applyAsyncTransferOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @applyAsyncTransferOp(%operand: !stream.resource<transient>, %size: index) {
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: stream.cmd.execute
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%size} {
+    // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c0], %[[ALLOC_CAPTURE]][%c0], %[[SIZE]]
+    // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.transfer %capture : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[ALLOC]])
+  util.do_not_optimize(%result) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @applyAsyncDispatchOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: index) {
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %results:2, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
+    // CHECK-NEXT: stream.cmd.dispatch @executable::@dispatch[%c1, %c1, %c1](%c4 : index) {
+    // CHECK-NEXT:   rw %[[OPERAND_CAPTURE]][%c0 for %[[SIZE]]] : !stream.resource<transient>{%[[SIZE]]},
+    // CHECK-NEXT:   wo %[[ALLOC_CAPTURE]][%c0 for %[[SIZE]]] : !stream.resource<transient>{%[[SIZE]]}
+    // CHECK-NEXT: }
+    %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%capture, %c4) : (!stream.resource<transient>{%size}, index) -> (%capture{%size}, !stream.resource<transient>{%size})
+    stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[TIMEPOINT]])
+  util.do_not_optimize(%result_timepoint) : !stream.timepoint
+  // CHECK: util.do_not_optimize(%[[OPERAND]])
+  util.do_not_optimize(%results#0) : !stream.resource<transient>
+  // CHECK: util.do_not_optimize(%[[ALLOC]])
+  util.do_not_optimize(%results#1) : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// Tests that stream.async.load/store are converted to their explicit forms.
+
+// CHECK-LABEL: @asyncLoadStore
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<staging>,
+// CHECK-SAME:  %[[SIZE:.+]]: index)
+func @asyncLoadStore(%operand: !stream.resource<staging>, %size: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 5.4 : f32
+  // CHECK: stream.resource.store %cst, %[[OPERAND]][%c0] : f32 -> !stream.resource<staging>{%[[SIZE]]}
+  %0 = stream.async.store %cst, %operand[%c0] : f32 -> %operand as !stream.resource<staging>{%size}
+  // CHECK: %[[RESULT:.+]] = stream.resource.load %[[OPERAND]][%c0] : !stream.resource<staging>{%[[SIZE]]} -> f32
+  %1 = stream.async.load %0[%c0] : !stream.resource<staging>{%size} -> f32
+  // CHECK: return %[[RESULT]]
+  return %1 : f32
+}

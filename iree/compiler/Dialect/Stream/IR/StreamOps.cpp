@@ -264,19 +264,22 @@ static ParseResult parseResourceRegion(
     }
   }
 
-  if (failed(parser.parseArrow())) return failure();
-  if (succeeded(parser.parseOptionalLParen())) {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandSizes, resultTypes, resultSizes,
-                                     tiedOperands)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  } else {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandSizes, resultTypes, resultSizes,
-                                     tiedOperands))) {
-      return failure();
+  if (succeeded(parser.parseOptionalArrow())) {
+    if (succeeded(parser.parseOptionalLParen())) {
+      if (succeeded(parser.parseOptionalRParen())) {
+        // -> ()
+      } else if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                              operandSizes, resultTypes,
+                                              resultSizes, tiedOperands)) ||
+                 failed(parser.parseRParen())) {
+        return failure();
+      }
+    } else {
+      if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                       operandSizes, resultTypes, resultSizes,
+                                       tiedOperands))) {
+        return failure();
+      }
     }
   }
   return parser.parseRegion(body, regionArgs, operandTypes,
@@ -303,11 +306,14 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
           operandSizes = operandSizes.drop_front(1);
         }
       });
-  p << ") -> ";
-  if (resultTypes.size() != 1) p << "(";
-  printShapedResultList(p, op, operands, operandTypes, operandSizes,
-                        resultTypes, resultSizes, tiedOperands);
-  if (resultTypes.size() != 1) p << ")";
+  p << ")";
+  if (!resultTypes.empty()) {
+    p << " -> ";
+    if (resultTypes.size() != 1) p << "(";
+    printShapedResultList(p, op, operands, operandTypes, operandSizes,
+                          resultTypes, resultSizes, tiedOperands);
+    if (resultTypes.size() != 1) p << ")";
+  }
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }

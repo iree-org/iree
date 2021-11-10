@@ -24,6 +24,7 @@ cc_library(
         "Passes.cpp",
         "PropagateTimepoints.cpp",
         "RefineUsage.cpp",
+        "ScheduleAllocation.cpp",
         "ScheduleConcurrency.cpp",
         "ScheduleExecution.cpp",
         "VerifyLowerings.cpp",

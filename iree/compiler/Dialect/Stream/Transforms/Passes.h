@@ -98,6 +98,12 @@ std::unique_ptr<OperationPass<>> createScheduleConcurrencyPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateTimepointsPass();
 
 //===----------------------------------------------------------------------===//
+// Allocation and command issuing
+//===----------------------------------------------------------------------===//
+
+std::unique_ptr<OperationPass<>> createScheduleAllocationPass();
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 

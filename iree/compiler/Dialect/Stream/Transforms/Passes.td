@@ -98,6 +98,18 @@ def PropagateTimepoints :
 }
 
 //===----------------------------------------------------------------------===//
+// Allocation and command issuing
+//===----------------------------------------------------------------------===//
+
+def ScheduleAllocation :
+    Pass<"iree-stream-schedule-allocation", ""> {
+  let summary = "Allocates resources and converts to explicit stream commands.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createScheduleAllocationPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 

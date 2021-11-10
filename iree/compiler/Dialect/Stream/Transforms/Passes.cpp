@@ -165,7 +165,18 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 void buildStreamCmdPassPipeline(OpPassManager &passManager,
-                                const TransformOptions &transformOptions) {}
+                                const TransformOptions &transformOptions) {
+  // Schedule fine-grained allocations and insert placeholders for larger/longer
+  // lifetime allocations.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createScheduleAllocationPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createScheduleAllocationPass());
+
+  // TODO(benvanik): passes to convert alloc to alloca and thread through
+  // streams. Ideally all transient allocs become stream-ordered allocas.
+  // createPropagateTransientsPass()
+}
 
 //===----------------------------------------------------------------------===//
 // -iree-stream-optimization-pipeline
