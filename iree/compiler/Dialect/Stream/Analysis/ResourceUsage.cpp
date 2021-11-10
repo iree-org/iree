@@ -188,6 +188,9 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
   // This may be dynamic as the result value may be tied to an operand that
   // itself is under analysis.
   void updateFromDefiningOp(Value value, OpResult result, DFX::Solver &solver) {
+    // Some tied uses route through ops that change types - ignore those.
+    if (!result.getType().isa<IREE::Stream::ResourceType>()) return;
+
     TypeSwitch<Operation *, void>(result.getOwner())
         .Case([&](mlir::SelectOp op) {
           auto trueUsage = solver.getElementFor<ValueResourceUsage>(
@@ -317,6 +320,9 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
   // Updates the usage based on the particular usage as |operand|.
   // This walks through tied uses as well.
   void updateFromUse(Value value, OpOperand &operand, DFX::Solver &solver) {
+    // Some tied uses route through ops that change types - ignore those.
+    if (!operand.get().getType().isa<IREE::Stream::ResourceType>()) return;
+
     auto *userOp = operand.getOwner();
     unsigned operandIdx = operand.getOperandNumber();
     TypeSwitch<Operation *, void>(userOp)

@@ -30,6 +30,24 @@ func @propagateFuncCaller(%size: index) -> !stream.resource<*> {
 
 // -----
 
+// Tests that if a tied op (in this case export) is traversed during analysis
+// and the type changes we don't explode.
+
+// CHECK-LABEL: @transitionTypesAcrossTies
+func @transitionTypesAcrossTies() -> !hal.buffer_view {
+  %cst = arith.constant 1.0 : f32
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat {{.+}} -> !stream.resource<external>
+  %0 = stream.async.splat %cst : f32 -> !stream.resource<*>{%c4}
+  // CHECK-NOT: stream.async.transfer
+  %1 = stream.async.transfer %0 : !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
+  // CHECK: stream.tensor.export %[[SPLAT]] : tensor<f32> in !stream.resource<external>{%c4} -> !hal.buffer_view
+  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c4} -> !hal.buffer_view
+  return %2 : !hal.buffer_view
+}
+
+// -----
+
 // Tests that resource usage and type updates are propagated around the CFG.
 // This starts with one result being * and the other pinned to external,
 // demonstrating how we can hint usage when required and that the refinement
