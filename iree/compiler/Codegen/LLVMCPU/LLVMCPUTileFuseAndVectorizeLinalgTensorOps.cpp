@@ -95,7 +95,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   // Assume there is a single op with a lowering config we use to drive the
   // tiling decisions.
   // TODO(hanchung): Speicify a callback to get tile sizes in tile+fuse after
-  // upstream patterns does not use the tiling options. Then we don't need this.
+  // upstream method supports it. Then we don't need extracting the config.
   IREE::Codegen::LoweringConfigAttr config;
   funcOp.walk([&](linalg::LinalgOp linalgOp) {
     if (auto opConfig = getLoweringConfig(linalgOp)) {
