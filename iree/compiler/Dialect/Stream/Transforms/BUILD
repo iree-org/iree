@@ -25,6 +25,7 @@ cc_library(
         "PackConstants.cpp",
         "PassDetail.h",
         "Passes.cpp",
+        "PropagateSubviews.cpp",
         "PropagateTimepoints.cpp",
         "RefineUsage.cpp",
         "ScheduleAllocation.cpp",
