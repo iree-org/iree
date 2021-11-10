@@ -147,7 +147,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
   // Apply post distribution canonicalization passes.
   OwningRewritePatternList canonicalization(context);
   AffineMinOp::getCanonicalizationPatterns(canonicalization, context);
-  populateFoldAffineMinInDistributedLoopsPatterns(canonicalization);
+  populateAffineMinSCFCanonicalizationPattern(canonicalization);
   IREE::Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,
                                                            context);
   (void)applyPatternsAndFoldGreedily(module, std::move(canonicalization));
