@@ -149,6 +149,41 @@ def PropagateSubviews :
 // TODO(benvanik): deduplicate outlined streams.
 
 //===----------------------------------------------------------------------===//
+// Dispatch optimization
+//===----------------------------------------------------------------------===//
+
+def FoldUniformOperands :
+    Pass<"iree-stream-fold-uniform-operands", "mlir::ModuleOp"> {
+  let summary = "Folds redundant and uniformly constant dispatch operands.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createFoldUniformOperandsPass()
+  }];
+}
+
+def FuseDispatchBindings :
+    Pass<"iree-stream-fuse-dispatch-bindings", "mlir::ModuleOp"> {
+  let summary = "Fuses bindings to the same underlying storage to reduce binding count.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createFuseDispatchBindingsPass()
+  }];
+}
+
+def SpecializeDispatches :
+    Pass<"iree-stream-specialize-dispatches", "mlir::ModuleOp"> {
+  let summary = "Specializes executables by inlining/fusing operands based on dispatch sites.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createSpecializeDispatchesPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Stream memoization
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): outline streams (ala dispatch regions).
+// TODO(benvanik): deduplicate outlined streams.
+
+//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
 
