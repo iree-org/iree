@@ -43,41 +43,6 @@ static Value getAsValue(OpFoldResult attrOrValue, OpBuilder &builder,
   return builder.create<arith::ConstantIndexOp>(loc, attr.getInt());
 }
 
-/// Returns the numeric index for the given string processor dimension.
-static int dimensionToIndex(StringRef dimension) {
-  return StringSwitch<int>(dimension).Case("x", 0).Case("y", 1).Case("z", 2);
-}
-
-/// Returns the dimension if the given `value` is from a processor id op.
-static Optional<unsigned> getProcessorIDDim(Value value) {
-  if (auto op = value.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>()) {
-    return op.dimension().getZExtValue();
-  }
-  if (auto op = value.getDefiningOp<gpu::ThreadIdOp>()) {
-    return dimensionToIndex(op.dimension());
-  }
-  return llvm::None;
-}
-
-/// Returns the dimension if the given `value` is from a processor count op.
-static Optional<unsigned> getProcessorCountDim(Value value) {
-  if (auto op = value.getDefiningOp<IREE::HAL::InterfaceWorkgroupCountOp>()) {
-    return op.dimension().getZExtValue();
-  }
-  if (auto op = value.getDefiningOp<gpu::BlockDimOp>()) {
-    return dimensionToIndex(op.dimension());
-  }
-  return llvm::None;
-}
-
-/// Returns the dimension if the given `value` is from a processor tile size op.
-static Optional<unsigned> getProcessorTileSizeDim(Value value) {
-  if (auto op = value.getDefiningOp<IREE::HAL::InterfaceWorkgroupSizeOp>()) {
-    return op.dimension().getZExtValue();
-  }
-  return llvm::None;
-}
-
 #ifndef NDEBUG
 inline raw_ostream &operator<<(raw_ostream &os,
                                const LoopTilingAndDistributionInfo &info) {
@@ -114,15 +79,13 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
 
   LogicalResult matchAndRewrite(AffineMinOp minOp,
                                 PatternRewriter &rewriter) const override {
-    QueryProcessor queryProcessor{getProcessorIDDim, getProcessorCountDim,
-                                  getProcessorTileSizeDim};
     Location loc = minOp.getLoc();
 
     auto loopMatcher = [&](Value iv, Value &lb, Value &ub, Value &step) {
       scf::ForOp forOp = scf::getForInductionVarOwner(iv);
       if (!forOp) return failure();
 
-      auto loopInfo = isTiledAndDistributedLoop(forOp, queryProcessor);
+      auto loopInfo = isTiledAndDistributedLoop(forOp);
       if (!loopInfo) return failure();
       LLVM_DEBUG(llvm::dbgs() << *loopInfo);
 
@@ -173,15 +136,12 @@ struct FoldAffineApplyOverSingleValueInductionVariable final
 
   LogicalResult matchAndRewrite(AffineApplyOp applyOp,
                                 PatternRewriter &rewriter) const override {
-    QueryProcessor queryProcessor{getProcessorIDDim, getProcessorCountDim,
-                                  getProcessorTileSizeDim};
-
     for (auto indexedOperand : llvm::enumerate(applyOp.getMapOperands())) {
       Value iv = indexedOperand.value();
       scf::ForOp forOp = scf::getForInductionVarOwner(iv);
       if (!forOp) continue;
 
-      auto loopInfo = isTiledAndDistributedLoop(forOp, queryProcessor);
+      auto loopInfo = isTiledAndDistributedLoop(forOp);
       if (!loopInfo) continue;
       LLVM_DEBUG(llvm::dbgs() << *loopInfo);
 

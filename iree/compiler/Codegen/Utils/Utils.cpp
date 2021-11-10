@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
+#include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -195,18 +196,22 @@ static SmallVector<Value> getValuesForDimsOrSymbols(
 /// returns the dimension.  If `refDimension` is passed checks if the dimension
 /// matches the given value.
 static Optional<unsigned> checkDimensions(
-    ArrayRef<Value> vals, const QueryProcessor &query,
-    Optional<unsigned> refDimension = llvm::None) {
+    ArrayRef<Value> vals, bool allowIdOp, bool allowCountOp,
+    bool allowTileSizeOp, Optional<unsigned> refDimension = llvm::None) {
   for (auto v : vals) {
+    Operation *op = v.getDefiningOp();
     Optional<unsigned> currDimension;
-    if (query.getIdDim) {
-      if (auto vIdDim = query.getIdDim(v)) currDimension = vIdDim;
+    if (allowIdOp) {
+      if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(op))
+        currDimension = ifx.getDimIndex();
     }
-    if (!currDimension && query.getCountDim) {
-      if (auto vCountDim = query.getCountDim(v)) currDimension = vCountDim;
+    if (!currDimension && allowCountOp) {
+      if (auto ifx = dyn_cast_or_null<ProcessorCountInterface>(op))
+        currDimension = ifx.getDimIndex();
     }
-    if (!currDimension && query.getTileSizeDim) {
-      if (auto vSizeDim = query.getTileSizeDim(v)) currDimension = vSizeDim;
+    if (!currDimension && allowTileSizeOp) {
+      if (auto ifx = dyn_cast_or_null<ProcessorTileSizeInterface>(op))
+        currDimension = ifx.getDimIndex();
     }
     if (!currDimension) return llvm::None;
     if (!refDimension) refDimension = currDimension;
@@ -222,9 +227,9 @@ namespace {
 class LowerBoundExprVisitor
     : public AffineExprVisitor<LowerBoundExprVisitor, LogicalResult> {
  public:
-  LowerBoundExprVisitor(AffineApplyOp applyOp, QueryProcessor query,
+  LowerBoundExprVisitor(AffineApplyOp applyOp,
                         LoopTilingAndDistributionInfo &loopInfo)
-      : applyOp(applyOp), queryProcessor(query), loopInfo(loopInfo) {}
+      : applyOp(applyOp), loopInfo(loopInfo) {}
 
   LogicalResult visitSymbolExpr(AffineSymbolExpr /*expr*/) { return failure(); }
   LogicalResult visitDimExpr(AffineDimExpr /*expr*/) { return failure(); }
@@ -270,9 +275,9 @@ class LowerBoundExprVisitor
         return failure();
       }
       loopInfo.tileSize = wgSize.getValue();
-      QueryProcessor query = {};
-      query.getIdDim = queryProcessor.getIdDim;
-      dimension = checkDimensions(vals, query);
+      dimension =
+          checkDimensions(vals, /*allowIdOp=*/true, /*allowCountOp=*/false,
+                          /*allowTileSizeOp=*/false);
     } else {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
       if (vals.size() != 2 || !vals[0] || !vals[1]) {
@@ -281,12 +286,13 @@ class LowerBoundExprVisitor
       IntegerAttr tileSizeAttr;
       if (matchPattern(vals[1], m_Constant(&tileSizeAttr))) {
         loopInfo.tileSize = tileSizeAttr.getInt();
-        dimension = queryProcessor.getIdDim(vals[0]);
+        dimension =
+            checkDimensions(vals[0], /*allowIdOp=*/true, /*allowCountOp=*/false,
+                            /*allowTileSizeOp=*/false);
       } else {
-        QueryProcessor query = {};
-        query.getIdDim = queryProcessor.getIdDim;
-        query.getTileSizeDim = queryProcessor.getTileSizeDim;
-        dimension = checkDimensions(vals, query);
+        dimension =
+            checkDimensions(vals, /*allowIdOp=*/true, /*allowCountOp=*/false,
+                            /*allowTileSizeOp=*/true);
       }
     }
     if (!dimension) {
@@ -302,7 +308,6 @@ class LowerBoundExprVisitor
 
  private:
   AffineApplyOp applyOp;
-  QueryProcessor queryProcessor;
   LoopTilingAndDistributionInfo &loopInfo;
 };
 
@@ -313,9 +318,9 @@ class LowerBoundExprVisitor
 class StepExprVisitor
     : public AffineExprVisitor<StepExprVisitor, LogicalResult> {
  public:
-  StepExprVisitor(AffineApplyOp applyOp, QueryProcessor query,
+  StepExprVisitor(AffineApplyOp applyOp,
                   LoopTilingAndDistributionInfo &loopInfo)
-      : applyOp(applyOp), queryProcessor(query), loopInfo(loopInfo) {}
+      : applyOp(applyOp), loopInfo(loopInfo) {}
 
   LogicalResult visitSymbolExpr(AffineSymbolExpr /*expr*/) { return failure(); }
   LogicalResult visitDimExpr(AffineDimExpr /*expr*/) { return failure(); }
@@ -390,18 +395,13 @@ class StepExprVisitor
     }
     SmallVector<Value> vals = getValuesForDimsOrSymbols(applyOp, sentinels);
 
-    QueryProcessor queryCount = {};
-    queryCount.getCountDim = queryProcessor.getCountDim;
-
-    QueryProcessor queryCountAndSize = {};
-    queryCountAndSize.getCountDim = queryProcessor.getCountDim;
-    queryCountAndSize.getTileSizeDim = queryProcessor.getTileSizeDim;
-
     if ((loopInfo.tileSize &&
-         !checkDimensions(vals, queryCount,
+         !checkDimensions(vals, /*allowIdOp=*/false, /*allowCountOp=*/true,
+                          /*allowTileSizeOp=*/false,
                           loopInfo.processorDistributionDim)) ||
         (!loopInfo.tileSize &&
-         !checkDimensions(vals, queryCountAndSize,
+         !checkDimensions(vals, /*allowIdOp=*/false, /*allowCountOp=*/true,
+                          /*allowTileSizeOp=*/true,
                           loopInfo.processorDistributionDim))) {
       return failure();
     }
@@ -426,7 +426,6 @@ class StepExprVisitor
   }
 
   AffineApplyOp applyOp;
-  QueryProcessor queryProcessor;
   LoopTilingAndDistributionInfo &loopInfo;
 };
 }  // namespace
@@ -453,14 +452,7 @@ static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
 ///   scf.for %iv = %offset to %ub step %new_step { ... }
 /// ```
 Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
-    scf::ForOp forOp, Optional<QueryProcessor> queryProcessor) {
-  if (!queryProcessor) {
-    queryProcessor = QueryProcessor{
-        getInterfaceWorkgroupOpDim<IREE::HAL::InterfaceWorkgroupIDOp>,
-        getInterfaceWorkgroupOpDim<IREE::HAL::InterfaceWorkgroupCountOp>,
-        getInterfaceWorkgroupOpDim<IREE::HAL::InterfaceWorkgroupSizeOp>};
-  }
-
+    scf::ForOp forOp) {
   LoopTilingAndDistributionInfo loopInfo;
   loopInfo.loop = forOp;
   loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.upperBound());
@@ -471,9 +463,18 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   if (!lbApplyOp || !stepApplyOp) {
     // Try to see if this s a specical case where we have:
     //   scf.for %iv = %id to %ub step %count
-    auto idDim = queryProcessor->getIdDim(forOp.lowerBound());
+    Optional<unsigned> idDim;
+    if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(
+            forOp.lowerBound().getDefiningOp())) {
+      idDim = ifx.getDimIndex();
+    }
 
-    auto countDim = queryProcessor->getCountDim(forOp.step());
+    Optional<unsigned> countDim;
+    if (auto ifx = dyn_cast_or_null<ProcessorCountInterface>(
+            forOp.step().getDefiningOp())) {
+      countDim = ifx.getDimIndex();
+    }
+
     if (!idDim || !countDim) return llvm::None;
 
     Builder b(forOp.getContext());
@@ -485,8 +486,8 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
     return loopInfo;
   }
 
-  LowerBoundExprVisitor lbVisitor(lbApplyOp, *queryProcessor, loopInfo);
-  StepExprVisitor stepVisitor(stepApplyOp, *queryProcessor, loopInfo);
+  LowerBoundExprVisitor lbVisitor(lbApplyOp, loopInfo);
+  StepExprVisitor stepVisitor(stepApplyOp, loopInfo);
 
   if (failed(lbVisitor.visit(lbApplyOp.getAffineMap().getResults()[0]))) {
     return llvm::None;
