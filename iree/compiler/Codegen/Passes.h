@@ -132,6 +132,8 @@ createLLVMCPUSynchronizeSymbolVisibilityPass();
 /// Multi-level tiling and vectorization of linalg ops on tensors.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
     bool lowerToVectors = true);
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
+    bool lowerToVectors = true);
 
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUVectorizationPass(
@@ -173,7 +175,8 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
-                                    bool lowerToVectors = true);
+                                    bool lowerToVectors = true,
+                                    bool useTileAndVectorizeV2 = false);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.

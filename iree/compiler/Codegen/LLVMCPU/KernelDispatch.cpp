@@ -85,6 +85,12 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
+static llvm::cl::opt<bool> clUseTileFuseAndVectorize(
+    "iree-llvmcpu-use-tile-fuse-and-vectorize",
+    llvm::cl::desc(
+        "THIS IS DEVELOPMENT ONLY FLAG. Uses tile, fuse and vectorize"),
+    llvm::cl::init(false));
+
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
 static Optional<int64_t> getNativeVectorSizeInBytes(FuncOp entryPointFn) {
@@ -300,7 +306,9 @@ static LogicalResult setRootConfig(
   }
   setTranslationInfo(
       entryPointFn,
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors,
+      clUseTileFuseAndVectorize
+          ? IREE::Codegen::DispatchLoweringPassPipeline::CPUTileFuseAndVectorize
+          : IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors,
       workloadPerWorkgroup, /*workgroupSize =*/ArrayRef<int64_t>{});
 
   SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;

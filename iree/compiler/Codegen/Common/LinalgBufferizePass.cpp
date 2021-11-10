@@ -649,8 +649,8 @@ static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
         })
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
-              plan.insert(transferReadOp.source());
-              return success();
+              return analyseSingleOperandResultOp(
+                  transferReadOp.source(), transferReadOp.vector(), plan);
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
@@ -1378,7 +1378,10 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
   if (!resultType) return success();
   Value resultBuffer = bvm.lookup(result);
 
-  if (!plan.isEquivalent(op.source(), result)) {
+  if (!plan.isEquivalent(op.source(), result) &&
+      // If the source is linalg.init_tensor, then we don't care about the
+      // initial value and can avoid the copy.
+      !op.source().getDefiningOp<linalg::InitTensorOp>()) {
     Value destBuffer = bvm.lookup(op.source());
     b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
   }

@@ -18,6 +18,7 @@ cc_library(
         "LLVMCPULowerExecutableTarget.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp",
+        "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
         "LLVMCPUVectorization.cpp",
         "Passes.cpp",
