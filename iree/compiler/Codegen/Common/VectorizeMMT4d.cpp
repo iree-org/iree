@@ -32,7 +32,7 @@ Value promoteVector(Location loc, Value inputVector, Type promotedElementType,
 }
 
 /// Converts linalg.mmt4d into vector.contract.
-/// This converts linalg.mmt4d with operands <1x1xM0xK0>, <1x1xK0xN0>
+/// This converts linalg.mmt4d with operands <1x1xM0xK0>, <1x1xN0xK0>
 /// to vector.contract where K0 is the contraction dimension.
 struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
   using OpRewritePattern<linalg::Mmt4DOp>::OpRewritePattern;
