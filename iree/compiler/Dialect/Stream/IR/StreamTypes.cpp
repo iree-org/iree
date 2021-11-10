@@ -28,8 +28,7 @@ namespace Stream {
 //===----------------------------------------------------------------------===//
 
 // static
-Attribute ResourceConfigAttr::parse(mlir::DialectAsmParser &p,
-                                    mlir::Type type) {
+Attribute ResourceConfigAttr::parse(DialectAsmParser &p, Type type) {
   if (failed(p.parseLess()) || failed(p.parseLBrace())) return {};
 
   int64_t maxAllocationSize = 0;
@@ -61,9 +60,9 @@ Attribute ResourceConfigAttr::parse(mlir::DialectAsmParser &p,
                                  minBufferRangeAlignment);
 }
 
-void ResourceConfigAttr::print(mlir::DialectAsmPrinter &p) const {
+void ResourceConfigAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<{";
+  os << "<{";
   os << "max_allocation_size = " << getMaxAllocationSize() << ", ";
   os << "min_buffer_offset_alignment = " << getMinBufferOffsetAlignment()
      << ", ";
@@ -111,7 +110,7 @@ static ResourceConfigAttr inferResourceConfigFromAffinity(
 // static
 ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
   auto *context = op->getContext();
-  auto attrId = mlir::Identifier::get("stream.resources", context);
+  auto attrId = Identifier::get("stream.resources", context);
   while (op) {
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinityAttr = affinityOp.getAffinity();
@@ -132,7 +131,7 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
 // #stream.timepoint<...>
 //===----------------------------------------------------------------------===//
 
-Attribute TimepointAttr::parse(mlir::DialectAsmParser &p, mlir::Type type) {
+Attribute TimepointAttr::parse(DialectAsmParser &p, Type type) {
   StringRef timeStr;
   if (failed(p.parseLess())) return {};
   if (failed(p.parseKeyword(&timeStr))) {
@@ -147,8 +146,8 @@ Attribute TimepointAttr::parse(mlir::DialectAsmParser &p, mlir::Type type) {
   return TimepointAttr::get(p.getContext(), TimepointType::get(p.getContext()));
 }
 
-void TimepointAttr::print(mlir::DialectAsmPrinter &p) const {
-  p << getMnemonic() << "<";
+void TimepointAttr::print(DialectAsmPrinter &p) const {
+  p << "<";
   p << "immediate";
   p << ">";
 }
@@ -158,7 +157,7 @@ void TimepointAttr::print(mlir::DialectAsmPrinter &p) const {
 //===----------------------------------------------------------------------===//
 
 AffinityAttr AffinityAttr::lookup(Operation *op) {
-  auto attrId = mlir::Identifier::get("stream.affinity", op->getContext());
+  auto attrId = Identifier::get("stream.affinity", op->getContext());
   while (op) {
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinity = affinityOp.getAffinity();
@@ -188,8 +187,7 @@ void PartitioningConfigAttr::walkImmediateSubElements(
   walkAttrsFn(getFavor());
 }
 
-Attribute PartitioningConfigAttr::parse(mlir::DialectAsmParser &p,
-                                        mlir::Type type) {
+Attribute PartitioningConfigAttr::parse(DialectAsmParser &p, Type type) {
   std::string favorStr;
   if (failed(p.parseLess())) return {};
   if (succeeded(p.parseOptionalStar())) {
@@ -207,15 +205,15 @@ Attribute PartitioningConfigAttr::parse(mlir::DialectAsmParser &p,
       FavorAttr::get(p.getContext(), favor.getValue()));
 }
 
-void PartitioningConfigAttr::print(mlir::DialectAsmPrinter &p) const {
-  p << getMnemonic() << "<";
+void PartitioningConfigAttr::print(DialectAsmPrinter &p) const {
+  p << "<";
   p << "favor-";
   p << stringifyFavor(getFavor().getValue());
   p << ">";
 }
 
 PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
-  auto attrId = mlir::Identifier::get("stream.partitioning", op->getContext());
+  auto attrId = Identifier::get("stream.partitioning", op->getContext());
   while (op) {
     auto attr = op->getAttrOfType<PartitioningConfigAttr>(attrId);
     if (attr) return attr;
@@ -254,7 +252,7 @@ static void printLifetime(Lifetime lifetime, llvm::raw_ostream &os) {
   }
 }
 
-Type ResourceType::parse(mlir::DialectAsmParser &p) {
+Type ResourceType::parse(DialectAsmParser &p) {
   StringRef lifetimeStr;
   if (failed(p.parseLess())) return {};
   if (succeeded(p.parseOptionalStar())) {
@@ -271,8 +269,8 @@ Type ResourceType::parse(mlir::DialectAsmParser &p) {
   return ResourceType::get(p.getContext(), lifetime.getValue());
 }
 
-void ResourceType::print(mlir::DialectAsmPrinter &p) const {
-  p << getMnemonic() << "<";
+void ResourceType::print(DialectAsmPrinter &p) const {
+  p << "<";
   printLifetime(getLifetime(), p.getStream());
   p << ">";
 }

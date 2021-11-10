@@ -106,6 +106,7 @@ cc_binary(
         "@llvm-project//mlir:TosaDialect",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:flatbuffer_import",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:tensorflow_lite",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tf_dialect_passes",
     ],
 )
