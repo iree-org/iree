@@ -208,7 +208,17 @@ def get_test_generators(shapes_id: ShapesId):
 local_pseudorandom_state = 1
 
 
-# A static size value, i.e. a size value that could appear in a MLIR type
+# Returns a pseudorandom boolean
+def pseudorandom_bool():
+  global local_pseudorandom_state
+  # Same as C++ std::minstd_rand.
+  # Using a local pseudorandom generator implementation ensures that it's
+  # completely reproducible, across runs and across machines.
+  local_pseudorandom_state = (local_pseudorandom_state * 48271) % 2147483647
+  return local_pseudorandom_state > 1073741824
+
+
+# A shape dimension value, i.e. a size value that could appear in a MLIR type
 # such as 'tensor<?x4xf32>'. None means a dynamic size, similar to '?' in MLIR.
 @dataclasses.dataclass
 class DimSize:
@@ -217,18 +227,13 @@ class DimSize:
 
 # Generates a compile-time MLIR size value, i.e. either a fixed positive integer
 # or None (which maps to MLIR '?') depending on dynamicity.
-def static_size(x: int, dynamicity: Dynamicity):
+def shape_dim(x: int, dynamicity: Dynamicity):
   if dynamicity == Dynamicity.DYNAMIC:
     return DimSize(None)
   elif dynamicity == Dynamicity.STATIC:
     return DimSize(x)
   elif dynamicity == Dynamicity.MIXED:
-    global local_pseudorandom_state
-    # Same as C++ std::minstd_rand.
-    # Using a local pseudorandom generator implementation ensures that it's
-    # completely reproducible, across runs and across machines.
-    local_pseudorandom_state = (local_pseudorandom_state * 48271) % 2147483647
-    return DimSize(x if local_pseudorandom_state > 1073741824 else None)
+    return DimSize(x if pseudorandom_bool() else None)
   else:
     raise ValueError(dynamicity)
 
@@ -244,13 +249,13 @@ def int_or_DYN(s: DimSize):
   return s.value or "DYN"
 
 
-# Describes the fully resolved static dimensions of all 3 input matrices,
+# Describes the fully resolved shape dimensions of all 3 input matrices,
 # LHS, RHS, and Accumulator, in a testcase.
 # Each value is a string, which may either represent a positive integer such as "123",
 # or a "?" string, meaning a dynamic dimension as in MLIR.
 # These string values are used to generate MLIR function names and tensor shapes.
 @dataclasses.dataclass
-class TestInputMatricesStaticShapes:
+class TestInputMatricesShapes:
   lhs_rows: DimSize
   lhs_cols: DimSize
   rhs_rows: DimSize
@@ -259,33 +264,56 @@ class TestInputMatricesStaticShapes:
   acc_cols: DimSize
 
 
-# Helper for generate_function. Generates TestInputMatricesStaticShapes, i.e.
+# Helper for generate_function. Generates TestInputMatricesShapes, i.e.
 # converts from the runtime shape dimensions in TestShape and given dynamicity to
-# the set of static shapes to be used in a test function's input tensors.
-def generate_static_shapes(shape: TestShape, dynamicity: Dynamicity):
-  return TestInputMatricesStaticShapes(
-      lhs_rows=static_size(shape.m, dynamicity),
-      lhs_cols=static_size(shape.k, dynamicity),
-      rhs_rows=static_size(shape.k, dynamicity),
-      rhs_cols=static_size(shape.n, dynamicity),
-      acc_rows=static_size(shape.m, dynamicity),
-      acc_cols=static_size(shape.n, dynamicity),
+# the set of shapes to be used in a test function's input tensors.
+def generate_shapes(shape: TestShape, dynamicity: Dynamicity):
+  shapes = TestInputMatricesShapes(
+      lhs_rows=shape_dim(shape.m, dynamicity),
+      lhs_cols=shape_dim(shape.k, dynamicity),
+      rhs_rows=shape_dim(shape.k, dynamicity),
+      rhs_cols=shape_dim(shape.n, dynamicity),
+      acc_rows=shape_dim(shape.m, dynamicity),
+      acc_cols=shape_dim(shape.n, dynamicity),
   )
+  # In the mixed-shapes case, we have just randomly picked each of the above 6
+  # values independently, making it likely that we got discrepancies where some
+  # of the M, K, N dimensions of the problem appear as a static dim in some
+  # matrix and as a dynamic dim in another matrix, e.g. for the M dimension we
+  # might have lhs_rows=dynamic, acc_rows=3. We should be testing both such
+  # 'wild' mixed-shapes cases, and more 'tame' mixed-shapes cases where each of
+  # the M, K, N dimensions is consistently either static or dynamic in both
+  # matrices (among lhs, rhs, acc) where it appears. If we don't do anything
+  # about it, as there is a 1/2 chance of discrepancy for each of the M, K, N
+  # dimensions, 7/8 of the mixed-shapes testcases will be 'wild'. Given our
+  # limited number of overall mixed-shapes testcases, this risks not testing
+  # the 'tame' case at all.
+  #
+  # At the moment there is an additional practical reason to care about this
+  # here: the matmul-to-mmt4d transformation currently bails on most 'wild'
+  # cases. So we care even more to test 'tame' cases so that mmt4d is tested
+  # on some mixed-shapes cases.
+  if pseudorandom_bool():
+    # Ensure that we are generating a 'tame' case.
+    shapes.acc_rows = shapes.lhs_rows
+    shapes.acc_cols = shapes.rhs_cols
+    shapes.rhs_rows = shapes.lhs_cols
+  return shapes
 
 
 # Helper for generate_function.
 # Generates a name for a test function in the generated MLIR code.
 def generate_function_name(lhs_rhs_type: MatrixElemTypeId,
                            acc_type: MatrixElemTypeId,
-                           static_shapes: TestInputMatricesStaticShapes):
+                           shapes: TestInputMatricesShapes):
   input_t = lhs_rhs_type.value
   acc_t = acc_type.value
-  lhs_m = int_or_DYN(static_shapes.lhs_rows)
-  lhs_k = int_or_DYN(static_shapes.lhs_cols)
-  rhs_k = int_or_DYN(static_shapes.rhs_rows)
-  rhs_n = int_or_DYN(static_shapes.rhs_cols)
-  acc_m = int_or_DYN(static_shapes.acc_rows)
-  acc_n = int_or_DYN(static_shapes.acc_cols)
+  lhs_m = int_or_DYN(shapes.lhs_rows)
+  lhs_k = int_or_DYN(shapes.lhs_cols)
+  rhs_k = int_or_DYN(shapes.rhs_rows)
+  rhs_n = int_or_DYN(shapes.rhs_cols)
+  acc_m = int_or_DYN(shapes.acc_rows)
+  acc_n = int_or_DYN(shapes.acc_cols)
   return f"matmul_{lhs_m}x{lhs_k}x{input_t}_times_{rhs_k}x{rhs_n}x{input_t}_into_{acc_m}x{acc_n}x{acc_t}"
 
 
@@ -302,14 +330,14 @@ class MLIRFunction:
 def generate_function(lhs_rhs_type: MatrixElemTypeId,
                       acc_type: MatrixElemTypeId, shape: TestShape,
                       dynamicity: Dynamicity):
-  static_shapes = generate_static_shapes(shape, dynamicity)
-  func_name = generate_function_name(lhs_rhs_type, acc_type, static_shapes)
-  lhs_m = int_or_question_mark(static_shapes.lhs_rows)
-  lhs_k = int_or_question_mark(static_shapes.lhs_cols)
-  rhs_k = int_or_question_mark(static_shapes.rhs_rows)
-  rhs_n = int_or_question_mark(static_shapes.rhs_cols)
-  acc_m = int_or_question_mark(static_shapes.acc_rows)
-  acc_n = int_or_question_mark(static_shapes.acc_cols)
+  shapes = generate_shapes(shape, dynamicity)
+  func_name = generate_function_name(lhs_rhs_type, acc_type, shapes)
+  lhs_m = int_or_question_mark(shapes.lhs_rows)
+  lhs_k = int_or_question_mark(shapes.lhs_cols)
+  rhs_k = int_or_question_mark(shapes.rhs_rows)
+  rhs_n = int_or_question_mark(shapes.rhs_cols)
+  acc_m = int_or_question_mark(shapes.acc_rows)
+  acc_n = int_or_question_mark(shapes.acc_cols)
   lhs_tensor_type = f"tensor<{lhs_m}x{lhs_k}x{lhs_rhs_type.value}>"
   rhs_tensor_type = f"tensor<{rhs_k}x{rhs_n}x{lhs_rhs_type.value}>"
   acc_tensor_type = f"tensor<{acc_m}x{acc_n}x{acc_type.value}>"
