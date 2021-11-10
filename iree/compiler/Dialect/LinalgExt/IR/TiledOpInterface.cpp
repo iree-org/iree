@@ -267,12 +267,15 @@ struct ForwardToTilingInterface
                                     SmallVectorImpl<Value> &results) const {
     Operation *tiledOp =
         cast<OpTy>(op).getTiledImplementation(b, dest, offsets, sizes);
-    Location loc = op->getLoc();
-    if (op->getNumResults() != dest.size()) {
-      op->emitOpError(
+    if (!tiledOp) {
+      return op->emitOpError("failed to tile operation");
+    }
+    if (tiledOp->getNumResults() != dest.size()) {
+      return op->emitOpError(
           "mismatch in the number of results of the tiled operation and the "
           "number of results expected");
     }
+    Location loc = op->getLoc();
     auto oneAttr = b.getI64IntegerAttr(1);
     SmallVector<OpFoldResult> strides(offsets.size(), oneAttr);
     for (auto result : llvm::enumerate(tiledOp->getResults())) {
