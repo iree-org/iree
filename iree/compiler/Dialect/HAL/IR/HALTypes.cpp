@@ -479,7 +479,7 @@ Attribute BufferConstraintsAttr::parse(DialectAsmParser &p) {
 
 void BufferConstraintsAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   os << "max_allocation_size = " << max_allocation_size() << ", ";
   os << "min_buffer_offset_alignment = " << min_buffer_offset_alignment()
      << ", ";
@@ -506,7 +506,7 @@ Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
 
 void DescriptorSetLayoutBindingAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   os << binding() << ", ";
   os << "\"" << stringifyDescriptorType(type()) << "\", ";
   printMemoryAccess(p, access());
@@ -547,7 +547,7 @@ Attribute DeviceTargetAttr::parse(DialectAsmParser &p, Type type) {
 
 void DeviceTargetAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getDeviceID());
   auto configAttr = getConfiguration();
   if (configAttr && !configAttr.empty()) {
@@ -691,7 +691,7 @@ Attribute ExecutableTargetAttr::parse(DialectAsmParser &p, Type type) {
 
 void ExecutableTargetAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getBackend());
   os << ", ";
   p.printAttribute(getFormat());
@@ -758,7 +758,6 @@ Attribute MatchAnyAttr::parse(DialectAsmParser &p, Type type) {
 }
 
 void MatchAnyAttr::print(DialectAsmPrinter &p) const {
-  p << getMnemonic();
   printMultiMatchAttrList(getConditions(), p);
 }
 
@@ -788,7 +787,6 @@ Attribute MatchAllAttr::parse(DialectAsmParser &p, Type type) {
 }
 
 void MatchAllAttr::print(DialectAsmPrinter &p) const {
-  p << getMnemonic();
   printMultiMatchAttrList(getConditions(), p);
 }
 
@@ -824,7 +822,7 @@ Attribute DeviceMatchIDAttr::parse(DialectAsmParser &p, Type type) {
 
 void DeviceMatchIDAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getPattern());
   os << ">";
 }
@@ -851,7 +849,7 @@ Attribute DeviceMatchFeatureAttr::parse(DialectAsmParser &p, Type type) {
 
 void DeviceMatchFeatureAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getPattern());
   os << ">";
 }
@@ -879,7 +877,7 @@ Attribute DeviceMatchArchitectureAttr::parse(DialectAsmParser &p, Type type) {
 
 void DeviceMatchArchitectureAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getPattern());
   os << ">";
 }
@@ -908,7 +906,7 @@ Attribute DeviceMatchExecutableFormatAttr::parse(DialectAsmParser &p,
 
 void DeviceMatchExecutableFormatAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getPattern());
   os << ">";
 }
@@ -946,7 +944,7 @@ Attribute ExConstantStorageAttr::parse(DialectAsmParser &p) {
 
 void ExConstantStorageAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   p.printAttribute(bindingAttr());
   os << ", ";
   p.printAttribute(storageAttr());
@@ -971,7 +969,7 @@ Attribute ExPushConstantAttr::parse(DialectAsmParser &p) {
 
 void ExPushConstantAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   p.printAttribute(ordinalAttr());
   os << ", ";
   p.printAttribute(operandAttr());
@@ -992,7 +990,7 @@ Attribute ExOperandBufferAttr::parse(DialectAsmParser &p) {
 
 void ExOperandBufferAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   p.printAttribute(bindingAttr());
   os << ", ";
   p.printAttribute(operandAttr());
@@ -1013,7 +1011,7 @@ Attribute ExResultBufferAttr::parse(DialectAsmParser &p) {
 
 void ExResultBufferAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   p.printAttribute(bindingAttr());
   os << ", ";
   p.printAttribute(resultAttr());
@@ -1081,7 +1079,10 @@ void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
       .Case<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
             // Experimental:
             ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
-            ExResultBufferAttr>([&](auto typedAttr) { typedAttr.print(p); })
+            ExResultBufferAttr>([&](auto typedAttr) {
+        p << typedAttr.getKindName();
+        typedAttr.print(p);
+      })
       .Default([&](Attribute) {
         if (failed(generatedAttributePrinter(attr, p))) {
           llvm_unreachable("unhandled HAL attribute kind");

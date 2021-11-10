@@ -170,7 +170,7 @@ Attribute OrdinalCountsAttr::parse(DialectAsmParser &p) {
 
 void OrdinalCountsAttr::print(DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   os << "import_funcs = " << import_funcs() << ", ";
   os << "export_funcs = " << export_funcs() << ", ";
   os << "internal_funcs = " << internal_funcs() << ", ";

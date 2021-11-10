@@ -186,10 +186,9 @@ LogicalResult TranslationInfoAttr::verify(
   return success();
 }
 
-::mlir::Attribute TranslationInfoAttr::parse(::mlir::DialectAsmParser &parser,
-                                             ::mlir::Type attrType) {
-  ::mlir::FailureOr<StringAttr> _result_passPipeline;
-  ::mlir::FailureOr<ArrayAttr> _result_workloadPerWorkgroup;
+Attribute TranslationInfoAttr::parse(DialectAsmParser &parser, Type attrType) {
+  FailureOr<StringAttr> _result_passPipeline;
+  FailureOr<ArrayAttr> _result_workloadPerWorkgroup;
   // Parse literal '<'
   if (parser.parseLess()) return {};
   // Parse variable 'passPipeline'
@@ -222,8 +221,7 @@ LogicalResult TranslationInfoAttr::verify(
                                   _result_workloadPerWorkgroup.getValue());
 }
 
-void TranslationInfoAttr::print(::mlir::DialectAsmPrinter &printer) const {
-  printer << "translation.info";
+void TranslationInfoAttr::print(DialectAsmPrinter &printer) const {
   printer << "<";
   printer << getPassPipeline();
   printer << ",";
@@ -299,10 +297,9 @@ LogicalResult LoweringConfigAttr::verify(
   return success();
 }
 
-::mlir::Attribute LoweringConfigAttr::parse(::mlir::DialectAsmParser &parser,
-                                            ::mlir::Type attrType) {
-  ::mlir::FailureOr<ArrayAttr> _result_tileSizes;
-  ::mlir::FailureOr<ArrayAttr> _result_nativeVectorSize;
+Attribute LoweringConfigAttr::parse(DialectAsmParser &parser, Type attrType) {
+  FailureOr<ArrayAttr> _result_tileSizes;
+  FailureOr<ArrayAttr> _result_nativeVectorSize;
   // Parse literal '<'
   if (parser.parseLess()) return {};
   // Parse literal 'tile_sizes'
@@ -338,8 +335,7 @@ LogicalResult LoweringConfigAttr::verify(
                                  _result_nativeVectorSize.getValue());
 }
 
-void LoweringConfigAttr::print(::mlir::DialectAsmPrinter &printer) const {
-  printer << "lowering.config";
+void LoweringConfigAttr::print(DialectAsmPrinter &printer) const {
   printer << "<";
   printer << "tile_sizes";
   printer << ' ' << "=";
@@ -414,11 +410,10 @@ LogicalResult CompilationInfoAttr::verify(
 
 /// Parser method that is copied from the auto-generated using `assemblyFormat`
 /// available with patch D111594. Replace after that change is in IREE.
-::mlir::Attribute CompilationInfoAttr::parse(::mlir::DialectAsmParser &parser,
-                                             ::mlir::Type attrType) {
-  ::mlir::FailureOr<LoweringConfigAttr> _result_loweringConfig;
-  ::mlir::FailureOr<TranslationInfoAttr> _result_translationInfo;
-  ::mlir::FailureOr<ArrayAttr> _result_workgroupSize;
+Attribute CompilationInfoAttr::parse(DialectAsmParser &parser, Type attrType) {
+  FailureOr<LoweringConfigAttr> _result_loweringConfig;
+  FailureOr<TranslationInfoAttr> _result_translationInfo;
+  FailureOr<ArrayAttr> _result_workgroupSize;
   // Parse literal '<'
   if (parser.parseLess()) return {};
   // Parse variable 'loweringConfig'
@@ -464,8 +459,7 @@ LogicalResult CompilationInfoAttr::verify(
 
 /// Printer method that is copied from the auto-generated using `assemblyFormat`
 /// available with patch D111594. Replace after that change is in IREE.
-void CompilationInfoAttr::print(::mlir::DialectAsmPrinter &printer) const {
-  printer << "compilation.info";
+void CompilationInfoAttr::print(DialectAsmPrinter &printer) const {
   printer << "<";
   printer << getLoweringConfig();
   printer << ",";
