@@ -12,8 +12,10 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/allocator_caching.h"
 #include "iree/hal/cuda/cuda_allocator.h"
-#include "iree/hal/buffer_caching.h"
+
+extern bool iree_hal_allocator_cache_buffer;
 
 typedef struct iree_hal_cuda_buffer_t {
   iree_hal_buffer_t base;
@@ -64,18 +66,19 @@ iree_status_t iree_hal_cuda_buffer_wrap(
 }
 
 static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
-
   iree_hal_memory_type_t memory_type = iree_hal_buffer_memory_type(base_buffer);
-  // Cache host visible device memory into a list.
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-      iree_status_t status = iree_hal_add_buffer_to_cache(base_buffer);
-      if (iree_status_is_ok(status)) {
-        return;
+  // Cache host visible device memory using caching allocator.
+  if(iree_hal_allocator_cache_buffer) {
+    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+      if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+        iree_status_t status = iree_hal_allocator_add_buffer_to_cache(base_buffer);
+        if (iree_status_is_ok(status)) {
+          return;
+        }
       }
     }
   }
-  // Destroy other types of memory.
+  
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
@@ -87,27 +90,6 @@ static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_allocator_free(host_allocator, buffer);
 
   IREE_TRACE_ZONE_END(z0);
-}
-
-// Clear all cached memory on program exit.
-void iree_hal_clear_cuda_buffer() {
-  iree_hal_buffer_cache *iree_hal_buffer_cache_ptr = iree_hal_buffer_cache_list;
-  while(iree_hal_buffer_cache_ptr != NULL) {
-    iree_hal_buffer_t* base_buffer = iree_hal_buffer_cache_ptr->buffer;
-    iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
-    iree_allocator_t host_allocator =
-        iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
-
-    iree_hal_cuda_allocator_free(buffer->base.allocator, buffer->base.memory_type,
-                                buffer->device_ptr, buffer->host_ptr,
-                                buffer->base.allocation_size);
-    iree_allocator_free(host_allocator, buffer);
-
-    iree_hal_buffer_cache *prev_buffer_cache = iree_hal_buffer_cache_ptr;
-    iree_hal_buffer_cache_ptr = iree_hal_buffer_cache_ptr->next;
-    free(prev_buffer_cache);
-  }
-  return;
 }
 
 static iree_status_t iree_hal_cuda_buffer_map_range(

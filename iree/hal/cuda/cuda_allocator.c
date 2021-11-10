@@ -13,7 +13,6 @@
 #include "iree/hal/cuda/cuda_buffer.h"
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/status_util.h"
-#include "iree/hal/buffer_caching.h"
 
 typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;
@@ -128,26 +127,22 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
     if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-      // Allocate cache memory if available.
-      if(iree_hal_cached_buffer_available(allocation_size)) {
-          return iree_hal_allocate_cached_buffer(allocation_size, out_buffer);
-      } else {
-          status =
-              CU_RESULT_TO_STATUS(allocator->context->syms,
-                                  cuMemAllocManaged(&device_ptr, allocation_size,
-                                                    CU_MEM_ATTACH_GLOBAL));
-          if (iree_status_is_ok(status)) {
-            // Prefetch the buffer on the GPU device.
-            status = CU_RESULT_TO_STATUS(
-                allocator->context->syms,
-                cuMemPrefetchAsync(device_ptr, allocation_size, allocator->device,
-                                  allocator->stream));
-          }
-          host_ptr = (void*)device_ptr;
+      status =
+          CU_RESULT_TO_STATUS(allocator->context->syms,
+                              cuMemAllocManaged(&device_ptr, allocation_size,
+                                                CU_MEM_ATTACH_GLOBAL));
+      if (iree_status_is_ok(status)) {
+        // Prefetch the buffer on the GPU device.
+        status = CU_RESULT_TO_STATUS(
+            allocator->context->syms,
+            cuMemPrefetchAsync(device_ptr, allocation_size, allocator->device,
+                               allocator->stream));
       }
+      host_ptr = (void*)device_ptr;
     } else {
+      // Device only.
       status = CU_RESULT_TO_STATUS(allocator->context->syms,
-          cuMemAlloc(&device_ptr, allocation_size));
+                                   cuMemAlloc(&device_ptr, allocation_size));
     }
   } else {
     unsigned int flags = CU_MEMHOSTALLOC_DEVICEMAP;
@@ -162,7 +157,6 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
           allocator->context->syms,
           cuMemHostGetDevicePointer(&device_ptr, host_ptr, /*flags=*/0));
     }
-
   }
   if (iree_status_is_ok(status)) {
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(

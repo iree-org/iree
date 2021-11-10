@@ -109,6 +109,8 @@ static iree_status_t iree_hal_cuda_device_create_internal(
 
   iree_status_t status = iree_hal_cuda_allocator_create(
       &device->context_wrapper, cu_device, stream, &device->device_allocator);
+  status = iree_hal_allocator_create_caching(
+      identifier, device->device_allocator, &device->device_allocator);
 
   device->command_buffer_mode = params->command_buffer_mode;
   if (iree_status_is_ok(status) &&
