@@ -101,7 +101,6 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 # TODO(#5715): Fix these
 declare -a excluded_tests=(
   "iree/base/internal/file_io_test"
-  "iree/samples/static_library/static_library_demo_test"
   "bindings/tflite/smoke_test"
   "iree/hal/cts/allocator_test"
   "iree/hal/cts/buffer_mapping_test"
