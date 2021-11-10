@@ -190,32 +190,42 @@ static SmallVector<Value> getValuesForDimsOrSymbols(
   return vals;
 }
 
+/// Returns the dimension for any operation that implements processor op
+/// interfaces.
+template <typename T>
+static Optional<unsigned> getDimension(Operation *op) {
+  if (auto tOp = dyn_cast<T>(op)) {
+    return tOp.getDimIndex();
+  }
+  return llvm::None;
+}
+template <typename T1, typename T2, typename... T3>
+static Optional<unsigned> getDimension(Operation *op) {
+  if (!op) return llvm::None;
+  if (auto dimension = getDimension<T1>(op)) {
+    return dimension;
+  }
+  return getDimension<T2, T3...>(op);
+}
+
 /// Checks that all `vals` are defined by some processor id/count/size ops using
 /// the same `dimension`. If any element of `vals` is not defined by one of
 /// these ops, or the dimensions dont match, returns llvm::None; oterhwise,
 /// returns the dimension.  If `refDimension` is passed checks if the dimension
 /// matches the given value.
+template <typename... T>
 static Optional<unsigned> checkDimensions(
-    ArrayRef<Value> vals, bool allowIdOp, bool allowCountOp,
-    bool allowTileSizeOp, Optional<unsigned> refDimension = llvm::None) {
+    ArrayRef<Value> vals, Optional<unsigned> refDimension = llvm::None) {
   for (auto v : vals) {
-    Operation *op = v.getDefiningOp();
-    Optional<unsigned> currDimension;
-    if (allowIdOp) {
-      if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(op))
-        currDimension = ifx.getDimIndex();
-    }
-    if (!currDimension && allowCountOp) {
-      if (auto ifx = dyn_cast_or_null<ProcessorCountInterface>(op))
-        currDimension = ifx.getDimIndex();
-    }
-    if (!currDimension && allowTileSizeOp) {
-      if (auto ifx = dyn_cast_or_null<ProcessorTileSizeInterface>(op))
-        currDimension = ifx.getDimIndex();
-    }
+    auto currDimension = getDimension<T...>(v.getDefiningOp());
     if (!currDimension) return llvm::None;
-    if (!refDimension) refDimension = currDimension;
-    if (currDimension != refDimension) return llvm::None;
+    if (refDimension) {
+      if (refDimension.getValue() != currDimension.getValue()) {
+        return llvm::None;
+      }
+    } else {
+      refDimension = currDimension.getValue();
+    }
   }
   return refDimension;
 }
@@ -275,9 +285,7 @@ class LowerBoundExprVisitor
         return failure();
       }
       loopInfo.tileSize = wgSize.getValue();
-      dimension =
-          checkDimensions(vals, /*allowIdOp=*/true, /*allowCountOp=*/false,
-                          /*allowTileSizeOp=*/false);
+      dimension = checkDimensions<ProcessorIDInterface>(vals);
     } else {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
       if (vals.size() != 2 || !vals[0] || !vals[1]) {
@@ -286,13 +294,11 @@ class LowerBoundExprVisitor
       IntegerAttr tileSizeAttr;
       if (matchPattern(vals[1], m_Constant(&tileSizeAttr))) {
         loopInfo.tileSize = tileSizeAttr.getInt();
-        dimension =
-            checkDimensions(vals[0], /*allowIdOp=*/true, /*allowCountOp=*/false,
-                            /*allowTileSizeOp=*/false);
+        dimension = checkDimensions<ProcessorIDInterface>(vals[0]);
       } else {
         dimension =
-            checkDimensions(vals, /*allowIdOp=*/true, /*allowCountOp=*/false,
-                            /*allowTileSizeOp=*/true);
+            checkDimensions<ProcessorIDInterface, ProcessorTileSizeInterface>(
+                vals);
       }
     }
     if (!dimension) {
@@ -395,14 +401,11 @@ class StepExprVisitor
     }
     SmallVector<Value> vals = getValuesForDimsOrSymbols(applyOp, sentinels);
 
-    if ((loopInfo.tileSize &&
-         !checkDimensions(vals, /*allowIdOp=*/false, /*allowCountOp=*/true,
-                          /*allowTileSizeOp=*/false,
-                          loopInfo.processorDistributionDim)) ||
+    if ((loopInfo.tileSize && !checkDimensions<ProcessorCountInterface>(
+                                  vals, loopInfo.processorDistributionDim)) ||
         (!loopInfo.tileSize &&
-         !checkDimensions(vals, /*allowIdOp=*/false, /*allowCountOp=*/true,
-                          /*allowTileSizeOp=*/true,
-                          loopInfo.processorDistributionDim))) {
+         !checkDimensions<ProcessorCountInterface, ProcessorTileSizeInterface>(
+             vals, loopInfo.processorDistributionDim))) {
       return failure();
     }
     return success();
