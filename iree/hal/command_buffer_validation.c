@@ -249,8 +249,7 @@ static iree_status_t iree_hal_validating_command_buffer_execution_barrier(
   iree_hal_validating_command_buffer_t* command_buffer =
       iree_hal_validating_command_buffer_cast(base_command_buffer);
 
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, IREE_HAL_COMMAND_CATEGORY_ANY));
+  // NOTE: all command buffer types can perform this so no need to check.
 
   // TODO(benvanik): additional synchronization validation.
 
