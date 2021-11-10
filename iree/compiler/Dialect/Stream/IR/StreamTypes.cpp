@@ -30,7 +30,7 @@ namespace Stream {
 // static
 Attribute ResourceConfigAttr::parse(mlir::DialectAsmParser &p,
                                     mlir::Type type) {
-  if (failed(p.parseLBrace())) return {};
+  if (failed(p.parseLess()) || failed(p.parseLBrace())) return {};
 
   int64_t maxAllocationSize = 0;
   int64_t minBufferOffsetAlignment = 0;
@@ -54,6 +54,7 @@ Attribute ResourceConfigAttr::parse(mlir::DialectAsmParser &p,
     }
     (void)p.parseOptionalComma();
   }
+  if (failed(p.parseGreater())) return {};
 
   return ResourceConfigAttr::get(p.getContext(), maxAllocationSize,
                                  minBufferOffsetAlignment, maxBufferRange,
@@ -62,13 +63,13 @@ Attribute ResourceConfigAttr::parse(mlir::DialectAsmParser &p,
 
 void ResourceConfigAttr::print(mlir::DialectAsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "{";
+  os << getMnemonic() << "<{";
   os << "max_allocation_size = " << getMaxAllocationSize() << ", ";
   os << "min_buffer_offset_alignment = " << getMinBufferOffsetAlignment()
      << ", ";
   os << "max_buffer_range = " << getMaxBufferRange() << ", ";
   os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment();
-  os << "}";
+  os << "}>";
 }
 
 // static

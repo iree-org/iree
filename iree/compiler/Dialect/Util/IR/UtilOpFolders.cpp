@@ -309,6 +309,85 @@ void RangeExtentsOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// util.align
+//===----------------------------------------------------------------------===//
+
+// TODO(#5405): add canonicalizers that reach further in the IR or a dedicated
+// pass for full potential-value-set analysis.
+
+// Returns true if |value| is definitely aligned to at least |alignment|.
+// Recursively checks up the source of the value to see if we can trivially
+// prove the alignment either directly matches (when dynamic) or is >= the
+// specified |alignment|. This does not walk across blocks or calls but catches
+// a large majority of the cases we generate ourselves from packing/allocation.
+static bool isAlignedTo(Value value, Value alignment) {
+  APInt staticValue;
+  APInt staticAlignment;
+  if (matchPattern(value, m_ConstantInt(&staticValue)) &&
+      matchPattern(alignment, m_ConstantInt(&staticAlignment))) {
+    // If this value is itself a multiple of the alignment then we can fold.
+    if (staticValue.urem(staticAlignment).isZero()) {
+      return true;  // value % alignment == 0
+    }
+  }
+
+  // If the value is produced by an align op we can check that.
+  if (auto sourceAlignOp = value.getDefiningOp<IREE::Util::AlignOp>()) {
+    // Check for same exact alignment - even if dynamic.
+    if (sourceAlignOp.alignment() == alignment) return true;
+
+    // If the alignments are constant we can compare them inline.
+    APInt sourceAlignment;
+    APInt selfAlignment;
+    if (matchPattern(sourceAlignOp.alignment(),
+                     m_ConstantInt(&sourceAlignment)) &&
+        matchPattern(alignment, m_ConstantInt(&selfAlignment))) {
+      if (sourceAlignment.uge(selfAlignment)) {
+        return true;  // source alignment is >= our alignment
+      }
+    }
+
+    // Recurse and check the alignment on the input to the align; if it was
+    // aligned earlier we can rely on that as align will never shrink a value.
+    return isAlignedTo(sourceAlignOp.value(), alignment);
+  }
+
+  // If we are sourced from add/mul we peephole check to see if what is being
+  // added is also aligned. This should be part of a larger pass doing IPO but
+  // as the common case is that we align+add+align this is worth having in a
+  // folder. This single folder can avoid ever even materializing thousands of
+  // ops.
+  if (auto sourceAddOp = value.getDefiningOp<arith::AddIOp>()) {
+    // Two aligned values added together are still aligned.
+    if (isAlignedTo(sourceAddOp.lhs(), alignment) &&
+        isAlignedTo(sourceAddOp.rhs(), alignment)) {
+      return true;
+    }
+  } else if (auto sourceSubOp = value.getDefiningOp<arith::SubIOp>()) {
+    // An aligned value subtracted from an aligned value is still aligned.
+    if (isAlignedTo(sourceSubOp.lhs(), alignment) &&
+        isAlignedTo(sourceSubOp.rhs(), alignment)) {
+      return true;
+    }
+  } else if (auto sourceMulOp = value.getDefiningOp<arith::MulIOp>()) {
+    // Two aligned values multiplied together are still aligned.
+    if (isAlignedTo(sourceMulOp.lhs(), alignment) &&
+        isAlignedTo(sourceMulOp.rhs(), alignment)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+OpFoldResult AlignOp::fold(ArrayRef<Attribute> operands) {
+  // If aligning an already-aligned value then fold if this is provably a
+  // no-op. We can check this for equality even with dynamic alignments.
+  if (isAlignedTo(value(), alignment())) return value();
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 

@@ -97,6 +97,30 @@ def PropagateTimepoints :
   }];
 }
 
+def PackConstants :
+    Pass<"iree-stream-pack-constants", ""> {
+  let summary = "Packs and allocate backing storage for fused constant resources.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPackConstantsPass()
+  }];
+}
+
+def PackAllocations :
+    Pass<"iree-stream-pack-allocations", ""> {
+  let summary = "Packs fused allocations based on lifetime.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPackAllocationsPass()
+  }];
+}
+
+def LayoutSlices :
+    Pass<"iree-stream-layout-slices", ""> {
+  let summary = "Lays out packed slices and produces arithmetic required for all offsets.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createLayoutSlicesPass()
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Allocation and command issuing
 //===----------------------------------------------------------------------===//

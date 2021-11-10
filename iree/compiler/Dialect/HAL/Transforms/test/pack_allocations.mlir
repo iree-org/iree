@@ -51,21 +51,13 @@ func @packDynamic(%allocator: !hal.allocator, %size_a: index, %size_b: index) ->
     [2, 3] = %size_a,
   }) : index
 
-  // TODO(#5405): make this math easier to read/track by adding an iree.align
-  // instead of expanding to the individual bit twiddling alignment ops.
-  // Right now this is too verbose to really test against with anything but
-  // a change detector like this.
-
   // CHECK-DAG: %c16 = arith.constant 16 : index
   // CHECK-DAG: %c0 = arith.constant 0 : index
   // CHECK-DAG: %0 = util.align %arg1, %c16 : index
-  // CHECK-DAG: %1 = util.align %0, %c16 : index
-  // CHECK-DAG: %2 = util.align %arg2, %c16 : index
-  // CHECK-DAG: %3 = arith.addi %1, %2 : index
-  // CHECK-DAG: %4 = util.align %3, %c16 : index
-  // CHECK-DAG: %5 = util.align %4, %c16 : index
+  // CHECK-DAG: %1 = util.align %arg2, %c16 : index
+  // CHECK-DAG: %2 = arith.addi %0, %1 : index
 
-  // CHECK-DAG: return %5, %c0, %1, %c0
+  // CHECK-DAG: return %2, %c0, %0, %c0
   return %t#0, %t#1, %t#2, %t#3 : index, index, index, index
 }
 
@@ -95,23 +87,15 @@ func @packMixedStaticDynamic(%allocator: !hal.allocator, %size_a: index, %size_b
     [5, 6] = %c200,
   }) : index
 
-  // TODO(#5405): make this math easier to read/track by adding an iree.align
-  // instead of expanding to the individual bit twiddling alignment ops.
-  // Right now this is too verbose to really test against with anything but
-  // a change detector like this.
-
   // CHECK-DAG: %c16 = arith.constant 16 : index
   // CHECK-DAG: %c208 = arith.constant 208 : index
   // CHECK-DAG: %c0 = arith.constant 0 : index
   // CHECK-DAG: %0 = util.align %arg1, %c16 : index
   // CHECK-DAG: %1 = arith.addi %0, %c208 : index
-  // CHECK-DAG: %2 = util.align %1, %c16 : index
-  // CHECK-DAG: %3 = util.align %arg2, %c16 : index
-  // CHECK-DAG: %4 = arith.addi %2, %3 : index
-  // CHECK-DAG: %5 = util.align %4, %c16 : index
-  // CHECK-DAG: %6 = util.align %5, %c16 : index
+  // CHECK-DAG: %2 = util.align %arg2, %c16 : index
+  // CHECK-DAG: %3 = arith.addi %1, %2 : index
 
-  // CHECK-DAG: return %6, %c0, %c208, %2, %c0
+  // CHECK-DAG: return %3, %c0, %c208, %1, %c0
   return %t#0, %t#1, %t#2, %t#3, %t#4 : index, index, index, index, index
 }
 

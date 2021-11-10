@@ -176,6 +176,28 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // TODO(benvanik): passes to convert alloc to alloca and thread through
   // streams. Ideally all transient allocs become stream-ordered allocas.
   // createPropagateTransientsPass()
+
+  // Allocate backing storage for fused constant resources.
+  // This expands packed constants into explicit forms with partitioned storage
+  // buffers and upload logic.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createPackConstantsPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createPackConstantsPass());
+
+  // Pack fused allocations based on lifetime.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createPackAllocationsPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createPackAllocationsPass());
+
+  // Layout packed slices to emit the arithmetic required for all resource
+  // offsets. This enables us to propagate the subviews across the program
+  // below.
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      IREE::Stream::createLayoutSlicesPass());
+  passManager.addNestedPass<mlir::FuncOp>(
+      IREE::Stream::createLayoutSlicesPass());
 }
 
 //===----------------------------------------------------------------------===//
