@@ -22,7 +22,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-tile-and-vectorize"
+#define DEBUG_TYPE "iree-llvmcpu-tile-fuse-and-vectorize"
 
 namespace mlir {
 namespace iree_compiler {
@@ -52,11 +52,11 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 }  // namespace
 
 namespace {
-struct LLVMCPUTileAndVectorizePass2
-    : public LLVMCPUTileAndVectorize2Base<LLVMCPUTileAndVectorizePass2> {
-  LLVMCPUTileAndVectorizePass2(bool vectorize = true)
+struct LLVMCPUTileFuseAndVectorizePass
+    : public LLVMCPUTileFuseAndVectorizeBase<LLVMCPUTileFuseAndVectorizePass> {
+  LLVMCPUTileFuseAndVectorizePass(bool vectorize = true)
       : lowerToVectors(vectorize) {}
-  LLVMCPUTileAndVectorizePass2(const LLVMCPUTileAndVectorizePass2 &pass) {
+  LLVMCPUTileFuseAndVectorizePass(const LLVMCPUTileFuseAndVectorizePass &pass) {
     lowerToVectors = pass.lowerToVectors;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -68,14 +68,26 @@ struct LLVMCPUTileAndVectorizePass2
  private:
   bool lowerToVectors;
 };
+
+LogicalResult applyTileAndFuseCanonicalizationPatterns(FuncOp funcOp) {
+  auto context = funcOp.getContext();
+  OwningRewritePatternList patterns(context);
+  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+  tensor::DimOp::getCanonicalizationPatterns(patterns, context);
+  memref::DimOp::getCanonicalizationPatterns(patterns, context);
+  memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+  memref::populateResolveShapedTypeResultDimsPatterns(patterns);
+  scf::populateSCFForLoopCanonicalizationPatterns(patterns);
+  return applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+}
 }  // namespace
 
-void LLVMCPUTileAndVectorizePass2::runOnOperation() {
+void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "\n--- Before LLVMCPUTileAndVectorizePass2 ---\n";
+    llvm::dbgs() << "\n--- Before LLVMCPUTileFuseAndVectorize ---\n";
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
@@ -93,9 +105,12 @@ void LLVMCPUTileAndVectorizePass2::runOnOperation() {
     }
   });
 
-  // Skip vetorization if not all the ops can be vectorized.
-  bool isVectorizable = true;
+  // Expect all the ops are vectorizable. Do nothing if the expectation is not
+  // met.
+  // TODO(hanchung): Make the decision earlier, e.g., in setting translation
+  // information. Then the check will be unnecessary.
   {
+    bool isVectorizable = true;
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
@@ -109,22 +124,28 @@ void LLVMCPUTileAndVectorizePass2::runOnOperation() {
         }
       }
     }
+    if (!isVectorizable) return;
   }
 
-  // Query if first level of tiling is needed.
-  auto l1TileSizes = config.getTileSizeVals(1);
-  if (!l1TileSizes.empty() && isVectorizable) {
-    // First tile and fuse paralell loops.
+  auto tileAndFuseLinalgOps = [&](TilingLevel level) {
     OpBuilder builder(funcOp.getContext());
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return signalPassFailure();
     }
-    auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOps.back());
+    auto tileSizes = config.getTileSizeVals(static_cast<unsigned>(level));
+    linalg::LinalgOp consumerOp;
+    for (auto iter : llvm::reverse(computeOps)) {
+      if (auto op = dyn_cast<linalg::LinalgOp>(iter)) {
+        consumerOp = op;
+        break;
+      }
+    }
+    assert(consumerOp && "can't find consumerOp");
     SmallVector<int64_t> consumerTileSize(
-        l1TileSizes.begin(),
-        l1TileSizes.begin() + consumerOp.getNumParallelLoops());
+        tileSizes.begin(),
+        tileSizes.begin() + consumerOp.getNumParallelLoops());
     auto identityIndicesOrder =
         llvm::to_vector<4>(llvm::seq<int64_t>(0, consumerTileSize.size()));
     FailureOr<linalg::TileLoopNest> tileLoopNest =
@@ -133,92 +154,61 @@ void LLVMCPUTileAndVectorizePass2::runOnOperation() {
     if (failed(tileLoopNest)) return signalPassFailure();
     consumerOp->replaceAllUsesWith(tileLoopNest->getRootOpReplacementResults());
 
+    // Apply canoncalization
+    if (failed(applyTileAndFuseCanonicalizationPatterns(funcOp))) {
+      return signalPassFailure();
+    }
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "\n--- After tile and fuse paralell loops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+  };
 
+  tileAndFuseLinalgOps(TilingLevel::L1Tiles);
+
+  // Tile and fuse for vector sizes, then tile reduction loops. We don't rely on
+  // unroll vector pass because it could introduce register pressure.
+  {
+    tileAndFuseLinalgOps(TilingLevel::VectorTiles);
+    OwningRewritePatternList l1patterns(&getContext());
+    l1patterns.insert<TileWorkgroups>(
+        context,
+        linalg::LinalgTilingOptions().setTileSizeComputationFunction(
+            [](OpBuilder &builder,
+               Operation *operation) -> SmallVector<Value, 4> {
+              auto tiles =
+                  getTileSizes(builder, operation,
+                               static_cast<unsigned>(TilingLevel::VectorTiles));
+              auto numParallelLoops =
+                  dyn_cast<linalg::LinalgOp>(operation).getNumParallelLoops();
+              auto zeroTileVal = builder.create<arith::ConstantIndexOp>(
+                  operation->getLoc(), 0);
+              SmallVector<Value> reductionTiles(tiles.size(), zeroTileVal);
+              for (int i = numParallelLoops; i < tiles.size(); ++i) {
+                reductionTiles[i] = tiles[i];
+              }
+              return std::move(reductionTiles);
+            }),
+        linalg::LinalgTransformationFilter(
+            ArrayRef<Identifier>{},
+            Identifier::get(getVectorizeMarker(), context)));
+
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
+      return signalPassFailure();
+    }
     // Apply canoncalization
-    {
-      OwningRewritePatternList canonicalizationPatterns(&getContext());
-      linalg::populateLinalgTilingCanonicalizationPatterns(
-          canonicalizationPatterns);
-      memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                                 context);
-      scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
-        return signalPassFailure();
-      }
+    if (failed(applyTileAndFuseCanonicalizationPatterns(funcOp))) {
+      return signalPassFailure();
     }
-
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "\n--- After canonicalization ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
-    // Tile reduction loops.
-    {
-      OwningRewritePatternList l1patterns(&getContext());
-      l1patterns.insert<TileWorkgroups>(
-          context,
-          linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-              [](OpBuilder &builder,
-                 Operation *operation) -> SmallVector<Value, 4> {
-                auto tiles =
-                    getTileSizes(builder, operation,
-                                 static_cast<unsigned>(TilingLevel::L1Tiles));
-                auto numParallelLoops =
-                    dyn_cast<linalg::LinalgOp>(operation).getNumParallelLoops();
-                auto zeroTileVal = builder.create<arith::ConstantIndexOp>(
-                    operation->getLoc(), 0);
-                SmallVector<Value> reductionTiles(tiles.size(), zeroTileVal);
-                for (int i = numParallelLoops; i < tiles.size(); ++i) {
-                  reductionTiles[i] = tiles[i];
-                }
-                return std::move(reductionTiles);
-              }),
-          linalg::LinalgTransformationFilter(
-              ArrayRef<Identifier>{},
-              Identifier::get(getVectorizeMarker(), context)));
-
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "\n--- After tiling reduction loops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
-
-    // Apply canoncalization
-    {
-      OwningRewritePatternList canonicalizationPatterns(context);
-      linalg::populateLinalgTilingCanonicalizationPatterns(
-          canonicalizationPatterns);
-      tensor::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                                 context);
-      memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
-                                                 context);
-      scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
-        return signalPassFailure();
-      }
-
-      DEBUG_WITH_TYPE(DEBUG_TYPE, {
-        llvm::dbgs() << "\n--- After canonicalization ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
-    }
   }
 
-  if (!lowerToVectors || !isVectorizable) {
+  if (!lowerToVectors) {
     return;
   }
 
@@ -272,27 +262,8 @@ void LLVMCPUTileAndVectorizePass2::runOnOperation() {
     });
   }
 
-  // Apply vector unroll
-  {
-    RewritePatternSet vectorUnrollPatterns(context);
-    vector::populateVectorUnrollPatterns(
-        vectorUnrollPatterns, vector::UnrollVectorOptions().setNativeShape(
-                                  config.getNativeVectorSizeVals()));
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(vectorUnrollPatterns)))) {
-      return signalPassFailure();
-    }
-  }
-
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "\n--- After vector unroll ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
   linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
   linalg::hoistRedundantVectorTransfers(funcOp);
-
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "--- After hoisting vector transfers ---\n";
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
@@ -324,9 +295,9 @@ void LLVMCPUTileAndVectorizePass2::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass2(
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
     bool lowerToVectors) {
-  return std::make_unique<LLVMCPUTileAndVectorizePass2>(lowerToVectors);
+  return std::make_unique<LLVMCPUTileFuseAndVectorizePass>(lowerToVectors);
 }
 
 }  // namespace iree_compiler

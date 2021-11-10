@@ -56,7 +56,7 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
   // Tile and vectorize linalg ops on tensors.
   if (useTileAndVectorizeV2) {
     passManager.addNestedPass<FuncOp>(
-        createLLVMCPUTileAndVectorizePass2(lowerToVectors));
+        createLLVMCPUTileFuseAndVectorizePass(lowerToVectors));
   } else {
     passManager.addNestedPass<FuncOp>(
         createLLVMCPUTileAndVectorizePass(lowerToVectors));

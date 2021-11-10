@@ -121,10 +121,11 @@ def LLVMCPUTileAndVectorize
   let constructor = "mlir::iree_compiler::createLLVMCPUTileAndVectorizePass()";
 }
 
-def LLVMCPUTileAndVectorize2
-    : Pass<"iree-llvmcpu-tile-and-vectorize2", "FuncOp"> {
-  let summary = "Tile and vectorize workgroups tiles (v2)";
-  let constructor = "mlir::iree_compiler::createLLVMCPUTileAndVectorizePass2()";
+def LLVMCPUTileFuseAndVectorize
+    : Pass<"iree-llvmcpu-tile-fuse-and-vectorize", "FuncOp"> {
+  let summary = "Tile, fuse and vectorize Linalg ops";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUTileFuseAndVectorizePass()";
 }
 
 def LLVMCPUUnfuseFMAOps :
