@@ -13,12 +13,13 @@
 #include "iree/hal/local/sync_device.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
-#include "iree/samples/static_library/simple_mul_c.h"
 #include "iree/task/api.h"
-#include "iree/vm/bytecode_module.h"
 
 // Compiled static library module here to avoid IO:
 #include "iree/samples/static_library/simple_mul.h"
+
+// A function to create the bytecode or C module.
+extern iree_status_t create_module(iree_vm_module_t** module);
 
 // A function to create the HAL device from the different backend targets.
 // The HAL device is returned based on the implementation, and it must be
@@ -87,18 +88,14 @@ iree_status_t Run() {
   }
 
   // Load bytecode module from the embedded data. Append to the session.
-  const struct iree_file_toc_t* module_file_toc =
-      iree_samples_static_library_simple_mul_create();
-  iree_const_byte_span_t module_data =
-      iree_make_const_byte_span(module_file_toc->data, module_file_toc->size);
-  iree_vm_module_t* bytecode_module = NULL;
+  iree_vm_module_t* module = NULL;
+
   if (iree_status_is_ok(status)) {
-    status = iree_vm_bytecode_module_create(module_data, iree_allocator_null(),
-                                            iree_allocator_system(),
-                                            &bytecode_module);
+    status = create_module(&module);
   }
+
   if (iree_status_is_ok(status)) {
-    status = iree_runtime_session_append_module(session, bytecode_module);
+    status = iree_runtime_session_append_module(session, module);
   }
 
   // Lookup the entry point function call.
@@ -197,7 +194,7 @@ iree_status_t Run() {
   iree_hal_device_release(device);
   iree_runtime_session_release(session);
   iree_runtime_instance_release(instance);
-  iree_vm_module_release(bytecode_module);
+  iree_vm_module_release(module);
 
   return status;
 }
