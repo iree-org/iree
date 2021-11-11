@@ -25,7 +25,6 @@ iree_lit_test_suite(
             "distribute_wg_copy.mlir",
             "gpu_set_num_workgroups.mlir",
             "nvvm_pipeline_test.mlir",
-            "remove_loops.mlir",
             "rocdl_pipeline_test.mlir",
             "legalize.mlir",
             "vectorization.mlir",

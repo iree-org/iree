@@ -115,6 +115,9 @@ static void populateTilingToInvocationPatterns(
                   linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
                   linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
                   linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
+                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
+                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
+                  linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>,
                   linalg_ext::TiledOpInterfaceTilingPattern>(
       context, tilingOptions,
       linalg::LinalgTransformationFilter(

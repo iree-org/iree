@@ -94,7 +94,7 @@ def InterchangeGenericOps :
 }
 
 def OutlineDispatchRegions :
-    Pass<"iree-flow-outline-dispatch-regions2", "mlir::ModuleOp"> {
+    Pass<"iree-flow-outline-dispatch-regions", "mlir::ModuleOp"> {
   let summary = "Outlines dispatch regions into executables";
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }

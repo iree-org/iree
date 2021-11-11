@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
@@ -132,6 +133,11 @@ LogicalResult getFilteredOps(
 LogicalResult getComputeOps(
     FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
+
+/// If the given `forOp` is a tiled and distributed loop, returns its tiling and
+/// distribution information.
+Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
+    scf::ForOp forOp);
 
 /// Collects information about loops matching tiled+distribute pattern.
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(

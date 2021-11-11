@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-remove-single-iteration-loop))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-codegen-remove-single-iteration-loop))))' %s | IreeFileCheck %s
 
 
 // CHECK-LABEL: func @dispatch_0()

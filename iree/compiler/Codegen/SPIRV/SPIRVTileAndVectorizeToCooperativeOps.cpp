@@ -18,7 +18,6 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -312,7 +311,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
 
       RewritePatternSet canonicalizationPatterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
-      populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
+      populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns));
     }

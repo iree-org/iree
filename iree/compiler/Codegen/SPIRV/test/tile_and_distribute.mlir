@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize,canonicalize,cse))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute))))' %s | IreeFileCheck %s
 
 #map0 = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<()[s0, s1] -> (8, s1 - s0 * 8)>
@@ -9,7 +9,7 @@
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[8, 16], [1, 1], [0, 0, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [8, 16]>
+#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [8, 16]>
 
 hal.executable private @matmul  {
   hal.interface @io {
@@ -75,16 +75,15 @@ hal.executable private @matmul  {
 //   CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //   CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //   CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//       CHECK:   scf.for
 //       CHECK:     scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //       CHECK:       scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
 //       CHECK:         scf.for %{{.+}} = %[[C0]] to %{{.*}} step %[[C1]]
-//   CHECK-NOT:           linalg.matmul
+//       CHECK:           linalg.matmul
 
 // -----
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 4, 32], [1, 1, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4, 1]>
+#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
 hal.executable private @conv_1d  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -119,7 +118,9 @@ hal.executable private @conv_1d  {
         %15 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 1)>()[%3]
         %16 = memref.subview %0[%5, %12, %14] [1, %13, %15] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
         %17 = memref.subview %0[%5, %12, %9] [1, %13, %10] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
-        linalg.conv_1d_nwc_wcf { lowering.config = #config, dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>} ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>) outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
+        linalg.conv_1d_nwc_wcf {lowering.config = #config, dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>}
+          ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>)
+          outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
         return
       }
       hal.interface private @io  {
@@ -144,15 +145,16 @@ hal.executable private @conv_1d  {
 //       CHECK: %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //       CHECK: %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //       CHECK: %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//       CHECK: scf.for %[[IV0:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//       CHECK:   %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[TIDZ]], %[[IV0]], 0] [1, %{{.+}}, 1]
-//       CHECK:   scf.for %[[IV1:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-//       CHECK:     %[[ARG1SV2:.+]] = memref.subview %[[ARG1SV1]][0, 0, %[[IV1]]] [3, 1, 1]
-//       CHECK:     %[[RETSV2:.+]] = memref.subview %[[RETSV1]][%[[TIDZ]], %[[IV0]], %[[IV1]]] [1, 1, 1]
-//       CHECK:     linalg.conv_1d_nwc_wcf
-//  CHECK-SAME:       __internal_linalg_transform__ = "vectorize"
-//  CHECK-SAME:       ins(%[[ARG0SV2]], %[[ARG1SV2]]
-//  CHECK-SAME:       outs(%[[RETSV2]]
+//       CHECK: %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//       CHECK: scf.for %[[IV_Z:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//       CHECK:   scf.for %[[IV_Y:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//       CHECK:     scf.for %[[IV_X:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//       CHECK:       %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[IV_Z]], %[[IV_Y]], 0] [1, 3, 1]
+//       CHECK:       %[[ARG1SV2:.+]] = memref.subview %[[ARG1SV1]][0, 0, %[[IV_X]]] [3, 1, 1]
+//       CHECK:       %[[RETSV2:.+]] = memref.subview %[[RETSV1]][%[[IV_Z]], %[[IV_Y]], %[[IV_X]]] [1, 1, 1]
+//       CHECK:       linalg.conv_1d_nwc_wcf
+//  CHECK-SAME:         ins(%[[ARG0SV2]], %[[ARG1SV2]]
+//  CHECK-SAME:         outs(%[[RETSV2]]
 
 
 // -----
@@ -167,21 +169,21 @@ hal.executable private @conv_1d  {
 #map7 = affine_map<(d0)[s0] -> (32, -d0 + s0)>
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4, 1]>
-hal.executable private @conv_no_padding  {
+#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
+hal.executable private @conv_2d  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_no_padding attributes {
+    hal.executable.entry_point @conv_2d attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [32: index, 4: index, 1: index],
       translation.info = #translation
     }
     builtin.module {
-      func @conv_no_padding() {
+      func @conv_2d() {
         %c0 = arith.constant 0 : index
         %n = hal.interface.load.constant offset = 0 : index
         %oh = hal.interface.load.constant offset = 1 : index
@@ -252,48 +254,39 @@ hal.executable private @conv_no_padding  {
 }
 //     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //     CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//         CHECK: func @conv_no_padding
+//         CHECK: func @conv_2d
 //     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 //     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
 //     CHECK-DAG:   %[[C1:.+]] = arith.constant 1
-//     CHECK-DAG:   %[[C2:.+]] = arith.constant 2
-//     CHECK-DAG:   %[[N:.+]] = memref.dim %[[ARG1]], %[[C0]]
-//     CHECK-DAG:   %[[P:.+]] = memref.dim %[[RET0]], %[[C1]]
-//     CHECK-DAG:   %[[Q:.+]] = memref.dim %[[RET0]], %[[C2]]
-//     CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//     CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
-//     CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
-//     CHECK-DAG:   %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"}
-//     CHECK-DAG:   %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"}
-//     CHECK-DAG:   %[[NBLOCKSZ:.+]] = "gpu.grid_dim"() {dimension = "z"}
-//         CHECK:   %[[BOFFSETY:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//         CHECK:   %[[BSTEPY:.+]] = affine.apply #[[MAP0]]()[%[[NBLOCKSY]]]
-//         CHECK:   %[[BOFFSETX:.+]] = affine.apply #[[MAP1]]()[%[[BIDX]]]
-//         CHECK:   %[[BSTEPX:.+]] = affine.apply #[[MAP1]]()[%[[NBLOCKSX]]]
+//     CHECK-DAG:   %[[C4:.+]] = arith.constant 4
+//         CHECK:   %[[INPUT_BLOCK:.+]] = memref.subview %[[ARG1]]
+//         CHECK:   %[[OUTPUT_BLOCK:.+]] = memref.subview %[[RET0]]
 //     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //     CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //     CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
 //     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
 //     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//         CHECK:   scf.for %[[IV0:.+]] = %[[BIDZ]] to %[[N]] step %[[NBLOCKSZ]]
-//         CHECK:     scf.for %[[IV1:.+]] = %[[BOFFSETY]] to %[[P]] step %[[BSTEPY]]
-//         CHECK:       scf.for %[[IV2:.+]] = %[[BOFFSETX]] to %[[Q]] step %[[BSTEPX]]
-//         CHECK:         %[[SV1:.+]] = memref.subview %[[ARG1]][%[[IV0]], %[[IV1]], %[[IV2]], 0]
-//         CHECK:         %[[SV2:.+]] = memref.subview %[[RET0]][%[[IV0]], %[[IV1]], %[[IV2]], 0]
-//         CHECK:         scf.for %[[IV3:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//         CHECK:           scf.for %[[IV4:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//         CHECK:             scf.for %[[IV5:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-//         CHECK:               %[[OUT:.+]] = memref.subview %[[SV2]][0, %[[IV3]], %[[IV4]], %[[IV5]]]
+//         CHECK:   scf.for %[[IV_Z:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:     scf.for %[[IV_Y:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:       scf.for %[[IV_X:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//         CHECK:         %[[INPUT_THREAD:.+]] = memref.subview %[[INPUT_BLOCK]]
+//         CHECK:         %[[FILTER_THREAD:.+]] = memref.subview %[[ARG0]]
+//         CHECK:         %[[OUTPUT:.+]] = memref.subview %[[OUTPUT_BLOCK]][0, %[[IV_Z]], %[[IV_Y]], %[[IV_X]]]
+//         CHECK:         scf.for %[[IV_FH:.+]] = %[[C0]] to %{{.+}} step %[[C1]]
+//         CHECK:           scf.for %[[IV_FW:.+]] = %[[C0]] to %{{.+}} step %[[C1]]
+//         CHECK:             scf.for %[[IV_IC:.+]] = %[[C0]] to %{{.+}} step %[[C4]]
+//         CHECK:               %[[INPUT:.+]] = memref.subview %[[INPUT_THREAD]]
+//         CHECK:               %[[FILTER:.+]] = memref.subview %[[FILTER_THREAD]]
 //         CHECK:               linalg.conv_2d_nhwc_hwcf
-//    CHECK-SAME:                 __internal_linalg_transform__ = "vectorize"
-//    CHECK-SAME:                 outs(%[[OUT]]
+//    CHECK-SAME:                 ins(%[[INPUT]], %[[FILTER]]
+//    CHECK-SAME:                 outs(%[[OUTPUT]]
 
 // -----
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4, 1]>
+#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
 hal.executable private @conv_3d  {
   hal.interface @io {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
@@ -327,7 +320,9 @@ hal.executable private @conv_3d  {
         %14 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 7)>()[%3]
         %15 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
         %16 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
-        linalg.conv_3d_ndhwc_dhwcf {lowering.config = #config, dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>} ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>) outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
+        linalg.conv_3d_ndhwc_dhwcf {lowering.config = #config, dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>}
+          ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>)
+          outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
         return
       }
       hal.interface private @io  {
@@ -340,19 +335,18 @@ hal.executable private @conv_3d  {
 }
 
 //   CHECK-LABEL: func @conv_3d
-//     CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//     CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//     CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//     CHECK-DAG:         %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//     CHECK-DAG:         %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//     CHECK-DAG:         %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
-//         CHECK:         scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//         CHECK:           scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//         CHECK:             scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-//         CHECK:               %[[OUT:.+]] = memref.subview %{{.+}}[0, 0, %[[IV0]], %[[IV1]], %[[IV2]]]
-//         CHECK:               linalg.conv_3d_ndhwc_dhwcf
-//    CHECK-SAME:                 __internal_linalg_transform__ = "vectorize"
-//    CHECK-SAME:                 outs(%[[OUT]]
+//     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//     CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//     CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
+//     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
+//     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
+//     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//         CHECK:   scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
+//         CHECK:     scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//         CHECK:       scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//         CHECK:         %[[OUT:.+]] = memref.subview %{{.+}}[0, 0, %[[IV0]], %[[IV1]], %[[IV2]]]
+//         CHECK:         linalg.conv_3d_ndhwc_dhwcf
+//    CHECK-SAME:           outs(%[[OUT]]
 
 // -----
 
@@ -366,7 +360,7 @@ hal.executable private @conv_3d  {
 #map7 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1092 + s0 + d1 * 78 + d2 * 6 + d3)>
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 4, 32], [1, 1, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4, 1]>
+#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
 module  {
   hal.executable private @pooling_nhwc_max  {
     hal.interface @io {
@@ -396,7 +390,9 @@ module  {
           %10 = affine.min #map5()[%4]
           %11 = affine.min #map6()[%3]
           %12 = memref.subview %2[0, %5, %7, 0] [2, %10, %11, 6] [1, 1, 1, 1] : memref<2x14x13x6xf32> to memref<2x?x?x6xf32, #map7>
-          linalg.pooling_nhwc_max {lowering.config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>) outs(%12 : memref<2x?x?x6xf32, #map7>)
+          linalg.pooling_nhwc_max {lowering.config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+            ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>)
+            outs(%12 : memref<2x?x?x6xf32, #map7>)
           return
         }
         hal.interface private @io  {
@@ -415,12 +411,8 @@ module  {
 //     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 //     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//     CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
-//     CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
-//         CHECK:   %[[IV1:.+]] = affine.apply #[[MAP0]]()[%[[BIDY]]]
-//         CHECK:   %[[IV2:.+]] = affine.apply #[[MAP2]]()[%[[BIDX]]]
-//         CHECK:   %[[SV1:.+]] = memref.subview %[[ARG0]][0, %[[IV1]], %[[IV2]], 0]
-//         CHECK:   %[[SV2:.+]] = memref.subview %[[RET0]][0, %[[IV1]], %[[IV2]], 0]
+//         CHECK:   %[[SV1:.+]] = memref.subview %[[ARG0]]
+//         CHECK:   %[[SV2:.+]] = memref.subview %[[RET0]]
 //     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //     CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
 //     CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
@@ -430,9 +422,8 @@ module  {
 //         CHECK:   scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
 //         CHECK:     scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //         CHECK:       scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-//         CHECK:         %[[IN:.+]] = memref.subview %[[SV1]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, %{{.+}}, %{{.+}}, 6]
+//         CHECK:         %[[IN:.+]] = memref.subview %[[SV1]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, 3, 4, 6]
 //         CHECK:         %[[OUT:.+]] = memref.subview %[[SV2]][%[[IV0]], %[[IV1]], %[[IV2]], 0] [1, 1, 1, 6]
 //         CHECK:         linalg.pooling_nhwc_max
-//    CHECK-SAME:           __internal_linalg_transform__ = "vectorize"
 //    CHECK-SAME:           ins(%[[IN]], %[[ARG1]]
 //    CHECK-SAME:           outs(%[[OUT]]

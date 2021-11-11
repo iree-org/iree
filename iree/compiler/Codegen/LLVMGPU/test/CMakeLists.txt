@@ -21,7 +21,6 @@ iree_lit_test_suite(
     "gpu_set_num_workgroups.mlir"
     "legalize.mlir"
     "nvvm_pipeline_test.mlir"
-    "remove_loops.mlir"
     "rocdl_pipeline_test.mlir"
     "vectorization.mlir"
   DATA

@@ -59,6 +59,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
 /// backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
+/// Creates a pass to to fold `affine.min` ops in tiled and distributed loops.
+std::unique_ptr<OperationPass<FuncOp>>
+createFoldAffineMinInDistributedLoopsPass();
+
 /// After running the upstream TensorConstantBufferize pass, remove tensor_loads
 /// introduced for use only in tensor_extract. These can be folded to use a load
 /// of the created memref object that holds the constant values.
@@ -82,6 +86,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks> =
         linalg::comprehensive_bufferize::defaultAllocationCallbacks());
 
+/// Creates a pass to remove single iteration distributed loops.
+std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
+
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
 
@@ -99,6 +106,11 @@ createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
+
+/// Populates `patterns` with patterns to fold `affine.min` ops in tiled and
+/// distributed loops.
+void populateFoldAffineMinInDistributedLoopsPatterns(
+    RewritePatternSet &patterns);
 
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on
@@ -217,9 +229,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUTileAndDistributeToThreads();
 
-std::unique_ptr<OperationPass<FuncOp>>
-createLLVMGPURemoveSingleIterationLoopPass();
-
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
@@ -272,11 +281,6 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
 
-/// Pass to remove loop generated at flow for tiled and distributed Linalg ops
-/// when the loop is known to have a single trip count.
-/// WARNING: DO NOT USE. This is a legacy pass that is to be deprecated.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVRemoveOneTripTiledLoopPass();
-
 /// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
 
@@ -312,15 +316,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 /// size.
 /// TODO: Are both of these needed and does this one still work on HLO?
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
-
-//----------------------------------------------------------------------------//
-// SPIRV Codegen specific patterns.
-//----------------------------------------------------------------------------//
-
-/// Populates patterns to fold processor ID uses by using processor counts
-/// information where possible.
-void populateFoldGPUProcessorIDUsesPatterns(MLIRContext *context,
-                                            OwningRewritePatternList &patterns);
 
 //------------------------------------------------------------------------------
 // Test passes

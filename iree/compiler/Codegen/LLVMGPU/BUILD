@@ -20,7 +20,6 @@ cc_library(
         "LLVMGPUDistributeSharedMemoryCopy.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUPipelining.cpp",
-        "LLVMGPURemoveTrivialLoops.cpp",
         "LLVMGPUTileAndDistribute.cpp",
         "LLVMGPUVectorLowering.cpp",
         "LLVMGPUVectorization.cpp",

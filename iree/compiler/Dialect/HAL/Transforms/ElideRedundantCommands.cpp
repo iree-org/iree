@@ -51,6 +51,14 @@ struct CommandBufferState {
   SmallVector<Value, 32> pushConstants;
   SmallVector<DescriptorSetState, 4> descriptorSets;
 
+  // Set after we know a full barrier has been issued; any subsequent barrier
+  // until a real operation is redundant. We could track more fine-grained state
+  // here such as which stages are being waited on.
+  // Note that we assume no barriers by default, as the command buffer may have
+  // been passed as a function/branch argument and we don't have visibility.
+  // We need to use IPO to track that.
+  IREE::HAL::CommandBufferExecutionBarrierOp previousFullBarrier;
+
   Value &getPushConstant(int64_t index) {
     if (index >= pushConstants.size()) {
       pushConstants.resize(index + 1);
@@ -75,6 +83,31 @@ struct CommandBufferState {
 using CommandBufferStateMap = DenseMap<Value, CommandBufferState>;
 
 }  // namespace
+
+static void processOp(IREE::HAL::CommandBufferExecutionBarrierOp op,
+                      CommandBufferState &state) {
+  if (state.previousFullBarrier) {
+    // We are following a full barrier - this is a no-op (issuing two barriers
+    // doesn't make the device barrier any harder).
+    op.erase();
+    return;
+  }
+
+  // See if this is a full barrier. These are all we emit today so this simple
+  // analysis can remain simple by pattern matching.
+  if (bitEnumContains(op.source_stage_mask(),
+                      IREE::HAL::ExecutionStageBitfield::CommandRetire |
+                          IREE::HAL::ExecutionStageBitfield::Transfer |
+                          IREE::HAL::ExecutionStageBitfield::Dispatch) &&
+      bitEnumContains(op.target_stage_mask(),
+                      IREE::HAL::ExecutionStageBitfield::CommandRetire |
+                          IREE::HAL::ExecutionStageBitfield::Transfer |
+                          IREE::HAL::ExecutionStageBitfield::Dispatch)) {
+    state.previousFullBarrier = op;
+  } else {
+    state.previousFullBarrier = {};
+  }
+}
 
 static LogicalResult processOp(IREE::HAL::CommandBufferPushConstantsOp op,
                                CommandBufferState &state) {
@@ -200,51 +233,64 @@ class ElideRedundantCommandsPass
         auto invalidateState = [&](Value commandBuffer) {
           stateMap[commandBuffer] = {};
         };
+        auto resetCommandBufferBarrierBit = [&](Operation *op) {
+          assert(op->getNumOperands() > 0 && "must be a command buffer op");
+          auto commandBuffer = op->getOperand(0);
+          assert(commandBuffer.getType().isa<IREE::HAL::CommandBufferType>() &&
+                 "operand 0 must be a command buffer");
+          stateMap[commandBuffer].previousFullBarrier = {};
+        };
         for (auto &op : llvm::make_early_inc_range(block.getOperations())) {
-          if (op.getDialect())
-            TypeSwitch<Operation *>(&op)
-                .Case([&](IREE::HAL::CommandBufferBeginOp op) {
+          if (!op.getDialect()) continue;
+          TypeSwitch<Operation *>(&op)
+              .Case([&](IREE::HAL::CommandBufferBeginOp op) {
+                invalidateState(op.command_buffer());
+              })
+              .Case([&](IREE::HAL::CommandBufferEndOp op) {
+                invalidateState(op.command_buffer());
+              })
+              .Case([&](IREE::HAL::CommandBufferExecutionBarrierOp op) {
+                processOp(op, stateMap[op.command_buffer()]);
+              })
+              .Case([&](IREE::HAL::CommandBufferPushConstantsOp op) {
+                resetCommandBufferBarrierBit(op);
+                if (failed(processOp(op, stateMap[op.command_buffer()]))) {
                   invalidateState(op.command_buffer());
-                })
-                .Case([&](IREE::HAL::CommandBufferEndOp op) {
+                }
+              })
+              .Case([&](IREE::HAL::CommandBufferPushDescriptorSetOp op) {
+                resetCommandBufferBarrierBit(op);
+                if (failed(processOp(op, stateMap[op.command_buffer()]))) {
                   invalidateState(op.command_buffer());
-                })
-                .Case([&](IREE::HAL::CommandBufferPushConstantsOp op) {
-                  if (failed(processOp(op, stateMap[op.command_buffer()]))) {
-                    invalidateState(op.command_buffer());
-                  }
-                })
-                .Case([&](IREE::HAL::CommandBufferPushDescriptorSetOp op) {
-                  if (failed(processOp(op, stateMap[op.command_buffer()]))) {
-                    invalidateState(op.command_buffer());
-                  }
-                })
-                .Case([&](IREE::HAL::CommandBufferBindDescriptorSetOp op) {
-                  if (failed(processOp(op, stateMap[op.command_buffer()]))) {
-                    invalidateState(op.command_buffer());
-                  }
-                })
-                .Case<IREE::HAL::CommandBufferDeviceOp,
-                      IREE::HAL::CommandBufferBeginDebugGroupOp,
-                      IREE::HAL::CommandBufferEndDebugGroupOp,
-                      IREE::HAL::CommandBufferExecutionBarrierOp,
-                      IREE::HAL::CommandBufferFillBufferOp,
-                      IREE::HAL::CommandBufferCopyBufferOp,
-                      IREE::HAL::CommandBufferDispatchSymbolOp,
-                      IREE::HAL::CommandBufferDispatchOp,
-                      IREE::HAL::CommandBufferDispatchIndirectSymbolOp,
-                      IREE::HAL::CommandBufferDispatchIndirectOp>(
-                    [&](Operation *op) {
-                      // Ok - don't impact state.
-                    })
-                .Default([&](Operation *op) {
-                  // Unknown op - discard state cache.
-                  // This is to avoid correctness issues with region ops (like
-                  // scf.if) that we don't analyze properly here. We could
-                  // restrict this a bit by only discarding on use of the
-                  // command buffer.
-                  stateMap.clear();
-                });
+                }
+              })
+              .Case([&](IREE::HAL::CommandBufferBindDescriptorSetOp op) {
+                resetCommandBufferBarrierBit(op);
+                if (failed(processOp(op, stateMap[op.command_buffer()]))) {
+                  invalidateState(op.command_buffer());
+                }
+              })
+              .Case<IREE::HAL::CommandBufferDeviceOp,
+                    IREE::HAL::CommandBufferBeginDebugGroupOp,
+                    IREE::HAL::CommandBufferEndDebugGroupOp,
+                    IREE::HAL::CommandBufferFillBufferOp,
+                    IREE::HAL::CommandBufferCopyBufferOp,
+                    IREE::HAL::CommandBufferDispatchSymbolOp,
+                    IREE::HAL::CommandBufferDispatchOp,
+                    IREE::HAL::CommandBufferDispatchIndirectSymbolOp,
+                    IREE::HAL::CommandBufferDispatchIndirectOp>(
+                  [&](Operation *op) {
+                    // Ok - don't impact state.
+                    resetCommandBufferBarrierBit(op);
+                  })
+              .Default([&](Operation *op) {
+                // Unknown op - discard state cache.
+                // This is to avoid correctness issues with region ops (like
+                // scf.if) that we don't analyze properly here. We could
+                // restrict this a bit by only discarding on use of the
+                // command buffer.
+                stateMap.clear();
+              });
         }
       }
     }

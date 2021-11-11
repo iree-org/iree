@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/api.h"
 #include "iree/vm/api.h"
 
 #ifdef __cplusplus
@@ -42,8 +43,9 @@ iree_status_t iree_custom_native_module_register_types(void);
 // Creates a native custom module.
 // Modules may exist in multiple contexts and should be thread-safe and (mostly)
 // immutable. Use the per-context allocated state for retaining data.
-iree_status_t iree_custom_native_module_create(iree_allocator_t allocator,
-                                               iree_vm_module_t** out_module);
+iree_status_t iree_custom_native_module_create(
+    iree_allocator_t host_allocator, iree_hal_allocator_t* device_allocator,
+    iree_vm_module_t** out_module);
 
 #ifdef __cplusplus
 }  // extern "C"

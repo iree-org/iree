@@ -15,6 +15,7 @@
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -48,6 +49,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format on
 
   linalg_ext::registerTiledOpInterfaceExternalModels(registry);
+  registerProcessorOpInterfaceExternalModels(registry);
 }
 
 }  // namespace iree_compiler

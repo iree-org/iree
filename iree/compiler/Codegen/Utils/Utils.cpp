@@ -6,8 +6,10 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
+#include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
@@ -15,6 +17,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/AffineExprVisitor.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
 
 #define DEBUG_TYPE "iree-codegen-utils"
@@ -187,13 +190,12 @@ static SmallVector<Value> getValuesForDimsOrSymbols(
   return vals;
 }
 
-/// Returns the dimension for any operation that has the `dimension`
-/// attribute. Currently tested for `flow.dispatch.workgroup.(size|count|id)`,
-/// `hal.interface.workgroup.(size|count|id)`.
+/// Returns the dimension for any operation that implements processor op
+/// interfaces.
 template <typename T>
 static Optional<unsigned> getDimension(Operation *op) {
   if (auto tOp = dyn_cast<T>(op)) {
-    return tOp.dimension().getZExtValue();
+    return tOp.getDimIndex();
   }
   return llvm::None;
 }
@@ -206,12 +208,11 @@ static Optional<unsigned> getDimension(Operation *op) {
   return getDimension<T2, T3...>(op);
 }
 
-/// Checks that all `vals` are defined by either
-/// `flow.dispatch.workgroup.(size|count|id)` or
-/// `hal.interface.workgroup.(size|count|id)` using the same `dimension`. If any
-/// element of `vals` is not defined by one of these ops, or the dimensions dont
-/// match, returns llvm::None. On success returns the dimension.  If
-/// `refDimension` is passed checks if the dimension matches the given value.
+/// Checks that all `vals` are defined by some processor id/count/size ops using
+/// the same `dimension`. If any element of `vals` is not defined by one of
+/// these ops, or the dimensions dont match, returns llvm::None; oterhwise,
+/// returns the dimension.  If `refDimension` is passed checks if the dimension
+/// matches the given value.
 template <typename... T>
 static Optional<unsigned> checkDimensions(
     ArrayRef<Value> vals, Optional<unsigned> refDimension = llvm::None) {
@@ -284,14 +285,21 @@ class LowerBoundExprVisitor
         return failure();
       }
       loopInfo.tileSize = wgSize.getValue();
-      dimension = checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp>(vals);
+      dimension = checkDimensions<ProcessorIDInterface>(vals);
     } else {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS(), expr.getRHS()});
       if (vals.size() != 2 || !vals[0] || !vals[1]) {
         return failure();
       }
-      dimension = checkDimensions<IREE::HAL::InterfaceWorkgroupIDOp,
-                                  IREE::HAL::InterfaceWorkgroupSizeOp>(vals);
+      IntegerAttr tileSizeAttr;
+      if (matchPattern(vals[1], m_Constant(&tileSizeAttr))) {
+        loopInfo.tileSize = tileSizeAttr.getInt();
+        dimension = checkDimensions<ProcessorIDInterface>(vals[0]);
+      } else {
+        dimension =
+            checkDimensions<ProcessorIDInterface, ProcessorTileSizeInterface>(
+                vals);
+      }
     }
     if (!dimension) {
       return failure();
@@ -347,6 +355,14 @@ class StepExprVisitor
           loopInfo.untiledStep =
               IntegerAttr::get(IndexType::get(applyOp.getContext()),
                                stepCst.getValue() / *loopInfo.tileSize);
+        } else {
+          auto stepValue = getValueForDimOrSymbol(applyOp, expr.getRHS());
+          IntegerAttr tileSizeAttr;
+          if (stepValue && matchPattern(stepValue, m_Constant(&tileSizeAttr))) {
+            loopInfo.untiledStep =
+                IntegerAttr::get(IndexType::get(applyOp.getContext()),
+                                 tileSizeAttr.getInt() / *loopInfo.tileSize);
+          }
         }
       } else {
         loopInfo.untiledStep =
@@ -384,12 +400,11 @@ class StepExprVisitor
       return failure();
     }
     SmallVector<Value> vals = getValuesForDimsOrSymbols(applyOp, sentinels);
-    if ((loopInfo.tileSize &&
-         !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp>(
-             vals, loopInfo.processorDistributionDim)) ||
+
+    if ((loopInfo.tileSize && !checkDimensions<ProcessorCountInterface>(
+                                  vals, loopInfo.processorDistributionDim)) ||
         (!loopInfo.tileSize &&
-         !checkDimensions<IREE::HAL::InterfaceWorkgroupCountOp,
-                          IREE::HAL::InterfaceWorkgroupSizeOp>(
+         !checkDimensions<ProcessorCountInterface, ProcessorTileSizeInterface>(
              vals, loopInfo.processorDistributionDim))) {
       return failure();
     }
@@ -418,6 +433,14 @@ class StepExprVisitor
 };
 }  // namespace
 
+template <typename OpTy>
+static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
+  if (auto op = value.getDefiningOp<OpTy>()) {
+    return op.dimension().getZExtValue();
+  }
+  return llvm::None;
+}
+
 /// Checks if the `forOp` is a tiled + distributed op. Looks for the op of this
 /// form
 /// ```
@@ -435,24 +458,49 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
     scf::ForOp forOp) {
   LoopTilingAndDistributionInfo loopInfo;
   loopInfo.loop = forOp;
+  loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.upperBound());
+
   auto lbApplyOp = forOp.lowerBound().getDefiningOp<AffineApplyOp>();
-  if (!lbApplyOp) {
-    return llvm::None;
-  }
-  LowerBoundExprVisitor lbVisitor(lbApplyOp, loopInfo);
   auto stepApplyOp = forOp.step().getDefiningOp<AffineApplyOp>();
-  if (!stepApplyOp) {
+
+  if (!lbApplyOp || !stepApplyOp) {
+    // Try to see if this s a specical case where we have:
+    //   scf.for %iv = %id to %ub step %count
+    Optional<unsigned> idDim;
+    if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(
+            forOp.lowerBound().getDefiningOp())) {
+      idDim = ifx.getDimIndex();
+    }
+
+    Optional<unsigned> countDim;
+    if (auto ifx = dyn_cast_or_null<ProcessorCountInterface>(
+            forOp.step().getDefiningOp())) {
+      countDim = ifx.getDimIndex();
+    }
+
+    if (!idDim || !countDim) return llvm::None;
+
+    Builder b(forOp.getContext());
+    loopInfo.untiledLowerBound = b.getIndexAttr(0);
+    loopInfo.untiledStep = b.getIndexAttr(1);
+    loopInfo.processorDistributionDim = idDim.getValue();
+    // For such special case, the tile size is 1.
+    loopInfo.tileSize = 1;
+    return loopInfo;
+  }
+
+  LowerBoundExprVisitor lbVisitor(lbApplyOp, loopInfo);
+  StepExprVisitor stepVisitor(stepApplyOp, loopInfo);
+
+  if (failed(lbVisitor.visit(lbApplyOp.getAffineMap().getResults()[0]))) {
     return llvm::None;
   }
-  StepExprVisitor stepVisitor(stepApplyOp, loopInfo);
-  if (failed(lbVisitor.visit(lbApplyOp.getAffineMap().getResults()[0])) ||
-      failed(stepVisitor.visit(stepApplyOp.getAffineMap().getResults()[0]))) {
+  if (failed(stepVisitor.visit(stepApplyOp.getAffineMap().getResults()[0]))) {
     return llvm::None;
   }
   if (!loopInfo.untiledLowerBound || !loopInfo.untiledStep) {
     return llvm::None;
   }
-  loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.upperBound());
   return loopInfo;
 }
 
