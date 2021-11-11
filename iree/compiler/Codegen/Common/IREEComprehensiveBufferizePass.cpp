@@ -68,21 +68,27 @@ class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
   explicit IREEComprehensiveBufferizePass(
-      linalg::comprehensive_bufferize::AllocationCallbacks allocationFn)
-      : allocationFn(allocationFn) {}
+      std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+          allocationFn)
+      : allocationFn(std::move(allocationFn)) {}
+
+  IREEComprehensiveBufferizePass(const IREEComprehensiveBufferizePass &other) {
+    llvm_unreachable("pass cannot be copied");
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
                     linalg::LinalgDialect, memref::MemRefDialect,
                     scf::SCFDialect, StandardOpsDialect, tensor::TensorDialect,
-                    vector::VectorDialect>();
+                    vector::VectorDialect, AffineDialect>();
     linalg::comprehensive_bufferize::
         registerBufferizableOpInterfaceExternalModels(registry);
   }
   void runOnOperation() override;
 
  private:
-  linalg::comprehensive_bufferize::AllocationCallbacks allocationFn;
+  std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+      allocationFn;
 };
 }  // namespace
 
@@ -215,7 +221,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
     // 5. Perform bufferization.
     for (Operation *op : ops) {
       if (failed(linalg::comprehensive_bufferize::bufferizeOp(
-              op, bvm, aliasInfo, allocationFn,
+              op, bvm, aliasInfo, *allocationFn,
               /*bufferizedFunctionTypes=*/nullptr))) {
         return signalPassFailure();
       }
@@ -233,14 +239,18 @@ static Value defaultAllocationFn(OpBuilder &builder, Location loc,
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    linalg::comprehensive_bufferize::AllocationCallbacks allocationFns) {
-  return std::make_unique<IREEComprehensiveBufferizePass>(allocationFns);
+    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+        allocationFns) {
+  return std::make_unique<IREEComprehensiveBufferizePass>(
+      std::move(allocationFns));
 }
 
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    linalg::comprehensive_bufferize::AllocationCallbacks allocationFns) {
-  passManager.addPass(createIREEComprehensiveBufferizePass(allocationFns));
+    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+        allocationFns) {
+  passManager.addPass(
+      createIREEComprehensiveBufferizePass(std::move(allocationFns)));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());

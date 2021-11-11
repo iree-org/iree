@@ -143,8 +143,8 @@ class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, {3}Storage> {
   }
 
   os << R"(
-  static Attribute parse(DialectAsmParser &p);
-  void print(DialectAsmPrinter &p) const;
+  static Attribute parse(AsmParser &p);
+  void print(AsmPrinter &p) const;
 
 )";
 
