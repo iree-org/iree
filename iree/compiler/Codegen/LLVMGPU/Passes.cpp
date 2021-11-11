@@ -41,7 +41,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createLLVMGPURemoveSingleIterationLoopPass());
+  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
   pm.addNestedPass<FuncOp>(createLLVMGPUVectorizationPass());
@@ -63,7 +63,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createLLVMGPURemoveSingleIterationLoopPass());
+  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
   pm.addNestedPass<FuncOp>(createLLVMGPUVectorizationPass());
@@ -87,7 +87,7 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createLLVMGPURemoveSingleIterationLoopPass());
+  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {

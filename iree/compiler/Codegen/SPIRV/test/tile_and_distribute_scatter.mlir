@@ -64,15 +64,17 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:     %[[WG_UPDATE:.+]] = memref.subview %[[ARG0]]
 //       CHECK:     %[[WG_INDEX:.+]] = memref.subview %[[ARG1]]
 //       CHECK:     %[[WG_TARGET:.+]] = memref.subview %[[ARG2]]
-//       CHECK:     %[[TID_X:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
-//       CHECK:     %[[DIM_X:.+]] = "gpu.block_dim"() {dimension = "x"} : () -> index
-//       CHECK:     %[[TID_Y:.+]] = "gpu.thread_id"() {dimension = "y"} : () -> index
-//       CHECK:     scf.for %[[IV:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
-//       CHECK:       %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][%[[TID_Y]], %[[IV]]] [1, 1] [1, 1]
-//       CHECK:       %[[T_UPDATE_CAST:.+]] = memref.cast %[[T_UPDATE]]
-//       CHECK:       %[[T_INDEX:.+]] = memref.cast %[[WG_INDEX]]
-//       CHECK:       %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV]]] [100, 1] [1, 1]
-//       CHECK:       %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
-//       CHECK:       linalg_ext.scatter
-//  CHECK-SAME:         ins(%[[T_UPDATE_CAST]], %[[T_INDEX]]
-//  CHECK-SAME:         outs(%[[T_TARGET_CAST]]
+//       CHECK:     %[[TID_X:.+]] = "gpu.thread_id"() {dimension = "x"}
+//       CHECK:     %[[DIM_X:.+]] = "gpu.block_dim"() {dimension = "x"}
+//       CHECK:     %[[TID_Y:.+]] = "gpu.thread_id"() {dimension = "y"}
+//       CHECK:     %[[DIM_Y:.+]] = "gpu.block_dim"() {dimension = "y"}
+//       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
+//       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
+//       CHECK:         %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][%[[IV_Y]], %[[IV_X]]] [1, 1] [1, 1]
+//       CHECK:         %[[T_UPDATE_CAST:.+]] = memref.cast %[[T_UPDATE]]
+//       CHECK:         %[[T_INDEX:.+]] = memref.cast %[[WG_INDEX]]
+//       CHECK:         %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV_X]]] [100, 1] [1, 1]
+//       CHECK:         %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
+//       CHECK:         linalg_ext.scatter
+//  CHECK-SAME:           ins(%[[T_UPDATE_CAST]], %[[T_INDEX]]
+//  CHECK-SAME:           outs(%[[T_TARGET_CAST]]

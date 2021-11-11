@@ -21,7 +21,6 @@ cc_library(
         "Passes.cpp",
         "SPIRVCopyToWorkgroupMemory.cpp",
         "SPIRVLowerExecutableTargetPass.cpp",
-        "SPIRVRemoveOneTripTiledLoops.cpp",
         "SPIRVTileAndDistribute.cpp",
         "SPIRVTileAndVectorizeToCooperativeOps.cpp",
         "SPIRVVectorToCooperativeOps.cpp",

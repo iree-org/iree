@@ -71,6 +71,12 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
+def RemoveSingleIterationLoop :
+    Pass<"iree-codegen-remove-single-iteration-loop", "FuncOp"> {
+  let summary = "Remove distributed loop with single iteration.";
+  let constructor = "mlir::iree_compiler::createRemoveSingleIterationLoopPass()";
+}
+
 // TODO: Consider removing or moving to HAL/Transforms in order to avoid
 // polluting common pass declarations with HAL specific ops.
 def SetNumWorkgroups :
@@ -179,12 +185,6 @@ def LLVMGPULowerExecutableTarget :
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
 
-def LLVMGPURemoveSingleIterationLoop :
-    Pass<"iree-llvmgpu-remove-single-iteration-loop", "FuncOp"> {
-  let summary = "Remove distributed loop with single iteration.";
-  let constructor = "mlir::iree_compiler::createLLVMGPURemoveSingleIterationLoopPass()";
-}
-
 def LLVMGPUTileAndDistribute :
     Pass<"iree-llvmgpu-tile-and-distribute", "FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
@@ -232,14 +232,6 @@ def SPIRVLowerExecutableTarget :
                 "IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
       "mlir::iree_compiler::createSPIRVLowerExecutableTargetPass()";
-}
-
-def SPIRVRemoveOneTripTiledLoop :
-    Pass<"iree-spirv-remove-one-trip-tiled-loop", "FuncOp"> {
-  let summary = "Remove one-trip tiled loop for convolution "
-                "(LEGACY PASS; DO NOT USE!)";
-  let constructor =
-      "mlir::iree_compiler::createSPIRVRemoveOneTripTiledLoopPass()";
 }
 
 // TODO: Rename argument to be fully qualified.

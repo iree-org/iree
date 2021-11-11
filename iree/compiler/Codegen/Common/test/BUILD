@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "iree_comprehensive_bufferize.mlir",
             "linalg_bufferize.mlir",
             "remove_dead_allocs.mlir",
+            "remove_trivial_loops.mlir",
             "transpose_canonicalization.mlir",
             "vectorize_linalg_conv.mlir",
             "vectorize_linalg_mmt4d.mlir",

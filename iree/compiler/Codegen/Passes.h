@@ -87,6 +87,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
         linalg::defaultAllocationFn, linalg::defaultDeallocationFn,
         linalg::defaultMemCpyFn));
 
+/// Creates a pass to remove single iteration distributed loops.
+std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
+
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
 
@@ -227,9 +230,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUTileAndDistributeToThreads();
 
-std::unique_ptr<OperationPass<FuncOp>>
-createLLVMGPURemoveSingleIterationLoopPass();
-
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
@@ -281,11 +281,6 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
 /// scalar + vector code.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
-
-/// Pass to remove loop generated at flow for tiled and distributed Linalg ops
-/// when the loop is known to have a single trip count.
-/// WARNING: DO NOT USE. This is a legacy pass that is to be deprecated.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVRemoveOneTripTiledLoopPass();
 
 /// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();

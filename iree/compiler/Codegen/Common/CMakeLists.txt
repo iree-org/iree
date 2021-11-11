@@ -32,6 +32,7 @@ iree_cc_library(
     "IREEComprehensiveBufferizePass.cpp"
     "LinalgBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
+    "RemoveTrivialLoops.cpp"
     "SetNumWorkgroupsPass.cpp"
     "VectorizeConv.cpp"
     "VectorizeMMT4d.cpp"
