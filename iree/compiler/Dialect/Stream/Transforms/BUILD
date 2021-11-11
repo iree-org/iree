@@ -47,6 +47,7 @@ cc_library(
         "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/Shape/Utils:TypeConversion",
         "//iree/compiler/Dialect/Stream/Analysis",
+        "//iree/compiler/Dialect/Stream/Conversion",
         "//iree/compiler/Dialect/Stream/Conversion/FlowToStream",
         "//iree/compiler/Dialect/Stream/Conversion/StandardToStream",
         "//iree/compiler/Dialect/Stream/Conversion/UtilToStream",
