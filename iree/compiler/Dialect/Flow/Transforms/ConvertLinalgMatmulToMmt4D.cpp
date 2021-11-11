@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <array>
+
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
-#include <array>
 
 namespace mlir {
 namespace iree_compiler {
@@ -42,7 +42,8 @@ static Value expandTo4D(mlir::Location loc, PatternRewriter &rewriter,
   }
   RankedTensorType targetType =
       RankedTensorType::get(targetShape, inputType.getElementType());
-  std::array<ReassociationIndices, 2> expandIndices = {ReassociationIndices{0, 1}, ReassociationIndices{2, 3}};
+  std::array<ReassociationIndices, 2> expandIndices = {
+      ReassociationIndices{0, 1}, ReassociationIndices{2, 3}};
   Value reshapedOperand = rewriter.create<linalg::TensorExpandShapeOp>(
       loc, targetType, input, expandIndices);
   return reshapedOperand;
@@ -68,8 +69,7 @@ static Value transpose(mlir::Location loc, PatternRewriter &rewriter,
       targetShape.emplace_back(
           rewriter.create<tensor::DimOp>(loc, input, indices[i]));
     } else {
-      targetShape.push_back(
-          rewriter.getIndexAttr(inputShape[indices[i]]));
+      targetShape.push_back(rewriter.getIndexAttr(inputShape[indices[i]]));
     }
   }
 
@@ -101,7 +101,8 @@ static Value collapseTo2D(mlir::Location loc, PatternRewriter &rewriter,
   auto inputType = input.getType().cast<RankedTensorType>();
   auto targetType =
       RankedTensorType::get(targetShape, inputType.getElementType());
-  std::array<ReassociationIndices, 2> collapseIndices = {ReassociationIndices{0, 1}, ReassociationIndices{2, 3}};
+  std::array<ReassociationIndices, 2> collapseIndices = {
+      ReassociationIndices{0, 1}, ReassociationIndices{2, 3}};
   Value reshapedOperand = rewriter.create<linalg::TensorCollapseShapeOp>(
       loc, targetType, input, collapseIndices);
   return reshapedOperand;
@@ -183,9 +184,9 @@ static Value pad(Location loc, PatternRewriter &rewriter, Value input,
       RankedTensorType::get(resultTypeShape, elementType);
   Value padValue = rewriter.create<arith::ConstantOp>(
       loc, elementType, rewriter.getZeroAttr(elementType));
-  return linalg::PadTensorOp::createPadScalarOp(resultType, input, padValue,
-                                                lowPadding, highPadding, /* nofold = */ false,
-                                                loc, rewriter);
+  return linalg::PadTensorOp::createPadScalarOp(
+      resultType, input, padValue, lowPadding, highPadding,
+      /* nofold = */ false, loc, rewriter);
 }
 
 // Returns a top-left slice from |input| shaped like |likeWhat|.
