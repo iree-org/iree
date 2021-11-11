@@ -5,12 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "mlir/Dialect/GPU/Passes.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -18,6 +17,11 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+/// Converts a symbolic GPU processor dimension to its numeric one.
+static unsigned dimToIndex(StringRef dim) {
+  return StringSwitch<unsigned>(dim).Case("x", 0).Case("y", 1).Case("z", 2);
+}
 
 /// If the value is a threadID return the range [0, workgroupSize-1].
 /// If the number of workgroup is known also return the range of workgroupId ad
@@ -27,15 +31,19 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
     SmallVectorImpl<Value> & /*symbols*/, ArrayRef<int64_t> workgroupCount,
     ArrayRef<int64_t> workgroupSize) {
   if (auto idOp = processorValue.getDefiningOp<gpu::ThreadIdOp>()) {
-    unsigned index = StringSwitch<unsigned>(idOp.dimension())
-                         .Case("x", 0)
-                         .Case("y", 1)
-                         .Case("z", 2);
+    unsigned index = dimToIndex(idOp.dimension());
     OpBuilder b(processorValue.getContext());
     AffineExpr zero = b.getAffineConstantExpr(0);
     AffineExpr ubExpr = b.getAffineConstantExpr(workgroupSize[index]);
     return std::make_pair(zero, ubExpr - 1);
   }
+  if (auto dimOp = processorValue.getDefiningOp<gpu::BlockDimOp>()) {
+    OpBuilder builder(processorValue.getContext());
+    unsigned index = dimToIndex(dimOp.dimension());
+    AffineExpr bound = builder.getAffineConstantExpr(workgroupSize[index]);
+    return std::make_pair(bound, bound);
+  }
+
   if (workgroupCount.empty()) return llvm::None;
 
   if (auto idOp =
@@ -116,9 +124,8 @@ static void removeOneTripTiledLoops(FuncOp funcOp,
 
 namespace {
 
-class LLVMGPURemoveSingleIterationLoopPass
-    : public LLVMGPURemoveSingleIterationLoopBase<
-          LLVMGPURemoveSingleIterationLoopPass> {
+class RemoveSingleIterationLoopPass final
+    : public RemoveSingleIterationLoopBase<RemoveSingleIterationLoopPass> {
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
     auto entryPointOp = getEntryPoint(funcOp);
@@ -132,9 +139,8 @@ class LLVMGPURemoveSingleIterationLoopPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
-createLLVMGPURemoveSingleIterationLoopPass() {
-  return std::make_unique<LLVMGPURemoveSingleIterationLoopPass>();
+std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass() {
+  return std::make_unique<RemoveSingleIterationLoopPass>();
 }
 
 }  // namespace iree_compiler

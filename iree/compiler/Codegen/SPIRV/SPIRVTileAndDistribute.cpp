@@ -65,11 +65,6 @@ static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
   return linalg::LinalgTransformationFilter(matchIds, replaceId);
 }
 
-/// Converts a symbolic GPU processor dimension to its numeric one.
-static unsigned dimToIndex(StringRef dim) {
-  return StringSwitch<unsigned>(dim).Case("x", 0).Case("y", 1).Case("z", 2);
-}
-
 //===----------------------------------------------------------------------===//
 // Invocation tiling patterns
 //===----------------------------------------------------------------------===//
@@ -129,27 +124,6 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
       getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
                                      context)
           .setMatchByDefault());
-}
-
-/// Returns the corresponding range for the given `processorValue` is a GPU
-/// thread id or block dim.
-static Optional<std::pair<AffineExpr, AffineExpr>> getThreadRange(
-    Value processorValue, SmallVectorImpl<Value> & /*dims*/,
-    SmallVectorImpl<Value> & /*symbols*/, ArrayRef<int64_t> workgroupSize) {
-  if (auto idOp = processorValue.getDefiningOp<gpu::ThreadIdOp>()) {
-    OpBuilder builder(processorValue.getContext());
-    unsigned index = dimToIndex(idOp.dimension());
-    AffineExpr zero = builder.getAffineConstantExpr(0);
-    AffineExpr ubExpr = builder.getAffineConstantExpr(workgroupSize[index]);
-    return std::make_pair(zero, ubExpr - 1);
-  }
-  if (auto dimOp = processorValue.getDefiningOp<gpu::BlockDimOp>()) {
-    OpBuilder builder(processorValue.getContext());
-    unsigned index = dimToIndex(dimOp.dimension());
-    AffineExpr bound = builder.getAffineConstantExpr(workgroupSize[index]);
-    return std::make_pair(bound, bound);
-  }
-  return llvm::None;
 }
 
 //====---------------------------------------------------------------------===//
@@ -231,34 +205,6 @@ void SPIRVTileAndDistributePass::runOnOperation() {
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tiling canonicalization ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  {
-    RewritePatternSet canonicalizationPatterns(context);
-
-    // Add patterns to remove trip-one loops created during cyclic loop
-    // distribution, if we can prove the tiling was perfect.
-    SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
-    if (workgroupSize.empty()) {
-      entryPointOp.emitError("expected to have workgroup_size attribute");
-      return signalPassFailure();
-    }
-    auto getThreadRangeFn = [workgroupSize](Value processorValue,
-                                            SmallVectorImpl<Value> &dims,
-                                            SmallVectorImpl<Value> &symbols) {
-      return getThreadRange(processorValue, dims, symbols, workgroupSize);
-    };
-    populateRemoveSingleIterationLoopPattern(canonicalizationPatterns,
-                                             getThreadRangeFn);
-
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(canonicalizationPatterns));
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After loop canonicalization ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
