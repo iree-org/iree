@@ -127,8 +127,10 @@ namespace {
 // it must synchronize itself.
 class CustomModuleState final {
  public:
-  explicit CustomModuleState(iree_allocator_t allocator)
-      : allocator_(allocator) {}
+  explicit CustomModuleState(iree_allocator_t host_allocator,
+                             vm::ref<iree_hal_allocator_t> device_allocator)
+      : host_allocator_(host_allocator),
+        device_allocator_(std::move(device_allocator)) {}
   ~CustomModuleState() = default;
 
   Status Initialize(int32_t unique_id) {
@@ -136,13 +138,7 @@ class CustomModuleState final {
     auto str_buffer = "ctx_" + std::to_string(unique_id);
     IREE_RETURN_IF_ERROR(
         iree_custom_message_create(iree_make_cstring_view(str_buffer.c_str()),
-                                   allocator_, &unique_message_));
-
-    // Setup a host-local allocator we can use because this sample doesn't have
-    // a real device allocator.
-    IREE_RETURN_IF_ERROR(
-        iree_hal_allocator_create_heap(iree_make_cstring_view("host_local"),
-                                       allocator_, &host_local_allocator_));
+                                   host_allocator_, &unique_message_));
 
     return OkStatus();
   }
@@ -166,7 +162,7 @@ class CustomModuleState final {
     vm::ref<iree_custom_message_t> message;
     IREE_RETURN_IF_ERROR(iree_custom_message_create(
         iree_string_view_t{string_value.data(), string_value.size()},
-        iree_allocator_system(), &message));
+        host_allocator_, &message));
     return std::move(message);
   }
 
@@ -176,7 +172,7 @@ class CustomModuleState final {
     // Convert the [shape]x[type]=[contents] string to a buffer view.
     vm::ref<iree_hal_buffer_view_t> buffer_view;
     IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_parse(message->value, host_local_allocator_.get(),
+        iree_hal_buffer_view_parse(message->value, device_allocator_.get(),
                                    &buffer_view),
         "parsing value '%.*s'", (int)message->value.size, message->value.data);
     return std::move(buffer_view);
@@ -216,12 +212,12 @@ class CustomModuleState final {
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
-  iree_allocator_t allocator_ = iree_allocator_system();
+  iree_allocator_t host_allocator_ = iree_allocator_system();
 
   // HAL buffer allocator that uses host-local memory. This is just for this
   // test as we don't actually use a HAL device and don't have a real device
   // allocator to use.
-  vm::ref<iree_hal_allocator_t> host_local_allocator_;
+  vm::ref<iree_hal_allocator_t> device_allocator_;
 
   // A unique message owned by the state and returned to the VM.
   // This demonstrates any arbitrary per-context state one may want to store.
@@ -254,7 +250,8 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
 
   // Example of global initialization (shared across all contexts), such as
   // loading native libraries or creating shared pools.
-  Status Initialize() {
+  Status Initialize(iree_hal_allocator_t* device_allocator) {
+    device_allocator_ = vm::retain_ref(device_allocator);
     next_unique_id_ = 0;
     return OkStatus();
   }
@@ -262,13 +259,17 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
   // Creates per-context state when the module is added to a new context.
   // May be called from any thread.
   StatusOr<std::unique_ptr<CustomModuleState>> CreateState(
-      iree_allocator_t allocator) override {
-    auto state = std::make_unique<CustomModuleState>(allocator);
+      iree_allocator_t host_allocator) override {
+    auto state = std::make_unique<CustomModuleState>(
+        host_allocator, vm::retain_ref(device_allocator_));
     IREE_RETURN_IF_ERROR(state->Initialize(next_unique_id_++));
     return state;
   }
 
  private:
+  // Used for any HAL buffer allocations we need to make.
+  vm::ref<iree_hal_allocator_t> device_allocator_;
+
   // The next ID to allocate for states that will be used to form the
   // per-context unique message. This shows state at the module level. Note that
   // this must be thread-safe.
@@ -280,14 +281,15 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
 // Note that while we are using C++ bindings internally we still expose the
 // module as a C instance. This hides the details of our implementation.
 extern "C" iree_status_t iree_custom_native_module_create(
-    iree_allocator_t allocator, iree_vm_module_t** out_module) {
+    iree_allocator_t host_allocator, iree_hal_allocator_t* device_allocator,
+    iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CustomModule>(
-      "custom", allocator,
+      "custom", host_allocator,
       iree::span<const vm::NativeFunction<CustomModuleState>>(
           kCustomModuleFunctions));
-  IREE_RETURN_IF_ERROR(module->Initialize());
+  IREE_RETURN_IF_ERROR(module->Initialize(device_allocator));
   *out_module = module.release()->interface();
   return iree_ok_status();
 }
