@@ -77,7 +77,7 @@ class CombineInitializersPass
             << "failed to inline into combined initializer";
         return signalPassFailure();
       }
-      builder.setInsertionPointToEnd(builder.getInsertionBlock());
+      builder.setInsertionPointToEnd(&newOp.back());
       initializerOp.erase();
     }
     builder.create<IREE::Util::InitializerReturnOp>(fusedLoc);

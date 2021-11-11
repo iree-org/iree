@@ -246,7 +246,13 @@ class SimplifyGlobalAccessesPass
     assert(moduleOp && "func not in a module");
 
     // Build a set of all immutable globals for fast lookup.
-    auto immutableGlobals = gatherImmutableGlobals(moduleOp);
+    // We only do this if we are in a normal function - if we are in an
+    // initializer we can't rely on the mutability of globals as we ourselves
+    // may be initializing them.
+    DenseSet<StringRef> immutableGlobals;
+    if (!isa<IREE::Util::InitializerOp>(callableOp)) {
+      immutableGlobals = gatherImmutableGlobals(moduleOp);
+    }
 
     // Hoist immutable globals first. These have no hazards and don't care
     // about control flow - like `constant` - so getting them handled first

@@ -66,7 +66,7 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
   void handleTerminator(Operation *op, Block *newDest) const final {
     auto returnOp = dyn_cast<IREE::Util::InitializerReturnOp>(op);
     if (!returnOp) return;
-    // util.initialize.return takes no args.
+    // util.initialize.return takes no args - just branch to the new block.
     OpBuilder builder(op);
     builder.create<mlir::BranchOp>(op->getLoc(), newDest, ValueRange{});
     op->erase();
