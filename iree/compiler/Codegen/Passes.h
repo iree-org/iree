@@ -42,9 +42,8 @@ void addLinalgBufferizePasses(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    linalg::AllocationCallbacks allocationFn = linalg::AllocationCallbacks(
-        linalg::defaultAllocationFn, linalg::defaultDeallocationFn,
-        linalg::defaultMemCpyFn));
+    linalg::comprehensive_bufferize::AllocationCallbacks allocationFn =
+        linalg::comprehensive_bufferize::AllocationCallbacks());
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -79,9 +78,8 @@ std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    linalg::AllocationCallbacks = linalg::AllocationCallbacks(
-        linalg::defaultAllocationFn, linalg::defaultDeallocationFn,
-        linalg::defaultMemCpyFn));
+    linalg::comprehensive_bufferize::AllocationCallbacks =
+        linalg::comprehensive_bufferize::AllocationCallbacks());
 
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();

@@ -29,6 +29,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -67,19 +68,21 @@ class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
   explicit IREEComprehensiveBufferizePass(
-      linalg::AllocationCallbacks allocationFn)
+      linalg::comprehensive_bufferize::AllocationCallbacks allocationFn)
       : allocationFn(allocationFn) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
                     linalg::LinalgDialect, memref::MemRefDialect,
                     scf::SCFDialect, StandardOpsDialect, tensor::TensorDialect,
                     vector::VectorDialect>();
-    linalg::registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::
+        registerBufferizableOpInterfaceExternalModels(registry);
   }
   void runOnOperation() override;
 
  private:
-  linalg::AllocationCallbacks allocationFn;
+  linalg::comprehensive_bufferize::AllocationCallbacks allocationFn;
 };
 }  // namespace
 
@@ -107,7 +110,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
     // 1. First go over all hal.interface.binding.subspan ops and create
     // counterparts working with memrefs.
     BlockAndValueMapping bvm, tensorLoads;
-    linalg::BufferizationAliasInfo aliasInfo(funcOp);
+    linalg::comprehensive_bufferize::BufferizationAliasInfo aliasInfo(funcOp);
     // These are used until late, erase on scoped exit.
     SmallVector<Operation *> toEraseLate;
     auto scopeGuard = llvm::make_scope_exit([&]() {
@@ -204,14 +207,16 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 
     // 4. Perform inplaceability analysis of `ops`.
     if (opsSelected.wasInterrupted() ||
-        failed(linalg::inPlaceAnalysis(ops, aliasInfo, domInfo))) {
+        failed(linalg::comprehensive_bufferize::inPlaceAnalysis(ops, aliasInfo,
+                                                                domInfo))) {
       return signalPassFailure();
     }
 
     // 5. Perform bufferization.
     for (Operation *op : ops) {
-      if (failed(linalg::bufferizeOp(op, bvm, aliasInfo, allocationFn,
-                                     /*bufferizedFunctionTypes=*/nullptr))) {
+      if (failed(linalg::comprehensive_bufferize::bufferizeOp(
+              op, bvm, aliasInfo, allocationFn,
+              /*bufferizedFunctionTypes=*/nullptr))) {
         return signalPassFailure();
       }
     }
@@ -228,12 +233,13 @@ static Value defaultAllocationFn(OpBuilder &builder, Location loc,
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    linalg::AllocationCallbacks allocationFns) {
+    linalg::comprehensive_bufferize::AllocationCallbacks allocationFns) {
   return std::make_unique<IREEComprehensiveBufferizePass>(allocationFns);
 }
 
 void addIREEComprehensiveBufferizePasses(
-    OpPassManager &passManager, linalg::AllocationCallbacks allocationFns) {
+    OpPassManager &passManager,
+    linalg::comprehensive_bufferize::AllocationCallbacks allocationFns) {
   passManager.addPass(createIREEComprehensiveBufferizePass(allocationFns));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
