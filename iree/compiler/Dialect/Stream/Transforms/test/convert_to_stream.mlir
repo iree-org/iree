@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-conversion %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -allow-unregistered-dialect -iree-stream-conversion %s | IreeFileCheck %s
 
 // CHECK: stream.executable private @executable
 flow.executable private @executable {
@@ -47,6 +47,24 @@ func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.a
   %2 = hal.tensor.cast %1 : tensor<?xf32>{%dim0} -> !hal.buffer_view
   // CHECK: return %[[RET0_EXPORT]] : !hal.buffer_view
   return %2 : !hal.buffer_view
+}
+
+// -----
+
+// Tests that ops consuming/producing tensors in other dialects pass through ok.
+
+// CHECK-LABEL: @custom_ops
+// CHECK-SAME: (%[[ARG:.+]]: !stream.resource<*>, %[[ARG_SIZE:.+]]: index) -> (!stream.resource<*>, index)
+func @custom_ops(%arg0: tensor<4x8xf32>) -> tensor<8x4xf32> {
+  // CHECK: %[[ARG_EXTERNAL:.+]] = stream.async.transfer %[[ARG]]
+  // CHECK: %[[ARG_TENSOR:.+]] = stream.tensor.export %[[ARG_EXTERNAL]]
+  // CHECK: %[[RET_TENSOR:.+]] = "some.op"(%[[ARG_TENSOR]]) : (tensor<4x8xf32>) -> tensor<8x4xf32>
+  %0 = "some.op"(%arg0) : (tensor<4x8xf32>) -> tensor<8x4xf32>
+  // CHECK: %[[RET_SIZE:.+]] = stream.tensor.sizeof tensor<8x4xf32>
+  // CHECK: %[[RET_EXTERNAL:.+]] = stream.tensor.import %[[RET_TENSOR]]
+  // CHECK: %[[RET:.+]] = stream.async.transfer %[[RET_EXTERNAL]]
+  // CHECK: return %[[RET]], %[[RET_SIZE]] : !stream.resource<*>, index
+  return %0 : tensor<8x4xf32>
 }
 
 // -----
