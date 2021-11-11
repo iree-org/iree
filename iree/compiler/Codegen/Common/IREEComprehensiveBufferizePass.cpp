@@ -219,13 +219,12 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
     }
 
     // 5. Perform bufferization.
-    for (Operation *op : ops) {
+    linalg::comprehensive_bufferize::BufferizationState state(
+        aliasInfo, *allocationFn, bvm);
+    for (Operation *op : ops)
       if (failed(linalg::comprehensive_bufferize::bufferizeOp(
-              op, bvm, aliasInfo, *allocationFn,
-              /*bufferizedFunctionTypes=*/nullptr))) {
+              op, state, /*bufferizedFunctionTypes=*/nullptr)))
         return signalPassFailure();
-      }
-    }
   }
 }
 
