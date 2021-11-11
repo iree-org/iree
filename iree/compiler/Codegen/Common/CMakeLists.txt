@@ -40,6 +40,7 @@ iree_cc_library(
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithmetic
+    MLIRBufferizableOpInterface
     MLIRComprehensiveBufferize
     MLIRGPUOps
     MLIRIR
