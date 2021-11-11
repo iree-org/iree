@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRSupport
+    iree::compiler::Codegen::Dialect::ProcessorOpInterfaces
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR

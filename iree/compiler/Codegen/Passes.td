@@ -33,6 +33,12 @@ def FlattenMemRefSubspan :
   let constructor = "mlir::iree_compiler::createFlattenMemRefSubspanPass()";
 }
 
+def FoldAffineMinInDistributedLoops :
+  Pass<"iree-codegen-fold-affinemin-in-distributed-loops", "FuncOp"> {
+  let summary = "Fold `affine.min` ops in distributed loops";
+  let constructor = "mlir::iree_compiler::createFoldAffineMinInDistributedLoopsPass()";
+}
+
 def FoldTensorExtractOp :
   Pass<"iree-codegen-fold-tensor-extract-op", ""> {
   let summary = "Fold `tensor.extract` operations prior to lowering to LLVM";
@@ -217,13 +223,6 @@ def LLVMGPUPipelining :
 def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   let summary = "Perform the final conversion to SPIR-V dialect";
   let constructor = "mlir::iree_compiler::createConvertToSPIRVPass()";
-}
-
-// TODO: Rename argument to be fully qualified.
-def SPIRVFoldProcessorIDUses :
-    Pass<"iree-spirv-fold-gpu-procid-uses", "FuncOp"> {
-  let summary = "Fold GPU processor ID uses where possible";
-  let constructor = "mlir::iree_compiler::createSPIRVFoldProcessorIDUsesPass()";
 }
 
 def SPIRVLowerExecutableTarget :

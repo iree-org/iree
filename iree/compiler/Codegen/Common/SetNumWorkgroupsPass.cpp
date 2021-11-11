@@ -11,8 +11,11 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-codegen-set-num-workgroups"
 
 static const unsigned kNumMaxParallelDims = 3;
 
@@ -106,7 +109,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
 
     // The workgroup count region might already be set by op-specific
     // configuration logic. If so, just return to avoid overwriting that.
-    if (!entryPointOp.workgroup_count_region().empty()) return;
+    if (!entryPointOp.workgroup_count_region().empty()) continue;
 
     WorkgroupCountRegionBuilder regionBuilder;
     if (currWorkloadPerWorkgroup.empty()) {

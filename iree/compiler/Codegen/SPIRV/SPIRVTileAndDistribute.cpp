@@ -224,12 +224,20 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
 
-    populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
+    populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
 
-    // Add patterns to fold affine.min ops created for convolution input
-    // subtensor/subview sizes. They have the affine map of
-    // (d0) -> (<tile-size>, <dim-size> - d0 * <stride>)>(%<processor-id>)`.
-    populateFoldGPUProcessorIDUsesPatterns(context, canonicalizationPatterns);
+    (void)applyPatternsAndFoldGreedily(funcOp,
+                                       std::move(canonicalizationPatterns));
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tiling canonicalization ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
+
+  {
+    RewritePatternSet canonicalizationPatterns(context);
 
     // Add patterns to remove trip-one loops created during cyclic loop
     // distribution, if we can prove the tiling was perfect.
@@ -250,7 +258,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
                                        std::move(canonicalizationPatterns));
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After loop/affine canonicalization ---\n";
+      llvm::dbgs() << "--- After loop canonicalization ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });

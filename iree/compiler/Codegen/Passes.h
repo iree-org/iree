@@ -59,6 +59,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
 /// backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
+/// Creates a pass to to fold `affine.min` ops in tiled and distributed loops.
+std::unique_ptr<OperationPass<FuncOp>>
+createFoldAffineMinInDistributedLoopsPass();
+
 /// After running the upstream TensorConstantBufferize pass, remove tensor_loads
 /// introduced for use only in tensor_extract. These can be folded to use a load
 /// of the created memref object that holds the constant values.
@@ -100,6 +104,11 @@ createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
+
+/// Populates `patterns` with patterns to fold `affine.min` ops in tiled and
+/// distributed loops.
+void populateFoldAffineMinInDistributedLoopsPatterns(
+    RewritePatternSet &patterns);
 
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on
@@ -313,15 +322,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 /// size.
 /// TODO: Are both of these needed and does this one still work on HLO?
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
-
-//----------------------------------------------------------------------------//
-// SPIRV Codegen specific patterns.
-//----------------------------------------------------------------------------//
-
-/// Populates patterns to fold processor ID uses by using processor counts
-/// information where possible.
-void populateFoldGPUProcessorIDUsesPatterns(MLIRContext *context,
-                                            OwningRewritePatternList &patterns);
 
 //------------------------------------------------------------------------------
 // Test passes

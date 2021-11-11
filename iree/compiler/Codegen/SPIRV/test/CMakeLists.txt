@@ -23,7 +23,6 @@ iree_lit_test_suite(
     "config_mali_matmul.mlir"
     "config_nvidia_matmul_cooperative_ops.mlir"
     "convert_to_spirv.mlir"
-    "fold_gpu_procid_uses.mlir"
     "pipeline_matmul_cooperative_ops.mlir"
     "pipeline_matmul_vectorization.mlir"
     "remove_one_trip_tiled_loop.mlir"
