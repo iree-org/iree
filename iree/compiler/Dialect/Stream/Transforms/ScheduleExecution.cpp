@@ -51,16 +51,14 @@ struct ExecutePartitionBuilder {
     auto fusedLoc = FusedLoc::get(context, locs);
 
     // Find the insertion point in the parent block.
-    // This is at the last op defining an input as all inputs must be available.
+    // This is at the last op in the partition.
     Operation *insertionPt = nullptr;
-    for (auto in : partition->ins) {
-      auto *definingOp = in.getDefiningOp();
-      if (!definingOp) continue;
-      if (definingOp->getBlock() != parentBlock) continue;
+    for (auto *op : partition->ops) {
+      if (op->getBlock() != parentBlock) continue;
       if (!insertionPt) {
-        insertionPt = definingOp;  // first defining op
-      } else if (insertionPt->isBeforeInBlock(definingOp)) {
-        insertionPt = definingOp;  // moving insertion point down
+        insertionPt = op;  // first defining op
+      } else if (insertionPt->isBeforeInBlock(op)) {
+        insertionPt = op;  // moving insertion point down
       }
     }
     OpBuilder parentBuilder(context);

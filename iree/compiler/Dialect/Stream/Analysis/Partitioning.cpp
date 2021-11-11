@@ -30,7 +30,7 @@ void dumpPartition(Partition &partition, AsmState &state) {
     out.printAsOperand(llvm::dbgs(), state);
   });
   llvm::dbgs() << "\n OPS:\n";
-  for (auto *op : partition.ops) {
+  for (auto *op : llvm::reverse(partition.ops)) {
     llvm::dbgs() << "  ";
     op->print(llvm::dbgs(), state);
     llvm::dbgs() << "\n";
