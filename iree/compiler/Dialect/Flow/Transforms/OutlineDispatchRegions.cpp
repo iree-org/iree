@@ -91,7 +91,9 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
       auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
           regionOp.getLoc(), result, builder);
       resultDynamicDims.append(dynamicDims);
-      newOperands.append(dynamicDims);
+      if (!regionOp.getTiedResultOperand(result)) {
+        newOperands.append(dynamicDims);
+      }
     }
   }
 
