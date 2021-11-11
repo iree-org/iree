@@ -59,6 +59,7 @@ iree_check_single_backend_test_suite(
             "pad.mlir",
             "pow.mlir",
             "reduce.mlir",
+            "reduce_window.mlir",
             "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
@@ -80,7 +81,6 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "reduce_window.mlir",  # TODO(#7564): re-enable the test.
             "round.mlir",
         ],
     ),
