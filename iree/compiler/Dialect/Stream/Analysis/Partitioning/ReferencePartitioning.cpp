@@ -34,6 +34,7 @@ PartitionSet partitionStreamableOpsReference(
     SetVector<Operation *> ops;
   };
   SmallVector<std::unique_ptr<PartitionBuilder>> builders;
+  llvm::BitVector usableBuilders;
 
   struct OpInfo {
     // Which partitions the op is contained within.
@@ -49,6 +50,18 @@ PartitionSet partitionStreamableOpsReference(
     if (op.hasTrait<OpTrait::ConstantLike>()) {
       LLVM_DEBUG(llvm::dbgs() << "(ignoring constant)\n");
       continue;
+    } else if (!isa<IREE::Stream::StreamableOpInterface>(op)) {
+      // Not a streamable op. If it has side-effects then we force a hazard on
+      // all builders so that we don't move ops across it.
+      if (!mlir::wouldOpBeTriviallyDead(&op)) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "Side-effecting op forcing flush and freeze:\n";
+          op.dump();
+        });
+        usableBuilders.reset();
+        continue;
+      }
+      // Even though not a streamable op we still want to track it below.
     }
 
     // Initialize op info for this op - whether streamable or not. We track
@@ -93,6 +106,7 @@ PartitionSet partitionStreamableOpsReference(
     llvm::BitVector candidates(builders.size(), /*t=*/true);
     candidates ^= opInfo.hazards;
     candidates |= consumers;
+    candidates &= usableBuilders;
 
     // Prune candidates that do not have a compatible affinity.
     for (auto ordinal : candidates.set_bits()) {
@@ -161,6 +175,7 @@ PartitionSet partitionStreamableOpsReference(
     LLVM_DEBUG(llvm::dbgs()
                << "Created partition " << builder->ordinal << "\n");
     builders.push_back(std::move(builder));
+    usableBuilders.resize(builders.size(), /*t=*/true);
   }
 
   // Emit partitions in forward order (as they are topologically sorted in
