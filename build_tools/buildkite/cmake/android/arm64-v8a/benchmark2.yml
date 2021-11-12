@@ -41,7 +41,7 @@ steps:
     artifact_paths:
       - "benchmark-results-pixel-4-${BUILDKITE_BUILD_NUMBER}.json"
       - "trace-captures-pixel-4-${BUILDKITE_BUILD_NUMBER}.tgz"
-    timeout_in_minutes: "40"
+    timeout_in_minutes: "60"
 
   - label: "Benchmark on Galaxy S20 (exynos-990, mali-g77)"
     commands:
@@ -61,7 +61,7 @@ steps:
     artifact_paths:
       - "benchmark-results-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.json"
       - "trace-captures-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.tgz"
-    timeout_in_minutes: "40"
+    timeout_in_minutes: "60"
 
   - wait
 
