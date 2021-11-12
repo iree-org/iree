@@ -76,14 +76,15 @@ hal.executable @conv_112x112x512 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 1, 8, 256], [0, 1, 8, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [256, 8, 1]>
+//  CHECK-DAG: #[[MAP_X:.+]] = affine_map<()[s0] -> (s0 ceildiv 256)
+//  CHECK-DAG: #[[MAP_Y:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //      CHECK: hal.executable.entry_point public @conv_112x112x512
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[C2:.+]] = arith.constant 2 : index
-// CHECK-NEXT:   %[[C14:.+]] = arith.constant 14 : index
-// CHECK-NEXT:   %[[C112:.+]] = arith.constant 112 : index
-// CHECK-NEXT:   hal.return %[[C2]], %[[C14]], %[[C112]]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP_X]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP_Y]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z]]
 
 //      CHECK: func @conv_112x112x512()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
@@ -167,14 +168,17 @@ hal.executable @conv_112x112x32 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 16, 32], [0, 4, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 16, 4]>
+//  CHECK-DAG: #[[MAP_X:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)
+//  CHECK-DAG: #[[MAP_Y:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+//  CHECK-DAG: #[[MAP_Z:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
 //      CHECK: hal.executable.entry_point public @conv_112x112x32
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-NEXT:   %[[C7:.+]] = arith.constant 7 : index
-// CHECK-NEXT:   %[[C28:.+]] = arith.constant 28 : index
-// CHECK-NEXT:   hal.return %[[C1]], %[[C7]], %[[C28]]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP_X]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP_Y]]()[%[[Y]]]
+// CHECK-NEXT:   %[[Z_COUNT:.+]] = affine.apply #[[MAP_Z]]()[%[[Z]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z_COUNT]]
 
 //      CHECK: func @conv_112x112x32()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
@@ -257,13 +261,16 @@ hal.executable @conv_16x16x16 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 8, 8, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 8, 8]>
+//  CHECK-DAG: #[[MAP_X:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)
+//  CHECK-DAG: #[[MAP_YZ:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //      CHECK: hal.executable.entry_point public @conv_16x16x16
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-NEXT:   %[[C2:.+]] = arith.constant 2 : index
-// CHECK-NEXT:   hal.return %[[C1]], %[[C2]], %[[C2]]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP_X]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP_YZ]]()[%[[Y]]]
+// CHECK-NEXT:   %[[Z_COUNT:.+]] = affine.apply #[[MAP_YZ]]()[%[[Z]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z_COUNT]]
 
 //      CHECK: func @conv_16x16x16()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
@@ -348,13 +355,16 @@ hal.executable @dwconv_28x28x144 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
+//  CHECK-DAG: #[[MAP_X:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)
+//  CHECK-DAG: #[[MAP_YZ:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
 //      CHECK: hal.executable.entry_point public @dwconv_28x28x144
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[C9:.+]] = arith.constant 9 : index
-// CHECK-NEXT:   %[[C7:.+]] = arith.constant 7 : index
-// CHECK-NEXT:   hal.return %[[C9]], %[[C7]], %[[C7]]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP_X]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP_YZ]]()[%[[Y]]]
+// CHECK-NEXT:   %[[Z_COUNT:.+]] = affine.apply #[[MAP_YZ]]()[%[[Z]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z_COUNT]]
 
 //      CHECK: func @dwconv_28x28x144()
 //      CHECK:   linalg.depthwise_conv2D_nhw
@@ -438,12 +448,16 @@ hal.executable @dwconv_4x4x8 {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 4, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [8, 4, 4]>
+//  CHECK-DAG: #[[MAP_X:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)
+//  CHECK-DAG: #[[MAP_YZ:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
 //      CHECK: hal.executable.entry_point public @dwconv_4x4x8
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 4 : index, 4 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-NEXT:   hal.return %[[C1]], %[[C1]], %[[C1]]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP_X]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP_YZ]]()[%[[Y]]]
+// CHECK-NEXT:   %[[Z_COUNT:.+]] = affine.apply #[[MAP_YZ]]()[%[[Z]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z_COUNT]]
 
 //      CHECK: func @dwconv_4x4x8()
 //      CHECK:   linalg.depthwise_conv2D_nhw

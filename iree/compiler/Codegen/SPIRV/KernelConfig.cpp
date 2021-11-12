@@ -31,28 +31,6 @@ namespace iree_compiler {
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
 
-/// Lets the entry point region to return fully static number of workgroups.
-// This is needed for folding `affine.min` ops to expose static-shaped tiled
-// convolution for vectorization.
-// TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
-static LogicalResult defineConvWorkgroupCountRegion(
-    Operation *op, ArrayRef<int64_t> outputShape,
-    ArrayRef<int64_t> workgroupTileSizes) {
-  auto numWorkgroupsFn = [&](OpBuilder &b, Location loc, std::array<Value, 3>) {
-    std::array<Value, 3> xyz;
-    for (unsigned i = 0; i < 3; ++i) {
-      int64_t count = outputShape[i] / workgroupTileSizes[i];
-      // This is meant for perfectly tilable cases. Double check that.
-      assert(outputShape[i] % workgroupTileSizes[i] == 0 && count != 0);
-      xyz[2 - i] = b.create<arith::ConstantIndexOp>(loc, count);
-    }
-    return xyz;
-  };
-  OpBuilder builder(op->getContext());
-  return defineWorkgroupCountRegion(builder, op->getParentOfType<FuncOp>(),
-                                    numWorkgroupsFn);
-}
-
 namespace detail {
 
 LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
@@ -166,13 +144,8 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   }
 
   auto funcOp = linalgOp->getParentOfType<FuncOp>();
-  if (failed(setOpConfigAndEntryPointFnTranslation(
-          funcOp, linalgOp, tileSizes, {}, pipeline, workgroupSize))) {
-    return failure();
-  }
-  return defineConvWorkgroupCountRegion(
-      linalgOp, llvm::makeArrayRef(outputShape).drop_front(),
-      llvm::makeArrayRef(workgroupTileSizes).drop_front());
+  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes, {},
+                                               pipeline, workgroupSize);
 }
 
 }  // namespace detail
