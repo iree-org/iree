@@ -64,15 +64,14 @@ set(POSENET_FP32_MODULE
 #                                                                              #
 # Each suite benchmarks a list of modules with configurations specifying a     #
 # target architecture and runtime characteristics (e.g. threads/cores). These  #
-# benchmarks only configure IREE translation and runtime flags for these       #
-# purposes target architecture and do *not* include any non-default flags. No  #
-# non-default flags should be added here.                                      #
+# benchmarks only configure IREE translation and runtime flags for the target  #
+# architecture and do *not* include any non-default flags. No non-default      #
+# flags should be added here.                                                  #
 #                                                                              #
 ################################################################################
 
 set(ANDROID_CPU_TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29")
+    ${ANDROID_CPU_TRANSLATION_FLAGS})
 
 # CPU, Dylib-Sync, big/little-core, full-inference
 iree_benchmark_suite(
@@ -89,7 +88,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "${ANDROID_CPU_TRANSLATION_FLAGS}"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
   DRIVER
     "dylib-sync"
 )
@@ -109,7 +108,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "${ANDROID_CPU_TRANSLATION_FLAGS}"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -130,7 +129,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "${ANDROID_CPU_TRANSLATION_FLAGS}"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -150,7 +149,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "${ANDROID_CPU_TRANSLATION_FLAGS}"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -170,13 +169,32 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "${ANDROID_CPU_TRANSLATION_FLAGS}"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
   DRIVER
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
 
+# GPU, Vulkan, Adreno, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference,default-flags"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Adreno"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=adreno-unknown-android11"
+  DRIVER
+    "vulkan"
+)
 
 # GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
@@ -229,8 +247,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
@@ -252,8 +269,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
@@ -276,8 +292,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
@@ -299,8 +314,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
@@ -322,8 +336,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
