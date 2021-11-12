@@ -1184,7 +1184,8 @@ struct AsyncCopyFullSourceToUpdate : public OpRewritePattern<AsyncCopyOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncCopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
-    if (copyOp.source_end() == copyOp.source_size()) {
+    if (copyOp.source_end() == copyOp.source_size() &&
+        copyOp.length() == copyOp.source_size()) {
       rewriter.replaceOpWithNewOp<IREE::Stream::AsyncUpdateOp>(
           copyOp, copyOp.result().getType(), copyOp.target(),
           copyOp.target_size(), copyOp.target_offset(), copyOp.target_end(),
