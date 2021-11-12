@@ -175,7 +175,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
         vectorSize = 1;
         break;
       }
-      ArrayRef<int64_t> shape = getUntiledResultShape(
+      SmallVector<int64_t> shape = getUntiledResultShape(
           cast<linalg::LinalgOp>(op), outputOperand.index());
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         vectorSize = 1;

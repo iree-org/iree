@@ -33,6 +33,20 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
 //===----------------------------------------------------------------------===//
+// Utility functions to get untiled op shapes
+//===----------------------------------------------------------------------===//
+
+/// Returns the untiled type of a tiled view for both tensor and memref
+/// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
+/// extract/load op chain (for tensors).
+ArrayRef<int64_t> getUntiledShape(Value tiledView);
+
+/// Returns the untiled result shape for the given Linalg `op` by inspecting
+/// the subview chain or the tiled and distributed loop nests around it.
+SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
+                                           unsigned resultNum);
+
+//===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
 
@@ -41,22 +55,6 @@ IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 /// Note that this is the same method that is used at the Flow dispatch region
 /// formation to tile and distribute the ops.
 SmallVector<unsigned> getPartitionedLoops(Operation *op);
-
-/// Returns the untiled type of a tiled view for both tensor and memref
-/// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
-/// `subtensor` op chain (for tensors).
-Type getUntiledType(Value tiledView);
-
-/// Returns the untiled type of a tiled view for both tensor and memref
-/// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
-/// `subtensor` op chain (for tensors).
-ArrayRef<int64_t> getUntiledShape(Value tiledView);
-
-/// Returns the shape of the result of the untiled operation for
-/// `LinalgOp`s. First looks at definitions of the corresponding `outs`
-/// operands. If that fails, then looks at uses of the `result`.
-ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
-                                        unsigned resultNum);
 
 /// Information about a tiled and distributed loop.
 ///

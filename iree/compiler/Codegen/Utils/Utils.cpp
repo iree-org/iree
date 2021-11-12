@@ -26,7 +26,7 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Utility functions to get entry point(s)
+// Utility functions to get entry points
 //===----------------------------------------------------------------------===//
 
 bool isEntryPoint(FuncOp func) { return func.isPublic(); }
@@ -52,7 +52,7 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 }
 
 //===----------------------------------------------------------------------===//
-// Utility functions used in setting default configurations.
+// Utility functions to get untiled op shapes
 //===----------------------------------------------------------------------===//
 
 SmallVector<unsigned> getPartitionedLoops(Operation *op) {
@@ -102,49 +102,56 @@ static Value getViewSource(Value view) {
   return view;
 }
 
-Type getUntiledType(Value tiledView) {
-  Value viewSource = getViewSource(tiledView);
-  return viewSource.getType();
-}
-
 ArrayRef<int64_t> getUntiledShape(Value tiledView) {
-  auto type = getUntiledType(tiledView);
+  auto type = getViewSource(tiledView).getType();
   return TypeSwitch<Type, ArrayRef<int64_t>>(type)
       .Case<ShapedType, IREE::Flow::DispatchTensorType>(
           [&](auto shapedType) { return shapedType.getShape(); })
       .Default([&](Type type) { return ArrayRef<int64_t>{}; });
 }
 
-/// Returns the untiled shape of the output of a `LinalgOp`.
 // TODO(ravishankarm): Using the result shape for vectorization should be
 // avoided. Ideally the tile size is enough. But there is a phase ordering issue
 // which prevents the tile size from being known at this point.
-ArrayRef<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
-                                        unsigned resultNum) {
-  // Check the shape of the `outs` operand.
-  auto outputShape = getUntiledShape(linalgOp.outputs()[resultNum]);
+SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
+                                           unsigned resultNum) {
+  // Get the shape from the `outs` operand.
+  SmallVector<int64_t> outputShape =
+      llvm::to_vector<4>(getUntiledShape(linalgOp.outputs()[resultNum]));
+
+  // If this is already fully static, it means we didn't tile it at the flow
+  // level at all; just return.
   if (llvm::none_of(outputShape, ShapedType::isDynamic)) return outputShape;
 
-  // For Linalg ops with buffer semantics, there won't exist op results and
-  // hence IR users. Also directly return.
+  // For Linalg ops with buffer semantics, subview chains should give us enough
+  // information; also directly return.
   if (linalgOp.hasBufferSemantics()) return outputShape;
 
-  // Try to use the result value and check if the untiled shape can be obtained
-  // based on the uses.
-  Value result = linalgOp->getResult(resultNum);
-  for (Operation *user : result.getUsers()) {
-    if (auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(user)) {
-      return storeOp.target()
-          .getType()
-          .cast<IREE::Flow::DispatchTensorType>()
-          .getShape();
+  // For Linalg ops with tensor semantics, we need to correlate how the op
+  // should be tiled and the materialized loop nest. The materialized loops'
+  // upper bounds should be the original dimension size for the corresponding
+  // tiled op shape dimension.
+  auto partitionedLoops = getPartitionedLoops(linalgOp);
+  SmallVector<LoopTilingAndDistributionInfo> loopInfo =
+      getTiledAndDistributedLoopInfo(linalgOp->getParentOfType<FuncOp>());
+  // The number of linalg implicit loops to partition and tiled loops
+  // surrounding the op should match. Otherwise, something is incorrect.
+  assert(partitionedLoops.size() == loopInfo.size());
+
+  for (auto pair : llvm::zip(llvm::reverse(partitionedLoops), loopInfo)) {
+    unsigned loopIndex = std::get<0>(pair);
+    const LoopTilingAndDistributionInfo &loopInfo = std::get<1>(pair);
+    if (Optional<int64_t> attrValue =
+            getConstantIntValue(loopInfo.untiledUpperBound)) {
+      outputShape[loopIndex] = *attrValue;
     }
   }
-  return result.getType().cast<ShapedType>().getShape();
+
+  return outputShape;
 }
 
 //===----------------------------------------------------------------------===//
-// Get the tiled loops in the computation.
+// Utility functions to set configurations
 //===----------------------------------------------------------------------===//
 
 /// Returns the first of `exprs` which is of the type `T`.
