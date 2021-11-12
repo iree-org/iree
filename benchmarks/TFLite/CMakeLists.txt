@@ -513,13 +513,68 @@ iree_benchmark_suite(
     "vulkan"
 )
 
-# GPU, Vulkan, Adreno, kernel-execution
+# GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference,experimental-flags"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+)
+
+iree_benchmark_suite(
+  MODULES
+    "${MOBILEBERT_FP16_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference,experimental-flags"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-flow-demote-f32-to-f16"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+)
+
+# kernel-execution
+
+# Note that for kernel-execution benchmarks batch_size/repeat-count need to be
+# low enough that the whole dispatch completes within an OS-specific timeout.
+# Otherwise you'll get error like:
+# ```
+# INTERNAL; VK_ERROR_DEVICE_LOST; vkQueueSubmit; while invoking native function
+# hal.ex.submit_and_wait; while calling import;
+# ```
+# With current kernel performance and timeouts on Adreno Pixel 4, this means we
+# have no kernel benchmark for the DeepLabV3 Model
+
+# GPU, Vulkan, Adreno, kernel-execution
+iree_benchmark_suite(
+  MODULES
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -541,51 +596,31 @@ iree_benchmark_suite(
     "--batch_size=16"
 )
 
-# GPU, Vulkan, Mali, full-inference
+# 16 is too much for this model and it hits the timeout (so is 12)
 iree_benchmark_suite(
   MODULES
-    "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
-    "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
-    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "full-inference,experimental-flags"
+    "kernel-execution,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
-    "GPU-Mali-Valhall"
+    "GPU-Adreno"
   TRANSLATION_FLAGS
     "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
-    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-vulkan-target-triple=adreno-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-enable-fusion-with-reduction-ops"
+    "--iree-hal-benchmark-dispatch-repeat-count=8"
   DRIVER
     "vulkan"
+  RUNTIME_FLAGS
+    "--batch_size=8"
 )
 
-# GPU, Vulkan, Mali, full-inference
-iree_benchmark_suite(
-  MODULES
-    "${MOBILEBERT_FP16_MODULE}"
-
-  BENCHMARK_MODES
-    "full-inference,experimental-flags"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  TARGET_ARCHITECTURE
-    "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-flow-demote-f32-to-f16"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
-    "--iree-flow-inline-constants-max-byte-length=16"
-    "--iree-enable-fusion-with-reduction-ops"
-  DRIVER
-    "vulkan"
-)
+# TODO: Add kernel-execution config for DEEPLABV3_FP32_MODULE when it can run
+# with at least 8 repetitions.
 
 # GPU, Vulkan, Mali, kernel-execution
 iree_benchmark_suite(
@@ -615,7 +650,6 @@ iree_benchmark_suite(
     "--batch_size=32"
 )
 
-# GPU, Vulkan, Mali, kernel-execution
 iree_benchmark_suite(
   MODULES
     "${MOBILEBERT_FP16_MODULE}"
