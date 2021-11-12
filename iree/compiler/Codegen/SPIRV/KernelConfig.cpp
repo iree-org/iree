@@ -37,7 +37,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                               const int64_t subgroupSize,
                               const int64_t bestTilingFactor) {
   ArrayRef<int64_t> inputShape = getUntiledShape(linalgOp.inputs()[0]);
-  ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
+  SmallVector<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
   if (llvm::any_of(inputShape, ShapedType::isDynamic)) return success();
   if (llvm::any_of(outputShape, ShapedType::isDynamic)) return success();
 
