@@ -99,12 +99,11 @@ static bool materializeTiedOpCOW(IREE::Util::TiedOpInterface tiedOp) {
 
   // Clones each operand that is tied to a result and it may be required.
   OpBuilder builder(tiedOp);
-  unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;
   auto tiedOperandIndices = tiedOp.getTiedResultOperandIndices();
   for (unsigned i = 0; i < tiedOperandIndices.size(); ++i) {
     int64_t operandIdx = tiedOperandIndices[i];
     if (operandIdx == IREE::Util::TiedOpInterface::kUntiedIndex) continue;
-    auto &operand = tiedOp->getOpOperand(tiedOperandsOffset + operandIdx);
+    auto &operand = tiedOp->getOpOperand(operandIdx);
     didChange =
         materializeOperandCOW(tiedOp.getLoc(), operand, affinity, builder) ||
         didChange;

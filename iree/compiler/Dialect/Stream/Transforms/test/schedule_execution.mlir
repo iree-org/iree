@@ -102,3 +102,42 @@ func @deviceHostDevice() -> !stream.resource<transient> {
   // CHECK: return %[[READY_H2D]]
   return %5 : !stream.resource<transient>
 }
+
+// -----
+
+// Tests that partitioning does not hoist ops across asserts.
+
+// CHECK-LABEL: @dontHoistPastAsserts
+func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
+  %c1 = arith.constant 1 : index
+  %c20 = arith.constant 20 : index
+  %c80 = arith.constant 80 : index
+  %c1280 = arith.constant 1280 : index
+  %cst = arith.constant 0x7F800000 : f32
+  %cond_a = arith.constant 0 : i1
+  %cond_b = arith.constant 0 : i1
+
+  // CHECK: stream.async.execute
+  // CHECK-NEXT: stream.async.splat
+  %2 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c1280}
+  // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_0
+  %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%2, %arg1) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %2{%c1280}
+
+  // CHECK: "assert A"
+  assert %cond_a, "assert A"
+
+  // CHECK: stream.async.execute
+  // CHECK-NEXT: stream.async.splat
+  %4 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c20}
+  // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_1
+  %5 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg0, %4) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %4{%c20}
+
+  // CHECK: "assert B"
+  assert %cond_b, "assert B"
+
+  // CHECK: stream.async.execute
+  // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_2
+  %6 = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%3, %5) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+
+  return %6 : !stream.resource<external>
+}

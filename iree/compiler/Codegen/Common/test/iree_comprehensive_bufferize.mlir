@@ -66,12 +66,12 @@ hal.interface private @io  {
 //  CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]] [%[[K]], %[[TILESIZE_X]]]
 //  CHECK-DAG:       %[[ALLOC:.+]] = memref.alloc(%[[TILESIZE_Y]], %[[TILESIZE_X]]) {alignment = 128 : i64}
 //  CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
-//      CHECK:       linalg.copy(%[[INIT_TILE]], %[[ALLOC]])
+//      CHECK:       memref.copy %[[INIT_TILE]], %[[ALLOC]]
 //      CHECK:       linalg.matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
 // CHECK-SAME:           outs(%[[ALLOC]]
 //      CHECK:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
-//      CHECK:       linalg.copy(%[[ALLOC]], %[[RESULT_TILE]])
+//      CHECK:       memref.copy %[[ALLOC]], %[[RESULT_TILE]]
 //      CHECK:       memref.dealloc %[[ALLOC]]
 
 // -----
@@ -146,5 +146,5 @@ hal.interface private @io  {
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
 // CHECK-SAME:           outs(%[[ALLOC]]
 //  CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
-//      CHECK:       linalg.copy(%[[ALLOC]], %[[RESULT_TILE]])
+//      CHECK:       memref.copy %[[ALLOC]], %[[RESULT_TILE]]
 //      CHECK:       memref.dealloc %[[ALLOC]]

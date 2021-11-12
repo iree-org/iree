@@ -40,9 +40,13 @@ namespace Stream {
 namespace {
 
 // Builds a stream.tensor.import op that imports an external tensor value into
-// a stream resource.
+// a stream resource. |consumingOps| will be populated with all ops that consume
+// the original |sourceTensor| and that should not be replaced with the returned
+// value.
 static Value buildTensorImportOp(Location loc, Value sourceTensor,
-                                 Type targetType, OpBuilder &builder) {
+                                 Type targetType,
+                                 SmallPtrSetImpl<Operation *> &consumingOps,
+                                 OpBuilder &builder) {
   // Gather dynamic dimensions from the input value.
   auto dynamicDims =
       Shape::buildOrFindDynamicDimsForValue(loc, sourceTensor, builder);
@@ -63,19 +67,23 @@ static Value buildTensorImportOp(Location loc, Value sourceTensor,
   auto importOp = builder.create<IREE::Stream::TensorImportOp>(
       loc, externalType, sourceTensor, encodingAttr, dynamicDims, resultSize,
       /*affinity=*/nullptr);
+  consumingOps.insert(importOp);
 
   // If needed insert a transfer to the target lifetime.
   Value result = importOp.result();
   if (targetType != externalType) {
     result = builder
                  .create<IREE::Stream::AsyncTransferOp>(
-                     loc, externalType, result, resultSize, resultSize,
+                     loc, targetType, result, resultSize, resultSize,
                      /*source_affinity=*/nullptr,
                      /*result_affinity=*/nullptr)
                  .result();
   }
 
-  return result;
+  auto castOp = builder.create<mlir::UnrealizedConversionCastOp>(
+      loc, sourceTensor.getType(), ValueRange{result, resultSize});
+  consumingOps.insert(castOp);
+  return castOp.getResult(0);
 }
 
 // Builds a stream.tensor.export op that exports a stream resource into an
@@ -161,10 +169,11 @@ struct GenericResourcePattern : public ConversionPattern {
 
       auto dynamicDims =
           Shape::buildOrFindDynamicDimsForValue(op->getLoc(), result, rewriter);
+      SmallPtrSet<Operation *, 4> consumingOps;
       auto importedValue = buildTensorImportOp(
           op->getLoc(), result, rewriter.getType<IREE::Stream::ResourceType>(),
-          rewriter);
-      result.replaceAllUsesExcept(importedValue, importedValue.getDefiningOp());
+          consumingOps, rewriter);
+      result.replaceAllUsesExcept(importedValue, consumingOps);
     }
 
     return success();
@@ -192,6 +201,11 @@ class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
     conversionTarget.addLegalDialect<IREE::Stream::StreamDialect>();
     typeConverter.addConversion(
         [](IREE::Stream::ResourceType type) { return type; });
+
+    // Allow unknown types to pass through; these come from custom dialects that
+    // may be mixed into the IR we are converting.
+    typeConverter.addConversion(
+        [](Type type) { return !type.isa<TensorType>() ? type : Type{}; });
 
     // Disallow tensor dialects; the goal here is to remove all tensors and
     // turn them into stream resource ops.

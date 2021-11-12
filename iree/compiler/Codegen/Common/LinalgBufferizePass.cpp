@@ -951,7 +951,7 @@ static Value walkUseToGetResultBuffer(
   while (value.hasOneUse()) {
     OpOperand &use = *value.use_begin();
     user = use.getOwner();
-    if (isa<IREE::Flow::DispatchTensorStoreOp>(user)) {
+    if (isa<IREE::Flow::DispatchTensorStoreOp, tensor::InsertSliceOp>(user)) {
       return getSubviewOpForTensorStoreOp(b, user, bvm);
     }
     value = getTiedResultForOperand(use, plan);

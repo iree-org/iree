@@ -28,7 +28,7 @@ namespace Stream {
 //===----------------------------------------------------------------------===//
 
 // static
-Attribute ResourceConfigAttr::parse(DialectAsmParser &p, Type type) {
+Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess()) || failed(p.parseLBrace())) return {};
 
   int64_t maxAllocationSize = 0;
@@ -60,7 +60,7 @@ Attribute ResourceConfigAttr::parse(DialectAsmParser &p, Type type) {
                                  minBufferRangeAlignment);
 }
 
-void ResourceConfigAttr::print(DialectAsmPrinter &p) const {
+void ResourceConfigAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<{";
   os << "max_allocation_size = " << getMaxAllocationSize() << ", ";
@@ -131,7 +131,7 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
 // #stream.timepoint<...>
 //===----------------------------------------------------------------------===//
 
-Attribute TimepointAttr::parse(DialectAsmParser &p, Type type) {
+Attribute TimepointAttr::parse(AsmParser &p, Type type) {
   StringRef timeStr;
   if (failed(p.parseLess())) return {};
   if (failed(p.parseKeyword(&timeStr))) {
@@ -146,7 +146,7 @@ Attribute TimepointAttr::parse(DialectAsmParser &p, Type type) {
   return TimepointAttr::get(p.getContext(), TimepointType::get(p.getContext()));
 }
 
-void TimepointAttr::print(DialectAsmPrinter &p) const {
+void TimepointAttr::print(AsmPrinter &p) const {
   p << "<";
   p << "immediate";
   p << ">";
@@ -187,7 +187,7 @@ void PartitioningConfigAttr::walkImmediateSubElements(
   walkAttrsFn(getFavor());
 }
 
-Attribute PartitioningConfigAttr::parse(DialectAsmParser &p, Type type) {
+Attribute PartitioningConfigAttr::parse(AsmParser &p, Type type) {
   std::string favorStr;
   if (failed(p.parseLess())) return {};
   if (succeeded(p.parseOptionalStar())) {
@@ -205,7 +205,7 @@ Attribute PartitioningConfigAttr::parse(DialectAsmParser &p, Type type) {
       FavorAttr::get(p.getContext(), favor.getValue()));
 }
 
-void PartitioningConfigAttr::print(DialectAsmPrinter &p) const {
+void PartitioningConfigAttr::print(AsmPrinter &p) const {
   p << "<";
   p << "favor-";
   p << stringifyFavor(getFavor().getValue());
@@ -252,7 +252,7 @@ static void printLifetime(Lifetime lifetime, llvm::raw_ostream &os) {
   }
 }
 
-Type ResourceType::parse(DialectAsmParser &p) {
+Type ResourceType::parse(AsmParser &p) {
   StringRef lifetimeStr;
   if (failed(p.parseLess())) return {};
   if (succeeded(p.parseOptionalStar())) {
@@ -269,7 +269,7 @@ Type ResourceType::parse(DialectAsmParser &p) {
   return ResourceType::get(p.getContext(), lifetime.getValue());
 }
 
-void ResourceType::print(DialectAsmPrinter &p) const {
+void ResourceType::print(AsmPrinter &p) const {
   p << "<";
   printLifetime(getLifetime(), p.getStream());
   p << ">";
