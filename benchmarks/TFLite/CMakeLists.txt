@@ -71,7 +71,8 @@ set(POSENET_FP32_MODULE
 ################################################################################
 
 set(ANDROID_CPU_TRANSLATION_FLAGS
-    ${ANDROID_CPU_TRANSLATION_FLAGS})
+      "--iree-input-type=tosa"
+      "--iree-llvm-target-triple=aarch64-none-linux-android29")
 
 # CPU, Dylib-Sync, big/little-core, full-inference
 iree_benchmark_suite(
