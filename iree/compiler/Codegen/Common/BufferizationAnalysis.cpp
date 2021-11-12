@@ -474,6 +474,23 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
   }
 }
 
+void BufferizationPlan::dump() {
+  llvm::dbgs() << "BufferMappings : \n";
+  unsigned numSets = 0;
+  for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
+       ++it) {
+    if (!it->isLeader()) continue;
+    llvm::dbgs() << "\tSet " << numSets << ":\n";
+    for (auto member : llvm::make_range(mappedTensors.member_begin(it),
+                                        mappedTensors.member_end())) {
+      llvm::dbgs() << "\t\t";
+      getValue(member).print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+    numSets++;
+  }
+}
+
 LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
                                              BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {

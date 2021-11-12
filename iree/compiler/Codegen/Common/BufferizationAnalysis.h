@@ -66,22 +66,7 @@ class BufferizationPlan {
   /// the dispatch region.
   bool isInStoreSet(Value v) { return storeLeaders.count(getLeaderValue(v)); }
 
-  void dump() {
-    llvm::dbgs() << "BufferMappings : \n";
-    unsigned numSets = 0;
-    for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
-         ++it) {
-      if (!it->isLeader()) continue;
-      llvm::dbgs() << "\tSet " << numSets << ":\n";
-      for (auto member : llvm::make_range(mappedTensors.member_begin(it),
-                                          mappedTensors.member_end())) {
-        llvm::dbgs() << "\t\t";
-        getValue(member).print(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      }
-      numSets++;
-    }
-  }
+  void dump();
 
  private:
   Value getLeaderValue(Value v1) const {
