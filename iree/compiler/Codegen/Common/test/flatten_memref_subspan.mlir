@@ -331,3 +331,47 @@ hal.interface private @io  {
 //      CHECK:   %[[LOAD:.+]] = memref.load %[[SPAN0]][%[[INDEX0]]] : memref<?xf32>
 //      CHECK:   %[[INDEX1:.+]] = affine.apply #[[MAP]]()[%[[OFFSET]]]
 //      CHECK:   memref.store %[[LOAD]], %[[SPAN1]][%[[INDEX1]]] : memref<?xf32>
+
+// -----
+
+func @collapse_shape(%offset : index, %i0 : index, %i1 : index) -> f32 {
+  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<4x5x6x7xf32>
+  %collapse = memref.collapse_shape %subspan[[0, 1], [2, 3]] : memref<4x5x6x7xf32> into memref<20x42xf32>
+  %value = memref.load %collapse[%i0, %i1] : memref<20x42xf32>
+  return %value : f32
+}
+
+hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 42 + s1 + s2 floordiv 4)>
+//      CHECK: func @collapse_shape
+// CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index)
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//      CHECK:   %[[SIZE:.+]] = arith.constant 840 : index
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[OFFSET]]]
+//      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]
+
+// -----
+
+func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3: index) -> f32 {
+  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<20x42xf32>
+  %expand = memref.expand_shape %subspan[[0, 1], [2, 3]] : memref<20x42xf32> into memref<4x5x6x7xf32>
+  %value = memref.load %expand[%i0, %i1, %i2, %i3] : memref<4x5x6x7xf32>
+  return %value : f32
+}
+
+hal.interface @io attributes {sym_visibility = "private"} {
+  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> (s0 * 210 + s1 * 42 + s2 * 7 + s3 + s4 floordiv 4)>
+//      CHECK: func @expand_shape
+// CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//      CHECK:   %[[SIZE:.+]] = arith.constant 840 : index
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[I3]], %[[OFFSET]]]
+//      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]

@@ -231,6 +231,10 @@ struct FlattenBindingSubspan final
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Linearizing Patterns
+//===----------------------------------------------------------------------===//
+
 /// Generates IR to perform index linearization with the given `indices`
 /// indexing into the given memref `sourceValue`.
 static Value linearizeIndices(Value sourceValue, ValueRange indices,
@@ -312,7 +316,7 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
       ConversionPatternRewriter &rewriter) const override {
     if (!isRankOneMemRef(adaptor.memref().getType())) {
       return rewriter.notifyMatchFailure(
-          loadOp, "expected converted memref of rank <= 1");
+          loadOp, "expected converted memref of rank == 1");
     }
 
     Value linearIndex = linearizeIndices(loadOp.memref(), loadOp.getIndices(),
@@ -337,7 +341,7 @@ struct LinearizeStoreIndices final
       ConversionPatternRewriter &rewriter) const override {
     if (!isRankOneMemRef(adaptor.memref().getType())) {
       return rewriter.notifyMatchFailure(
-          storeOp, "expected converted memref of rank <= 1");
+          storeOp, "expected converted memref of rank == 1");
     }
 
     Value linearIndex = linearizeIndices(storeOp.memref(), storeOp.getIndices(),
@@ -366,7 +370,7 @@ struct LinearizeTransferReadIndices final
     }
     if (!isRankOneMemRef(adaptor.source().getType())) {
       return rewriter.notifyMatchFailure(
-          transferReadOp, "expected converted memref of rank <= 1");
+          transferReadOp, "expected converted memref of rank == 1");
     }
     Value linearIndex =
         linearizeIndices(transferReadOp.source(), transferReadOp.indices(),
@@ -397,7 +401,7 @@ struct LinearizeTransferWriteIndices final
     }
     if (!isRankOneMemRef(adaptor.source().getType())) {
       return rewriter.notifyMatchFailure(
-          transferWriteOp, "expected converted memref of rank <= 1");
+          transferWriteOp, "expected converted memref of rank == 1");
     }
     Value linearIndex =
         linearizeIndices(transferWriteOp.source(), transferWriteOp.indices(),
@@ -429,7 +433,7 @@ struct AdjustConversionCast final
 
     if (!isRankOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
-          castOp, "expected converted memref of rank <= 1");
+          castOp, "expected converted memref of rank == 1");
     }
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         castOp, castOp.getResultTypes(), input);
@@ -440,6 +444,24 @@ struct AdjustConversionCast final
 //===----------------------------------------------------------------------===//
 // Folding Patterns
 //===----------------------------------------------------------------------===//
+
+/// Removes MemRef reshape ops given that we'll linearize both the source and
+/// target type to the same one.
+template <typename ReshapeOpTy>
+struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
+  using OpConversionPattern<ReshapeOpTy>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      ReshapeOpTy op, typename ReshapeOpTy::Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!isRankOneMemRef(adaptor.src().getType())) {
+      return rewriter.notifyMatchFailure(
+          op, "expected converted memref of rank == 1");
+    }
+    rewriter.replaceOp(op, adaptor.src());
+    return success();
+  };
+};
 
 /// Returns the number of bytes of the given `type`. Returns llvm::None if
 /// cannot deduce.
@@ -551,15 +573,17 @@ struct FlattenMemRefSubspanPass
              FlattenGlobal, FlattenGetGlobal, FlattenBindingSubspan,
              LinearizeLoadIndices, LinearizeStoreIndices,
              LinearizeTransferReadIndices, LinearizeTransferWriteIndices,
-             AdjustConversionCast>(typeConverter, &context);
+             AdjustConversionCast, FoldMemRefReshape<memref::CollapseShapeOp>,
+             FoldMemRefReshape<memref::ExpandShapeOp>>(typeConverter, &context);
 
     ConversionTarget target(context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-    target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp,
-                                 memref::AllocaOp, memref::AllocOp,
-                                 memref::GetGlobalOp>([](Operation *op) {
-      return isRankOneMemRef(op->getResultTypes().front());
-    });
+    target.addDynamicallyLegalOp<
+        IREE::HAL::InterfaceBindingSubspanOp, memref::AllocaOp, memref::AllocOp,
+        memref::CollapseShapeOp, memref::ExpandShapeOp, memref::GetGlobalOp>(
+        [](Operation *op) {
+          return isRankOneMemRef(op->getResultTypes().front());
+        });
     target.addDynamicallyLegalOp<memref::GlobalOp>(
         [](memref::GlobalOp op) { return isRankOneMemRef(op.type()); });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
