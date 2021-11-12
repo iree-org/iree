@@ -89,7 +89,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "3-thread,little-core,full-inference"
+    "3-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "vmvx"
   TARGET_ARCHITECTURE
@@ -110,8 +110,8 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "big-core,full-inference"
-    "little-core,full-inference"
+    "big-core,full-inference,experimental-flags"
+    "little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
@@ -132,8 +132,8 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "1-thread,big-core,full-inference"
-    "1-thread,little-core,full-inference"
+    "1-thread,big-core,full-inference,experimental-flags"
+    "1-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
@@ -156,8 +156,8 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "3-thread,big-core,full-inference"
-    "3-thread,little-core,full-inference"
+    "3-thread,big-core,full-inference,experimental-flags"
+    "3-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
@@ -181,7 +181,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "full-inference"
+    "full-inference,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -202,7 +202,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "kernel-execution"
+    "kernel-execution,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -227,7 +227,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "full-inference"
+    "full-inference,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -248,7 +248,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "kernel-execution"
+    "kernel-execution,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -271,7 +271,7 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP16_MODULE}"
 
   BENCHMARK_MODES
-    "kernel-execution"
+    "kernel-execution,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -295,7 +295,7 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP16_MODULE}"
 
   BENCHMARK_MODES
-    "full-inference"
+    "full-inference,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -325,8 +325,8 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "big-core,full-inference"
-    "little-core,full-inference"
+    "big-core,full-inference,experimental-flags"
+    "little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
@@ -346,8 +346,8 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "1-thread,big-core,full-inference"
-    "1-thread,little-core,full-inference"
+    "1-thread,big-core,full-inference,experimental-flags"
+    "1-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
@@ -369,8 +369,8 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "3-thread,big-core,full-inference"
-    "3-thread,little-core,full-inference"
+    "3-thread,big-core,full-inference,experimental-flags"
+    "3-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
