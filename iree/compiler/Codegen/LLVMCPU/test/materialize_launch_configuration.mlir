@@ -382,15 +382,14 @@ hal.executable private @batch_matmul_tensors  {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [1, 32, 32, 32], [1, 4, 4, 4]{{\]}}, native_vector_size = [1, 4, 4, 4]>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [64, 64, 1]>
 //      CHECK: hal.executable.entry_point public @batch_matmul_tensors
 // CHECK-NEXT: (%[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: index)
-//  CHECK-DAG:  %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:  %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //  CHECK-DAG:  %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
-//      CHECK:  hal.return %[[D0]], %[[D1]], %[[C1]]
+//      CHECK:  hal.return %[[D0]], %[[D1]], %[[ARG2]]
 //      CHECK:  linalg.batch_matmul
 // CHECK-SAME:    lowering.config = #[[CONFIG]]
 

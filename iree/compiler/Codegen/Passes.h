@@ -9,6 +9,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -19,8 +20,14 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Registers all conversion passes in this directory.
+/// Registers all conversion passes in this directory.
 void registerCodegenPasses();
+
+/// Verify that the configuration used for compilation is valid.
+LogicalResult verifyLoweringConfiguration(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 
 //------------------------------------------------------------------------------
 // Misc/common conversions
@@ -191,6 +198,10 @@ void addCPUVectorizationPassPipeline(OpPassManager &passManager,
 
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
+LogicalResult verifyTensorToVectorsPassPipelineConfig(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true,
                                     bool useTileAndVectorizeV2 = false);
