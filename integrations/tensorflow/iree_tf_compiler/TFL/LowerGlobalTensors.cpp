@@ -14,6 +14,10 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/Tosa/IR/TosaOps.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/IR/BuiltinAttributes.h"
+#include "third_party/llvm/llvm-project/mlir/include/mlir/IR/BuiltinOps.h"
+#include "third_party/tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
 
 namespace mlir {
 namespace iree_integrations {
@@ -24,7 +28,7 @@ class LowerGlobalTensorsPass
     : public LowerGlobalTensorsBase<LowerGlobalTensorsPass> {
  public:
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<mlir::TFL::TensorFlowLiteDialect,
+    registry.insert<mlir::TFL::TensorFlowLiteDialect, tosa::TosaDialect,
                     iree_compiler::IREE::Util::UtilDialect>();
   }
 
@@ -49,14 +53,29 @@ class LowerGlobalTensorsPass
       // Look through the initialization functions and find the assigned values
       // for each handle, save out the constant value.
       for (auto init : func.getOps<mlir::TFL::CallOnceOp>()) {
-        FuncOp initFunc = symNameToFunction[init.session_init_function()];
+        auto findInitFunc =
+            symNameToFunction.find(init.session_init_function());
+        if (findInitFunc == symNameToFunction.end()) {
+          init.emitError("Unable to find initialization function: " +
+                         init.session_init_function());
+          continue;
+        }
+        FuncOp initFunc = std::get<1>(*findInitFunc);
         for (auto assign : initFunc.getOps<mlir::TFL::AssignVariableOp>()) {
           auto handle = dyn_cast<mlir::TFL::VarHandleOp>(
               assign.resource_id().getDefiningOp());
           if (!handle) continue;
 
           DenseElementsAttr constant;
-          if (!matchPattern(assign.value(), m_Constant(&constant))) continue;
+          if (!matchPattern(assign.value(), m_Constant(&constant))) {
+            // Quantized types we can not use the m_Constant matcher.
+            if (auto constOp = dyn_cast<mlir::TFL::QConstOp>(
+                    assign.value().getDefiningOp())) {
+              constant = constOp.value().cast<DenseElementsAttr>();
+            }
+          }
+          if (!constant) continue;
+
           auto name = handle.shared_name();
           sharedNameToConstant[name] = constant;
           sharedNameToLoc[name] = handle.getLoc();
@@ -131,8 +150,19 @@ class LowerGlobalTensorsPass
       if (!address) continue;
 
       builder.setInsertionPoint(assign);
+      Value value = assign.value();
+      Type storageType = address.getType()
+                             .cast<iree_compiler::IREE::Util::PtrType>()
+                             .getTargetType();
+      if (storageType != value.getType()) {
+        value = builder
+                    .create<UnrealizedConversionCastOp>(assign.getLoc(),
+                                                        storageType, value)
+                    .getResult(0);
+      }
+
       builder.create<iree_compiler::IREE::Util::GlobalStoreIndirectOp>(
-          assign.getLoc(), assign.value(), assign.resource_id());
+          assign.getLoc(), value, assign.resource_id());
       assign.erase();
     }
 
@@ -149,9 +179,15 @@ class LowerGlobalTensorsPass
       auto type = ptrType.getTargetType();
 
       builder.setInsertionPoint(read);
-      auto load =
+      Value load =
           builder.create<iree_compiler::IREE::Util::GlobalLoadIndirectOp>(
               read.getLoc(), type, read.resource_id());
+      if (type != read.getResult().getType()) {
+        load = builder
+                   .create<UnrealizedConversionCastOp>(
+                       read.getLoc(), read.getResult().getType(), load)
+                   .getResult(0);
+      }
       read.getResult().replaceAllUsesWith(load);
       read.erase();
     }
