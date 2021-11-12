@@ -190,6 +190,41 @@ struct DispatchTensorStoreOpInterface
   }
 };
 
+using mlir::linalg::comprehensive_bufferize::linalg_ext::
+    InitTensorEliminationStep;
+
+/// Try to eliminate InitTensorOps that are eventually fed into a
+/// DispatchTensorStoreOp. Such InitTensorOps are replaced with matching
+/// DispatchTensorLoadOps. Two conditions must be met:
+///
+/// * The target must be a "readwrite" tensor.
+/// * All ops along the reverse SSA use-def chain from the
+///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
+struct StoreTensorOpAnchoredInitTensorEliminationStep
+    : public InitTensorEliminationStep {
+  LogicalResult run(FuncOp funcOp, BufferizationAliasInfo &aliasInfo,
+                    DominanceInfo &domInfo,
+                    SmallVector<Operation *> &newOps) override {
+    return eliminateInitTensors(
+        funcOp, aliasInfo, domInfo,
+        /*anchorMatchFunc=*/
+        [&](OpOperand &operand) {
+          return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+        },
+        /*rewriteFunc=*/
+        [](OpBuilder &b, Location loc, OpOperand &operand) {
+          auto storeOp =
+              cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+          auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
+              loc, storeOp.value().getType().cast<RankedTensorType>(),
+              storeOp.target(), storeOp.getMixedOffsets(),
+              storeOp.getMixedSizes(), storeOp.getMixedStrides());
+          return loadOp.result();
+        },
+        newOps);
+  }
+};
+
 /// Pass to convert from tensor based ops to memref based ops.
 class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
@@ -240,6 +275,10 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 
   linalg::comprehensive_bufferize::BufferizationOptions options;
   options.testAnalysisOnly = false;
+
+  // Enable InitTensorOp elimination.
+  options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
+
   // TODO: Use allocationFn.
 
   if (failed(runComprehensiveBufferize(moduleOp, options))) signalPassFailure();
