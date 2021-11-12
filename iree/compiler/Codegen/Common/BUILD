@@ -62,6 +62,7 @@ cc_library(
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:BufferizableOpInterface",
         "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:ComprehensiveBufferize",
         "@llvm-project//mlir:DialectUtils",

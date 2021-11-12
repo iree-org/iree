@@ -113,7 +113,7 @@ LogicalResult DispatchTensorType::verify(
 }
 
 template <typename T>
-static T parseShapedType(DialectAsmParser &parser) {
+static T parseShapedType(AsmParser &parser) {
   StringRef accessStr;
   SmallVector<int64_t, 4> shape;
   Type elementType;
@@ -131,7 +131,7 @@ static T parseShapedType(DialectAsmParser &parser) {
   return T::get(access, shape, elementType);
 }
 
-static void printShapedType(DispatchTensorType &type, DialectAsmPrinter &p) {
+static void printShapedType(DispatchTensorType &type, AsmPrinter &p) {
   switch (type.getAccess()) {
     case TensorAccess::ReadOnly:
       p << "readonly";
@@ -158,7 +158,7 @@ static void printShapedType(DispatchTensorType &type, DialectAsmPrinter &p) {
 }
 
 // static
-DispatchTensorType DispatchTensorType::parse(DialectAsmParser &parser) {
+DispatchTensorType DispatchTensorType::parse(AsmParser &parser) {
   return parseShapedType<DispatchTensorType>(parser);
 }
 

@@ -67,7 +67,7 @@ class DispatchTensorType
 
   static DispatchTensorType get(TensorAccess access, TensorType tensorType);
 
-  static DispatchTensorType parse(DialectAsmParser &parser);
+  static DispatchTensorType parse(AsmParser &parser);
 
   /// Returns the allowed operations the tensor.
   TensorAccess getAccess() const;
