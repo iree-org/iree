@@ -22,6 +22,8 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     Common
+  HDRS
+    "BufferizationAnalysis.h"
   SRCS
     "BufferizationAnalysis.cpp"
     "CleanupBufferAllocViewPass.cpp"

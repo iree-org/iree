@@ -48,6 +48,9 @@ cc_library(
         "VectorizeConv.cpp",
         "VectorizeMMT4d.cpp",
     ],
+    hdrs = [
+        "BufferizationAnalysis.h",
+    ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common:FoldTensorExtractOpIncGen",
