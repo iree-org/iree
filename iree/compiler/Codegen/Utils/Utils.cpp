@@ -140,6 +140,7 @@ SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
 
   for (auto pair : llvm::zip(llvm::reverse(partitionedLoops), loopInfo)) {
     unsigned loopIndex = std::get<0>(pair);
+    if (loopIndex >= outputShape.size()) continue;
     const LoopTilingAndDistributionInfo &loopInfo = std::get<1>(pair);
     if (Optional<int64_t> attrValue =
             getConstantIntValue(loopInfo.untiledUpperBound)) {
