@@ -32,7 +32,9 @@ gentbl_cc_library(
 cc_library(
     name = "Common",
     srcs = [
+        "BufferizationAnalysis.cpp",
         "CleanupBufferAllocViewPass.cpp",
+        "ConvertToDestinationPassingStylePass.cpp",
         "DemoteF32ToF16.cpp",
         "FlattenMemRefSubspanPass.cpp",
         "FoldAffineMinInDistributedLoops.cpp",
@@ -45,6 +47,9 @@ cc_library(
         "SetNumWorkgroupsPass.cpp",
         "VectorizeConv.cpp",
         "VectorizeMMT4d.cpp",
+    ],
+    hdrs = [
+        "BufferizationAnalysis.h",
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",

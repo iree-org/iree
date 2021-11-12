@@ -89,6 +89,12 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
 
+/// Converts entry point function within dispatch regions to use
+/// destination-passing style, which is better suited for the upstream
+/// comprehensive bufferization pass.
+std::unique_ptr<OperationPass<FuncOp>>
+createConvertToDestinationPassingStylePass();
+
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
 
