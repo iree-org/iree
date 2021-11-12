@@ -117,31 +117,15 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    // There might be multiple entry points in the module. Currently, all of
-    // them need to have the same pipeline.
-    // TODO(ravishankarm): This is strange that this is not enforced
-    // structurally, but something to address later on. For now this restriction
-    // is fine.
     llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
         getAllEntryPoints(moduleOp);
+    assert(entryPoints.size() == 1 &&
+           "should have exactly one entryPoint per executable");
     Optional<IREE::Codegen::DispatchLoweringPassPipeline> passPipeline;
-    for (auto &it : entryPoints) {
-      auto entryPointOp = it.second;
-      if (IREE::Codegen::TranslationInfoAttr translationInfo =
-              getTranslationInfo(entryPointOp)) {
-        IREE::Codegen::DispatchLoweringPassPipeline currPipeline =
-            translationInfo.getDispatchLoweringPassPipeline();
-        if (passPipeline) {
-          if (currPipeline != passPipeline.getValue()) {
-            moduleOp.emitError(
-                "unhandled compilation of entry point function with different "
-                "pass pipelines within a module");
-            return signalPassFailure();
-          }
-          continue;
-        }
-        passPipeline = currPipeline;
-      }
+    auto entryPointOp = entryPoints.begin()->second;
+    if (IREE::Codegen::TranslationInfoAttr translationInfo =
+            getTranslationInfo(entryPointOp)) {
+      passPipeline = translationInfo.getDispatchLoweringPassPipeline();
     }
 
     executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
