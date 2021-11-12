@@ -4,6 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// TODO: We should not be including C implementation-only headers in a C++
+// module like this. In order to make this work for the moment across
+// runtime libraries that are strict, do a global using of the std namespace.
+// See #7605
+#include <cmath>
+using namespace std;
+
 #include "iree/base/logging.h"
 #include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
