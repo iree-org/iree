@@ -306,7 +306,7 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP16_MODULE}"
 
   BENCHMARK_MODES
-    "full-inference"
+    "full-inference,default-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -343,6 +343,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "big-core,full-inference,experimental-flags"
@@ -365,6 +368,8 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -390,6 +395,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "2-thread,little-core,full-inference,experimental-flags"
@@ -409,9 +417,12 @@ iree_benchmark_suite(
 
 iree_benchmark_suite(
   MODULES
-    "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
-    "${POSENET_FP32_MODULE}"
+  "${DEEPLABV3_FP32_MODULE}"
+  "${MOBILESSD_FP32_MODULE}"
+  "${POSENET_FP32_MODULE}"
+  "${MOBILEBERT_FP32_MODULE}"
+  "${MOBILENET_V2_MODULE}"
+  "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "3-thread,little-core,full-inference,experimental-flags"
@@ -434,6 +445,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,little-core,full-inference,experimental-flags"
@@ -451,12 +465,38 @@ iree_benchmark_suite(
     "--task_topology_group_count=4"
 )
 
+
+# CPU, VMVX, 3-thread, little-core, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
+
+  BENCHMARK_MODES
+    "3-thread,little-core,full-inference,experimental-flags"
+  TARGET_BACKEND
+    "vmvx"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+  DRIVER
+    "vmvx"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=3"
+)
+
+
 # GPU, Vulkan, Adreno, full-inference
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,experimental-flags"
@@ -473,12 +513,43 @@ iree_benchmark_suite(
     "vulkan"
 )
 
+# GPU, Vulkan, Adreno, kernel-execution
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
+
+  BENCHMARK_MODES
+    "kernel-execution,experimental-flags"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Adreno"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=adreno-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-enable-fusion-with-reduction-ops"
+    "--iree-hal-benchmark-dispatch-repeat-count=16"
+  DRIVER
+    "vulkan"
+  RUNTIME_FLAGS
+    "--batch_size=16"
+)
+
 # GPU, Vulkan, Mali, full-inference
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,experimental-flags"
@@ -495,12 +566,36 @@ iree_benchmark_suite(
     "vulkan"
 )
 
+# GPU, Vulkan, Mali, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${MOBILEBERT_FP16_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference,experimental-flags"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-flow-demote-f32-to-f16"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-enable-fusion-with-reduction-ops"
+  DRIVER
+    "vulkan"
+)
+
 # GPU, Vulkan, Mali, kernel-execution
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
+    "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
     "kernel-execution,experimental-flags"
@@ -510,6 +605,30 @@ iree_benchmark_suite(
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
     "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-inline-constants-max-byte-length=16"
+    "--iree-enable-fusion-with-reduction-ops"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+  DRIVER
+    "vulkan"
+  RUNTIME_FLAGS
+    "--batch_size=32"
+)
+
+# GPU, Vulkan, Mali, kernel-execution
+iree_benchmark_suite(
+  MODULES
+    "${MOBILEBERT_FP16_MODULE}"
+
+  BENCHMARK_MODES
+    "kernel-execution,experimental-flags"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
     "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
