@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-codegen-convert-to-destination-passing-style -canonicalize -cse | IreeFileCheck %s
+// RUN: iree-opt %s -iree-codegen-convert-to-destination-passing-style -canonicalize -cse -split-input-file | IreeFileCheck %s
 
 func @matmul() {
   %c0 = arith.constant 0 : index
