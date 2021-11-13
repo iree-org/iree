@@ -25,6 +25,7 @@ iree_cc_library(
     "LLVMGPUDistributeSharedMemoryCopy.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPipelining.cpp"
+    "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorization.cpp"
@@ -59,6 +60,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     MLIRVector
+    MLIRVectorToGPU
     MLIRVectorToLLVM
     MLIRVectorToSCF
     iree::compiler::Codegen::Common

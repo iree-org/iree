@@ -108,6 +108,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
         addGPUMatmulSimtPassPipeline(nestedModulePM);
         break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
+        addGPUMatmulTensorCorePassPipeline(nestedModulePM);
+        break;
       default:
         llvm_unreachable("Unsupported pipeline on GPU target.");
     }

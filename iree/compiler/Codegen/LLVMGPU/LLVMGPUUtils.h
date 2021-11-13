@@ -13,6 +13,8 @@
 
 static constexpr int32_t kNumGPUDims = 3;
 
+static constexpr int32_t kWarpSize = 32;
+
 static llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
     mlir::OpBuilder &builder, mlir::Location loc, unsigned numDims,
     llvm::ArrayRef<int64_t> workgroupSize) {
@@ -26,6 +28,32 @@ static llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
         builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, attr),
         builder.create<mlir::arith::ConstantOp>(
             loc, builder.getIndexAttr(workgroupSize[i]))};
+  }
+  return procInfo;
+}
+
+/// Compute subgroup ID. CUDA doesn't have a subgroupId equivalent so we are are
+/// computing the subgroup ID based on the threadID.
+static llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
+    mlir::OpBuilder &builder, mlir::Location loc, unsigned numDims,
+    llvm::ArrayRef<int64_t> numSubgroups) {
+  assert(numDims <= kNumGPUDims);
+  llvm::SmallVector<mlir::linalg::ProcInfo, 2> procInfo(numDims);
+  std::array<llvm::StringRef, kNumGPUDims> dimAttr{"x", "y", "z"};
+  mlir::Type indexType = builder.getIndexType();
+  for (unsigned i = 0; i < numDims; ++i) {
+    mlir::StringAttr attr = builder.getStringAttr(dimAttr[i]);
+    mlir::Value subgroupId =
+        builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, attr);
+    if (i == 0) {
+      mlir::AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
+      subgroupId = mlir::makeComposedAffineApply(
+          builder, loc, d0.floorDiv(builder.getAffineConstantExpr(kWarpSize)),
+          {subgroupId});
+    }
+    procInfo[numDims - 1 - i] = {
+        subgroupId, builder.create<mlir::arith::ConstantOp>(
+                        loc, builder.getIndexAttr(numSubgroups[i]))};
   }
   return procInfo;
 }

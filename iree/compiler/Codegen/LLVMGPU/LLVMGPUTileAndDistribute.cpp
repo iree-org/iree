@@ -61,6 +61,67 @@ static void populateTilingReductionPatterns(
 }
 
 /// Patterns for thread level tiling.
+static void populateTilingToWarpPatterns(
+    MLIRContext *context, OwningRewritePatternList &patterns,
+    SmallVectorImpl<int64_t> &workgroupSize,
+    SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
+  std::array<int64_t, 3> warpPerWorkgroup = {
+      workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
+
+  linalg::TileSizeComputationFunction getInnerTileSizeFn =
+      [&](OpBuilder &builder, Operation *operation) {
+        SmallVector<Value, 4> tileSizesVal;
+        SmallVector<int64_t, 4> tileSizes;
+        for (auto workload : llvm::enumerate(workloadPerWorkgroup)) {
+          tileSizes.push_back(workload.value() /
+                              warpPerWorkgroup[workload.index()]);
+        }
+        std::reverse(tileSizes.begin(), tileSizes.end());
+        if (tileSizes.empty()) return SmallVector<Value, 4>();
+        SmallVector<unsigned> partitionedLoops = getPartitionedLoops(operation);
+        unsigned maxDepth = partitionedLoops.back() + 1;
+        auto zero =
+            builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
+        tileSizesVal.resize(maxDepth, zero);
+        size_t tileSizeIdx = 0;
+        for (unsigned depth : partitionedLoops) {
+          tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
+              operation->getLoc(), tileSizes[tileSizeIdx++]);
+          if (tileSizeIdx == tileSizes.size()) break;
+        }
+        return tileSizesVal;
+      };
+  auto getWarpProcInfoFn = [&warpPerWorkgroup](
+                               OpBuilder &builder, Location loc,
+                               ArrayRef<Range> parallelLoopRanges) {
+    return getSubgroupIdsAndCounts(builder, loc, parallelLoopRanges.size(),
+                                   warpPerWorkgroup);
+  };
+  linalg::LinalgLoopDistributionOptions warpDistributionOptions;
+  warpDistributionOptions.procInfo = getWarpProcInfoFn;
+  warpDistributionOptions.distributionMethod = {
+      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
+       linalg::DistributionMethod::Cyclic}};
+
+  auto tilingOptions = linalg::LinalgTilingOptions()
+                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
+                           .setTileSizeComputationFunction(getInnerTileSizeFn)
+                           .setDistributionOptions(warpDistributionOptions);
+
+  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::FillOp>,
+                  linalg::LinalgTilingPattern<linalg::CopyOp>,
+                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
+      context, tilingOptions,
+      linalg::LinalgTransformationFilter(
+          {Identifier::get(getWorkgroupKTiledMarker(), context),
+           Identifier::get(getWorkgroupMemoryMarker(), context)},
+          Identifier::get(getVectorizeMarker(), context))
+          .setMatchByDefault());
+}
+
+/// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns,
     SmallVectorImpl<int64_t> &workgroupSize,
@@ -203,6 +264,13 @@ static void populatePromotionPatterns(MLIRContext *context,
 namespace {
 struct LLVMGPUTileAndDistributePass
     : public LLVMGPUTileAndDistributeBase<LLVMGPUTileAndDistributePass> {
+ private:
+  // Distribute the workloads to warp if true otherwise distribute to threads.
+  bool distributeToWarp = false;
+
+ public:
+  LLVMGPUTileAndDistributePass(bool distributeToWarp)
+      : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect>();
   }
@@ -210,7 +278,6 @@ struct LLVMGPUTileAndDistributePass
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
-
     {
       // Tile again at the workgroup level since redution dimension were
       // ignored. Dimensions already tiled will be ignore since we tile to the
@@ -243,7 +310,7 @@ struct LLVMGPUTileAndDistributePass
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     // Only promote to workgroup size if there are multiple warps.
-    if (flatWorkgroupSize > 32) {
+    if (flatWorkgroupSize > kWarpSize) {
       OwningRewritePatternList promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
@@ -278,7 +345,15 @@ struct LLVMGPUTileAndDistributePass
       funcOp.dump();
     });
 
-    {
+    if (distributeToWarp) {
+      // Apply last level of tiling and distribute to warps.
+      OwningRewritePatternList warpLevelTilingPatterns(context);
+      populateTilingToWarpPatterns(context, warpLevelTilingPatterns,
+                                   workgroupSize, workloadPerWorkgroup);
+      (void)applyPatternsAndFoldGreedily(funcOp,
+                                         std::move(warpLevelTilingPatterns));
+
+    } else {
       // Apply last level of tiling and distribute to threads.
       OwningRewritePatternList threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(context, threadLevelTilingPatterns,
@@ -304,9 +379,9 @@ struct LLVMGPUTileAndDistributePass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
-createLLVMGPUTileAndDistributeToThreads() {
-  return std::make_unique<LLVMGPUTileAndDistributePass>();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUTileAndDistribute(
+    bool distributeToWarp) {
+  return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
 }
 
 }  // namespace iree_compiler
