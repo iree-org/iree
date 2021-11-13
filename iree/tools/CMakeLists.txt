@@ -211,8 +211,8 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_dialects.h"
       "init_iree_passes.h"
     DEPS
-      IREEDialectsIREEPyDMDialect
       IREEInputDialect
+      IREEPyDMDialect
       MLIRIR
       iree::compiler::Bindings::Native::Transforms
       iree::compiler::Bindings::TFLite::Transforms

@@ -6,9 +6,9 @@
 
 #include "iree-dialects-c/Dialects.h"
 
-#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
 #include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
+#include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"

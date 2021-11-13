@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
 #include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
+#include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"

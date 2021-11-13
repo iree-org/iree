@@ -1,2 +1,2 @@
 add_subdirectory(Input)
-add_subdirectory(IREEPyDM)
+add_subdirectory(PyDM)
