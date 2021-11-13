@@ -31,6 +31,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace Stream {
 
+// TODO(benvanik): pick a policy for whether we want to favor copying external
+// values into transients or try to reuse the external values. In very loopy
+// programs enabling this lets us use a lot more stream-ordered allocations but
+// an allocation hoisting pass would be able to do the same thing. Until we have
+// that pass we can evaluate the difference manually with this flag. This could
+// likely be solved by adding a NOT_LOOP_CARRIED bit to the usage and setting it
+// on any value that ends up on a back edge of the CFG. We'd then favor those
+// as transients instead of straight-line escaping results.
+static constexpr bool kFavorTransients = false;
+
 // Starts by assuming that the resource is never used and then removes assumed
 // bits based on the usage in the program.
 //
@@ -40,7 +50,7 @@ namespace Stream {
 // used in a particular way (if the resource is read as part of a transfer
 // operation then the NOT_TRANSFER_READ assumed bit will be removed). Upon
 // completion we'll know for each resource what _is not_ performed and thus by
-// inverting the bits we can arive at what _is_ performed.
+// inverting the bits we can arrive at what _is_ performed.
 //
 // Best state: never used at all (never read/written/etc).
 // Worst state: used for all kinds of things.
@@ -295,6 +305,18 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
             });
             return;
           }
+          // TODO(benvanik): remove kFavorTransients.
+          bool isSourceExternal = !sourceUsage.isAssumed(NOT_EXTERNAL);
+          bool isTargetInternal = isAssumed(NOT_EXTERNAL);
+          if (kFavorTransients && isSourceExternal && isTargetInternal) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "[ValueResourceUsage] skipping forward prop of "
+                              "external into internal:";
+              op.print(llvm::dbgs(), solver.getAsmState());
+              llvm::dbgs() << "\n";
+            });
+            return;
+          }
           getState() ^= sourceUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncStoreOp op) {
@@ -421,6 +443,18 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
             // Can't transition staging across transfers.
             LLVM_DEBUG({
               llvm::dbgs() << "[ValueResourceUsage] skipping transfer target: ";
+              op.print(llvm::dbgs(), solver.getAsmState());
+              llvm::dbgs() << "\n";
+            });
+            return;
+          }
+          // TODO(benvanik): remove kFavorTransients.
+          bool isSourceInternal = isAssumed(NOT_EXTERNAL);
+          bool isTargetExternal = !resultUsage.isAssumed(NOT_EXTERNAL);
+          if (kFavorTransients && isSourceInternal && isTargetExternal) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "[ValueResourceUsage] skipping back prop of "
+                              "external into internal due to kFavorTransients:";
               op.print(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << "\n";
             });
