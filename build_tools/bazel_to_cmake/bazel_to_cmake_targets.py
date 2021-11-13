@@ -13,8 +13,14 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:IREEDialect": [
-        "IREEDialectsIREEDialect"
+    "//llvm-external-projects/iree-dialects:IREEInputDialect": [
+        "IREEInputDialect"
+    ],
+    "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
+        "IREEPyDMDialect"
+    ],
+    "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
+        "IREEPyDMTransforms"
     ],
 
     # LLVM

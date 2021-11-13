@@ -125,7 +125,7 @@ cc_library(
         "//iree/compiler/InputConversion/MHLO",
         "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:IREEVM",
-        "//llvm-external-projects/iree-dialects:IREEDialect",
+        "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREEPyDMDialect",
         "@llvm-project//mlir:IR",
     ],
