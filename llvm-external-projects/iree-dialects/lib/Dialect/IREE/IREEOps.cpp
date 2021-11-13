@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -88,6 +89,38 @@ static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
     p << " = ";
     p.printAttribute(attr);
   }
+}
+
+//===----------------------------------------------------------------------===//
+// DeviceTensorFunc
+//===----------------------------------------------------------------------===//
+
+LogicalResult DeviceTensorFuncOp::verifyType() {
+  if (getNumFuncResults() != 0)
+    return emitOpError("iree.device.tensor_func must have no results");
+  return success();
+}
+
+static ParseResult parseFuncOp(OpAsmParser &parser, OperationState &result) {
+  auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
+                          ArrayRef<Type> results,
+                          function_like_impl::VariadicFlag, std::string &) {
+    return builder.getFunctionType(argTypes, results);
+  };
+
+  return function_like_impl::parseFunctionLikeOp(
+      parser, result, /*allowVariadic=*/false, buildFuncType);
+}
+
+static void print(DeviceTensorFuncOp op, OpAsmPrinter &p) {
+  FunctionType fnType = op.getType();
+  function_like_impl::printFunctionLikeOp(
+      p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
+}
+
+static LogicalResult verify(DeviceTensorFuncOp op) {
+  // TODO: Verify that dynamic dims match shapeDims affine map.
+  return success();
 }
 
 #define GET_OP_CLASSES

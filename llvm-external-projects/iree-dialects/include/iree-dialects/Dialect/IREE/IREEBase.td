@@ -85,6 +85,8 @@ def IREE_ElementTypeParameter : TypeParameter<
     "::mlir::Type", "A type suitable as an element type of a container">;
 def IREE_PtrTargetTypeParameter : TypeParameter<
     "::mlir::Type", "A type suitable as a target type of a pointer">;
+def IREE_TensorElementTypeParameter : TypeParameter<
+    "::mlir::Type", "A type suitable as a target type of a pointer">;
 
 def IREE_Dim : TypeAlias<Index>;
 def IREE_Dims : Variadic<IREE_Dim>;

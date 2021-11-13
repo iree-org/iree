@@ -307,6 +307,10 @@ def IREE_ListSetOp : IREE_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
 
 //===----------------------------------------------------------------------===//
 // Tensor ops
+// These operate on native `tensor` types with the extension that they are
+// ranked with dynamic dimensions explicitly carried. Most built-in `tensor`
+// ops operate on and produce tensors where unknown dimensions must be
+// inferred.
 //===----------------------------------------------------------------------===//
 
 def IREE_TensorReshapeOp : IREE_PureOp<"tensor.reshape", [
@@ -520,6 +524,204 @@ def IREE_TensorTraceOp : IREE_Op<"tensor.trace", []> {
   );
 
   let assemblyFormat = "$key attr-dict ($operands^ `:` type($operands))?";
+}
+
+//===----------------------------------------------------------------------===//
+// Device dispatch
+// IREE models device workload definition and dispatching across devices in
+// not dissimilar to a GPU but with a simplified execution model that applies
+// to all backends.
+//===----------------------------------------------------------------------===//
+
+def IREE_DeviceExecutableOp : IREE_Op<"device.executable", [
+    IsolatedFromAbove,
+    SingleBlockImplicitTerminator<"::mlir::iree::DeviceExecutableEndOp">,
+    NativeOpTrait<"SymbolTable">,
+    Symbol,
+  ]> {
+  let summary = "A module compiled as a device executable";
+  let description = [{
+    Contains one or more functions (public or private) that will be compiled
+    with a dedicated device backend compiler.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$symName
+  );
+
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    $symName
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
+}
+
+def IREE_DeviceExecutableEndOp : IREE_Op<"device.executable_end", [
+    HasParent<"::mlir::iree::DeviceExecutableOp">,
+    Terminator,
+  ]> {
+  let summary = [{terminator pseudo-op for the executable op}];
+  let assemblyFormat = "attr-dict";
+}
+
+def IREE_DeviceTensorFuncOp : IREE_Op<"device.tensor_func", [
+    IsolatedFromAbove,
+    FunctionLike,
+    Symbol
+  ]> {
+  let summary = "A device-scoped tensor function";
+  let description = [{
+    Device tensor functions operate on !iree.device.tensor operands representing
+    the function arguments and results in destination-passing-style (i.e.
+    function results are the last N `writeonly` tensors).
+
+    For functions upon which all tensor arguments have static shapes, there is
+    no additional metadata required. However, for functions with unknown
+    dimensions, there must be a corresponding `shapeDims` affine map
+    covering all unknown dimensions and referencing symbols which must be
+    externally derived. In the future, additional facilities will be introduced
+    for implementing data-dependent shaped functions.
+  }];
+
+  let arguments = (ins SymbolNameAttr:$sym_name,
+                       TypeAttr:$type,
+                       OptionalAttr<AffineMapAttr>:$shapeDims,
+                       OptionalAttr<I32Attr>:$workgroupRank,
+                       OptionalAttr<StrAttr>:$sym_visibility);
+  let regions = (region AnyRegion:$body);
+  let extraClassDeclaration = [{
+    // FunctionLike hooks.
+    FunctionType getType() {
+      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
+          .getValue()
+          .cast<FunctionType>();
+    }
+    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+    unsigned getNumFuncResults() { return getType().getResults().size(); }
+    LogicalResult verifyType();
+  }];
+
+  let parser = [{ return ::parseFuncOp(parser, result); }];
+  let printer = [{ return ::print(*this, p); }];
+  let verifier = [{ return ::verify(*this); }];
+}
+
+def IREE_DeviceReturnOp : IREE_Op<"device.return", [
+    Terminator,
+  ]> {
+  let summary = [{returns from a device func}];
+  let assemblyFormat = "attr-dict";
+}
+
+def IREE_DeviceWorkgroupRankOp : IREE_PureOp<"device.workgroup.rank"> {
+  let summary = [{returns the rank of the workgroup dimensions}];
+  let description = [{
+    The number of workgroup dimensions used during dispatch, bounding the
+    `iree.device.workgroup.*` query functions.
+
+    ```mlir
+    %rank = iree.device.workgroup.rank : index
+    ```
+  }];
+  let arguments = (ins);
+  let results = (outs IREE_Dim:$result);
+  let assemblyFormat = "attr-dict `:` type($result)";
+}
+
+def IREE_DeviceWorkgroupIDOp : IREE_PureOp<"device.workgroup.id"> {
+  let summary = [{returns the index of the current workgroup in the grid}];
+  let description = [{
+    The global workgroup ID of the current workgroup in the range of
+    `[0, iree.device.workgroup.count)` along each dimension.
+
+    Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+    built-in variable, only in the iree dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = iree.device.workgroup.id[0] : index
+    %y = iree.device.workgroup.id[1] : index
+    ```
+  }];
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs IREE_Dim:$result);
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+def IREE_DeviceWorkgroupCountOp : IREE_PureOp<"device.workgroup.count"> {
+  let summary = [{returns the total workgroup count of the grid}];
+  let description = [{
+    The total number of workgroups along each dimension in the dispatch grid.
+
+    Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+    built-in variable, only in the iree dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = iree.device.workgroup.count[0] : index
+    %y = iree.device.workgroup.count[1] : index
+    ```
+  }];
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs IREE_Dim:$result);
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+def IREE_DeviceWorkgroupSizeOp : IREE_PureOp<"device.workgroup.size"> {
+  let summary = [{returns the size of each workgroup in invocations}];
+  let description = [{
+    The number of local invocations within the current workgroup along each
+    dimension. Depending on backend this may map to the SIMT thread count or
+    inner loop nest parameters.
+
+    Workgroup sizes are not determined at the iree dialect level as they are
+    dependent on the target backend determined when lowering into the HAL. It's
+    still possible to use the symbolic workgroup size inside of dispatch
+    executables as a placeholder for the resolved value once in the HAL.
+
+    Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
+    built-in variable, only in the iree dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = iree.device.workgroup.size[0] : index
+    %y = iree.device.workgroup.size[1] : index
+    ```
+  }];
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs IREE_Dim:$result);
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+// TODO: iree.device.dim
+// TODO: iree.device.load
+// TODO: iree.device.store
+
+def IREE_DeviceDispatchOp : IREE_Op<"device.dispatch.tensor_func", [
+    AttrSizedOperandSegments
+  ]> {
+  let summary = [{dispatch a device function across an n-dimension grid}];
+  let description = [{
+    This dispatch variant causes an `iree.device.tensor_func` to be invoked
+    across an n-dimension grid, returning immutable tensor values representing
+    the trailing result writeonly device tensors.
+
+    For any dynamic dimensions, the shape transfer metadata for the target
+    `tensor_func` will be used to determine which dimensions need to be
+    queried from the surrounding context, and assertions/calculations will
+    be automatically inserted during lowering.
+  }];
+  let arguments = (ins
+    Variadic<IREE_Dim>:$workgroupCount,
+    SymbolRefAttr:$entryPoint,
+    Variadic<AnyType>:$operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
 }
 
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_OPS_TD

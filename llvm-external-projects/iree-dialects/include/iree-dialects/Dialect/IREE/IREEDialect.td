@@ -107,4 +107,36 @@ def IREE_PtrType : IREE_Type<"Ptr"> {
   }];
 }
 
+def IREE_DeviceTensorType : IREE_Type<"DeviceTensor"> {
+  let mnemonic = "device.tensor";
+  let summary = "Mutable device-side tensor used for arguments and results";
+  let description = [{
+    Within a device function, the `!iree.device.tensor` type represents all
+    arguments and results. It:
+      - Can be read-only, write-only or read-write.
+      - Has an element type.
+      - Has a fixed rank.
+      - Each dimension can either be static or unknown.
+
+    Values are accessed via `iree.device.load` and `iree.device.store` ops.
+  }];
+
+  let parameters = (ins
+    "TensorAccess":$access,
+    ArrayRefParameter<"int64_t">:$shape,
+    IREE_TensorElementTypeParameter:$elementType
+  );
+  let builders = [
+    TypeBuilderWithInferredContext<(ins
+      "TensorAccess":$access,
+      "ArrayRef<int64_t>":$shape,
+      "Type":$elementType
+    ), [{
+      return $_get(elementType.getContext(), access, shape, elementType);
+    }]>
+  ];
+  let skipDefaultBuilders = 1;
+  let genVerifyDecl = 1;
+}
+
 #endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_DIALECT_TD

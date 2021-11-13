@@ -9,6 +9,18 @@
 
 #include "mlir/IR/Dialect.h"
 
+namespace mlir {
+namespace iree {
+
+enum class TensorAccess : uint32_t {
+  ReadOnly,
+  ReadWrite,
+  WriteOnly,
+};
+
+} // namespace iree
+} // namespace mlir
+
 // Include generated dialect code (this comment blocks clang-format from
 // clobbering order).
 #include "iree-dialects/Dialect/IREE/IREEOpsDialect.h.inc"
