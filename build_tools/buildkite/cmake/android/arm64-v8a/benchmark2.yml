@@ -75,6 +75,13 @@ steps:
     agents:
       - "queue=report"
 
+  # TODO(antiagainst): Remove this block step when the migration is complete.
+  - block: "Upload to Dashboard"
+    prompt: "Uploads are paused while we rename series in Dana. Don't unblock unless you know what you're doing."
+    key: "block-upload-to-dashboard"
+    branches: "main"
+
+
   - label: "Push benchmark results to dashboard"
     commands:
       - "git clean -f"
