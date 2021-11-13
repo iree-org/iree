@@ -354,11 +354,47 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
-        .Case([&](mlir::ReturnOp op) {
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+        .Case([&](mlir::BranchOp op) {
+          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getOperand(operandIdx)),
+              DFX::Resolution::OPTIONAL);
+          getState() ^= operandUsage.getState();
+          solver.getExplorer().walkOutgoingBranchOperandArguments(
+              op, operandIdx, [&](Block *targetBlock, BlockArgument arg) {
+                auto argUsage = solver.getElementFor<ValueResourceUsage>(
+                    *this, Position::forValue(arg), DFX::Resolution::OPTIONAL);
+                getState() ^= argUsage;
+                return WalkResult::advance();
+              });
+        })
+        .Case([&](mlir::CondBranchOp op) {
+          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);
-          getState() ^= resultUsage.getState();
+          getState() ^= operandUsage.getState();
+          solver.getExplorer().walkOutgoingBranchOperandArguments(
+              op, operandIdx, [&](Block *targetBlock, BlockArgument arg) {
+                auto argUsage = solver.getElementFor<ValueResourceUsage>(
+                    *this, Position::forValue(arg), DFX::Resolution::OPTIONAL);
+                getState() ^= argUsage;
+                return WalkResult::advance();
+              });
+        })
+        .Case([&](mlir::ReturnOp op) {
+          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getOperand(operandIdx)),
+              DFX::Resolution::OPTIONAL);
+          getState() ^= operandUsage.getState();
+          solver.getExplorer().walkIncomingCalls(
+              op->getParentOfType<mlir::CallableOpInterface>(),
+              [&](mlir::CallOpInterface callOp) {
+                auto argUsage = solver.getElementFor<ValueResourceUsage>(
+                    *this,
+                    Position::forValue(callOp.getArgOperands()[operandIdx]),
+                    DFX::Resolution::OPTIONAL);
+                getState() ^= argUsage;
+                return WalkResult::advance();
+              });
         })
         .Case([&](IREE::Util::DoNotOptimizeOp op) {
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
