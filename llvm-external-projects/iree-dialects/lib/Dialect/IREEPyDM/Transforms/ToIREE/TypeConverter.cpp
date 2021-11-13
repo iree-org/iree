@@ -6,17 +6,19 @@
 
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/ToIREE/TypeConverter.h"
 
-#include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 using namespace mlir;
+namespace IREE = mlir::iree_compiler::IREE;
 namespace PYDM = mlir::iree_compiler::IREE::PYDM;
 using namespace PYDM;
 
 static Type getVariantListType(Builder &builder) {
-  return builder.getType<iree::ListType>(builder.getType<iree::VariantType>());
+  return builder.getType<IREE::Input::ListType>(
+      builder.getType<IREE::Input::VariantType>());
 }
 
 LoweringTypeConverter::LoweringTypeConverter() {
@@ -81,7 +83,7 @@ LoweringTypeConverter::LoweringTypeConverter() {
   addConversion([](mlir::IntegerType t) -> Optional<Type> { return t; });
   addConversion([](mlir::FloatType t) -> Optional<Type> { return t; });
   addConversion([](mlir::IndexType t) -> Optional<Type> { return t; });
-  addConversion([](iree::ListType t) -> Optional<Type> { return t; });
+  addConversion([](IREE::Input::ListType t) -> Optional<Type> { return t; });
 }
 
 Type LoweringTypeConverter::getBoolType(Builder b) const {
@@ -103,7 +105,7 @@ Type LoweringTypeConverter::getWeakFloatType(Builder b) const {
 
 bool LoweringTypeConverter::isTypeLegal(Type t) const {
   return t.isa<mlir::IntegerType, mlir::FloatType, mlir::IndexType,
-               iree::ListType>();
+               IREE::Input::ListType>();
 }
 
 bool LoweringTypeConverter::areTypesLegal(TypeRange types) const {

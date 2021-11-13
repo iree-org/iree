@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_OPS_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_OPS_TD
+#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_TD
+#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_TD
 
-include "iree-dialects/Dialect/IREE/IREEDialect.td"
+include "iree-dialects/Dialect/Input/InputDialect.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 
-def IREE_NullOp : IREE_PureOp<"null"> {
+def IREEInput_NullOp : IREEInput_PureOp<"null"> {
   let summary = "a null value";
   let description = [{
     Initializes reference and variant types with a null value.
@@ -30,13 +30,13 @@ def IREE_NullOp : IREE_PureOp<"null"> {
 // Casts
 //===----------------------------------------------------------------------===//
 
-def IREE_TensorToBufferViewOp : IREE_PureOp<"cast.tensor_to_buffer_view"> {
+def IREEInput_TensorToBufferViewOp : IREEInput_PureOp<"cast.tensor_to_buffer_view"> {
   let summary = "Casts a tensor to a BufferView, capturing dynamic dims";
   let arguments = (ins
-    IREE_Tensor:$source,
-    IREE_ShapeDynamicDims:$source_dims
+    IREEInput_Tensor:$source,
+    IREEInput_ShapeDynamicDims:$source_dims
   );
-  let results = (outs IREE_BufferViewType:$target);
+  let results = (outs IREEInput_BufferViewType:$target);
 
   let assemblyFormat = [{
     $source `:` type($source) (`{` $source_dims^ `}`)? `->` type($target)
@@ -44,13 +44,13 @@ def IREE_TensorToBufferViewOp : IREE_PureOp<"cast.tensor_to_buffer_view"> {
   }];
 }
 
-def IREE_BufferViewToTensorOp : IREE_PureOp<"cast.buffer_view_to_tensor"> {
+def IREEInput_BufferViewToTensorOp : IREEInput_PureOp<"cast.buffer_view_to_tensor"> {
   let summary = "Casts a BufferView to a tensor, providing dynamic dims";
   let arguments = (ins
-    IREE_BufferViewType:$source,
-    IREE_ShapeDynamicDims:$target_dims
+    IREEInput_BufferViewType:$source,
+    IREEInput_ShapeDynamicDims:$target_dims
   );
-  let results = (outs IREE_Tensor:$target);
+  let results = (outs IREEInput_Tensor:$target);
 
   let assemblyFormat = [{
     $source `:` type($source) `->` type($target) (`{` $target_dims^ `}`)?
@@ -62,7 +62,7 @@ def IREE_BufferViewToTensorOp : IREE_PureOp<"cast.buffer_view_to_tensor"> {
 // Global variables
 //===----------------------------------------------------------------------===//
 
-def IREE_GlobalOp : IREE_Op<"global", [
+def IREEInput_GlobalOp : IREEInput_Op<"global", [
     Symbol,
   ]> {
   let summary = [{stateful global variable declaration}];
@@ -91,7 +91,7 @@ def IREE_GlobalOp : IREE_Op<"global", [
   }];
 }
 
-def IREE_GlobalAddressOp : IREE_PureOp<"global.address"> {
+def IREEInput_GlobalAddressOp : IREEInput_PureOp<"global.address"> {
   let summary = [{returns an address reference to a global}];
   let description = [{
     Returns the address of a global as a typed reference. Can be used with the
@@ -99,10 +99,10 @@ def IREE_GlobalAddressOp : IREE_PureOp<"global.address"> {
   }];
 
   let arguments = (ins
-    IREE_GlobalRefAttr:$global
+    IREEInput_GlobalRefAttr:$global
   );
   let results = (outs
-    IREE_AnyGlobalPtr:$result
+    IREEInput_AnyGlobalPtr:$result
   );
 
   let assemblyFormat = [{
@@ -110,14 +110,14 @@ def IREE_GlobalAddressOp : IREE_PureOp<"global.address"> {
   }];
 }
 
-def IREE_GlobalLoadOp : IREE_Op<"global.load"> {
+def IREEInput_GlobalLoadOp : IREEInput_Op<"global.load"> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the global value.
   }];
 
   let arguments = (ins
-    IREE_GlobalRefAttr:$global
+    IREEInput_GlobalRefAttr:$global
   );
   let results = (outs
     AnyType:$result
@@ -128,14 +128,14 @@ def IREE_GlobalLoadOp : IREE_Op<"global.load"> {
   }];
 }
 
-def IREE_GlobalLoadIndirectOp : IREE_Op<"global.load.indirect"> {
+def IREEInput_GlobalLoadIndirectOp : IREEInput_Op<"global.load.indirect"> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the global value.
   }];
 
   let arguments = (ins
-    IREE_AnyGlobalPtr:$global
+    IREEInput_AnyGlobalPtr:$global
   );
   let results = (outs
     AnyType:$result
@@ -146,7 +146,7 @@ def IREE_GlobalLoadIndirectOp : IREE_Op<"global.load.indirect"> {
   }];
 }
 
-def IREE_GlobalStoreOp : IREE_Op<"global.store"> {
+def IREEInput_GlobalStoreOp : IREEInput_Op<"global.store"> {
   let summary = [{stores a value into a global variable}];
   let description = [{
     Stores a copy of the value into a global.
@@ -154,7 +154,7 @@ def IREE_GlobalStoreOp : IREE_Op<"global.store"> {
 
   let arguments = (ins
     AnyType:$value,
-    IREE_GlobalRefAttr:$global
+    IREEInput_GlobalRefAttr:$global
   );
 
   let assemblyFormat = [{
@@ -162,7 +162,7 @@ def IREE_GlobalStoreOp : IREE_Op<"global.store"> {
   }];
 }
 
-def IREE_GlobalStoreIndirectOp : IREE_Op<"global.store.indirect"> {
+def IREEInput_GlobalStoreIndirectOp : IREEInput_Op<"global.store.indirect"> {
   let summary = [{stores a value into a global variable}];
   let description = [{
     Stores a copy of the value into a global.
@@ -170,7 +170,7 @@ def IREE_GlobalStoreIndirectOp : IREE_Op<"global.store.indirect"> {
 
   let arguments = (ins
     AnyType:$value,
-    IREE_AnyGlobalPtr:$global
+    IREEInput_AnyGlobalPtr:$global
   );
 
   let assemblyFormat = [{
@@ -182,17 +182,17 @@ def IREE_GlobalStoreIndirectOp : IREE_Op<"global.store.indirect"> {
 // Buffer Views
 //===----------------------------------------------------------------------===//
 
-def IREE_BufferViewRankOp : IREE_PureOp<"buffer_view.rank"> {
+def IREEInput_BufferViewRankOp : IREEInput_PureOp<"buffer_view.rank"> {
   let summary = [{buffer view rank query}];
   let description = [{
     Returns the rank of the buffer view.
   }];
 
   let arguments = (ins
-    IREE_BufferViewType:$buffer_view
+    IREEInput_BufferViewType:$buffer_view
   );
   let results = (outs
-    IREE_Dim:$result
+    IREEInput_Dim:$result
   );
 
   let assemblyFormat = [{
@@ -200,18 +200,18 @@ def IREE_BufferViewRankOp : IREE_PureOp<"buffer_view.rank"> {
   }];
 }
 
-def IREE_BufferViewDimOp : IREE_PureOp<"buffer_view.dim"> {
+def IREEInput_BufferViewDimOp : IREEInput_PureOp<"buffer_view.dim"> {
   let summary = [{buffer view dimension value query}];
   let description = [{
     Returns the value of the given dimension.
   }];
 
   let arguments = (ins
-    IREE_BufferViewType:$buffer_view,
+    IREEInput_BufferViewType:$buffer_view,
     IndexAttr:$index
   );
   let results = (outs
-    IREE_Dim:$result
+    IREEInput_Dim:$result
   );
 
   let assemblyFormat = [{
@@ -223,7 +223,7 @@ def IREE_BufferViewDimOp : IREE_PureOp<"buffer_view.dim"> {
 // Mutable Lists
 //===----------------------------------------------------------------------===//
 
-def IREE_ListCreateOp : IREE_PureOp<
+def IREEInput_ListCreateOp : IREEInput_PureOp<
     "list.create", [MemoryEffects<[MemAlloc]>]> {
   let summary = [{creates a new empty list}];
   let description = [{
@@ -234,20 +234,20 @@ def IREE_ListCreateOp : IREE_PureOp<
     Optional<Index>:$initial_capacity
   );
   let results = (outs
-    IREE_AnyList:$result
+    IREEInput_AnyList:$result
   );
 
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` type($result)";
 }
 
-def IREE_ListSizeOp : IREE_Op<"list.size", [MemoryEffects<[MemRead]>]> {
+def IREEInput_ListSizeOp : IREEInput_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   let summary = [{the size of the list in elements}];
   let description = [{
     Returns the current size of the list in elements.
   }];
 
   let arguments = (ins
-    IREE_AnyList:$list
+    IREEInput_AnyList:$list
   );
   let results = (outs
     Index:$result
@@ -256,7 +256,7 @@ def IREE_ListSizeOp : IREE_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   let assemblyFormat = "operands attr-dict `:` type($list)";
 }
 
-def IREE_ListResizeOp : IREE_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
+def IREEInput_ListResizeOp : IREEInput_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   let summary = [{resizes the list to a new count in elements}];
   let description = [{
     Resizes the list to contain `new_size` elements. This will either truncate
@@ -265,14 +265,14 @@ def IREE_ListResizeOp : IREE_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   }];
 
   let arguments = (ins
-    IREE_AnyList:$list,
+    IREEInput_AnyList:$list,
     Index:$new_size
   );
 
   let assemblyFormat = "operands attr-dict `:` type($list)";
 }
 
-def IREE_ListGetOp : IREE_Op<"list.get", [MemoryEffects<[MemRead]>]> {
+def IREEInput_ListGetOp : IREEInput_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   let summary = [{element accessor}];
   let description = [{
     Returns the value of the element at the given index. Note that the value
@@ -280,7 +280,7 @@ def IREE_ListGetOp : IREE_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   }];
 
   let arguments = (ins
-    IREE_AnyList:$list,
+    IREEInput_AnyList:$list,
     Index:$index
   );
   let results = (outs
@@ -290,14 +290,14 @@ def IREE_ListGetOp : IREE_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   let assemblyFormat = "$list `[` $index `]` attr-dict `:` type($list) `->` type($result)";
 }
 
-def IREE_ListSetOp : IREE_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
+def IREEInput_ListSetOp : IREEInput_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
   let summary = [{element mutator}];
   let description = [{
     Sets the element at the given index to the new value.
   }];
 
   let arguments = (ins
-    IREE_AnyList:$list,
+    IREEInput_AnyList:$list,
     Index:$index,
     AnyType:$value
   );
@@ -309,7 +309,7 @@ def IREE_ListSetOp : IREE_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
 // Tensor ops
 //===----------------------------------------------------------------------===//
 
-def IREE_TensorReshapeOp : IREE_PureOp<"tensor.reshape", [
+def IREEInput_TensorReshapeOp : IREEInput_PureOp<"tensor.reshape", [
     AllElementTypesMatch<["source", "result"]>,
     AttrSizedOperandSegments,
   ]> {
@@ -319,12 +319,12 @@ def IREE_TensorReshapeOp : IREE_PureOp<"tensor.reshape", [
   }];
 
   let arguments = (ins
-    IREE_Tensor:$source,
-    IREE_ShapeDynamicDims:$source_dims,
-    IREE_ShapeDynamicDims:$result_dims
+    IREEInput_Tensor:$source,
+    IREEInput_ShapeDynamicDims:$source_dims,
+    IREEInput_ShapeDynamicDims:$result_dims
   );
   let results = (outs
-    IREE_Tensor:$result
+    IREEInput_Tensor:$result
   );
 
   let assemblyFormat = [{
@@ -335,7 +335,7 @@ def IREE_TensorReshapeOp : IREE_PureOp<"tensor.reshape", [
   }];
 }
 
-def IREE_TensorLoadOp : IREE_PureOp<"tensor.load", [
+def IREEInput_TensorLoadOp : IREEInput_PureOp<"tensor.load", [
     TypesMatchWith<"value type matches element type of target operand",
                    "source", "result",
                    "$_self.cast<ShapedType>().getElementType()">,
@@ -347,12 +347,12 @@ def IREE_TensorLoadOp : IREE_PureOp<"tensor.load", [
   }];
 
   let arguments = (ins
-    IREE_Tensor:$source,
-    IREE_ShapeDynamicDims:$source_dims,
-    Variadic<IREE_Dim>:$indices
+    IREEInput_Tensor:$source,
+    IREEInput_ShapeDynamicDims:$source_dims,
+    Variadic<IREEInput_Dim>:$indices
   );
   let results = (outs
-    AnyTypeOf<[IREE_PrimitiveType, AnyVector]>:$result
+    AnyTypeOf<[IREEInput_PrimitiveType, AnyVector]>:$result
   );
 
   let assemblyFormat = [{
@@ -363,7 +363,7 @@ def IREE_TensorLoadOp : IREE_PureOp<"tensor.load", [
 
 }
 
-def IREE_TensorStoreOp : IREE_PureOp<"tensor.store", [
+def IREEInput_TensorStoreOp : IREEInput_PureOp<"tensor.store", [
     AllTypesMatch<["target", "result"]>,
     TypesMatchWith<"value type matches element type of target operand",
                    "target", "value",
@@ -376,13 +376,13 @@ def IREE_TensorStoreOp : IREE_PureOp<"tensor.store", [
   }];
 
   let arguments = (ins
-    AnyTypeOf<[IREE_PrimitiveType, AnyVector]>:$value,
-    IREE_Tensor:$target,
-    IREE_ShapeDynamicDims:$target_dims,
-    Variadic<IREE_Dim>:$indices
+    AnyTypeOf<[IREEInput_PrimitiveType, AnyVector]>:$value,
+    IREEInput_Tensor:$target,
+    IREEInput_ShapeDynamicDims:$target_dims,
+    Variadic<IREEInput_Dim>:$indices
   );
   let results = (outs
-    IREE_Tensor:$result
+    IREEInput_Tensor:$result
   );
 
   let assemblyFormat = [{
@@ -392,7 +392,7 @@ def IREE_TensorStoreOp : IREE_PureOp<"tensor.store", [
   }];
 }
 
-def IREE_TensorSplatOp : IREE_PureOp<"tensor.splat", [
+def IREEInput_TensorSplatOp : IREEInput_PureOp<"tensor.splat", [
     TypesMatchWith<"value type matches element type of result",
                    "result", "value",
                    "$_self.cast<ShapedType>().getElementType()">,
@@ -403,11 +403,11 @@ def IREE_TensorSplatOp : IREE_PureOp<"tensor.splat", [
   }];
 
   let arguments = (ins
-    IREE_PrimitiveType:$value,
-    IREE_ShapeDynamicDims:$result_dims
+    IREEInput_PrimitiveType:$value,
+    IREEInput_ShapeDynamicDims:$result_dims
   );
   let results = (outs
-    IREE_Tensor:$result
+    IREEInput_Tensor:$result
   );
 
   let assemblyFormat = [{
@@ -416,7 +416,7 @@ def IREE_TensorSplatOp : IREE_PureOp<"tensor.splat", [
   }];
 }
 
-def IREE_TensorCloneOp : IREE_PureOp<"tensor.clone", [
+def IREEInput_TensorCloneOp : IREEInput_PureOp<"tensor.clone", [
     AllTypesMatch<["operand", "result"]>,
   ]> {
   let summary = [{performs a full tensor clone operation}];
@@ -425,11 +425,11 @@ def IREE_TensorCloneOp : IREE_PureOp<"tensor.clone", [
   }];
 
   let arguments = (ins
-    IREE_Tensor:$operand,
-    IREE_ShapeDynamicDims:$operand_dims
+    IREEInput_Tensor:$operand,
+    IREEInput_ShapeDynamicDims:$operand_dims
   );
   let results = (outs
-    IREE_Tensor:$result
+    IREEInput_Tensor:$result
   );
 
   let assemblyFormat = [{
@@ -438,7 +438,7 @@ def IREE_TensorCloneOp : IREE_PureOp<"tensor.clone", [
   }];
 }
 
-def IREE_TensorSliceOp : IREE_PureOp<"tensor.slice", [
+def IREEInput_TensorSliceOp : IREEInput_PureOp<"tensor.slice", [
     AllRanksMatch<["source", "result"]>,
     AllElementTypesMatch<["source", "result"]>,
     AttrSizedOperandSegments,
@@ -449,14 +449,14 @@ def IREE_TensorSliceOp : IREE_PureOp<"tensor.slice", [
   }];
 
   let arguments = (ins
-    IREE_Tensor:$source,
-    IREE_ShapeDynamicDims:$source_dims,
-    Variadic<IREE_Dim>:$start_indices,
-    Variadic<IREE_Dim>:$lengths,
-    IREE_ShapeDynamicDims:$result_dims
+    IREEInput_Tensor:$source,
+    IREEInput_ShapeDynamicDims:$source_dims,
+    Variadic<IREEInput_Dim>:$start_indices,
+    Variadic<IREEInput_Dim>:$lengths,
+    IREEInput_ShapeDynamicDims:$result_dims
   );
   let results = (outs
-    IREE_Tensor:$result
+    IREEInput_Tensor:$result
   );
 
   let assemblyFormat = [{
@@ -467,7 +467,7 @@ def IREE_TensorSliceOp : IREE_PureOp<"tensor.slice", [
   }];
 }
 
-def IREE_TensorUpdateOp : IREE_PureOp<"tensor.update", [
+def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
     AllRanksMatch<["update", "target", "result"]>,
     AllTypesMatch<["target", "result"]>,
     AllElementTypesMatch<["update", "target", "result"]>,
@@ -480,14 +480,14 @@ def IREE_TensorUpdateOp : IREE_PureOp<"tensor.update", [
   }];
 
   let arguments = (ins
-    IREE_Tensor:$target,
-    IREE_ShapeDynamicDims:$target_dims,
-    Variadic<IREE_Dim>:$start_indices,
-    IREE_Tensor:$update,
-    IREE_ShapeDynamicDims:$update_dims
+    IREEInput_Tensor:$target,
+    IREEInput_ShapeDynamicDims:$target_dims,
+    Variadic<IREEInput_Dim>:$start_indices,
+    IREEInput_Tensor:$update,
+    IREEInput_ShapeDynamicDims:$update_dims
   );
   let results = (outs
-    IREE_Tensor:$result
+    IREEInput_Tensor:$result
   );
 
   let assemblyFormat = [{
@@ -505,7 +505,7 @@ def IREE_TensorUpdateOp : IREE_PureOp<"tensor.update", [
   ];
 }
 
-def IREE_TensorTraceOp : IREE_Op<"tensor.trace", []> {
+def IREEInput_TensorTraceOp : IREEInput_Op<"tensor.trace", []> {
   let summary = [{trace value(s) operation}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given
@@ -516,10 +516,10 @@ def IREE_TensorTraceOp : IREE_Op<"tensor.trace", []> {
 
   let arguments = (ins
     StrAttr:$key,
-    Variadic<IREE_Tensor>:$operands
+    Variadic<IREEInput_Tensor>:$operands
   );
 
   let assemblyFormat = "$key attr-dict ($operands^ `:` type($operands))?";
 }
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_OPS_TD
+#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_TD

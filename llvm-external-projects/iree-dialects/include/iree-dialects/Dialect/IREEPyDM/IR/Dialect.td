@@ -152,7 +152,6 @@ def IREEPyDM_IntegerType : IREEPyDM_PrimitiveTypeDef<"Integer", [
 
   let printer = [{
     auto w = getImpl()->bitWidth;
-    $_printer << "integer";
     if (w) {
       $_printer << "<";
       if (*w == 0) {
@@ -219,7 +218,6 @@ def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List", ["isRefinable"]> {
   ];
 
   let printer = [{
-    $_printer << getMnemonic();
     if (getImpl()->uniformElementType ||
         getImpl()->storageClass != CollectionStorageClass::Boxed) {
       $_printer << "<";
@@ -335,7 +333,6 @@ def IREEPyDM_RealType : IREEPyDM_PrimitiveTypeDef<"Real",
 
   let printer = [{
     auto ft = getImpl()->floatType;
-    $_printer << "real";
     if (ft)
       $_printer << "<" << ft << ">";
   }];
@@ -429,7 +426,6 @@ def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
   ];
 
   let printer = [{
-    $_printer << getMnemonic();
     if (getImpl()->primitiveType)
       $_printer << "<" << getImpl()->primitiveType << ">";
   }];
@@ -484,7 +480,6 @@ def IREEPyDM_UnionType : IREEPyDM_TypeDef<"Union"> {
 
   let genVerifyDecl = 1;
   let printer = [{
-    $_printer << getMnemonic();
     llvm::interleaveComma(getAlternatives(), $_printer);
   }];
 

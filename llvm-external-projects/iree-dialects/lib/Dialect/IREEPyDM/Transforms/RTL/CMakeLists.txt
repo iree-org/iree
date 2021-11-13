@@ -8,7 +8,7 @@ add_mlir_library(IREEDialectsIREEPyDMRTLPasses
 
   LINK_LIBS PUBLIC
   IREEDialectsIREEPyDMDialect
-  IREEDialectsIREEDialect
+  IREEInputDialect
   MLIRIR
   MLIRParser
   MLIRTransformUtils

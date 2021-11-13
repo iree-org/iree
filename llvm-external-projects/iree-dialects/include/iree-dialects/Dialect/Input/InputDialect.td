@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_DIALECT_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_DIALECT_TD
+#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD
+#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD
 
-include "iree-dialects/Dialect/IREE/IREEBase.td"
+include "iree-dialects/Dialect/Input/InputBase.td"
 
 //===----------------------------------------------------------------------===//
 // Types
 //===----------------------------------------------------------------------===//
 
-def IREE_BufferViewType : IREE_Type<"BufferView"> {
+def IREEInput_BufferViewType : IREEInput_Type<"BufferView"> {
   let mnemonic = "buffer_view";
 
   let summary = "View into a buffer, with runtime shape and element type";
@@ -32,16 +32,9 @@ def IREE_BufferViewType : IREE_Type<"BufferView"> {
     to higher level code to ensure that aliasing rules are enforced at such
     boundaries.
   }];
-  let printer = [{
-    $_printer << "buffer_view";
-  }];
-
-  let parser = [{
-    return get($_ctxt);
-  }];
 }
 
-def IREE_VariantType : IREE_Type<"Variant"> {
+def IREEInput_VariantType : IREEInput_Type<"Variant"> {
   let mnemonic = "variant";
 
   let summary = "Represents any legal or reference type in the IREE runtime";
@@ -50,16 +43,9 @@ def IREE_VariantType : IREE_Type<"Variant"> {
     The variant type is typically used to parameterize container types that
     can contain any legal primitive, reference or null in the IREE type system.
   }];
-  let printer = [{
-    $_printer << "variant";
-  }];
-
-  let parser = [{
-    return get($_ctxt);
-  }];
 }
 
-def IREE_ListType : IREE_Type<"List"> {
+def IREEInput_ListType : IREEInput_Type<"List"> {
   let mnemonic = "list";
 
   let summary = "A one dimensional list of runtime values";
@@ -73,10 +59,10 @@ def IREE_ListType : IREE_Type<"List"> {
     by parameterizing them with a VariantType.
   }];
 
-  let parameters = (ins IREE_ElementTypeParameter:$elementType);
+  let parameters = (ins IREEInput_ElementTypeParameter:$elementType);
 
   let printer = [{
-    $_printer << "list<" << getElementType() << ">";
+    $_printer << "<" << getElementType() << ">";
   }];
 
   let parser = [{
@@ -88,14 +74,14 @@ def IREE_ListType : IREE_Type<"List"> {
   }];
 }
 
-def IREE_PtrType : IREE_Type<"Ptr"> {
+def IREEInput_PtrType : IREEInput_Type<"Ptr"> {
   let mnemonic = "ptr";
 
   let summary = "Pointer to a concrete type";
-  let parameters = (ins IREE_PtrTargetTypeParameter:$targetType);
+  let parameters = (ins IREEInput_PtrTargetTypeParameter:$targetType);
 
   let printer = [{
-    $_printer << "ptr<" << getTargetType() << ">";
+    $_printer << "<" << getTargetType() << ">";
   }];
 
   let parser = [{
@@ -107,4 +93,4 @@ def IREE_PtrType : IREE_Type<"Ptr"> {
   }];
 }
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_DIALECT_TD
+#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD

@@ -8,6 +8,6 @@
 #define PYTHON_BINDINGS_IREE_OPS
 
 include "mlir/Bindings/Python/Attributes.td"
-include "iree-dialects/Dialect/IREE/IREEOps.td"
+include "iree-dialects/Dialect/Input/InputOps.td"
 
 #endif // PYTHON_BINDINGS_IREE_OPS

@@ -77,11 +77,11 @@ PYBIND11_MODULE(_ireeDialects, m) {
   //===--------------------------------------------------------------------===//
   // IREEDialect
   //===--------------------------------------------------------------------===//
-  auto iree_m = m.def_submodule("iree");
+  auto iree_m = m.def_submodule("iree_input");
   iree_m.def(
       "register_dialect",
       [](MlirContext context, bool load) {
-        MlirDialectHandle handle = mlirGetDialectHandle__iree__();
+        MlirDialectHandle handle = mlirGetDialectHandle__iree_input__();
         mlirDialectHandleRegisterDialect(handle, context);
         if (load) {
           mlirDialectHandleLoadDialect(handle, context);

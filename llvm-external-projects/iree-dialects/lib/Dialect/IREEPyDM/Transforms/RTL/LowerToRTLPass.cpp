@@ -5,10 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "../PassDetail.h"
-#include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREE/IREEOps.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Ops.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -221,8 +221,8 @@ struct ObjectAsBoolPattern
 struct LowerIREEPyDMToRTLPass
     : public LowerIREEPyDMToRTLBase<LowerIREEPyDMToRTLPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<mlir::iree::IREEDialect, BuiltinDialect, StandardOpsDialect>();
+    registry.insert<mlir::iree_compiler::IREE::Input::IREEInputDialect,
+                    BuiltinDialect, StandardOpsDialect>();
   }
 
   void runOnOperation() override {

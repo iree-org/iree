@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/IREE/IREEOps.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Ops.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/ToIREE/Patterns.h"
+#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -18,6 +18,7 @@
 using llvm::enumerate;
 using namespace mlir;
 namespace PYDM = mlir::iree_compiler::IREE::PYDM;
+namespace Input = mlir::iree_compiler::IREE::Input;
 using namespace PYDM;
 
 namespace {
@@ -39,15 +40,16 @@ enum class ExceptionCode : int {
 }  // namespace
 
 static Type getVariantListType(Builder &builder) {
-  return builder.getType<iree::ListType>(builder.getType<iree::VariantType>());
+  return builder.getType<Input::ListType>(
+      builder.getType<Input::VariantType>());
 }
 
 static Value getNullValue(Location loc, OpBuilder &builder, Type t) {
   return TypeSwitch<Type, Value>(t)
-      .Case<iree::ListType>([&](auto t) -> Value {
+      .Case<Input::ListType>([&](auto t) -> Value {
         // TODO: If it becomes important to optimize this, come up with a way
         // to return an empty list without creating one.
-        return builder.create<iree::ListCreateOp>(
+        return builder.create<Input::ListCreateOp>(
             loc, getVariantListType(builder), /*capacity=*/nullptr);
       })
       .Default([&](Type t) -> Value {
@@ -75,8 +77,8 @@ static Value getFailureStatusValue(Location loc, OpBuilder &builder,
 }
 
 static Value createUndefObjectList(Location loc, OpBuilder &builder) {
-  return builder.create<iree::ListCreateOp>(loc, getVariantListType(builder),
-                                            /*capacity=*/nullptr);
+  return builder.create<Input::ListCreateOp>(loc, getVariantListType(builder),
+                                             /*capacity=*/nullptr);
 }
 
 void resetObjectList(Location loc, OpBuilder &builder, Value list, int typeCode,
@@ -85,13 +87,13 @@ void resetObjectList(Location loc, OpBuilder &builder, Value list, int typeCode,
   // to truly reset, we have to resize. Low level optimizations should be able
   // to elide this if it turns out to be unnecessary.
   auto size = builder.create<arith::ConstantIndexOp>(loc, 2);
-  builder.create<iree::ListResizeOp>(loc, list, size);
+  builder.create<Input::ListResizeOp>(loc, list, size);
   auto index0 = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value typeCodeValue = builder.create<arith::ConstantOp>(
       loc, builder.getI32IntegerAttr(typeCode));
-  builder.create<iree::ListSetOp>(loc, list, index0, typeCodeValue);
+  builder.create<Input::ListSetOp>(loc, list, index0, typeCodeValue);
   auto index1 = builder.create<arith::ConstantIndexOp>(loc, 1);
-  builder.create<iree::ListSetOp>(loc, list, index1, data);
+  builder.create<Input::ListSetOp>(loc, list, index1, data);
 }
 
 static Value createObjectList(Location loc, OpBuilder &builder, int typeCode,
@@ -334,7 +336,7 @@ class AssignSubscriptListConversion
 
     Value zero = rewriter.create<arith::ConstantIntOp>(loc, 0, slice.getType());
     Value listSizeIndex =
-        rewriter.create<iree::ListSizeOp>(loc, indexType, sequence);
+        rewriter.create<Input::ListSizeOp>(loc, indexType, sequence);
     Value listSizeInteger = rewriter.create<arith::IndexCastOp>(
         loc, slice.getType(), listSizeIndex);
     Block *entryBlock = rewriter.getInsertionBlock();
@@ -387,7 +389,7 @@ class AssignSubscriptListConversion
     {
       rewriter.setInsertionPointToEnd(setElementBlock);
       Value successResult = getSuccessStatusValue(loc, rewriter);
-      rewriter.create<iree::ListSetOp>(
+      rewriter.create<Input::ListSetOp>(
           loc, sequence, setElementBlock->getArgument(0), valueToSet);
       rewriter.create<mlir::BranchOp>(loc, continuationBlock,
                                       ValueRange{successResult});
@@ -555,7 +557,7 @@ class DynamicUnpackOpConversion
       rewriter.setInsertionPointToEnd(entryBlock);
       auto arityValue =
           rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(arity));
-      Value listSize = rewriter.create<iree::ListSizeOp>(
+      Value listSize = rewriter.create<Input::ListSizeOp>(
           loc, rewriter.getIndexType(), adaptor.sequence());
       Value arityMatch = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::eq, arityValue, listSize);
@@ -571,7 +573,7 @@ class DynamicUnpackOpConversion
       for (auto it : enumerate(slotTypes)) {
         Value index = rewriter.create<arith::ConstantOp>(
             loc, rewriter.getIndexAttr(it.index()));
-        Value slotValue = rewriter.create<iree::ListGetOp>(
+        Value slotValue = rewriter.create<Input::ListGetOp>(
             loc, it.value(), adaptor.sequence(), index);
         branchArgs.push_back(slotValue);
       }
@@ -687,8 +689,8 @@ class GetTypeCodeConversion : public OpConversionPattern<PYDM::GetTypeCodeOp> {
     Type i32Type = rewriter.getIntegerType(32);
     Value index0 =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
-    Value typeCode =
-        rewriter.create<iree::ListGetOp>(loc, i32Type, adaptor.value(), index0);
+    Value typeCode = rewriter.create<Input::ListGetOp>(loc, i32Type,
+                                                       adaptor.value(), index0);
     rewriter.replaceOp(
         srcOp,
         castIntegerValue(loc, typeCode, resultType.cast<mlir::IntegerType>(),
@@ -712,8 +714,8 @@ class LoadVarOpConversion : public OpConversionPattern<PYDM::LoadVarOp> {
     auto list = adaptor.getOperands()[0];
     auto index1 =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
-    rewriter.replaceOpWithNewOp<iree::ListGetOp>(srcOp, resultType, list,
-                                                 index1);
+    rewriter.replaceOpWithNewOp<Input::ListGetOp>(srcOp, resultType, list,
+                                                  index1);
     return success();
   }
 };
@@ -737,13 +739,13 @@ class MakeListOpBoxedConversion : public OpConversionPattern<PYDM::MakeListOp> {
     auto size = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getIndexAttr(adaptor.elements().size()));
     auto list =
-        rewriter.create<iree::ListCreateOp>(loc, getVariantListType(rewriter),
-                                            /*capacity=*/size);
-    rewriter.create<iree::ListResizeOp>(loc, list, size);
+        rewriter.create<Input::ListCreateOp>(loc, getVariantListType(rewriter),
+                                             /*capacity=*/size);
+    rewriter.create<Input::ListResizeOp>(loc, list, size);
     for (auto it : enumerate(adaptor.elements())) {
       auto index = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIndexAttr(it.index()));
-      rewriter.create<iree::ListSetOp>(loc, list, index, it.value());
+      rewriter.create<Input::ListSetOp>(loc, list, index, it.value());
     }
 
     rewriter.replaceOp(srcOp, ValueRange{list});
@@ -766,13 +768,13 @@ class MakeTupleOpConversion : public OpConversionPattern<PYDM::MakeTupleOp> {
     auto size = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getIndexAttr(adaptor.slots().size()));
     auto list =
-        rewriter.create<iree::ListCreateOp>(loc, getVariantListType(rewriter),
-                                            /*capacity=*/size);
-    rewriter.create<iree::ListResizeOp>(loc, list, size);
+        rewriter.create<Input::ListCreateOp>(loc, getVariantListType(rewriter),
+                                             /*capacity=*/size);
+    rewriter.create<Input::ListResizeOp>(loc, list, size);
     for (auto it : enumerate(adaptor.slots())) {
       auto index = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIndexAttr(it.index()));
-      rewriter.create<iree::ListSetOp>(loc, list, index, it.value());
+      rewriter.create<Input::ListSetOp>(loc, list, index, it.value());
     }
 
     rewriter.replaceOp(srcOp, ValueRange{list});
@@ -901,7 +903,7 @@ class SequenceCloneBuiltinConversion
     Type indexType = rewriter.getType<IndexType>();
     Type listType = listOperand.getType();
     Value subListSize =
-        rewriter.create<iree::ListSizeOp>(loc, indexType, listOperand);
+        rewriter.create<Input::ListSizeOp>(loc, indexType, listOperand);
     Value countInteger = countOperand;
     Value countIndex =
         rewriter.create<arith::IndexCastOp>(loc, indexType, countOperand);
@@ -916,8 +918,8 @@ class SequenceCloneBuiltinConversion
     Value newListSize =
         rewriter.create<arith::MulIOp>(loc, subListSize, clampedCountIndex);
     Value newList =
-        rewriter.create<iree::ListCreateOp>(loc, listType, clampedCountIndex);
-    rewriter.create<iree::ListResizeOp>(loc, newList, newListSize);
+        rewriter.create<Input::ListCreateOp>(loc, listType, clampedCountIndex);
+    rewriter.create<Input::ListResizeOp>(loc, newList, newListSize);
 
     // Split blocks to loop.
     // TODO: Use a new list.copy op instead of an inner loop.
@@ -969,9 +971,9 @@ class SequenceCloneBuiltinConversion
       Value newListIt = innerBody->getArgument(0);
       Value subListIt = innerBody->getArgument(1);
 
-      Value elementValue = rewriter.create<iree::ListGetOp>(
+      Value elementValue = rewriter.create<Input::ListGetOp>(
           loc, listElementType, listOperand, subListIt);
-      rewriter.create<iree::ListSetOp>(loc, newList, newListIt, elementValue);
+      rewriter.create<Input::ListSetOp>(loc, newList, newListIt, elementValue);
 
       newListIt = rewriter.create<arith::AddIOp>(loc, newListIt, oneIndex);
       subListIt = rewriter.create<arith::AddIOp>(loc, subListIt, oneIndex);
@@ -1057,7 +1059,7 @@ class SubscriptOpBuiltinSequenceConversion
 
     Value zero = rewriter.create<arith::ConstantIntOp>(loc, 0, slice.getType());
     Value listSizeIndex =
-        rewriter.create<iree::ListSizeOp>(loc, indexType, adaptor.value());
+        rewriter.create<Input::ListSizeOp>(loc, indexType, adaptor.value());
     Value listSizeInteger = rewriter.create<arith::IndexCastOp>(
         loc, slice.getType(), listSizeIndex);
 
@@ -1117,7 +1119,7 @@ class SubscriptOpBuiltinSequenceConversion
     {
       rewriter.setInsertionPointToEnd(getElementBlock);
       Value successResult = getSuccessStatusValue(loc, rewriter);
-      Value resultValue = rewriter.create<iree::ListGetOp>(
+      Value resultValue = rewriter.create<Input::ListGetOp>(
           loc, resultType, adaptor.value(), getElementBlock->getArgument(0));
       rewriter.create<mlir::BranchOp>(loc, continuationBlock,
                                       ValueRange{successResult, resultValue});
@@ -1180,7 +1182,7 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
           rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
       Value requiredTypeCodeValue = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getI32IntegerAttr(typeCode));
-      Value actualTypeCodeValue = rewriter.create<iree::ListGetOp>(
+      Value actualTypeCodeValue = rewriter.create<Input::ListGetOp>(
           loc, rewriter.getI32Type(), list, index0);
       Value typeCodeEqual = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::eq, requiredTypeCodeValue,
@@ -1195,7 +1197,7 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
       auto index1 =
           rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
       Value successResult = getSuccessStatusValue(loc, rewriter);
-      Value unboxedValue = rewriter.create<iree::ListGetOp>(
+      Value unboxedValue = rewriter.create<Input::ListGetOp>(
           loc, targetUnboxedType, list, index1);
       rewriter.create<mlir::BranchOp>(loc, continuationBlock,
                                       ValueRange{successResult, unboxedValue});

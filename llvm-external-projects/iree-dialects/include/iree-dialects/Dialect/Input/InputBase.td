@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_BASE_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_BASE_TD
+#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_BASE_TD
+#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_BASE_TD
 
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def IREE_Dialect : Dialect {
-  let name = "iree";
+def IREEInput_Dialect : Dialect {
+  let name = "iree_input";
   let summary = "Public ops/type/attributes legal for input to IREE's compiler";
   let description = [{
     IREE's compiler allows as input a number of common dialects. This dialect
@@ -25,76 +25,76 @@ def IREE_Dialect : Dialect {
     are of course, limits, and source-compatibility is not guaranteed, since
     LLVM/MLIR's API surface is itself unstable.
   }];
-  let cppNamespace = "::mlir::iree";
+  let cppNamespace = "::mlir::iree_compiler::IREE::Input";
 }
 
-class IREE_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<IREE_Dialect, mnemonic, traits>;
-class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
-    Op<IREE_Dialect, mnemonic, !listconcat(traits, [NoSideEffect])>;
-class IREE_Type<string name> : TypeDef<IREE_Dialect, name>;
+class IREEInput_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<IREEInput_Dialect, mnemonic, traits>;
+class IREEInput_PureOp<string mnemonic, list<OpTrait> traits = []> :
+    Op<IREEInput_Dialect, mnemonic, !listconcat(traits, [NoSideEffect])>;
+class IREEInput_Type<string name> : TypeDef<IREEInput_Dialect, name>;
 
 //===----------------------------------------------------------------------===//
 // Predicates
 //===----------------------------------------------------------------------===//
 
-class IREE_AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
-                                        "symbol reference attribute"> {
+class IREEInput_AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
+                                                  "symbol reference attribute"> {
   let storageType = [{ FlatSymbolRefAttr }];
   let returnType = [{ StringRef }];
   let valueType = NoneType;
   let constBuilderCall = "mlir::SymbolRefAttr::get($_builder.getContext(), $0)";
 }
-class IREE_AnyPtrOf<list<Type> types> :
+class IREEInput_AnyPtrOf<list<Type> types> :
     Type<And<[
-      CPred<"$_self.isa<::mlir::iree::PtrType>()">,
+      CPred<"$_self.isa<::mlir::iree_compiler::IREE::Input::PtrType>()">,
       Or<!foreach(type, types,
           SubstLeaves<
               "$_self",
-              "$_self.cast<::mlir::iree::PtrType>().getTargetType()",
+              "$_self.cast<::mlir::iree_compiler::IREE::Input::PtrType>().getTargetType()",
               type.predicate>)>,
     ]>, !interleave(!foreach(type, types, type.summary), " or ")> {
   string builderCall = "";
 }
 
-def IREE_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
-def IREE_Tensor : TypeAlias<AnyRankedTensor>;
+def IREEInput_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
+def IREEInput_Tensor : TypeAlias<AnyRankedTensor>;
 
-def IREE_AnyList : DialectType<
-    IREE_Dialect,
-    CPred<"$_self.isa<::mlir::iree::ListType>()">,
+def IREEInput_AnyList : DialectType<
+    IREEInput_Dialect,
+    CPred<"$_self.isa<::mlir::iree_compiler::IREE::Input::ListType>()">,
       "list"> {
   let description = [{
     A mutable, resizable list of some type.
   }];
 }
 
-class IREE_ListOf<Type type> :
+class IREEInput_ListOf<Type type> :
     Type<And<[
-      CPred<"$_self.isa<::mlir::iree::ListType>()">,
+      CPred<"$_self.isa<::mlir::iree_compiler::IREE::Input::ListType>()">,
       SubstLeaves<"$_self",
-                  "$_self.cast<::mlir::iree::ListType>().getElementType()",
+                  "$_self.cast<::mlir::iree_compiler::IREE::Input::ListType>().getElementType()",
                   type.predicate>
     ]>, "list<" # type.summary # ">"> {
   // Set the builder call if the base type has a builder call.
   string builderCall = !if(!empty(type.builderCall),
-                           "", "::mlir::iree::ListType::get(" # type.builderCall # ")");
+                           "", "::mlir::iree_compiler::IREE::Input::ListType::get(" # type.builderCall # ")");
 }
 
-def IREE_ElementTypeParameter : TypeParameter<
+def IREEInput_ElementTypeParameter : TypeParameter<
     "::mlir::Type", "A type suitable as an element type of a container">;
-def IREE_PtrTargetTypeParameter : TypeParameter<
+def IREEInput_PtrTargetTypeParameter : TypeParameter<
     "::mlir::Type", "A type suitable as a target type of a pointer">;
 
-def IREE_Dim : TypeAlias<Index>;
-def IREE_Dims : Variadic<IREE_Dim>;
-def IREE_Shape : Variadic<IREE_Dim>;
-def IREE_ShapeDynamicDims : Variadic<IREE_Dim>;
+def IREEInput_Dim : TypeAlias<Index>;
+def IREEInput_Dims : Variadic<IREEInput_Dim>;
+def IREEInput_Shape : Variadic<IREEInput_Dim>;
+def IREEInput_ShapeDynamicDims : Variadic<IREEInput_Dim>;
 
-def IREE_GlobalRefAttr : IREE_AliasedSymbolRefAttr;
-def IREE_AnyGlobalPtr : IREE_AnyPtrOf<[IREE_Tensor, IREE_PrimitiveType]>;
+def IREEInput_GlobalRefAttr : IREEInput_AliasedSymbolRefAttr;
+def IREEInput_AnyGlobalPtr : IREEInput_AnyPtrOf<[IREEInput_Tensor, IREEInput_PrimitiveType]>;
 
-class IREE_IndexAttrBase<string descr> :
+class IREEInput_IndexAttrBase<string descr> :
     TypedAttrBase<
       Index, "IntegerAttr",
       And<[
@@ -104,11 +104,11 @@ class IREE_IndexAttrBase<string descr> :
       descr> {
   let returnType = [{ APInt }];
 }
-def IREE_IndexAttr : IREE_IndexAttrBase<"size_t">;
+def IREEInput_IndexAttr : IREEInput_IndexAttrBase<"size_t">;
 
-def IREE_TiedOpStorageAttr :
-    TypedArrayAttrBase<IREE_IndexAttr, "64-bit integer array attribute"> {
+def IREEInput_TiedOpStorageAttr :
+    TypedArrayAttrBase<IREEInput_IndexAttr, "64-bit integer array attribute"> {
   let constBuilderCall = "$_builder.getI64ArrayAttr($0)";
 }
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_IREE_IREE_BASE_TD
+#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_BASE_TD

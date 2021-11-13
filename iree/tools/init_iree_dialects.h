@@ -12,8 +12,8 @@
 #ifndef IREE_TOOLS_INIT_IREE_DIALECTS_H_
 #define IREE_TOOLS_INIT_IREE_DIALECTS_H_
 
-#include "iree-dialects/Dialect/IREE/IREEDialect.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -44,7 +44,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::VMVX::VMVXDialect,
                   IREE::Vulkan::VulkanDialect,
                   linalg_ext::LinalgExtDialect,
-                  mlir::iree::IREEDialect,
+                  IREE::Input::IREEInputDialect,
                   IREE::PYDM::IREEPyDMDialect>();
   // clang-format on
 

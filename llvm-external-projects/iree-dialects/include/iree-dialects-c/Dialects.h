@@ -19,7 +19,7 @@ extern "C" {
 // IREEDialect
 //===----------------------------------------------------------------------===//
 
-MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREE, iree);
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREEInput, iree_input);
 
 //===----------------------------------------------------------------------===//
 // IREEPyDMDialect

@@ -5,7 +5,7 @@ set(LIBS
   MLIRSCFTransforms
   MLIRStandard
   MLIRTransforms
-  IREEDialectsIREEDialect
+  IREEInputDialect
   IREEDialectsIREEPyDMDialect
   IREEDialectsIREEPyDMPasses
 )

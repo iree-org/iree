@@ -3,7 +3,7 @@ add_mlir_public_c_api_library(IREEDialectsCAPI
   Utils.cpp
   LINK_LIBS PUBLIC
   MLIRIR
-  IREEDialectsIREEDialect
+  IREEInputDialect
   IREEDialectsIREEPyDMDialect
   IREEDialectsIREEPyDMPasses
 )

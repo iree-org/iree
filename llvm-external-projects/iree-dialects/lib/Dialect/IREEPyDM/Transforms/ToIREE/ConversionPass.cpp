@@ -5,12 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "../PassDetail.h"
-#include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREE/IREEOps.h"
 #include "iree-dialects/Dialect/IREEPyDM/IR/Ops.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/ToIREE/Patterns.h"
 #include "iree-dialects/Dialect/IREEPyDM/Transforms/ToIREE/TypeConverter.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -25,8 +25,8 @@ namespace {
 struct ConvertIREEPyDMToIREEPass
     : public ConvertIREEPyDMToIREEBase<ConvertIREEPyDMToIREEPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::iree::IREEDialect, BuiltinDialect, StandardOpsDialect,
-                    math::MathDialect>();
+    registry.insert<mlir::iree_compiler::IREE::Input::IREEInputDialect,
+                    BuiltinDialect, StandardOpsDialect, math::MathDialect>();
   }
 
   void runOnOperation() override {
@@ -39,7 +39,8 @@ struct ConvertIREEPyDMToIREEPass
     ConversionTarget target(*context);
     target.addIllegalDialect<IREEPyDMDialect>();
     target.addLegalDialect<BuiltinDialect>();
-    target.addLegalDialect<mlir::iree::IREEDialect>();
+    target
+        .addLegalDialect<mlir::iree_compiler::IREE::Input::IREEInputDialect>();
     target.addLegalDialect<mlir::arith::ArithmeticDialect>();
     target.addLegalDialect<mlir::math::MathDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
