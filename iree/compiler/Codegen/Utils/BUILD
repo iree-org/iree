@@ -26,7 +26,7 @@ cc_library(
         "//iree/compiler/Codegen/Dialect:ProcessorOpInterfaces",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/LinalgExt/IR",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",

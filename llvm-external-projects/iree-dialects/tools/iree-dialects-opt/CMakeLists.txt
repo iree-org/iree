@@ -1,11 +1,17 @@
 set(LIBS
+  MLIRArithmetic
   MLIRDialect
+  MLIRLinalg
+  MLIRMemRef
   MLIROptLib
   MLIRSCF
   MLIRSCFTransforms
   MLIRStandard
+  MLIRTensor
   MLIRTransforms
   IREEInputDialect
+  IREELinalgExtDialect
+  IREELinalgExtPasses
   IREEPyDMDialect
   IREEPyDMPasses
 )

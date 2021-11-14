@@ -20,6 +20,7 @@ iree_cc_library(
     "MarkerUtils.cpp"
     "Utils.cpp"
   DEPS
+    IREELinalgExtDialect
     LLVMSupport
     MLIRIR
     MLIRLinalg
@@ -28,7 +29,6 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::ProcessorOpInterfaces
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 

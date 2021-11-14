@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_CONSTANTS_H
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_CONSTANTS_H
+#ifndef IREE_DIALECTS_DIALECT_PYDM_IR_CONSTANTS_H
+#define IREE_DIALECTS_DIALECT_PYDM_IR_CONSTANTS_H
 
 namespace mlir {
 namespace iree_compiler {
@@ -149,4 +149,4 @@ enum class BuiltinTypeCode : int {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_CONSTANTS_H
+#endif  // IREE_DIALECTS_DIALECT_PYDM_IR_CONSTANTS_H

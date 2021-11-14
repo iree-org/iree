@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_TD
+#ifndef IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_TD
+#define IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_TD
 
 include "iree-dialects/Dialect/PyDM/IR/PyDMBase.td"
 include "iree-dialects/Dialect/PyDM/IR/PyDMInterfaces.td"
@@ -533,4 +533,4 @@ def IREEPyDM_FlatSymbolRefArrayAttr :
   let constBuilderCall = ?;
 }
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_TD
+#endif // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_TD

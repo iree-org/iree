@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_H
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_H
+#ifndef IREE_DIALECTS_DIALECT_INPUT_OPS_H
+#define IREE_DIALECTS_DIALECT_INPUT_OPS_H
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -18,4 +18,4 @@
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/Input/InputOps.h.inc"
 
-#endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_H
+#endif  // IREE_DIALECTS_DIALECT_INPUT_OPS_H

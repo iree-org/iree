@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_INTERFACES_H
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_INTERFACES_H
+#ifndef IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_INTERFACES_H
+#define IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_INTERFACES_H
 
 #include "iree-dialects/Dialect/PyDM/IR/Constants.h"
 #include "mlir/IR/OpImplementation.h"
@@ -27,4 +27,4 @@ enum class BuiltinTypeCode;
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOpInterfaces.h.inc"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMTypeInterfaces.h.inc"
 
-#endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_INTERFACES_H
+#endif  // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_INTERFACES_H

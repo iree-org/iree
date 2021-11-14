@@ -6,10 +6,10 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -391,7 +391,7 @@ static LogicalResult setRootConfig(
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
 /// root op.
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, linalg_ext::FftOp fftOp,
+    FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto partitionedLoops = getPartitionedLoops(fftOp);
   unsigned maxDepth = partitionedLoops.back() + 1;
@@ -435,7 +435,7 @@ static LogicalResult setRootConfig(
     auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
       return TypeSwitch<Operation *, LogicalResult>(op)
           .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
-                linalg_ext::FftOp>([&](auto op) {
+                IREE::LinalgExt::FftOp>([&](auto op) {
             return setRootConfig(entryPointFn, op, tiledLoops);
           })
           .Default([&](Operation *op) { return success(); });

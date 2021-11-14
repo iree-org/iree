@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -82,7 +82,8 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // LinalgExt -> SCF
-  passManager.addNestedPass<FuncOp>(linalg_ext::createLinalgExtToLoopsPass());
+  passManager.addNestedPass<FuncOp>(
+      IREE::LinalgExt::createLinalgExtToLoopsPass());
 
   // Linalg -> SCF
   passManager.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());

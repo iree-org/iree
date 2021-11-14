@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_BASE_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_BASE_TD
+#ifndef IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_BASE_TD
+#define IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_BASE_TD
 
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -44,4 +44,4 @@ class IREEPyDM_PureOp<string mnemonic, list<OpTrait> traits = []> :
 }
 class IREEPyDM_TypeDef<string name, list<Trait> traits = []> : TypeDef<IREEPyDM_Dialect, name, traits>;
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_BASE_TD
+#endif // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_BASE_TD

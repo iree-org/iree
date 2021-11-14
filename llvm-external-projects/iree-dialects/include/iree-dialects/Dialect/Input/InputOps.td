@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_TD
+#ifndef IREE_DIALECTS_DIALECT_INPUT_OPS_TD
+#define IREE_DIALECTS_DIALECT_INPUT_OPS_TD
 
 include "iree-dialects/Dialect/Input/InputDialect.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -522,4 +522,110 @@ def IREEInput_TensorTraceOp : IREEInput_Op<"tensor.trace", []> {
   let assemblyFormat = "$key attr-dict ($operands^ `:` type($operands))?";
 }
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_OPS_TD
+//===----------------------------------------------------------------------===//
+// Workgroup dispatch
+// These ops allow both scheduling and accessing parameters of workgroup
+// dispatches across an arbitrary nd-grid.
+//===----------------------------------------------------------------------===//
+
+// TODO: Define dispatch.workgroup op.
+
+def IREEInput_DispatchWorkgroupRankOp : IREEInput_PureOp<"dispatch.workgroup.rank"> {
+  let summary = [{returns the rank of the workgroup dimensions}];
+  let description = [{
+    The number of workgroup dimensions used during dispatch, bounding the
+    `iree_input.dispatch.workgroup.*` query functions.
+
+    ```mlir
+    %rank = iree_input.dispatch.workgroup.rank : index
+    ```
+  }];
+  let arguments = (ins);
+  let results = (outs IREEInput_Dim:$result);
+  let assemblyFormat = "attr-dict `:` type($result)";
+}
+
+def IREEInput_DispatchWorkgroupIDOp : IREEInput_PureOp<"dispatch.workgroup.id"> {
+  let summary = [{returns the index of the current workgroup in the grid}];
+  let description = [{
+    The global workgroup ID of the current workgroup in the range of
+    `[0, iree_input.dispatch.workgroup.count)` along each dimension.
+
+    Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+    built-in variable, only in the iree dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = iree_input.dispatch.workgroup.id[0] : index
+    %y = iree_input.dispatch.workgroup.id[1] : index
+    ```
+  }];
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs IREEInput_Dim:$result);
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+def IREEInput_DispatchWorkgroupCountOp : IREEInput_PureOp<"dispatch.workgroup.count"> {
+  let summary = [{returns the total workgroup count of the grid}];
+  let description = [{
+    The total number of workgroups along each dimension in the dispatch grid.
+
+    Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+    built-in variable, only in the iree dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = iree_input.dispatch.workgroup.count[0] : index
+    %y = iree_input.dispatch.workgroup.count[1] : index
+    ```
+  }];
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs IREEInput_Dim:$result);
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+def IREEInput_DispatchWorkgroupSizeOp : IREEInput_PureOp<"dispatch.workgroup.size"> {
+  let summary = [{returns the size of each workgroup in invocations}];
+  let description = [{
+    The number of local invocations within the current workgroup along each
+    dimension. Depending on backend this may map to the SIMT thread count or
+    inner loop nest parameters.
+
+    Workgroup sizes are not determined at the iree dialect level as they are
+    dependent on the target backend determined when lowering into the HAL. It's
+    still possible to use the symbolic workgroup size inside of dispatch
+    executables as a placeholder for the resolved value once in the HAL.
+
+    Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
+    built-in variable, only in the iree dialect the number of dimensions is not
+    restricted to 3 (XYZ).
+
+    ```mlir
+    %x = iree_input.dispatch.workgroup.size[0] : index
+    %y = iree_input.dispatch.workgroup.size[1] : index
+    ```
+  }];
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs IREEInput_Dim:$result);
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+}
+
+#endif // IREE_DIALECTS_DIALECT_INPUT_OPS_TD

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_BASE_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_BASE_TD
+#ifndef IREE_DIALECTS_DIALECT_INPUT_BASE_TD
+#define IREE_DIALECTS_DIALECT_INPUT_BASE_TD
 
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -111,4 +111,4 @@ def IREEInput_TiedOpStorageAttr :
   let constBuilderCall = "$_builder.getI64ArrayAttr($0)";
 }
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_BASE_TD
+#endif // IREE_DIALECTS_DIALECT_INPUT_BASE_TD

@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
@@ -11,8 +13,6 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
@@ -118,7 +118,7 @@ static void populateTilingToInvocationPatterns(
                   linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
                   linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
                   linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>,
-                  linalg_ext::TiledOpInterfaceTilingPattern>(
+                  IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
       context, tilingOptions,
       linalg::LinalgTransformationFilter(
           {Identifier::get(getWorkgroupKTiledMarker(), context),
@@ -126,7 +126,7 @@ static void populateTilingToInvocationPatterns(
           Identifier::get(getVectorizeMarker(), context))
           .addFilter([](Operation *op) {
             // FFT doesn't support second level of tiling yet.
-            return success(!isa<linalg_ext::FftOp>(op));
+            return success(!isa<IREE::LinalgExt::FftOp>(op));
           })
           .setMatchByDefault());
 }

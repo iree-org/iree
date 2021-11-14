@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD
+#ifndef IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD
+#define IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD
 
 include "iree-dialects/Dialect/Input/InputBase.td"
 
@@ -93,4 +93,4 @@ def IREEInput_PtrType : IREEInput_Type<"Ptr"> {
   }];
 }
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD
+#endif // IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD

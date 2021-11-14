@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DestructiveUpdateUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -155,7 +155,7 @@ static bool isRootOp(Operation *op) {
     }
     return !isa<linalg::FillOp>(op);
   }
-  return isa<linalg_ext::TiledOpInterface>(op) &&
+  return isa<IREE::LinalgExt::TiledOpInterface>(op) &&
          !isa<tensor::ExtractSliceOp>(op);
 }
 
@@ -483,8 +483,8 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
                 return loadArg;
               })
           .Case<linalg::LinalgOp,
-                linalg_ext::LinalgExtOp>([&](auto linalgLikeOp)
-                                             -> BlockArgument {
+                IREE::LinalgExt::LinalgExtOp>([&](auto linalgLikeOp)
+                                                  -> BlockArgument {
             unsigned resultIndex =
                 storeOp.value().cast<OpResult>().getResultNumber();
             auto loadOp =
@@ -667,7 +667,7 @@ static SmallVector<unsigned> getPartitionedLoops(Operation *op) {
     }
     return partitionedLoops;
   }
-  if (auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op)) {
+  if (auto tilableOp = dyn_cast<IREE::LinalgExt::TiledOpInterface>(op)) {
     return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
   }
   return {};
@@ -797,11 +797,11 @@ struct TileAndDistributeLinalgOpsPattern
 
 /// Rewrite pattern to tile and distribute `LinalgExt` ops.
 struct TiledOpInterfacePattern
-    : public linalg_ext::TiledOpInterfaceBaseTilingPattern {
-  using Base = linalg_ext::TiledOpInterfaceBaseTilingPattern;
+    : public IREE::LinalgExt::TiledOpInterfaceBaseTilingPattern {
+  using Base = IREE::LinalgExt::TiledOpInterfaceBaseTilingPattern;
   using Base::TiledOpInterfaceBaseTilingPattern;
 
-  LogicalResult matchAndRewrite(linalg_ext::TiledOpInterface tilableOp,
+  LogicalResult matchAndRewrite(IREE::LinalgExt::TiledOpInterface tilableOp,
                                 PatternRewriter &rewriter) const override {
     if (!hasRootOpAttribute(tilableOp)) return failure();
     if (hasOnlyDimUses(tilableOp)) return failure();
@@ -843,9 +843,9 @@ struct TiledOpInterfacePattern
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(clonedOp);
 
-    linalg_ext::TiledOp tiledOp;
+    IREE::LinalgExt::TiledOp tiledOp;
     LogicalResult tilingResult = Base::matchAndRewriteBase(
-        cast<linalg_ext::TiledOpInterface>(clonedOp), rewriter, tiledOp);
+        cast<IREE::LinalgExt::TiledOpInterface>(clonedOp), rewriter, tiledOp);
     if (failed(tilingResult)) {
       // GreedyPatternRewriter is not transactional and does not stop on
       // failure. Must explicitly delete on all failure paths.
@@ -1169,7 +1169,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   for (Block &block : funcOp) {
     for (Operation &op : block) {
       // Ignore ops that do not implement the `TiledOpInterface` interface.
-      if (!isa<linalg_ext::TiledOpInterface>(&op)) continue;
+      if (!isa<IREE::LinalgExt::TiledOpInterface>(&op)) continue;
       assert(!hasRootOpAttribute(&op) &&
              "unexpected root operation outside of dispatch region");
       removeFusionGroupsAttribute(&op);

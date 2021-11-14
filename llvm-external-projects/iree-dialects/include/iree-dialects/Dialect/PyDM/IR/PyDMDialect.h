@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_H
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_H
+#ifndef IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_H
+#define IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_H
 
 #include "iree-dialects/Dialect/PyDM/IR/Constants.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMInterfaces.h"
@@ -53,4 +53,4 @@ inline bool PrimitiveType::classof(Type type) {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_H
+#endif  // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_H

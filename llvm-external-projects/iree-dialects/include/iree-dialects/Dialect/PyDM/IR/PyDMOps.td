@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_OPS_TD
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_OPS_TD
+#ifndef IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_OPS_TD
+#define IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_OPS_TD
 
 include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -795,4 +795,4 @@ def IREEPyDM_SequenceCloneOp : IREEPyDM_PureOp<"sequence_clone", [
   }];
 }
 
-#endif // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_OPS_TD
+#endif // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_OPS_TD
