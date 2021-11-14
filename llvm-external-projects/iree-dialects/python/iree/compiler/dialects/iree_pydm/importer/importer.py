@@ -840,6 +840,13 @@ class ExpressionImporter(BaseNodeVisitor):
     def visit_Constant(self, ast_node):
       self._set_result(self.fctx.ic.emit_constant(ast_node.value))
 
+  if sys.version_info < (3, 9, 0):
+    # Starting in 3.9, Index nodes are no longer generated (they used to be
+    # a layer of indirection in subscripts). They aren't "real" nodes and
+    # we just pass them through.
+    def visit_Index(self, ast_node):
+      self.visit(ast_node.value)
+
 
 def _get_function_ast(f) -> Tuple[str, ast.AST]:
   filename = inspect.getsourcefile(f)
