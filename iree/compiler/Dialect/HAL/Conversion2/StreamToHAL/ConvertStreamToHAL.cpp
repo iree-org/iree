@@ -82,6 +82,97 @@ static IREE::HAL::CommandCategoryBitfield deriveCommandCategories(
   return bits;
 }
 
+// Maps a resource type to the corresponding HAL memory types and buffer usage.
+// This will fail if the resource type is not directly mappable to HAL bits.
+// The bits set here are those that must be set for the buffer to be used as the
+// buffer within the program with its defined resource lifetime.
+static LogicalResult deriveRequiredResourceBufferBits(
+    Location loc, IREE::Stream::ResourceType resourceType,
+    IREE::HAL::MemoryTypeBitfield &memoryTypes,
+    IREE::HAL::BufferUsageBitfield &bufferUsage) {
+  memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+  bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+  switch (resourceType.getLifetime()) {
+    default:
+      return mlir::emitError(loc)
+             << "unsupported resource lifetime: "
+             << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
+    case IREE::Stream::Lifetime::Constant:
+      // Device local; copies required to get into external resources.
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Constant;
+      break;
+    case IREE::Stream::Lifetime::Variable:
+      // Device local; copies required to get into external resources.
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+      break;
+    case IREE::Stream::Lifetime::External:
+      // We only require device-visible for external buffers (as we don't today
+      // do anything else with them on the host). They may be mappable for user
+      // convenience. Ideally they would have been placed in device-local memory
+      // but so long as they are device visible the program will execute
+      // correctly.
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceVisible;
+      break;
+    case IREE::Stream::Lifetime::Staging:
+      // Host local; copies required to get into device resources.
+      // We could vary this based on staging usage (upload/download) by
+      // making it device-local|host-visible, but host-local means we have
+      // a better chance of mapping it during uploads.
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostLocal |
+                    IREE::HAL::MemoryTypeBitfield::DeviceVisible;
+      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
+                    IREE::HAL::BufferUsageBitfield::Mapping;
+      break;
+    case IREE::Stream::Lifetime::Transient:
+      // Device local; copies required to get into external resources.
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
+                    IREE::HAL::MemoryTypeBitfield::Transient;
+      break;
+  }
+
+  // TODO(benvanik): refine usage based on analysis.
+  bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
+                IREE::HAL::BufferUsageBitfield::Dispatch;
+
+  return success();
+}
+
+// Maps a resource type to the corresponding HAL memory types and buffer usage.
+// This will fail if the resource type is not directly mappable to HAL bits.
+// The bits set here represent the superset of required and allowed bits and
+// are useful for providing buffers back to users via the ABI that may need to
+// be used for more than just what the internal program requires.
+static LogicalResult deriveAllowedResourceBufferBits(
+    Location loc, IREE::Stream::ResourceType resourceType,
+    IREE::HAL::MemoryTypeBitfield &memoryTypes,
+    IREE::HAL::BufferUsageBitfield &bufferUsage) {
+  memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+  bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+  if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
+                                              bufferUsage))) {
+    return failure();
+  }
+  switch (resourceType.getLifetime()) {
+    default:
+      break;
+    case IREE::Stream::Lifetime::External:
+      // #yolo; these come from/go to outside the program.
+      // Today we assume they are device-local|host-visible just for
+      // practical purposes but that does not have to be true. We really
+      // want this to be something we analyze and handle on the edges
+      // (transfering devices/etc if needed).
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
+                    IREE::HAL::MemoryTypeBitfield::HostVisible;
+      // NOTE: we may not map it but users may after they get them back.
+      // Another reason we should annotate this - having a buffer be
+      // mappable is potentially expensive (may get a 2nd copy in memory!).
+      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
+      break;
+  }
+  return success();
+}
+
 class StreamConversionMapping {
  public:
   // Maps the stream dialect |executeOp| to the hal dialect |commandBuffer|
@@ -143,57 +234,10 @@ struct ResourceAllocOpPattern
 
       auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
       auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-      switch (resourceType.getLifetime()) {
-        default:
-          return allocOp.emitOpError()
-                 << "unsupported resource lifetime: "
-                 << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
-        case IREE::Stream::Lifetime::Constant:
-          // Device local; copies required to get into external resources.
-          memoryTypes =
-              memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-          bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Constant;
-          break;
-        case IREE::Stream::Lifetime::Variable:
-          // Device local; copies required to get into external resources.
-          memoryTypes =
-              memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-          break;
-        case IREE::Stream::Lifetime::External:
-          // #yolo; these come from/go to outside the program.
-          // Today we assume they are device-local|host-visible just for
-          // practical purposes but that does not have to be true. We really
-          // want this to be something we analyze and handle on the edges
-          // (transfering devices/etc if needed).
-          memoryTypes = memoryTypes |
-                        IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                        IREE::HAL::MemoryTypeBitfield::HostVisible;
-          // NOTE: we may not map it but users may after they get them back.
-          // Another reason we should annotate this - having a buffer be
-          // mappable is potentially expensive (may get a 2nd copy in memory!).
-          bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
-          break;
-        case IREE::Stream::Lifetime::Staging:
-          // Host local; copies required to get into device resources.
-          // We could vary this based on staging usage (upload/download) by
-          // making it device-local|host-visible, but host-local means we have
-          // a better chance of mapping it during uploads.
-          memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostLocal |
-                        IREE::HAL::MemoryTypeBitfield::DeviceVisible;
-          bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                        IREE::HAL::BufferUsageBitfield::Mapping;
-          break;
-        case IREE::Stream::Lifetime::Transient:
-          // Device local; copies required to get into external resources.
-          memoryTypes = memoryTypes |
-                        IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                        IREE::HAL::MemoryTypeBitfield::Transient;
-          break;
+      if (failed(deriveAllowedResourceBufferBits(allocOp.getLoc(), resourceType,
+                                                 memoryTypes, bufferUsage))) {
+        return failure();
       }
-
-      // TODO(benvanik): refine usage based on analysis.
-      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                    IREE::HAL::BufferUsageBitfield::Dispatch;
 
       auto allocateOp = rewriter.create<IREE::HAL::AllocatorAllocateOp>(
           allocOp.getLoc(), bufferType, allocator, memoryTypes, bufferUsage,
@@ -389,6 +433,9 @@ struct TensorImportOpPattern
       ConversionPatternRewriter &rewriter) const override {
     auto loc = importOp.getLoc();
 
+    // TODO(benvanik): get a name for the tensor (argument name/etc).
+    auto message = rewriter.getStringAttr("tensor");
+
     auto bufferView = adaptor.source();
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
     auto bufferOp = rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewBufferOp>(
@@ -398,36 +445,22 @@ struct TensorImportOpPattern
     // NOTE: we do this before the other checks as it's the most likely mistake
     // and it's better to know of a shape mismatch than just buffer byte length
     // difference.
-    buildEncodingAssertions(
-        loc, bufferView,
-        adaptor.result_encoding().getValue().cast<RankedTensorType>(),
-        adaptor.result_encoding_dims(), rewriter);
+    if (failed(buildEncodingAssertions(
+            loc, bufferView, message,
+            adaptor.result_encoding().getValue().cast<RankedTensorType>(),
+            adaptor.result_encoding_dims(), rewriter))) {
+      return failure();
+    }
 
-    // Ensure we have enough bytes in the buffer for the encoding we have.
-    // Note that having more bytes is fine:
-    //   assert(expected_length <= actual_length);
-    auto expectedLength = adaptor.result_size();
-    auto actualLength = rewriter.create<IREE::HAL::BufferLengthOp>(
-        loc, rewriter.getIndexType(), bufferOp);
-    auto isMinSize = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::ule, expectedLength, actualLength);
-    rewriter.create<mlir::AssertOp>(
-        loc, isMinSize,
-        "imported tensor buffer truncated; must be >= the encoded size");
-
-    // TODO(benvanik): assert that the buffer view is accessible from the
-    // target device. We need to add a hal.allocator.* op set for importing
-    // or verifying that things are possible. To start we could just compare if
-    // the allocators are identical - though we don't have the ops to do that.
-    auto sourceAllocatorOp = rewriter.create<IREE::HAL::BufferAllocatorOp>(
-        loc, rewriter.getType<IREE::HAL::AllocatorType>(), bufferOp);
-    auto targetAllocatorOp = lookupAllocatorFor(importOp, rewriter);
-    auto isAllocatorEq = rewriter.create<IREE::Util::CmpEQOp>(
-        loc, rewriter.getI1Type(), sourceAllocatorOp, targetAllocatorOp);
-    rewriter.create<mlir::AssertOp>(
-        loc, isAllocatorEq,
-        "imported tensor buffer allocator mismatch; must be from the same "
-        "allocator (today)");
+    // Assert the storage is compatible with our expected device and usage.
+    auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
+    auto resourceType =
+        importOp.result().getType().cast<IREE::Stream::ResourceType>();
+    if (failed(buildStorageAssertions(loc, bufferOp.result(), message,
+                                      targetAllocator, adaptor.result_size(),
+                                      resourceType, rewriter))) {
+      return failure();
+    }
 
     return success();
   }
@@ -435,92 +468,33 @@ struct TensorImportOpPattern
   // Inserts IR to assert that the buffer view shape and encoding matches the
   // expected encoding we have in the program. This ensures that the user didn't
   // pass a 4x8xf32 when they originally compiled the model for a 2x8x1xi8.
-  //
-  // Order: encoding (dense/etc), element type (f32/etc), rank, dims
-  static void buildEncodingAssertions(Location loc, Value bufferView,
-                                      RankedTensorType tensorType,
-                                      ValueRange dynamicDims,
-                                      OpBuilder &builder) {
-    auto indexType = builder.getIndexType();
-    auto i32Type = builder.getI32Type();
-
-    // Encoding:
-    {
-      // NOTE: we should have verified supported encodings at entry into the HAL
-      // pipeline.
-      auto encodingType =
-          IREE::HAL::getEncodingTypeValue(tensorType.getEncoding());
-      assert(encodingType.hasValue() && "invalid tensor encoding");
-
-      auto actualEncodingType =
-          builder
-              .create<IREE::HAL::BufferViewEncodingTypeOp>(loc, i32Type,
-                                                           bufferView)
-              .result();
-      auto expectedEncodingType = builder.create<arith::ConstantIntOp>(
-          loc, encodingType.getValue(), 32);
-      auto cmpOp = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                                 actualEncodingType,
-                                                 expectedEncodingType);
-      std::string message;
-      llvm::raw_string_ostream os(message);
-      os << "encoding mismatch; expected ";
-      if (tensorType.getEncoding()) {
-        os << tensorType.getEncoding();
-      } else {
-        os << "dense";
-      }
-      os << " (for " << tensorType << ")";
-      builder.create<mlir::AssertOp>(loc, cmpOp.result(), os.str());
+  static LogicalResult buildEncodingAssertions(Location loc, Value bufferView,
+                                               StringAttr message,
+                                               RankedTensorType tensorType,
+                                               ValueRange dynamicDims,
+                                               OpBuilder &builder) {
+    auto elementType =
+        IREE::HAL::getElementTypeValue(tensorType.getElementType());
+    if (!elementType.hasValue()) {
+      return mlir::emitError(loc)
+             << "invalid tensor element type: " << tensorType.getElementType();
     }
+    auto expectedElementType =
+        builder.create<arith::ConstantIntOp>(loc, elementType.getValue(), 32);
 
-    // Element type:
-    {
-      // NOTE: we should have verified supported element types at entry into the
-      // HAL pipeline.
-      auto elementType =
-          IREE::HAL::getElementTypeValue(tensorType.getElementType());
-      assert(elementType.hasValue() && "invalid tensor element type");
-
-      auto actualElementType = builder
-                                   .create<IREE::HAL::BufferViewElementTypeOp>(
-                                       loc, i32Type, bufferView)
-                                   .result();
-      auto expectedElementType =
-          builder.create<arith::ConstantIntOp>(loc, elementType.getValue(), 32);
-      auto cmpOp =
-          builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                        actualElementType, expectedElementType);
-      std::string message;
-      llvm::raw_string_ostream os(message);
-      os << "element type mismatch; expected " << tensorType.getElementType();
-      builder.create<mlir::AssertOp>(loc, cmpOp.result(), os.str());
+    auto encodingType =
+        IREE::HAL::getEncodingTypeValue(tensorType.getEncoding());
+    if (!encodingType.hasValue()) {
+      return mlir::emitError(loc)
+             << "invalid tensor encoding: " << tensorType.getEncoding();
     }
+    auto expectedEncodingType =
+        builder.create<arith::ConstantIntOp>(loc, encodingType.getValue(), 32);
 
-    // Rank:
-    {
-      auto actualRank =
-          builder
-              .create<IREE::HAL::BufferViewRankOp>(loc, indexType, bufferView)
-              .result();
-      auto expectedRank =
-          builder.create<arith::ConstantIndexOp>(loc, tensorType.getRank());
-      auto cmpOp = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                                 actualRank, expectedRank);
-      std::string message;
-      llvm::raw_string_ostream os(message);
-      os << "rank mismatch; expected rank " << tensorType.getRank() << " (for "
-         << tensorType << ")";
-      builder.create<mlir::AssertOp>(loc, cmpOp.result(), os.str());
-    }
-
-    // Compare each dim in turn.
+    SmallVector<Value> shapeDims;
     if (tensorType.getRank() > 0) {
       unsigned dynamicIdx = 0;
-      Value shapeOk;
       for (int64_t idx = 0; idx < tensorType.getRank(); ++idx) {
-        auto actualDim = builder.create<IREE::HAL::BufferViewDimOp>(
-            loc, indexType, bufferView, builder.getIndexAttr(idx));
         Value expectedDim;
         if (tensorType.isDynamicDim(idx)) {
           expectedDim = dynamicDims[dynamicIdx++];
@@ -528,19 +502,41 @@ struct TensorImportOpPattern
           expectedDim = builder.create<arith::ConstantIndexOp>(
               loc, tensorType.getDimSize(idx));
         }
-        auto cmpOp = builder.create<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::eq, actualDim, expectedDim);
-        if (shapeOk) {
-          shapeOk = builder.create<arith::OrIOp>(loc, shapeOk, cmpOp);
-        } else {
-          shapeOk = cmpOp;
-        }
+        shapeDims.push_back(expectedDim);
       }
-      std::string message;
-      llvm::raw_string_ostream os(message);
-      os << "shape mismatch (for " << tensorType << ")";
-      builder.create<mlir::AssertOp>(loc, shapeOk, os.str());
     }
+
+    builder.create<IREE::HAL::BufferViewAssertOp>(
+        loc, bufferView, message, expectedElementType, expectedEncodingType,
+        shapeDims);
+    return success();
+  }
+
+  // Inserts IR to assert that the underlying buffer storage is compatible with
+  // the intended usage in the program. The allocator used to allocate the
+  // buffer must have compatibility with our target device allocator and the
+  // buffer must have at least the minimum expected size (additional padding is
+  // ok).
+  static LogicalResult buildStorageAssertions(
+      Location loc, Value buffer, StringAttr message, Value allocator,
+      Value minimumLength, IREE::Stream::ResourceType resourceType,
+      OpBuilder &builder) {
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+    if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
+                                                bufferUsage))) {
+      return failure();
+    }
+
+    auto requiredTypes = IREE::HAL::MemoryTypeBitfieldAttr::get(
+        builder.getContext(), memoryTypes);
+    auto requiredUsage = IREE::HAL::BufferUsageBitfieldAttr::get(
+        builder.getContext(), bufferUsage);
+
+    builder.create<IREE::HAL::BufferAssertOp>(loc, buffer, message, allocator,
+                                              minimumLength, requiredTypes,
+                                              requiredUsage);
+    return success();
   }
 };
 
