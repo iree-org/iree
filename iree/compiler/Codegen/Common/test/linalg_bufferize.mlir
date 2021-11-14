@@ -2425,21 +2425,21 @@ hal.interface private @io  {
 
 // -----
 
-func @linalg_ext_sort_1d() {
+func @iree_linalg_ext.sort_1d() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan @io::@rw[%c0] : !flow.dispatch.tensor<readwrite:128xi32>
   %1 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:128xi32> -> tensor<128xi32>
-  %2 = linalg_ext.sort dimension(0) outs(%1 : tensor<128xi32>) {
+  %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<128xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
     %3 = arith.cmpi sgt, %arg0, %arg1 : i32
-    linalg_ext.yield %3 : i1
+    iree_linalg_ext.yield %3 : i1
   } -> tensor<128xi32>
   flow.dispatch.tensor.store %2, %0, offsets = [], sizes = [], strides = [] : tensor<128xi32> -> !flow.dispatch.tensor<readwrite:128xi32>
   return
 }
-// CHECK-LABEL: func @linalg_ext_sort_1d()
+// CHECK-LABEL: func @iree_linalg_ext.sort_1d()
 //   CHECK-DAG:   %[[INOUT:.+]] = hal.interface.binding.subspan @io::@rw
-//       CHECK:   linalg_ext.sort
+//       CHECK:   iree_linalg_ext.sort
 //  CHECK-SAME:     dimension(0)
 //  CHECK-SAME:     outs(%[[INOUT]] : memref<128xi32>)
 
