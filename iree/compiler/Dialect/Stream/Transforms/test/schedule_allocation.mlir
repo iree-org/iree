@@ -138,26 +138,29 @@ func @producedResults(%size0: index, %size1: index) {
 // allocated with the async stream-ordered alloca/dealloca ops.
 
 // CHECK-LABEL: @locals
-// CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index)
-func @locals(%size0: index, %size1: index) {
+// CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index, %[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint)
+func @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
   %cst = arith.constant 5.4 : f32
   %cst_0 = arith.constant 6.4 : f32
   //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack slices({
   // CHECK-NEXT:   [0, 0] = %[[SIZE0]],
   // CHECK-NEXT:   [1, 1] = %[[SIZE1]]
   // CHECK-NEXT: })
-  // CHECK-NEXT: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized : !stream.resource<transient>{%[[SLICES]]#0}
-  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute await(%[[ALLOCA_TIMEPOINT]])
+  // CHECK-NEXT: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized await(%[[AWAIT_TIMEPOINT]]) => !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
+  // CHECK-NEXT: %[[AWAIT_JOIN:.+]] = stream.timepoint.join max(%[[AWAIT_TIMEPOINT]], %[[ALLOCA_TIMEPOINT]])
+  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute await(%[[AWAIT_JOIN]])
   // CHECK-SAME: with(%[[ALLOCA]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SLICES]]#0})
-  %result_timepoint = stream.async.execute with() {
+  %result_timepoint = stream.async.execute await(%await_timepoint) => with() {
     // CHECK: stream.cmd.fill %cst, %[[CAPTURE]][%[[SLICES]]#1 for %[[SIZE0]]] : f32 -> !stream.resource<transient>{%[[SLICES]]#0}
     %0 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%size0}
     // CHECK: stream.cmd.fill %cst_0, %[[CAPTURE]][%[[SLICES]]#2 for %[[SIZE1]]] : f32 -> !stream.resource<transient>{%[[SLICES]]#0}
     %1 = stream.async.splat %cst_0 : f32 -> !stream.resource<transient>{%size1}
     stream.yield
   } => !stream.timepoint
-  // CHECK: stream.resource.dealloca await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]]
-  return
+  // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]] : !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[DEALLOCA_TIMEPOINT]], %[[EXEC_TIMEPOINT]]) => !stream.timepoint
+  // CHECK: return %[[JOIN]]
+  return %result_timepoint : !stream.timepoint
 }
 
 // -----

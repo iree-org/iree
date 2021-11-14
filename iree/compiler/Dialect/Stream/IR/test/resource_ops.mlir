@@ -10,18 +10,22 @@ func @resourceAlloc(%arg0: index, %arg1: index) -> (!stream.resource<*>, !stream
 // -----
 
 // CHECK-LABEL: @resourceAlloca
-func @resourceAlloca(%arg0: index) -> (!stream.resource<staging>, !stream.timepoint) {
+func @resourceAlloca(%arg0: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<staging>, !stream.timepoint, !stream.resource<staging>, !stream.timepoint) {
   // CHECK: = stream.resource.alloca uninitialized : !stream.resource<staging>{%arg0} => !stream.timepoint
   %0:2 = stream.resource.alloca uninitialized : !stream.resource<staging>{%arg0} => !stream.timepoint
-  return %0#0, %0#1 : !stream.resource<staging>, !stream.timepoint
+  // CHECK: = stream.resource.alloca uninitialized await(%arg1) => !stream.resource<staging>{%arg0} => !stream.timepoint
+  %1:2 = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<staging>{%arg0} => !stream.timepoint
+  return %0#0, %0#1, %1#0, %1#1 : !stream.resource<staging>, !stream.timepoint, !stream.resource<staging>, !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @resourceDealloca
 func @resourceDealloca(%arg0: index, %arg1: !stream.resource<staging>, %arg2: !stream.timepoint) {
-  // CHECK: stream.resource.dealloca await(%arg2) => %arg1 : !stream.resource<staging>{%arg0}
-  stream.resource.dealloca await(%arg2) => %arg1 : !stream.resource<staging>{%arg0}
+  // CHECK: = stream.resource.dealloca %arg1 : !stream.resource<staging>{%arg0} => !stream.timepoint
+  stream.resource.dealloca %arg1 : !stream.resource<staging>{%arg0} => !stream.timepoint
+  // CHECK: = stream.resource.dealloca await(%arg2) => %arg1 : !stream.resource<staging>{%arg0} => !stream.timepoint
+  stream.resource.dealloca await(%arg2) => %arg1 : !stream.resource<staging>{%arg0} => !stream.timepoint
   return
 }
 

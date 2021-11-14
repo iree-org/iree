@@ -83,6 +83,7 @@ def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
     "getAffinity",
     "setAffinity",
   ]>,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   MemoryEffects<[MemAlloc]>,
 ]> {
@@ -98,6 +99,7 @@ def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
 
   let arguments = (ins
     Stream_Size:$storage_size,
+    Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -109,9 +111,10 @@ def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
     `uninitialized`
-    attr-dict `:`
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`):(`:`)?
+    attr-dict
     type($result) `{` $storage_size `}`
     `=` `` `>`
     type($result_timepoint)
@@ -130,6 +133,7 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
     "getAffinity",
     "setAffinity",
   ]>,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   MemoryEffects<[MemFree]>,
 ]> {
@@ -139,7 +143,8 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
     current computation) previously allocated using `stream.resource.alloca`.
 
     The resource is considered live and valid until the provided timepoint is
-    reached and the memory is only made available for future requests afterward.
+    reached and the memory is only made available for future requests after
+    the result timepoint is reached.
   }];
 
   let arguments = (ins
@@ -148,16 +153,18 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
       Stream_TransientResource,
     ]>:$operand,
     Stream_Size:$operand_size,
-    Stream_Timepoint:$timepoint,
+    Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
-  let results = (outs);
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    `await` `(` $timepoint `)`
-    `=` `` `>`
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
     $operand `:` type($operand) `{` $operand_size `}`
+    `=` `` `>` type($result_timepoint)
     attr-dict
   }];
 
@@ -471,6 +478,7 @@ def Stream_ResourcePackOp : Stream_PureOp<"resource.pack", [
 def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
   SameVariadicResultSize,
   Stream_AffinityOp,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
   let summary = [{asynchronously uploads or maps constant values}];
@@ -1748,6 +1756,7 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -2195,6 +2204,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
   Stream_CmdPhaseOp,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
 ]> {
@@ -2392,6 +2402,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
 
 def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
   ConstantLike,
+  Stream_TimelineOp,
 ]> {
   let summary = [{results an immediately-available timepoint}];
   let description = [{
@@ -2403,18 +2414,20 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
 
   let arguments = (ins);
   let results = (outs
-    Stream_Timepoint:$timepoint
+    Stream_Timepoint:$result_timepoint
   );
 
   let assemblyFormat = [{
     attr-dict
-    `=` `` `>` type($timepoint)
+    `=` `` `>` type($result_timepoint)
   }];
 
   let hasFolder = 1;
 }
 
-def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", []> {
+def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
+  Stream_TimelineOp,
+]> {
   let summary = [{joins one or more timepoints into the max of all of them}];
   let description = [{
     Returns a timepoint that indicates that all of the input timepoints have
@@ -2422,14 +2435,14 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", []> {
   }];
 
   let arguments = (ins
-    Variadic<Stream_Timepoint>:$timepoints
+    Variadic<Stream_Timepoint>:$await_timepoints
   );
   let results = (outs
-    Stream_Timepoint:$result
+    Stream_Timepoint:$result_timepoint
   );
 
   let assemblyFormat = [{
-    `max` `(` $timepoints `)` `=` `` `>` type($result)
+    `max` `(` $await_timepoints `)` `=` `` `>` type($result_timepoint)
     attr-dict-with-keyword
   }];
 
@@ -2442,6 +2455,7 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", []> {
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResultOperandIndex",
@@ -2464,7 +2478,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
       Stream_StagingResource,
     ]>>:$operands,
     Variadic<Stream_Size>:$operand_sizes,
-    Stream_Timepoint:$timepoint,
+    Stream_Timepoint:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -2476,7 +2490,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $timepoint `=` `` `>`
+    $await_timepoint `=` `` `>`
     $operands `:`
     custom<SizeAwareTypeList>(type($operands), type($results), $operand_sizes)
     attr-dict-with-keyword
@@ -2486,7 +2500,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   let builders = [
     OpBuilder<(ins
       "ValueRange":$operands, "ValueRange":$operandSizes,
-      "Value":$timepoint,
+      "Value":$await_timepoint,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 

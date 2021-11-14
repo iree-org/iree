@@ -248,7 +248,10 @@ struct ResourceDeallocaOpPattern
       IREE::Stream::ResourceDeallocaOp deallocaOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): stream ordered allocations.
-    rewriter.eraseOp(deallocaOp);
+    auto resolvedTimepoint =
+        rewriter.create<arith::ConstantIndexOp>(deallocaOp.getLoc(), 0)
+            .getResult();
+    rewriter.replaceOp(deallocaOp, {resolvedTimepoint});
     return success();
   }
 };
