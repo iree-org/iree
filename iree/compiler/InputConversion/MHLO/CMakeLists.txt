@@ -54,7 +54,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
-    IREELinalgExtTransforms
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRComplex

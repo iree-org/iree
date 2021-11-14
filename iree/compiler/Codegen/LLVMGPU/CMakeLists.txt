@@ -31,7 +31,7 @@ iree_cc_library(
     "Passes.cpp"
   DEPS
     IREELinalgExtDialect
-    IREELinalgExtTransforms
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard

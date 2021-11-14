@@ -28,7 +28,7 @@ iree_cc_library(
     "VectorContractToAArch64InlineAsmOp.cpp"
   DEPS
     IREELinalgExtDialect
-    IREELinalgExtTransforms
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis

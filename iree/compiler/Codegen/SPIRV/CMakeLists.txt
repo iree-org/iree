@@ -34,7 +34,7 @@ iree_cc_library(
     "Utils.cpp"
   DEPS
     IREELinalgExtDialect
-    IREELinalgExtTransforms
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard

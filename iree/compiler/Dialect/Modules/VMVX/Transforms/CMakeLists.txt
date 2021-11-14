@@ -19,7 +19,7 @@ iree_cc_library(
     "Conversion.cpp"
     "Passes.cpp"
   DEPS
-    IREELinalgExtTransforms
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard

@@ -42,7 +42,7 @@ iree_cc_library(
     "VectorizeMMT4d.cpp"
   DEPS
     IREELinalgExtDialect
-    IREELinalgExtTransforms
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineUtils

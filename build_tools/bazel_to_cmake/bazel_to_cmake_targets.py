@@ -20,13 +20,13 @@ EXPLICIT_TARGET_MAPPING = {
         "IREELinalgExtDialect"
     ],
     "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
-        "IREELinalgExtTransforms"
+        "IREELinalgExtPasses"
     ],
     "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
         "IREEPyDMDialect"
     ],
     "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
-        "IREEPyDMTransforms"
+        "IREEPyDMPasses"
     ],
 
     # LLVM
