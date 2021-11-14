@@ -198,7 +198,9 @@ class BaseNodeVisitor(ast.NodeVisitor):
     self.fctx = fctx
 
   def visit(self, node):
-    self.fctx.update_loc(node)
+    # Some psuedo-nodes (like old 'Index' types do not have location info).
+    if hasattr(node, "lineno"):
+      self.fctx.update_loc(node)
     return super().visit(node)
 
   def generic_visit(self, ast_node: ast.AST):
