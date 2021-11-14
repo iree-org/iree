@@ -13,10 +13,10 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -246,7 +246,7 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
   return tiedOperands;
 }
 
-static LogicalResult analyseLinalgExtOps(linalg_ext::LinalgExtOp op,
+static LogicalResult analyseLinalgExtOps(IREE::LinalgExt::LinalgExtOp op,
                                          BufferizationPlan &plan) {
   if (!op.hasTensorSemantics()) return success();
   // TODO(hanchung): Revisit if we can tie together op.getOutputOperands() with
@@ -521,8 +521,8 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
           return analyseLinalgOps(linalgOp, plan);
         })
-        .Case<linalg_ext::LinalgExtOp>(
-            [&](linalg_ext::LinalgExtOp linalgExtOp) {
+        .Case<IREE::LinalgExt::LinalgExtOp>(
+            [&](IREE::LinalgExt::LinalgExtOp linalgExtOp) {
               return analyseLinalgExtOps(linalgExtOp, plan);
             })
         .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(

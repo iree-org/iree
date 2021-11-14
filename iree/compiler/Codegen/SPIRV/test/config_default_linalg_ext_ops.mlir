@@ -16,10 +16,10 @@ hal.executable private @static_1d_sort  {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:1000xi32>
         %1 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:1000xi32> -> tensor<1000xi32>
-        %2 = linalg_ext.sort dimension(0) {__internal_linalg_transform__ = "workgroup"} outs(%1 : tensor<1000xi32>)  {
+        %2 = iree_linalg_ext.sort dimension(0) {__internal_linalg_transform__ = "workgroup"} outs(%1 : tensor<1000xi32>)  {
         ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
           %3 = arith.cmpi slt, %arg0, %arg1 : i32
-          linalg_ext.yield %3 : i1
+          iree_linalg_ext.yield %3 : i1
         } -> tensor<1000xi32>
         flow.dispatch.tensor.store %2, %0, offsets = [], sizes = [], strides = [] : tensor<1000xi32> -> !flow.dispatch.tensor<readwrite:1000xi32>
         return
@@ -43,7 +43,7 @@ hal.executable private @static_1d_sort  {
 //  CHECK-NEXT:   hal.return %[[ONE]], %[[ONE]], %[[ONE]]
 
 //       CHECK: func @static_1d_sort()
-//       CHECK:   linalg_ext.sort
+//       CHECK:   iree_linalg_ext.sort
 //  CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
@@ -86,10 +86,10 @@ hal.executable private @static_3d_sort  {
             %9 = memref.cast %8 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>> to memref<?x?x?xi32>
             %10 = memref.subview %1[%arg0, 0, %arg1] [%4, 32, %7] [1, 1, 1] : memref<64x32x128xi32> to memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
             linalg.copy(%9, %10) : memref<?x?x?xi32>, memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
-            linalg_ext.sort dimension(1) {__internal_linalg_transform__ = "workgroup"} outs(%10 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
+            iree_linalg_ext.sort dimension(1) {__internal_linalg_transform__ = "workgroup"} outs(%10 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
               %11 = arith.cmpi slt, %arg2, %arg3 : i32
-              linalg_ext.yield %11 : i1
+              iree_linalg_ext.yield %11 : i1
             }
           }
         }
@@ -111,7 +111,7 @@ hal.executable private @static_3d_sort  {
 // CHECK-NEXT:   hal.return %[[DIV]], %[[Y]], %[[ONE]]
 
 //      CHECK: func @static_3d_sort()
-//      CHECK:   linalg_ext.sort
+//      CHECK:   iree_linalg_ext.sort
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
@@ -139,7 +139,7 @@ hal.executable private @static_1d_fft_stage2  {
         %1 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
         %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
-        %4:2 = linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
+        %4:2 = iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
         flow.dispatch.tensor.store %4#0, %0, offsets = [], sizes = [], strides = [] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:32xf32>
         flow.dispatch.tensor.store %4#1, %1, offsets = [], sizes = [], strides = [] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:32xf32>
         return
@@ -160,7 +160,7 @@ hal.executable private @static_1d_fft_stage2  {
 //  CHECK-NEXT:   hal.return %[[T]], %[[ONE]], %[[ONE]]
 
 //       CHECK: func @static_1d_fft_stage2()
-//       CHECK:   linalg_ext.fft
+//       CHECK:   iree_linalg_ext.fft
 //  CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
@@ -207,7 +207,7 @@ hal.executable private @static_3d_fft_stage3  {
               %7 = memref.cast %6 : memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>> to memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
               %8 = memref.subview %3[%arg0, %arg1, %arg2] [1, 1, 4] [1, 1, 1] : memref<64x128x32xf32> to memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
               %9 = memref.cast %8 : memref<1x1x4xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>> to memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>
-              linalg_ext.fft {__internal_linalg_transform__ = "workgroup"}
+              iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"}
                 ins(%c3, %1, %0 : index, memref<4xf32>, memref<4xf32>)
                 outs(%7, %9 : memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>, memref<?x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 32 + d2)>>)
             }
@@ -231,5 +231,5 @@ hal.executable private @static_3d_fft_stage3  {
 //  CHECK-NEXT:   hal.return %[[T]], %[[ARG1]], %[[ARG2]]
 
 //       CHECK: func @static_3d_fft_stage3()
-//       CHECK:   linalg_ext.fft
+//       CHECK:   iree_linalg_ext.fft
 //  CHECK-SAME:     lowering.config = #[[CONFIG]]

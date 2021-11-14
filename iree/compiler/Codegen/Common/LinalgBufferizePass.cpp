@@ -36,6 +36,7 @@
 //     involved and explained below.
 //
 //===----------------------------------------------------------------------===//
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -44,7 +45,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -362,7 +362,7 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
             .Case<scf::IfOp, scf::ForOp, linalg::LinalgOp,
-                  linalg_ext::LinalgExtOp, tensor::InsertSliceOp,
+                  IREE::LinalgExt::LinalgExtOp, tensor::InsertSliceOp,
                   vector::TransferWriteOp>(
                 [&](auto op) { return resultBuffer; })
             .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
@@ -975,7 +975,7 @@ void LinalgBufferizePass::runOnOperation() {
           }
           return convertPadTensorOp(b, padTensorOp, bvm);
         })
-        .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp>([&](auto op) {
+        .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>([&](auto op) {
           if (failed(
                   getOrAllocateResultBuffers(b, op, bvm, plan, allocationFn))) {
             return failure();

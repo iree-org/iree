@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_C_UTILS_H
-#define IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_C_UTILS_H
+#ifndef IREE_DIALECTS_C_UTILS_H
+#define IREE_DIALECTS_C_UTILS_H
 
 #include "mlir-c/IR.h"
 
@@ -23,4 +23,4 @@ ireeLookupNearestSymbolFrom(MlirOperation fromOp, MlirAttribute symbolRefAttr);
 }
 #endif
 
-#endif  // IREE_LLVM_EXTERNAL_PROJECTS_IREE_DIALECTS_C_UTILS_H
+#endif  // IREE_DIALECTS_C_UTILS_H

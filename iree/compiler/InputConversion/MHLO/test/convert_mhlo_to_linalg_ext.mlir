@@ -13,12 +13,12 @@ func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 // CHECK-LABEL: func @sort_1d(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
-// CHECK:         %[[SORT:.+]] = linalg_ext.sort
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<128xi32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi sgt, %[[ARG1]], %[[ARG2]]
-// CHECK:             linalg_ext.yield %[[CMP]]
+// CHECK:             iree_linalg_ext.yield %[[CMP]]
 // CHECK:         return %[[SORT]]
 
 // -----
@@ -37,10 +37,10 @@ func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[SCALAR:.+]] = arith.constant 0 : i32
-// CHECK:         %[[SORT:.+]] = linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
 // CHECK:         ^bb0(%[[ARG1:.+]]: i32, %{{.*}}: i32)
 // CHECK:           %[[RES:.+]] = arith.cmpi slt, %[[ARG1]], %[[SCALAR]] : i32
-// CHECK:           linalg_ext.yield %[[RES]] : i1
+// CHECK:           iree_linalg_ext.yield %[[RES]] : i1
 // CHECK:         } -> tensor<1x10xi32>
 // CHECK:         return %[[SORT]]
 
@@ -60,10 +60,10 @@ func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -> ten
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
 // CHECK:         %[[SCALAR:.+]] = tensor.extract %[[ARG1]][] : tensor<i32>
-// CHECK:         %[[SORT:.+]] = linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
 // CHECK:         ^bb0(%[[ARG2:.+]]: i32, %{{.*}}: i32)
 // CHECK:           %[[RES:.+]] = arith.cmpi slt, %[[ARG2]], %[[SCALAR]] : i32
-// CHECK:           linalg_ext.yield %[[RES]] : i1
+// CHECK:           iree_linalg_ext.yield %[[RES]] : i1
 // CHECK:         } -> tensor<1x10xi32>
 // CHECK:         return %[[SORT]]
 
@@ -80,12 +80,12 @@ func @sort_2d(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
 // CHECK-LABEL: func @sort_2d(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
-// CHECK:         %[[SORT:.+]] = linalg_ext.sort
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<16x32xi32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi sgt, %[[ARG1]], %[[ARG2]]
-// CHECK:             linalg_ext.yield %[[CMP]]
+// CHECK:             iree_linalg_ext.yield %[[CMP]]
 // CHECK:         return %[[SORT]]
 
 // -----
@@ -104,14 +104,14 @@ func @sort_unsigned(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
 // CHECK-LABEL: func @sort_unsigned(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
-// CHECK:         %[[SORT:.+]] = linalg_ext.sort
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<1x5xf32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK:             %[[CAST1:.+]] = arith.bitcast %[[ARG1]] : f32 to i32
 // CHECK:             %[[CAST2:.+]] = arith.bitcast %[[ARG2]] : f32 to i32
 // CHECK:             %[[CMP:.+]] = arith.cmpi ult, %[[CAST1]], %[[CAST2]] : i32
-// CHECK:             linalg_ext.yield %[[CMP]]
+// CHECK:             iree_linalg_ext.yield %[[CMP]]
 // CHECK:         return %[[SORT]]
 
 // -----
@@ -133,18 +133,18 @@ func @sort_unsigned_cst_capture(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
 // CHECK:         %[[UI32:.+]] = mhlo.constant dense<2> : tensor<ui32>
 // CHECK:         %[[CONVERSION_CAST_CST:.+]] = builtin.unrealized_conversion_cast %[[UI32]] : tensor<ui32> to tensor<i32>
 // CHECK:         %[[EXTRACT_CST:.+]] = tensor.extract %[[CONVERSION_CAST_CST]][] : tensor<i32>
-// CHECK:         %[[SORT:.+]] = linalg_ext.sort
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<1x5xf32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK:             %[[CAST1:.+]] = arith.bitcast %[[ARG1]] : f32 to i32
 // CHECK:             %[[CMP:.+]] = arith.cmpi ult, %[[CAST1]], %[[EXTRACT_CST]] : i32
-// CHECK:             linalg_ext.yield %[[CMP]]
+// CHECK:             iree_linalg_ext.yield %[[CMP]]
 // CHECK:         return %[[SORT]]
 
 // -----
 
-// For testing that complex within an linalg_ext op gets lowered
+// For testing that complex within an iree_linalg_ext.op gets lowered
 func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) -> tensor<1x5xf32> {
   %ui32 = mhlo.constant dense<2> : tensor<ui32>
   %1 = "mhlo.sort"(%arg0) ( {
@@ -163,13 +163,13 @@ func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) -> tens
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:      %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
-// CHECK:         %[[SORT:.+]] = linalg_ext.sort
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:    dimension(1)
 // CHECK-SAME:    outs(%[[ARG0]] : tensor<1x5xf32>)
 // CHECK:         ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK-NOT:       mhlo.complex
 // CHECK:           %[[CMP:.+]] = arith.cmpf olt, %{{.+}}, %{{.+}} : f32
-// CHECK:           linalg_ext.yield %[[CMP]]
+// CHECK:           iree_linalg_ext.yield %[[CMP]]
 // CHECK:       return %[[SORT]]
 
 // -----
@@ -185,12 +185,12 @@ func @topk(%arg0: tensor<128xi32>, %arg1: tensor<128xi32>) -> (tensor<128xi32>) 
 // CHECK-LABEL: func @topk
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK:         %[[SORT:.+]]:2 = linalg_ext.sort
+// CHECK:         %[[SORT:.+]]:2 = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs(%[[ARG0]], %[[ARG1]] : tensor<128xi32>, tensor<128xi32>)
 // CHECK:           ^bb0(%[[ARG2:.+]]: i32, %[[ARG3:.+]]: i32, %{{.*}}: i32, %{{.*}}: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi sgt, %[[ARG2]], %[[ARG3]]
-// CHECK:             linalg_ext.yield %[[CMP]]
+// CHECK:             iree_linalg_ext.yield %[[CMP]]
 // CHECK:        return %[[SORT]]#0
 
 // -----
@@ -215,7 +215,7 @@ func @scatter_update_scalar_1D(%arg0: tensor<8xi32>, %arg1: tensor<4x1xi32>,
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK:         %[[SCATTER:.+]] = linalg_ext.scatter
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<4xi32>, tensor<4x1xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<8xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):  // no predecessors
@@ -243,7 +243,7 @@ func @scatter_update_scalar_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>,
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK:         %[[SCATTER:.+]] = linalg_ext.scatter
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<3xi32>, tensor<3x2xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<4x3xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):  // no predecessors
@@ -273,7 +273,7 @@ func @scatter_update_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK:         %[[SCATTER:.+]] = linalg_ext.scatter
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<2x3xi32>, tensor<2x1xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<6x3xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):  // no predecessors
@@ -304,7 +304,7 @@ func @scatter_add_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK:         %[[SCATTER:.+]] = linalg_ext.scatter
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<2x3xi32>, tensor<2x1xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<6x3xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):  // no predecessors
@@ -340,7 +340,7 @@ func @scatter_update_batch_scalar_1D(%arg0: tensor<8xi32>,
 // CHECK-SAME:        %[[ARG1]] {{\[}}[0, 1], [2]] : tensor<3x4x1xi32> into tensor<12x1xi32>
 // CHECK:         %[[COLLAPSED_UPDATES:.+]] = linalg.tensor_collapse_shape
 // CHECK-SAME:        %[[ARG2]] {{\[}}[0, 1]] : tensor<3x4xi32> into tensor<12xi32>
-// CHECK:         %[[SCATTER:.+]] = linalg_ext.scatter
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:       ins(%[[COLLAPSED_UPDATES]], %[[COLLAPSED_INDICES]] : tensor<12xi32>, tensor<12x1xi32>)
 // CHECK-SAME:       outs(%[[ARG0]] : tensor<8xi32>)
 // CHECK:            ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):  // no predecessors
@@ -373,7 +373,7 @@ func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
 // CHECK-SAME:        %[[ARG1]] {{\[}}[0, 1], [2]] : tensor<?x3x2xi32> into tensor<?x2xi32>
 // CHECK:         %[[COLLAPSED_UPDATES:.+]] = linalg.tensor_collapse_shape
 // CHECK-SAME:        %[[ARG2]] {{\[}}[0, 1], [2]] : tensor<?x3x512xi32> into tensor<?x512xi32>
-// CHECK:         %[[SCATTER:.+]] = linalg_ext.scatter
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:        ins(%[[COLLAPSED_UPDATES]], %[[COLLAPSED_INDICES]] : tensor<?x512xi32>, tensor<?x2xi32>)
 // CHECK-SAME:        outs(%[[ARG0]] : tensor<1x24x512xi32>)
 // CHECK:             ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):  // no predecessors
@@ -408,19 +408,19 @@ func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
-// CHECK:        %[[R1:.+]]:2 = linalg_ext.fft
+// CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
-// CHECK:        %[[R2:.+]]:2 = linalg_ext.fft
+// CHECK:        %[[R2:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
 // CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
-// CHECK:        %[[R3:.+]]:2 = linalg_ext.fft
+// CHECK:        %[[R3:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
 // CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
@@ -457,19 +457,19 @@ func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>) {
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<1xf32>
-// CHECK:        %[[R1:.+]]:2 = linalg_ext.fft
+// CHECK:        %[[R1:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:     ins(%[[C1]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[REORDERED]], %[[IMAG]]
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<2xf32>
-// CHECK:        %[[R2:.+]]:2 = linalg_ext.fft
+// CHECK:        %[[R2:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:     ins(%[[C2]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R1]]#0, %[[R1]]#1
 // CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
 // CHECK-DAG:    %[[COEF_REAL:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
 // CHECK-DAG:    %[[COEF_IMAG:.+]] = arith.constant dense<{{.+}}> : tensor<4xf32>
-// CHECK:        %[[R3:.+]]:2 = linalg_ext.fft
+// CHECK:        %[[R3:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:     ins(%[[C3]], %[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
 // CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0, 0] [4, 5] [1, 1] : tensor<4x8xf32> to tensor<4x5xf32>
@@ -487,7 +487,7 @@ func @reverse_dim1(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 // CHECK-LABEL: func @reverse_dim1
 // CHECK-SAME:   %[[IN:[a-zA-Z0-9]+]]
 // CHECK:        %[[INIT:.+]] = linalg.init_tensor [3, 5] : tensor<3x5xi32>
-// CHECK:        %[[REV:.+]] = linalg_ext.reverse
+// CHECK:        %[[REV:.+]] = iree_linalg_ext.reverse
 // CHECK-SAME:     dimensions(dense<1> : tensor<1xi64>)
 // CHECK-SAME:     ins(%[[IN]] : tensor<3x5xi32>)
 // CHECK-SAME:     outs(%[[INIT]] : tensor<3x5xi32>) : tensor<3x5xi32>
@@ -508,7 +508,7 @@ func @reverse_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[IN]], %[[C0]]
 // CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[IN]], %[[C1]]
 // CHECK:        %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]]] : tensor<?x?xi32>
-// CHECK:        %[[REV:.+]] = linalg_ext.reverse
+// CHECK:        %[[REV:.+]] = iree_linalg_ext.reverse
 // CHECK-SAME:     dimensions(dense<[0, 1]> : tensor<2xi64>)
 // CHECK-SAME:     ins(%[[IN]] : tensor<?x?xi32>)
 // CHECK-SAME:     outs(%[[INIT]] : tensor<?x?xi32>) : tensor<?x?xi32>

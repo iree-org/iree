@@ -6,11 +6,11 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
@@ -263,7 +263,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
-                                    linalg_ext::FftOp op) {
+                                    IREE::LinalgExt::FftOp op) {
   const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
@@ -563,8 +563,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
             // If unsuccessful, try to tile and distribute.
             return setDefaultOpConfig(limits, op);
           })
-      .Case<linalg_ext::FftOp>(
-          [limits](linalg_ext::FftOp op) { return setFftOpConfig(limits, op); })
+      .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
+        return setFftOpConfig(limits, op);
+      })
       .Case<linalg::GenericOp>([limits](linalg::GenericOp op) {
         // If a generic op has reduction iterator types, it can be treated as a
         // root op for configuration as well. Use the default configuration,

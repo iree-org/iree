@@ -6,9 +6,9 @@
 
 #include "iree-dialects-c/Dialects.h"
 
-#include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/Transforms/Passes.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
+#include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
@@ -24,7 +24,8 @@ using namespace mlir::iree_compiler::IREE;
 // IREEDialect
 //===----------------------------------------------------------------------===//
 
-MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(IREE, iree, mlir::iree::IREEDialect)
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
+    IREEInput, iree_input, mlir::iree_compiler::IREE::Input::IREEInputDialect)
 
 //===----------------------------------------------------------------------===//
 // IREEPyDMDialect

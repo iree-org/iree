@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -11,7 +12,6 @@
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -37,11 +37,12 @@ class SPIRVLowerExecutableTargetPass
   SPIRVLowerExecutableTargetPass(const SPIRVLowerExecutableTargetPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, AffineDialect,
-                    gpu::GPUDialect, IREE::HAL::HALDialect,
-                    linalg::LinalgDialect, linalg_ext::LinalgExtDialect,
-                    memref::MemRefDialect, scf::SCFDialect, ShapeDialect,
-                    spirv::SPIRVDialect, vector::VectorDialect>();
+    registry
+        .insert<IREE::Codegen::IREECodegenDialect, AffineDialect,
+                gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
+                IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
+                scf::SCFDialect, ShapeDialect, spirv::SPIRVDialect,
+                vector::VectorDialect>();
   }
 
   void runOnOperation() override;

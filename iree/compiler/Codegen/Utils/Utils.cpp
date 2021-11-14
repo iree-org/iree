@@ -6,11 +6,11 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -72,7 +72,7 @@ SmallVector<unsigned> getPartitionedLoops(Operation *op) {
     }
     return partitionedLoops;
   }
-  if (auto tilableOp = dyn_cast<linalg_ext::TiledOpInterface>(op)) {
+  if (auto tilableOp = dyn_cast<IREE::LinalgExt::TiledOpInterface>(op)) {
     return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
   }
   return {};
@@ -544,7 +544,7 @@ LogicalResult getComputeOps(
   if (failed(getFilteredOps(
           funcOp,
           [](Operation *op) {
-            return isa<linalg::LinalgOp, linalg_ext::TiledOpInterface>(op);
+            return isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op);
           },
           computeOps, tiledLoops))) {
     return failure();
