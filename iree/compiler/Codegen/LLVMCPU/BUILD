@@ -20,7 +20,6 @@ cc_library(
         "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp",
         "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
-        "LLVMCPUVectorization.cpp",
         "Passes.cpp",
         "VectorContractToAArch64InlineAsmOp.cpp",
     ],

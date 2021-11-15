@@ -153,12 +153,6 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
-def LLVMCPUVectorization :
-    Pass<"iree-llvmcpu-vectorization", "FuncOp"> {
-  let summary = "Tile and vectorize for CPU backends";
-  let constructor = "mlir::iree_compiler::createLLVMCPUVectorizationPass()";
-}
-
 def VectorToAArch64InlineAsm :
     Pass<"iree-llvmcpu-vector-to-aarch64-inline-asm", "FuncOp"> {
   let summary = "Convert vector operations to aarch64 inline asm LLVMIR dialect";

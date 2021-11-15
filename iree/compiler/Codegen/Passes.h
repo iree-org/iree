@@ -191,11 +191,6 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
-/// Populates the passes needed to lower to vector operations using linalg based
-/// progressive lowering with vectorization after bufferization.
-void addCPUVectorizationPassPipeline(OpPassManager &passManager,
-                                     bool lowerToVectors = true);
-
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
 LogicalResult verifyTensorToVectorsPassPipelineConfig(
