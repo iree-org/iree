@@ -7,6 +7,7 @@
 #include "iree_tf_compiler/TFL/Passes.h"
 
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -56,6 +57,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   mlir::tosa::createTFTFLtoTOSALegalizationPipeline(pm, tosaOptions);
   pm.nest<FuncOp>().addPass(mlir::tosa::createStripQuantTypesPass());
   pm.addPass(createCanonicalizerPass());
+  pm.addPass(createReconcileUnrealizedCastsPass());
 
   //----------------------------------------------------------------------------
   // Lowering shape-related constructs

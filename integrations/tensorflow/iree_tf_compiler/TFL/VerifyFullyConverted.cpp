@@ -28,6 +28,7 @@ class VerifyFullyConvertedPass
     ConversionTarget target(getContext());
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addIllegalDialect<mlir::TFL::TensorFlowLiteDialect>();
+    target.addIllegalOp<mlir::UnrealizedConversionCastOp>();
     if (failed(
             iree_compiler::verifyAllOperationsAreLegal(getOperation(), target)))
       return signalPassFailure();
