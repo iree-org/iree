@@ -44,11 +44,11 @@ static llvm::cl::opt<int> matmulWorkgroupTileSize(
     llvm::cl::desc(
         "linalg.matmul tile size for workgroups spliting of M, N dimension"),
     llvm::cl::init(64));
-static llvm::cl::opt<int> matmulL1TileSize(
+static llvm::cl::list<int> clMatmulL1TileSize(
     "iree-codegen-llvm-matmul-l1-size",
-    llvm::cl::desc(
-        "linalg.matmul tile size for L1 spliting of M, N, K dimension"),
-    llvm::cl::init(32));
+    llvm::cl::desc("Speicifically set linalg.matmul tile size for L1 spliting "
+                   "of M, N, K dimension."),
+    llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 static llvm::cl::opt<int> matmulVectorSize(
     "iree-codegen-llvm-matmul-vector-size",
     llvm::cl::desc("linalg.matmul vector tile size"), llvm::cl::init(4));
@@ -340,6 +340,17 @@ static LogicalResult setRootConfig(
       workloadPerWorkgroup,
       /*workgroupSize =*/ArrayRef<int64_t>{});
 
+  SmallVector<int64_t> matmulL1TileSizes(clMatmulL1TileSize.begin(),
+                                         clMatmulL1TileSize.end());
+  if (clMatmulL1TileSize.empty()) {
+    Optional<std::string> triple = getTargetTriple(entryPointFn);
+    if (triple && triple.getValue().find("x86_64") != std::string::npos) {
+      matmulL1TileSizes.append(3 + isBatchMatmul, 16);
+    } else {
+      matmulL1TileSizes.append(3 + isBatchMatmul, 32);
+    }
+  }
+
   SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;
   if (isBatchMatmul) {
     l1TileSizes.push_back(1);
@@ -347,11 +358,12 @@ static LogicalResult setRootConfig(
   for (unsigned i = tiledLoops.size() - 2; i < tiledLoops.size(); ++i) {
     l1TileSizes.push_back(
         getTileSize(0, workloadPerWorkgroup[tiledLoops.size() - 1 - i],
-                    matmulL1TileSize, vectorSizeVals[i]));
+                    matmulL1TileSizes[i], vectorSizeVals[i]));
   }
   // L1 tile size for k dimensions.
   int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getTileSize(0, K, matmulL1TileSize, vectorSize));
+  l1TileSizes.push_back(
+      getTileSize(0, K, matmulL1TileSizes.back(), vectorSize));
   vectorSizeVals.push_back(vectorSize);
   vectorTileSizes.assign(vectorSizeVals.begin(), vectorSizeVals.end());
   TileSizesListType tileSizes;
