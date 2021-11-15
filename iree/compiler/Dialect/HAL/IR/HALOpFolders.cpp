@@ -34,10 +34,22 @@ OpFoldResult TensorCastOp::fold(ArrayRef<Attribute> operands) {
   }
 
   auto castOp = source().getDefiningOp<TensorCastOp>();
-  if (castOp && target().getType() == castOp.source().getType() &&
-      source_dims() == castOp.source_dims() &&
+  if (castOp && source_dims() == castOp.source_dims() &&
       target_dims() == castOp.target_dims()) {
-    return castOp.source();
+    if (target().getType() == castOp.source().getType()) {
+      // %1 = hal.tensor.cast %0 : A -> B  (source defining op)
+      // %2 = hal.tensor.cast %1 : B -> A  (this op)
+      // fold to just %0 then let CSE remove %1 if no other uses
+      return castOp.source();
+    } else {
+      // %1 = hal.tensor.cast %0 : A -> B  (source defining op)
+      // %2 = hal.tensor.cast %1 : B -> C  (this op)
+      // change %1 to %0 and let CSE remove %1 if no other uses
+      auto mutableSource = sourceMutable();
+      mutableSource.clear();
+      mutableSource.append(castOp.source());
+      return getResult();
+    }
   }
 
   return {};
