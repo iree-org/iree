@@ -537,10 +537,8 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   fprintf(stderr, "--- CALL[%.*s] ---\n", (int)function_name.size,
           function_name.data);
 
-  iree_hal_allocator_t* heap_hal_allocator;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_create_heap(
-      iree_make_cstring_view("e2e-matmul-test-heap-allocator"),
-      replay->host_allocator, &heap_hal_allocator));
+  iree_hal_allocator_t* device_allocator =
+      iree_hal_device_allocator(replay->device);
 
   iree_vm_function_t function;
   iree_vm_list_t* input_list = NULL;
@@ -553,8 +551,7 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   // linalg.matmul. We need to preserve the original test inputs to run the
   // reference matmul on and to use in test failure logs.
   iree_vm_list_t* copy_of_input_list = NULL;
-  copy_list_of_buffer_views(heap_hal_allocator, input_list,
-                            &copy_of_input_list);
+  copy_list_of_buffer_views(device_allocator, input_list, &copy_of_input_list);
 
   // Invoke the function to produce the actual result.
   iree_vm_list_t* output_list = NULL;
@@ -572,8 +569,8 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
 
   // Allocate an expected_result buffer, with same shape as actual_result.
   iree_hal_buffer_view_t* expected_result;
-  IREE_RETURN_IF_ERROR(allocate_buffer_like(heap_hal_allocator, actual_result,
-                                            &expected_result));
+  IREE_RETURN_IF_ERROR(
+      allocate_buffer_like(device_allocator, actual_result, &expected_result));
 
   // Use the reference matmul implementation to fill expected_result
   IREE_RETURN_IF_ERROR(reference_matmul(input_list, expected_result));
@@ -586,8 +583,6 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   iree_vm_list_release(copy_of_input_list);
   iree_vm_list_release(output_list);  // releases actual_result
   iree_hal_buffer_view_release(expected_result);
-
-  iree_hal_allocator_release(heap_hal_allocator);
 
   return iree_ok_status();
 }

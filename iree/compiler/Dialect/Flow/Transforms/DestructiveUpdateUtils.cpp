@@ -11,9 +11,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -62,7 +62,7 @@ static bool hasDestructiveUpdateUses(BlockArgument arg,
   SmallVector<Operation *> writes;
   for (OpOperand &u : arg.getUses()) {
     TypeSwitch<Operation *, void>(u.getOwner())
-        .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp>(
+        .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>(
             [&](auto linalgLikeOp) {
               if (linalgLikeOp.isOutputTensor(&u)) {
                 writes.push_back(linalgLikeOp);
@@ -320,7 +320,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
   // Try to rewrite inplace.
   auto status =
       TypeSwitch<Operation *, LogicalResult>(capture.rootDestructiveUpdate)
-          .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp,
+          .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp,
                 tensor::InsertSliceOp>([&](auto op) {
             return rewriteDestructiveUpdateInPlace(b, op, target);
           })

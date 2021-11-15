@@ -107,28 +107,6 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     }
   });
 
-  // Expect all the ops are vectorizable. Do nothing if the expectation is not
-  // met.
-  // TODO(hanchung): Make the decision earlier, e.g., in setting translation
-  // information. Then the check will be unnecessary.
-  {
-    bool isVectorizable = true;
-    SmallVector<Operation *> computeOps;
-    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
-      return signalPassFailure();
-    }
-
-    for (auto op : computeOps) {
-      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-        if (failed(linalg::vectorizeLinalgOpPrecondition(op))) {
-          isVectorizable = false;
-        }
-      }
-    }
-    if (!isVectorizable) return;
-  }
-
   auto tileAndFuseLinalgOps = [&](TilingLevel level) {
     OpBuilder builder(funcOp.getContext());
     SmallVector<Operation *> computeOps;
@@ -171,10 +149,36 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
 
   // Tile and fuse for vector sizes, then tile reduction loops. We don't rely on
   // unroll vector pass because it could introduce register pressure.
+  bool hasMatmulAndIsVectorizable = true;
   {
     tileAndFuseLinalgOps(TilingLevel::VectorTiles);
-    OwningRewritePatternList l1patterns(&getContext());
-    l1patterns.insert<TileWorkgroups>(
+    OwningRewritePatternList tileReductionPatterns(&getContext());
+
+    funcOp.walk([&](linalg::ContractionOpInterface op) {
+      auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+      if (failed(linalg::vectorizeLinalgOpPrecondition(linalgOp))) {
+        hasMatmulAndIsVectorizable = false;
+      }
+      auto loopRanges = linalgOp.getStaticLoopRanges();
+      if (loopRanges) {
+        auto tiles =
+            getTileSizes(op, static_cast<unsigned>(TilingLevel::VectorTiles));
+        for (int i = linalgOp.getNumParallelLoops(); i < tiles.size(); ++i) {
+          if (loopRanges.getValue()[i] == ShapedType::kDynamicSize ||
+              (tiles[i] && loopRanges.getValue()[i] % tiles[i] != 0)) {
+            hasMatmulAndIsVectorizable = false;
+          }
+        }
+      }
+    });
+    // If the matmul op is not vectorizable, stop directly.
+    // If the follow generic op is not vectorizable, it's fine.
+    // If the follow generic op is vectorizable, we can't vectorize it. Because
+    // an extra allocation op will be created (to temporarily store the result
+    // of matmul.)
+    if (!hasMatmulAndIsVectorizable) return;
+
+    tileReductionPatterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder,
@@ -196,7 +200,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
             ArrayRef<Identifier>{},
             Identifier::get(getVectorizeMarker(), context)));
 
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(tileReductionPatterns)))) {
       return signalPassFailure();
     }
     // Apply canoncalization

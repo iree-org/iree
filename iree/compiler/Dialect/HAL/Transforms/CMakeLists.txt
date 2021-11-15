@@ -19,12 +19,14 @@ iree_cc_library(
     "AssignTargetDevices.cpp"
     "BenchmarkBatchDispatches.cpp"
     "ConvertToHAL.cpp"
+    "ConvertToHAL2.cpp"
     "ElideRedundantCommands.cpp"
     "IdentifyConstantPools.cpp"
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
     "MaterializeConstantPoolBuffers.cpp"
     "MaterializeInterfaces.cpp"
+    "MaterializeInterfaces2.cpp"
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
     "PackAllocations.cpp"
@@ -44,7 +46,11 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::Conversion2::StandardToHAL
+    iree::compiler::Dialect::HAL::Conversion2::StreamToHAL
+    iree::compiler::Dialect::HAL::Conversion2::UtilToHAL
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL
     iree::compiler::Dialect::HAL::Conversion::HALToHAL
     iree::compiler::Dialect::HAL::Conversion::StandardToHAL
@@ -54,6 +60,8 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
+    iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

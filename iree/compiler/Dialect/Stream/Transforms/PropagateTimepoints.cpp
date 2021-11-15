@@ -132,7 +132,7 @@ static std::pair<Value, Value> consumeTimepoint(
 
   if (auto awaitOp = dyn_cast_or_null<IREE::Stream::TimepointAwaitOp>(
           value.getDefiningOp())) {
-    return std::make_pair(awaitOp.timepoint(),
+    return std::make_pair(awaitOp.await_timepoint(),
                           awaitOp.getTiedResultOperand(value));
   } else if (auto executeOp = dyn_cast_or_null<IREE::Stream::AsyncExecuteOp>(
                  value.getDefiningOp())) {
@@ -482,7 +482,8 @@ static void expandCondBranchOp(mlir::CondBranchOp op,
 static void expandAwaitOp(IREE::Stream::TimepointAwaitOp op,
                           BlockAndValueMapping &resourceTimepointMap) {
   for (auto result : op.results()) {
-    resourceTimepointMap.map(op.getTiedResultOperand(result), op.timepoint());
+    resourceTimepointMap.map(op.getTiedResultOperand(result),
+                             op.await_timepoint());
   }
 }
 

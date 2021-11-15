@@ -1,7 +1,7 @@
 # RUN: %PYTHON %s
 
 import iree.compiler.ir
-from iree.compiler.dialects import iree as iree_d
+from iree.compiler.dialects import iree_input as iree_d
 from iree.compiler.dialects import iree_pydm as pydm_d
 
 with iree.compiler.ir.Context() as ctx:

@@ -522,6 +522,44 @@ def HAL_AllocatorPackOp : HAL_PureOp<"allocator.pack", [
 // !hal.buffer / iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
 
+def HAL_BufferAssertOp : HAL_Op<"buffer.assert", []> {
+  let summary = [{buffer compatibility assertion}];
+  let description = [{
+    Asserts that the buffer is compatible with the given allocator and usage.
+    Program execution will abort as if `std.assert` had been used.
+
+    This only checks that the buffer can be used and not that it matches the
+    given parameters exactly. Buffers may be from other allocators so long as
+    the allocators are compatible (devices can address each other's memory),
+    the type and usage contain all the requested bits (having more bits is ok),
+    and the length is at least the requested minimum (as padding may be
+    ignored).
+  }];
+
+  let arguments = (ins
+    HAL_Buffer:$buffer,
+    StrAttr:$message,
+    HAL_Allocator:$allocator,
+    HAL_DeviceSize:$minimum_length,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $buffer `:` type($buffer) `>`
+    `message` `(` $message `)`
+    `allocator` `(` $allocator `:` type($allocator) `)`
+    `minimum_length` `(` $minimum_length `)`
+    `type` `(` $memory_types `)`
+    `usage` `(` $buffer_usage `)`
+    attr-dict-with-keyword
+  }];
+
+  // TODO(benvanik): fold away when we know some properties of the buffer
+  // (such as when we create it ourselves earlier on) or we've already asserted.
+}
+
 def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -687,6 +725,36 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
       "ValueRange":$shape
     )>,
   ];
+}
+
+def HAL_BufferViewAssertOp : HAL_Op<"buffer_view.assert", []> {
+  let summary = [{buffer view contents assertion}];
+  let description = [{
+    Asserts that the buffer view contains a data compatible tensor with the
+    given encoding. Program execution will abort as if `std.assert` had been
+    used.
+  }];
+
+  let arguments = (ins
+    HAL_BufferView:$buffer_view,
+    StrAttr:$message,
+    HAL_ElementType:$element_type,
+    HAL_EncodingType:$encoding_type,
+    HAL_Shape:$shape
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `message` `(` $message `)`
+    `shape` `(` `[` $shape `]` `)`
+    `type` `(` $element_type `)`
+    `encoding` `(` $encoding_type `)`
+    attr-dict-with-keyword
+  }];
+
+  // TODO(benvanik): fold away when we know some properties of the buffer view
+  // (such as when we create it ourselves earlier on) or we've already asserted.
 }
 
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [

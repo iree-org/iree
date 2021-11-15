@@ -22,8 +22,12 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     Common
+  HDRS
+    "BufferizationAnalysis.h"
   SRCS
+    "BufferizationAnalysis.cpp"
     "CleanupBufferAllocViewPass.cpp"
+    "ConvertToDestinationPassingStylePass.cpp"
     "DemoteF32ToF16.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
@@ -37,6 +41,8 @@ iree_cc_library(
     "VectorizeConv.cpp"
     "VectorizeMMT4d.cpp"
   DEPS
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineUtils
@@ -68,7 +74,6 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC

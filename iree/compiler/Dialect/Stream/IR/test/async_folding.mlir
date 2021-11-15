@@ -147,11 +147,20 @@ func @CombineSliceUpdateFromToCopy(%arg0: !stream.resource<*>, %arg1: index, %ar
 // -----
 
 // CHECK-LABEL: @AsyncCopyFullSourceToUpdate
-func @AsyncCopyFullSourceToUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
+func @AsyncCopyFullSourceToUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+
+  // This copy is from the full source (0..%arg3) so it can be turned into an update.
   // CHECK: = stream.async.update %arg2, %arg0[%c0 to %arg3] : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
   %0 = stream.async.copy %arg2[%c0 to %arg3], %arg0[%c0 to %arg3], %arg3 : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
-  return %0 : !stream.resource<*>
+
+  // This copy is only a partial section of the source and needs to remain a copy.
+  // CHECK: = stream.async.copy %arg2[%c16 to %arg3], %arg0[%c0 to %arg3], %c8 : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
+  %1 = stream.async.copy %arg2[%c16 to %arg3], %arg0[%c0 to %arg3], %c8 : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
+
+  return %0, %1 : !stream.resource<*>, !stream.resource<*>
 }
 
 // -----

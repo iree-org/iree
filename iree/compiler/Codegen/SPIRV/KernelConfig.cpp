@@ -6,11 +6,11 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
@@ -31,35 +31,13 @@ namespace iree_compiler {
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
 
-/// Lets the entry point region to return fully static number of workgroups.
-// This is needed for folding `affine.min` ops to expose static-shaped tiled
-// convolution for vectorization.
-// TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
-static LogicalResult defineConvWorkgroupCountRegion(
-    Operation *op, ArrayRef<int64_t> outputShape,
-    ArrayRef<int64_t> workgroupTileSizes) {
-  auto numWorkgroupsFn = [&](OpBuilder &b, Location loc, std::array<Value, 3>) {
-    std::array<Value, 3> xyz;
-    for (unsigned i = 0; i < 3; ++i) {
-      int64_t count = outputShape[i] / workgroupTileSizes[i];
-      // This is meant for perfectly tilable cases. Double check that.
-      assert(outputShape[i] % workgroupTileSizes[i] == 0 && count != 0);
-      xyz[2 - i] = b.create<arith::ConstantIndexOp>(loc, count);
-    }
-    return xyz;
-  };
-  OpBuilder builder(op->getContext());
-  return defineWorkgroupCountRegion(builder, op->getParentOfType<FuncOp>(),
-                                    numWorkgroupsFn);
-}
-
 namespace detail {
 
 LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                               const int64_t subgroupSize,
                               const int64_t bestTilingFactor) {
   ArrayRef<int64_t> inputShape = getUntiledShape(linalgOp.inputs()[0]);
-  ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
+  SmallVector<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
   if (llvm::any_of(inputShape, ShapedType::isDynamic)) return success();
   if (llvm::any_of(outputShape, ShapedType::isDynamic)) return success();
 
@@ -166,13 +144,8 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   }
 
   auto funcOp = linalgOp->getParentOfType<FuncOp>();
-  if (failed(setOpConfigAndEntryPointFnTranslation(
-          funcOp, linalgOp, tileSizes, {}, pipeline, workgroupSize))) {
-    return failure();
-  }
-  return defineConvWorkgroupCountRegion(
-      linalgOp, llvm::makeArrayRef(outputShape).drop_front(),
-      llvm::makeArrayRef(workgroupTileSizes).drop_front());
+  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes, {},
+                                               pipeline, workgroupSize);
 }
 
 }  // namespace detail
@@ -290,7 +263,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
-                                    linalg_ext::FftOp op) {
+                                    IREE::LinalgExt::FftOp op) {
   const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
@@ -590,8 +563,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
             // If unsuccessful, try to tile and distribute.
             return setDefaultOpConfig(limits, op);
           })
-      .Case<linalg_ext::FftOp>(
-          [limits](linalg_ext::FftOp op) { return setFftOpConfig(limits, op); })
+      .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
+        return setFftOpConfig(limits, op);
+      })
       .Case<linalg::GenericOp>([limits](linalg::GenericOp op) {
         // If a generic op has reduction iterator types, it can be treated as a
         // root op for configuration as well. Use the default configuration,

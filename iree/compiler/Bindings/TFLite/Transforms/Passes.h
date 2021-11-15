@@ -35,17 +35,12 @@ void registerTransformPassPipeline();
 // expected invocation semantics of the IREE TFLite bindings.
 std::unique_ptr<OperationPass<ModuleOp>> createWrapEntryPointsPass();
 
-// Materialize the functions required by the runtime bindings to manipulate
-// the program state (like _resize_input_shape, etc).
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeShapeSupportPass();
-
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
 inline void registerPasses() {
   createWrapEntryPointsPass();
-  createMaterializeShapeSupportPass();
 }
 
 }  // namespace TFLite

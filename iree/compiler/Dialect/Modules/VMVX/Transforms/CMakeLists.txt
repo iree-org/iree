@@ -19,6 +19,7 @@ iree_cc_library(
     "Conversion.cpp"
     "Passes.cpp"
   DEPS
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
@@ -46,7 +47,6 @@ iree_cc_library(
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Modules::VMVX::Conversion::HALToVMVX
     iree::compiler::Dialect::Modules::VMVX::Conversion::StandardToVMVX
     iree::compiler::Dialect::Modules::VMVX::IR

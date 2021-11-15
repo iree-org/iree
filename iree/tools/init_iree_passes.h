@@ -14,11 +14,11 @@
 
 #include <cstdlib>
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Modules/VMVX/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
@@ -45,10 +45,10 @@ inline void registerAllIreePasses() {
   registerMHLOConversionPasses();
   registerTOSAConversionPasses();
 
-  linalg_ext::registerLinalgExtPasses();
   Shape::registerShapePasses();
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
+  IREE::LinalgExt::registerPasses();
   IREE::Stream::registerStreamPasses();
   IREE::Util::registerTransformPasses();
   IREE::VM::registerVMPasses();

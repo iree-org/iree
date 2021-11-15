@@ -32,7 +32,9 @@ gentbl_cc_library(
 cc_library(
     name = "Common",
     srcs = [
+        "BufferizationAnalysis.cpp",
         "CleanupBufferAllocViewPass.cpp",
+        "ConvertToDestinationPassingStylePass.cpp",
         "DemoteF32ToF16.cpp",
         "FlattenMemRefSubspanPass.cpp",
         "FoldAffineMinInDistributedLoops.cpp",
@@ -46,6 +48,9 @@ cc_library(
         "VectorizeConv.cpp",
         "VectorizeMMT4d.cpp",
     ],
+    hdrs = [
+        "BufferizationAnalysis.h",
+    ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common:FoldTensorExtractOpIncGen",
@@ -54,9 +59,10 @@ cc_library(
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/LinalgExt/IR",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineUtils",

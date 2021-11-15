@@ -8,9 +8,9 @@
 
 #include <numeric>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
@@ -114,7 +114,8 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       workgroupSize);
 }
 
-static LogicalResult setFftConfig(FuncOp entryPoint, linalg_ext::FftOp op) {
+static LogicalResult setFftConfig(FuncOp entryPoint,
+                                  IREE::LinalgExt::FftOp op) {
   auto partitionedLoops = getPartitionedLoops(op);
   unsigned loopDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
@@ -175,7 +176,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
         vectorSize = 1;
         break;
       }
-      ArrayRef<int64_t> shape = getUntiledResultShape(
+      SmallVector<int64_t> shape = getUntiledResultShape(
           cast<linalg::LinalgOp>(op), outputOperand.index());
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         vectorSize = 1;
@@ -245,7 +246,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
       return setContractConfig(entryPointFn, linalgOp);
     }
   }
-  if (auto fftOp = dyn_cast<linalg_ext::FftOp>(computeOp)) {
+  if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
   }
   return setRootDefaultConfig(entryPointFn, computeOp);

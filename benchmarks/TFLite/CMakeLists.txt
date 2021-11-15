@@ -60,13 +60,19 @@ set(POSENET_FP32_MODULE
 
 ################################################################################
 #                                                                              #
-# Common benchmark configurations                                              #
+# Default benchmark configurations                                             #
 #                                                                              #
-# Each suite benchmarks a list of modules with some specific configuration,    #
-# typically involving different translation/runtime flags and targeting        #
-# different IREE drivers and hardware architectures.                           #
+# Each suite benchmarks a list of modules with configurations specifying a     #
+# target architecture and runtime characteristics (e.g. threads/cores). These  #
+# benchmarks only configure IREE translation and runtime flags for the target  #
+# architecture and do *not* include any non-default flags. No non-default      #
+# flags should be added here.                                                  #
 #                                                                              #
 ################################################################################
+
+set(ANDROID_CPU_TRANSLATION_FLAGS
+      "--iree-input-type=tosa"
+      "--iree-llvm-target-triple=aarch64-none-linux-android29")
 
 # CPU, Dylib-Sync, big/little-core, full-inference
 iree_benchmark_suite(
@@ -76,25 +82,19 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "big-core,full-inference"
-    "little-core,full-inference"
+    "big-core,full-inference,default-flags"
+    "little-core,full-inference,default-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-llvm-loop-unrolling=true"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
   DRIVER
     "dylib-sync"
 )
 
-# CPU, Dylib, 1-thread, big/little-core, full-inference. These benchmarks only
-# configure IREE translation and runtime flags for the target architecture and
-# runtime characteristics and do *not* include any non-default flags. No
-# non-default flags should be added here.
+# CPU, Dylib, 1-thread, big/little-core, full-inference.
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
@@ -109,12 +109,150 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
   DRIVER
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
+)
+
+# CPU, Dylib, 2 through 4-thread, little-core, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "2-thread,little-core,full-inference,default-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=2"
+)
+
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "3-thread,little-core,full-inference,default-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=3"
+)
+
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "4-thread,little-core,full-inference,default-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=4"
+)
+
+# GPU, Vulkan, Adreno, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference,default-flags"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Adreno"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=adreno-unknown-android11"
+  DRIVER
+    "vulkan"
+)
+
+# GPU, Vulkan, Mali, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference,default-flags"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  TARGET_ARCHITECTURE
+    "GPU-Mali-Valhall"
+  TRANSLATION_FLAGS
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-android11"
+  DRIVER
+    "vulkan"
+)
+
+################################################################################
+
+################################################################################
+#                                                                              #
+# Specialized benchmark configurations                                         #
+#                                                                              #
+# Each suite benchmarks one or more module with configurations that can vary   #
+# on model or architecture characteristics. These are intended for providing   #
+# continuous benchmarks of experimental features that cannot be turned on by   #
+# default yet. It is primarily intended for whoever is actively investigating  #
+# optimizations for a feature exemplified in a specific model or architecture. #
+# Due to our current benchmark setup, there can only be one experimental       #
+# configuration per model and other benchmark mode.                            #
+#                                                                              #
+################################################################################
+
+# CPU, Dylib-Sync, big/little-core, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${DEEPLABV3_FP32_MODULE}"
+    "${MOBILESSD_FP32_MODULE}"
+    "${POSENET_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "big-core,full-inference,experimental-flags"
+    "little-core,full-inference,experimental-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-llvm-loop-unrolling=true"
+  DRIVER
+    "dylib-sync"
 )
 
 # CPU, Dylib, 1-thread, big/little-core, full-inference
@@ -125,15 +263,14 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "1-thread,big-core,full-inference"
-    "1-thread,little-core,full-inference"
+    "1-thread,big-core,full-inference,experimental-flags"
+    "1-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
@@ -150,14 +287,13 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "2-thread,little-core,full-inference"
+    "2-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
@@ -173,14 +309,13 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "3-thread,little-core,full-inference"
+    "3-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
@@ -196,14 +331,13 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "4-thread,little-core,full-inference"
+    "4-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
@@ -220,7 +354,7 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "full-inference"
+    "full-inference,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -242,7 +376,7 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "full-inference"
+    "full-inference,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE
@@ -264,7 +398,7 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
 
   BENCHMARK_MODES
-    "kernel-execution"
+    "kernel-execution,experimental-flags"
   TARGET_BACKEND
     "vulkan-spirv"
   TARGET_ARCHITECTURE

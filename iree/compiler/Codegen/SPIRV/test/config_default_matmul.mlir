@@ -340,3 +340,104 @@ hal.executable @matmul_25x546 {
 //      CHECK: func @matmul_25x546()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
+
+// -----
+
+// Matmul with consumer pointwise ops
+
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 256)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
+#map3 = affine_map<(d0)[s0] -> (-d0 + 256, s0)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
+#map5 = affine_map<(d0, d1) -> (d0, d1)>
+
+hal.executable private @matmul_pointwise_256x1024 {
+  hal.interface public @io {
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer", access="Read"
+    hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer", access="Read"
+    hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
+        max_compute_shared_memory_size = 16384 : i32,
+        max_compute_workgroup_invocations = 128 : i32,
+        max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>,
+        subgroup_size = 32 : i32}>
+    }> {
+    hal.executable.entry_point public @matmul_pointwise_256x1024 attributes {interface = @io, ordinal = 0 : index}
+    builtin.module  {
+      func @matmul_pointwise_256x1024() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %c256 = arith.constant 256 : index
+        %c1024 = arith.constant 1024 : index
+        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x1024xf16>
+        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x1024xf16>
+        %2 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x128xf16>
+        %3 = hal.interface.binding.subspan @io::@s0b3_ro_external[%c0] : !flow.dispatch.tensor<readonly:128x1024xf16>
+        %4 = hal.interface.binding.subspan @io::@s0b4_xw_external[%c0] : !flow.dispatch.tensor<writeonly:256x1024xf16>
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %5 = affine.apply #map0()[%workgroup_id_y, %workgroup_size_y]
+        %6 = affine.apply #map0()[%workgroup_count_y, %workgroup_size_y]
+        scf.for %arg0 = %5 to %c256 step %6 {
+          %7 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
+          %8 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
+          scf.for %arg1 = %7 to %c1024 step %8 {
+            %9 = affine.min #map1(%arg0)[%workgroup_size_y]
+            %10 = affine.min #map2(%arg1)[%workgroup_size_x]
+            %11 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1], sizes = [%9, %10], strides = [1, 1] : !flow.dispatch.tensor<readonly:256x1024xf16> -> tensor<?x?xf16>
+            %12 = flow.dispatch.tensor.load %1, offsets = [%arg0, %arg1], sizes = [%9, %10], strides = [1, 1] : !flow.dispatch.tensor<readonly:256x1024xf16> -> tensor<?x?xf16>
+            %13 = linalg.init_tensor [%9, %10] : tensor<?x?xf16>
+            %14 = affine.min #map3(%arg0)[%workgroup_size_y]
+            %15 = flow.dispatch.tensor.load %2, offsets = [%arg0, 0], sizes = [%14, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:256x128xf16> -> tensor<?x128xf16>
+            %16 = affine.min #map4(%arg1)[%workgroup_size_x]
+            %17 = flow.dispatch.tensor.load %3, offsets = [0, %arg1], sizes = [128, %16], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x1024xf16> -> tensor<128x?xf16>
+            %18 = linalg.init_tensor [%14, %16] : tensor<?x?xf16>
+            %19 = linalg.fill(%cst, %18) : f16, tensor<?x?xf16> -> tensor<?x?xf16>
+            %20 = linalg.matmul ins(%15, %17 : tensor<?x128xf16>, tensor<128x?xf16>) outs(%19 : tensor<?x?xf16>) -> tensor<?x?xf16>
+            %21 = linalg.generic {indexing_maps = [#map5, #map5, #map5, #map5], iterator_types = ["parallel", "parallel"]} ins(%20, %11, %12 : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>) outs(%13 : tensor<?x?xf16>) {
+            ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
+              %22 = arith.divf %arg2, %arg3 : f16
+              %23 = arith.subf %22, %arg4 : f16
+              linalg.yield %23 : f16
+            } -> tensor<?x?xf16>
+            flow.dispatch.tensor.store %21, %4, offsets = [%arg0, %arg1], sizes = [%9, %10], strides = [1, 1] : tensor<?x?xf16> -> !flow.dispatch.tensor<writeonly:256x1024xf16>
+          }
+        }
+        return
+      }
+      hal.interface private @io {
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer", access="Read"
+        hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer", access="Read"
+        hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[16, 256], [8, 8], [0, 0, 4]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP_X:.+]] = affine_map<()[s0] -> (s0 ceildiv 256)>
+//  CHECK-DAG: #[[MAP_Y:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [256, 16]>
+//      CHECK: hal.executable.entry_point public @matmul_pointwise_256x1024
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP_X]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP_Y]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
+
+//      CHECK: func @matmul_pointwise_256x1024()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]

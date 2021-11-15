@@ -48,7 +48,10 @@ struct DescriptorSetState {
 };
 
 struct CommandBufferState {
+  // Push constants can only be reused with compatible layouts.
+  Value pushConstantLayout;
   SmallVector<Value, 32> pushConstants;
+
   SmallVector<DescriptorSetState, 4> descriptorSets;
 
   // Set after we know a full barrier has been issued; any subsequent barrier
@@ -111,6 +114,12 @@ static void processOp(IREE::HAL::CommandBufferExecutionBarrierOp op,
 
 static LogicalResult processOp(IREE::HAL::CommandBufferPushConstantsOp op,
                                CommandBufferState &state) {
+  // Push constant state is only shared with the same layout.
+  if (state.pushConstantLayout != op.executable_layout()) {
+    state.pushConstantLayout = op.executable_layout();
+    state.pushConstants.clear();
+  }
+
   // Today we only eat constants from the beginning or end of the range
   // (hopefully removing the entire op). Sparse constant sets aren't worth it.
   int64_t baseIndex = op.offset().getSExtValue();

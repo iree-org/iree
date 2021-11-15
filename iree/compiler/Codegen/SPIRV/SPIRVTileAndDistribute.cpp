@@ -11,14 +11,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -119,7 +119,7 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
                                      context)
           .setMatchByDefault());
 
-  patterns.insert<linalg_ext::TiledOpInterfaceTilingPattern>(
+  patterns.insert<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
                                      context)

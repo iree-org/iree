@@ -7,10 +7,10 @@
 #include <cmath>
 #include <complex>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -105,7 +105,7 @@ static bool isInBodyOfLinalgExtOps(Operation *op) {
   auto parent_op = op->getParentRegion()->getParentOp();
   return parent_op->getDialect() ==
          parent_op->getContext()
-             ->getLoadedDialect<linalg_ext::LinalgExtDialect>();
+             ->getLoadedDialect<IREE::LinalgExt::IREELinalgExtDialect>();
 }
 
 static SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements) {
@@ -146,7 +146,8 @@ struct LinalgExtRegionReturnOpConversion
       mhlo::ReturnOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!isInBodyOfLinalgExtOps(op)) return failure();
-    rewriter.replaceOpWithNewOp<linalg_ext::YieldOp>(op, adaptor.getOperands());
+    rewriter.replaceOpWithNewOp<IREE::LinalgExt::YieldOp>(
+        op, adaptor.getOperands());
     return success();
   }
 };
@@ -161,7 +162,7 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
   LogicalResult matchAndRewrite(
       mhlo::SortOp mhloSortOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
-    auto sortOp = rewriter.create<linalg_ext::SortOp>(
+    auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
         mhloSortOp.getLoc(), mhloSortOp.getResultTypes(),
         /*inputs=*/ValueRange{}, adaptor.getOperands(),
         mhloSortOp.dimensionAttr());
@@ -286,7 +287,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     if (failed(collapseBatchDimsIfNeeded(indices, updates, b))) {
       return failure();
     }
-    auto scatterOp = rewriter.create<linalg_ext::ScatterOp>(
+    auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
         ValueRange{original});
 
@@ -409,7 +410,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
       SmallVector<Value> inputs;
       inputs.push_back(b.create<arith::ConstantIndexOp>(s));
       inputs.append(getCoeffConstants(b, s));
-      auto fft = b.create<linalg_ext::FftOp>(
+      auto fft = b.create<IREE::LinalgExt::FftOp>(
           TypeRange{results[0].getType(), results[1].getType()}, inputs,
           results);
       results = fft.getResults();
@@ -463,7 +464,7 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
     }
     Value initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, dynSizes, ty.getShape(), ty.getElementType());
-    rewriter.replaceOpWithNewOp<linalg_ext::ReverseOp>(
+    rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
         op, op->getResultTypes(), adaptor.getOperands(), initTensor,
         op.dimensions());
     return success();
@@ -477,10 +478,11 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
 struct ConvertMHLOToLinalgExtPass
     : public ConvertMHLOToLinalgExtBase<ConvertMHLOToLinalgExtPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg_ext::LinalgExtDialect, linalg::LinalgDialect,
-                    IREE::Flow::FlowDialect, StandardOpsDialect,
-                    mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
-                    complex::ComplexDialect, tensor::TensorDialect>();
+    registry
+        .insert<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+                IREE::Flow::FlowDialect, StandardOpsDialect,
+                mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
+                complex::ComplexDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
@@ -539,9 +541,9 @@ struct ConvertMHLOToLinalgExtPass
                 LinalgExtRegionReturnOpConversion>(typeConverter, context);
 
     ConversionTarget target(getContext());
-    target.addLegalDialect<linalg_ext::LinalgExtDialect, linalg::LinalgDialect,
-                           IREE::Flow::FlowDialect, StandardOpsDialect,
-                           mlir::math::MathDialect,
+    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect,
+                           linalg::LinalgDialect, IREE::Flow::FlowDialect,
+                           StandardOpsDialect, mlir::math::MathDialect,
                            mlir::arith::ArithmeticDialect,
                            tensor::TensorDialect, complex::ComplexDialect>();
     target.addIllegalOp<mhlo::SortOp, mhlo::ScatterOp, mhlo::FftOp,

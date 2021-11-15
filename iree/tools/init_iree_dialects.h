@@ -12,14 +12,14 @@
 #ifndef IREE_TOOLS_INIT_IREE_DIALECTS_H_
 #define IREE_TOOLS_INIT_IREE_DIALECTS_H_
 
-#include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREEPyDM/IR/Dialect.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
+#include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
@@ -37,18 +37,18 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   registry.insert<IREE::Codegen::IREECodegenDialect,
                   IREE::Flow::FlowDialect,
                   IREE::HAL::HALDialect,
+                  IREE::LinalgExt::IREELinalgExtDialect,
                   ShapeDialect,
                   IREE::Stream::StreamDialect,
                   IREE::Util::UtilDialect,
                   IREE::VM::VMDialect,
                   IREE::VMVX::VMVXDialect,
                   IREE::Vulkan::VulkanDialect,
-                  linalg_ext::LinalgExtDialect,
-                  mlir::iree::IREEDialect,
+                  IREE::Input::IREEInputDialect,
                   IREE::PYDM::IREEPyDMDialect>();
   // clang-format on
 
-  linalg_ext::registerTiledOpInterfaceExternalModels(registry);
+  IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
   registerProcessorOpInterfaceExternalModels(registry);
 }
 

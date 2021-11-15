@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "config_adreno_conv.mlir"
     "config_adreno_matmul.mlir"
+    "config_default_conv.mlir"
     "config_default_linalg_ext_ops.mlir"
     "config_default_linalg_ops.mlir"
     "config_default_matmul.mlir"
