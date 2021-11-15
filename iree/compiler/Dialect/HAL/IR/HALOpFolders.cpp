@@ -32,6 +32,14 @@ OpFoldResult TensorCastOp::fold(ArrayRef<Attribute> operands) {
   if (source().getType() == target().getType()) {
     return source();
   }
+
+  auto castOp = source().getDefiningOp<TensorCastOp>();
+  if (castOp && target().getType() == castOp.source().getType() &&
+      source_dims() == castOp.source_dims() &&
+      target_dims() == castOp.target_dims()) {
+    return castOp.source();
+  }
+
   return {};
 }
 
