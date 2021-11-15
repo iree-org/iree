@@ -15,14 +15,12 @@ cc_library(
     srcs = [
         "CleanupPlaceholdersPass.cpp",
         "FoldDimOverShapeCarryingOpPass.cpp",
-        "FunctionSignatureExpansionPass.cpp",
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Shape/Utils:TypeConversion",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",

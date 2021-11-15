@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
@@ -68,7 +67,7 @@ class ConvertToHALPass
       }
     }
 
-    HALTypeConverter typeConverter(conversionInterfaces, true);
+    HALTypeConverter typeConverter(conversionInterfaces);
     HALConversionTarget conversionTarget(context, typeConverter);
 
     OwningRewritePatternList patterns(&getContext());

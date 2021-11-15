@@ -64,7 +64,7 @@ class BindingLayoutAnalysis {
   explicit BindingLayoutAnalysis(Operation *rootOp);
 
   // Returns all of the dispatches to the given executable export.
-  const SmallVector<IREE::Stream::CmdDispatchOp> &getExportDispatches(
+  SmallVector<IREE::Stream::CmdDispatchOp> getExportDispatches(
       IREE::Stream::ExecutableExportOp exportOp) const;
 
   // Returns a layout used for the given executable export op.

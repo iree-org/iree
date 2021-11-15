@@ -12,16 +12,18 @@ module attributes {
   ]
 } {
 
-flow.executable @add_dispatch_0 {
-  flow.dispatch.entry @entry attributes {
-    workgroup_rank = 3 : index
-  }
+stream.executable public @add_dispatch_0 {
+  stream.executable.export @add_dispatch_0
   builtin.module  {
-    func @entry(%arg0: !flow.dispatch.tensor<readonly:16xf32>, %arg1: !flow.dispatch.tensor<readonly:16xf32>, %arg2: !flow.dispatch.tensor<writeonly:16xf32>) {
+    func @add_dispatch_0(%arg0_binding: !stream.binding, %arg1_binding: !stream.binding, %arg2_binding: !stream.binding) {
+      %c0 = arith.constant 0 : index
+      %arg0 = stream.binding.subspan %arg0_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:16xf32>
+      %arg1 = stream.binding.subspan %arg1_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:16xf32>
+      %arg2 = stream.binding.subspan %arg2_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:16xf32>
       %0 = linalg.init_tensor [16] : tensor<16xf32>
       %1 = flow.dispatch.tensor.load %arg0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
       %2 = flow.dispatch.tensor.load %arg1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
-      %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]} ins(%1, %2 : tensor<16xf32>, tensor<16xf32>) outs(%0 : tensor<16xf32>) {
+      %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%1, %2 : tensor<16xf32>, tensor<16xf32>) outs(%0 : tensor<16xf32>) {
       ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
         %4 = arith.addf %arg3, %arg4 : f32
         linalg.yield %4 : f32
@@ -35,19 +37,19 @@ flow.executable @add_dispatch_0 {
 }
 
 // CHECK-LABEL: hal.executable public @add_dispatch_0
-//  CHECK-NEXT:   hal.interface public @io {
-//  CHECK-NEXT:    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-//  CHECK-NEXT:    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+//  CHECK-NEXT:   hal.interface public @io
+//  CHECK-NEXT:    hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer", access="None"
+//  CHECK-NEXT:    hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer", access="None"
+//  CHECK-NEXT:    hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer", access="None"
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-//  CHECK-NEXT:     hal.executable.entry_point public @entry attributes {
+//  CHECK-NEXT:     hal.executable.entry_point public @add_dispatch_0 attributes {
 //  CHECK-SAME:       interface = @io,
 //  CHECK-SAME:       ordinal = 0 : index
 //  CHECK-SAME:     }
 //       CHECK:     module {
 //  CHECK-NEXT:       vm.module public @module {
-//  CHECK-NEXT:         vm.func private @entry(
+//  CHECK-NEXT:         vm.func private @add_dispatch_0(
 //  CHECK-SAME:             %[[SCRATCHPAD:.+]]: !vm.buffer, %[[CONSTANTS:.+]]: !vm.buffer,
 //  CHECK-SAME:             %[[BINDINGS:.+]]: !vm.list<!vm.buffer>
 //   CHECK-DAG:           %c16 = vm.const.i32 16 : i32
@@ -73,4 +75,4 @@ flow.executable @add_dispatch_0 {
 //  CHECK-NEXT:         ^bb3:  // pred: ^bb1
 //  CHECK-NEXT:           vm.return
 //  CHECK-NEXT:         }
-//  CHECK-NEXT:         vm.export @entry
+//  CHECK-NEXT:         vm.export @add_dispatch_0

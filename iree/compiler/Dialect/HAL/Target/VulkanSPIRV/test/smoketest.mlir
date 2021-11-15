@@ -12,10 +12,13 @@ module attributes {
   ]
 } {
 
-flow.executable @reduce_dispatch {
-  flow.dispatch.entry @reduce_dispatch attributes {workgroup_rank = 3 : index}
+stream.executable public @reduce_dispatch {
+  stream.executable.export @reduce_dispatch
   builtin.module {
-    func @reduce_dispatch(%arg0: !flow.dispatch.tensor<readonly:16xf32>, %arg1: !flow.dispatch.tensor<writeonly:f32>) {
+    func @reduce_dispatch(%arg0_binding: !stream.binding, %arg1_binding: !stream.binding) {
+      %c0 = arith.constant 0 : index
+      %arg0 = stream.binding.subspan %arg0_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:16xf32>
+      %arg1 = stream.binding.subspan %arg1_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:f32>
       %0 = linalg.init_tensor [] : tensor<f32>
       %1 = flow.dispatch.tensor.load %arg0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
       %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%1 : tensor<16xf32>) outs(%0 : tensor<f32>) {

@@ -144,8 +144,7 @@ func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 // CHECK-NEXT: "test.sink_shape_ret"(%[[RET_DIM0]], %[[RET_DIM1]])
 
 //      CHECK: %[[ARG_TILE:.+]] = flow.dispatch.tensor.load %[[ARG_SHAPED]], {{.*}}
-// CHECK-NEXT: %[[ARG_TILE_SHAPE:.+]] = shapex.get_ranked_shape %[[ARG_TILE]]
-// CHECK-NEXT: %[[RET_TILE:.+]] = "test.tile_math"(%[[ARG_TILE]], %[[ARG_TILE_SHAPE]], %[[RET_SHAPE]])
+// CHECK-NEXT: %[[RET_TILE:.+]] = "test.tile_math"(%[[ARG_TILE]])
 // CHECK-NEXT: flow.dispatch.tensor.store %[[RET_TILE]], %[[RET_SHAPED]], {{.*}}
 
 // CHECK:   return
@@ -184,10 +183,8 @@ func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32>
     "test.sink_shape_ret"(%ret_dim0, %ret_dim1) : (index, index) -> ()
 
     %arg_tile = flow.dispatch.tensor.load %arg, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:7x?x24x?xf32> -> tensor<7x?x24x?xf32>
-    %arg_tile_shape = shapex.get_ranked_shape %arg_tile : tensor<7x?x24x?xf32> -> !shapex.ranked_shape<[7,?,24,?]>
 
-    %ret_tile = "test.tile_math"(%arg_tile, %arg_tile_shape, %ret_shape) :
-        (tensor<7x?x24x?xf32>, !shapex.ranked_shape<[7,?,24,?]>, !shapex.ranked_shape<[?,?,1024]>) -> (tensor<?x?x1024xf32>)
+    %ret_tile = "test.tile_math"(%arg_tile) : (tensor<7x?x24x?xf32>) -> (tensor<?x?x1024xf32>)
 
     flow.dispatch.tensor.store %ret_tile, %ret, offsets=[], sizes=[], strides=[] : tensor<?x?x1024xf32> -> !flow.dispatch.tensor<writeonly:?x?x1024xf32>
 

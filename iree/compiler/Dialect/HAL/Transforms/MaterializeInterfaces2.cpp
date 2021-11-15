@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"

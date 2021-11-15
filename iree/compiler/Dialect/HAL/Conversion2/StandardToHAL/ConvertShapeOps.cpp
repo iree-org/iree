@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -17,21 +16,6 @@
 namespace mlir {
 namespace iree_compiler {
 namespace {
-
-// Legalize the type from operand() -> result() for tie_shape op.
-// At this level, we preserve any remaining tie_shapes since they may still
-// provide information in some contexts.
-class ElideTieShapePattern : public OpConversionPattern<Shape::TieShapeOp> {
- public:
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      Shape::TieShapeOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<Shape::TieShapeOp>(op, adaptor.operand(),
-                                                   adaptor.shape());
-    return success();
-  }
-};
 
 struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -75,8 +59,7 @@ void populateStandardShapeToHALPatterns(MLIRContext *context,
   conversionTarget.addIllegalOp<mlir::RankOp>();
   conversionTarget.addIllegalOp<tensor::DimOp>();
 
-  patterns.insert<BufferViewDimPattern, BufferViewRankPattern,
-                  ElideTieShapePattern>(context);
+  patterns.insert<BufferViewDimPattern, BufferViewRankPattern>(context);
 }
 
 }  // namespace iree_compiler

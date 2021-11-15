@@ -93,26 +93,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Cleanup and canonicalization of util.global (and other util ops).
   passManager.addPass(IREE::Util::createApplyPatternsPass());
   passManager.addPass(IREE::Util::createFoldGlobalsPass());
+
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-
-  // Replaces variables with !shapex.ranked_shape types with individual
-  // variables for each dimension. This allows for constant dimensions to be
-  // DCE'd in following passes.
-  passManager.addPass(createExpandGlobalDynamicDimsPass());
-
-  // Materialize dynamic shapes in the IR, also expanding function signatures
-  // such that:
-  //   - Dynamic ranked tensors: (tensor<?x?xf32>) expands to
-  //     (tensor<?x?xf32>, ranked_shape<[?,?]>), and ultimately expands to
-  //     (tensor<?x?xf32>, i32, i32)
-  //   - Unranked tensors: **unsupported**
-  // The generated ABI wrappers assume such an expansion and will generate code
-  // to produce it from the original reflection metadata captured in the
-  // previous pass.
-  passManager.addPass(Shape::createExpandFunctionDynamicDimsPass());
 
   passManager.addPass(createPadTensorToSubTensorInsertPass());
 
@@ -179,43 +164,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(mlir::createSymbolDCEPass());
-
-  //----------------------------------------------------------------------------
-  // Stream formation.
-  // Pre-conditions:
-  //   - Full formation of dispatch regions
-  //----------------------------------------------------------------------------
-  // TODO(#7277): remove when switched to streams (happens there now).
-  if (transformOptions.streamFormation) {
-    // Cleanup the IR before we try to form streams.
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-
-    // Outline large constants into globals so we can efficiently manage them.
-    passManager.addPass(IREE::Flow::createOutlineLargeConstantsPass());
-
-    // Reorder blocks to increase the grouping of streamable ops.
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createHoistUnstreamableOpsPass());
-
-    // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
-    // arbitrary ordering.
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-
-    // Clone constants that escape basic blocks until we have better analysis.
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createInsertConstantClonesPass());
-
-    // Group streamable ops into streams.
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createFormStreamsPass());
-
-    // Forming streams involves a fair amount of subgraph stitching, which can
-    // cause duplication. Run CSE to collapse.
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-  }
 }
 
 void registerFlowTransformPassPipeline() {

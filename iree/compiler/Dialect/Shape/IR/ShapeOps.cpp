@@ -55,34 +55,6 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
 Value TieShapeOp::getViewSource() { return operand(); }
 
 //===----------------------------------------------------------------------===//
-// shapex.get_ranked_shape
-//===----------------------------------------------------------------------===//
-
-void GetRankedShapeOp::build(OpBuilder &builder, OperationState &result,
-                             Value operand) {
-  auto rankedOperandType = operand.getType().dyn_cast<RankedTensorType>();
-  if (rankedOperandType) {
-    result.types.push_back(RankedShapeType::get(rankedOperandType.getShape(),
-                                                builder.getContext()));
-  }
-  result.addOperands(operand);
-}
-
-static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
-  auto tensorType = op.operand().getType().cast<TensorType>();
-  auto rsType = op.shape().getType().cast<RankedShapeType>();
-  if (tensorType.getRank() != rsType.getRank()) {
-    return op.emitOpError("operand and result must be of same rank");
-  }
-  auto rsDims = rsType.getAllDims();
-  if (!std::equal(rsDims.begin(), rsDims.end(),
-                  tensorType.getShape().begin())) {
-    return op.emitOpError("operand tensor and result shape must be equal");
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // shapex.const_ranked_shape
 //===----------------------------------------------------------------------===//
 

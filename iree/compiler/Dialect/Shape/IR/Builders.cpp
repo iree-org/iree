@@ -79,50 +79,6 @@ Value buildRankedShapeForValueInList(Location loc, unsigned index,
   return buildRankedShapeForValue(loc, flatValues[index], dynamicDims, builder);
 }
 
-Optional<SmallVector<Value, 4>> buildOrFindDimsForValue(Location loc,
-                                                        Value value,
-                                                        OpBuilder &builder) {
-  auto valueSt = value.getType().dyn_cast<ShapedType>();
-  if (!valueSt) {
-    builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
-        << "cannot construct shape for non shaped value: " << value.getType();
-    return llvm::None;
-  }
-
-  // Walk the uses to find a tie_shape op (either this op or an immediate use).
-  SmallVector<Value, 4> result;
-  Value rs = findRankedShapeFromUse(value, builder);
-  if (rs) {
-    auto rsType = rs.getType().dyn_cast<RankedShapeType>();
-    if (!rsType) {
-      builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
-          << "dynamically shaped value is not ranked (which is not yet "
-          << "supported)";
-      return llvm::None;
-    }
-    for (unsigned i = 0; i < rsType.getRank(); ++i) {
-      if (rsType.isDimDynamic(i)) {
-        result.push_back(builder.createOrFold<Shape::RankedDimOp>(loc, rs, i));
-      } else {
-        result.push_back(builder.create<arith::ConstantIndexOp>(
-            loc, rsType.getStaticDim(i)));
-      }
-    }
-  } else {
-    // No tie information - insert std.dim ops that may later be used and
-    // hopefully converted to ranked shape types.
-    for (unsigned i = 0; i < valueSt.getRank(); ++i) {
-      if (valueSt.isDynamicDim(i)) {
-        result.push_back(builder.createOrFold<tensor::DimOp>(loc, value, i));
-      } else {
-        result.push_back(
-            builder.create<arith::ConstantIndexOp>(loc, valueSt.getDimSize(i)));
-      }
-    }
-  }
-  return result;
-}
-
 SmallVector<Value, 4> buildOrFindDynamicDimsForValue(Location loc, Value value,
                                                      OpBuilder &builder) {
   auto valueSt = value.getType().dyn_cast<ShapedType>();

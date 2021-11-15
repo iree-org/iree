@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -29,7 +29,7 @@ class BufferLoadOpConversion
     auto sizeConst = rewriter.createOrFold<mlir::arith::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
-            IREE::HAL::getRoundedElementByteWidth(op.getResult().getType())));
+            IREE::Util::getRoundedElementByteWidth(op.getResult().getType())));
     auto callOp = rewriter.create<IREE::VM::CallOp>(
         op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.source_buffer(), adaptor.source_offset(),
@@ -71,7 +71,7 @@ class BufferStoreOpConversion
     auto sizeConst = rewriter.createOrFold<mlir::arith::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
-            IREE::HAL::getRoundedElementByteWidth(op.value().getType())));
+            IREE::Util::getRoundedElementByteWidth(op.value().getType())));
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.value(), adaptor.target_buffer(),
