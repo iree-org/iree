@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/SPIRV/MemorySpace.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
@@ -93,6 +94,53 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       passPipeline = currPipeline;
     }
   }
+
+  //===--------------------------------------------------------------------===//
+  // TODO: This is HACK to unblock vectorization on tensor-semantic ops. For
+  // padding, it would mean that we need to support tiling and distributing
+  // linalg.pad_tensor ops. It's quite involved and still ongoing. So for now
+  // fallback to bufferization first (which will turn it into a `linalg.copy`
+  // op) before even deducing the CodeGen configuration.
+  if (!passPipeline) {
+    OpPassManager bufferizePipeline(
+        IREE::HAL::ExecutableVariantOp::getOperationName());
+    OpPassManager &nestedPM = bufferizePipeline.nest<ModuleOp>();
+    auto allocFn = [](OpBuilder &builder, Location loc,
+                      ArrayRef<int64_t> staticShape, Type elementType,
+                      ArrayRef<Value> dynamicSizes) {
+      MemRefType allocType = MemRefType::get(staticShape, elementType, {},
+                                             getWorkgroupMemorySpace());
+      return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
+    };
+    addLinalgBufferizePasses(nestedPM, allocFn);
+    if (failed(runPipeline(bufferizePipeline, variantOp))) {
+      return signalPassFailure();
+    }
+  }
+
+  if (failed(initSPIRVLaunchConfig(moduleOp))) {
+    return signalPassFailure();
+  }
+
+  for (auto &it : entryPoints) {
+    auto entryPointOp = it.second;
+    if (IREE::Codegen::TranslationInfoAttr translationInfo =
+            getTranslationInfo(entryPointOp)) {
+      IREE::Codegen::DispatchLoweringPassPipeline currPipeline =
+          translationInfo.getDispatchLoweringPassPipeline();
+      if (passPipeline) {
+        if (currPipeline != passPipeline.getValue()) {
+          moduleOp.emitError(
+              "unhandled compilation of entry point function with different "
+              "pass pipelines within a module");
+          return signalPassFailure();
+        }
+        continue;
+      }
+      passPipeline = currPipeline;
+    }
+  }
+  //===--------------------------------------------------------------------===//
 
   executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
   executableLoweringPipeline.addPass(createCanonicalizerPass());

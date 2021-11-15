@@ -649,19 +649,16 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       // If the tiled loops are not empty then this could be a corner case of
       // tensor.insert_slice being tiled and distributed, that just shows up as
       // a `flow.dispatch.tensor.load` and a `flow.dispatch.tensor.store` (or as
-      // a copy. For now just treat the tiled loops not being empty as an
+      // a copy). For now just treat the tiled loops not being empty as an
       // indicator of that. Need a better way of information flow from flow
       // dialect to hal.
       if (!tiledLoops.empty()) {
-        const int64_t subgroupSize =
-            limits.subgroup_size().getValue().getSExtValue();
-        std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
-        SmallVector<int64_t> workloadPerWorkgroup(tiledLoops.size(), 1);
-        workloadPerWorkgroup.front() = subgroupSize * 4;
-        setTranslationInfo(
-            funcOp,
-            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute,
-            workloadPerWorkgroup, workgroupSize);
+        // TODO: This is HACK to unblock vectorization on tensor-semantic ops.
+        // For padding, it would mean that we need to support tiling and
+        // distributing linalg.pad_tensor ops. It's quite involved and still
+        // ongoing. So for now fallback to bufferization first (which will turn
+        // it into a `linalg.copy` op) before even deducing the CodeGen
+        // configuration.
         return success();
       }
       return funcOp.emitError("contains no root Linalg operation");
