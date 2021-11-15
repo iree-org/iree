@@ -31,7 +31,8 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRPass
     MLIRTransforms
-    iree::compiler::Codegen::Dialect::IREECodegenDialect::::iree::compiler::Dialect::HAL::IR
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 
