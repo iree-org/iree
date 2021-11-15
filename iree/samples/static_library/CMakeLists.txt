@@ -160,6 +160,7 @@ DEPS
   iree::hal::local::loaders::static_library_loader
   iree::hal::local::sync_driver
   iree::task::api
+  iree::vm::shims_emitc
   simple_mul_c_module
   simple_mul_h
 )

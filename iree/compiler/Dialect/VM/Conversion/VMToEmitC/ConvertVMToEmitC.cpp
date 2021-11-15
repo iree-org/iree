@@ -1540,19 +1540,19 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
       size_t numVariadicSegments = llvm::count_if(segmentSizes, isVariadic);
 
       if (numVariadicSegments != 1) {
-        op->emitError() << "only exactly one variadic segment supported";
+        return op->emitError() << "only exactly one variadic segment supported";
       }
 
       auto lastSegmentSize = *(segmentSizes.begin() + (numSegments - 1));
 
       if (!isVariadic(lastSegmentSize)) {
-        op->emitError() << "expected the last segment to be variadic";
+        return op->emitError() << "expected the last segment to be variadic";
       }
 
       size_t numSpans = lastSegmentSize.getSExtValue();
 
-      // TODO(simon-camp): Use the args attribute of the call op to specify
-      // the constant,
+      // TODO(simon-camp): It would be cleaner to use the args attribute of the
+      // call op instead of creating a the constant.
       auto numSpansOp = rewriter.create<emitc::ConstantOp>(
           /*location=*/loc,
           /*resultType=*/rewriter.getIndexType(),
@@ -1655,7 +1655,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
           return op->emitError() << "local ref not found";
         }
 
-        // Zero initialize, just in case
+        // Zero initialize, just in case.
         if (failed(clearStruct(rewriter, ref.getValue(),
                                /*isPointer=*/true))) {
           return failure();
