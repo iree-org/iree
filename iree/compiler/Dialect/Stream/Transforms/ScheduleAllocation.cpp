@@ -787,7 +787,7 @@ static llvm::Optional<TransientAllocation> allocateLocalTransients(
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
   auto allocaOp = externalBuilder.create<IREE::Stream::ResourceAllocaOp>(
       fusedLoc, transientType, timepointType, packOp.total_length(),
-      executeOp.affinityAttr());
+      executeOp.await_timepoint(), executeOp.affinityAttr());
   TransientAllocation allocation;
   allocation.awaitTimepoint = allocaOp.result_timepoint();
   allocation.reservation = allocaOp.result();
@@ -1350,6 +1350,7 @@ static LogicalResult allocateExecutionRegion(
     auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
         reservation.getLoc(), reservation, reservationSize,
         newExecuteOp.result_timepoint(), newExecuteOp.affinityAttr());
+    joinTimepoints.push_back(deallocaOp.result_timepoint());
     executeTimepointUsers.insert(deallocaOp);
   }
 
@@ -1364,7 +1365,7 @@ static LogicalResult allocateExecutionRegion(
         fusedLoc, newExecuteOp.result_timepoint().getType(), joinTimepoints);
     executeTimepointUsers.insert(joinOp);
     newExecuteOp.result_timepoint().replaceUsesWithIf(
-        joinOp.result(), [&](OpOperand &operand) {
+        joinOp.result_timepoint(), [&](OpOperand &operand) {
           return !executeTimepointUsers.contains(operand.getOwner());
         });
   }

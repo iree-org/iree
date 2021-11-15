@@ -213,6 +213,12 @@ class Explorer {
                                Block::BlockArgListType args)>
           fn);
 
+  // Walks all successors of |branchOp| and provides the successor block
+  // argument corresponding to the given branch |operandIdx|.
+  TraversalResult walkOutgoingBranchOperandArguments(
+      mlir::BranchOpInterface branchOp, unsigned operandIdx,
+      std::function<WalkResult(Block *targetBlock, BlockArgument arg)> fn);
+
   // Walks all potential defining ops of |value|.
   // The defining ops may come from any part of the program. There may be
   // multiple defining ops in cases of arguments that may come from multiple

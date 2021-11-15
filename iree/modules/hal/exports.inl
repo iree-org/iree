@@ -29,11 +29,13 @@ EXPORT_FN("allocator.map.byte_buffer", iree_hal_module_allocator_map_byte_buffer
 EXPORT_FN("allocator.wrap.byte_buffer", iree_hal_module_allocator_wrap_byte_buffer, riirii, r)
 
 EXPORT_FN("buffer.allocator", iree_hal_module_buffer_allocator, r, r)
+EXPORT_FN("buffer.assert", iree_hal_module_buffer_assert, rrriii, v)
 EXPORT_FN("buffer.length", iree_hal_module_buffer_length, r, i)
 EXPORT_FN("buffer.load", iree_hal_module_buffer_load, rii, i)
 EXPORT_FN("buffer.store", iree_hal_module_buffer_store, irii, v)
 EXPORT_FN("buffer.subspan", iree_hal_module_buffer_subspan, rii, r)
 
+EXPORT_FN("buffer_view.assert", iree_hal_module_buffer_view_assert, rriiCiD, v)
 EXPORT_FN("buffer_view.buffer", iree_hal_module_buffer_view_buffer, r, r)
 EXPORT_FN("buffer_view.byte_length", iree_hal_module_buffer_view_byte_length, r, i)
 EXPORT_FN("buffer_view.create", iree_hal_module_buffer_view_create, riiCiD, r)
