@@ -425,12 +425,74 @@ struct ResourceSubviewOpPattern
   }
 };
 
-struct TensorImportOpPattern
+// Inserts IR to assert that the underlying buffer storage is compatible with
+// the intended usage in the program. The allocator used to allocate the
+// buffer must have compatibility with our target device allocator and the
+// buffer must have at least the minimum expected size (additional padding is
+// ok).
+static LogicalResult buildStorageAssertions(
+    Location loc, Value buffer, StringAttr message, Value allocator,
+    Value minimumLength, IREE::Stream::ResourceType resourceType,
+    OpBuilder &builder) {
+  auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+  auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+  if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
+                                              bufferUsage))) {
+    return failure();
+  }
+
+  auto requiredTypes =
+      IREE::HAL::MemoryTypeBitfieldAttr::get(builder.getContext(), memoryTypes);
+  auto requiredUsage = IREE::HAL::BufferUsageBitfieldAttr::get(
+      builder.getContext(), bufferUsage);
+
+  builder.create<IREE::HAL::BufferAssertOp>(loc, buffer, message, allocator,
+                                            minimumLength, requiredTypes,
+                                            requiredUsage);
+  return success();
+}
+
+struct TensorImportBufferOpPattern
     : public StreamConversionPattern<IREE::Stream::TensorImportOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    if (!importOp.source().getType().isa<IREE::HAL::BufferType>()) {
+      return failure();
+    }
+
+    // TODO(benvanik): get a name for the tensor (argument name/etc).
+    auto message = rewriter.getStringAttr("tensor");
+
+    // Directly use the buffer.
+    auto buffer = adaptor.source();
+    rewriter.replaceOp(importOp, buffer);
+
+    // Assert the storage is compatible with our expected device and usage.
+    auto targetAllocator = lookupAllocatorFor(importOp, rewriter);
+    auto resourceType =
+        importOp.result().getType().cast<IREE::Stream::ResourceType>();
+    if (failed(buildStorageAssertions(
+            importOp.getLoc(), adaptor.source(), message, targetAllocator,
+            adaptor.result_size(), resourceType, rewriter))) {
+      return failure();
+    }
+
+    return success();
+  }
+};
+
+struct TensorImportBufferViewOpPattern
+    : public StreamConversionPattern<IREE::Stream::TensorImportOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!importOp.source().getType().isa<IREE::HAL::BufferViewType>()) {
+      return failure();
+    }
+
     auto loc = importOp.getLoc();
 
     // TODO(benvanik): get a name for the tensor (argument name/etc).
@@ -511,41 +573,32 @@ struct TensorImportOpPattern
         shapeDims);
     return success();
   }
-
-  // Inserts IR to assert that the underlying buffer storage is compatible with
-  // the intended usage in the program. The allocator used to allocate the
-  // buffer must have compatibility with our target device allocator and the
-  // buffer must have at least the minimum expected size (additional padding is
-  // ok).
-  static LogicalResult buildStorageAssertions(
-      Location loc, Value buffer, StringAttr message, Value allocator,
-      Value minimumLength, IREE::Stream::ResourceType resourceType,
-      OpBuilder &builder) {
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-    if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
-                                                bufferUsage))) {
-      return failure();
-    }
-
-    auto requiredTypes = IREE::HAL::MemoryTypeBitfieldAttr::get(
-        builder.getContext(), memoryTypes);
-    auto requiredUsage = IREE::HAL::BufferUsageBitfieldAttr::get(
-        builder.getContext(), bufferUsage);
-
-    builder.create<IREE::HAL::BufferAssertOp>(loc, buffer, message, allocator,
-                                              minimumLength, requiredTypes,
-                                              requiredUsage);
-    return success();
-  }
 };
 
-struct TensorExportOpPattern
+struct TensorExportBufferOpPattern
     : public StreamConversionPattern<IREE::Stream::TensorExportOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    if (!exportOp.result().getType().isa<IREE::HAL::BufferType>()) {
+      return failure();
+    }
+    rewriter.replaceOp(exportOp, adaptor.source());
+    return success();
+  }
+};
+
+struct TensorExportBufferViewOpPattern
+    : public StreamConversionPattern<IREE::Stream::TensorExportOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!exportOp.result().getType().isa<IREE::HAL::BufferViewType>()) {
+      return failure();
+    }
+
     auto loc = exportOp.getLoc();
     auto tensorType =
         adaptor.source_encoding().getValue().cast<RankedTensorType>();
@@ -1132,7 +1185,8 @@ void populateStreamToHALPatterns(MLIRContext *context,
                   ResourceMapOpPattern, ResourceTryMapOpPattern,
                   ResourceLoadOpPattern, ResourceStoreOpPattern,
                   ResourceSubviewOpPattern>(mapping, typeConverter, context);
-  patterns.insert<TensorImportOpPattern, TensorExportOpPattern,
+  patterns.insert<TensorImportBufferOpPattern, TensorImportBufferViewOpPattern,
+                  TensorExportBufferOpPattern, TensorExportBufferViewOpPattern,
                   TensorTraceOpPattern>(mapping, typeConverter, context);
   patterns
       .insert<CmdFlushOpPattern, CmdInvalidateOpPattern, CmdDiscardOpPattern,
