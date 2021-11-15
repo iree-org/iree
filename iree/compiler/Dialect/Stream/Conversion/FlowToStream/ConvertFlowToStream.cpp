@@ -49,16 +49,18 @@ struct ConvertHALTensorCastOp
   LogicalResult matchAndRewrite(
       IREE::HAL::TensorCastOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (op.source().getType().isa<IREE::HAL::BufferViewType>()) {
+    auto sourceType = op.source().getType();
+    auto targetType = op.target().getType();
+    if (sourceType.isa<IREE::HAL::BufferType>() ||
+        sourceType.isa<IREE::HAL::BufferViewType>()) {
       // Import (buffer view to stream resource).
       auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
           IREE::Stream::Lifetime::External);
       auto resultSize = buildResultSizeOf(op.getLoc(), op.target(),
                                           adaptor.target_dims(), rewriter);
       auto newOp = rewriter.create<IREE::Stream::TensorImportOp>(
-          op.getLoc(), resultType, adaptor.source(),
-          TypeAttr::get(op.target().getType()), adaptor.target_dims(),
-          resultSize,
+          op.getLoc(), resultType, adaptor.source(), TypeAttr::get(targetType),
+          adaptor.target_dims(), resultSize,
           /*affinity=*/nullptr);
 
       auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
@@ -66,7 +68,8 @@ struct ConvertHALTensorCastOp
           op, unknownType, newOp.result(), resultSize, resultSize,
           /*source_affinity=*/nullptr,
           /*result_affinity=*/nullptr);
-    } else if (op.target().getType().isa<IREE::HAL::BufferViewType>()) {
+    } else if (targetType.isa<IREE::HAL::BufferType>() ||
+               targetType.isa<IREE::HAL::BufferViewType>()) {
       auto source =
           consumeTensorOperand(op.getLoc(), adaptor.source(), rewriter);
       auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
@@ -82,9 +85,8 @@ struct ConvertHALTensorCastOp
 
       // Export (stream resource to buffer view).
       rewriter.replaceOpWithNewOp<IREE::Stream::TensorExportOp>(
-          op, op.target().getType(), exportSource,
-          TypeAttr::get(op.source().getType()), adaptor.source_dims(),
-          source.resourceSize,
+          op, targetType, exportSource, TypeAttr::get(op.source().getType()),
+          adaptor.source_dims(), source.resourceSize,
           /*affinity=*/nullptr);
     } else {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
