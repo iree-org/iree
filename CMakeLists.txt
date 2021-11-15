@@ -323,7 +323,7 @@ if(Python3_FOUND)
 endif()
 
 if(IREE_BUILD_TESTS AND NOT IREE_PYYAML_FOUND)
-  message(WARNING "IREE's regression test suite requires PyYAML to run all tests. It is not installed, so some tests will be disabled.")
+  message(FATAL_ERROR "IREE's regression test suite requires PyYAML. Try installing it, perhaps with a command like:  pip install pyyaml")
 endif()
 
 #-------------------------------------------------------------------------------
