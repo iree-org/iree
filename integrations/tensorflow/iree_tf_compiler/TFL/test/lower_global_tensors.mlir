@@ -1,9 +1,8 @@
 // RUN: iree-opt-tflite -split-input-file -allow-unregistered-dialect -pass-pipeline='iree-tflite-lower-global-tensors' %s | IreeFileCheck %s
 
-// CHECK-LABEL: module {
 module {
   // CHECK: util.global private mutable @__iree_flow_Variable = dense<1.000000e+00> : tensor<16x16xf32>
-  // CHECK: func @state
+  // CHECK-LABEL: func @state
   func @state(%arg0: tensor<16x16xf32>) -> () {
     "tfl.call_once"() {session_init_function = "StateInit"} : () -> ()
     return
@@ -19,11 +18,10 @@ module {
 
 // -----
 
-// CHECK-LABEL: module {
 module {
   // CHECK: util.global private mutable @__iree_flow_Variable = dense<1.000000e+00> : tensor<16x16xf32>
 
-  // CHECK: func @assign
+  // CHECK-LABEL: func @assign
   func @assign(%arg0: tensor<16x16xf32>) -> () {
     "tfl.call_once"() {session_init_function = "AssignInit"} : () -> ()
     // CHECK: %[[ADDR:.+]] = util.global.address @__iree_flow_Variable : !util.ptr<tensor<16x16xf32>>
@@ -44,11 +42,10 @@ module {
 
 // -----
 
-// CHECK-LABEL: module {
 module {
   // CHECK: util.global private mutable @__iree_flow_Variable = dense<1.000000e+00> : tensor<16x16xf32>
 
-  // CHECK: func @read
+  // CHECK-LABEL: func @read
   func @read(%arg0: tensor<16x16xf32>) -> (tensor<16x16xf32>) {
     "tfl.call_once"() {session_init_function = "ReadInit"} : () -> ()
 
@@ -70,11 +67,10 @@ module {
 
 // -----
 
-// CHECK-LABEL: module {
 module {
   // CHECK: util.global private mutable @__iree_flow_Variable = dense<2.000000e+00> : tensor<16x16xf32>
 
-  // func @readAssign
+  // CHECK-LABEL: func @readAssign
   func @readAssign(%arg0: tensor<16x16xf32>) -> (tensor<16x16xf32>) {
     "tfl.call_once"() {session_init_function = "ReadAssignInit"} : () -> ()
     // CHECK: %[[ADDR:.+]] = util.global.address @__iree_flow_Variable : !util.ptr<tensor<16x16xf32>>
@@ -100,12 +96,11 @@ module {
 
 // -----
 
-// CHECK-LABEL: module {
 module {
-  // func @readAssignQuant
+  // CHECK: util.global private mutable @__iree_flow_Variable = dense<42> : tensor<2x3xi8>
+  // CHECK-LABEL: func @readAssignQuant
   func @readAssignQuant(%arg0: tensor<2x3x!quant.uniform<i8:f32, 0.1:2>>) -> (tensor<2x3x!quant.uniform<i8:f32, 0.1:2>>) {
     "tfl.call_once"() {session_init_function = "ReadAssignInit"} : () -> ()
-  // CHECK: util.global private mutable @__iree_flow_Variable = dense<42> : tensor<2x3xi8>
     %0 = "tfl.var_handle"() {container = "", shared_name = "Variable"} : () -> tensor<*x!tf_type.resource>
 
     // CHECK: %[[ADDR:.+]] = util.global.load.indirect %ptr___iree_flow_Variable : !util.ptr<tensor<2x3xi8>> -> tensor<2x3xi8>

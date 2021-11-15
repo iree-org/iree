@@ -10,14 +10,13 @@
 #include "iree/compiler/Utils/ConversionUtils.h"
 #include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
+#include "mlir/Dialect/Tosa/IR/TosaOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
-#include "third_party/llvm/llvm-project/mlir/include/mlir/Dialect/Tosa/IR/TosaOps.h"
-#include "third_party/llvm/llvm-project/mlir/include/mlir/IR/BuiltinAttributes.h"
-#include "third_party/llvm/llvm-project/mlir/include/mlir/IR/BuiltinOps.h"
-#include "third_party/tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
 
 namespace mlir {
 namespace iree_integrations {
