@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -52,11 +53,11 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
-  // Expected CPU side to have empty workgroup size.
   if (!workgroupSize.empty()) {
     return op->emitOpError(
         "expected workgroup size to be empty for CPU pipelines");
   }
+
   // Verify that the translation info is using the right pipeline.
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors;
@@ -121,7 +122,9 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
   SmallVector<int64_t> nativeVectorSize =
       loweringConfig.getNativeVectorSizeVals();
   if (!nativeVectorSize.empty()) {
-    if (nativeVectorSize != loweringConfig.getTileSizeVals(2)) {
+    if (nativeVectorSize !=
+        loweringConfig.getTileSizeVals(
+            static_cast<unsigned>(TilingLevel::VectorTiles))) {
       return op->emitOpError(
           "native_vector_size must be same as the last level of tiling");
     }

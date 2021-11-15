@@ -34,6 +34,7 @@ cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect"
         "//iree/compiler/Dialect/HAL/IR",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
