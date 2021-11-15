@@ -50,6 +50,7 @@ cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//iree/compiler/Codegen/Common",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/LLVMCPU",
         "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Codegen/SPIRV",
