@@ -21,7 +21,6 @@ iree_check_single_backend_test_suite(
     "dylib"
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
-    "--iree-llvmcpu-use-tile-fuse-and-vectorize"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

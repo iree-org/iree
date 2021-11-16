@@ -85,11 +85,38 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-static llvm::cl::opt<bool> clUseTileFuseAndVectorize(
-    "iree-llvmcpu-use-tile-fuse-and-vectorize",
-    llvm::cl::desc(
-        "THIS IS DEVELOPMENT ONLY FLAG. Uses tile, fuse and vectorize"),
-    llvm::cl::init(false));
+using IREE::Codegen::DispatchLoweringPassPipeline;
+
+static Optional<std::string> getTargetTriple(FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+  if (!targetAttr) return llvm::None;
+  auto config = targetAttr.getConfiguration();
+  if (!config) return llvm::None;
+  auto triple = config.getAs<StringAttr>("target_triple");
+  if (!triple) return llvm::None;
+  return triple.getValue().str();
+}
+
+static DispatchLoweringPassPipeline getDispatchLoweringPassPipeline(
+    FuncOp entryPointFn, Operation *op) {
+  return TypeSwitch<Operation *, DispatchLoweringPassPipeline>(op)
+      .Case<linalg::ContractionOpInterface>([&](auto op) {
+        Optional<std::string> triple = getTargetTriple(entryPointFn);
+        if (triple && triple.getValue().find("x86_64") != std::string::npos) {
+          return DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
+        } else {
+          return DispatchLoweringPassPipeline::CPUTensorToVectors;
+        }
+      })
+      .Case<linalg::Mmt4DOp>([&](auto op) {
+        return DispatchLoweringPassPipeline::CPUTensorToVectors;
+      })
+      .Default([&](Operation *op) {
+        return DispatchLoweringPassPipeline::CPUDefault;
+      });
+}
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
@@ -230,9 +257,9 @@ static LogicalResult setDefaultLaunchConfig(
   SmallVector<int64_t> workloadPerWorkgroup =
       getDefaultWorkloadPerWorkgroup(tiledLoops, nativeVectorSizeInElements);
 
-  setTranslationInfo(
-      entryPointFn, IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault,
-      workloadPerWorkgroup, /*workgroupSize =*/ArrayRef<int64_t>{});
+  setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
+                     workloadPerWorkgroup,
+                     /*workgroupSize =*/ArrayRef<int64_t>{});
   return success();
 }
 
@@ -309,10 +336,9 @@ static LogicalResult setRootConfig(
   }
   setTranslationInfo(
       entryPointFn,
-      clUseTileFuseAndVectorize
-          ? IREE::Codegen::DispatchLoweringPassPipeline::CPUTileFuseAndVectorize
-          : IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors,
-      workloadPerWorkgroup, /*workgroupSize =*/ArrayRef<int64_t>{});
+      getDispatchLoweringPassPipeline(entryPointFn, contractionOp),
+      workloadPerWorkgroup,
+      /*workgroupSize =*/ArrayRef<int64_t>{});
 
   SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;
   if (isBatchMatmul) {
@@ -388,7 +414,7 @@ static LogicalResult setRootConfig(
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors);
+      getDispatchLoweringPassPipeline(entryPointFn, mmt4dOp));
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
@@ -425,7 +451,7 @@ static LogicalResult setRootConfig(
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, fftOp, tileSizes,
       /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault);
+      getDispatchLoweringPassPipeline(entryPointFn, fftOp));
 }
 
 /// Finds the root operation in the given list of linalg operations and sets
