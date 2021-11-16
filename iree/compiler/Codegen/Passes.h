@@ -251,7 +251,7 @@ createLLVMGPULowerExecutableTargetPass();
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass();
 
-/// Convert Linalg ops to Vector and prepare converstion to gpu mma ops.
+/// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUTensorCoreVectorizationPass();
 

@@ -523,15 +523,15 @@ hal.executable @mma_fused {
 //     CHECK-LABEL: hal.executable public @mma_fused
 //           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-4:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //           CHECK:   llvm.br
-//   CHECK-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//   CHECK-COUNT-8:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-8:   nvvm.wmma.mma
-//   CHECK-COUNT-4:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //           CHECK:   llvm.br
-//   CHECK-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//   CHECK-COUNT-8:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-8:   nvvm.wmma.mma
-//  CHECK-COUNT-32:   llvm.fadd
-//   CHECK-COUNT-4:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//   CHECK-COUNT-8:   llvm.fadd
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32

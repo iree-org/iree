@@ -50,7 +50,9 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
 /// operations.
 static void getTensorCoreConfig(
     SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
-  tileSizes.push_back(TileWorkgroupSizePair({{64, 64, 16}, {64, 2, 1}}));
+  // Tile sizes are skewed towards small matmul for now. Long term the plan is
+  // to not rely on hardcoded configurations.
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
 }
 
 static std::string getTargetArch(FuncOp entryPoint) {
@@ -79,7 +81,7 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
   entryPoint.walk([&fusedOpSupported](linalg::GenericOp linalgOp) {
     for (Operation &fusedOp : linalgOp.getOps()) {
       if (!isa<arith::AddFOp, arith::MulFOp, MaxFOp, MinFOp, linalg::YieldOp,
-               linalg::GenericOp, arith::DivFOp>(fusedOp)) {
+               arith::DivFOp>(fusedOp)) {
         fusedOpSupported = false;
         break;
       }
@@ -96,6 +98,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   auto rhsShape = getUntiledShape(op.getInputOperand(1)->get());
   int64_t sizeM = ShapedType::kDynamicSize;
   int64_t sizeN = ShapedType::kDynamicSize;
+  int64_t sizeK = ShapedType::kDynamicSize;
   auto outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
   for (unsigned i = 0; i < lhsShape.size(); i++) {
     if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
@@ -111,6 +114,17 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       break;
     }
   }
+  SmallVector<AffineExpr> exprs;
+  op.getReductionDims(exprs);
+  if (exprs.size() == 1) {
+    for (unsigned i = 0; i < lhsShape.size(); i++) {
+      if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
+          exprs[0].cast<AffineDimExpr>().getPosition()) {
+        sizeK = lhsShape[i];
+        break;
+      }
+    }
+  }
   // Default tile size and workgroup size.
   int64_t tileX = 2;
   int64_t tileY = 256;
@@ -118,17 +132,19 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
   IREE::Codegen::DispatchLoweringPassPipeline pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt;
   SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
-  bool isStaticSize =
-      sizeM != ShapedType::kDynamicSize && sizeN != ShapedType::kDynamicSize;
+  bool isStaticSize = sizeM != ShapedType::kDynamicSize &&
+                      sizeN != ShapedType::kDynamicSize &&
+                      sizeK != ShapedType::kDynamicSize;
   if (isStaticSize) {
-    bool foundTensorCoreConfig = false;
+    bool isLoweringConfigSet = false;
     if (supportsTensorCore(entryPoint, op)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
       getTensorCoreConfig(TCtileSizeConfig);
       // Pick the best configuration where the original shape is aligned on the
       // tile size.
       for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
-        if (sizeN % config.tileSize[1] == 0 &&
+        if (sizeK % config.tileSize[2] == 0 &&
+            sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
           tileX = config.tileSize[0];
           tileY = config.tileSize[1];
@@ -137,18 +153,21 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
                                config.workgroupSize.end());
           pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
               LLVMGPUMatmulTensorCore;
-          foundTensorCoreConfig = true;
+          isLoweringConfigSet = true;
           break;
         }
       }
     }
-    if (!foundTensorCoreConfig) {
+    if (!isLoweringConfigSet) {
       // Special case for very small matrices.
       if (sizeM * sizeN <= cudaWarpSize) {
         tileX = sizeN;
         tileY = sizeM;
         workgroupSize = {sizeM, sizeN, 1};
+        isLoweringConfigSet = true;
       }
+    }
+    if (!isLoweringConfigSet) {
       SmallVector<TileWorkgroupSizePair> tileSizeConfig;
       // Query the best configuration.
       getMatmulConfig(tileSizeConfig);
@@ -162,6 +181,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
           tileK = config.tileSize[2];
           workgroupSize.assign(config.workgroupSize.begin(),
                                config.workgroupSize.end());
+          isLoweringConfigSet = true;
           break;
         }
       }

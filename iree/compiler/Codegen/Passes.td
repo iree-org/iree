@@ -200,7 +200,7 @@ def LLVMGPUVectorization :
 
 def LLVMGPUTensorCoreVectorization :
     Pass<"iree-llvmgpu-tensorcore-vectorization", "FuncOp"> {
-  let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to gpu mma ops";
+  let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorCoreVectorizationPass()";
 }
 
