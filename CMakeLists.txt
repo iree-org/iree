@@ -332,14 +332,26 @@ endif()
 #-------------------------------------------------------------------------------
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
-if(Python3_FOUND)
+find_package(Git)
+if(Python3_FOUND AND Git_FOUND)
+  # Only check submodule status when the git commit changes.
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} scripts/git/check_submodule_init.py
+    COMMAND git rev-parse --short HEAD
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    RESULT_VARIABLE ret
-  )
-  if(NOT ret EQUAL "0")
-    message(FATAL_ERROR "check_submodule_init.py failed, see the logs above")
+    RESULT_VARIABLE SHORT_HASH_RESULT
+    OUTPUT_VARIABLE SHORT_HASH)
+  string(REGEX REPLACE "\n$" "" SHORT_HASH "${SHORT_HASH}")
+  if(SHORT_HASH_RESULT EQUAL "0" AND NOT "${IREE_GIT_SHORT_HASH}" EQUAL "${SHORT_HASH}")
+    execute_process(
+      COMMAND ${Python3_EXECUTABLE} scripts/git/check_submodule_init.py
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      RESULT_VARIABLE SUBMODULE_INIT_RESULT
+    )
+    if(NOT SUBMODULE_INIT_RESULT EQUAL "0")
+      message(FATAL_ERROR "check_submodule_init.py failed, see the logs above")
+    else()
+      set(IREE_GIT_SHORT_HASH "${SHORT_HASH}" CACHE STRING "" FORCE)
+    endif()
   endif()
 endif()
 
