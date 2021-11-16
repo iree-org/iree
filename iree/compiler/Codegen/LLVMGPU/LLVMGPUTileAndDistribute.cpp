@@ -68,7 +68,8 @@ static void populateTilingToWarpPatterns(
       workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
 
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
-      [&](OpBuilder &builder, Operation *operation) {
+      [&workloadPerWorkgroup, warpPerWorkgroup](OpBuilder &builder,
+                                                Operation *operation) {
         SmallVector<Value, 4> tileSizesVal;
         SmallVector<int64_t, 4> tileSizes;
         for (auto workload : llvm::enumerate(workloadPerWorkgroup)) {
@@ -90,7 +91,7 @@ static void populateTilingToWarpPatterns(
         }
         return tileSizesVal;
       };
-  auto getWarpProcInfoFn = [&warpPerWorkgroup](
+  auto getWarpProcInfoFn = [warpPerWorkgroup](
                                OpBuilder &builder, Location loc,
                                ArrayRef<Range> parallelLoopRanges) {
     return getSubgroupIdsAndCounts(builder, loc, parallelLoopRanges.size(),
