@@ -35,6 +35,7 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     # should pretty consistently be just a number we can use for target triple.
     set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
     list(APPEND _RULE_FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
+    list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu-features=+dotprod")
   endif()
 
   iree_bytecode_module(

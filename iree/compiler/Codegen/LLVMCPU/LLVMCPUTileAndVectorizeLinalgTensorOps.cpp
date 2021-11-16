@@ -223,6 +223,14 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     });
   }
 
+  {
+    RewritePatternSet vectorContractSpecialLoweringPatterns(context);
+    populateVectorContractToAArch64InlineAsm(
+        vectorContractSpecialLoweringPatterns, context);
+    (void)applyPatternsAndFoldGreedily(
+        funcOp, std::move(vectorContractSpecialLoweringPatterns));
+  }
+
   // Apply vector specific operation lowering.
   {
     vector::VectorTransformsOptions vectorTransformsOptions =
