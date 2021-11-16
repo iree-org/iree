@@ -24,7 +24,6 @@ iree_lit_test_suite(
             "hal_interface_workgroup_info.mlir",
             "illegal_configuration.mlir",
             "materialize_launch_configuration.mlir",
-            "matmul_vectorization.mlir",
             "synchronize_symbol_visibility.mlir",
             "test_config_mmt4d.mlir",
             "tile_and_vectorize.mlir",
