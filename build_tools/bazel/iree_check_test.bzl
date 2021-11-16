@@ -25,6 +25,7 @@ def iree_check_test(
         opt_tool = "//iree/tools:iree-opt",
         opt_flags = [],
         tags = [],
+        target_cpu_features = None,
         timeout = None,
         **kwargs):
     """Creates an iree-check-module test for the specified source file.
@@ -44,9 +45,14 @@ def iree_check_test(
           these flags.
       tags: additional tags to apply to the generated test. A tag "driver=DRIVER" is added
           automatically.
+      target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
       timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying run_binary_test.
     """
+
+    if target_cpu_features:
+        fail("target_cpu_features must currently be empty")
+
     bytecode_module_name = name + "_bytecode_module"
     iree_bytecode_module(
         name = bytecode_module_name,
@@ -84,6 +90,7 @@ def iree_check_single_backend_test_suite(
         opt_tool = "//iree/tools:iree-opt",
         opt_flags = [],
         tags = [],
+        target_cpu_features = None,
         timeout = None,
         **kwargs):
     """Creates a test suite of iree-check-module tests for a single backend/driver pair.
@@ -104,11 +111,20 @@ def iree_check_single_backend_test_suite(
           if opt_flags is specified.
       opt_flags: If specified, source files are preprocessed with OPT_TOOL with
           these flags.
+      target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
       tags: tags to apply to the generated tests. Note that as in standard test suites, manual
           is treated specially and will also apply to the test suite itself.
       timeout: timeout for the generated tests.
       **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
+
+    # We haven't implemented this so far because we have been using target_cpu_features so far only
+    # for aarch64 targets, for which we use the CMake build. To future people implementing this:
+    # target_cpu_features should be a list, and here it should be joined into a comma-separated
+    # string to be passed to --iree-llvm-target-cpu-features
+    if target_cpu_features:
+        fail("target_cpu_features must currently be empty")
+
     tests = []
     for src in srcs:
         test_name = "_".join([name, src])
@@ -147,6 +163,7 @@ def iree_check_test_suite(
         opt_tool = "//iree/tools:iree-opt",
         opt_flags = [],
         tags = [],
+        target_cpu_features_variants = [],
         **kwargs):
     """Creates a test suite of iree-check-module tests.
 
@@ -167,8 +184,15 @@ def iree_check_test_suite(
           these flags.
       tags: tags to apply to the generated tests. Note that as in standard test suites, manual
           is treated specially and will also apply to the test suite itself.
+      target_cpu_features_variants: list of target cpu features variants. Currently unimplemented, so each
+            entry must be either "default" or start with "aarch64:" so as Bazel builds are currently x86-only,
+            we know that it is correct to ignore this.
       **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
+
+    for target_cpu_features in target_cpu_features_variants:
+        if not (target_cpu_features == "default" or target_cpu_features.startswith("aarch64:")):
+            fail("Entry %s in target_cpu_features_variants: unimplemented" % target_cpu_features)
 
     # We could have complicated argument override logic for runner_args and such, or... the client
     # could just create a test suite. The latter seems simpler and more readable.

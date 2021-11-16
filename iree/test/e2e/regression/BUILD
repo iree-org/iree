@@ -143,6 +143,10 @@ py_binary(
         ("dylib-llvm-aot", "dylib"),
         ("vmvx", "vmvx"),
     ],
+    target_cpu_features_variants = [
+        "default",
+        "aarch64:+dotprod",
+    ],
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
@@ -162,6 +166,10 @@ py_binary(
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
         # TODO: enable VMVX. Skipped for now: it's very slow for these large matmul tests.
+    ],
+    target_cpu_features_variants = [
+        "default",
+        "aarch64:+dotprod",
     ],
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [

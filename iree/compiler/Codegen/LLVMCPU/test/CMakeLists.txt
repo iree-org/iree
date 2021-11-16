@@ -26,7 +26,7 @@ iree_lit_test_suite(
     "tile_and_vectorize.mlir"
     "tile_fuse_and_vectorize.mlir"
     "unfused_fma.mlir"
-    "vector_contract_to_aarch64_asm.mlir"
+    "vector_contract_custom_kernels.mlir"
   DATA
     FileCheck
     iree::tools::iree-opt

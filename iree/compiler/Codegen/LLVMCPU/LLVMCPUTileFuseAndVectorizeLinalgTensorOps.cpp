@@ -254,6 +254,15 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
         [&](linalg::LinalgOp op) { setMarker(op, getVectorizeMarker()); });
   }
 
+  // Op specific conversion.
+  {
+    RewritePatternSet patterns(context);
+    populateLinalgToVectorVectorizeMMT4dPatterns(context, patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns(&getContext());
@@ -327,6 +336,19 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
+
+  {
+    // Special-case vector.contract codegen paths. This needs to happen
+    // just before the generic vector ops lowerings.
+    CustomKernelsTargetInfo info;
+    if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
+      RewritePatternSet patterns(context);
+      populateVectorContractCustomKernelsPatterns(info, patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+  }
 
   // Apply vector specific operation lowering.
   {

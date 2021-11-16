@@ -238,7 +238,6 @@ class BuildFileFunctions(object):
 
     self._convert_unimplemented_function("filegroup", name)
 
-
   def sh_binary(self, name, **kwargs):
     self._convert_unimplemented_function("sh_binary", name)
 
@@ -532,6 +531,7 @@ class BuildFileFunctions(object):
                                            runner_args=None,
                                            tags=None,
                                            opt_flags=None,
+                                           target_cpu_features=None,
                                            **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
@@ -543,6 +543,8 @@ class BuildFileFunctions(object):
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
     opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
+    target_cpu_features_block = _convert_string_arg_block(
+        "TARGET_CPU_FEATURES", target_cpu_features)
 
     self.converter.body += (f"iree_check_single_backend_test_suite(\n"
                             f"{name_block}"
@@ -553,6 +555,7 @@ class BuildFileFunctions(object):
                             f"{runner_args_block}"
                             f"{labels_block}"
                             f"{opt_flags_block}"
+                            f"{target_cpu_features_block}"
                             f")\n\n")
 
   def iree_check_test_suite(self,
@@ -563,6 +566,7 @@ class BuildFileFunctions(object):
                             runner_args=None,
                             tags=None,
                             opt_flags=None,
+                            target_cpu_features_variants=None,
                             **kwargs):
     target_backends = None
     drivers = None
@@ -580,6 +584,8 @@ class BuildFileFunctions(object):
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
     opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
+    target_cpu_features_variants_block = _convert_string_list_block(
+        "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
 
     self.converter.body += (f"iree_check_test_suite(\n"
                             f"{name_block}"
@@ -590,6 +596,7 @@ class BuildFileFunctions(object):
                             f"{runner_args_block}"
                             f"{labels_block}"
                             f"{opt_flags_block}"
+                            f"{target_cpu_features_variants_block}"
                             f")\n\n")
 
   def iree_generated_trace_runner_test(self,
@@ -603,6 +610,7 @@ class BuildFileFunctions(object):
                                        tags=None,
                                        opt_tool=None,
                                        opt_flags=None,
+                                       target_cpu_features_variants=None,
                                        **kwargs):
     target_backends = None
     drivers = None
@@ -628,6 +636,8 @@ class BuildFileFunctions(object):
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
     opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
+    target_cpu_features_variants_block = _convert_string_list_block(
+        "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
 
     self.converter.body += (f"iree_generated_trace_runner_test(\n"
                             f"{name_block}"
@@ -640,8 +650,8 @@ class BuildFileFunctions(object):
                             f"{runner_args_block}"
                             f"{labels_block}"
                             f"{opt_flags_block}"
+                            f"{target_cpu_features_variants_block}"
                             f")\n\n")
-
 
   def iree_e2e_cartesian_product_test_suite(self,
                                             name,
