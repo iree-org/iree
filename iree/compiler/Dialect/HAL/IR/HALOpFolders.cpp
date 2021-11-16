@@ -33,22 +33,13 @@ OpFoldResult TensorCastOp::fold(ArrayRef<Attribute> operands) {
     return source();
   }
 
-  auto castOp = source().getDefiningOp<TensorCastOp>();
-  if (castOp) {
-    if (target().getType() == castOp.source().getType()) {
-      // %1 = hal.tensor.cast %0 : A -> B  (source defining op)
-      // %2 = hal.tensor.cast %1 : B -> A  (this op)
-      // fold to just %0 then let CSE remove %1 if no other uses
-      return castOp.source();
-    } else {
-      // %1 = hal.tensor.cast %0 : A -> B  (source defining op)
-      // %2 = hal.tensor.cast %1 : B -> C  (this op)
-      // change %1 to %0 and let CSE remove %1 if no other uses
-      auto mutableSource = sourceMutable();
-      mutableSource.clear();
-      mutableSource.append(castOp.source());
-      return getResult();
-    }
+  // Cast of a cast can use the defining op's source.
+  // This can apply recursively and may bottom out at source == target type.
+  if (auto castOp = source().getDefiningOp<TensorCastOp>()) {
+    auto mutableSource = sourceMutable();
+    mutableSource.clear();
+    mutableSource.append(castOp.source());
+    return getResult();
   }
 
   return {};
