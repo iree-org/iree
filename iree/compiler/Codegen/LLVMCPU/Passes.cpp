@@ -27,28 +27,6 @@ static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
 }
 
-void addCPUVectorizationPassPipeline(OpPassManager &passManager,
-                                     bool lowerToVectors) {
-  passManager.addPass(createCanonicalizerPass());
-
-  // TODO(ataei): This causes segmentation fault on Android. Fix it and
-  // re-enable.
-  // passManager.addNestedPass<FuncOp>(createPadLinalgWorkgroupTilesPass());
-
-  // Use stack allocation on CPU side.
-  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-
-  // Tile and vectorize linalg ops on buffers.
-  passManager.addNestedPass<FuncOp>(
-      createLLVMCPUVectorizationPass(lowerToVectors));
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-
-  passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
-}
-
 LogicalResult verifyTensorToVectorsPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
