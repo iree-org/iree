@@ -76,6 +76,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMCommonConversion",
         "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:LinalgBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
