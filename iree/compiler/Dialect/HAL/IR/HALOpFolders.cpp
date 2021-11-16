@@ -34,8 +34,7 @@ OpFoldResult TensorCastOp::fold(ArrayRef<Attribute> operands) {
   }
 
   auto castOp = source().getDefiningOp<TensorCastOp>();
-  if (castOp && source_dims() == castOp.source_dims() &&
-      target_dims() == castOp.target_dims()) {
+  if (castOp) {
     if (target().getType() == castOp.source().getType()) {
       // %1 = hal.tensor.cast %0 : A -> B  (source defining op)
       // %2 = hal.tensor.cast %1 : B -> A  (this op)
