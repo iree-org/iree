@@ -65,7 +65,6 @@
 #define FOR_EACH_10(f, i, a, ...) f(i, a) FOR_EACH_9(f, INC(i), __VA_ARGS__)
 
 #define TYPE_JOIN(types) JOIN(TUPLE_UNPACK(types))
-#define EMITC_FIXED_CCONV(arg_types, ret_types) JOIN(0, arg_types, _, ret_types)
 
 #define EMITC_DEFINE_SHIMS(arg_types, ret_types)                  \
   EMITC_FIXED_TYPEDEF(arg_types, TYPE_JOIN(arg_types), ret_types, \
