@@ -193,6 +193,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           default:
             llvm_unreachable("Unsupported pipeline on CPU target.");
         }
+      }
     }
   }
 
