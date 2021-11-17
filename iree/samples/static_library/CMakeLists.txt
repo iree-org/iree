@@ -79,7 +79,6 @@ DEPS
   iree::runtime
   iree::hal::local::loaders::static_library_loader
   iree::hal::local::sync_driver
-  iree::task::api
   simple_mul
 )
 
@@ -94,6 +93,11 @@ iree_lit_test(
   LABELS
     "hostonly"
 )
+
+
+if(NOT (${IREE_ENABLE_EMITC} OR DEFINED IREE_HOST_BINARY_ROOT))
+  return()
+endif()
 
 ## Example with VM C module.
 # Setup args for iree-translate.
@@ -146,7 +150,7 @@ SET_TARGET_PROPERTIES(
  LINKER_LANGUAGE C
 )
 
-# TODO(marbre): Check sources and dependencies.
+# TODO(marbre): Cleanup SRCS and DEPS.
 iree_cc_binary(
 NAME
   static_library_demo_c
@@ -159,7 +163,6 @@ DEPS
   iree::runtime
   iree::hal::local::loaders::static_library_loader
   iree::hal::local::sync_driver
-  iree::task::api
   iree::vm::shims_emitc
   simple_mul_c_module
   simple_mul_h
