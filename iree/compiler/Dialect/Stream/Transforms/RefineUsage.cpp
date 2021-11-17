@@ -61,6 +61,14 @@ static Lifetime convertUsageToLifetime(ResourceUsageBitfield usage) {
   }
 }
 
+// Returns either the affinity of |op| or nullptr.
+static IREE::Stream::AffinityAttr getOpAffinity(Operation *op) {
+  if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+    return affinityOp.getAffinity();
+  }
+  return {};
+}
+
 // Base pattern type for resource usage refinement.
 // The results of the usage analysis are available for use by subclasses.
 template <typename OpT>
@@ -70,6 +78,27 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
 
   ResourceUsageAnalysis &analysis;
 
+  // Updates the |arg| type to the lifetime derived by analysis, if needed.
+  // Returns true if a change was made.
+  bool applyArgTransition(BlockArgument arg, PatternRewriter &rewriter) const {
+    auto oldType = arg.getType().dyn_cast<IREE::Stream::ResourceType>();
+    if (!oldType) return false;
+    auto newUsage = analysis.lookupResourceUsage(arg);
+    auto newLifetime = convertUsageToLifetime(newUsage);
+    auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
+    if (oldType == newType) {
+      // Old and new lifetimes match; no need to apply a transition.
+      return false;
+    } else if (oldType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      // Transitioning lifetimes; rely on users to insert the transitions.
+      return false;
+    } else {
+      // Directly overwrite the existing lifetime.
+      arg.setType(newType);
+      return true;
+    }
+  }
+
   // Updates the |result| type to the lifetime derived by analysis, if needed.
   // Returns true if a change was made.
   bool applyResultTransition(Operation *op, Value result,
@@ -78,25 +107,62 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
     if (!oldType) return false;
     auto newUsage = analysis.lookupResourceUsage(result);
     auto newLifetime = convertUsageToLifetime(newUsage);
-    if (oldType.getLifetime() == newLifetime) return false;
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
-    result.setType(newType);
-    return true;
+    if (oldType == newType) {
+      // Old and new lifetimes match; no need to apply a transition.
+      return false;
+    } else if (oldType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      // Transitioning from one lifetime to another; insert a transfer
+      // placeholder (as we may later decide it's ok to transition on a
+      // particular device).
+      auto resultSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
+          op->getLoc(), result);
+      auto affinityAttr = getOpAffinity(op);
+      auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
+          op->getLoc(), newType, result, resultSize, resultSize,
+          /*source_affinity=*/affinityAttr,
+          /*target_affinity=*/affinityAttr);
+      result.replaceUsesWithIf(transferOp.result(), [&](OpOperand &operand) {
+        return operand.getOwner() != transferOp &&
+               operand.getOwner() != resultSize.getDefiningOp();
+      });
+      return true;
+    } else {
+      // Directly overwrite the existing lifetime.
+      result.setType(newType);
+      return true;
+    }
   }
 
   // Updates the |result| type to the lifetime derived by analysis, if needed.
-  // Returns true if a change was made.
-  bool applyResultTransition(Operation *op, Value result, Value resultSize,
-                             Attribute affinityAttr,
+  // Returns true if a change was made. Same as above but for when we have the
+  // information available and don't need to insert the queries.
+  bool applyResultTransition(Value result, Value resultSize,
+                             IREE::Stream::AffinityAttr affinityAttr,
                              PatternRewriter &rewriter) const {
     auto oldType = result.getType().dyn_cast<IREE::Stream::ResourceType>();
     if (!oldType) return false;
     auto newUsage = analysis.lookupResourceUsage(result);
     auto newLifetime = convertUsageToLifetime(newUsage);
-    if (oldType.getLifetime() == newLifetime) return false;
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
-    result.setType(newType);
-    return true;
+    if (oldType == newType) {
+      // Old and new lifetimes match; no need to apply a transition.
+      return false;
+    } else if (oldType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      // Transitioning from one lifetime to another; insert a transfer
+      // placeholder (as we may later decide it's ok to transition on a
+      // particular device).
+      auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
+          result.getLoc(), newType, result, resultSize, resultSize,
+          /*source_affinity=*/affinityAttr,
+          /*target_affinity=*/affinityAttr);
+      result.replaceAllUsesExcept(transferOp.result(), transferOp);
+      return true;
+    } else {
+      // Directly overwrite the existing lifetime.
+      result.setType(newType);
+      return true;
+    }
   }
 
   // Updates all blocks argument lifetimes within the regions of |op|.
@@ -108,16 +174,9 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
       for (auto &block : region) {
         rewriter.setInsertionPoint(&block, block.begin());
         for (auto &blockArg : block.getArguments()) {
-          auto oldType =
-              blockArg.getType().dyn_cast<IREE::Stream::ResourceType>();
-          if (!oldType) continue;
-          auto newUsage = analysis.lookupResourceUsage(blockArg);
-          auto newLifetime = convertUsageToLifetime(newUsage);
-          if (oldType.getLifetime() == newLifetime) return false;
-          auto newType =
-              rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
-          blockArg.setType(newType);
-          didChange = true;
+          if (applyArgTransition(blockArg, rewriter)) {
+            didChange = true;
+          }
         }
       }
     }
@@ -158,13 +217,16 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::FuncOp> {
       auto oldType = inputType.value().dyn_cast<IREE::Stream::ResourceType>();
       if (!oldType) {
         newInputs.push_back(inputType.value());
-        continue;
+      } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
+        auto blockArg = op.getArgument(inputType.index());
+        auto newUsage = analysis.lookupResourceUsage(blockArg);
+        auto newLifetime = convertUsageToLifetime(newUsage);
+        auto newType =
+            rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
+        newInputs.push_back(newType);
+      } else {
+        newInputs.push_back(oldType);
       }
-      auto blockArg = op.getArgument(inputType.index());
-      auto newUsage = analysis.lookupResourceUsage(blockArg);
-      auto newLifetime = convertUsageToLifetime(newUsage);
-      auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
-      newInputs.push_back(newType);
     }
 
     // Results:
@@ -174,13 +236,16 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::FuncOp> {
       auto oldType = outputType.value().dyn_cast<IREE::Stream::ResourceType>();
       if (!oldType) {
         newOutputs.push_back(outputType.value());
-        continue;
+      } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
+        auto returnValue = anyReturnOp.getOperand(outputType.index());
+        auto newUsage = analysis.lookupResourceUsage(returnValue);
+        auto newLifetime = convertUsageToLifetime(newUsage);
+        auto newType =
+            rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
+        newOutputs.push_back(newType);
+      } else {
+        newOutputs.push_back(oldType);
       }
-      auto returnValue = anyReturnOp.getOperand(outputType.index());
-      auto newUsage = analysis.lookupResourceUsage(returnValue);
-      auto newLifetime = convertUsageToLifetime(newUsage);
-      auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
-      newOutputs.push_back(newType);
     }
     auto newFuncType = rewriter.getFunctionType(newInputs, newOutputs);
     if (op.getType() != newFuncType) {
@@ -231,11 +296,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
     // Walk into nested regions first so we have the final result types returned
     // by the regions.
     bool didChange = this->applyRegionTransitions(op, rewriter);
-    Attribute affinityAttr;
-    if (auto affinityOp =
-            dyn_cast<IREE::Stream::AffinityOpInterface>(op.getOperation())) {
-      affinityAttr = affinityOp.getAffinity();
-    }
+    auto affinityAttr = getOpAffinity(op);
 
     rewriter.startRootUpdate(op);
 
@@ -247,7 +308,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
         continue;
       }
       auto resultSize = sizeAwareOp.getResultSize(i);
-      if (this->applyResultTransition(op, result, resultSize, affinityAttr,
+      if (this->applyResultTransition(result, resultSize, affinityAttr,
                                       rewriter)) {
         didChange = true;
       }
