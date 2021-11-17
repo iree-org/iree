@@ -35,7 +35,7 @@ static bool getExperimentalStreamsModeFromFlags() {
   static llvm::cl::opt<bool> *enableFlag = new llvm::cl::opt<bool>{
       "iree-experimental-streams",
       llvm::cl::desc("Enables experimental stream dialect pipelines."),
-      llvm::cl::init(false),
+      llvm::cl::init(true),
   };
   return *enableFlag;
 }
