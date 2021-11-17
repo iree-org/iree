@@ -13,11 +13,10 @@
 #include "iree/hal/local/sync_device.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
-#include "iree/task/api.h"
 
-// Compiled static library module here to avoid IO:
-#include "iree/samples/static_library/simple_mul.h"
-
+extern const iree_hal_executable_library_header_t**
+simple_mul_dispatch_0_library_query(
+    iree_hal_executable_library_version_t max_version, void* reserved);
 // A function to create the bytecode or C module.
 extern iree_status_t create_module(iree_vm_module_t** module);
 

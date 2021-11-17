@@ -130,24 +130,14 @@ add_custom_target(
 
 add_library(simple_mul_c_module
  STATIC
- ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.h
  ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.o
 )
+add_dependencies(simple_mul_c_module simple_mul_gen)
 
 SET_TARGET_PROPERTIES(
   simple_mul_c_module
   PROPERTIES
   LINKER_LANGUAGE C
-)
-
-add_library(simple_mul_h STATIC "")
-target_sources(simple_mul_h PRIVATE "simple_mul_c_module.h")
-add_dependencies(simple_mul_h simple_mul_gen)
-
-SET_TARGET_PROPERTIES(
- simple_mul_h
- PROPERTIES
- LINKER_LANGUAGE C
 )
 
 # TODO(marbre): Cleanup SRCS and DEPS.
@@ -157,7 +147,6 @@ NAME
 SRCS
   "create_c_module.c"
   "static_library_demo.c"
-  "simple_mul_c_module.h"
   "simple_mul_emitc.h"
 DEPS
   iree::runtime
@@ -165,7 +154,6 @@ DEPS
   iree::hal::local::sync_driver
   iree::vm::shims_emitc
   simple_mul_c_module
-  simple_mul_h
 )
 
 iree_lit_test(
