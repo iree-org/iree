@@ -59,7 +59,7 @@ struct GlobalOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalOp globalOp, OpAdaptor operands,
+      IREE::Util::GlobalOp globalOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(globalOp.type())) return failure();
@@ -145,12 +145,12 @@ struct GlobalLoadOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalLoadOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalLoadOp loadOp, OpAdaptor operands,
+      IREE::Util::GlobalLoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(loadOp.getType())) return failure();
     auto &expandedGlobal =
-        expansionState->globalMap[operands.global().getValue()];
+        expansionState->globalMap[adaptor.global().getValue()];
 
     // Insert a load/transfer to the unknown resource lifetime.
     auto unknownType = IREE::Stream::ResourceType::get(rewriter.getContext());
@@ -177,17 +177,17 @@ struct GlobalStoreOpExpansion
     : public BaseGlobalConversionPattern<IREE::Util::GlobalStoreOp> {
   using BaseGlobalConversionPattern::BaseGlobalConversionPattern;
   LogicalResult matchAndRewrite(
-      IREE::Util::GlobalStoreOp storeOp, OpAdaptor operands,
+      IREE::Util::GlobalStoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(storeOp.value().getType())) return failure();
     auto &expandedGlobal =
-        expansionState->globalMap[operands.global().getValue()];
+        expansionState->globalMap[adaptor.global().getValue()];
 
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
     // refinement will make this go away if possible.
     auto value =
-        consumeTensorOperand(storeOp.getLoc(), operands.value(), rewriter);
+        consumeTensorOperand(storeOp.getLoc(), adaptor.value(), rewriter);
     auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
         storeOp.getLoc(), expandedGlobal.resourceOp.type(), value.resource,
         value.resourceSize, value.resourceSize, /*source_affinity=*/nullptr,

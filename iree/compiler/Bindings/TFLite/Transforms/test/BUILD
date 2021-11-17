@@ -17,7 +17,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "materialize_shape_support.mlir",
             "wrap_entry_points.mlir",
         ],
         include = ["*.mlir"],

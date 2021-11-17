@@ -9,6 +9,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -19,8 +20,14 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Registers all conversion passes in this directory.
+/// Registers all conversion passes in this directory.
 void registerCodegenPasses();
+
+/// Verify that the configuration used for compilation is valid.
+LogicalResult verifyLoweringConfiguration(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 
 //------------------------------------------------------------------------------
 // Misc/common conversions
@@ -184,13 +191,12 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
-/// Populates the passes needed to lower to vector operations using linalg based
-/// progressive lowering with vectorization after bufferization.
-void addCPUVectorizationPassPipeline(OpPassManager &passManager,
-                                     bool lowerToVectors = true);
-
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
+LogicalResult verifyTensorToVectorsPassPipelineConfig(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true,
                                     bool useTileAndVectorizeV2 = false);
@@ -215,6 +221,9 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm);
 /// Lowering calling vectorization patterns.
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
+/// Lowering using tensorcore operations.
+void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm);
+
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level
 /// pass manager.
@@ -232,8 +241,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<FuncOp>>
-createLLVMGPUTileAndDistributeToThreads();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUTileAndDistribute(
+    bool distributeToWarp = false);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -241,6 +250,10 @@ createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass();
+
+/// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
+std::unique_ptr<OperationPass<FuncOp>>
+createLLVMGPUTensorCoreVectorizationPass();
 
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();

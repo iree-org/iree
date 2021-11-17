@@ -1198,7 +1198,8 @@ struct AsyncCopyFullSourceToUpdate : public OpRewritePattern<AsyncCopyOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncCopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
-    if (copyOp.source_end() == copyOp.source_size()) {
+    if (copyOp.source_end() == copyOp.source_size() &&
+        copyOp.length() == copyOp.source_size()) {
       rewriter.replaceOpWithNewOp<IREE::Stream::AsyncUpdateOp>(
           copyOp, copyOp.result().getType(), copyOp.target(),
           copyOp.target_size(), copyOp.target_offset(), copyOp.target_end(),
@@ -1363,7 +1364,7 @@ struct ChainAsyncExecuteWaits : public OpRewritePattern<AsyncExecuteOp> {
     SmallVector<std::pair<unsigned, Value>> replacements;
     for (auto operand : llvm::enumerate(op.operands())) {
       if (auto awaitOp = operand.value().getDefiningOp<TimepointAwaitOp>()) {
-        newTimepoints.push_back(awaitOp.timepoint());
+        newTimepoints.push_back(awaitOp.await_timepoint());
         replacements.push_back(std::make_pair(
             operand.index(), awaitOp.getTiedResultOperand(operand.value())));
       }
@@ -1816,7 +1817,7 @@ struct ChainCmdExecuteWaits : public OpRewritePattern<CmdExecuteOp> {
     SmallVector<std::pair<unsigned, Value>> replacements;
     for (auto operand : llvm::enumerate(op.operands())) {
       if (auto awaitOp = operand.value().getDefiningOp<TimepointAwaitOp>()) {
-        newTimepoints.push_back(awaitOp.timepoint());
+        newTimepoints.push_back(awaitOp.await_timepoint());
         replacements.push_back(std::make_pair(
             operand.index(), awaitOp.getTiedResultOperand(operand.value())));
       }
@@ -1982,9 +1983,9 @@ OpFoldResult TimepointJoinOp::fold(ArrayRef<Attribute> operands) {
     // Immediate wait; fold into immediate.
     return IREE::Stream::TimepointAttr::get(getContext(),
                                             getResult().getType());
-  } else if (timepoints().size() == 1) {
+  } else if (await_timepoints().size() == 1) {
     // Join of a single timepoint => that timepoint.
-    return timepoints().front();
+    return await_timepoints().front();
   }
   return {};
 }
@@ -1997,20 +1998,20 @@ struct ElideImmediateTimepointJoinOperands
   LogicalResult matchAndRewrite(TimepointJoinOp op,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Value> newTimepoints;
-    newTimepoints.reserve(op.timepoints().size());
-    for (auto timepoint : op.timepoints()) {
+    newTimepoints.reserve(op.await_timepoints().size());
+    for (auto timepoint : op.await_timepoints()) {
       if (!isa_and_nonnull<TimepointImmediateOp>(timepoint.getDefiningOp())) {
         newTimepoints.push_back(timepoint);
       }
     }
-    if (newTimepoints.size() == op.timepoints().size()) return failure();
+    if (newTimepoints.size() == op.await_timepoints().size()) return failure();
     if (newTimepoints.empty()) {
       // Fully immediate; replace entire join with immediate.
-      rewriter.replaceOpWithNewOp<TimepointImmediateOp>(op,
-                                                        op.result().getType());
+      rewriter.replaceOpWithNewOp<TimepointImmediateOp>(
+          op, op.result_timepoint().getType());
     } else {
       rewriter.updateRootInPlace(
-          op, [&]() { op.timepointsMutable().assign(newTimepoints); });
+          op, [&]() { op.await_timepointsMutable().assign(newTimepoints); });
     }
     return success();
   }
@@ -2022,10 +2023,41 @@ struct FoldDuplicateTimepointJoinOperands
   LogicalResult matchAndRewrite(TimepointJoinOp op,
                                 PatternRewriter &rewriter) const override {
     SetVector<Value> newTimepoints;
-    newTimepoints.insert(op.timepoints().begin(), op.timepoints().end());
-    if (newTimepoints.size() == op.timepoints().size()) return failure();
+    newTimepoints.insert(op.await_timepoints().begin(),
+                         op.await_timepoints().end());
+    if (newTimepoints.size() == op.await_timepoints().size()) return failure();
     rewriter.updateRootInPlace(op, [&]() {
-      op.timepointsMutable().assign(newTimepoints.takeVector());
+      op.await_timepointsMutable().assign(newTimepoints.takeVector());
+    });
+    return success();
+  }
+};
+
+// Expands await timepoints in join ops that come from join ops.
+// Local transformations will often insert joins that end up back-to-back:
+//   %j0 = stream.timepoint.join max(%tp0, %tp1)
+//   %j1 = stream.timepoint.join max(%tp2, %j0, %tp3)
+// Which we want to fold and expand:
+//   %j1 = stream.timepoint.join max(%tp2, %tp0, %tp1, %tp3)
+struct ExpandTimepointJoinOperands : public OpRewritePattern<TimepointJoinOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TimepointJoinOp op,
+                                PatternRewriter &rewriter) const override {
+    SetVector<Value> newTimepoints;
+    bool didExpand = false;
+    for (auto timepoint : op.await_timepoints()) {
+      if (auto sourceJoinOp =
+              dyn_cast_or_null<TimepointJoinOp>(timepoint.getDefiningOp())) {
+        newTimepoints.insert(sourceJoinOp.await_timepoints().begin(),
+                             sourceJoinOp.await_timepoints().end());
+        didExpand = true;
+      } else {
+        newTimepoints.insert(timepoint);
+      }
+    }
+    if (!didExpand) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      op.await_timepointsMutable().assign(newTimepoints.takeVector());
     });
     return success();
   }
@@ -2039,6 +2071,7 @@ void TimepointJoinOp::getCanonicalizationPatterns(
   // TODO(benvanik): sink and pull in other timepoints (join on all needed).
   results.insert<ElideImmediateTimepointJoinOperands>(context);
   results.insert<FoldDuplicateTimepointJoinOperands>(context);
+  results.insert<ExpandTimepointJoinOperands>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2061,7 +2094,8 @@ struct ElideImmediateAwaits : public OpRewritePattern<TimepointAwaitOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
-    if (isa_and_nonnull<TimepointImmediateOp>(op.timepoint().getDefiningOp())) {
+    if (isa_and_nonnull<TimepointImmediateOp>(
+            op.await_timepoint().getDefiningOp())) {
       rewriter.replaceOp(op, op.operands());
       return success();
     }
@@ -2177,7 +2211,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     SmallVector<TimepointAwaitOp> coveredOps;
-    for (auto &use : op.timepoint().getUses()) {
+    for (auto &use : op.await_timepoint().getUses()) {
       // TODO(benvanik): make this handle joins/ties; today we get blocked
       // there. We rely on other canonicalizers to sink things such that
       // (hopefully) we get them directly accessible here.
@@ -2216,7 +2250,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       llvm::append_range(newOperandSizes, coveredOp.operand_sizes());
     }
     auto newOp = rewriter.create<TimepointAwaitOp>(
-        op.getLoc(), newOperands, newOperandSizes, op.timepoint());
+        op.getLoc(), newOperands, newOperandSizes, op.await_timepoint());
     if (op.affinity().hasValue()) {
       newOp.affinityAttr(op.affinityAttr());
     }
@@ -2267,7 +2301,7 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
 
     // Create replacement op with deduped operands/results.
     auto newOp = rewriter.create<IREE::Stream::TimepointAwaitOp>(
-        op.getLoc(), newOperands, newOperandSizes, op.timepoint());
+        op.getLoc(), newOperands, newOperandSizes, op.await_timepoint());
     if (op.affinity().hasValue()) {
       newOp.affinityAttr(op.affinityAttr());
     }

@@ -12,8 +12,6 @@ include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
 // List of pre-existing pipelines for translating executables.
 def CPU_Default
     : StrEnumAttrCase<"CPUDefault">;
-def CPU_Vectorization
-    : StrEnumAttrCase<"CPUVectorization">;
 def CPU_TensorToVectors
     : StrEnumAttrCase<"CPUTensorToVectors">;
 def CPU_TileFuseAndVectorize
@@ -25,6 +23,8 @@ def LLVMGPU_Vectorize
     : StrEnumAttrCase<"LLVMGPUVectorize">;
 def LLVMGPU_MatmulSimt
     : StrEnumAttrCase<"LLVMGPUMatmulSimt">;
+def LLVMGPU_MatmulTensorCore
+    : StrEnumAttrCase<"LLVMGPUMatmulTensorCore">;
 
 def SPIRV_SimpleDistribute
     : StrEnumAttrCase<"SPIRVDistribute">;
@@ -42,8 +42,8 @@ def DispatchLoweringPassPipelineEnum : StrEnumAttr<
     "DispatchLoweringPassPipeline",
     "identifier for pass pipeline use to lower dispatch region",
     [CPU_Default, CPU_TensorToVectors, CPU_TileFuseAndVectorize,
-     CPU_Vectorization, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
-     LLVMGPU_MatmulSimt, SPIRV_SimpleDistribute, SPIRV_Vectorize,
+     LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
+     LLVMGPU_MatmulTensorCore, SPIRV_SimpleDistribute, SPIRV_Vectorize,
      SPIRV_VectorizeToCooperativeOps, None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
 }

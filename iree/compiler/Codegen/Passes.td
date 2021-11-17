@@ -153,12 +153,6 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
-def LLVMCPUVectorization :
-    Pass<"iree-llvmcpu-vectorization", "FuncOp"> {
-  let summary = "Tile and vectorize for CPU backends";
-  let constructor = "mlir::iree_compiler::createLLVMCPUVectorizationPass()";
-}
-
 def VectorToAArch64InlineAsm :
     Pass<"iree-llvmcpu-vector-to-aarch64-inline-asm", "FuncOp"> {
   let summary = "Convert vector operations to aarch64 inline asm LLVMIR dialect";
@@ -195,13 +189,19 @@ def LLVMGPULowerExecutableTarget :
 def LLVMGPUTileAndDistribute :
     Pass<"iree-llvmgpu-tile-and-distribute", "FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistributeToThreads()";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistribute()";
 }
 
 def LLVMGPUVectorization :
     Pass<"iree-llvmgpu-vectorization", "FuncOp"> {
   let summary = "Pass to convert linalg into Vector.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
+}
+
+def LLVMGPUTensorCoreVectorization :
+    Pass<"iree-llvmgpu-tensorcore-vectorization", "FuncOp"> {
+  let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTensorCoreVectorizationPass()";
 }
 
 def LLVMGPUVectorLowering :

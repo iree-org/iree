@@ -407,6 +407,106 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
 // iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
 
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_assert,  //
+                   iree_hal_module_state_t,        //
+                   rrriii, v) {
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
+  iree_vm_buffer_t* message = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &message));
+  iree_string_view_t message_str = iree_vm_buffer_as_string(message);
+  iree_hal_allocator_t* allocator = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r2, &allocator));
+  iree_vm_size_t minimum_length = (iree_vm_size_t)args->i3;
+  iree_hal_memory_type_t required_memory_types =
+      (iree_hal_memory_type_t)args->i4;
+  iree_hal_buffer_usage_t required_buffer_usage =
+      (iree_hal_buffer_usage_t)args->i5;
+
+  // Ensure we have enough bytes in the buffer for the encoding we have.
+  // Note that having more bytes is fine:
+  //   assert(expected_length <= actual_length);
+  iree_device_size_t actual_length = iree_hal_buffer_byte_length(buffer);
+  if (actual_length < minimum_length) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "%.*s buffer byte length %" PRIdsz " less than expected minimum %d",
+        (int)message_str.size, message_str.data, actual_length, minimum_length);
+  }
+
+  // TODO(benvanik): assert that the buffer view is accessible from the
+  // target device. This needs some iree_hal_allocator_* methods for checking
+  // whether the external buffer can be used. To start we just compare if the
+  // allocators are identical.
+  if (iree_hal_buffer_allocator(buffer) != allocator) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "%.*s imported buffer allocator mismatch; must be from "
+        "the same allocator (today)",
+        (int)message_str.size, message_str.data);
+  }
+
+  // All memory type bits expected (indicating where the program intends to use
+  // the buffer data) must be set in the buffer while the buffer is allowed to
+  // have more bits.
+  iree_hal_memory_type_t actual_memory_type =
+      iree_hal_buffer_memory_type(buffer);
+  if (!iree_all_bits_set(actual_memory_type, required_memory_types)) {
+#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+    iree_bitfield_string_temp_t temp0, temp1;
+    iree_string_view_t actual_memory_type_str =
+        iree_hal_memory_type_format(actual_memory_type, &temp0);
+    iree_string_view_t expected_memory_type_str =
+        iree_hal_memory_type_format(required_memory_types, &temp1);
+    return iree_make_status(
+        IREE_STATUS_PERMISSION_DENIED,
+        "%.*s buffer memory type is not compatible; buffer has %.*s, operation "
+        "requires %.*s",
+        (int)message_str.size, message_str.data,
+        (int)actual_memory_type_str.size, actual_memory_type_str.data,
+        (int)expected_memory_type_str.size, expected_memory_type_str.data);
+#else
+    return iree_make_status(
+        IREE_STATUS_PERMISSION_DENIED,
+        "%.*s buffer memory type is not compatible; buffer has %08X, operation "
+        "requires %08X",
+        (int)message_str.size, message_str.data, actual_memory_type,
+        expected_memory_type);
+#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
+  }
+
+  // All usage bits expected (indicating what the program intends to use the
+  // buffer for) must be set in the buffer while the buffer is allowed to have
+  // more bits.
+  iree_hal_buffer_usage_t actual_buffer_usage =
+      iree_hal_buffer_allowed_usage(buffer);
+  if (!iree_all_bits_set(actual_buffer_usage, required_buffer_usage)) {
+#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+    iree_bitfield_string_temp_t temp0, temp1;
+    iree_string_view_t allowed_usage_str =
+        iree_hal_buffer_usage_format(actual_buffer_usage, &temp0);
+    iree_string_view_t required_usage_str =
+        iree_hal_buffer_usage_format(required_buffer_usage, &temp1);
+    return iree_make_status(
+        IREE_STATUS_PERMISSION_DENIED,
+        "%.*s requested usage was not specified when the buffer was allocated; "
+        "buffer allows %.*s, operation requires %.*s",
+        (int)message_str.size, message_str.data, (int)allowed_usage_str.size,
+        allowed_usage_str.data, (int)required_usage_str.size,
+        required_usage_str.data);
+#else
+    return iree_make_status(
+        IREE_STATUS_PERMISSION_DENIED,
+        "%.*s requested usage was not specified when the buffer was allocated; "
+        "buffer allows %08X, operation requires %08X",
+        (int)message_str.size, message_str.data, allowed_buffer_usage,
+        required_buffer_usage);
+#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
+  }
+
+  return iree_ok_status();
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_allocator,  //
                    iree_hal_module_state_t,           //
                    r, r) {
@@ -511,6 +611,115 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
                                   element_type, encoding_type, &buffer_view));
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
+                   iree_hal_module_state_t,             //
+                   rriiCiD, v) {
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
+  iree_vm_buffer_t* message = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &message));
+  iree_string_view_t message_str = iree_vm_buffer_as_string(message);
+  iree_hal_element_type_t expected_element_type =
+      (iree_hal_element_type_t)args->i2;
+  iree_hal_encoding_type_t expected_encoding_type =
+      (iree_hal_encoding_type_t)args->i3;
+  iree_host_size_t expected_shape_rank = 0;
+  iree_hal_dim_t* expected_shape_dims = NULL;
+  IREE_VM_ABI_VLA_STACK_CAST(args, a4_count, a4, iree_hal_dim_t, 128,
+                             &expected_shape_rank, &expected_shape_dims);
+
+  // Check encoding first; getting the encoding wrong is worse than the shape.
+  iree_hal_encoding_type_t actual_encoding_type =
+      iree_hal_buffer_view_encoding_type(buffer_view);
+  if (actual_encoding_type != expected_encoding_type) {
+    // TODO(benvanik): string formatting of encodings.
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "%.*s encoding mismatch; expected %08X but have %08X",
+        (int)message_str.size, message_str.data, expected_encoding_type,
+        actual_encoding_type);
+  }
+
+  // Element types determine the storage requirements.
+  iree_hal_element_type_t actual_element_type =
+      iree_hal_buffer_view_element_type(buffer_view);
+  if (actual_element_type != expected_element_type) {
+#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+    char actual_element_type_str[32];
+    iree_host_size_t actual_element_type_str_length = 0;
+    char expected_element_type_str[32];
+    iree_host_size_t expected_element_type_str_length = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
+        actual_element_type, sizeof(actual_element_type_str),
+        actual_element_type_str, &actual_element_type_str_length));
+    IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
+        expected_element_type, sizeof(expected_element_type_str),
+        expected_element_type_str, &expected_element_type_str_length));
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "%.*s element type mismatch; expected %.*s (%08X) but have %.*s (%08X)",
+        (int)message_str.size, message_str.data,
+        (int)expected_element_type_str_length, expected_element_type_str,
+        expected_element_type, (int)actual_element_type_str_length,
+        actual_element_type_str, actual_element_type);
+#else
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "%.*s element type mismatch; expected %08X but have %08X",
+        (int)message_str.size, message_str.data, expected_element_type,
+        actual_element_type);
+#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
+  }
+
+  // Rank check before the individual shape dimensions.
+  iree_host_size_t actual_shape_rank =
+      iree_hal_buffer_view_shape_rank(buffer_view);
+  const iree_hal_dim_t* actual_shape_dims =
+      iree_hal_buffer_view_shape_dims(buffer_view);
+  iree_status_t shape_status = iree_ok_status();
+  if (actual_shape_rank != expected_shape_rank) {
+    shape_status =
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "%.*s shape rank mismatch; expected %zu but have %zu",
+                         (int)message_str.size, message_str.data,
+                         expected_shape_rank, actual_shape_rank);
+  }
+  if (iree_status_is_ok(shape_status)) {
+    for (iree_host_size_t i = 0; i < actual_shape_rank; ++i) {
+      if (actual_shape_dims[i] == expected_shape_dims[i]) continue;
+      // Dimension mismatch.
+      shape_status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "%.*s shape dimension %zu mismatch; expected %d but have %d",
+          (int)message_str.size, message_str.data, i, expected_shape_dims[i],
+          actual_shape_dims[i]);
+      break;
+    }
+  }
+
+#if IREE_HAL_MODULE_STRING_UTIL_ENABLE
+  if (!iree_status_is_ok(shape_status)) {
+    char actual_shape_str[32];
+    iree_host_size_t actual_shape_str_length = 0;
+    char expected_shape_str[32];
+    iree_host_size_t expected_shape_str_length = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_format_shape(
+        actual_shape_dims, actual_shape_rank, sizeof(actual_shape_str),
+        actual_shape_str, &actual_shape_str_length));
+    IREE_RETURN_IF_ERROR(iree_hal_format_shape(
+        expected_shape_dims, expected_shape_rank, sizeof(expected_shape_str),
+        expected_shape_str, &expected_shape_str_length));
+    shape_status = iree_status_annotate_f(
+        shape_status, "expected shape %.*s, actual shape %.*s",
+        (int)expected_shape_str_length, expected_shape_str,
+        (int)actual_shape_str_length, actual_shape_str);
+  }
+#endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
+
+  return shape_status;
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_buffer,  //

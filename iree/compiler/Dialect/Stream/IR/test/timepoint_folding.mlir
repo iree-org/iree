@@ -43,6 +43,17 @@ func @FoldDuplicateTimepointJoinOperands(%arg0: !stream.timepoint, %arg1: !strea
 
 // -----
 
+// CHECK-LABEL: @ExpandTimepointJoinOperands
+func @ExpandTimepointJoinOperands(%arg0: !stream.timepoint, %arg1: !stream.timepoint, %arg2: !stream.timepoint, %arg3: !stream.timepoint) -> !stream.timepoint {
+  %join0 = stream.timepoint.join max(%arg0, %arg1) => !stream.timepoint
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%arg2, %arg0, %arg1, %arg3)
+  %join1 = stream.timepoint.join max(%arg2, %join0, %arg3) => !stream.timepoint
+  // CHECK: return %[[JOIN]]
+  return %join1 : !stream.timepoint
+}
+
+// -----
+
 // CHECK-LABEL: @ElideImmediateAwaits
 func @ElideImmediateAwaits(%arg0: !stream.resource<staging>) -> !stream.resource<staging> {
   %c100 = arith.constant 100 : index

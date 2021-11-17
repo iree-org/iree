@@ -55,6 +55,7 @@ iree_cc_library(
     MLIRLLVMCommonConversion
     MLIRLLVMIR
     MLIRLinalg
+    MLIRLinalgBufferizableOpInterfaceImpl
     MLIRLinalgTransforms
     MLIRMemRef
     MLIRMemRefTransforms

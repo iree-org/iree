@@ -304,6 +304,9 @@ static LogicalResult setRootConfig(
         lb.getInt(), ub.getInt(),
         workloadPerWorkgroup[tiledLoops.size() - 1 - i], vectorSizeVals[i]);
   }
+  if (isBatchMatmul) {
+    workloadPerWorkgroup.push_back(1);
+  }
   setTranslationInfo(
       entryPointFn,
       clUseTileFuseAndVectorize
