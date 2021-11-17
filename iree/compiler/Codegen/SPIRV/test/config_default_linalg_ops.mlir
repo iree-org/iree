@@ -280,3 +280,79 @@ hal.executable @avg_pool {
 
 //      CHECK:   linalg.pooling_nhwc_sum
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
+
+// -----
+
+hal.executable @elementwise {
+  hal.interface public @io {
+    hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
+        max_compute_shared_memory_size = 32768 : i32,
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+        subgroup_size = 32 : i32}>
+    }> {
+    hal.executable.entry_point public @elementwise attributes {interface = @io, ordinal = 0 : index}
+    builtin.module  {
+      func @elementwise() {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
+        %c10 = arith.constant 10 : index
+        %0 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x10xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:10xf32>
+        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:10xf32>
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+        scf.for %arg0 = %3 to %c1 step %4 {
+          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+          scf.for %arg1 = %5 to %c10 step %6 {
+            %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1)>(%arg0)[%workgroup_size_y]
+            %8 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 10)>(%arg1)[%workgroup_size_x]
+            %9 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1], sizes = [%7, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x10xf32> -> tensor<?x?xf32>
+            %10 = flow.dispatch.tensor.load %1, offsets = [%arg1], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:10xf32> -> tensor<?xf32>
+            %11 = linalg.init_tensor [%8] : tensor<?xf32>
+            %12 = linalg.generic {
+              indexing_maps = [
+                affine_map<(d0, d1) -> (d0, d1)>,
+                affine_map<(d0, d1) -> (d1)>,
+                affine_map<(d0, d1) -> (d1)>],
+              iterator_types = ["parallel", "parallel"]
+            } ins(%9, %10 : tensor<?x?xf32>, tensor<?xf32>) outs(%11 : tensor<?xf32>) {
+            ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
+              %13 = arith.addf %arg2, %arg3 : f32
+              linalg.yield %13 : f32
+            } -> tensor<?xf32>
+            flow.dispatch.tensor.store %12, %2, offsets = [%arg1], sizes = [%8], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:10xf32>
+          }
+        }
+        return
+      }
+      hal.interface private @io {
+        hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
+        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 1]>
+//      CHECK: hal.executable.entry_point public @elementwise
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[NWGSX:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
+//      CHECK:   hal.return %[[NWGSX]], %[[ARG1]], %[[C1]]
