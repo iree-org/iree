@@ -114,6 +114,26 @@ func @conflictResolution(%cond: i1, %arg0: !stream.resource<transient>, %arg1: !
 
 // -----
 
+// Tests invalid transfer conflict resolution.
+// Constants cannot be mutated even though it is tied. This survives after
+// copy-on-write materialization because of the transfer and we need to preserve
+// it such that the copy is performed as epxected.
+
+// CHECK-LABEL: @transferResolution
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+// CHECK-SAME: -> !stream.resource<external>
+func @transferResolution(%arg0: !stream.resource<constant>, %size: index) -> !stream.resource<*> {
+  %c1 = arith.constant 1 : index
+  // CHECK: %[[ARG0_EXT:.+]] = stream.async.transfer %[[ARG0]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  %arg0_any = stream.async.transfer %arg0 : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[RET0:.+]] = stream.async.dispatch @ex::@dispatch[%c1, %c1, %c1](%[[ARG0_EXT]]) : (!stream.resource<external>{%[[SIZE]]}) -> %[[ARG0_EXT]]{%[[SIZE]]}
+  %ret0_any = stream.async.dispatch @ex::@dispatch[%c1, %c1, %c1](%arg0_any) : (!stream.resource<*>{%size}) -> %arg0_any{%size}
+  // return %[[RET0]] : !stream.resource<external>
+  return %ret0_any : !stream.resource<*>
+}
+
+// -----
+
 // Tests that global usage propagates through loads/stores.
 
 util.global private mutable @variable : !stream.resource<variable>

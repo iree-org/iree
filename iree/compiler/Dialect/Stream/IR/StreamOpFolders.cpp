@@ -2019,6 +2019,36 @@ struct FoldDuplicateTimepointJoinOperands
   }
 };
 
+// Expands await timepoints in join ops that come from join ops.
+// Local transformations will often insert joins that end up back-to-back:
+//   %j0 = stream.timepoint.join max(%tp0, %tp1)
+//   %j1 = stream.timepoint.join max(%tp2, %j0, %tp3)
+// Which we want to fold and expand:
+//   %j1 = stream.timepoint.join max(%tp2, %tp0, %tp1, %tp3)
+struct ExpandTimepointJoinOperands : public OpRewritePattern<TimepointJoinOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TimepointJoinOp op,
+                                PatternRewriter &rewriter) const override {
+    SetVector<Value> newTimepoints;
+    bool didExpand = false;
+    for (auto timepoint : op.await_timepoints()) {
+      if (auto sourceJoinOp =
+              dyn_cast_or_null<TimepointJoinOp>(timepoint.getDefiningOp())) {
+        newTimepoints.insert(sourceJoinOp.await_timepoints().begin(),
+                             sourceJoinOp.await_timepoints().end());
+        didExpand = true;
+      } else {
+        newTimepoints.insert(timepoint);
+      }
+    }
+    if (!didExpand) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      op.await_timepointsMutable().assign(newTimepoints.takeVector());
+    });
+    return success();
+  }
+};
+
 }  // namespace
 
 void TimepointJoinOp::getCanonicalizationPatterns(
@@ -2027,6 +2057,7 @@ void TimepointJoinOp::getCanonicalizationPatterns(
   // TODO(benvanik): sink and pull in other timepoints (join on all needed).
   results.insert<ElideImmediateTimepointJoinOperands>(context);
   results.insert<FoldDuplicateTimepointJoinOperands>(context);
+  results.insert<ExpandTimepointJoinOperands>(context);
 }
 
 //===----------------------------------------------------------------------===//

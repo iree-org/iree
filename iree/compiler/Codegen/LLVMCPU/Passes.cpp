@@ -111,18 +111,12 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 }
 
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
-                                    bool lowerToVectors,
-                                    bool useTileAndVectorizeV2) {
+                                    bool lowerToVectors) {
   passManager.addPass(createCanonicalizerPass());
 
   // Tile and vectorize linalg ops on tensors.
-  if (useTileAndVectorizeV2) {
-    passManager.addNestedPass<FuncOp>(
-        createLLVMCPUTileFuseAndVectorizePass(lowerToVectors));
-  } else {
-    passManager.addNestedPass<FuncOp>(
-        createLLVMCPUTileAndVectorizePass(lowerToVectors));
-  }
+  passManager.addNestedPass<FuncOp>(
+      createLLVMCPUTileAndVectorizePass(lowerToVectors));
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
@@ -133,6 +127,23 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
 
   passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
+  passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+}
+
+void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createCanonicalizerPass());
+
+  // Tile and vectorize linalg ops on tensors.
+  passManager.addNestedPass<FuncOp>(createLLVMCPUTileFuseAndVectorizePass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+
+  // Use stack allocation on CPU side.
+  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+
+  passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
   passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
 

@@ -91,7 +91,7 @@ void Explorer::initializeGlobalInfos() {
   for (auto use : allUses.getValue()) {
     auto *symbolOp =
         symbolTable.lookupNearestSymbolFrom(use.getUser(), use.getSymbolRef());
-    if (!isa<IREE::Util::GlobalOp>(symbolOp)) continue;
+    if (!isa_and_nonnull<IREE::Util::GlobalOp>(symbolOp)) continue;
     auto &globalInfo = globalInfos[symbolOp];
     globalInfo.op = cast<IREE::Util::GlobalOp>(symbolOp);
     if (isa<IREE::Util::GlobalAddressOp>(use.getUser())) {
@@ -606,7 +606,7 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
       return TraversalResult::COMPLETE;
     }
     LLVM_DEBUG(llvm::dbgs()
-               << "  -> traversing into call target @" << targetSymbol << "\n");
+               << "  -> traversing into call target " << targetSymbol << "\n");
     return walkReturnOperands(targetOp, [&](OperandRange returnOperands) {
       auto returnOperand = returnOperands[idx];
       LLVM_DEBUG({

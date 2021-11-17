@@ -138,12 +138,32 @@ SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
   // surrounding the op should match. Otherwise, something is incorrect.
   assert(partitionedLoops.size() == loopInfo.size());
 
+  // Collect the mapping from the implict loop / iterator indices of the Linalg
+  // op to the output shape dimensions. Normally the first batch of iterators of
+  // a Linalg op are used to index into the output shape dimensions; but that's
+  // not guaranteed. For example, we can see the `linalg.pooling_nhwc_sum` op
+  // having the following indexing map for the output:
+  //   (N, OH, OW, KH, KW, C) -> (N, OH, OW, C)
+  DenseMap<int64_t, int64_t> loopToOutputDimMap;
+  auto outputMap =
+      linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(resultNum));
+  for (const auto &indexedResult : llvm::enumerate(outputMap.getResults())) {
+    if (auto dimExpr = indexedResult.value().dyn_cast<AffineDimExpr>()) {
+      loopToOutputDimMap[dimExpr.getPosition()] = indexedResult.index();
+    }
+  }
+
   for (auto pair : llvm::zip(llvm::reverse(partitionedLoops), loopInfo)) {
     unsigned loopIndex = std::get<0>(pair);
     const LoopTilingAndDistributionInfo &loopInfo = std::get<1>(pair);
+    // If we know the static upper bound of this loop..
     if (Optional<int64_t> attrValue =
             getConstantIntValue(loopInfo.untiledUpperBound)) {
-      outputShape[loopIndex] = *attrValue;
+      // ..and it accesses one output dimension..
+      if (loopToOutputDimMap.count(loopIndex)) {
+        // then we can recover the corresponding shape dimension's size.
+        outputShape[loopToOutputDimMap[loopIndex]] = *attrValue;
+      }
     }
   }
 

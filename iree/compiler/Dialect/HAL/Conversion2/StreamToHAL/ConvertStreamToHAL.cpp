@@ -489,7 +489,9 @@ struct TensorImportBufferViewOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorImportOp importOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!importOp.source().getType().isa<IREE::HAL::BufferViewType>()) {
+    auto sourceType = importOp.source().getType();
+    if (!sourceType.isa<IREE::HAL::BufferViewType>() &&
+        !sourceType.isa<TensorType>()) {
       return failure();
     }
 
@@ -595,7 +597,9 @@ struct TensorExportBufferViewOpPattern
   LogicalResult matchAndRewrite(
       IREE::Stream::TensorExportOp exportOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!exportOp.result().getType().isa<IREE::HAL::BufferViewType>()) {
+    auto targetType = exportOp.result().getType();
+    if (!targetType.isa<IREE::HAL::BufferViewType>() &&
+        !targetType.isa<TensorType>()) {
       return failure();
     }
 

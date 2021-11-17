@@ -54,19 +54,11 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 namespace {
 struct LLVMCPUTileFuseAndVectorizePass
     : public LLVMCPUTileFuseAndVectorizeBase<LLVMCPUTileFuseAndVectorizePass> {
-  LLVMCPUTileFuseAndVectorizePass(bool vectorize = true)
-      : lowerToVectors(vectorize) {}
-  LLVMCPUTileFuseAndVectorizePass(const LLVMCPUTileFuseAndVectorizePass &pass) {
-    lowerToVectors = pass.lowerToVectors;
-  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
                     vector::VectorDialect>();
   }
   void runOnOperation() override;
-
- private:
-  bool lowerToVectors;
 };
 
 LogicalResult applyTileAndFuseCanonicalizationPatterns(FuncOp funcOp) {
@@ -215,10 +207,6 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     });
   }
 
-  if (!lowerToVectors) {
-    return;
-  }
-
   {
     // Set vectorization marker globally
     OpBuilder builder(funcOp.getContext());
@@ -300,9 +288,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
-    bool lowerToVectors) {
-  return std::make_unique<LLVMCPUTileFuseAndVectorizePass>(lowerToVectors);
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass() {
+  return std::make_unique<LLVMCPUTileFuseAndVectorizePass>();
 }
 
 }  // namespace iree_compiler
