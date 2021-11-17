@@ -1772,19 +1772,17 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
     SymbolNameAttr:$sym_name,
     IndexAttr:$set,
     IndexAttr:$binding,
-    HAL_DescriptorTypeAttr:$type,
-    HAL_MemoryAccessBitfieldAttr:$access
+    HAL_DescriptorTypeAttr:$type
   );
 
   // TODO(scotttodd): enable assemblyFormat after figuring out how to keep
-  //   quotes around "type" and "access". The custom printer uses stringify*
+  //   quotes around "type". The custom printer uses stringify*
   // let assemblyFormat = [{
   //   custom<SymbolVisibility>($sym_visibility)
   //   $sym_name
   //   `,` `set` `` `=` `` $set
   //   `,` `binding` `` `=` `` $binding
   //   `,` `type` `` `=` `` $type
-  //   `,` `access` `` `=` `` $access
   //   attr-dict-with-keyword
   // }];
 
@@ -1793,16 +1791,15 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
       "StringRef":$sym_name,
       "::llvm::APInt":$set,
       "::llvm::APInt":$binding,
-      "IREE::HAL::DescriptorType":$type,
-      "IREE::HAL::MemoryAccessBitfield":$access
+      "IREE::HAL::DescriptorType":$type
     ), [{
-      build($_builder, $_state, nullptr, sym_name, set, binding, type, access);
+      build($_builder, $_state, nullptr, sym_name, set, binding, type);
     }]>
   ];
 
   let extraClassDeclaration = [{
     /// Returns a hash for the descriptor, considering the set, binding,
-    /// type, and access.
+    /// and type.
     llvm::hash_code getDescriptorHash();
   }];
 }

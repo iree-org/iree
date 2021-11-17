@@ -106,8 +106,8 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
 static iree_status_t iree_hal_command_buffer_validate_dispatch_bindings(
     iree_hal_validating_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point) {
-  // TODO(benvanik): validate buffers referenced have compatible memory types,
-  // access rights, and usage.
+  // TODO(benvanik): validate buffers referenced have compatible memory types
+  // and access rights.
   // TODO(benvanik): validate no aliasing between inputs/outputs.
   return iree_ok_status();
 }
