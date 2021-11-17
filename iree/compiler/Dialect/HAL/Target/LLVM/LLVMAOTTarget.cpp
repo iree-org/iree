@@ -254,7 +254,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
                                     .getValueOr(APInt(64, 0))
                                     .getSExtValue();
       // Grab source IR code here to pass it down as a string for dispatch user tags.
-      const char* source_code = "test tag";
+      llvm::StringRef source_code = variantOp->getParentOfType<mlir::FuncOp>()
+	      				 ->getAttr("source_code")
+					 .cast<mlir::StringAttr>().getValue();
 
       libraryBuilder.addExport(entryPointOp.getName(), source_code,
                                LibraryBuilder::DispatchAttrs{localMemorySize},

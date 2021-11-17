@@ -272,15 +272,14 @@ typedef struct iree_hal_executable_dispatch_attrs_v0_t {
   uint16_t reserved;
 } iree_hal_executable_dispatch_attrs_v0_t;
 
+static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) == 4, "uint32_t");
+
 typedef struct iree_hal_executable_dispatch_src_locs_v0_t {
-  const char* const* file_name;
   // Source line number.
   uint32_t line_num;
   // Source IR code.
-  const char* const* func_name;
+  const char* const* source_code;
 } iree_hal_executable_dispatch_src_locs_v0_t;
-
-static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) == 4, "uint32_t");
 
 // A table of exported functions arranged as a struct-of-arrays for more
 // efficient packing and faster lookup. Each subarray - when not omitted and

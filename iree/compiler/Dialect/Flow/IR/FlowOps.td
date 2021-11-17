@@ -474,7 +474,8 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<StrAttr>:$source_code
     // TODO(benvanik): add compatibility and versioning attributes.
   );
 

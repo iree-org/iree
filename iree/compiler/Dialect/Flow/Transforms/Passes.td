@@ -99,6 +99,12 @@ def OutlineDispatchRegions :
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }
 
+def GenerateDispatchTags :
+    Pass<"iree-flow-generate-dispatch-tags", "mlir::ModuleOp"> {
+  let summary = "Generates source IR text and stores it as an attribute.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createGenerateDispatchTagsPass()";
+}
+
 def OutlineLargeConstants :
     Pass<"iree-flow-outline-large-constants", "mlir::ModuleOp"> {
   let summary = "Outlines large tensor constants into util.globals at the module level.";

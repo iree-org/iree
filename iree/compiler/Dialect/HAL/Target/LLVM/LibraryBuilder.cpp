@@ -143,7 +143,6 @@ static llvm::StructType *makeDispatchSrc_locsType(llvm::LLVMContext &context) {
   auto *type = 
       llvm::StructType::create(context,
 		               {
-			           i8PtrType->getPointerTo(),
 			           i32Type,
 				   i8PtrType->getPointerTo(),
 			       },

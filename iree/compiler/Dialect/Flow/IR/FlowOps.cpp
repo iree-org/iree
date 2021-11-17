@@ -560,7 +560,8 @@ void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                          StringRef name) {
   ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
-                     builder.getStringAttr(name));
+                     builder.getStringAttr(name)
+		     );
 }
 
 static LogicalResult verifyExecutableOp(ExecutableOp op) {
