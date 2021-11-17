@@ -234,9 +234,6 @@
     return status;                                                            \
   }
 
-// TODO(simon-camp): Meh... We need to hardcode every "argument/result pack" (or
-// use a foreach macro)
-
 #define ARGUMENTS_SIZE(types) (0 FOR_EACH(ARGUMENT_SIZE, TUPLE_UNPACK(types)))
 #define ARGUMENT_SIZE(idx, arg) +ARGUMENT_SIZE_##arg
 #define ARGUMENT_SIZE_i sizeof(int32_t)

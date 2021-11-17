@@ -1551,8 +1551,8 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
 
       size_t numSpans = lastSegmentSize.getSExtValue();
 
-      // TODO(simon-camp): It would be cleaner to use the args attribute of the
-      // call op instead of creating a the constant.
+      // TODO(simon-camp): The generated code would be cleaner if we used the
+      // args attribute of the call op to specify the constant.
       auto numSpansOp = rewriter.create<emitc::ConstantOp>(
           /*location=*/loc,
           /*resultType=*/rewriter.getIndexType(),
