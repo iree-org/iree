@@ -37,7 +37,7 @@ func @tensor_cast_does_not_alias_metadata_update(%arg0: !hal.buffer_view) -> !ha
     // CHECK-DAG: %[[C1_1:.*]] = arith.constant 1 : index
     // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
     // CHECK-DAG: %[[C1_2:.*]] = arith.constant 1 : index
-    // CHECK-DAG: %[[ET:.*]] = arith.constant 50331680 : i32
+    // CHECK-DAG: %[[ET:.*]] = arith.constant 553648160 : i32
     //     CHECK: %[[VIEW:.*]] = hal.buffer_view.create
     //       CHECK-SAME: shape([%[[C3]], %[[C2]], %[[C1_1]], %[[C4]], %[[C1_2]]])
     //       CHECK-SAME: type(%[[ET]])
