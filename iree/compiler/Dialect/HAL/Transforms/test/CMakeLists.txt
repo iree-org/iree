@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "assign_target_devices.mlir"
     "benchmark_batch_dispatches.mlir"
-    "convert_to_hal2.mlir"
+    "convert_to_hal.mlir"
     "elide_redundant_commands.mlir"
     "inline_device_switches.mlir"
     "materialize_resource_caches.mlir"

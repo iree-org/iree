@@ -68,9 +68,9 @@ static void addCleanupPatterns(OpPassManager &passManager) {
       IREE::Util::createSimplifyGlobalAccessesPass());
 }
 
-void buildHALTransformPassPipeline2(OpPassManager &passManager,
-                                    const TargetOptions &targetOptions,
-                                    const TransformOptions &transformOptions) {
+void buildHALTransformPassPipeline(OpPassManager &passManager,
+                                   const TargetOptions &targetOptions,
+                                   const TransformOptions &transformOptions) {
   //----------------------------------------------------------------------------
   // Input cleanup and simplification
   //----------------------------------------------------------------------------
@@ -101,7 +101,7 @@ void buildHALTransformPassPipeline2(OpPassManager &passManager,
 
   // Each executable needs a hal.interface to specify how the host and
   // device communicate across the ABI boundary.
-  passManager.addPass(createMaterializeInterfaces2Pass());
+  passManager.addPass(createMaterializeInterfacesPass());
 
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead
@@ -121,7 +121,7 @@ void buildHALTransformPassPipeline2(OpPassManager &passManager,
   //----------------------------------------------------------------------------
 
   // Convert supported input dialects (std, stream, etc) into the HAL dialect.
-  passManager.addPass(createConvertToHAL2Pass());
+  passManager.addPass(createConvertToHALPass());
   addCleanupPatterns(passManager);
 
   //----------------------------------------------------------------------------
@@ -199,10 +199,10 @@ void buildHALTransformPassPipeline2(OpPassManager &passManager,
   }
 }
 
-void buildHALTransformPassPipeline2(OpPassManager &passManager,
-                                    const TargetOptions &targetOptions) {
+void buildHALTransformPassPipeline(OpPassManager &passManager,
+                                   const TargetOptions &targetOptions) {
   TransformOptions transformOptions;
-  buildHALTransformPassPipeline2(passManager, targetOptions, transformOptions);
+  buildHALTransformPassPipeline(passManager, targetOptions, transformOptions);
 }
 
 void registerHALTransformPassPipeline() {
@@ -210,8 +210,8 @@ void registerHALTransformPassPipeline() {
       "iree-hal-transformation-pipeline",
       "Runs the full IREE HAL dialect transformation pipeline",
       [](OpPassManager &passManager, const TransformOptions &transformOptions) {
-        buildHALTransformPassPipeline2(passManager, getTargetOptionsFromFlags(),
-                                       transformOptions);
+        buildHALTransformPassPipeline(passManager, getTargetOptionsFromFlags(),
+                                      transformOptions);
       });
 }
 

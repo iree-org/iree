@@ -6,10 +6,10 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
+#include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/ConvertStreamToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
-#include "iree/compiler/Dialect/HAL/Conversion2/StandardToHAL/ConvertStandardToHAL.h"
-#include "iree/compiler/Dialect/HAL/Conversion2/StreamToHAL/ConvertStreamToHAL.h"
-#include "iree/compiler/Dialect/HAL/Conversion2/UtilToHAL/ConvertUtilToHAL.h"
+#include "iree/compiler/Dialect/HAL/Conversion/UtilToHAL/ConvertUtilToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -99,7 +99,7 @@ class ConvertToHALPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToHAL2Pass() {
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
   return std::make_unique<ConvertToHALPass>();
 }
 

@@ -100,7 +100,7 @@ void buildIREEVMTransformPassPipeline(
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   IREE::Stream::TransformOptions streamOptions;
   IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
-  IREE::HAL::buildHALTransformPassPipeline2(passManager, executableOptions);
+  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());
 }

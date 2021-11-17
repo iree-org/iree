@@ -372,10 +372,10 @@ static LogicalResult convertFlowInfoOps(IREE::HAL::ExecutableOp executableOp) {
 // -iree-hal-materialize-interfaces2
 //===----------------------------------------------------------------------===//
 
-class MaterializeInterfaces2Pass
-    : public PassWrapper<MaterializeInterfaces2Pass, OperationPass<ModuleOp>> {
+class MaterializeInterfacesPass
+    : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
-  MaterializeInterfaces2Pass() = default;
+  MaterializeInterfacesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
@@ -435,12 +435,12 @@ class MaterializeInterfaces2Pass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass() {
-  return std::make_unique<MaterializeInterfaces2Pass>();
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass() {
+  return std::make_unique<MaterializeInterfacesPass>();
 }
 
-static PassRegistration<MaterializeInterfaces2Pass> pass([] {
-  return std::make_unique<MaterializeInterfaces2Pass>();
+static PassRegistration<MaterializeInterfacesPass> pass([] {
+  return std::make_unique<MaterializeInterfacesPass>();
 });
 
 }  // namespace HAL

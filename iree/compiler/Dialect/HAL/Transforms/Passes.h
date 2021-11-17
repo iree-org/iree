@@ -34,8 +34,8 @@ namespace HAL {
 //   <run conversion to flow/sequencer/etc>
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
-void buildHALTransformPassPipeline2(OpPassManager &passManager,
-                                    const TargetOptions &targetOptions);
+void buildHALTransformPassPipeline(OpPassManager &passManager,
+                                   const TargetOptions &targetOptions);
 
 void registerHALTransformPassPipeline();
 
@@ -44,7 +44,7 @@ void registerHALTransformPassPipeline();
 //===----------------------------------------------------------------------===//
 
 // Converts input flow/std/etc dialects to the IREE HAL dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToHAL2Pass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
 
 //===----------------------------------------------------------------------===//
 // Device management
@@ -72,7 +72,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // Defines hal.executables and hal.interfaces for flow.executable ops based on
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass();
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass();
 
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
@@ -137,12 +137,12 @@ inline void registerHALPasses() {
   auto targetOptions = getTargetOptionsFromFlags();
   createAssignTargetDevicesPass({});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
-  createConvertToHAL2Pass();
+  createConvertToHALPass();
   createElideRedundantCommandsPass();
   createInlineDeviceSwitchesPass();
   createLinkExecutablesPass();
   createLinkTargetExecutablesPass("");
-  createMaterializeInterfaces2Pass();
+  createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
   createResolveEntryPointOrdinalsPass();

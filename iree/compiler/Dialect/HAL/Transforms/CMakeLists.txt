@@ -18,11 +18,11 @@ iree_cc_library(
   SRCS
     "AssignTargetDevices.cpp"
     "BenchmarkBatchDispatches.cpp"
-    "ConvertToHAL2.cpp"
+    "ConvertToHAL.cpp"
     "ElideRedundantCommands.cpp"
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
-    "MaterializeInterfaces2.cpp"
+    "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
     "Passes.cpp"
@@ -41,9 +41,9 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion
-    iree::compiler::Dialect::HAL::Conversion2::StandardToHAL
-    iree::compiler::Dialect::HAL::Conversion2::StreamToHAL
-    iree::compiler::Dialect::HAL::Conversion2::UtilToHAL
+    iree::compiler::Dialect::HAL::Conversion::StandardToHAL
+    iree::compiler::Dialect::HAL::Conversion::StreamToHAL
+    iree::compiler::Dialect::HAL::Conversion::UtilToHAL
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
