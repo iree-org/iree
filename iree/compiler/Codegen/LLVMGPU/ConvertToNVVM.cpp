@@ -46,6 +46,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(64);
     LLVMTypeConverter converter(m.getContext(), options);
+    // Lowering for MMAMatrixType.
+    converter.addConversion([&](gpu::MMAMatrixType type) -> Type {
+      return convertMMAToLLVMType(type);
+    });
     // Apply in-dialect lowering first. In-dialect lowering will replace ops
     // which need to be lowered further, which is not supported by a single
     // conversion pass.
@@ -82,6 +86,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
                                                         llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
+      populateGpuWMMAToNVVMConversionPatterns(converter, llvmPatterns);
       LLVMConversionTarget target(getContext());
       populateStdToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToNVVMConversionLegality(target);

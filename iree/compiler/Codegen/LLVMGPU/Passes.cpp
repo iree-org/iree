@@ -10,8 +10,11 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -37,7 +40,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistributeToThreads());
+  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -58,7 +61,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistributeToThreads());
+  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
   pm.addNestedPass<FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -75,6 +78,38 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createLLVMGPUPipeliningPass());
 }
 
+void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
+  //===--------------------------------------------------------------------===//
+  // Initial clean up.
+  //===--------------------------------------------------------------------===//
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Distribute linalg onto warps within the workgroup.
+  pm.addNestedPass<FuncOp>(
+      createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+  pm.addNestedPass<FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+
+  // Linalg -> vector
+  pm.addNestedPass<FuncOp>(createLLVMGPUTensorCoreVectorizationPass());
+  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+
+  // Vector -> MMA ops
+  pm.addNestedPass<FuncOp>(memref::createFoldSubViewOpsPass());
+  pm.addNestedPass<FuncOp>(createConvertVectorToGPUPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Pipeline memory operations.
+  pm.addNestedPass<FuncOp>(createLLVMGPUPipeliningPass());
+}
+
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   //===--------------------------------------------------------------------===//
   // Initial clean up.
@@ -83,7 +118,7 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistributeToThreads());
+  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

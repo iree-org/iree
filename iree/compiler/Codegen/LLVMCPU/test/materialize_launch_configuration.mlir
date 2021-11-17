@@ -19,16 +19,13 @@ hal.executable private @matmul_tensors  {
       func @matmul_tensors() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
-        %pcM = hal.interface.load.constant offset = 0 : index
-        %pcN = hal.interface.load.constant offset = 1 : index
-        %pcK = hal.interface.load.constant offset = 2 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>{%pcM, %pcK}
-        %2 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?xf32>{%pcK, %pcN}
-        %4 = hal.interface.binding.subspan @io::@arg2[%c0] : memref<?x?xf32>{%pcM, %pcN}
-        %6 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>{%pcM, %pcN}
-        %M = memref.dim %0, %c0 : memref<?x?xf32>
-        %N = memref.dim %2, %c1 : memref<?x?xf32>
-        %K = memref.dim %0, %c1 : memref<?x?xf32>
+        %M = hal.interface.load.constant offset = 0 : index
+        %N = hal.interface.load.constant offset = 1 : index
+        %K = hal.interface.load.constant offset = 2 : index
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
+        %2 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
+        %4 = hal.interface.binding.subspan @io::@arg2[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
+        %6 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>{%M, %N}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -42,15 +39,12 @@ hal.executable private @matmul_tensors  {
           %11 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_count_x]
           scf.for %arg1 = %10 to %N step %11 {
             %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %N]
-            %13 = memref.subview %0[%arg0, 0] [%12, %K] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            %13 = flow.dispatch.tensor.load %0, offsets=[%arg0, 0], sizes=[%12, %K], strides=[1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
             %14 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %M]
-            %15 = memref.subview %2[0, %arg1] [%K, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            %16 = memref.subview %4[%arg0, %arg1] [%12, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            %17 = memref.alloc(%12, %14) : memref<?x?xf32>
-            linalg.copy(%16, %17) : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xf32>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%13, %15 : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>) outs(%17 : memref<?x?xf32>)
-            %18 = memref.subview %6[%arg0, %arg1] [%12, %14] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            linalg.copy(%17, %18) : memref<?x?xf32>, memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            %15 = flow.dispatch.tensor.load %2, offsets=[0, %arg1], sizes=[%K, %14], strides=[1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+            %16 = flow.dispatch.tensor.load %4, offsets=[%arg0, %arg1], sizes=[%12, %14], strides=[1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+            %17 = linalg.matmul ins(%13, %15 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %17, %6, offsets=[%arg0, %arg1], sizes=[%12, %14], strides=[1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
           }
         }
         return
@@ -96,19 +90,23 @@ hal.executable private @add_no_config  {
         %c0 = arith.constant 0 : index
         %dim0 = hal.interface.load.constant offset = 0 : index
         %dim1 = hal.interface.load.constant offset = 1 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>{%dim0, %dim1}
-        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?xf32>{%dim1}
-        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>{%dim0, %dim1}
-        linalg.generic {
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?xf32>{%dim1}
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim0, %dim1}
+        %3 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?xf32> -> tensor<?xf32>
+        %5 = linalg.init_tensor [%dim0, %dim1] : tensor<?x?xf32>
+        %6 = linalg.generic {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                            affine_map<(d0, d1) -> (d1)>,
                            affine_map<(d0, d1) -> (d0, d1)>],
           iterator_types = ["parallel", "parallel"]}
-          ins(%0, %1 : memref<?x?xf32>, memref<?xf32>) outs(%2 : memref<?x?xf32>) {
+          ins(%3, %4 : tensor<?x?xf32>, tensor<?xf32>) outs(%5 : tensor<?x?xf32>) {
           ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
-            %3 = arith.addf %arg0, %arg1 : f32
-            linalg.yield %3 : f32
-          }
+            %7 = arith.addf %arg0, %arg1 : f32
+            linalg.yield %7 : f32
+          } -> tensor<?x?xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
         return
       }
       hal.interface private @io  {
@@ -382,23 +380,22 @@ hal.executable private @batch_matmul_tensors  {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [1, 32, 32, 32], [1, 4, 4, 4]{{\]}}, native_vector_size = [1, 4, 4, 4]>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [64, 64, 1]>
 //      CHECK: hal.executable.entry_point public @batch_matmul_tensors
 // CHECK-NEXT: (%[[ARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: index)
-//  CHECK-DAG:  %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:  %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //  CHECK-DAG:  %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
-//      CHECK:  hal.return %[[D0]], %[[D1]], %[[C1]]
+//      CHECK:  hal.return %[[D0]], %[[D1]], %[[ARG2]]
 //      CHECK:  linalg.batch_matmul
 // CHECK-SAME:    lowering.config = #[[CONFIG]]
 
 // -----
 
 #compilation = #iree_codegen.compilation.info<
-    #iree_codegen.lowering.config<tile_sizes = [[32, 32, 32]], native_vector_size = []>,
-    #iree_codegen.translation.info<"CPUVectorization", workload_per_wg = [32, 32]>,
+    #iree_codegen.lowering.config<tile_sizes = [[], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>,
+    #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [32, 32]>,
     workgroup_size = []>
 hal.executable private @preset_config_matmul_tensors  {
   hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
@@ -452,10 +449,10 @@ hal.executable private @preset_config_matmul_tensors  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[32, 32, 32]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [32, 32, 32], [4, 4, 4]{{\]}}, native_vector_size = [4, 4, 4]>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUVectorization", workload_per_wg = [32, 32]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [32, 32]>
 //      CHECK: hal.executable.entry_point
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index
