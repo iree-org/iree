@@ -85,6 +85,37 @@ class AbstractResourceUsage
   static_assert(BEST_STATE == BaseType::getBestState(),
                 "unexpected BEST_STATE value");
 
+  static bool isValidState(uint16_t bits) {
+    // bool isIndirect = (bits & NOT_INDIRECT) != NOT_INDIRECT;
+    // bool isExternal = (bits & NOT_EXTERNAL) != NOT_EXTERNAL;
+    bool isMutated = (bits & NOT_MUTATED) != NOT_MUTATED;
+    bool isConstant = (bits & NOT_CONSTANT) != NOT_CONSTANT;
+    // bool isTransferRead = (bits & NOT_TRANSFER_READ) != NOT_TRANSFER_READ;
+    // bool isTransferWrite = (bits & NOT_TRANSFER_WRITE) != NOT_TRANSFER_WRITE;
+    bool isStagingRead = (bits & NOT_STAGING_READ) != NOT_STAGING_READ;
+    bool isStagingWrite = (bits & NOT_STAGING_WRITE) != NOT_STAGING_WRITE;
+    bool isDispatchRead = (bits & NOT_DISPATCH_READ) != NOT_DISPATCH_READ;
+    bool isDispatchWrite = (bits & NOT_DISPATCH_WRITE) != NOT_DISPATCH_WRITE;
+    // bool isGlobalRead = (bits & NOT_GLOBAL_READ) != NOT_GLOBAL_READ;
+    // bool isGlobalWrite = (bits & NOT_GLOBAL_WRITE) != NOT_GLOBAL_WRITE;
+
+    // Cannot be both staging and dispatch.
+    if ((isStagingRead || isStagingWrite) &&
+        (isDispatchRead || isDispatchWrite)) {
+      return false;
+    }
+
+    // Cannot be both constant and mutated.
+    // TODO(benvanik): maybe allow this for initializers that perform dispatches
+    // to initialize the resources. This introduces copies of those that are
+    // annoying to elide later on.
+    if (isConstant && isMutated) {
+      return false;
+    }
+
+    return true;
+  }
+
   ResourceUsageBitfield convertBitsToResourceUsage(uint16_t bits) const {
     return static_cast<ResourceUsageBitfield>(~bits & BEST_STATE);
   }
@@ -232,9 +263,17 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
             default:
               break;
           }
+          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.result()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Util::GlobalLoadIndirectOp op) {
           removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_READ);
+          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.result()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::ResourceStoreOp op) {
           removeAssumedBits(NOT_STAGING_WRITE);
@@ -245,12 +284,24 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         })
         .Case([&](IREE::Stream::TensorImportOp op) {
           removeAssumedBits(NOT_MUTATED | NOT_EXTERNAL);
+          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.result()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncConstantOp op) {
           removeAssumedBits(NOT_CONSTANT | NOT_TRANSFER_WRITE);
+          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.result()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncSplatOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
+          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.result()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncCloneOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
@@ -334,6 +385,10 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
                 *this, Position::forValue(tiedOperand),
                 DFX::Resolution::REQUIRED);
             getState() ^= tiedUsage.getState();
+          } else {
+            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+            getState() ^= resultUsage.getState();
           }
         })
         .Default([&](Operation *op) {});
@@ -354,22 +409,9 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
-        .Case([&](mlir::BranchOp op) {
+        .Case([&](mlir::BranchOpInterface op) {
           auto operandUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.getOperand(operandIdx)),
-              DFX::Resolution::OPTIONAL);
-          getState() ^= operandUsage.getState();
-          solver.getExplorer().walkOutgoingBranchOperandArguments(
-              op, operandIdx, [&](Block *targetBlock, BlockArgument arg) {
-                auto argUsage = solver.getElementFor<ValueResourceUsage>(
-                    *this, Position::forValue(arg), DFX::Resolution::OPTIONAL);
-                getState() ^= argUsage;
-                return WalkResult::advance();
-              });
-        })
-        .Case([&](mlir::CondBranchOp op) {
-          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.getOperand(operandIdx)),
+              *this, Position::forValue(op->getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);
           getState() ^= operandUsage.getState();
           solver.getExplorer().walkOutgoingBranchOperandArguments(
@@ -383,14 +425,13 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
         .Case([&](mlir::ReturnOp op) {
           auto operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getOperand(operandIdx)),
-              DFX::Resolution::OPTIONAL);
+              DFX::Resolution::REQUIRED);
           getState() ^= operandUsage.getState();
           solver.getExplorer().walkIncomingCalls(
               op->getParentOfType<mlir::CallableOpInterface>(),
               [&](mlir::CallOpInterface callOp) {
                 auto argUsage = solver.getElementFor<ValueResourceUsage>(
-                    *this,
-                    Position::forValue(callOp.getArgOperands()[operandIdx]),
+                    *this, Position::forValue(callOp->getResult(operandIdx)),
                     DFX::Resolution::OPTIONAL);
                 getState() ^= argUsage;
                 return WalkResult::advance();
@@ -546,6 +587,13 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
     if (traversalResult == TraversalResult::INCOMPLETE) {
       removeAssumedBits(NOT_EXTERNAL);
     }
+
+    // Filter out impossible states by marking the state invalid.
+    // The fixpoint framework will try again.
+    if (!isValidState(assumedBits)) {
+      return indicatePessimisticFixpoint();
+    }
+
     return assumedBits == getAssumed() ? ChangeStatus::UNCHANGED
                                        : ChangeStatus::CHANGED;
   }
