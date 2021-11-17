@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "legalize.mlir"
     "nvvm_pipeline_test.mlir"
     "rocdl_pipeline_test.mlir"
+    "tensorcore_vectorization.mlir"
     "vectorization.mlir"
   DATA
     iree::tools::IreeFileCheck

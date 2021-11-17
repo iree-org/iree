@@ -41,6 +41,10 @@ static llvm::cl::opt<bool> clDisableLoopNounrollWa(
         "Disable the workaround for bug in ptxas for CUDA version before 11.4"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<std::string> clTargetChip(
+    "iree-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip"),
+    llvm::cl::init("sm_35"));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -245,7 +249,7 @@ class CUDATargetBackend final : public TargetBackend {
     std::unique_ptr<llvm::TargetMachine> targetMachine;
     {
       llvm::Triple triple("nvptx64-nvidia-cuda");
-      std::string targetChip = "sm_35";
+      std::string targetChip = clTargetChip;
       std::string features = "+ptx60";
       std::string error;
       const llvm::Target *target =
@@ -317,6 +321,13 @@ class CUDATargetBackend final : public TargetBackend {
       MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
+    // Add some configurations to the `hal.executable.target` attribute.
+    auto addConfig = [&](StringRef name, Attribute value) {
+      configItems.emplace_back(
+          std::make_pair(Identifier::get(name, context), value));
+    };
+    // Set target arch
+    addConfig("target_arch", StringAttr::get(context, clTargetChip));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(

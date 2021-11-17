@@ -221,6 +221,9 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm);
 /// Lowering calling vectorization patterns.
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
+/// Lowering using tensorcore operations.
+void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm);
+
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level
 /// pass manager.
@@ -238,8 +241,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<FuncOp>>
-createLLVMGPUTileAndDistributeToThreads();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUTileAndDistribute(
+    bool distributeToWarp = false);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -247,6 +250,10 @@ createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass();
+
+/// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
+std::unique_ptr<OperationPass<FuncOp>>
+createLLVMGPUTensorCoreVectorizationPass();
 
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();

@@ -27,6 +27,7 @@ iree_lit_test_suite(
             "nvvm_pipeline_test.mlir",
             "rocdl_pipeline_test.mlir",
             "legalize.mlir",
+            "tensorcore_vectorization.mlir",
             "vectorization.mlir",
         ],
         include = ["*.mlir"],

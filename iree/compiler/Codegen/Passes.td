@@ -189,13 +189,19 @@ def LLVMGPULowerExecutableTarget :
 def LLVMGPUTileAndDistribute :
     Pass<"iree-llvmgpu-tile-and-distribute", "FuncOp"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistributeToThreads()";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistribute()";
 }
 
 def LLVMGPUVectorization :
     Pass<"iree-llvmgpu-vectorization", "FuncOp"> {
   let summary = "Pass to convert linalg into Vector.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
+}
+
+def LLVMGPUTensorCoreVectorization :
+    Pass<"iree-llvmgpu-tensorcore-vectorization", "FuncOp"> {
+  let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTensorCoreVectorizationPass()";
 }
 
 def LLVMGPUVectorLowering :
