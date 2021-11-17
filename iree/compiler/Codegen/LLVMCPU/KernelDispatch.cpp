@@ -39,30 +39,11 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     llvm::cl::desc("number of threads that are used at runtime"),
     llvm::cl::init(8));
 
-static llvm::cl::opt<int> matmulWorkgroupTileSize(
-    "iree-codegen-llvm-matmul-workgroup-size",
-    llvm::cl::desc(
-        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
-    llvm::cl::init(64));
 static llvm::cl::opt<int> matmulL1TileSize(
     "iree-codegen-llvm-matmul-l1-size",
     llvm::cl::desc(
         "linalg.matmul tile size for L1 spliting of M, N, K dimension"),
     llvm::cl::init(32));
-static llvm::cl::opt<int> matmulVectorSize(
-    "iree-codegen-llvm-matmul-vector-size",
-    llvm::cl::desc("linalg.matmul vector tile size"), llvm::cl::init(4));
-
-static llvm::cl::opt<int> batchMatmulWorkgroupTileSize(
-    "iree-codegen-llvm-batch-matmul-workgroup-size",
-    llvm::cl::desc("linalg.batch_matmul tile size for workgroups spliting of "
-                   "M, N dimension"),
-    llvm::cl::init(32));
-static llvm::cl::opt<int> batchMatmulL1TileSize(
-    "iree-codegen-llvm-batch-matmul-l1-size",
-    llvm::cl::desc("linalg.batch_matmul tile size for L1 spliting of M, N, K "
-                   "dimensions"),
-    llvm::cl::init(16));
 
 static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
     "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
@@ -280,7 +261,7 @@ static LogicalResult setRootConfig(
     }
   } else if (tiledLoops.size() != 2) {
     return contractionOp.emitOpError(
-        "expected op tbe distributed along 2 dimensions");
+        "expected op to be distributed along 2 dimensions");
   }
 
   Type elementType = lhsShapedType.getElementType();
@@ -291,7 +272,7 @@ static LogicalResult setRootConfig(
           getNativeVectorSizeInBytes(entryPointFn)) {
     vectorSize = nativeVectorSizeVal.getValue() / byteWidth;
   } else {
-    vectorSize = matmulVectorSize;
+    vectorSize = clNativeVectorSizeInBytes;
   }
   SmallVector<int64_t> vectorSizeVals(tiledLoops.size(), 1);
   vectorSizeVals.back() = vectorSize;
