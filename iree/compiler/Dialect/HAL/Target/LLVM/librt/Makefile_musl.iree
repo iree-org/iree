@@ -7,7 +7,10 @@
 musldir=${MUSL_DIR}
 include $(musldir)/Makefile
 
-IREE_BASE_SRCS = $(addprefix $(srcdir)/,src/math/ceilf.c src/math/floorf.c src/math/fmodf.c)
+IREE_BASE_SRCS = $(addprefix $(srcdir)/, \
+	src/math/ceilf.c \
+	src/math/floorf.c \
+	src/math/fmodf.c)
 IREE_BASE_LLS = $(patsubst $(srcdir)/%,%.ll,$(basename $(IREE_BASE_SRCS)))
 IREE_BASE_BCS = $(patsubst $(srcdir)/%,%.bc,$(basename $(IREE_BASE_SRCS)))
 IREE_LL_FILES = $(addprefix obj/, $(IREE_BASE_LLS))
