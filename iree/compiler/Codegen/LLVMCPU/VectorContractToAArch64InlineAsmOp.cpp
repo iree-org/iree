@@ -38,9 +38,7 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
       return false;
     }
   }
-  if (parallel_iterators.size() != 2 ||
-      reduction_iterators.size() != 1)
-  {
+  if (parallel_iterators.size() != 2 || reduction_iterators.size() != 1) {
     return false;
   }
   const int M = parallel_iterators[0];
@@ -50,16 +48,15 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   if (indexingMaps.size() != 3) {
     return false;
   }
-  const int expectedMapResults[3][2] = {{M,K}, {N, K}, {M, N}};
+  const int expectedMapResults[3][2] = {{M, K}, {N, K}, {M, N}};
   for (int m = 0; m < 3; ++m) {
     auto map = indexingMaps[m].cast<AffineMapAttr>().getValue();
-    if (map.getNumDims() != 3 ||
-        map.getNumResults() != 2)
-    {
+    if (map.getNumDims() != 3 || map.getNumResults() != 2) {
       return false;
     }
     for (int r = 0; r < 2; ++r) {
-      int actualMapResult = map.getResults()[r].cast<AffineDimExpr>().getPosition();
+      int actualMapResult =
+          map.getResults()[r].cast<AffineDimExpr>().getPosition();
       if (actualMapResult != expectedMapResults[m][r]) {
         return false;
       }
@@ -83,7 +80,26 @@ static Value getExtInput(Type extSrcType, Type extDstType, Value extResult) {
   return extInput;
 }
 
-static Value extractChunk(PatternRewriter &rewriter, Location loc, VectorType dstVecType, Value input, int position) {
+// WIP WIP WIP WIP WIP
+// This currently gives very bad generated code. Working on it.
+//
+// From the 1D |input| vector, extract the segment
+//   [position * S .. (position+1) * S - 1]
+// where S is the size of the 1D vector type |dstVecType|
+static Value extractChunk(PatternRewriter &rewriter, Location loc,
+                          VectorType dstVecType, Value input, int position) {
+  Value shapeCastOp = input.getDefiningOp<vector::ShapeCastOp>();
+
+  /*if (shapeCastOp) {
+    Value transferReadOp = shapeCastOp.getDefiningOp<vector::TransferReadOp>();
+    if (transferReadOp) {
+      fprintf(stderr, "transfer read!\n");
+      Value chunkTransferReadOp = rewriter.create<vector::TransferReadOp>(loc, ...);
+      Value chunkShapeCastOp = rewriter.create<vector::ShapeCastOp>(loc, ...);
+      return chunkShapeCastOp;
+    }
+  }*/
+
   VectorType inputVecType = input.getType().cast<VectorType>();
   auto inputShape = inputVecType.getShape();
   auto dstShape = dstVecType.getShape();
@@ -95,17 +111,19 @@ static Value extractChunk(PatternRewriter &rewriter, Location loc, VectorType ds
     SmallVector<int64_t> sizes{dstShape[0]};
     SmallVector<int64_t> strides{1};
 
-    return rewriter.create<vector::ExtractStridedSliceOp>(
-            loc, input, offsets, sizes, strides);
+    return rewriter.create<vector::ExtractStridedSliceOp>(loc, input, offsets,
+                                                          sizes, strides);
   } else {
     // Try casting to a 2D shape just so we can get the desired chunk with just
     // a vector::ExtractOp ?
     Type elemType = dstVecType.getElementType();
-    VectorType input2DType =  VectorType::get({inputShape[0] / dstShape[0], dstShape[0]}, elemType);
-    Value input2D = rewriter.create<vector::ShapeCastOp>(
-          loc, input2DType, input);
+    VectorType input2DType =
+        VectorType::get({inputShape[0] / dstShape[0], dstShape[0]}, elemType);
+    Value input2D =
+        rewriter.create<vector::ShapeCastOp>(loc, input2DType, input);
     auto posAttr = rewriter.getI64ArrayAttr(position);
-    return rewriter.create<vector::ExtractOp>(loc, dstVecType, input2D, posAttr);
+    return rewriter.create<vector::ExtractOp>(loc, dstVecType, input2D,
+                                              posAttr);
   }
 }
 
@@ -157,7 +175,7 @@ struct ConvertVectorContract8x4x8_i8i8i32_ToAArch64InlineAsmPattern
       SmallVector<int64_t> offsets{i / 2, (i % 2) * 4};
       SmallVector<int64_t> sizes{1, 4};
       SmallVector<int64_t> strides{1, 1};
-      Value flatAcc =  rewriter.create<vector::ShapeCastOp>(
+      Value flatAcc = rewriter.create<vector::ShapeCastOp>(
           loc, VectorType::get({8 * 8}, I32Type), contractionOp.acc());
       dstVec.push_back(extractChunk(rewriter, loc, int32x4VType, flatAcc, i));
     }
