@@ -226,10 +226,123 @@ class BuildFileFunctions(object):
   def td_library(self, *args, **kwargs):
     pass
 
-  # Technically we could do something with a CMake equivalent but we have no use
-  # case.
-  def py_binary(self, *args, **kwargs):
-    pass
+  def py_test(self,
+              name,
+              hdrs=None,
+              srcs=None,
+              copts=None,
+              defines=None,
+              data=None,
+              deps=None,
+              tags=None,
+              **kwargs):
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
+    srcs_block = _convert_srcs_block(srcs)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
+    data_block = _convert_target_list_block("DATA", data)
+    deps_block = _convert_target_list_block("DEPS", deps)
+    labels_block = _convert_string_list_block("LABELS", tags)
+
+    self.converter.body += (f"cmake_py_test(\n"
+                            f"{name_block}"
+                            f"{hdrs_block}"
+                            f"{srcs_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
+                            f"{data_block}"
+                            f"{deps_block}"
+                            f"{labels_block}"
+                            f")\n\n")
+
+  def py_binary(self,
+                name,
+                srcs=None,
+                data=None,
+                deps=None,
+                copts=None,
+                defines=None,
+                linkopts=None,
+                testonly=None,
+                **kwargs):
+    if linkopts:
+      self._convert_unimplemented_function("linkopts")
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
+    srcs_block = _convert_srcs_block(srcs)
+    data_block = _convert_target_list_block("DATA", data)
+    deps_block = _convert_target_list_block("DEPS", deps)
+    testonly_block = _convert_option_block("TESTONLY", testonly)
+
+    self.converter.body += (f"cmake_py_binary(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
+                            f"{data_block}"
+                            f"{deps_block}"
+                            f"{testonly_block}"
+                            f")\n\n")
+
+  def py_library(self,
+                 name,
+                 hdrs=None,
+                 textual_hdrs=None,
+                 srcs=None,
+                 copts=None,
+                 defines=None,
+                 data=None,
+                 deps=None,
+                 testonly=None,
+                 linkopts=None,
+                 **kwargs):
+    if linkopts:
+      self._convert_unimplemented_function("linkopts")
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    hdrs_block = _convert_string_list_block("HDRS", hdrs, sort=True)
+    textual_hdrs_block = _convert_string_list_block("TEXTUAL_HDRS",
+                                                    textual_hdrs,
+                                                    sort=True)
+    srcs_block = _convert_srcs_block(srcs)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
+    data_block = _convert_target_list_block("DATA", data)
+    deps_block = _convert_target_list_block("DEPS", deps)
+    testonly_block = _convert_option_block("TESTONLY", testonly)
+
+    self.converter.body += (f"cmake_py_library(\n"
+                            f"{name_block}"
+                            f"{copts_block}"
+                            f"{hdrs_block}"
+                            f"{textual_hdrs_block}"
+                            f"{srcs_block}"
+                            f"{data_block}"
+                            f"{deps_block}"
+                            f"{defines_block}"
+                            f"{testonly_block}"
+                            f"  PUBLIC\n)\n\n")
+
+  def genrule(self,
+              name,
+              srcs=None,
+              outs=None,
+              cmd=None,
+              testonly=None):
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = _convert_srcs_block(srcs)
+    outs_block = _convert_string_list_block("DEFINES", defines)
+    cmd_block = _convert_string_arg_block("CMD", name, quote=False)
+    testonly_block = _convert_option_block("TESTONLY", testonly)
+
+    self.converter.body += (f"cmake_genrule(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{outs_block}"
+                            f"{cmd_block}"
+                            f"{testonly_block}"
+                            f"  PUBLIC\n)\n\n")
 
   def filegroup(self, name, **kwargs):
     # Not implemented yet. Might be a no-op, or may want to evaluate the srcs
