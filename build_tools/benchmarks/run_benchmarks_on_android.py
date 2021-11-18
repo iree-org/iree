@@ -682,9 +682,9 @@ def main(args):
   if previous_benchmarks:
     benchmarks.extend(f"{os.path.join(previous_benchmarks_dir, b)}.json"
                       for b in previous_benchmarks)
-  if do_capture and skip_captures:
-    captures.extend(
-        f"{os.path.join(skip_captures_dir, c)}.tracy" for c in skip_captures)
+  if do_capture and previous_captures:
+    captures.extend(f"{os.path.join(previous_captures_dir, c)}.tracy"
+                    for c in previous_captures)
 
   for b in benchmarks:
     with open(b) as f:
