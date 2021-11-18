@@ -712,7 +712,7 @@ def main(args):
 
   # Delete all the temp files if everything completed successfully.
   if not args.no_clean and not errors:
-    shutil.rmtree(args.tmpdir)
+    shutil.rmtree(args.tmp_dir)
 
   if errors:
     print("Benchmarking completed with errors", file=sys.stderr)
