@@ -639,12 +639,13 @@ void ResourceSubviewOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
-  // If operand comes from an export with the same affinity then fold.
+  // If operand comes from an export with the same affinity and size then fold.
   // Different affinities may indicate importing from one device or queue and
   // exporting to a different device or queue.
-  // We assume that differing encodings, shapes, and sizes are compatible.
+  // We assume that differing encodings and shapes are compatible.
   auto exportOp = source().getDefiningOp<TensorExportOp>();
-  if (exportOp && affinity() == exportOp.affinity()) {
+  if (exportOp && affinity() == exportOp.affinity() &&
+      result_size() == exportOp.source_size()) {
     return exportOp.source();
   }
   return {};
@@ -660,12 +661,13 @@ void TensorImportOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
-  // If operand comes from an import with the same affinity then fold.
+  // If operand comes from an import with the same affinity and size then fold.
   // Different affinities may indicate importing from one device or queue and
   // exporting to a different device or queue.
-  // We assume that differing encodings, shapes, and sizes are compatible.
+  // We assume that differing encodings and shapes are compatible.
   auto importOp = source().getDefiningOp<TensorImportOp>();
-  if (importOp && affinity() == importOp.affinity()) {
+  if (importOp && affinity() == importOp.affinity() &&
+      source_size() == importOp.result_size()) {
     return importOp.source();
   }
   return {};
