@@ -103,27 +103,27 @@ set(MOBILENET_V3SMALL_MODULE
 #     "--task_topology_group_count=3"
 # )
 
-# # CPU, Dylib-Sync, big/little-core, full-inference
-# iree_benchmark_suite(
-#   MODULES
-#     "${MOBILENET_V2_MODULE}"
-#     "${MOBILENET_V3SMALL_MODULE}"
+# CPU, Dylib-Sync, big/little-core, full-inference
+iree_benchmark_suite(
+  MODULES
+    "${MOBILENET_V2_MODULE}"
+    # "${MOBILENET_V3SMALL_MODULE}"
 
-#   BENCHMARK_MODES
-#     "big-core,full-inference,experimental-flags"
-#     "little-core,full-inference,experimental-flags"
-#   TARGET_BACKEND
-#     "dylib-llvm-aot"
-#   TARGET_ARCHITECTURE
-#     "CPU-ARM64-v8A"
-#   TRANSLATION_FLAGS
-#     "--iree-input-type=mhlo"
-#     "--iree-llvm-target-triple=aarch64-none-linux-android29"
-#     "--iree-flow-inline-constants-max-byte-length=2048"
-#     "--iree-llvm-loop-unrolling=true"
-#   DRIVER
-#     "dylib-sync"
-# )
+  BENCHMARK_MODES
+    "big-core,full-inference,experimental-flags"
+    # "little-core,full-inference,experimental-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-flow-inline-constants-max-byte-length=2048"
+    "--iree-llvm-loop-unrolling=true"
+  DRIVER
+    "dylib-sync"
+)
 
 # # CPU, Dylib, 1-thread, big/little-core, full-inference
 # iree_benchmark_suite(
@@ -177,7 +177,7 @@ set(MOBILENET_V3SMALL_MODULE
 iree_benchmark_suite(
   MODULES
     "${MOBILEBERT_FP32_MODULE}"
-    # "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_MODULE}"
     # "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
