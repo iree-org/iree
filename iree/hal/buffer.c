@@ -712,7 +712,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
 
   // TODO(benvanik): add mode arg to the HAL API.
   iree_hal_mapping_mode_t mapping_mode = IREE_HAL_MAPPING_MODE_SCOPED;
-
+  
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(buffer, map_range)(
       buffer, mapping_mode, buffer_mapping->allowed_access,

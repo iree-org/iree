@@ -12,10 +12,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/allocator_caching.h"
 #include "iree/hal/cuda/cuda_allocator.h"
-
-extern bool iree_hal_allocator_cache_buffer;
 
 typedef struct iree_hal_cuda_buffer_t {
   iree_hal_buffer_t base;
@@ -66,19 +63,6 @@ iree_status_t iree_hal_cuda_buffer_wrap(
 }
 
 static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
-  iree_hal_memory_type_t memory_type = iree_hal_buffer_memory_type(base_buffer);
-  // Cache host visible device memory using caching allocator.
-  if(iree_hal_allocator_cache_buffer) {
-    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-      if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-        iree_status_t status = iree_hal_allocator_add_buffer_to_cache(base_buffer);
-        if (iree_status_is_ok(status)) {
-          return;
-        }
-      }
-    }
-  }
-  
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
