@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/Input/InputOps.h"
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpImplementation.h"

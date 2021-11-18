@@ -628,4 +628,43 @@ def IREEInput_DispatchWorkgroupSizeOp : IREEInput_PureOp<"dispatch.workgroup.siz
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 }
 
+//===----------------------------------------------------------------------===//
+// Utilities
+// Various utility ops needed for program completeness. These arguably should
+// not be exclusive to IREE.
+//===----------------------------------------------------------------------===//
+
+def IREEInput_AlignOp : IREEInput_PureOp<"align", [
+  SameOperandsAndResultType
+  ]> {
+  let summary = "Aligns up to a power-of-two alignment if required";
+  let description = [{
+     Aligns |value| up to the given power-of-two |alignment| if required.
+  }];
+
+  let arguments = (ins
+    SignlessIntegerLike:$value,
+    SignlessIntegerLike:$alignment
+  );
+
+  let results = (outs
+    SignlessIntegerLike:$result
+  );
+
+  let assemblyFormat = [{
+    $value `,` $alignment attr-dict `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$value,
+      "int64_t":$alignment
+    ),
+    [{
+      build($_builder, $_state, value.getType(), value,
+       $_builder.createOrFold<arith::ConstantIndexOp>($_state.location, alignment));
+    }]>,
+  ];
+}
+
 #endif // IREE_DIALECTS_DIALECT_INPUT_OPS_TD
