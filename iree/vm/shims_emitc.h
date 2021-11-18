@@ -113,37 +113,24 @@
       iree_vm_stack_t * IREE_RESTRICT stack, void* IREE_RESTRICT module, \
       void* IREE_RESTRICT module_state input_parameters output_parameters);
 
-#define EMITC_FIXED_SHIM_IMPL(arg_types, ret_types, input_arguments,        \
-                              output_arguments)                             \
-  static iree_status_t call_0##arg_types##_##ret_types##_shim(              \
-      iree_vm_stack_t* IREE_RESTRICT stack,                                 \
-      const iree_vm_function_call_t* IREE_RESTRICT call,                    \
-      call_0##arg_types##_##ret_types##_t target_fn,                        \
-      void* IREE_RESTRICT module, void* IREE_RESTRICT module_state,         \
-      iree_vm_execution_result_t* IREE_RESTRICT out_result) {               \
-    /*const*/ IREE_VM_ABI_TYPE_NAME(arg_types)* args =                      \
-        iree_vm_abi_##arg_types##_checked_deref(call->arguments);           \
-    IREE_VM_ABI_TYPE_NAME(ret_types)* rets =                                \
-        iree_vm_abi_##ret_types##_checked_deref(call->results);             \
-                                                                            \
-    /* TODO(simon-camp): Doesn't work for 'v' */                            \
-    /*                                                                    \
-    if                                                                    \
-    (IREE_UNLIKELY(!args                                                  \
-    ||                                                                    \
-    !rets))                                                               \
-    {                                                                     \
-      return                                                              \
-    iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                        \
-                              "argument/result                            \
-    signature                                                             \
-    mismatch");                                                           \
-    }                                                                     \
-    */ \                                                                 
-    \
-    iree_vm_abi_##ret_types##_reset(rets); \
-    return target_fn(stack, module,                                         \
-                     module_state input_arguments output_arguments);        \
+// TODO(simon-camp): We should check the args and rets pointers for NULL, but
+// need to special case type 'v'
+#define EMITC_FIXED_SHIM_IMPL(arg_types, ret_types, input_arguments, \
+                              output_arguments)                      \
+  static iree_status_t call_0##arg_types##_##ret_types##_shim(       \
+      iree_vm_stack_t* IREE_RESTRICT stack,                          \
+      const iree_vm_function_call_t* IREE_RESTRICT call,             \
+      call_0##arg_types##_##ret_types##_t target_fn,                 \
+      void* IREE_RESTRICT module, void* IREE_RESTRICT module_state,  \
+      iree_vm_execution_result_t* IREE_RESTRICT out_result) {        \
+    /*const*/ IREE_VM_ABI_TYPE_NAME(arg_types)* args =               \
+        iree_vm_abi_##arg_types##_checked_deref(call->arguments);    \
+    IREE_VM_ABI_TYPE_NAME(ret_types)* rets =                         \
+        iree_vm_abi_##ret_types##_checked_deref(call->results);      \
+                                                                     \
+    iree_vm_abi_##ret_types##_reset(rets);                           \
+    return target_fn(stack, module,                                  \
+                     module_state input_arguments output_arguments); \
   }
 
 #define EMITC_FIXED_IMPORT_IMPL(arg_types, ret_types, input_parameters,    \
