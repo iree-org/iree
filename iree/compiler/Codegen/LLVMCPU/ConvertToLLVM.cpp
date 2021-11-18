@@ -252,10 +252,10 @@ class HALDispatchABI {
     Value basePtrValue = loadBindingPtr(loc, ordinal, builder);
 
     // Adjust by baseOffset (if needed).
-    if (baseOffsetValue) {
-      basePtrValue = builder.createOrFold<LLVM::GEPOp>(
-          loc, basePtrValue.getType(), basePtrValue, baseOffsetValue);
-    }
+    // if (baseOffsetValue) {
+    //   basePtrValue = builder.createOrFold<LLVM::GEPOp>(
+    //       loc, basePtrValue.getType(), basePtrValue, baseOffsetValue);
+    // }
 
     // NOTE: if we wanted to check the range was in bounds here would be the
     // place to do it.
