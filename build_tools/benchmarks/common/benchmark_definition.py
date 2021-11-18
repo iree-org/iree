@@ -41,17 +41,27 @@ IREE_PRETTY_NAMES_TO_DRIVERS = {
 def execute_cmd(args: Sequence[str],
                 verbose: bool = False,
                 **kwargs) -> subprocess.CompletedProcess:
-  """Executes a command and returns its stdout."""
+  """Executes a command and returns the completed process.
+
+  A thin wrapper around subprocess.run that sets some useful defaults and
+  optionally prints out the command being run.
+
+  Raises:
+    CalledProcessError if the command fails.
+  """
   if verbose:
     cmd = " ".join(args)
     print(f"cmd: {cmd}")
-  return subprocess.run(args, check=True, universal_newlines=True, **kwargs)
+  return subprocess.run(args, check=True, text=True, **kwargs)
 
 
 def execute_cmd_and_get_output(args: Sequence[str],
                                verbose: bool = False,
                                **kwargs) -> str:
-  """Executes a command and returns its stdout."""
+  """Executes a command and returns its stdout.
+
+  Same as execute_cmd except captures stdout (and not stderr).
+  """
   return execute_cmd(args, verbose=verbose, stdout=subprocess.PIPE,
                      **kwargs).stdout.strip()
 

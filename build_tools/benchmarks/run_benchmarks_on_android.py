@@ -112,11 +112,11 @@ def adb_push_to_tmp_dir(content: str,
   """Pushes content onto the Android device.
 
   Args:
-  - content: the full path to the source file.
-  - relative_dir: the directory to push to; relative to ANDROID_TMP_DIR.
+    content: the full path to the source file.
+    relative_dir: the directory to push to; relative to ANDROID_TMP_DIR.
 
   Returns:
-  - The full path to the content on the Android device.
+    The full path to the content on the Android device.
   """
   filename = os.path.basename(content)
   android_path = os.path.join(ANDROID_TMP_DIR, relative_dir, filename)
@@ -133,12 +133,12 @@ def adb_execute_in_dir(cmd_args: Sequence[str],
   and returns the output.
 
   Args:
-  - cmd_args: a list containing the command to execute and its parameters
-  - relative_dir: the directory to execute the command in; relative to
-    ANDROID_TMP_DIR.
+    cmd_args: a list containing the command to execute and its parameters
+    relative_dir: the directory to execute the command in; relative to
+      ANDROID_TMP_DIR.
 
   Returns:
-  - A string for the command output.
+    A string for the command output.
   """
   cmd = ["adb", "shell"]
   cmd.extend(["cd", f"{ANDROID_TMP_DIR}/{relative_dir}"])
@@ -155,12 +155,12 @@ def adb_start_in_dir(cmd_args: Sequence[str],
   without waiting for completion.
 
   Args:
-  - cmd_args: a list containing the command to execute and its parameters
-  - relative_dir: the directory to execute the command in; relative to
-    ANDROID_TMP_DIR.
+    cmd_args: a list containing the command to execute and its parameters
+    relative_dir: the directory to execute the command in; relative to
+      ANDROID_TMP_DIR.
 
   Returns:
-  - A Popen object for the started command.
+    A Popen object for the started command.
   """
   cmd = ["adb", "shell"]
   cmd.extend(["cd", f"{ANDROID_TMP_DIR}/{relative_dir}"])
@@ -179,12 +179,12 @@ def compose_benchmark_info_object(device_info: AndroidDeviceInfo,
   """Creates an BenchmarkInfo object to describe the benchmark.
 
   Args:
-  - device_info: an AndroidDeviceInfo object.
-  - benchmark_category_dir: the directory to a specific benchmark category.
-  - benchmark_case_dir: a directory containing the benchmark case.
+    device_info: an AndroidDeviceInfo object.
+    benchmark_category_dir: the directory to a specific benchmark category.
+    benchmark_case_dir: a directory containing the benchmark case.
 
   Returns:
-  - A BenchmarkInfo object.
+    A BenchmarkInfo object.
   """
   # Extract the model name from the directory path. This uses the relative
   # path under the root model directory. If there are multiple segments,
@@ -226,13 +226,14 @@ def filter_benchmarks_for_category(benchmark_category_dir: str,
   """Filters benchmarks in a specific category for the given device.
 
   Args:
-  - benchmark_category_dir: the directory to a specific benchmark category.
-  - cpu_target_arch: CPU target architecture.
-  - gpu_target_arch: GPU target architecture.
-  - driver_filter: only run benchmarks for the given driver if not None.
+    benchmark_category_dir: the directory to a specific benchmark category.
+    cpu_target_arch: CPU target architecture.
+    gpu_target_arch: GPU target architecture.
+    driver_filter: only run benchmarks for the given driver if not None.
+    verbose: whether to print additional debug info.
 
   Returns:
-  - A list containing all matched benchmark cases' directories.
+    A list containing all matched benchmark cases' directories.
   """
   matched_benchmarks = []
 
@@ -276,12 +277,12 @@ def run_benchmarks_for_category(
     device_info: AndroidDeviceInfo,
     benchmark_category_dir: str,
     benchmark_case_dirs: Sequence[str],
-    normal_benchmark_tool: str,
     tmp_dir: str,
+    normal_benchmark_tool: str,
     traced_benchmark_tool: Optional[str] = None,
     trace_capture_tool: Optional[str] = None,
-    previous_benchmarks: Optional[Set[str]] = None,
-    previous_captures: Optional[Set[str]] = None,
+    skip_benchmarks: Optional[Set[str]] = None,
+    skip_captures: Optional[Set[str]] = None,
     do_capture: bool = False,
     keep_going: bool = False,
     verbose: bool = False,
@@ -289,15 +290,27 @@ def run_benchmarks_for_category(
   """Runs all benchmarks on the Android device and reports results and captures.
 
   Args:
-  - device_info: an AndroidDeviceInfo object.
-  - benchmark_category_dir: the directory to a specific benchmark category.
-  - benchmark_case_dirs: a list of benchmark case directories.
-  - normal_benchmark_tool: the path to the normal benchmark tool.
-  - traced_benchmark_tool: the path to the tracing-enabled benchmark tool.
-  - trace_capture_tool: the path to the tool for collecting captured traces.
+    device_info: an AndroidDeviceInfo object.
+    benchmark_category_dir: the directory to a specific benchmark category.
+    benchmark_case_dirs: a list of benchmark case directories.
+    tmp_dir: path to temporary directory to which intermediate outputs should be
+      stored. Separate "benchmark-results" and "captures" subdirectories will be
+      created as necessary.
+    normal_benchmark_tool: the path to the normal benchmark tool.
+    traced_benchmark_tool: the path to the tracing-enabled benchmark tool.
+    trace_capture_tool: the path to the tool for collecting captured traces.
+    skip_benchmarks: names of benchmarks that should be skipped. Note that
+      captures will still be run for these benchmarks if do_capture is true and
+      they are not also in skip_captures.
+    skip_captures: names of benchmark captures that should be skipped.
+    do_capture: whether captures should be collected.
+    keep_going: whether to proceed if an individual run fails. Exceptions will
+      logged and returned.
+    verbose: whether to print additional debug information.
 
   Returns:
-  - A list containing (BenchmarkInfo, context, results, capture-filename) tuples.
+    A tuple with a list containing (benchmark-filename, capture-filename) tuples
+    and a list containing raised exceptions (only if keep_going is true)
   """
   # Push the benchmark vmfb and tool files to the Android device first.
   adb_push_to_tmp_dir(os.path.join(benchmark_category_dir, VMFB_REL_PATH),
@@ -306,19 +319,21 @@ def run_benchmarks_for_category(
   normal_benchmark_tool_path = adb_push_to_tmp_dir(normal_benchmark_tool,
                                                    relative_dir="normal-tools",
                                                    verbose=verbose)
+  # Create directories on the host to store results from each benchmark run.
   benchmark_results_dir = os.path.join(tmp_dir, "benchmark-results")
   os.makedirs(benchmark_results_dir, exist_ok=True)
 
+  # And the same for captures, if we are collecting them.
   captures_dir = os.path.join(tmp_dir, "captures")
-  if traced_benchmark_tool is not None:
+  if do_capture:
     os.makedirs(captures_dir, exist_ok=True)
     traced_benchmark_tool_path = adb_push_to_tmp_dir(
         traced_benchmark_tool, relative_dir="traced-tools", verbose=verbose)
 
   results = []
   errors = []
-  previous_benchmarks = previous_benchmarks if previous_benchmarks else set()
-  previous_captures = previous_captures if previous_captures else set()
+  skip_benchmarks = skip_benchmarks if skip_benchmarks else set()
+  skip_captures = skip_captures if skip_captures else set()
 
   # Push all model artifacts to the device and run them.
   root_benchmark_dir = os.path.dirname(benchmark_category_dir)
@@ -327,10 +342,14 @@ def run_benchmarks_for_category(
                                                    benchmark_category_dir,
                                                    benchmark_case_dir)
     benchmark_key = str(benchmark_info)
-    if benchmark_key in previous_benchmarks and (not do_capture or benchmark_key
-                                                 in previous_captures):
+    # If we're not running the benchmark or the capture, just skip ahead. No
+    # need to push files.
+    if benchmark_key in skip_benchmarks and (not do_capture or benchmark_key
+                                                 in skip_captures):
       continue
     print(f"--> benchmark: {benchmark_info} <--")
+    # Now try to actually run benchmarks and collect captures. If keep_going is
+    # True then errors in the underlying commands will be logged and returned.
     try:
       android_relative_dir = os.path.relpath(benchmark_case_dir,
                                              root_benchmark_dir)
@@ -339,7 +358,7 @@ def run_benchmarks_for_category(
                           verbose=verbose)
 
       benchmark_result_filename = None
-      if benchmark_key not in previous_benchmarks:
+      if benchmark_key not in skip_benchmarks:
         repetitions = get_benchmark_repetition_count(benchmark_info.runner)
         benchmark_results_basename = f"{benchmark_key}.json"
         cmd = [
@@ -355,6 +374,9 @@ def run_benchmarks_for_category(
         result_json = adb_execute_in_dir(cmd,
                                          android_relative_dir,
                                          verbose=verbose)
+
+        # Pull the result file back onto the host and set the filename for later
+        # return.
         benchmark_result_filename = os.path.join(benchmark_results_dir,
                                                  benchmark_results_basename)
         pull_cmd = [
@@ -368,7 +390,7 @@ def run_benchmarks_for_category(
           print(result_json)
 
       capture_filename = None
-      if do_capture and benchmark_key not in previous_captures:
+      if do_capture and benchmark_key not in skip_captures:
         run_cmd = [
             "TRACY_NO_EXIT=1", "taskset",
             benchmark_info.deduce_taskset(), traced_benchmark_tool_path,
@@ -427,20 +449,37 @@ def filter_and_run_benchmarks(
     normal_benchmark_tool: str,
     traced_benchmark_tool: Optional[str],
     trace_capture_tool: Optional[str],
-    previous_benchmarks: Optional[Set[str]],
-    previous_captures: Optional[Set[str]],
+    skip_benchmarks: Optional[Set[str]],
+    skip_captures: Optional[Set[str]],
     do_capture: bool = False,
     keep_going: bool = False,
     verbose: bool = False) -> Tuple[List[str], List[str], List[Exception]]:
   """Filters and runs benchmarks in all categories for the given device.
 
   Args:
-  - device_info: an AndroidDeviceInfo object.
-  - root_build_dir: the root build directory.
-  - driver_filter: only run benchmarks for the given driver if not None.
-  - normal_benchmark_tool: the path to the normal benchmark tool.
-  - traced_benchmark_tool: the path to the tracing-enabled benchmark tool.
-  - trace_capture_tool: the path to the tool for collecting captured traces.
+    device_info: an AndroidDeviceInfo object.
+    root_build_dir: the root build directory containing the built benchmark
+      suites.
+    driver_filter: filter benchmarks to those with the given driver (or all if
+      this is None).
+    tmp_dir: path to temporary directory to which intermediate outputs should be
+      stored. Separate "benchmark-results" and "captures" subdirectories will be
+      created as necessary.
+    normal_benchmark_tool: the path to the normal benchmark tool.
+    traced_benchmark_tool: the path to the tracing-enabled benchmark tool.
+    trace_capture_tool: the path to the tool for collecting captured traces.
+    skip_benchmarks: names of benchmarks that should be skipped. Note that
+      captures will still be run for these benchmarks if do_capture is true and
+      they are not also in skip_captures.
+    skip_captures: names of benchmark captures that should be skipped.
+    do_capture: whether captures should be collected.
+    keep_going: whether to proceed if an individual run fails. Exceptions will
+      logged and returned.
+    verbose: whether to print additional debug information.
+
+  Returns:
+    Lists of benchmark file paths, capture file paths, and exceptions raise
+    (only if keep_going is True).
   """
   cpu_target_arch = CPU_ABI_TO_TARGET_ARCH_MAP[device_info.cpu_abi.lower()]
   gpu_target_arch = GPU_NAME_TO_TARGET_ARCH_MAP[device_info.gpu_name.lower()]
@@ -451,7 +490,7 @@ def filter_and_run_benchmarks(
   captures = []
   errors = []
 
-  previous_benchmarks = previous_benchmarks if previous_benchmarks else set()
+  skip_benchmarks = skip_benchmarks if skip_benchmarks else set()
 
   for directory in sorted(os.listdir(root_benchmark_dir)):
     benchmark_category_dir = os.path.join(root_benchmark_dir, directory)
@@ -468,7 +507,7 @@ def filter_and_run_benchmarks(
         tmp_dir=tmp_dir,
         normal_benchmark_tool=normal_benchmark_tool,
         traced_benchmark_tool=traced_benchmark_tool,
-        previous_benchmarks=previous_benchmarks,
+        skip_benchmarks=skip_benchmarks,
         trace_capture_tool=trace_capture_tool,
         do_capture=do_capture,
         keep_going=keep_going,
@@ -579,6 +618,8 @@ def main(args):
   do_capture = (args.traced_benchmark_tool is not None and
                 args.trace_capture_tool is not None)
 
+  # Collect names of previous benchmarks and captures that should be skipped and
+  # merged into the results.
   if args.continue_from_directory is not None:
     previous_benchmarks_dir = os.path.join(args.continue_from_directory,
                                            "benchmark-results")
@@ -630,18 +671,19 @@ def main(args):
       normal_benchmark_tool=os.path.realpath(args.normal_benchmark_tool),
       traced_benchmark_tool=args.traced_benchmark_tool,
       trace_capture_tool=args.trace_capture_tool,
-      previous_benchmarks=previous_benchmarks,
-      previous_captures=previous_captures,
+      skip_benchmarks=previous_benchmarks,
+      skip_captures=previous_captures,
       do_capture=do_capture,
       keep_going=args.keep_going,
       verbose=args.verbose)
 
+  # Merge in previous benchmarks and captures.
   if previous_benchmarks:
     benchmarks.extend(f"{os.path.join(previous_benchmarks_dir, b)}.json"
                       for b in previous_benchmarks)
-  if do_capture and previous_captures:
-    captures.extend(f"{os.path.join(previous_captures_dir, c)}.tracy"
-                    for c in previous_captures)
+  if do_capture and skip_captures:
+    captures.extend(f"{os.path.join(skip_captures_dir, c)}.tracy"
+                    for c in skip_captures)
 
   for b in benchmarks:
     with open(b) as f:
