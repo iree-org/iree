@@ -545,15 +545,18 @@ def parse_arguments():
       type=check_dir_path,
       help="Path to the build directory containing benchmark suites")
   parser.add_argument("--normal_benchmark_tool",
+                      "--normal-benchmark-tool",
                       type=check_exe_path,
                       required=True,
                       help="Path to the normal iree-benchmark-module tool")
   parser.add_argument(
       "--traced_benchmark_tool",
+      "--traced-benchmark-tool",
       type=check_exe_path,
       default=None,
       help="Path to the tracing-enabled iree-benchmark-module tool")
   parser.add_argument("--trace_capture_tool",
+                      "--trace-capture-tool",
                       type=check_exe_path,
                       default=None,
                       help="Path to the tool for collecting captured traces")
@@ -562,11 +565,12 @@ def parse_arguments():
       type=str,
       default=None,
       help="Only run benchmarks for a specific driver, e.g., 'vulkan'")
-  parser.add_argument("-o",
-                      dest="output",
+  parser.add_argument("--output",
+                      "-o",
                       default=None,
                       help="Path to the ouput file")
   parser.add_argument("--capture_tarball",
+                      "--capture-tarball",
                       default=None,
                       help="Path to the tarball for captures")
   parser.add_argument("--no-clean",
@@ -577,22 +581,25 @@ def parse_arguments():
                       action="store_true",
                       help="Print internal information during execution")
   parser.add_argument(
+      "--keep_going",
       "--keep-going",
       action="store_true",
       help="Continue running after a failed benchmark. The overall exit status"
       " will still indicate failure and all errors will be reported at the end."
   )
   parser.add_argument(
+      "--tmp_dir",
       "--tmp-dir",
       "--tmpdir",
       default="/tmp/iree-benchmarks",
       help="Base directory in which to store temporary files. A subdirectory"
       " with a name matching the git commit hash will be created.")
   parser.add_argument(
+      "--continue_from_directory",
       "--continue-from-directory",
       default=None,
       help="Path to directory with previous benchmark temporary files. This"
-      " should be for the specific commit (not the general tmpdir). Previous"
+      " should be for the specific commit (not the general tmp-dir). Previous"
       " benchmark and capture results from here will not be rerun and will be"
       " combined with the new runs.")
 
