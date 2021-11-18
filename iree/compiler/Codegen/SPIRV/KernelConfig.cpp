@@ -137,7 +137,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   // Tiling along reduction dimensions
   if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});
-  } else if (isa<linalg::DepthwiseConv2DNhwOp>(linalgOp)) {
+  } else if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1});
   } else {
     return success();
@@ -551,7 +551,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
+      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
           [limits](auto op) {
             // Try to tile and vectorize first. It's common to see 32 threads
             // per subgroup for GPUs.

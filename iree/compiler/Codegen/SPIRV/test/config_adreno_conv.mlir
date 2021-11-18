@@ -337,7 +337,7 @@ hal.executable @dwconv_28x28x144 {
               %22 = affine.min affine_map<(d0)[s0] -> (-d0 + 144, s0)>(%arg2)[%workgroup_size_x]
               %23 = linalg.init_tensor [1, %20, %21, %22] : tensor<1x?x?x?xf32>
               %24 = linalg.fill(%cst, %23) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
-              %25 = linalg.depthwise_conv2D_nhw {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%14, %16 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>) outs(%24 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+              %25 = linalg.depthwise_conv_2d_nhwc_hwc {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%14, %16 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>) outs(%24 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               flow.dispatch.tensor.store %25, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %17, %18, %19], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x28x28x144xf32>
             }
           }
@@ -367,7 +367,7 @@ hal.executable @dwconv_28x28x144 {
 // CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z_COUNT]]
 
 //      CHECK: func @dwconv_28x28x144()
-//      CHECK:   linalg.depthwise_conv2D_nhw
+//      CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
@@ -431,7 +431,7 @@ hal.executable @dwconv_4x4x8 {
               %22 = affine.min affine_map<(d0)[s0] -> (-d0 + 8, s0)>(%arg2)[%workgroup_size_x]
               %23 = linalg.init_tensor [1, %20, %21, %22] : tensor<1x?x?x?xf32>
               %24 = linalg.fill(%cst, %23) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
-              %25 = linalg.depthwise_conv2D_nhw {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%14, %16 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>) outs(%24 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+              %25 = linalg.depthwise_conv_2d_nhwc_hwc {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%14, %16 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>) outs(%24 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               flow.dispatch.tensor.store %25, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %17, %18, %19], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x4x4x8xf32>
             }
           }
@@ -460,5 +460,5 @@ hal.executable @dwconv_4x4x8 {
 // CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z_COUNT]]
 
 //      CHECK: func @dwconv_4x4x8()
-//      CHECK:   linalg.depthwise_conv2D_nhw
+//      CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:     lowering.config = #[[CONFIG]]

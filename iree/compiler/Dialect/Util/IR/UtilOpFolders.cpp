@@ -85,7 +85,7 @@ namespace {
 // Example:
 //  %min = util.range.min %0, %1 : index
 // ->
-//  %min = minui %0, %1 : index
+//  %min = arith.minui %0, %1 : index
 template <typename RangeOpT, typename StdOpT>
 struct ExpandSimpleRangeOp : public OpRewritePattern<RangeOpT> {
   using OpRewritePattern<RangeOpT>::OpRewritePattern;
@@ -147,13 +147,13 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
 
 void RangeMinOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                              MLIRContext *context) {
-  results.insert<ExpandSimpleRangeOp<RangeMinOp, mlir::MinUIOp>>(context);
+  results.insert<ExpandSimpleRangeOp<RangeMinOp, arith::MinUIOp>>(context);
   results.insert<SimplifyUniformRangeOp<RangeMinOp, INT64_MAX, xmin>>(context);
 }
 
 void RangeMaxOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                              MLIRContext *context) {
-  results.insert<ExpandSimpleRangeOp<RangeMaxOp, mlir::MaxUIOp>>(context);
+  results.insert<ExpandSimpleRangeOp<RangeMaxOp, arith::MaxUIOp>>(context);
   results.insert<SimplifyUniformRangeOp<RangeMaxOp, INT64_MIN, xmax>>(context);
 }
 
@@ -227,10 +227,10 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
         rewriter.getIntegerAttr(op.max().getType(),
                                 constantMax - constantMin + 1),
         op.max().getType());
-    min = min ? rewriter.create<mlir::MinUIOp>(op.getLoc(), min, constantMinOp)
+    min = min ? rewriter.create<arith::MinUIOp>(op.getLoc(), min, constantMinOp)
                     .getResult()
               : constantMinOp.getResult();
-    max = max ? rewriter.create<mlir::MaxUIOp>(op.getLoc(), max, constantMaxOp)
+    max = max ? rewriter.create<arith::MaxUIOp>(op.getLoc(), max, constantMaxOp)
                     .getResult()
               : constantMaxOp.getResult();
 
@@ -252,8 +252,8 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
                               rewriter);
     } else if (op.offsets().size() == 2) {
       // Two ranges turn into min/max.
-      minValue = rewriter.create<mlir::MinUIOp>(loc, op.offsets().front(),
-                                                op.offsets().back());
+      minValue = rewriter.create<arith::MinUIOp>(loc, op.offsets().front(),
+                                                 op.offsets().back());
       auto one = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIntegerAttr(op.min().getType(), 1),
           op.min().getType());
@@ -261,7 +261,7 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
                                  op.lengths().front(), one, rewriter);
       auto endRhs = makeRangeEnd(loc, op.offsets().back(), op.lengths().back(),
                                  one, rewriter);
-      maxValue = rewriter.create<mlir::MaxUIOp>(loc, endLhs, endRhs);
+      maxValue = rewriter.create<arith::MaxUIOp>(loc, endLhs, endRhs);
     }
     if (!minValue || !maxValue) return failure();
     rewriter.replaceOp(op, {minValue, maxValue});

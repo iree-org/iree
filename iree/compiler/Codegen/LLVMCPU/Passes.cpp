@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -175,6 +176,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createFoldTensorExtractOpPass());
 
   // (HAL, IREE, Linalg, STD) -> LLVM
+  passManager.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
   passManager.addNestedPass<FuncOp>(createStdExpandOpsPass());
   passManager.addPass(createConvertToLLVMPass());
 

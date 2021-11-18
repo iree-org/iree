@@ -197,8 +197,8 @@ func @nonvectorizable_matmul_and_vectorizable_generic() {
         %26 = arith.divf %25, %23 : f32
         %27 = arith.addf %26, %arg6 : f32
         %28 = arith.addf %27, %cst_1 : f32
-        %29 = minf %28, %cst_2 : f32
-        %30 = maxf %29, %cst : f32
+        %29 = arith.minf %28, %cst_2 : f32
+        %30 = arith.maxf %29, %cst : f32
         %31 = arith.mulf %30, %cst_3 : f32
         %32 = arith.mulf %31, %27 : f32
         linalg.yield %32 : f32

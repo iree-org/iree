@@ -168,28 +168,29 @@ static void populateTilingToInvocationPatterns(
           .setDistributionOptions(invocationDistributionOptions);
 
   MLIRContext *context = patterns.getContext();
-  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::CopyOp>,
-                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>,
-                  linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>,
-                  IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
-      context, tilingOptions,
-      linalg::LinalgTransformationFilter(
-          {Identifier::get(getWorkgroupKTiledMarker(), context),
-           Identifier::get(getWorkgroupMemoryMarker(), context)},
-          Identifier::get(getVectorizeMarker(), context))
-          .addFilter([](Operation *op) {
-            // FFT doesn't support second level of tiling yet.
-            return success(!isa<IREE::LinalgExt::FftOp>(op));
-          })
-          .setMatchByDefault());
+  patterns
+      .insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
+              linalg::LinalgTilingPattern<linalg::FillOp>,
+              linalg::LinalgTilingPattern<linalg::CopyOp>,
+              linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
+              linalg::LinalgTilingPattern<linalg::GenericOp>,
+              linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
+              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcOp>,
+              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcmOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>,
+              IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+          context, tilingOptions,
+          linalg::LinalgTransformationFilter(
+              {Identifier::get(getWorkgroupKTiledMarker(), context),
+               Identifier::get(getWorkgroupMemoryMarker(), context)},
+              Identifier::get(getVectorizeMarker(), context))
+              .addFilter([](Operation *op) {
+                // FFT doesn't support second level of tiling yet.
+                return success(!isa<IREE::LinalgExt::FftOp>(op));
+              })
+              .setMatchByDefault());
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
