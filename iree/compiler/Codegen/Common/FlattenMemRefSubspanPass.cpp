@@ -225,7 +225,8 @@ struct FlattenBindingSubspan final
     Type newType = getTypeConverter()->convertType(oldType);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, newType, subspanOp.binding(), subspanOp.byte_offset(),
+        subspanOp, newType, subspanOp.binding(),
+        rewriter.createOrFold<arith::ConstantIndexOp>(subspanOp.getLoc(), 0),
         subspanOp.byte_length(), dynamicDim);
     return success();
   }
