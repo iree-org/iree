@@ -914,7 +914,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                           buffer.getResult(0)});
     }
 
-    // Zero out refs
+    // Zero out refs from state struct.
     auto ordinal_counts = moduleOp.ordinal_counts();
 
     if (!ordinal_counts.hasValue()) {
@@ -1025,6 +1025,46 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                              emitc::OpaqueAttr::get(ctx, moduleStateTypeName)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{funcOp.getArgument(1)});
+
+    // Release refs from state struct.
+    auto ordinal_counts = moduleOp.ordinal_counts();
+
+    if (!ordinal_counts.hasValue()) {
+      return moduleOp.emitError()
+             << "ordinal_counts attribute not found. The OrdinalAllocationPass "
+                "must be run before.";
+    }
+    const int numGlobalRefs = ordinal_counts.getValue().global_refs();
+
+    auto refs = builder.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
+        /*args=*/
+        ArrayAttr::get(ctx, {builder.getIndexAttr(0),
+                             emitc::OpaqueAttr::get(ctx, "refs")}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{stateOp.getResult(0)});
+
+    for (int i = 0; i < numGlobalRefs; i++) {
+      auto refPtrOp = builder.create<emitc::CallOp>(
+          /*location=*/loc,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
+          /*args=*/
+          ArrayAttr::get(
+              ctx, {builder.getIndexAttr(0), builder.getUI32IntegerAttr(i)}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{refs.getResult(0)});
+
+      builder.create<emitc::CallOp>(
+          /*location=*/loc,
+          /*type=*/TypeRange{},
+          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{refPtrOp.getResult(0)});
+    }
 
     auto allocatorOp = builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1601,43 +1641,13 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
              emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"));
 
       if (operand.getType().isa<IREE::VM::RefType>()) {
-        auto refOp = rewriter.create<emitc::ConstantOp>(
-            /*location=*/loc,
-            /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-            /*value=*/emitc::OpaqueAttr::get(ctx, ""));
-
-        auto refPtrOp = rewriter.create<emitc::ApplyOp>(
-            /*location=*/loc,
-            /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-            /*applicableOperator=*/StringAttr::get(ctx, "&"),
-            /*operand=*/refOp.getResult());
-
-        if (failed(clearStruct(rewriter, refPtrOp.getResult(),
-                               /*isPointer=*/true))) {
-          return failure();
-        }
-
-        bool move = ptr->second.isLastValueUse(operand, op);
-
         Optional<Value> operandRef = findRef(funcOp, vmAnalysisCache, operand);
 
         if (!operandRef.hasValue()) {
           return op->emitError() << "local ref not found";
         }
 
-        rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain_or_move"),
-            /*args=*/
-            ArrayAttr::get(
-                ctx, {rewriter.getBoolAttr(move), rewriter.getIndexAttr(0),
-                      rewriter.getIndexAttr(1)}),
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/
-            ArrayRef<Value>{operandRef.getValue(), refPtrOp.getResult()});
-
-        updatedOperands.push_back(refPtrOp.getResult());
+        updatedOperands.push_back(operandRef.getValue());
       } else {
         updatedOperands.push_back(operand);
       }
@@ -1646,8 +1656,6 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     // Create a variable for every result and a pointer to it as output
     // parameter to the call.
     for (OpResult result : op->getResults()) {
-      emitc::ConstantOp resultOp;
-
       if (result.getType().isa<IREE::VM::RefType>()) {
         Optional<Value> ref = findRef(funcOp, vmAnalysisCache, result);
 
@@ -1655,16 +1663,10 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
           return op->emitError() << "local ref not found";
         }
 
-        // Zero initialize, just in case.
-        if (failed(clearStruct(rewriter, ref.getValue(),
-                               /*isPointer=*/true))) {
-          return failure();
-        }
-
         resultOperands.push_back(ref.getValue());
         updatedOperands.push_back(ref.getValue());
       } else {
-        resultOp = rewriter.create<emitc::ConstantOp>(
+        auto resultOp = rewriter.create<emitc::ConstantOp>(
             /*location=*/loc,
             /*resultType=*/result.getType(),
             /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -1691,9 +1693,6 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
   LogicalResult updateResults(Operation *op,
                               ConversionPatternRewriter &rewriter,
                               SmallVector<Value, 4> &resultOperands) const {
-    auto ctx = op->getContext();
-    auto loc = op->getLoc();
-
     auto funcOp = op->getParentOfType<mlir::FuncOp>();
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
@@ -1704,22 +1703,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
       size_t index = pair.index();
       OpResult result = pair.value();
 
-      if (result.getType().isa<IREE::VM::RefType>()) {
-        Optional<Value> ref = findRef(funcOp, vmAnalysisCache, result);
-
-        if (!ref.hasValue()) {
-          return op->emitError() << "local ref not found";
-        }
-
-        rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/
-            ArrayRef<Value>{resultOperands[index], ref.getValue()});
-      } else {
+      if (!result.getType().isa<IREE::VM::RefType>()) {
         result.replaceAllUsesWith(resultOperands[index]);
       }
     }
@@ -1756,9 +1740,9 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
     }
 
     bool moveLhs =
-        ptr->second.isLastValueUse(cmpOp.lhs(), cmpOp.getOperation());
+        ptr->second.isLastValueUse(cmpOp.lhs(), cmpOp.getOperation()) && false;
     bool moveRhs =
-        ptr->second.isLastValueUse(cmpOp.rhs(), cmpOp.getOperation());
+        ptr->second.isLastValueUse(cmpOp.rhs(), cmpOp.getOperation()) && false;
 
     Optional<Value> refLhs = findRef(funcOp, vmAnalysisCache, cmpOp.lhs());
 
@@ -1835,7 +1819,8 @@ class CompareRefNotZeroOpConversion
     }
 
     bool move =
-        ptr->second.isLastValueUse(cmpOp.operand(), cmpOp.getOperation());
+        ptr->second.isLastValueUse(cmpOp.operand(), cmpOp.getOperation()) ||
+        false;
 
     Optional<Value> ref = findRef(funcOp, vmAnalysisCache, cmpOp.operand());
 
@@ -2655,7 +2640,7 @@ class GlobalLoadStoreRefOpConversion
     Value srcRef = isLoad ? stateRef.getResult(0) : localRef.getValue();
     Value destRef = isLoad ? localRef.getValue() : stateRef.getResult(0);
 
-    bool move = ptr->second.isLastValueUse(localValue, op);
+    bool move = ptr->second.isLastValueUse(localValue, op) && false;
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -3331,7 +3316,9 @@ class ListSetRefOpConversion
       return setOp.emitError() << "parent func op not found in cache.";
     }
 
-    bool move = ptr->second.isLastValueUse(setOp.value(), setOp.getOperation());
+    bool move =
+        ptr->second.isLastValueUse(setOp.value(), setOp.getOperation()) ||
+        false;
 
     StringRef callee =
         move ? "iree_vm_list_set_ref_move" : "iree_vm_list_set_ref_retain";
