@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -207,14 +208,13 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 
   {
-    // Set vectorization marker globally
+    // Set vectorization marker globally and apply vectorization.
+    // CodegenStrategy can not vectorize multiple Linalg ops at the same time,
+    // so we have to vectorize them firstly.
     OpBuilder builder(funcOp.getContext());
     funcOp.walk(
         [&](linalg::LinalgOp op) { setMarker(op, getVectorizeMarker()); });
-  }
 
-  // Apply vectorization patterns.
-  {
     OwningRewritePatternList vectorizationPatterns(&getContext());
     linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
                                         linalg::GenericOp, linalg::CopyOp,
@@ -230,14 +230,6 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
       return signalPassFailure();
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "\n--- After vectorization ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  {
     // Fold consumer add ops into the contraction op itself.
     RewritePatternSet canonicalizationPatterns(context);
     vector::ContractionOp::getCanonicalizationPatterns(canonicalizationPatterns,
@@ -246,15 +238,14 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
                                        std::move(canonicalizationPatterns));
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs()
-          << "\n--- After folding consumer add ops into contraction op "
-             "iteself ---\n";
+      llvm::dbgs() << "\n--- After vectorization ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
   }
 
-  // Apply vector unroll
+  // Apply vector unroll. CodegenStrategy does not support unroll at this
+  // moment, so we manually apply the pass.
   {
     RewritePatternSet vectorUnrollPatterns(context);
     vector::populateVectorUnrollPatterns(
@@ -271,36 +262,67 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     });
   }
 
-  linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
-  linalg::hoistRedundantVectorTransfers(funcOp);
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "--- After hoisting vector transfers ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
+  vector::VectorTransposeLowering vectorTransposeLowering =
+      vector::VectorTransposeLowering::EltWise;
+  vector::VectorContractLowering vectorContractLowering =
+      vector::VectorContractLowering::OuterProduct;
+  vector::VectorMultiReductionLowering vectorMultiReductionLowering =
+      vector::VectorMultiReductionLowering::InnerReduction;
+  vector::VectorTransferSplit vectorTransferSplit =
+      vector::VectorTransferSplit::None;
 
-  // Apply vector specific operation lowering.
-  {
-    vector::VectorTransformsOptions vectorTransformsOptions =
-        vector::VectorTransformsOptions().setVectorTransformsOptions(
-            vector::VectorContractLowering::OuterProduct);
-    OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
-    vectorContractLoweringPatterns.insert<
-        vector::ContractionOpToOuterProductOpLowering,
-        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
-        vectorTransformsOptions, context);
-    vector::populateVectorTransferPermutationMapLoweringPatterns(
-        vectorContractLoweringPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorContractLoweringPatterns)))) {
-      return signalPassFailure();
-    }
+  vector::VectorTransformsOptions vectorTransformOptions =
+      vector::VectorTransformsOptions()
+          .setVectorTransposeLowering(vectorTransposeLowering)
+          .setVectorTransformsOptions(vectorContractLowering)
+          .setVectorMultiReductionLowering(vectorMultiReductionLowering)
+          .setVectorTransferSplit(vectorTransferSplit);
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "\n--- After vector specific operatrion lowering ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+  VectorTransferToSCFOptions vectorTransferToSCFOptions =
+      VectorTransferToSCFOptions()
+          .enableLowerPermutationMaps();
+
+  for (int vectorLoweringStage = 0; vectorLoweringStage < 7;
+       ++vectorLoweringStage) {
+    linalg::LinalgVectorLoweringOptions vectorLoweringOptions =
+        linalg::LinalgVectorLoweringOptions()
+            // Lowering of vector contractions.
+            .enableContractionLowering(vectorLoweringStage >= 0)
+            // Lowering of vector multi_reduction.
+            .enableMultiReductionLowering(vectorLoweringStage >= 1)
+            // Whether to split full/partial vector.transfer ops.
+            .enableTransferPartialRewrite(vectorLoweringStage >= 2 &&
+                                          vectorTransferSplit !=
+                                              vector::VectorTransferSplit::None)
+            // Set the maximum vector load / store rank.
+            //.setMaxTransferRank(maxTransferRank)
+            // Lower vector.transfer to vector.transfer of max rank.
+            .enableTransferLowering(vectorLoweringStage >= 3)
+            // Conversion to scf.
+            .enableTransferToSCFConversion(vectorLoweringStage >= 4)
+            .setVectorTransferToSCFOptions(vectorTransferToSCFOptions)
+            // Lowering of vector.shape_cast.
+            .enableShapeCastLowering(vectorLoweringStage >= 5)
+            // Lowering of vector.transpose.
+            .enableVectorTransposeLowering(vectorLoweringStage >= 6)
+            .setVectorTransformsOptions(vectorTransformOptions)
+            // TODO(hanchung): Check it through target triple. The pass is only
+            // used by x86 arch, so we can unconditionally enable AVX2 lowering.
+            .enableAVX2Lowering()
+            .setAVX2LoweringOptions(
+                x86vector::avx2::LoweringOptions().setTransposeOptions(
+                    x86vector::avx2::TransposeLoweringOptions()
+                        .lower4x8xf32()
+                        .lower8x8xf32()));
+
+    // Orders matter.
+    linalg::CodegenStrategy strategy;
+    strategy.vectorLowering(vectorLoweringOptions);
+
+    // Created a nested OpPassManager and run.
+    OpPassManager dynamicPM("builtin.func");
+    strategy.configurePassPipeline(dynamicPM, funcOp.getContext(), true);
+    if (failed(runPipeline(dynamicPM, funcOp))) return signalPassFailure();
   }
 }
 
