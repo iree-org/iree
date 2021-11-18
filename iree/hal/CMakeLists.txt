@@ -18,9 +18,13 @@ iree_cc_library(
   SRCS
     "allocator.c"
     "allocator.h"
+    "allocator_caching.c"
+    "allocator_caching.h"
     "allocator_heap.c"
     "buffer.c"
     "buffer.h"
+    "buffer_caching.c"
+    "buffer_caching.h"
     "buffer_heap.c"
     "buffer_heap_impl.h"
     "buffer_view.c"
@@ -55,8 +59,6 @@ iree_cc_library(
     "semaphore.h"
     "string_util.c"
     "string_util.h"
-    "allocator_caching.c"
-    "allocator_caching.h"
   DEPS
     iree::base
     iree::base::core_headers

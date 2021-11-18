@@ -21,9 +21,6 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_caching(
 IREE_API_EXPORT iree_status_t iree_hal_allocator_add_buffer_to_cache(
     iree_hal_buffer_t* base_buffer);
 
-// Boolean value to denote if the buffers should be cached or destroyed.
-IREE_API_EXPORT extern bool iree_hal_allocator_cache_buffer;
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

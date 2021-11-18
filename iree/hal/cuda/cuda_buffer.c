@@ -57,6 +57,7 @@ iree_status_t iree_hal_cuda_buffer_wrap(
 }
 
 static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
+<<<<<<< HEAD
 
   iree_hal_memory_type_t memory_type = iree_hal_buffer_memory_type(base_buffer);
   // Cache host visible device memory into a list.
@@ -69,6 +70,8 @@ static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
     }
   }
   // Destroy other types of memory.
+=======
+>>>>>>> Add custom buffer for caching
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
