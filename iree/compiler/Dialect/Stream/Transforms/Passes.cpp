@@ -226,8 +226,8 @@ void buildStreamOptimizationPassPipeline(
 
   if (transformOptions.optimizeBindings) {
     // Canonicalizer needs to run so that we have predictable inputs for fusion.
-    passManager.addPass(mlir::createCanonicalizerPass());
-    passManager.addPass(IREE::Stream::createFuseDispatchBindingsPass());
+    // passManager.addPass(mlir::createCanonicalizerPass());
+    // passManager.addPass(IREE::Stream::createFuseDispatchBindingsPass());
 
     // Folding operands requires that CSE folds the inputs that we check for.
     passManager.addPass(mlir::createCSEPass());
