@@ -312,7 +312,7 @@ def main(args):
   aggregate_results = {}
   for benchmark_index in range(len(all_results.benchmarks)):
     benchmark_case = all_results.benchmarks[benchmark_index]
-    benchmark_info = benchmark_case["benchmark"]
+    benchmark_info = benchmark_case.benchmark_info
 
     # Make sure each benchmark has a unique name.
     name = str(benchmark_info)
