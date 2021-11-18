@@ -63,6 +63,37 @@ hal.executable private @matmul_tensors  {
 // -----
 
 #config = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [1, 1, 1, 1]>
+hal.executable private @matmul_tensors  {
+  hal.interface @io {
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  }
+  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
+    hal.executable.entry_point @illegal attributes {
+      translation.info = #translation,
+      interface = @io,
+      ordinal = 0 : index
+    }
+    builtin.module {
+      func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x8xf32>
+        %rhs = hal.interface.binding.subspan @io::@arg1[%c0] : memref<8x16xf32>
+        %result = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4x16xf32>
+        // expected-error @+1 {{workload_per_wg size should be less than 3}}
+        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
+          outs(%result: memref<4x16xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#config = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [1, 1]>
 hal.executable private @matmul_tensors  {
   hal.interface @io {
