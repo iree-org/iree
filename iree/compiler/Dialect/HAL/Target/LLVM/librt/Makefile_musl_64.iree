@@ -9,6 +9,7 @@ include $(musldir)/Makefile
 
 IREE_BASE_SRCS = $(addprefix $(srcdir)/, \
 	src/math/powf.c \
+	src/math/expf.c \
 	src/math/powf_data.c \
 	src/math/exp2f_data.c \
 	src/math/__math_invalidf.c \

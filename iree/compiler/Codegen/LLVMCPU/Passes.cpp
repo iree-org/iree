@@ -6,9 +6,11 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
@@ -49,12 +51,18 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
   // Verify that the workload per workgroup is set and is non-zero.
   SmallVector<int64_t> workloadPerWorkgroup =
       translationInfo.getWorkloadPerWorkgroupVals();
-  SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
-  if (workloadPerWorkgroup.size() != partitionedLoops.size()) {
-    return op->emitOpError("expected ")
-           << partitionedLoops.size()
-           << " entries for workload_per_wg, but got "
-           << workloadPerWorkgroup.size();
+  if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
+    return op->emitOpError("workload_per_wg size should be less than ")
+           << kNumMaxParallelDims;
+  }
+  if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
+    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    if (workloadPerWorkgroup.size() != partitionedLoops.size()) {
+      return op->emitOpError("expected ")
+             << partitionedLoops.size()
+             << " entries for workload_per_wg, but got "
+             << workloadPerWorkgroup.size();
+    }
   }
   if (llvm::any_of(workloadPerWorkgroup,
                    [](int64_t val) { return val == 0; })) {
@@ -69,6 +77,7 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
   if (!firstLevelTileSizes.empty()) {
     // Verify that if the first-level tile sizes are set, they are the same as
     // workload_per_wg for the partitioned loops.
+    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
     size_t minElements =
         (partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1);
     if (firstLevelTileSizes.size() < minElements) {

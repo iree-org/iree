@@ -234,7 +234,7 @@ void buildStreamOptimizationPassPipeline(
     passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
 
     // Only want to specialize after we've added all the operands we need above.
-    passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
+    // passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
 
     // TODO(benvanik): canonicalize bindings: we should sort the bindings by
     // the block argument order of the parent stream.cmd.execute. This will get

@@ -18,14 +18,14 @@ from dataclasses import dataclass
 from typing import Any, Dict, Sequence
 
 __all__ = [
-    "AndroidDeviceInfo", "BenchmarkInfo", "BenchmarkResults",
-    "execute_cmd_and_get_output"
+    "AndroidDeviceInfo", "BenchmarkInfo", "BenchmarkResults", "BenchmarkRun",
+    "execute_cmd_and_get_output", "execute_cmd"
 ]
 
 # A map for IREE driver names. This allows us to normalize driver names like
 # mapping to more friendly ones and detach to keep driver names used in
 # benchmark presentation stable.
-IREE_DRIVER_NAME_MAP = {
+IREE_DRIVERS_TO_PRETTY_NAMES = {
     "iree-dylib": "IREE-Dylib",
     "iree-dylib-sync": "IREE-Dylib-Sync",
     "iree-vmvx": "IREE-VMVX",
@@ -33,19 +33,37 @@ IREE_DRIVER_NAME_MAP = {
     "iree-vulkan": "IREE-Vulkan",
 }
 
+IREE_PRETTY_NAMES_TO_DRIVERS = {
+    v: k for k, v in IREE_DRIVERS_TO_PRETTY_NAMES.items()
+}
+
+
+def execute_cmd(args: Sequence[str],
+                verbose: bool = False,
+                **kwargs) -> subprocess.CompletedProcess:
+  """Executes a command and returns the completed process.
+
+  A thin wrapper around subprocess.run that sets some useful defaults and
+  optionally prints out the command being run.
+
+  Raises:
+    CalledProcessError if the command fails.
+  """
+  if verbose:
+    cmd = " ".join(args)
+    print(f"cmd: {cmd}")
+  return subprocess.run(args, check=True, text=True, **kwargs)
+
 
 def execute_cmd_and_get_output(args: Sequence[str],
                                verbose: bool = False,
                                **kwargs) -> str:
-  """Executes a command and returns its stdout."""
-  if verbose:
-    cmd = " ".join(args)
-    print(f"cmd: {cmd}")
-  return subprocess.run(args,
-                        check=True,
-                        stdout=subprocess.PIPE,
-                        universal_newlines=True,
-                        **kwargs).stdout.strip()
+  """Executes a command and returns its stdout.
+
+  Same as execute_cmd except captures stdout (and not stderr).
+  """
+  return execute_cmd(args, verbose=verbose, stdout=subprocess.PIPE,
+                     **kwargs).stdout.strip()
 
 
 def get_android_device_model(verbose: bool = False) -> str:
@@ -173,7 +191,7 @@ class BenchmarkInfo:
       e.g., ['1-thread', 'big-core', 'full-inference']
   - runner: which runner is used for benchmarking, e.g., 'iree_vulkan', 'tflite'
   - device_info: an AndroidDeviceInfo object describing the phone where
-      bnechmarks run
+      benchmarks run
   """
 
   model_name: str
@@ -189,13 +207,14 @@ class BenchmarkInfo:
     driver = ""
     if self.runner == "iree-vulkan":
       target_arch = "GPU-" + self.device_info.gpu_name
-      driver = IREE_DRIVER_NAME_MAP[self.runner]
+      driver = IREE_DRIVERS_TO_PRETTY_NAMES[self.runner]
     elif (self.runner == "iree-dylib" or self.runner == "iree-dylib-sync" or
           self.runner == "iree-vmvx" or self.runner == "iree-vmvx-sync"):
       target_arch = "CPU-" + self.device_info.get_arm_arch_revision()
-      driver = IREE_DRIVER_NAME_MAP[self.runner]
+      driver = IREE_DRIVERS_TO_PRETTY_NAMES[self.runner]
     else:
-      raise ValueError("Unrecognized runner; need to update the list")
+      raise ValueError(
+          f"Unrecognized runner '{self.runner}'; need to update the list")
 
     if self.model_tags:
       tags = ",".join(self.model_tags)
@@ -206,6 +225,26 @@ class BenchmarkInfo:
     mode = ",".join(self.bench_mode)
 
     return f"{model_part} {mode} with {driver} @ {phone_part}"
+
+  @staticmethod
+  def from_device_info_and_name(device_info: AndroidDeviceInfo, name: str):
+    (
+        model_name,
+        model_tags,
+        model_source,
+        bench_mode,
+        _,  # "with"
+        runner,
+        _,  # "@"
+        model,
+        _,  # Device Info
+    ) = name.split()
+    model_source = model_source.strip("()")
+    model_tags = model_tags.strip("[]").split(",")
+    bench_mode = bench_mode.split(",")
+    runner = IREE_PRETTY_NAMES_TO_DRIVERS.get(runner)
+    return BenchmarkInfo(model_name, model_tags, model_source, bench_mode,
+                         runner, device_info)
 
   def deduce_taskset(self) -> str:
     """Deduces the CPU affinity taskset mask according to benchmark modes."""
@@ -239,15 +278,41 @@ class BenchmarkInfo:
                              json_object["device_info"]))
 
 
+@dataclass
+class BenchmarkRun(object):
+  """An object describing a single run of the benchmark binary.
+
+  - benchmark_info: a BenchmarkInfo object describing the benchmark setup.
+  - context: the benchmark context returned by the benchmarking framework.
+  - results: the benchmark results returned by the benchmarking framework.
+  """
+  benchmark_info: BenchmarkInfo
+  context: Dict[str, Any]
+  results: Sequence[Dict[str, Any]]
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "benchmark_info": self.benchmark_info.to_json_object(),
+        "context": self.context,
+        "results": self.results,
+    }
+
+  def to_json_str(self) -> str:
+    return json.dumps(self.to_json_object())
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return BenchmarkRun(
+        BenchmarkInfo.from_json_object(json_object["benchmark_info"]),
+        json_object["context"], json_object["results"])
+
+
 class BenchmarkResults(object):
   """An object describing a set of benchmarks for one particular commit.
 
     It contains the following fields:
     - commit: the commit SHA for this set of benchmarks.
-    - benchmarks: a list of benchmarks, each with
-      - benchmark: a BenchmarkInfo object
-      - context: the context for running the benchmarks
-      - results: results for all benchmark runs
+    - benchmarks: a list of BenchmarkRun objects
     """
 
   def __init__(self):
@@ -256,16 +321,6 @@ class BenchmarkResults(object):
 
   def set_commit(self, commit: str):
     self.commit = commit
-
-  def append_one_benchmark(self, benchmark_info: BenchmarkInfo,
-                           run_context: Dict[str, Any],
-                           run_results: Sequence[Dict[str, Any]]):
-    """Appends the results for one benchmark."""
-    self.benchmarks.append({
-        "benchmark": benchmark_info,
-        "context": run_context,
-        "results": run_results,
-    })
 
   def merge(self, other):
     if self.commit != other.commit:
@@ -281,7 +336,7 @@ class BenchmarkResults(object):
         'mean', 'median', 'stddev'.
       """
     time = None
-    for bench_case in self.benchmarks[benchmark_index]["results"]:
+    for bench_case in self.benchmarks[benchmark_index].results:
       if bench_case["name"].endswith(f"real_time_{kind}"):
         if bench_case["time_unit"] != "ms":
           raise ValueError(f"Expected ms as time unit")
@@ -293,12 +348,7 @@ class BenchmarkResults(object):
 
   def to_json_str(self) -> str:
     json_object = {"commit": self.commit, "benchmarks": []}
-    for benchmark in self.benchmarks:
-      json_object["benchmarks"].append({
-          "benchmark": benchmark["benchmark"].to_json_object(),
-          "context": benchmark["context"],
-          "results": benchmark["results"],
-      })
+    json_object["benchmarks"] = [b.to_json_object() for b in self.benchmarks]
     return json.dumps(json_object)
 
   @staticmethod
@@ -306,8 +356,7 @@ class BenchmarkResults(object):
     json_object = json.loads(json_str)
     results = BenchmarkResults()
     results.set_commit(json_object["commit"])
-    for benchmark in json_object["benchmarks"]:
-      results.append_one_benchmark(
-          BenchmarkInfo.from_json_object(benchmark["benchmark"]),
-          benchmark["context"], benchmark["results"])
+    results.benchmarks = [
+        BenchmarkRun.from_json_object(b) for b in json_object["benchmarks"]
+    ]
     return results
