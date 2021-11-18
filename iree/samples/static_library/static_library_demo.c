@@ -7,8 +7,6 @@
 // A example of static library loading in IREE. See the README.md for more info.
 // Note: this demo requires artifacts from iree-translate before it will run.
 
-#include <stdio.h>
-
 #include "iree/hal/local/loaders/static_library_loader.h"
 #include "iree/hal/local/sync_device.h"
 #include "iree/modules/hal/module.h"
@@ -19,6 +17,8 @@ simple_mul_dispatch_0_library_query(
     iree_hal_executable_library_version_t max_version, void* reserved);
 // A function to create the bytecode or C module.
 extern iree_status_t create_module(iree_vm_module_t** module);
+
+extern void print_success();
 
 // A function to create the HAL device from the different backend targets.
 // The HAL device is returned based on the implementation, and it must be
@@ -205,6 +205,6 @@ int main() {
     iree_status_free(result);
     return -1;
   }
-  printf("static_library_run passed\n");
+  print_success();
   return 0;
 }

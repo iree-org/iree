@@ -160,7 +160,7 @@ iree_lit_test(
   NAME
     static_library_demo_c_test
   TEST_FILE
-    "static_library_demo_test.txt"
+    "static_library_demo_c_test.txt"
   DATA
     ::static_library_demo_c
     iree::tools::IreeFileCheck
