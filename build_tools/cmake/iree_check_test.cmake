@@ -10,6 +10,10 @@ include(CMakeParseArguments)
 # Just a thin wrapper around iree_bytecode_module, passing it some
 # common flags, including the appropriate --iree-llvm-target-triple in the
 # Android case.
+#
+# TODO: just fold this into iree_bytecode_module. This is not trivial because
+# some existing iree_bytecode_module call sites are passing their own
+# --iree-llvm-target-triple and --iree-llvm-target-cpu-features.
 function(iree_bytecode_module_for_iree_check_test_and_friends)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -35,7 +39,9 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     # should pretty consistently be just a number we can use for target triple.
     set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
     list(APPEND _RULE_FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
-    list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu-features=+dotprod")
+    if (IREE_TESTS_TARGET_CPU_FEATURES)
+      list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu-features=${IREE_TESTS_TARGET_CPU_FEATURES}")
+    endif()
   endif()
 
   iree_bytecode_module(

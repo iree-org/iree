@@ -22,10 +22,96 @@ namespace iree_compiler {
 
 namespace {
 
-/// Converts 8x4x8 vector contraction with matmul(A_, B) semantics to AArch64
-/// inline assembly using aarch64 4-sdot instructions. Each sdot instruction
-/// performas a single matrix-vector product and to compute matmul(A, B) with
-/// matrix-vector products B is transposed.
+static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
+  auto iteratorTypes = contractionOp.iterator_types().getValue();
+  if (iteratorTypes.size() != 3) {
+    return false;
+  }
+  SmallVector<int, 3> parallel_iterators;
+  SmallVector<int, 3> reduction_iterators;
+  for (int i = 0; i < 3; i++) {
+    if (isParallelIterator(iteratorTypes[i])) {
+      parallel_iterators.push_back(i);
+    } else if (isReductionIterator(iteratorTypes[i])) {
+      reduction_iterators.push_back(i);
+    } else {
+      return false;
+    }
+  }
+  if (parallel_iterators.size() != 2 ||
+      reduction_iterators.size() != 1)
+  {
+    return false;
+  }
+  const int M = parallel_iterators[0];
+  const int N = parallel_iterators[1];
+  const int K = reduction_iterators[0];
+  auto indexingMaps = contractionOp.indexing_maps().getValue();
+  if (indexingMaps.size() != 3) {
+    return false;
+  }
+  const int expectedMapResults[3][2] = {{M,K}, {N, K}, {M, N}};
+  for (int m = 0; m < 3; ++m) {
+    auto map = indexingMaps[m].cast<AffineMapAttr>().getValue();
+    if (map.getNumDims() != 3 ||
+        map.getNumResults() != 2)
+    {
+      return false;
+    }
+    for (int r = 0; r < 2; ++r) {
+      int actualMapResult = map.getResults()[r].cast<AffineDimExpr>().getPosition();
+      if (actualMapResult != expectedMapResults[m][r]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+static Value getExtInput(Type extSrcType, Type extDstType, Value extResult) {
+  if (extResult.getType().cast<VectorType>().getElementType() != extDstType) {
+    return nullptr;
+  }
+  auto extSIOp = extResult.getDefiningOp<arith::ExtSIOp>();
+  if (!extSIOp) {
+    return nullptr;
+  }
+  Value extInput = extSIOp.in();
+  if (extInput.getType().cast<VectorType>().getElementType() != extSrcType) {
+    return nullptr;
+  }
+  return extInput;
+}
+
+static Value extractChunk(PatternRewriter &rewriter, Location loc, VectorType dstVecType, Value input, int position) {
+  VectorType inputVecType = input.getType().cast<VectorType>();
+  auto inputShape = inputVecType.getShape();
+  auto dstShape = dstVecType.getShape();
+  assert(inputShape.size() == 1);
+  assert(dstShape.size() == 1);
+  if (1) {
+    // Try vector::ExtractStridedSliceOp ?
+    SmallVector<int64_t> offsets{position * dstShape[0]};
+    SmallVector<int64_t> sizes{dstShape[0]};
+    SmallVector<int64_t> strides{1};
+
+    return rewriter.create<vector::ExtractStridedSliceOp>(
+            loc, input, offsets, sizes, strides);
+  } else {
+    // Try casting to a 2D shape just so we can get the desired chunk with just
+    // a vector::ExtractOp ?
+    Type elemType = dstVecType.getElementType();
+    VectorType input2DType =  VectorType::get({inputShape[0] / dstShape[0], dstShape[0]}, elemType);
+    Value input2D = rewriter.create<vector::ShapeCastOp>(
+          loc, input2DType, input);
+    auto posAttr = rewriter.getI64ArrayAttr(position);
+    return rewriter.create<vector::ExtractOp>(loc, dstVecType, input2D, posAttr);
+  }
+}
+
+/// Converts a vector.contract computing A*B^T where A and B are 8x4 matrices
+/// of int32's that are themselves the result of an arith.extsi promoting from
+/// i8, into an inline asm op using ARM NEON dotprod instructions.
 struct ConvertVectorContract8x4x8_i8i8i32_ToAArch64InlineAsmPattern
     : public OpRewritePattern<vector::ContractionOp> {
  public:
@@ -46,34 +132,19 @@ struct ConvertVectorContract8x4x8_i8i8i32_ToAArch64InlineAsmPattern
         rhsShape[1] != 4) {
       return failure();
     }
+    if (!isMatrixTimesMatrixTransposed(contractionOp)) {
+      return failure();
+    }
 
-    Value inLhs = contractionOp.lhs();
-    Value inRhs = contractionOp.rhs();
-
-    auto I8Type = rewriter.getIntegerType(8);
-    auto I32Type = rewriter.getIntegerType(32);
+    Type I8Type = rewriter.getIntegerType(8);
+    Type I32Type = rewriter.getIntegerType(32);
 
     if (accType.getElementType() != I32Type) {
       return failure();
     }
 
-    auto getI8Value = [&](Value v) -> Value {
-      if (auto parentOp = v.getDefiningOp<arith::ExtSIOp>()) {
-        if (parentOp.in().getType().cast<VectorType>().getElementType() !=
-            I8Type) {
-          return nullptr;
-        } else {
-          return parentOp.in();
-        }
-      }
-      return nullptr;
-    };
-    if (lhsType.getElementType() != I8Type) {
-      inLhs = getI8Value(inLhs);
-    }
-    if (rhsType.getElementType() != I8Type) {
-      inRhs = getI8Value(inRhs);
-    }
+    Value inLhs = getExtInput(I8Type, I32Type, contractionOp.lhs());
+    Value inRhs = getExtInput(I8Type, I32Type, contractionOp.rhs());
 
     if (!inLhs || !inRhs) return failure();
 
@@ -86,31 +157,21 @@ struct ConvertVectorContract8x4x8_i8i8i32_ToAArch64InlineAsmPattern
       SmallVector<int64_t> offsets{i / 2, (i % 2) * 4};
       SmallVector<int64_t> sizes{1, 4};
       SmallVector<int64_t> strides{1, 1};
-
-      dstVec.push_back(rewriter.create<vector::ShapeCastOp>(
-          loc, int32x4VType,
-          rewriter.create<vector::ExtractStridedSliceOp>(
-              loc, contractionOp.acc(), offsets, sizes, strides)));
+      Value flatAcc =  rewriter.create<vector::ShapeCastOp>(
+          loc, VectorType::get({8 * 8}, I32Type), contractionOp.acc());
+      dstVec.push_back(extractChunk(rewriter, loc, int32x4VType, flatAcc, i));
     }
 
     auto flatVectorType = VectorType::get({32}, I8Type);
+    auto flatHalfVectorType = VectorType::get({16}, I8Type);
 
     auto lhs = rewriter.create<vector::ShapeCastOp>(loc, flatVectorType, inLhs);
-
     auto rhs = rewriter.create<vector::ShapeCastOp>(loc, flatVectorType, inRhs);
 
-    auto extract = [&](Value input, int64_t offset) {
-      SmallVector<int64_t> offsets{offset};
-      SmallVector<int64_t> sizes{16};
-      SmallVector<int64_t> strides{1};
-
-      return rewriter.create<vector::ExtractStridedSliceOp>(loc, input, offsets,
-                                                            sizes, strides);
-    };
-    auto lhs0 = extract(lhs, 0);
-    auto lhs1 = extract(lhs, 16);
-    auto rhs0 = extract(rhs, 0);
-    auto rhs1 = extract(rhs, 16);
+    auto lhs0 = extractChunk(rewriter, loc, flatHalfVectorType, lhs, 0);
+    auto lhs1 = extractChunk(rewriter, loc, flatHalfVectorType, lhs, 1);
+    auto rhs0 = extractChunk(rewriter, loc, flatHalfVectorType, rhs, 0);
+    auto rhs1 = extractChunk(rewriter, loc, flatHalfVectorType, rhs, 1);
 
     auto returnType = LLVM::LLVMStructType::getLiteral(rewriter.getContext(),
                                                        {

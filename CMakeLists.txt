@@ -189,6 +189,8 @@ endif()
 
 option(IREE_DEV_MODE "Configure settings to optimize for IREE development (as opposed to CI or release)" OFF)
 
+option(IREE_TESTS_TARGET_CPU_FEATURES "CPU architecture features to enable (--iree-llvm-target-cpu-features) when building tests" "")
+
 #-------------------------------------------------------------------------------
 # IREE assertions
 # We don't love the way this is done, but we have to line it up with how LLVM
