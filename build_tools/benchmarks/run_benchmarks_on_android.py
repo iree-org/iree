@@ -345,8 +345,8 @@ def run_benchmarks_for_category(
     benchmark_key = str(benchmark_info)
     # If we're not running the benchmark or the capture, just skip ahead. No
     # need to push files.
-    if benchmark_key in skip_benchmarks and (not do_capture or benchmark_key
-                                                 in skip_captures):
+    if benchmark_key in skip_benchmarks and (not do_capture or
+                                             benchmark_key in skip_captures):
       continue
     print(f"--> benchmark: {benchmark_info} <--")
     # Now try to actually run benchmarks and collect captures. If keep_going is
@@ -683,8 +683,8 @@ def main(args):
     benchmarks.extend(f"{os.path.join(previous_benchmarks_dir, b)}.json"
                       for b in previous_benchmarks)
   if do_capture and skip_captures:
-    captures.extend(f"{os.path.join(skip_captures_dir, c)}.tracy"
-                    for c in skip_captures)
+    captures.extend(
+        f"{os.path.join(skip_captures_dir, c)}.tracy" for c in skip_captures)
 
   for b in benchmarks:
     with open(b) as f:
