@@ -55,6 +55,7 @@ import re
 import subprocess
 import tarfile
 import time
+import shutil
 import sys
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TextIO, Set
@@ -708,8 +709,10 @@ def main(args):
     with tarfile.open(args.capture_tarball, "w:gz") as tar:
       for capture_filename in captures:
         tar.add(capture_filename)
-    for capture_filename in captures:
-      os.remove(capture_filename)
+
+  # Delete all the temp files if everything completed successfully.
+  if not args.no_clean and not errors:
+    shutil.rmtree(args.tmpdir)
 
   if errors:
     print("Benchmarking completed with errors", file=sys.stderr)
