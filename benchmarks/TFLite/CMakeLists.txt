@@ -568,7 +568,9 @@ iree_benchmark_suite(
 # hal.ex.submit_and_wait; while calling import;
 # ```
 # With current kernel performance and timeouts on Adreno Pixel 4, this means we
-# have no kernel benchmark for the DeepLabV3 Model
+# have no kernel benchmark for the DeepLabV3 and MobileBert models
+# TODO: Add kernel-execution config for DEEPLABV3_FP32_MODULE and
+# MOBILEBERT_FP32_MODULE when they can run with at least 8 repetitions.
 
 # GPU, Vulkan, Adreno, kernel-execution
 iree_benchmark_suite(
@@ -595,32 +597,6 @@ iree_benchmark_suite(
   RUNTIME_FLAGS
     "--batch_size=16"
 )
-
-# 16 is too much for this model and it hits the timeout (so is 12)
-iree_benchmark_suite(
-  MODULES
-    "${MOBILEBERT_FP32_MODULE}"
-
-  BENCHMARK_MODES
-    "kernel-execution,experimental-flags"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  TARGET_ARCHITECTURE
-    "GPU-Adreno"
-  TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-android11"
-    "--iree-flow-inline-constants-max-byte-length=2048"
-    "--iree-enable-fusion-with-reduction-ops"
-    "--iree-hal-benchmark-dispatch-repeat-count=8"
-  DRIVER
-    "vulkan"
-  RUNTIME_FLAGS
-    "--batch_size=8"
-)
-
-# TODO: Add kernel-execution config for DEEPLABV3_FP32_MODULE when it can run
-# with at least 8 repetitions.
 
 # GPU, Vulkan, Mali, kernel-execution
 iree_benchmark_suite(
