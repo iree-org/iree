@@ -9,12 +9,12 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
-#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "iree-codegen-remove-trivial-loops"
 
