@@ -27,6 +27,7 @@ iree_cc_library(
     "LLVMGPUPipelining.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"
+    "LLVMGPUUtils.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
