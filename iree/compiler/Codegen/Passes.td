@@ -241,7 +241,16 @@ def SPIRVLowerExecutableTarget :
       "mlir::iree_compiler::createSPIRVLowerExecutableTargetPass()";
 }
 
-// TODO: Rename argument to be fully qualified.
+def SPIRVTile : Pass<"iree-spirv-tile", "FuncOp"> {
+  let summary = "Tile Linalg ops with tensor semantics to invocations";
+  let constructor = "mlir::iree_compiler::createSPIRVTilePass()";
+}
+
+def SPIRVDistribute : Pass<"iree-spirv-distribute", "FuncOp"> {
+  let summary = "Distribute tiled loop nests to invocations";
+  let constructor = "mlir::iree_compiler::createSPIRVDistributePass()";
+}
+
 def SPIRVTileAndDistribute : Pass<"iree-spirv-tile-and-distribute", "FuncOp"> {
   let summary = "Tile and distribute Linalg ops with buffer semantics to "
                 "invocations";

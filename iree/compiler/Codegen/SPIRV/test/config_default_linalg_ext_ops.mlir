@@ -34,7 +34,7 @@ hal.executable private @static_1d_sort  {
 // Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
 //       CHECK: hal.executable.entry_point public @static_1d_sort
 //  CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
