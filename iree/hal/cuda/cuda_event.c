@@ -15,6 +15,9 @@
 typedef struct iree_hal_cuda_event_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context_wrapper;
+  // For CUDA graph just keep track of the sync node assoociated to the event.
+  // TODO: This would work differently for multi-stream implementation.
+  CUgraphNode sync_node;
 } iree_hal_cuda_event_t;
 
 extern const iree_hal_event_vtable_t iree_hal_cuda_event_vtable;
@@ -39,6 +42,7 @@ iree_status_t iree_hal_cuda_event_create(
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_cuda_event_vtable, &event->resource);
     event->context_wrapper = context_wrapper;
+    event->sync_node = NULL;
     *out_event = (iree_hal_event_t*)event;
   }
 
@@ -54,6 +58,18 @@ static void iree_hal_cuda_event_destroy(iree_hal_event_t* base_event) {
   iree_allocator_free(host_allocator, event);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_hal_cuda_event_set_sync_node(iree_hal_event_t* base_event,
+                                       CUgraphNode node) {
+  iree_hal_cuda_event_t* event = iree_hal_cuda_event_cast(base_event);
+  event->sync_node = node;
+}
+
+CUgraphNode iree_hal_cuda_event_get_sync_node(
+    const iree_hal_event_t* base_event) {
+  iree_hal_cuda_event_t* event = (iree_hal_cuda_event_t*)(base_event);
+  return event->sync_node;
 }
 
 const iree_hal_event_vtable_t iree_hal_cuda_event_vtable = {

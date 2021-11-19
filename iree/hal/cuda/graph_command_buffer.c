@@ -11,12 +11,16 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/inline_array.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/cuda_buffer.h"
+#include "iree/hal/cuda/cuda_event.h"
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/executable_layout.h"
 #include "iree/hal/cuda/native_executable.h"
 #include "iree/hal/cuda/status_util.h"
+
+#define CUDA_MAX_LEAF_NODES 16
 
 // Command buffer implementation that directly maps to cuda graph.
 // This records the commands on the calling thread without additional threading
@@ -29,9 +33,16 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
   iree_hal_queue_affinity_t queue_affinity;
   CUgraph graph;
   CUgraphExec exec;
-  // Keep track of the last node added to the command buffer as we are currently
-  // serializing all the nodes (each node depends on the previous one).
-  CUgraphNode last_node;
+  // Keep track of an array of leaf nodes in the graph. Whenever an event is
+  // raised all the leaf nodes will be parents of the event node.
+  CUgraphNode leaf_nodes[CUDA_MAX_LEAF_NODES];
+  // Number of valid nodes in leaf_nodes.
+  size_t num_leaf_nodes;
+  // Keep track of the node any new dispatch needs to depend on. For simplicity
+  // we make all the dependency merged into a single node. This may require
+  // adding empty nodes. As an optimization we could try to reduce the number of
+  // empty nodes in the future.
+  CUgraphNode last_sync_node;
   // Keep track of the current set of kernel arguments.
   void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;
@@ -77,7 +88,8 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
     command_buffer->queue_affinity = queue_affinity;
     command_buffer->graph = graph;
     command_buffer->exec = NULL;
-    command_buffer->last_node = NULL;
+    command_buffer->num_leaf_nodes = 0;
+    command_buffer->last_sync_node = NULL;
 
     CUdeviceptr* device_ptrs =
         (CUdeviceptr*)(command_buffer->current_descriptor +
@@ -194,6 +206,40 @@ static void iree_hal_cuda_graph_command_buffer_end_debug_group(
   // TODO(benvanik): tracy event stack.
 }
 
+static iree_status_t iree_hal_merge_node_edges(
+    iree_hal_cuda_graph_command_buffer_t* command_buffer, size_t num_nodes,
+    const CUgraphNode* nodes, CUgraphNode* merged_node) {
+  if (num_nodes == 0) {
+    *merged_node = NULL;
+  } else if (num_nodes == 1) {
+    *merged_node = nodes[0];
+  } else if (num_nodes > 1) {
+    CUDA_RETURN_IF_ERROR(command_buffer->context->syms,
+                         cuGraphAddEmptyNode(merged_node, command_buffer->graph,
+                                             nodes, num_nodes),
+                         "cuGraphAddEmptyNode");
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_cuda_flush_dep_nodes(
+    iree_hal_cuda_graph_command_buffer_t* command_buffer) {
+  if (command_buffer->num_leaf_nodes <= 1) {
+    return iree_ok_status();
+  }
+  CUgraphNode dummy_node;
+  // If there are more nodes than our queue size add a dummy node with all the
+  // edges.
+  CUDA_RETURN_IF_ERROR(command_buffer->context->syms,
+                       cuGraphAddEmptyNode(&dummy_node, command_buffer->graph,
+                                           command_buffer->leaf_nodes,
+                                           command_buffer->num_leaf_nodes),
+                       "cuGraphAddEmptyNode");
+  command_buffer->num_leaf_nodes = 0;
+  command_buffer->leaf_nodes[command_buffer->num_leaf_nodes++] = dummy_node;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_cuda_graph_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_execution_stage_t source_stage_mask,
@@ -203,24 +249,32 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_execution_barrier(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized.
-  return iree_ok_status();
+  iree_hal_cuda_graph_command_buffer_t* command_buffer =
+      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+  iree_status_t status = iree_cuda_flush_dep_nodes(command_buffer);
+  if (command_buffer->num_leaf_nodes > 0) {
+    command_buffer->num_leaf_nodes = 0;
+    command_buffer->last_sync_node = command_buffer->leaf_nodes[0];
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_signal_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized.
-  return iree_ok_status();
+  iree_hal_cuda_graph_command_buffer_t* command_buffer =
+      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+  iree_status_t status = iree_cuda_flush_dep_nodes(command_buffer);
+  if (command_buffer->num_leaf_nodes > 0) {
+    iree_hal_cuda_event_set_sync_node(event, command_buffer->leaf_nodes[0]);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_reset_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized.
+  iree_hal_cuda_event_set_sync_node(event, NULL);
   return iree_ok_status();
 }
 
@@ -233,8 +287,24 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_wait_events(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized.
+  iree_hal_cuda_graph_command_buffer_t* command_buffer =
+      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+  iree_host_size_t edge_count =
+      event_count + (command_buffer->last_sync_node ? 1 : 0);
+  iree_inline_array(CUgraphNode, node_array, edge_count,
+                    command_buffer->context->host_allocator);
+  for (iree_host_size_t i = 0; i < event_count; i++) {
+    CUgraphNode syncNode = iree_hal_cuda_event_get_sync_node(events[i]);
+    *iree_inline_array_at(node_array, i) = syncNode;
+  }
+  if (command_buffer->last_sync_node) {
+    *iree_inline_array_at(node_array, event_count) =
+        command_buffer->last_sync_node;
+  }
+  CUgraphNode mergedNode;
+  iree_hal_merge_node_edges(command_buffer, event_count,
+                            iree_inline_array_data(node_array), &mergedNode);
+  command_buffer->last_sync_node = mergedNode;
   return iree_ok_status();
 }
 
@@ -266,6 +336,24 @@ static uint32_t iree_hal_cuda_splat_pattern(const void* pattern,
   }
 }
 
+static size_t iree_cuda_get_dep_nodes(
+    iree_hal_cuda_graph_command_buffer_t* command_buffer,
+    CUgraphNode (*dep)[CUDA_MAX_LEAF_NODES]) {
+  if (command_buffer->last_sync_node == NULL) return 0;
+  (*dep)[0] = command_buffer->last_sync_node;
+  return 1;
+}
+
+static iree_status_t iree_cuda_add_leaf_node(
+    iree_hal_cuda_graph_command_buffer_t* command_buffer, CUgraphNode node) {
+  iree_status_t status = iree_ok_status();
+  if (command_buffer->num_leaf_nodes == CUDA_MAX_LEAF_NODES) {
+    status = iree_cuda_flush_dep_nodes(command_buffer);
+  }
+  command_buffer->leaf_nodes[command_buffer->num_leaf_nodes++] = node;
+  return status;
+}
+
 static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
@@ -286,16 +374,16 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_fill_buffer(
       .height = 1,
       .value = dword_pattern,
   };
-  // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->last_node};
-  size_t numNode = command_buffer->last_node ? 1 : 0;
+  CUgraphNode dep[CUDA_MAX_LEAF_NODES];
+  size_t numNode = iree_cuda_get_dep_nodes(command_buffer, &dep);
+  CUgraphNode node;
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      cuGraphAddMemsetNode(&command_buffer->last_node, command_buffer->graph,
-                           dep, numNode, &params,
+      cuGraphAddMemsetNode(&node, command_buffer->graph, dep, numNode, &params,
                            command_buffer->context->cu_context),
       "cuGraphAddMemsetNode");
-  return iree_ok_status();
+
+  return iree_cuda_add_leaf_node(command_buffer, node);
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
@@ -331,16 +419,15 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
       .srcMemoryType = CU_MEMORYTYPE_DEVICE,
       .dstMemoryType = CU_MEMORYTYPE_DEVICE,
   };
-  // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->last_node};
-  size_t numNode = command_buffer->last_node ? 1 : 0;
+  CUgraphNode dep[CUDA_MAX_LEAF_NODES];
+  size_t numNode = iree_cuda_get_dep_nodes(command_buffer, &dep);
+  CUgraphNode node;
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      cuGraphAddMemcpyNode(&command_buffer->last_node, command_buffer->graph,
-                           dep, numNode, &params,
+      cuGraphAddMemcpyNode(&node, command_buffer->graph, dep, numNode, &params,
                            command_buffer->context->cu_context),
       "cuGraphAddMemcpyNode");
-  return iree_ok_status();
+  return iree_cuda_add_leaf_node(command_buffer, node);
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_push_constants(
@@ -441,14 +528,14 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
       .kernelParams = command_buffer->current_descriptor,
   };
   // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->last_node};
-  size_t numNodes = command_buffer->last_node ? 1 : 0;
-  CUDA_RETURN_IF_ERROR(
-      command_buffer->context->syms,
-      cuGraphAddKernelNode(&command_buffer->last_node, command_buffer->graph,
-                           dep, numNodes, &params),
-      "cuGraphAddKernelNode");
-  return iree_ok_status();
+  CUgraphNode dep[CUDA_MAX_LEAF_NODES];
+  size_t numNodes = iree_cuda_get_dep_nodes(command_buffer, &dep);
+  CUgraphNode node;
+  CUDA_RETURN_IF_ERROR(command_buffer->context->syms,
+                       cuGraphAddKernelNode(&node, command_buffer->graph, dep,
+                                            numNodes, &params),
+                       "cuGraphAddKernelNode");
+  return iree_cuda_add_leaf_node(command_buffer, node);
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch_indirect(

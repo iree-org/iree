@@ -24,6 +24,12 @@ iree_status_t iree_hal_cuda_event_create(
     iree_hal_cuda_context_wrapper_t* context_wrapper,
     iree_hal_event_t** out_event);
 
+void iree_hal_cuda_event_set_sync_node(iree_hal_event_t* base_event,
+                                       CUgraphNode node);
+
+CUgraphNode iree_hal_cuda_event_get_sync_node(
+    const iree_hal_event_t* base_event);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
