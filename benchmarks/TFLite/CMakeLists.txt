@@ -133,8 +133,16 @@ set(MOBILENET_V3SMALL_MODULE
 ################################################################################
 
 set(ANDROID_CPU_TRANSLATION_FLAGS
-      "--iree-input-type=tosa"
-      "--iree-llvm-target-triple=aarch64-none-linux-android29")
+  "--iree-input-type=tosa"
+  "--iree-llvm-target-triple=aarch64-none-linux-android29")
+set(ANDROID_ADRENO_GPU_TRANSLATION_FLAGS
+  "--iree-input-type=tosa"
+  "--iree-vulkan-target-triple=adreno-unknown-android11"
+)
+set(ANDROID_MALI_GPU_TRANSLATION_FLAGS
+  "--iree-input-type=tosa"
+  "--iree-vulkan-target-triple=valhall-unknown-android11"
+)
 
 # CPU, Dylib-Sync, big/little-core, full-inference
 iree_benchmark_suite(
@@ -271,8 +279,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Adreno"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-android11"
+    ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
   DRIVER
     "vulkan"
 )
@@ -294,8 +301,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
   DRIVER
     "vulkan"
 )
@@ -312,8 +318,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
     # This isn't a special optimization flag. It's so we can reuse the same f32
     # model file. See comments on MOBILEBERT_FP16_MODULE
     "--iree-flow-demote-f32-to-f16"
@@ -505,8 +510,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Adreno"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-android11"
+    ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
@@ -530,8 +534,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
@@ -587,8 +590,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Adreno"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-android11"
+    ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
@@ -615,8 +617,7 @@ iree_benchmark_suite(
   TARGET_ARCHITECTURE
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
     "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
