@@ -62,8 +62,8 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     mlir::TF::PopulateTFLoweringBeforeHLOPatterns(context, &lowerTfPatterns);
 
     OwningRewritePatternList canonicalizePatterns(&getContext());
-    for (auto *op : context->getRegisteredOperations()) {
-      op->getCanonicalizationPatterns(canonicalizePatterns, context);
+    for (auto op : context->getRegisteredOperations()) {
+      op.getCanonicalizationPatterns(canonicalizePatterns, context);
     }
 
     OwningRewritePatternList patterns(&getContext());
