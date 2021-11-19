@@ -92,7 +92,23 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
 }
 
 static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
-  TileSizesListType tileSizes;
+  auto setMatmulConfig =
+      [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
+                         llvm::ArrayRef<int64_t> workgroupSize,
+                         IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
+        TileSizesListType tileSizes;
+        SmallVector<int64_t> ts;
+        // Tile all the higher parallel dimension with a size of 1 and the 2
+        // most inner dimension with the tileX/tileY size.
+        ts.append(op.getNumParallelLoops() - 2, 1);
+        ts.append({tileX, tileY});
+        // Tile all the reduction dimensions.
+        ts.append(op.getNumReductionLoops(), tileK);
+        tileSizes.push_back(ts);  // Workgroup level.
+        return setOpConfigAndEntryPointFnTranslation(
+            entryPoint, op, tileSizes,
+            /*nativeVectorSizes=*/ArrayRef<int64_t>{}, pipeline, workgroupSize);
+      };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape = getUntiledShape(op.getInputOperand(0)->get());
   auto rhsShape = getUntiledShape(op.getInputOperand(1)->get());
@@ -125,18 +141,11 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       }
     }
   }
-  // Default tile size and workgroup size.
-  int64_t tileX = 2;
-  int64_t tileY = 256;
-  int64_t tileK = 4;
-  IREE::Codegen::DispatchLoweringPassPipeline pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt;
-  SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
   bool isStaticSize = sizeM != ShapedType::kDynamicSize &&
                       sizeN != ShapedType::kDynamicSize &&
                       sizeK != ShapedType::kDynamicSize;
   if (isStaticSize) {
-    bool isLoweringConfigSet = false;
+    /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
       getTensorCoreConfig(TCtileSizeConfig);
@@ -146,60 +155,42 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
         if (sizeK % config.tileSize[2] == 0 &&
             sizeN % config.tileSize[1] == 0 &&
             sizeM % config.tileSize[0] == 0) {
-          tileX = config.tileSize[0];
-          tileY = config.tileSize[1];
-          tileK = config.tileSize[2];
-          workgroupSize.assign(config.workgroupSize.begin(),
-                               config.workgroupSize.end());
-          pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
-              LLVMGPUMatmulTensorCore;
-          isLoweringConfigSet = true;
-          break;
+          return setMatmulConfig(config.tileSize[0], config.tileSize[1],
+                                 config.tileSize[2], config.workgroupSize,
+                                 IREE::Codegen::DispatchLoweringPassPipeline::
+                                     LLVMGPUMatmulTensorCore);
         }
       }
     }
-    if (!isLoweringConfigSet) {
-      // Special case for very small matrices.
-      if (sizeM * sizeN <= cudaWarpSize) {
-        tileX = sizeN;
-        tileY = sizeM;
-        workgroupSize = {sizeM, sizeN, 1};
-        isLoweringConfigSet = true;
-      }
+    // Special case for very small matrices.
+    if (sizeM * sizeN <= cudaWarpSize) {
+      return setMatmulConfig(
+          sizeN, sizeM, 4, {sizeM, sizeN, 1},
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
     }
-    if (!isLoweringConfigSet) {
-      SmallVector<TileWorkgroupSizePair> tileSizeConfig;
-      // Query the best configuration.
-      getMatmulConfig(tileSizeConfig);
-      // Pick the best configuration where the original shape is aligned on the
-      // tile size.
-      for (TileWorkgroupSizePair &config : tileSizeConfig) {
-        if (sizeN % config.tileSize[1] == 0 &&
-            sizeM % config.tileSize[0] == 0) {
-          tileX = config.tileSize[0];
-          tileY = config.tileSize[1];
-          tileK = config.tileSize[2];
-          workgroupSize.assign(config.workgroupSize.begin(),
-                               config.workgroupSize.end());
-          isLoweringConfigSet = true;
-          break;
-        }
+    // simt matmul case
+    SmallVector<TileWorkgroupSizePair> tileSizeConfig;
+    // Query the best configuration.
+    getMatmulConfig(tileSizeConfig);
+    // Pick the best configuration where the original shape is aligned on the
+    // tile size.
+    for (TileWorkgroupSizePair &config : tileSizeConfig) {
+      if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
+        return setMatmulConfig(
+            config.tileSize[0], config.tileSize[1], config.tileSize[2],
+            config.workgroupSize,
+            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
       }
     }
   }
-  // Currently just a basic tile size to enable tiling and vectorization.
-  // TODO: pick a more efficient tile size and tile at subgroup level.
-  SmallVector<int64_t> ts;
-  // Tile all the higher parallel dimension with a size of 1 and the 2 most
-  // inner dimension with the tileX/tileY size.
-  ts.append(op.getNumParallelLoops() - 2, 1);
-  ts.append({tileX, tileY});
-  // Tile all the reduction dimensions.
-  ts.append(op.getNumReductionLoops(), tileK);
-  tileSizes.push_back(ts);  // Workgroup level.
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      pipeline, workgroupSize);
+  // If we haven't found any config, fall back to default config.
+  int64_t tileX = 2;
+  int64_t tileY = 256;
+  int64_t tileK = 4;
+  SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  return setMatmulConfig(
+      tileX, tileY, tileK, workgroupSize,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
 }
 
 static LogicalResult setFftConfig(FuncOp entryPoint,
