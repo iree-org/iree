@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -66,6 +67,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // subview ops.
   pm.addPass(memref::createFoldSubViewOpsPass());
   pm.addNestedPass<FuncOp>(Shape::createFoldDimOverShapeCarryingOpPass());
+  pm.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
   pm.addNestedPass<FuncOp>(createStdExpandOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

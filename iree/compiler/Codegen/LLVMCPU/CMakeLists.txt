@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRArithmeticToLLVM
+    MLIRArithmeticTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR

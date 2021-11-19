@@ -44,7 +44,7 @@ declare_mlir_python_extension(IREEDialectsPythonExtensions.Main
   MODULE_NAME _ireeDialects
   ADD_TO_PARENT IREEDialectsPythonExtensions
   SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/IREEDialectsModule.cpp
+    IREEDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS
     IREEDialectsCAPI
   PRIVATE_LINK_LIBS

@@ -237,8 +237,10 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
                             << *funcOp << "\n");
 
     // 5. Perform bufferization.
-    linalg::comprehensive_bufferize::BufferizationState state(
-        aliasInfo, *allocationFn, bvm);
+    linalg::comprehensive_bufferize::BufferizationState state(aliasInfo,
+                                                              *allocationFn);
+    // Merge `bvm` into `state`.
+    for (auto it : bvm.getValueMap()) state.mapValue(it.first, it.second);
     for (Operation *op : ops)
       if (failed(linalg::comprehensive_bufferize::bufferizeOp(
               op, state, /*bufferizedFunctionTypes=*/nullptr)))

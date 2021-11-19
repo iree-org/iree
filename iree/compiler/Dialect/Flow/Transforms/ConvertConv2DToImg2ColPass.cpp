@@ -170,11 +170,11 @@ class Conv2DImg2ColMatmulConversion
 // by transposing both input filter so channles are outer most the computation
 // is a batched matrix-vector product.
 class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
-    : public OpRewritePattern<linalg::DepthwiseConv2DNhwOp> {
+    : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
  public:
-  using OpRewritePattern<linalg::DepthwiseConv2DNhwOp>::OpRewritePattern;
+  using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwOp convOp,
+  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
                                 PatternRewriter &rewriter) const override {
     RankedTensorType inputTensorType =
         convOp.getInputOperand(0)->get().getType().dyn_cast<RankedTensorType>();

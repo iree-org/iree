@@ -216,12 +216,12 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   }
 };
 
-/// Vectorizes linalg.depthwise_conv2D_nhw for a single GPU
-/// invocation. Therefore, the linalg.depthwise_conv2D_nhw op
+/// Vectorizes linalg.depthwise_conv_2d_nhwc_hwc for a single GPU
+/// invocation. Therefore, the linalg.depthwise_conv_2d_nhwc_hwc op
 /// should have a very specific form; other patterns are expected to tile and
 /// distribute larger convolutions into this form for a single GPU invocation.
 ///
-/// The linalg.depthwise_conv2D_nhw op should follow:
+/// The linalg.depthwise_conv_2d_nhwc_hwc op should follow:
 /// - Filter: HfWfC format
 /// - Input : NHiWiC format
 /// - Output: NHoWoC format
@@ -237,10 +237,10 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 /// Channel is requried to be a multiple of 4 so that we can process them with
 /// load4/store4, which is native to GPUs.
 struct VectorizeLinalgDepthwiseConv
-    : OpRewritePattern<linalg::DepthwiseConv2DNhwOp> {
+    : OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwOp convOp,
+  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
                                 PatternRewriter &rewriter) const override {
     LLVM_DEBUG(llvm::dbgs() << "inspecting " << convOp << "\n");
 

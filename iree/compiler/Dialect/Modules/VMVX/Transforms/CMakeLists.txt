@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineToStandard
     MLIRAffineTransforms
+    MLIRArithmeticTransforms
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms

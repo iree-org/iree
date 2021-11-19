@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineToStandard
     MLIRArithmeticToLLVM
+    MLIRArithmeticTransforms
     MLIRGPUOps
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
