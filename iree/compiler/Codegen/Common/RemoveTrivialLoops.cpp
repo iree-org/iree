@@ -9,11 +9,14 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+
+#define DEBUG_TYPE "iree-codegen-remove-trivial-loops"
 
 namespace mlir {
 namespace iree_compiler {
@@ -64,16 +67,27 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
   return llvm::None;
 }
 
+/// Return true if the given tiled loop is distributed to workgroups.
+static bool isWorkgroupLoop(const LoopTilingAndDistributionInfo &info) {
+  auto forOp = cast<scf::ForOp>(info.loop);
+  Operation *lbOp = forOp.lowerBound().getDefiningOp();
+  if (isa<IREE::HAL::InterfaceWorkgroupIDOp>(lbOp)) return true;
+  auto applyOp = dyn_cast<AffineApplyOp>(lbOp);
+  return applyOp && llvm::any_of(applyOp.getMapOperands(), [](Value operand) {
+           return operand.getDefiningOp<IREE::HAL::InterfaceWorkgroupIDOp>();
+         });
+}
+
 /// Infer the number of workgroups by looking at the tiled loop and the number
 /// of element per workgroups.
 static SmallVector<int64_t> getNumWorkgroup(
     FuncOp funcOp, IREE::HAL::ExecutableEntryPointOp entryPointOp) {
-  SmallVector<LoopTilingAndDistributionInfo> tiledLoopInfo =
-      getTiledAndDistributedLoopInfo(funcOp);
-  SmallVector<int64_t> workloadSize(tiledLoopInfo.size());
-  for (LoopTilingAndDistributionInfo &tileInfo : tiledLoopInfo) {
-    if (tileInfo.processorDistributionDim >= workloadSize.size())
-      return SmallVector<int64_t>();
+  auto allLoops = getTiledAndDistributedLoopInfo(funcOp);
+  auto wgLoops =
+      llvm::to_vector<3>(llvm::make_filter_range(allLoops, isWorkgroupLoop));
+  SmallVector<int64_t> workloadSize(wgLoops.size());
+  for (LoopTilingAndDistributionInfo &tileInfo : wgLoops) {
+    if (tileInfo.processorDistributionDim >= workloadSize.size()) return {};
     if (!tileInfo.untiledLowerBound.is<Attribute>() ||
         !tileInfo.untiledUpperBound.is<Attribute>() ||
         !tileInfo.untiledStep.is<Attribute>()) {
