@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file -lower-iree-pydm-to-rtl %s | FileCheck --enable-var-scope --dump-input-filter=all %s
+// RUN: iree-dialects-opt -split-input-file -lower-iree-pydm-to-rtl %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @object_as_bool
 // Doubles as a check for the general machinery.
