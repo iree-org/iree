@@ -124,6 +124,7 @@ cc_library(
     deps = [
         ":IREEInputIncGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
     ],
