@@ -81,7 +81,7 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
   entryPoint.walk([&fusedOpSupported](linalg::GenericOp linalgOp) {
     for (Operation &fusedOp : linalgOp.getOps()) {
       if (!isa<arith::AddFOp, arith::MulFOp, arith::MaxFOp, arith::MinFOp,
-          linalg::YieldOp, arith::DivFOp>(fusedOp)) {
+               linalg::YieldOp, arith::DivFOp>(fusedOp)) {
         fusedOpSupported = false;
         break;
       }
