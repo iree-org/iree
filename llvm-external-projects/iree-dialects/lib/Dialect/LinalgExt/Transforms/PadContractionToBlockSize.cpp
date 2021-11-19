@@ -19,8 +19,6 @@ using namespace mlir;
 namespace IREE = mlir::iree_compiler::IREE;
 using namespace IREE::LinalgExt;
 
-static bool isPowerOfTwo(int x) { return (x & (x - 1)) == 0; }
-
 static Operation *sliceTensor(Location loc, Value expanded, Value original,
                               OpBuilder &builder) {
   auto originalType = original.getType().cast<RankedTensorType>();
@@ -102,8 +100,6 @@ struct PadContractionToBlockSizePass
   }
 
   void runOnOperation() override {
-    MLIRContext *context = &getContext();
-
     getOperation()->walk([&](linalg::ContractionOpInterface op) {
       auto linalgOp = llvm::cast<linalg::LinalgOp>(op.getOperation());
       Location loc = op.getLoc();
