@@ -10,8 +10,10 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -62,7 +64,7 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
-static Optional<llvm::TargetTriple> getTargetTriple(FuncOp entryPointFn) {
+static Optional<llvm::Triple> getTargetTriple(FuncOp entryPointFn) {
   auto variantOp =
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
@@ -71,14 +73,14 @@ static Optional<llvm::TargetTriple> getTargetTriple(FuncOp entryPointFn) {
   if (!config) return llvm::None;
   auto triple = config.getAs<StringAttr>("target_triple");
   if (!triple) return llvm::None;
-  return llvm::TargetTriple(triple.getValue().str());
+  return llvm::Triple(triple.getValue().str());
 }
 
 static DispatchLoweringPassPipeline getDispatchLoweringPassPipeline(
     FuncOp entryPointFn, Operation *op) {
   return TypeSwitch<Operation *, DispatchLoweringPassPipeline>(op)
       .Case<linalg::ContractionOpInterface>([&](auto op) {
-        Optional<std::TargetTriple> triple = getTargetTriple(entryPointFn);
+        Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
         if (triple && triple.getValue().isX86()) {
           return DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
         } else {
@@ -315,7 +317,7 @@ static LogicalResult setRootConfig(
       workloadPerWorkgroup,
       /*workgroupSize =*/ArrayRef<int64_t>{});
 
-  Optional<llvm::TargetTriple> triple = getTargetTriple(entryPointFn);
+  Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
   int64_t matmulL1TileSize = (triple && triple.getValue().isX86()) ? 16 : 32;
 
   SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;
