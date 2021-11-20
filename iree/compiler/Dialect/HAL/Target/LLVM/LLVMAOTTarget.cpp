@@ -550,8 +550,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Add some configurations to the `hal.executable.target` attribute.
     SmallVector<NamedAttribute> config;
     auto addConfig = [&](StringRef name, Attribute value) {
-      config.emplace_back(
-          std::make_pair(Identifier::get(name, context), value));
+      config.emplace_back(StringAttr::get(context, name), value);
     };
 
     // Set target triple.

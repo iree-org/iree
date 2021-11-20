@@ -500,8 +500,8 @@ static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
           funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
     SmallVector<iree_vm_ReflectionAttrDef_ref_t, 4> reflectionAttrRefs;
     for (auto reflectionAttr : reflectionAttrs) {
-      auto key = reflectionAttr.first.strref();
-      auto value = reflectionAttr.second.dyn_cast<StringAttr>();
+      auto key = reflectionAttr.getName().strref();
+      auto value = reflectionAttr.getValue().dyn_cast<StringAttr>();
       if (!value || key.empty()) continue;
       // NOTE: if we actually want to keep these we should dedupe them (as the
       // keys and likely several of the values are shared across all functions).

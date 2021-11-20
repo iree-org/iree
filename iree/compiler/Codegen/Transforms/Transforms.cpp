@@ -48,12 +48,12 @@ LogicalResult defineWorkgroupCountRegion(
       entryPointOp.workgroup_local_memoryAttr(), 1);
   // Copy over all attributes
   for (auto attr : entryPointOp->getAttrs()) {
-    if (attr.first != entryPointOp.sym_nameAttrName() &&
-        attr.first != entryPointOp.ordinalAttrName() &&
-        attr.first != entryPointOp.interfaceAttrName() &&
-        attr.first != entryPointOp.workgroup_sizeAttrName() &&
-        attr.first != entryPointOp.workgroup_local_memoryAttrName()) {
-      clonedOp->setAttr(attr.first, attr.second);
+    if (attr.getName() != entryPointOp.sym_nameAttrName() &&
+        attr.getName() != entryPointOp.ordinalAttrName() &&
+        attr.getName() != entryPointOp.interfaceAttrName() &&
+        attr.getName() != entryPointOp.workgroup_sizeAttrName() &&
+        attr.getName() != entryPointOp.workgroup_local_memoryAttrName()) {
+      clonedOp->setAttr(attr.getName(), attr.getValue());
     }
   }
   Region *region = clonedOp.getBody();

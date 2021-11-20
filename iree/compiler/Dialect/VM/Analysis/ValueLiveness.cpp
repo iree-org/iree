@@ -120,7 +120,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
   // Markup all ops with their attributes.
   for (auto &opAttrs : livenessAttrs) {
     for (auto nameAttr : opAttrs.getSecond().getAttrs()) {
-      opAttrs.getFirst()->setAttr(nameAttr.first, nameAttr.second);
+      opAttrs.getFirst()->setAttr(nameAttr.getName(), nameAttr.getValue());
     }
   }
 

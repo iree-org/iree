@@ -99,12 +99,12 @@ static LogicalResult convertOperation(Operation *oldOp,
       llvm::isa<IREE::Util::GlobalOp>(oldOp)) {
     for (auto attr : oldOp->getAttrs()) {
       auto newAttr =
-          convertAttribute(oldOp->getLoc(), attr.second, typeConverter);
+          convertAttribute(oldOp->getLoc(), attr.getValue(), typeConverter);
       if (!newAttr) {
         return oldOp->emitOpError()
-               << "failed to convert attribute " << attr.first;
+               << "failed to convert attribute " << attr.getName();
       }
-      state.addAttribute(attr.first, newAttr);
+      state.addAttribute(attr.getName(), newAttr);
     }
   } else {
     state.attributes = llvm::to_vector<4>(oldOp->getAttrs());

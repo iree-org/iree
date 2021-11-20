@@ -102,8 +102,8 @@ void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
   SmallVector<NamedAttribute> attrs(existingAttr.begin(), existingAttr.end());
   bool didFind = false;
   for (size_t i = 0; i < attrs.size(); ++i) {
-    if (attrs[i].first == name) {
-      attrs[i].second = value;
+    if (attrs[i].getName() == name) {
+      attrs[i].setValue(value);
       didFind = true;
       break;
     }
