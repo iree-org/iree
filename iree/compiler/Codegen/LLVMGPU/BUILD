@@ -74,7 +74,5 @@ cc_library(
         "@llvm-project//mlir:VectorToGPU",
         "@llvm-project//mlir:VectorToLLVM",
         "@llvm-project//mlir:VectorToSCF",
-        "@mlir-hlo//:hlo",
-        "@mlir-hlo//:legalize_to_linalg",
     ],
 )

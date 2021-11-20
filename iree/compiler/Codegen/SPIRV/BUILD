@@ -82,7 +82,5 @@ cc_library(
         "@llvm-project//mlir:VectorInterfaces",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToSPIRV",
-        "@mlir-hlo//:hlo",
-        "@mlir-hlo//:legalize_to_linalg",
     ],
 )

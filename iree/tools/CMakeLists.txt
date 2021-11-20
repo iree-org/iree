@@ -317,7 +317,9 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_xla_dialects.h"
     DEPS
-      tensorflow::mlir_hlo
+      tensorflow::external_mhlo_includes
+      ChloDialect
+      MhloDialect
     PUBLIC
   )
 

@@ -73,7 +73,6 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )
 
