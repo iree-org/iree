@@ -202,26 +202,6 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   }
 };
 
-/// Convert mhlo.constant op into std.const.
-struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      mhlo::ConstOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto valueAttr = op.value();
-    Type oldElType = valueAttr.getType().getElementType();
-    Type newElType = this->typeConverter->convertType(oldElType);
-    ElementsAttr newValueAttr = valueAttr;
-    if (newElType != oldElType) {
-      // Values don't change, just their reported type.
-      newValueAttr = valueAttr.cast<DenseIntOrFPElementsAttr>().mapValues(
-          newElType, [](const APInt &oldEl) { return oldEl; });
-    }
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, newValueAttr);
-    return success();
-  }
-};
-
 // We need to convert func ops in order to convert types.
 class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
@@ -388,7 +368,7 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
-  patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion>(
+  patterns.insert<ConcatenateOpConversion, FftOpConversion>(
       typeConverter, context, PatternBenefit(1000));
 }
 
