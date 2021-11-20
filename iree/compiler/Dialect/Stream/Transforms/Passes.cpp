@@ -243,6 +243,15 @@ void buildStreamOptimizationPassPipeline(
     // make partitioning the bindings easier. Note we need to update both the
     // dispatches and the dispatch function argument order.
   }
+
+  //----------------------------------------------------------------------------
+  // Annotations to aid future lowering pipelines
+  //----------------------------------------------------------------------------
+
+  // Annotate dispatch region arguments based on the operands passed at dispatch
+  // sites. This allows codegen to see the potential values for the operands
+  // when operating locally on executables.
+  passManager.addPass(IREE::Stream::createAnnotateDispatchArgumentsPass());
 }
 
 //===----------------------------------------------------------------------===//

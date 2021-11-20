@@ -1553,6 +1553,23 @@ SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(mlir::FuncOp funcOp) {
   return map;
 }
 
+// static
+SmallVector<unsigned> CmdDispatchOp::makeResourceToArgMap(mlir::FuncOp funcOp) {
+  unsigned operandCount = llvm::count_if(
+      funcOp.getArgumentTypes(),
+      [](Type type) { return type.isa<IREE::Stream::BindingType>(); });
+  SmallVector<unsigned> map(operandCount);
+  unsigned operandIdx = 0;
+  for (auto it : llvm::enumerate(funcOp.getArgumentTypes())) {
+    unsigned argIdx = it.index();
+    auto argType = it.value();
+    if (argType.isa<IREE::Stream::BindingType>()) {
+      map[operandIdx++] = argIdx;
+    }
+  }
+  return map;
+}
+
 //===----------------------------------------------------------------------===//
 // stream.cmd.execute
 //===----------------------------------------------------------------------===//

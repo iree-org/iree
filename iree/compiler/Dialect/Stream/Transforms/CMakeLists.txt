@@ -17,6 +17,7 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   SRCS
+    "AnnotateDispatchArguments.cpp"
     "ConvertToStream.cpp"
     "ElideAsyncCopies.cpp"
     "EncodeTensors.cpp"

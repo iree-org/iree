@@ -176,6 +176,14 @@ def SpecializeDispatches :
   }];
 }
 
+def AnnotateDispatchArguments :
+    Pass<"iree-stream-annotate-dispatch-arguments", "mlir::ModuleOp"> {
+  let summary = "Annotates dispatch arguments with potential values derived from dispatch sites.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createAnnotateDispatchArgumentsPass()
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Stream memoization
 //===----------------------------------------------------------------------===//
