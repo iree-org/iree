@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "convert_structural_types.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
+    "flatten_tuples_in_cfg.mlir"
     "legalize_input_types.mlir"
     "mhlo_to_mhlo_preprocessing.mlir"
     "mhlo_to_mhlo_preprocessing_canoncalize_dot_general.mlir"

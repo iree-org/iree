@@ -28,6 +28,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 namespace {
 
@@ -886,5 +887,6 @@ std::unique_ptr<OperationPass<FuncOp>> createMHLOToMHLOPreprocessingPass() {
   return std::make_unique<MHLOToMHLOPreprocessingPass>();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir

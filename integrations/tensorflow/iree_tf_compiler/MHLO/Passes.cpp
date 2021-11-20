@@ -22,26 +22,17 @@ namespace iree_integrations {
 namespace MHLO {
 
 void buildMHLOImportPassPipeline(OpPassManager &pm) {
-  //----------------------------------------------------------------------------
-  // Convert control flow and flatten tuples (like tuple<tensor<...>, ...>)
-  //----------------------------------------------------------------------------
-  // NOTE: FlattenTuplesInCFGPass requires inlining to have run and has some
-  // sensitivity to structured control flow ops.
-  // SCF would be ideal as a target (as that matches our other IREE inputs) but
-  // the current HLO to SCF pass is extremely basic and doesn't handle anything
-  // but tf.while for less-than comparisons from 0. Since those are common we
-  // still try to pull those out here but then fall back on the full conversion
-  // to CFG form.
+  // We run the inliner for legacy reasons. It shouldn't be necessary anymore,
+  // but this entire pipeline will soon be deleted and it isn't worth
+  // removing now.
   pm.addPass(mlir::createInlinerPass());
-  pm.addNestedPass<FuncOp>(mhlo::createControlFlowToScfPass());
-  pm.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
-  pm.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
-  pm.addPass(createFlattenTuplesInCFGPass());
-  pm.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+
+  // Drop to CFG and eliminate tuples.
+  mlir::iree_compiler::MHLO::buildXLACleanupPassPipeline(pm);
 
   // Mostly delegate to the IREE side MHLO legalization pipeline, now that we
   // have handled the weird that comes from legacy HLO clients.
-  mlir::iree_compiler::buildMHLOInputConversionPassPipeline(pm);
+  mlir::iree_compiler::MHLO::buildMHLOInputConversionPassPipeline(pm);
 
   // Import pipelines should end with canonicalization because they may have
   // access to dialects and patterns that the core compiler does not.

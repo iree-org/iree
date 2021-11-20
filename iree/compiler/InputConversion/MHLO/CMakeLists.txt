@@ -45,6 +45,7 @@ iree_cc_library(
     "ConvertMHLOToFlow.cpp"
     "ConvertMHLOToFlow.h"
     "ConvertMHLOToLinalgExt.cpp"
+    "FlattenTuplesInCFG.cpp"
     "LegalizeInputTypes.cpp"
     "MHLOToLinalgOnTensors.cpp"
     "MHLOToMHLOPreprocessing.cpp"
@@ -66,6 +67,7 @@ iree_cc_library(
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCFToStandard
+    MLIRSCFTransforms
     MLIRShape
     MLIRShapeOpsTransforms
     MLIRShapeToStandard

@@ -48,6 +48,10 @@ struct InputDialectOptions {
 
     // Legalizes input defined over MHLO ops.
     mhlo,
+
+    // Special case of 'mhlo' legalization which also performs some XLA
+    // cleanup activities.
+    xla,
   };
   Type type = Type::none;
 };

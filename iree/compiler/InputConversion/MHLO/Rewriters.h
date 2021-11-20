@@ -11,6 +11,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 /// Populates the patterns that convert from MHLO to Linalg on tensors. Imports
 /// patterns from XLA, as well as some IREE specific modifications.
@@ -32,6 +33,7 @@ void populateMHLOComplexToRealPatterns(MLIRContext *context,
                                        TypeConverter &typeConverter,
                                        OwningRewritePatternList &patterns);
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir
 

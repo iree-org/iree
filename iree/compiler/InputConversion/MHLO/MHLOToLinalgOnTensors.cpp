@@ -43,6 +43,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 //===----------------------------------------------------------------------===//
 // mhlo.concatenate conversion patterns.
@@ -376,5 +377,6 @@ std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass() {
   return std::make_unique<ConvertMHLOToLinalgOnTensorsPass>();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir
