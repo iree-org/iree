@@ -43,7 +43,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace {
 
 //===----------------------------------------------------------------------===//
 // mhlo.concatenate conversion patterns.
@@ -100,13 +99,10 @@ struct ConcatenateOpConversion
     return success();
   }
 };
-}  // namespace
 
 //===----------------------------------------------------------------------===//
 // mhlo.fft conversion patterns.
 //===----------------------------------------------------------------------===//
-
-namespace {
 
 /// Creats coefficients based on DFT definition, see
 /// https://en.wikipedia.org/wiki/Discrete_Fourier_transform
@@ -205,7 +201,106 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     return success();
   }
 };
-}  // namespace
+
+/// Convert mhlo.constant op into std.const.
+struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      mhlo::ConstOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto valueAttr = op.value();
+    Type oldElType = valueAttr.getType().getElementType();
+    Type newElType = this->typeConverter->convertType(oldElType);
+    ElementsAttr newValueAttr = valueAttr;
+    if (newElType != oldElType) {
+      // Values don't change, just their reported type.
+      newValueAttr = valueAttr.cast<DenseIntOrFPElementsAttr>().mapValues(
+          newElType, [](const APInt &oldEl) { return oldEl; });
+    }
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, newValueAttr);
+    return success();
+  }
+};
+
+// We need to convert func ops in order to convert types.
+class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
+  using OpConversionPattern<FuncOp>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      FuncOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    FunctionType srcFuncType = srcOp.getType();
+    TypeConverter::SignatureConversion signatureConversion(
+        srcOp.getNumArguments());
+
+    // Convert function arguments.
+    for (unsigned i = 0, e = srcFuncType.getNumInputs(); i < e; ++i) {
+      if (failed(getTypeConverter()->convertSignatureArg(
+              i, srcFuncType.getInput(i), signatureConversion))) {
+        return rewriter.notifyMatchFailure(srcOp, "argument failed to convert");
+      }
+    }
+
+    // Convert function results.
+    SmallVector<Type> convertedResultTypes;
+    if (failed(getTypeConverter()->convertTypes(srcFuncType.getResults(),
+                                                convertedResultTypes))) {
+      return rewriter.notifyMatchFailure(srcOp, "results failed to convert");
+    }
+
+    // Create new function with converted argument and result types.
+    auto newFuncType = mlir::FunctionType::get(
+        srcOp.getContext(), signatureConversion.getConvertedTypes(),
+        convertedResultTypes);
+
+    // Update the function in place.
+    rewriter.startRootUpdate(srcOp);
+    srcOp.setType(newFuncType);
+
+    // Tell the rewriter to convert the region signature.
+    TypeConverter &typeConverter = *getTypeConverter();
+    if (failed(rewriter.convertRegionTypes(&srcOp.getBody(), typeConverter,
+                                           &signatureConversion))) {
+      return failure();
+    }
+
+    rewriter.finalizeRootUpdate(srcOp);
+    return success();
+  }
+};
+
+class GenericTypeConvert : public ConversionPattern {
+ public:
+  GenericTypeConvert(StringRef rootName, TypeConverter &converter,
+                     MLIRContext *context, PatternBenefit benefit = 0)
+      : ConversionPattern(converter, rootName, benefit, context) {}
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    llvm::SmallVector<NamedAttribute, 4> newAttr;
+    llvm::append_range(newAttr, op->getAttrs());
+    llvm::SmallVector<Type, 4> newResults;
+    if (failed(getTypeConverter()->convertTypes(op->getResultTypes(),
+                                                newResults))) {
+      return rewriter.notifyMatchFailure(op, "result type conversion failed");
+    }
+    OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
+                         newResults, newAttr, op->getSuccessors());
+    for (Region &r : op->getRegions()) {
+      Region *newRegion = state.addRegion();
+      rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
+      TypeConverter::SignatureConversion result(newRegion->getNumArguments());
+      if (failed(getTypeConverter()->convertSignatureArgs(
+              newRegion->getArgumentTypes(), result))) {
+        return rewriter.notifyMatchFailure(op,
+                                           "argument type conversion failed");
+      }
+      rewriter.applySignatureConversion(newRegion, result);
+    }
+    Operation *newOp = rewriter.createOperation(state);
+    rewriter.replaceOp(op, newOp->getResults());
+    return success();
+  }
+};
 
 struct ConvertMHLOToLinalgOnTensorsPass
     : public ConvertMHLOToLinalgOnTensorsBase<
@@ -232,37 +327,56 @@ struct ConvertMHLOToLinalgOnTensorsPass
                                                     patterns);
     populateMHLOComplexToRealPatterns(context, *typeConverter, patterns);
 
+    // Structural patterns (functions, cfg, terminators).
+    patterns.insert<BuiltinFuncOpPattern>(*typeConverter, context);
+    patterns.insert<GenericTypeConvert>(ReturnOp::getOperationName(),
+                                        *typeConverter, context);
+    patterns.insert<GenericTypeConvert>(CallOp::getOperationName(),
+                                        *typeConverter, context);
+    patterns.insert<GenericTypeConvert>(CondBranchOp::getOperationName(),
+                                        *typeConverter, context);
+    patterns.insert<GenericTypeConvert>(BranchOp::getOperationName(),
+                                        *typeConverter, context);
+
     ConversionTarget target(getContext());
+    auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
+    auto isLegallyTypedOp = [&](Operation *op) -> bool {
+      for (Type type : op->getResultTypes()) {
+        if (isIllegalType(type)) return false;
+      }
+      for (Type type : op->getOperandTypes()) {
+        if (isIllegalType(type)) return false;
+      }
+      return true;
+    };
+
     target.addIllegalDialect<chlo::HloClientDialect>();
     target.addIllegalDialect<mhlo::MhloDialect>();
 
+    // Functions must have legal types.
+    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
+      for (Type type : funcOp.getType().getInputs()) {
+        if (isIllegalType(type)) return false;
+      }
+      for (Type type : funcOp.getType().getResults()) {
+        if (isIllegalType(type)) return false;
+      }
+      for (Block &block : funcOp.body()) {
+        for (Type type : block.getArgumentTypes()) {
+          if (isIllegalType(type)) return false;
+        }
+      }
+      return true;
+    });
+
     // Let the rest fall through.
-    target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+    target.addLegalDialect<BuiltinDialect>();
+    target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
       return signalPassFailure();
     }
-  }
-};
-
-/// Convert mhlo.constant op into std.const.
-struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      mhlo::ConstOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto valueAttr = op.value();
-    Type oldElType = valueAttr.getType().getElementType();
-    Type newElType = this->typeConverter->convertType(oldElType);
-    ElementsAttr newValueAttr = valueAttr;
-    if (newElType != oldElType) {
-      // Values don't change, just their reported type.
-      newValueAttr = valueAttr.cast<DenseIntOrFPElementsAttr>().mapValues(
-          newElType, [](const APInt &oldEl) { return oldEl; });
-    }
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, newValueAttr);
-    return success();
   }
 };
 
