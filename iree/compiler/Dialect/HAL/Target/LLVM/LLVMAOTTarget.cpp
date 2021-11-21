@@ -319,7 +319,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       // object file per library).
       std::string objectData;
       if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
-                                      &objectData))) {
+                                      llvm::CGFT_ObjectFile, &objectData))) {
         return variantOp.emitError()
                << "failed to compile LLVM-IR module to an object file";
       }
@@ -330,6 +330,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       os.close();
       objectFiles.push_back(std::move(objectFile));
     }
+
     // Optionally append additional object files that provide functionality that
     // may otherwise have been runtime-dynamic (like libc/libm calls).
     // For now we only do this for embedded uses.
@@ -349,16 +350,32 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
     }
 
-    // If we are keeping artifacts then let's also add the bitcode for easier
-    // debugging (vs just the binary object file).
+    // If we are keeping artifacts then let's also add the bitcode and
+    // assembly listing for easier debugging (vs just the binary object file).
     if (options_.keepLinkerArtifacts) {
-      auto bitcodeFile =
-          Artifact::createVariant(objectFiles.front().path, "bc");
-      auto &os = bitcodeFile.outputFile->os();
-      llvm::WriteBitcodeToFile(*llvmModule, os);
-      os.flush();
-      os.close();
-      bitcodeFile.outputFile->keep();
+      std::string asmData;
+      if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
+                                      llvm::CGFT_AssemblyFile, &asmData))) {
+        return variantOp.emitError()
+               << "failed to compile LLVM-IR module to an assembly file";
+      }
+      {
+        auto asmFile = Artifact::createTemporary(libraryName, "s");
+        auto &os = asmFile.outputFile->os();
+        os << asmData;
+        os.flush();
+        os.close();
+        asmFile.outputFile->keep();
+      }
+      {
+        auto bitcodeFile =
+            Artifact::createVariant(objectFiles.front().path, "bc");
+        auto &os = bitcodeFile.outputFile->os();
+        llvm::WriteBitcodeToFile(*llvmModule, os);
+        os.flush();
+        os.close();
+        bitcodeFile.outputFile->keep();
+      }
     }
 
     if (!options_.staticLibraryOutput.empty()) {
@@ -624,7 +641,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Emit an object file we can pass to the linker.
     std::string objectData;
     if (failed(runEmitObjFilePasses(targetMachine, bitcodeModule.get(),
-                                    &objectData))) {
+                                    llvm::CGFT_ObjectFile, &objectData))) {
       return mlir::emitError(loc)
              << "failed to compile librt LLVM-IR module to an object file";
     }
