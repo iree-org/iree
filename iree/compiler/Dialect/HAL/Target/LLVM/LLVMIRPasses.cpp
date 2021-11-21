@@ -115,7 +115,9 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
 }
 
 LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
-                                   llvm::Module *module, std::string *objData) {
+                                   llvm::Module *module,
+                                   llvm::CodeGenFileType fileType,
+                                   std::string *objData) {
   llvm::SmallVector<char, 0> stream_buffer;
   {
     // TODO(ataei): Use non legacy pass mamanger for this.
@@ -124,8 +126,7 @@ LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
         new llvm::TargetLibraryInfoWrapperPass(machine->getTargetTriple()));
     llvm::raw_svector_ostream ostream(stream_buffer);
     if (machine->addPassesToEmitFile(passManager, ostream,
-                                     /*DwoOut=*/nullptr,
-                                     llvm::CGFT_ObjectFile)) {
+                                     /*DwoOut=*/nullptr, fileType)) {
       return failure();
     }
     passManager.run(*module);
