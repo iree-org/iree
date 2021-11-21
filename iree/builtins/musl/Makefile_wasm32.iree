@@ -8,6 +8,11 @@ musldir=${MUSL_DIR}
 include $(musldir)/Makefile
 
 IREE_BASE_SRCS = $(addprefix $(srcdir)/, \
+	src/fenv/fenv.c \
+	src/math/ceilf.c \
+	src/math/floorf.c \
+	src/math/fmaf.c \
+	src/math/fmodf.c \
 	src/math/powf.c \
 	src/math/expf.c \
 	src/math/powf_data.c \
@@ -19,7 +24,7 @@ IREE_BASE_SRCS = $(addprefix $(srcdir)/, \
 IREE_BASE_LLS = $(patsubst $(srcdir)/%,%.ll,$(basename $(IREE_BASE_SRCS)))
 IREE_BASE_BCS = $(patsubst $(srcdir)/%,%.bc,$(basename $(IREE_BASE_SRCS)))
 IREE_LL_FILES = $(addprefix obj/, $(IREE_BASE_LLS))
-IREE_CFLAGS=-Xclang -disable-llvm-passes -target wasm64
+IREE_CFLAGS=-Xclang -disable-llvm-passes -fno-ident -fvisibility=hidden -target wasm32
 LL_CMD = $(CC) $(CFLAGS_ALL) $(IREE_CFLAGS) -S -emit-llvm -o $@ -c $<
 
 obj/%.ll: $(musldir)/%.c obj/include/bits/alltypes.h

@@ -35,6 +35,7 @@ class LibraryBuilder {
  public:
   // Builder mode setting.
   enum class Mode : uint32_t {
+    NONE = 0u,
     // Include entry point names and tags.
     // If not specified then the reflection strings will be excluded to reduce
     // binary size.
