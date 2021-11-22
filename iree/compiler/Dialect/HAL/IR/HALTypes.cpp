@@ -293,34 +293,21 @@ static void printBufferUsage(AsmPrinter &printer, BufferUsageBitfield usage) {
 namespace {
 enum class NumericalType : uint32_t {
   kUnknown = 0x00,
-  kInteger = 0x10,
-  kIntegerSigned = kInteger | 0x01,
-  kIntegerUnsigned = kInteger | 0x02,
-  kFloat = 0x20,
-  kFloatIEEE = kFloat | 0x01,
-  kFloatBrain = kFloat | 0x02,
+  kIntegerSigned = 0x01,
+  kIntegerUnsigned = 0x02,
+  // TODO(benvanik): specialize with semantics from APFloat.
+  kFloatIEEE = 0x03,
 };
 constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
                                               int32_t bitCount) {
   return (static_cast<uint32_t>(numericalType) << 24) | bitCount;
 }
 }  // namespace
-
 llvm::Optional<int32_t> getElementTypeValue(Type type) {
   if (auto intType = type.dyn_cast_or_null<IntegerType>()) {
-    NumericalType numericalType;
-    if (intType.isSigned()) {
-      numericalType = NumericalType::kIntegerSigned;
-    } else if (intType.isUnsigned()) {
-      numericalType = NumericalType::kIntegerUnsigned;
-    } else {
-      // There's no such thing as a signless integer in machine types but we
-      // need to be able to round-trip the format through the ABI. Exact
-      // numerical type equality comparisons may fail if the frontend assumes
-      // signed/unsigned but the compiler is propagating signless.
-      numericalType = NumericalType::kInteger;
-    }
-    return makeElementTypeValue(numericalType, intType.getWidth());
+    // TODO(benvanik): add signed/unsigned check when landed in MLIR.
+    return makeElementTypeValue(NumericalType::kIntegerSigned,
+                                intType.getWidth());
   } else if (auto floatType = type.dyn_cast_or_null<FloatType>()) {
     switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
       case APFloat::S_IEEEhalf:
@@ -328,9 +315,6 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
       case APFloat::S_IEEEdouble:
       case APFloat::S_IEEEquad:
         return makeElementTypeValue(NumericalType::kFloatIEEE,
-                                    floatType.getWidth());
-      case APFloat::S_BFloat:
-        return makeElementTypeValue(NumericalType::kFloatBrain,
                                     floatType.getWidth());
       default:
         return llvm::None;

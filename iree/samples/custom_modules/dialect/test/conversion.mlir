@@ -12,7 +12,7 @@
 
 // CHECK-LABEL: @tensorToMessage
 func @tensorToMessage(%tensor : tensor<2x4xf32>) {
-  //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 553648160 : i32
+  //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
   //  CHECK-DAG: [[ENCODING:%.+]] = vm.const.i32 1 : i32
   //  CHECK-DAG: [[DIM0:%.+]] = vm.const.i32 2 : i32
   //  CHECK-DAG: [[DIM1:%.+]] = vm.const.i32 4 : i32
@@ -32,7 +32,7 @@ func @tensorToMessage(%tensor : tensor<2x4xf32>) {
 
 // CHECK-LABEL: @dynamicTensorToMessage
 func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index) {
-  //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 553648160 : i32
+  //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
   //  CHECK-DAG: [[ENCODING:%.+]] = vm.const.i32 1 : i32
   // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(
   // CHECK-SAME:     %arg0, [[TYPE]], [[ENCODING]], [%arg1, %arg2])
@@ -50,7 +50,7 @@ func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : ind
 
 // CHECK-LABEL: @dynamicTensorToMessage2
 func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?, ?]> {iree.reflection = {}}) {
-  //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 553648160 : i32
+  //  CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
   //  CHECK-DAG: [[ENCODING:%.+]] = vm.const.i32 1 : i32
   // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(
   // CHECK-SAME:     %arg0, [[TYPE]], [[ENCODING]], [%arg1, %arg2])

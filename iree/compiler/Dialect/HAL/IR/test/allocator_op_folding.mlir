@@ -30,7 +30,7 @@ func @allocator_constant_buffer_view(%allocator: !hal.allocator) -> !hal.buffer_
   // CHECK-NEXT: %[[VIEW:.+]] = hal.buffer_view.create
   // CHECK-SAME:     buffer(%[[BUFFER]] : !hal.buffer)
   // CHECK-SAME:     shape([%c4, %c4])
-  // CHECK-SAME:     type(%c268435488_i32)
+  // CHECK-SAME:     type(%c16777248_i32)
   // CHECK-SAME:     encoding(%c1_i32) : !hal.buffer_view
   %ref = hal.allocator.constant<%allocator : !hal.allocator>
          type(DeviceLocal) usage(Transfer) : !hal.buffer_view =

@@ -132,8 +132,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
   result = iree_tools_utils_load_pixel_data(
       filename, shape, shape_rank, element_type, &pixel_data, &buffer_length);
   if (iree_status_is_ok(result)) {
-    iree_host_size_t element_byte =
-        iree_hal_element_dense_byte_count(element_type);
+    iree_host_size_t element_byte = iree_hal_element_byte_count(element_type);
     // SINT_8 and UINT_8 perform direct buffer wrap.
     result = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
         allocator, shape, shape_rank, element_type,
@@ -165,8 +164,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
   uint8_t* pixel_data = NULL;
   iree_hal_buffer_t* buffer = NULL;
   iree_host_size_t buffer_length;
-  iree_host_size_t element_byte =
-      iree_hal_element_dense_byte_count(element_type);
+  iree_host_size_t element_byte = iree_hal_element_byte_count(element_type);
   iree_hal_buffer_mapping_t mapped_memory;
   result = iree_tools_utils_load_pixel_data(
       filename, shape, shape_rank, element_type, &pixel_data, &buffer_length);

@@ -90,7 +90,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_write_data(
         buffer.get(), 0, contents.data(), contents.size() * sizeof(int32_t)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_INT_32,
+        buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, &*out_buffer_view));
   }
 

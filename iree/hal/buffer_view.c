@@ -58,7 +58,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     buffer_view->element_type = element_type;
     buffer_view->encoding_type = encoding_type;
     buffer_view->byte_length =
-        iree_hal_element_dense_byte_count(buffer_view->element_type);
+        iree_hal_element_byte_count(buffer_view->element_type);
     buffer_view->shape_rank = shape_rank;
     for (iree_host_size_t i = 0; i < shape_rank; ++i) {
       buffer_view->shape[i] = shape[i];
@@ -322,7 +322,7 @@ iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view) {
 IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer_view);
-  return iree_hal_element_dense_byte_count(buffer_view->element_type);
+  return iree_hal_element_byte_count(buffer_view->element_type);
 }
 
 IREE_API_EXPORT iree_hal_encoding_type_t
@@ -371,7 +371,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
 
   switch (encoding_type) {
     case IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR:
-      byte_length = iree_hal_element_dense_byte_count(element_type);
+      byte_length = iree_hal_element_byte_count(element_type);
       for (iree_host_size_t i = 0; i < shape_rank; ++i) {
         byte_length *= shape[i];
       }
@@ -418,7 +418,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
     }
     offset += axis_offset;
   }
-  offset *= iree_hal_element_dense_byte_count(element_type);
+  offset *= iree_hal_element_byte_count(element_type);
 
   *out_offset = offset;
   return iree_ok_status();
@@ -456,8 +456,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
 
   iree_hal_dim_t* end_indices =
       iree_alloca(shape_rank * sizeof(iree_hal_dim_t));
-  iree_device_size_t element_size =
-      iree_hal_element_dense_byte_count(element_type);
+  iree_device_size_t element_size = iree_hal_element_byte_count(element_type);
   iree_device_size_t subspan_length = element_size;
   for (iree_host_size_t i = 0; i < lengths_count; ++i) {
     subspan_length *= lengths[i];
