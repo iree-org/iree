@@ -51,6 +51,11 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
     // TODO(benvanik): add an option for this.
     targetOptions.optLevel = llvm::OptimizationLevel::O3;
     targetOptions.options.FloatABIType = llvm::FloatABI::Hard;
+
+    // Force `-ffunction-sections` so we can strip unused code.
+    targetOptions.options.FunctionSections = true;
+    targetOptions.options.DataSections = true;
+    targetOptions.options.UniqueSectionNames = true;
   });
   return targetOptions;
 }

@@ -2436,10 +2436,23 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
     Loads a scalar constant value from an executable IO push constant block.
     The value will be loaded from the given constant offset and will be
     bitcast (possibly with truncation or zero-extension) to the result type.
+
+    An optional alignment indicates the byte alignment of potential values for
+    the constant when it could be determined from analysis. If omitted the value
+    may be anything and its interpretation is up to the usage. This is intended
+    to provide pointer alignment-like semantics to constants that are used to
+    index into binding resources.
+
+    An optional set of values indicates all possible values that can be passed
+    to the constant from all dispatch sites in the program. If omitted the value
+    may be from an unanalyzable source (outside of the program, indirect, etc)
+    and must be assumed to have any value.
   }];
 
   let arguments = (ins
-    HAL_HostSizeAttr:$offset
+    HAL_HostSizeAttr:$offset,
+    OptionalAttr<IndexAttr>:$alignment,
+    OptionalAttr<ArrayAttr>:$values
   );
   let results = (outs
     HAL_PrimitiveType:$result
@@ -2457,14 +2470,21 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
-    // TODO(benvanik): add description
+    Returns a subspan of an interface binding storage buffer in a generic type.
+    The exact shape, type, and alignment of the returned type are defined by
+    the result type (tensor, memref, etc).
+
+    An optional alignment indicates the byte alignment of the base binding
+    resource. Note that the byte offset is added to the base and the alignment
+    will be the minimum of the two.
   }];
 
   let arguments = (ins
     SymbolRefAttr:$binding,
     HAL_DeviceSize:$byte_offset,
     Optional<HAL_DeviceSize>:$byte_length,
-    HAL_ShapeDynamicDims:$dynamic_dims
+    HAL_ShapeDynamicDims:$dynamic_dims,
+    OptionalAttr<IndexAttr>:$alignment
   );
   let results = (outs
     Res<AnyType, "", [MemAlloc]>:$result
@@ -2484,6 +2504,12 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     /// Returns the hal.interface.binding op associated with this op.
     /// Returns null op if not found.
     IREE::HAL::InterfaceBindingOp queryBindingOp();
+
+    // Attempts to calculate an alignment of the final subspan offset in the
+    // parent storage buffer. This is a combination of both the binding
+    // alignment and the byte offset and may be as small as the natural
+    // alignment of the element type being accessed.
+    llvm::Align calculateAlignment();
   }];
 }
 

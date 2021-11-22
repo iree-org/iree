@@ -1,6 +1,6 @@
 // RUN: iree-opt %s -iree-llvmcpu-tile-fuse-and-vectorize -cse -canonicalize -split-input-file | IreeFileCheck %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[], [32, 32, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>
+#config = #iree_codegen.lowering.config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module  {
@@ -26,7 +26,7 @@ module  {
         %7 = linalg.init_tensor [64, 64] : tensor<64x64xf32>
         %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [64, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x512xf32> -> tensor<64x512xf32>
         %9 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [512, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x128xf32> -> tensor<512x64xf32>
-        %10 = linalg.fill(%cst, %7) : f32, tensor<64x64xf32> -> tensor<64x64xf32> 
+        %10 = linalg.fill(%cst, %7) : f32, tensor<64x64xf32> -> tensor<64x64xf32>
         %11 = linalg.matmul {lowering.config = #config} ins(%8, %9 : tensor<64x512xf32>, tensor<512x64xf32>) outs(%10 : tensor<64x64xf32>) -> tensor<64x64xf32>
         %12 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%11 : tensor<64x64xf32>) outs(%7 : tensor<64x64xf32>) {
         ^bb0(%arg2: f32, %arg3: f32):  // no predecessors
@@ -63,23 +63,19 @@ module  {
 //      CHECK:   %[[LHS_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]], {{.*}} -> tensor<64x512xf32>
 //      CHECK:   scf.for %[[J_IDX:.+]] = {{.*}} to %[[C128]] step %{{[0-9]*}} {
 //      CHECK:     %[[RHS_TILE:.+]] = flow.dispatch.tensor.load %[[RHS]], {{.*}} -> tensor<512x64xf32>
-//      CHECK:     {{.*}} = scf.for %[[L1_I:.+]] = %[[C0]] to %[[C64]] step %[[C32]]
+//      CHECK:     {{.*}} = scf.for %[[L1_I:.+]] = %[[C0]] to %[[C64]] step %[[C16]]
 // CHECK-SAME:       iter_args(%[[ITER0:.+]] = %[[DST_TILE_INIT]]) -> (tensor<64x64xf32>)
-//      CHECK:       {{.*}} = scf.for %[[L1_J:.+]] = %[[C0]] to %[[C64]] step %[[C32]]
+//      CHECK:       {{.*}} = scf.for %[[L1_J:.+]] = %[[C0]] to %[[C64]] step %[[C16]]
 // CHECK-SAME:         iter_args(%[[ITER1:.+]] = %[[ITER0]]) -> (tensor<64x64xf32>)
-//      CHECK:         %[[SLICE1:.+]] = tensor.extract_slice %[[ITER1]][%[[L1_I]], %[[L1_J]]] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
-//      CHECK:         {{.*}} = scf.for %[[VEC_I:.+]] = %[[C0]] to %[[C32]] step %[[C16]]
-// CHECK-SAME:           iter_args(%[[ITER2:.+]] = %[[SLICE1]]) -> (tensor<32x32xf32>)
-//      CHECK:           {{.*}} = scf.for %[[VEC_J:.+]] = %[[C0]] to %[[C32]] step %[[C16]]
-// CHECK-SAME:             iter_args(%[[ITER3:.+]] = %[[ITER2]]) -> (tensor<32x32xf32>)
-//      CHECK:         %[[MATMUL_RES:.+]] = scf.for %[[K:.+]] = %[[C0]] to %[[C512]] step %[[C16]]
+//      CHECK:         %[[MATMUL_RES:.+]] = scf.for %[[L1_K:.+]] = %[[C0]] to %[[C512]] step %[[C32]]
 // CHECK-SAME:           iter_args(%[[ITER2:.+]] = %[[CST_VECTOR]]) -> (vector<16x16xf32>)
 //      CHECK:           {{.*}} = vector.transfer_read %[[LHS_TILE]]
 //      CHECK:           {{.*}} = vector.transfer_read %[[RHS_TILE]]
 // CHECK-COUNT-16:       vector.outerproduct
+// CHECK-COUNT-16:       vector.outerproduct
 //      CHECK:           scf.yield %{{.*}} : vector<16x16xf32>
 //      CHECK:         %[[EXP:.+]] = math.exp %[[MATMUL_RES]] : vector<16x16xf32>
-//      CHECK:         %[[RES:.+]] = vector.transfer_write %[[EXP]], %[[ITER3]][%[[VEC_I]], %[[VEC_J]]] {{.*}} : vector<16x16xf32>, tensor<32x32xf32>
+//      CHECK:         %[[RES:.+]] = vector.transfer_write %[[EXP]], %[[ITER1]][%[[L1_I]], %[[L1_J]]] {{.*}} : vector<16x16xf32>, tensor<64x64xf32>
 //      CHECK:         scf.yield %[[RES]]
 
 // -----

@@ -10,8 +10,10 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -39,12 +41,6 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     llvm::cl::desc("number of threads that are used at runtime"),
     llvm::cl::init(8));
 
-static llvm::cl::opt<int> matmulL1TileSize(
-    "iree-codegen-llvm-matmul-l1-size",
-    llvm::cl::desc(
-        "linalg.matmul tile size for L1 spliting of M, N, K dimension"),
-    llvm::cl::init(32));
-
 static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
     "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
     llvm::cl::desc("linalg.mmt4d workgroup tile size"), llvm::cl::ZeroOrMore,
@@ -68,7 +64,7 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
-static Optional<std::string> getTargetTriple(FuncOp entryPointFn) {
+static Optional<llvm::Triple> getTargetTriple(FuncOp entryPointFn) {
   auto variantOp =
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
@@ -77,15 +73,15 @@ static Optional<std::string> getTargetTriple(FuncOp entryPointFn) {
   if (!config) return llvm::None;
   auto triple = config.getAs<StringAttr>("target_triple");
   if (!triple) return llvm::None;
-  return triple.getValue().str();
+  return llvm::Triple(triple.getValue().str());
 }
 
 static DispatchLoweringPassPipeline getDispatchLoweringPassPipeline(
     FuncOp entryPointFn, Operation *op) {
   return TypeSwitch<Operation *, DispatchLoweringPassPipeline>(op)
       .Case<linalg::ContractionOpInterface>([&](auto op) {
-        Optional<std::string> triple = getTargetTriple(entryPointFn);
-        if (triple && triple.getValue().find("x86_64") != std::string::npos) {
+        Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
+        if (triple && triple.getValue().isX86()) {
           return DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
         } else {
           return DispatchLoweringPassPipeline::CPUTensorToVectors;
@@ -320,6 +316,9 @@ static LogicalResult setRootConfig(
       getDispatchLoweringPassPipeline(entryPointFn, contractionOp),
       workloadPerWorkgroup,
       /*workgroupSize =*/ArrayRef<int64_t>{});
+
+  Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
+  int64_t matmulL1TileSize = (triple && triple.getValue().isX86()) ? 16 : 32;
 
   SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;
   if (isBatchMatmul) {

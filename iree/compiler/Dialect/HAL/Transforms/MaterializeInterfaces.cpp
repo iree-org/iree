@@ -579,7 +579,7 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
       case RegionOperand::Type::PUSH_CONSTANT: {
         auto loadOp = entryBuilder.create<IREE::HAL::InterfaceLoadConstantOp>(
             clonedFuncOp.getLoc(), blockArg.getType(),
-            APInt(64, value.pushConstantOrdinal));
+            APInt(64, value.pushConstantOrdinal), nullptr, nullptr);
         blockArg.replaceAllUsesWith(loadOp);
         break;
       }
@@ -624,7 +624,8 @@ FuncOp InterfaceBuilder::buildRegionFuncOp() {
         auto subspanOp =
             entryBuilder.create<IREE::HAL::InterfaceBindingSubspanOp>(
                 clonedFuncOp.getLoc(), blockArgType, bindingSymRefAttr,
-                /*byte_offset=*/offset, /*byte_length=*/Value{}, dynamicDims);
+                /*byte_offset=*/offset, /*byte_length=*/Value{}, dynamicDims,
+                /*alignment=*/nullptr);
         blockArg.replaceAllUsesWith(subspanOp);
 
         break;

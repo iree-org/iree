@@ -4,15 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "libm.h"
+#include "device.h"
 
-// https://en.cppreference.com/w/c/numeric/math/fma
-LIBRT_EXPORT float fmaf(float x, float y, float z) {
-  // TODO(*): a real implementation :)
-  return (x * y) + z;
-}
+#if !defined(IREE_DEVICE_STANDALONE)
+int libdevice_platform_example_flag = LIBDEVICE_PLATFORM_EXAMPLE_FLAG;
+#endif  // IREE_DEVICE_STANDALONE
 
-LIBRT_EXPORT float __gnu_h2f_ieee(short param) {
+IREE_DEVICE_EXPORT float iree_h2f_ieee(short param) {
   unsigned short expHalf16 = param & 0x7C00;
   int exp1 = (int)expHalf16;
   unsigned short mantissa16 = param & 0x03FF;
@@ -53,7 +51,7 @@ LIBRT_EXPORT float __gnu_h2f_ieee(short param) {
   return res;
 }
 
-LIBRT_EXPORT short __gnu_f2h_ieee(float param) {
+IREE_DEVICE_EXPORT short iree_f2h_ieee(float param) {
   unsigned int param_bit = *((unsigned int*)(&param));
   int sign = param_bit >> 31;
   int mantissa = param_bit & 0x007FFFFF;
@@ -109,3 +107,15 @@ LIBRT_EXPORT short __gnu_f2h_ieee(float param) {
   }
   return res;
 }
+
+#if defined(IREE_DEVICE_STANDALONE)
+
+IREE_DEVICE_EXPORT float __gnu_h2f_ieee(short param) {
+  return iree_h2f_ieee(param);
+}
+
+IREE_DEVICE_EXPORT short __gnu_f2h_ieee(float param) {
+  return iree_f2h_ieee(param);
+}
+
+#endif  // IREE_DEVICE_STANDALONE

@@ -118,6 +118,9 @@ struct iree_benchmark_def_t {
   // returns false.
   iree_status_t (*run)(const iree_benchmark_def_t* benchmark_def,
                        iree_benchmark_state_t* benchmark_state);
+
+  // User-defined data accessible in the run function.
+  const void* user_data;
 };
 
 // Registers a benchmark with the given definition.

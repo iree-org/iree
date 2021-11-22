@@ -1,5 +1,6 @@
 add_mlir_library(IREELinalgExtPasses
   ConvertToLoops.cpp
+  PadContractionToBlockSize.cpp
   Passes.cpp
   Tiling.cpp
 

@@ -14,11 +14,13 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_dispatch_arguments.mlir"
     "convert_to_stream.mlir"
     "elide_async_copies.mlir"
     "encode_tensors.mlir"
     "fold_uniform_operands.mlir"
     "fuse_dispatch_bindings.mlir"
+    "fuse_dispatch_bindings_noalias.mlir"
     "layout_slices.mlir"
     "materialize_copy_on_write.mlir"
     "outline_constants.mlir"

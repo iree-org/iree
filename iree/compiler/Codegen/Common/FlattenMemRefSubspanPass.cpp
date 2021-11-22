@@ -226,7 +226,7 @@ struct FlattenBindingSubspan final
 
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp, newType, subspanOp.binding(), subspanOp.byte_offset(),
-        subspanOp.byte_length(), dynamicDim);
+        subspanOp.byte_length(), dynamicDim, subspanOp.alignmentAttr());
     return success();
   }
 };
@@ -516,7 +516,8 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
         rewriter.create<arith::ConstantIndexOp>(op.memref().getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         op.memref().getLoc(), subspanOp.getType(), subspanOp.binding(), zero,
-        subspanOp.byte_length(), subspanOp.dynamic_dims());
+        subspanOp.byte_length(), subspanOp.dynamic_dims(),
+        subspanOp.alignmentAttr());
     rewriter.restoreInsertionPoint(ip);
 
     MLIRContext *context = rewriter.getContext();

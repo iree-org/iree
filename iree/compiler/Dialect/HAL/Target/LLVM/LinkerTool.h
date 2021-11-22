@@ -103,7 +103,7 @@ class LinkerTool {
 
  protected:
   // Runs the given command line on the shell, logging failures.
-  LogicalResult runLinkCommand(const std::string& commandLine);
+  LogicalResult runLinkCommand(std::string commandLine, StringRef env = "");
 
   // Returns the path to the first tool in |toolNames| found in the environment,
   // or empty string if no tool was found.

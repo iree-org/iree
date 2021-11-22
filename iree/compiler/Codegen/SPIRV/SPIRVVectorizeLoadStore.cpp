@@ -362,7 +362,8 @@ class ProcessInterfaceBinding final
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         bindingOp, *vecMemRef, bindingOp.binding(), bindingOp.byte_offset(),
-        bindingOp.byte_length(), bindingOp.dynamic_dims());
+        bindingOp.byte_length(), bindingOp.dynamic_dims(),
+        bindingOp.alignmentAttr());
     return success();
   }
 };
