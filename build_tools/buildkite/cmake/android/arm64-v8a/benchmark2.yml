@@ -25,7 +25,7 @@ steps:
 
   - label: "Benchmark on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
-      - "git clean -f"
+      - "git clean -fdx"
       - "buildkite-agent artifact download --step Build benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz ./"
       - "buildkite-agent artifact download --step Build iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz ./"
       - "wget https://storage.googleapis.com/iree-shared-files/tracy-capture-058e8901.tgz"
@@ -45,7 +45,7 @@ steps:
 
   - label: "Benchmark on Galaxy S20 (exynos-990, mali-g77)"
     commands:
-      - "git clean -f"
+      - "git clean -fdx"
       - "buildkite-agent artifact download --step Build benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz ./"
       - "buildkite-agent artifact download --step Build iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz ./"
       - "wget https://storage.googleapis.com/iree-shared-files/tracy-capture-058e8901.tgz"
@@ -67,7 +67,7 @@ steps:
 
   - label: "Comment benchmark results on pull request"
     commands:
-      - "git clean -f"
+      - "git clean -fdx"
       - "buildkite-agent artifact download benchmark-results-*.json ./"
       - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base benchmark-results-*.json"
     key: "post-on-pr"
@@ -77,7 +77,7 @@ steps:
 
   - label: "Push benchmark results to dashboard"
     commands:
-      - "git clean -f"
+      - "git clean -fdx"
       - "buildkite-agent artifact download benchmark-results-*.json ./"
       - "python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py --verbose benchmark-results-*.json"
     key: "upload-to-dashboard"
