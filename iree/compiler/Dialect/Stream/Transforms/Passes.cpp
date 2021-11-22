@@ -234,6 +234,9 @@ void buildStreamOptimizationPassPipeline(
     passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
 
     // Only want to specialize after we've added all the operands we need above.
+    // TODO(benvanik): make codegen more efficient with the specialized
+    // constants. The lookup tables inserted are currently extremely slow on
+    // some backends.
     // passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
 
     // TODO(benvanik): canonicalize bindings: we should sort the bindings by
