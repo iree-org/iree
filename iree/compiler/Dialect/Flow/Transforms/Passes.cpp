@@ -145,9 +145,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // executables.
   passManager.addPass(createOutlineDispatchRegionsPass());
 
-  // Generate tag for each executable and store it in an attribute.
-  passManager.addNestedPass<mlir::ModuleOp>(createGenerateDispatchTagsPass());
-
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
 
@@ -182,6 +179,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(mlir::createSymbolDCEPass());
+  
+  // Generate tag for each executable and store it in an attribute.
+  passManager.addPass(createGenerateDispatchTagsPass());
 
   //----------------------------------------------------------------------------
   // Stream formation.

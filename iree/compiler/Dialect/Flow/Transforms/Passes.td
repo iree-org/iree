@@ -69,6 +69,12 @@ def FusionOfTensorOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFusionOfTensorOpsPass()";
 }
 
+def GenerateDispatchTags :
+    Pass<"iree-flow-generate-dispatch-tags", "mlir::ModuleOp"> {
+  let summary = "Generates source IR text and stores it as an attribute.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createGenerateDispatchTagsPass()";
+}
+
 def HoistUnstreamableOps :
     Pass<"iree-flow-hoist-unstreamable-ops", "mlir::FuncOp"> {
   let summary = "Hoist ops that cannot be captured in streams to the top of their block.";
@@ -97,12 +103,6 @@ def OutlineDispatchRegions :
     Pass<"iree-flow-outline-dispatch-regions2", "mlir::ModuleOp"> {
   let summary = "Outlines dispatch regions into executables";
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
-}
-
-def GenerateDispatchTags :
-    Pass<"iree-flow-generate-dispatch-tags", "mlir::ModuleOp"> {
-  let summary = "Generates source IR text and stores it as an attribute.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createGenerateDispatchTagsPass()";
 }
 
 def OutlineLargeConstants :

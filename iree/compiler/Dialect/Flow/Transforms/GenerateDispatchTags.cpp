@@ -15,7 +15,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Module.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
@@ -28,28 +27,38 @@ namespace Flow {
 namespace {
 
 //Generate IR at executable scope.
-static std::string executableIRString(Operation *op) {
-  auto function = dyn_cast<FuncOp>(op);
-  std::string execIR;
-  llvm::raw_string_ostream out(execIR)
-  // Print the function name and a newline before the Module.
-  out << " (function: " << function.getName() << ")\n";
-  function.getParentOfType<ModuleOp>().print(out);
+static std::string getIRString(Operation *op) {
+  std::string IR;
+  llvm::raw_string_ostream out(IR);
+  // Print at module scope.
+  out << "  ('" << op->getName() << "' operation";
+  if (auto symbolName =
+          op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())) {
+    out << ": @" << symbolName.getValue();
+  }
+  out << ") //----- //\n";
 
-  // Print a newline before the IR.
-  out << "\n";
-
-  // Print the given function.
-  if (function) {
-    function.print(out);
-    return;
+  // Find the top-level operation.
+  auto *topLevelOp = op;
+  while (auto *parentOp = topLevelOp->getParentOp()) {
+    topLevelOp = parentOp;
+    out << "  ('" << topLevelOp->getName() << "' operation";
+    if (auto symbolName =
+            topLevelOp->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())) {
+      out << ": @" << symbolName.getValue();
+    }
+    out << ") //----- //\n";
   }
 
-  // Print the given module.
-  assert(isa<ModuleOp>(op) && "unexpected IR unit");
-  cast<ModuleOp>(op).print(out);
   return out.str();
 }
+//Create mlir::Attribute for source code.
+static mlir::Attribute getStringAsAttr(std::string str) {
+  const void * pointer = str.c_str();
+  return Attribute::getFromOpaquePointer(pointer);
+}
+
+} // namespace
 
 class GenerateDispatchTagsPass
     : public GenerateDispatchTagsBase<GenerateDispatchTagsPass> {
@@ -62,7 +71,8 @@ class GenerateDispatchTagsPass
     for (auto funcOp : getOperation().getOps<mlir::FuncOp>()) {
       // Generate module IR string. 
       // Store IR string as attribute.
-      funcOp.setAttr("source_code", executableIRString(*funcOp);
+      auto sourcecodeattr = getStringAsAttr(getIRString(funcOp.getOperation()));
+      funcOp.getOperation()->setAttr("source_code", sourcecodeattr);
     }
   }
 };
@@ -72,7 +82,7 @@ createGenerateDispatchTagsPass() {
   return std::make_unique<GenerateDispatchTagsPass>();
 }
 
-} // namespace
+
 } // namespace Flow
 } // namespace IREE
 } // namespace iree_compiler

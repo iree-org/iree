@@ -112,10 +112,6 @@ createDispatchLinalgOnTensorsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createOutlineDispatchRegionsPass();
 
-// Generates tag for each executable and stores it in an attribute.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createGenerateDispatchTagsPass();
-
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createInjectDispatchTracingPass();
 
@@ -172,6 +168,11 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createInsertConstantClonesPass();
 //                  generate test cases / models suitable for check-in
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantVariablesPass();
+
+// Generates tag for each executable and stores it in an attribute.
+// To be used in passing down source IR summaries to profiler tags.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createGenerateDispatchTagsPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

@@ -42,6 +42,7 @@ cc_library(
         "ExportBenchmarkFuncs.cpp",
         "FormStreams.cpp",
         "FusionOfTensorOps.cpp",
+        "GenerateDispatchTags.cpp",
         "HoistUnstreamableOps.cpp",
         "InjectDispatchTracing.cpp",
         "InsertConstantClones.cpp",
