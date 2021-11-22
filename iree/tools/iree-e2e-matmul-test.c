@@ -147,9 +147,9 @@ static void reference_matmul_element(
     reference_matmul_element_f32(m_size, k_size, n_size, lhs_type, rhs_type,
                                  (float*)lhs_data, (float*)rhs_data,
                                  (float*)acc_data, (float*)result_data, m, n);
-  } else if (iree_hal_element_type_is_integer(lhs_type, 8) &&
-             iree_hal_element_type_is_integer(rhs_type, 8) &&
-             iree_hal_element_type_is_integer(acc_type, 32)) {
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_SINT_8 &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_SINT_8 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_SINT_32) {
     reference_matmul_element_i8_i8_i32(
         m_size, k_size, n_size, lhs_type, rhs_type, (int8_t*)lhs_data,
         (int8_t*)rhs_data, (int32_t*)acc_data, (int32_t*)result_data, m, n);
@@ -203,18 +203,18 @@ static iree_vm_value_t read_matrix_element(iree_hal_dim_t m_size,
                                            iree_hal_dim_t n) {
   iree_host_size_t index = n + m * n_size;
   (void)m_size;
-  if (iree_hal_element_type_is_integer(result_type, 8)) {
-    return iree_vm_value_make_i8(((int8_t*)data)[index]);
-  } else if (iree_hal_element_type_is_integer(result_type, 16)) {
-    return iree_vm_value_make_i16(((int16_t*)data)[index]);
-  } else if (iree_hal_element_type_is_integer(result_type, 32)) {
-    return iree_vm_value_make_i32(((int32_t*)data)[index]);
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
-    return iree_vm_value_make_f32(((float*)data)[index]);
+  switch (result_type) {
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+      return iree_vm_value_make_f32(((float*)data)[index]);
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+      return iree_vm_value_make_i32(((int32_t*)data)[index]);
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+      return iree_vm_value_make_i8(((int8_t*)data)[index]);
+    default:
+      iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                         "unhandled matmul result type"));
+      return iree_vm_value_make_none();
   }
-  iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                     "unhandled matmul result type"));
-  return iree_vm_value_make_none();
 }
 
 typedef enum precision_e {

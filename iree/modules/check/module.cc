@@ -108,9 +108,22 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
       return AlmostEqByteSpan<double>(lhs_bytes, rhs_bytes);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       return AlmostEqByteSpanF16(lhs_bytes, rhs_bytes);
-    default:
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+    case IREE_HAL_ELEMENT_TYPE_UINT_8:
+    case IREE_HAL_ELEMENT_TYPE_SINT_16:
+    case IREE_HAL_ELEMENT_TYPE_UINT_16:
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+    case IREE_HAL_ELEMENT_TYPE_UINT_32:
+    case IREE_HAL_ELEMENT_TYPE_SINT_64:
+    case IREE_HAL_ELEMENT_TYPE_UINT_64:
       // TODO(gcmn): Consider supporting fuzzy matching for quantized integers.
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_8:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_16:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_32:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_64:
+    case IREE_HAL_ELEMENT_TYPE_NONE: {
       break;
+    }
   }
   char element_type_str[16];
   IREE_RETURN_IF_ERROR(iree_hal_format_element_type(
@@ -122,22 +135,18 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
 Status ExpectAllTrue(iree_byte_span_t bytes,
                      iree_hal_element_type_t element_type) {
   switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
       return ExpectAllTrue<int8_t>(bytes);
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
       return ExpectAllTrue<uint8_t>(bytes);
-    case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
       return ExpectAllTrue<int16_t>(bytes);
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
       return ExpectAllTrue<uint16_t>(bytes);
-    case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
       return ExpectAllTrue<int32_t>(bytes);
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
       return ExpectAllTrue<uint32_t>(bytes);
-    case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
       return ExpectAllTrue<int64_t>(bytes);
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
@@ -146,8 +155,14 @@ Status ExpectAllTrue(iree_byte_span_t bytes,
       return ExpectAllTrue<float>(bytes);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       return ExpectAllTrue<double>(bytes);
-    default:
+    case IREE_HAL_ELEMENT_TYPE_NONE:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_8:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_16:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_32:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_64:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
       break;
+    }
   }
   char element_type_str[16];
   IREE_RETURN_IF_ERROR(iree_hal_format_element_type(

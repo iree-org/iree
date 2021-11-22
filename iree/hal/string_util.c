@@ -104,15 +104,11 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
   iree_string_view_t str_value = value;
   iree_hal_numerical_type_t numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
   if (iree_string_view_consume_prefix(&str_value, IREE_SV("i"))) {
-    numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER;
-  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("si"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED;
-  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("ui"))) {
+  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("u"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("f"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
-  } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("bf"))) {
-    numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN;
   } else if (iree_string_view_consume_prefix(&str_value, IREE_SV("x")) ||
              iree_string_view_consume_prefix(&str_value, IREE_SV("*"))) {
     numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
@@ -142,20 +138,14 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
   }
   const char* prefix;
   switch (iree_hal_element_numerical_type(element_type)) {
-    case IREE_HAL_NUMERICAL_TYPE_INTEGER:
+    case IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED:
       prefix = "i";
       break;
-    case IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED:
-      prefix = "si";
-      break;
     case IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED:
-      prefix = "ui";
+      prefix = "u";
       break;
     case IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE:
       prefix = "f";
-      break;
-    case IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN:
-      prefix = "bf";
       break;
     default:
       prefix = "*";
@@ -208,7 +198,6 @@ static iree_status_t iree_hal_parse_element_unsafe(
     iree_string_view_t data_str, iree_hal_element_type_t element_type,
     uint8_t* out_data) {
   switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8: {
       int32_t temp = 0;
       if (!iree_string_view_atoi_int32(data_str, &temp) || temp > INT8_MAX) {
@@ -225,7 +214,6 @@ static iree_status_t iree_hal_parse_element_unsafe(
       *(uint8_t*)out_data = (uint8_t)temp;
       return iree_ok_status();
     }
-    case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16: {
       int32_t temp = 0;
       if (!iree_string_view_atoi_int32(data_str, &temp) || temp > INT16_MAX) {
@@ -242,7 +230,6 @@ static iree_status_t iree_hal_parse_element_unsafe(
       *(uint16_t*)out_data = (uint16_t)temp;
       return iree_ok_status();
     }
-    case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
       return iree_string_view_atoi_int32(data_str, (int32_t*)out_data)
                  ? iree_ok_status()
@@ -251,7 +238,6 @@ static iree_status_t iree_hal_parse_element_unsafe(
       return iree_string_view_atoi_uint32(data_str, (uint32_t*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
-    case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
       return iree_string_view_atoi_int64(data_str, (int64_t*)out_data)
                  ? iree_ok_status()
@@ -278,8 +264,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
     default: {
       // Treat any unknown format as binary.
-      iree_host_size_t element_size =
-          iree_hal_element_dense_byte_count(element_type);
+      iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
       if (data_str.size != element_size * 2) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "binary hex element count mismatch: buffer "
@@ -295,8 +280,7 @@ static iree_status_t iree_hal_parse_element_unsafe(
 IREE_API_EXPORT iree_status_t iree_hal_parse_element(
     iree_string_view_t data_str, iree_hal_element_type_t element_type,
     iree_byte_span_t data_ptr) {
-  iree_host_size_t element_size =
-      iree_hal_element_dense_byte_count(element_type);
+  iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
   if (data_ptr.data_length < element_size) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -337,8 +321,7 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
     iree_const_byte_span_t data, iree_hal_element_type_t element_type,
     iree_host_size_t buffer_capacity, char* buffer,
     iree_host_size_t* out_buffer_length) {
-  iree_host_size_t element_size =
-      iree_hal_element_dense_byte_count(element_type);
+  iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
   if (data.data_length < element_size) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
@@ -347,7 +330,6 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
   }
   int n = 0;
   switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi8,
                    *(const int8_t*)data.data);
@@ -356,7 +338,6 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu8,
                    *(const uint8_t*)data.data);
       break;
-    case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi16,
                    *(const int16_t*)data.data);
@@ -365,7 +346,6 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu16,
                    *(const uint16_t*)data.data);
       break;
-    case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi32,
                    *(const int32_t*)data.data);
@@ -374,7 +354,6 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu32,
                    *(const uint32_t*)data.data);
       break;
-    case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIi64,
                    *(const int64_t*)data.data);
@@ -419,8 +398,7 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
 IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
     iree_string_view_t data_str, iree_hal_element_type_t element_type,
     iree_byte_span_t data_ptr) {
-  iree_host_size_t element_size =
-      iree_hal_element_dense_byte_count(element_type);
+  iree_host_size_t element_size = iree_hal_element_byte_count(element_type);
   iree_host_size_t element_capacity = data_ptr.data_length / element_size;
   if (iree_string_view_is_empty(data_str)) {
     memset(data_ptr.data, 0, data_ptr.data_length);
@@ -513,7 +491,7 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
       dim_length *= shape[i];
     }
     iree_device_size_t dim_stride =
-        dim_length * iree_hal_element_dense_byte_count(element_type);
+        dim_length * iree_hal_element_byte_count(element_type);
     if (data.data_length < dim_stride * shape[0]) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
@@ -544,7 +522,7 @@ static iree_status_t iree_hal_format_buffer_elements_recursive(
     iree_host_size_t max_count =
         iree_min(*max_element_count, (iree_host_size_t)shape[0]);
     iree_device_size_t element_stride =
-        iree_hal_element_dense_byte_count(element_type);
+        iree_hal_element_byte_count(element_type);
     if (data.data_length < max_count * element_stride) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
