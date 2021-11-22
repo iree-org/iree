@@ -147,7 +147,6 @@ def Util_AnyPtr : DialectType<
   let description = [{
     Pointer to a typed value.
   }];
-  let builderCall = "$_builder.getType<IREE::Util::PtrType>()";
 }
 
 class Util_PtrOf<Type type> :
