@@ -15,6 +15,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "AnnotateDispatchArguments.cpp",
         "ConvertToStream.cpp",
         "ElideAsyncCopies.cpp",
         "EncodeTensors.cpp",

@@ -90,7 +90,7 @@ Value getSubspanBuffer(Value tensor, OpBuilder &b, BufferizationState &state) {
     auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp->getLoc(), memRefType, subspanOp.binding(),
         subspanOp.byte_offset(), subspanOp.byte_length(),
-        subspanOp.dynamic_dims());
+        subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
     state.mapValue(subspanOp, baseBuffer);
     state.aliasInfo.createAliasInfoEntry(subspanOp.result());
   }

@@ -163,15 +163,20 @@ static Interface createInterface(Location loc,
 }
 
 // Converts the usage of the given primitive |arg| to interface methods.
-static void convertOperandUsage(BlockArgument arg, unsigned pushConstantIdx,
-                                OpBuilder &builder) {
+static void convertOperandUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
+                                unsigned pushConstantIdx, OpBuilder &builder) {
+  auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
+      arg.getArgNumber(), "stream.alignment");
+  auto valuesAttr = sourceFuncOp.getArgAttrOfType<ArrayAttr>(arg.getArgNumber(),
+                                                             "stream.values");
   auto loadOp = builder.create<IREE::HAL::InterfaceLoadConstantOp>(
-      arg.getLoc(), arg.getType(), APInt(64, pushConstantIdx));
+      arg.getLoc(), arg.getType(), builder.getIndexAttr(pushConstantIdx),
+      alignmentAttr, valuesAttr);
   arg.replaceAllUsesWith(loadOp);
 }
 
 // Converts the usage of the given !stream.binding |arg| to interface methods.
-static void convertBindingUsage(BlockArgument arg,
+static void convertBindingUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
                                 IREE::HAL::InterfaceOp interfaceOp,
                                 IREE::HAL::InterfaceBindingOp bindingOp) {
   if (arg.use_empty()) return;  // no-op
@@ -179,11 +184,14 @@ static void convertBindingUsage(BlockArgument arg,
     auto oldOp = dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner());
     assert(oldOp && "bindings are only usable by stream.binding.subspan");
     OpBuilder builder(oldOp);
+    auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
+        arg.getArgNumber(), "stream.alignment");
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
         oldOp.getLoc(), oldOp.getType(),
         SymbolRefAttr::get(interfaceOp.sym_nameAttr(),
                            {SymbolRefAttr::get(bindingOp)}),
-        oldOp.byte_offset(), /*byte_length=*/Value{}, oldOp.dynamic_dims());
+        oldOp.byte_offset(), /*byte_length=*/Value{}, oldOp.dynamic_dims(),
+        alignmentAttr);
     oldOp.replaceAllUsesWith(newOp.result());
     oldOp.erase();
   }
@@ -210,13 +218,13 @@ static mlir::FuncOp cloneFuncWithInterface(
   for (auto arg : entryBlock->getArguments()) {
     if (!arg.getType().isa<IREE::Stream::BindingType>()) {
       // TODO(benvanik): symbolic push constant indices.
-      convertOperandUsage(arg, operandIdx++, entryBuilder);
+      convertOperandUsage(sourceFuncOp, arg, operandIdx++, entryBuilder);
     }
   }
   unsigned bindingIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
     if (arg.getType().isa<IREE::Stream::BindingType>()) {
-      convertBindingUsage(arg, interface.op,
+      convertBindingUsage(sourceFuncOp, arg, interface.op,
                           interface.resourceBindings[bindingIdx++]);
     }
   }
