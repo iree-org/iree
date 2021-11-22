@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_BUILTINS_DEVICE_DEVICE_H_
+#define IREE_BUILTINS_DEVICE_DEVICE_H_
+
 //===----------------------------------------------------------------------===//
 // A simplified libc/libm-alike that is designed to compile to portable LLVM IR.
 //===----------------------------------------------------------------------===//
@@ -31,17 +34,43 @@
 // target-specific module.
 
 //===----------------------------------------------------------------------===//
+// Configuration
+//===----------------------------------------------------------------------===//
+
+// IREE_DEVICE_STANDALONE:
+// Define to have libdevice's implementation of builtins alias the standard
+// names. If undefined then the host toolchain implementations will be used.
+
+//===----------------------------------------------------------------------===//
 // Attributes and metadata
 //===----------------------------------------------------------------------===//
 
 // Tagged on functions that are part of the public API.
-#define LIBRT_EXPORT __attribute__((visibility("hidden")))
+#ifdef __cplusplus
+#define IREE_DEVICE_EXPORT extern "C"
+#else
+#define IREE_DEVICE_EXPORT
+#endif  // __cplusplus
+
+// `restrict` keyword, not supported by some older compilers.
+// We define our own macro in case dependencies use `restrict` differently.
+#if defined(_MSC_VER) && _MSC_VER >= 1900
+#define IREE_DEVICE_RESTRICT __restrict
+#elif defined(_MSC_VER)
+#define IREE_DEVICE_RESTRICT
+#elif defined(__cplusplus)
+#define IREE_DEVICE_RESTRICT __restrict__
+#else
+#define IREE_DEVICE_RESTRICT restrict
+#endif  // _MSC_VER
 
 //===----------------------------------------------------------------------===//
 // stdint.h
 //===----------------------------------------------------------------------===//
 // https://pubs.opengroup.org/onlinepubs/009604599/basedefs/stdint.h.html
 // NOTE: no size_t/ptrdiff_t/etc (as they are target dependent).
+
+#if !defined(INT8_MIN)
 
 typedef signed char int8_t;
 typedef short int16_t;
@@ -65,6 +94,8 @@ typedef unsigned long long uint64_t;
 #define UINT32_MAX 0xffffffffui32
 #define UINT64_MAX 0xffffffffffffffffui64
 
+#endif  // !INT8_MIN
+
 //===----------------------------------------------------------------------===//
 // Target-specific queries
 //===----------------------------------------------------------------------===//
@@ -72,4 +103,18 @@ typedef unsigned long long uint64_t;
 // here in C before we generate the IR.
 
 // Do not use: here as an example. Remove once we have any other flag.
-extern int librt_platform_example_flag;
+extern int libdevice_platform_example_flag;
+// The value used when not coming from the compiler.
+#define LIBDEVICE_PLATFORM_EXAMPLE_FLAG 0
+
+//===----------------------------------------------------------------------===//
+// Public API
+//===----------------------------------------------------------------------===//
+
+// Converts a 16-bit floating-point value to a 32-bit C `float`.
+IREE_DEVICE_EXPORT float iree_h2f_ieee(short param);
+
+// Converts a 32-bit C `float` value to a 16-bit floating-point value.
+IREE_DEVICE_EXPORT short iree_f2h_ieee(float param);
+
+#endif  // IREE_BUILTINS_DEVICE_DEVICE_H_
