@@ -48,6 +48,10 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
 
 void addSPIRVBufferizePasses(OpPassManager &passManager,
                              WorkgroupMemoryAllocationFn allocationFn) {
+  // Resolve dim ops first so that we don't have compute Linalg ops lingering on
+  // becuase of dim op usage. This avoids bufferizing those compute ops just for
+  // their shape dimensions.
+  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(createLinalgBufferizePass(allocationFn));
   // Distribute immediately after bufferization to avoid losing attribute
   // annotations in subsequent transformations. This is a bit fragile right now
