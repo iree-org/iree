@@ -385,7 +385,7 @@ static iree_status_t iree_trace_replay_parse_hal_shape(
 // Parses an element type.
 //
 // ```yaml
-// element_type: 50331680
+// element_type: 553648160
 // ```
 // or
 // ```yaml
@@ -422,7 +422,7 @@ static iree_status_t iree_trace_replay_parse_hal_element_type(
 // Parses an encoding type.
 //
 // ```yaml
-// encoding_type: 50331680
+// encoding_type: 553648160
 // ```
 static iree_status_t iree_trace_replay_parse_hal_encoding_type(
     iree_trace_replay_t* replay, yaml_document_t* document,
@@ -509,6 +509,10 @@ static void iree_trace_replay_write_element(
     break;
 
   switch (element_type) {
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_8, int8_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_16, int16_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_32, int32_t)
+    IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(INT_64, int64_t)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_8, int8_t)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_16, int16_t)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(SINT_32, int32_t)
@@ -545,7 +549,7 @@ static void iree_trace_replay_generate_identity_matrix(
     iree_hal_element_type_t element_type, iree_byte_span_t span,
     iree_hal_dim_t inner_size) {
   iree_host_size_t element_byte_count =
-      iree_hal_element_byte_count(element_type);
+      iree_hal_element_dense_byte_count(element_type);
   uint8_t* data_end = span.data + span.data_length;
   iree_host_size_t inner_index = 0;
   iree_host_size_t outer_index = 0;
@@ -581,7 +585,7 @@ static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
   const bool is_unsigned = iree_hal_element_numerical_type(element_type) ==
                            IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED;
   iree_host_size_t element_byte_count =
-      iree_hal_element_byte_count(element_type);
+      iree_hal_element_dense_byte_count(element_type);
   uint8_t* data_end = span.data + span.data_length;
   uint32_t state = seed;
   for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
@@ -653,7 +657,7 @@ static iree_status_t iree_trace_replay_generate_hal_buffer(
 // ```yaml
 // shape:
 // - 4
-// element_type: 50331680
+// element_type: 553648160
 // contents: !!binary |
 //   AACAPwAAAEAAAEBAAACAQA==
 // ```
