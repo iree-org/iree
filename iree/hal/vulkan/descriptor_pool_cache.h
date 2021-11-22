@@ -28,8 +28,6 @@ class DescriptorPoolCache;
 struct DescriptorPool {
   // Type of the descriptor in the set.
   VkDescriptorType descriptor_type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
-  // Maximum number of descriptors of the given type per allocation.
-  int max_descriptor_count = 0;
   // Pool handle.
   VkDescriptorPool handle = VK_NULL_HANDLE;
 };
