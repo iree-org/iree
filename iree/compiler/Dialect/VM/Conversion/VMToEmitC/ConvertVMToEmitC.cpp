@@ -1365,7 +1365,7 @@ class GenericOpConversion : public OpConversionPattern<SrcOpTy> {
           indexSequence(adaptor.getOperands().size(), op.getContext());
 
       for (NamedAttribute attr : op->getAttrs()) {
-        args_.push_back(attr.value);
+        args_.push_back(attr.getValue());
       }
 
       args = rewriter.getArrayAttr(args_);
