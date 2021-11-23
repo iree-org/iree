@@ -547,13 +547,12 @@ def filter_and_run_benchmarks(
   return (benchmark_files, captures, errors)
 
 
-def set_frequency_scaling_governor(governor : str):
+def set_frequency_scaling_governor(governor: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   cpu_script = os.path.join(
       git_root, "build_tools/benchmarks/set_android_scaling_governor.sh")
   adb_push_to_tmp_dir(cpu_script)
   adb_execute(["./set_android_scaling_governor.sh", governor])
-
 
 
 def parse_arguments():
