@@ -552,7 +552,7 @@ def set_frequency_scaling_governor(governor: str):
   cpu_script = os.path.join(
       git_root, "build_tools/benchmarks/set_android_scaling_governor.sh")
   adb_push_to_tmp_dir(cpu_script)
-  adb_execute(["./set_android_scaling_governor.sh", governor])
+  adb_execute(["su", "root", "./set_android_scaling_governor.sh", governor])
 
 
 def parse_arguments():
