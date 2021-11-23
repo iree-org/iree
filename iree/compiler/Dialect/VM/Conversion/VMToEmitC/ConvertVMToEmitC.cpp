@@ -282,6 +282,8 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
 
   builder.setInsertionPointToStart(&entryBlock);
 
+  ptr->second.numRefArguments = numRefArgs;
+
   for (int i = 0; i < numLocalRefs; i++) {
     auto refOp = builder.create<emitc::ConstantOp>(
         /*location=*/loc,
@@ -485,8 +487,9 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
   return elementTypePtrOp;
 }
 
-void releaseLocalRefs(OpBuilder &builder, Location location,
-                      mlir::FuncOp funcOp, VMAnalysisCache &vmAnalysisCache) {
+/// Releases refs which are local to the function as well as ref arguments.
+void releaseRefs(OpBuilder &builder, Location location, mlir::FuncOp funcOp,
+                 VMAnalysisCache &vmAnalysisCache) {
   auto ctx = builder.getContext();
 
   auto ptr = vmAnalysisCache.find(funcOp.getOperation());
@@ -507,6 +510,24 @@ void releaseLocalRefs(OpBuilder &builder, Location location,
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{localRef});
+  }
+
+  // We only release the original arguments not the results which were appended
+  // as further operands.
+  size_t refArgumentsReleased = 0;
+  for (auto arg : funcOp.getArguments()) {
+    if (arg.getType() == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*")) {
+      if (ptr->second.numRefArguments <= refArgumentsReleased++) {
+        break;
+      }
+      builder.create<emitc::CallOp>(
+          /*location=*/location,
+          /*type=*/TypeRange{},
+          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{arg});
+    }
   }
 }
 
@@ -576,7 +597,7 @@ emitc::CallOp returnIfError(OpBuilder &builder, Location location,
     Block *block = builder.getBlock();
     mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
 
-    releaseLocalRefs(builder, location, funcOp, vmAnalysisCache);
+    releaseRefs(builder, location, funcOp, vmAnalysisCache);
 
     builder.create<mlir::ReturnOp>(location, callOp.getResult(0));
   };
@@ -598,7 +619,7 @@ emitc::CallOp failListNull(OpBuilder &builder, Location location, Type type,
     Block *block = builder.getBlock();
     mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
 
-    releaseLocalRefs(builder, location, funcOp, vmAnalysisCache);
+    releaseRefs(builder, location, funcOp, vmAnalysisCache);
 
     auto statusOp = builder.create<emitc::CallOp>(
         /*location=*/location,
@@ -679,7 +700,7 @@ mlir::CallOp returnIfError(OpBuilder &builder, Location location,
     Block *block = builder.getBlock();
     mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
 
-    releaseLocalRefs(builder, location, funcOp, vmAnalysisCache);
+    releaseRefs(builder, location, funcOp, vmAnalysisCache);
 
     builder.create<mlir::ReturnOp>(location, callOp.getResult(0));
   };
@@ -1647,7 +1668,34 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
           return op->emitError() << "local ref not found";
         }
 
-        updatedOperands.push_back(operandRef.getValue());
+        auto refOp = rewriter.create<emitc::ConstantOp>(
+            /*location=*/loc,
+            /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+            /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+
+        auto refPtrOp = rewriter.create<emitc::ApplyOp>(
+            /*location=*/loc,
+            /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+            /*applicableOperator=*/StringAttr::get(ctx, "&"),
+            /*operand=*/refOp.getResult());
+
+        if (failed(clearStruct(rewriter, refPtrOp.getResult(),
+                               /*isPointer=*/true))) {
+          return failure();
+        }
+
+        rewriter.create<emitc::CallOp>(
+            /*location=*/loc,
+            /*type=*/TypeRange{},
+            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_assign"),
+            /*args=*/ArrayAttr{},
+            /*templateArgs=*/ArrayAttr{},
+            /*operands=*/
+            ArrayRef<Value>{operandRef.getValue(), refPtrOp.getResult()});
+
+        updatedOperands.push_back(refPtrOp.getResult());
+
+        // updatedOperands.push_back(operandRef.getValue());
       } else {
         updatedOperands.push_back(operand);
       }
@@ -1819,7 +1867,7 @@ class CompareRefNotZeroOpConversion
     }
 
     bool move =
-        ptr->second.isLastValueUse(cmpOp.operand(), cmpOp.getOperation()) ||
+        ptr->second.isLastValueUse(cmpOp.operand(), cmpOp.getOperation()) &&
         false;
 
     Optional<Value> ref = findRef(funcOp, vmAnalysisCache, cmpOp.operand());
@@ -2347,7 +2395,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
       }
     }
 
-    releaseLocalRefs(rewriter, loc, funcOp, vmAnalysisCache);
+    releaseRefs(rewriter, loc, funcOp, vmAnalysisCache);
 
     auto status = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -2391,7 +2439,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
 
-      releaseLocalRefs(rewriter, loc, funcOp, vmAnalysisCache);
+      releaseRefs(rewriter, loc, funcOp, vmAnalysisCache);
 
       auto status = rewriter.create<emitc::CallOp>(
           /*location=*/loc,
@@ -2410,7 +2458,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
 
-      releaseLocalRefs(rewriter, loc, funcOp, vmAnalysisCache);
+      releaseRefs(rewriter, loc, funcOp, vmAnalysisCache);
 
       std::string message = std::string("\"") +
                             op.message().getValueOr("").str() +
@@ -3317,7 +3365,7 @@ class ListSetRefOpConversion
     }
 
     bool move =
-        ptr->second.isLastValueUse(setOp.value(), setOp.getOperation()) ||
+        ptr->second.isLastValueUse(setOp.value(), setOp.getOperation()) &&
         false;
 
     StringRef callee =
