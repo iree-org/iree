@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_INPUT_OPS_TD
 
 include "iree-dialects/Dialect/Input/InputDialect.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 

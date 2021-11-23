@@ -386,20 +386,18 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
-  for (auto *op : context->getRegisteredOperations()) {
+  for (auto op : context->getRegisteredOperations()) {
     // Non-serializable ops must be removed prior to serialization.
-    if (op->hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
-      op->getCanonicalizationPatterns(patterns, context);
-      target.setOpAction(OperationName(op->name, context),
-                         ConversionTarget::LegalizationAction::Illegal);
+    if (op.hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
+      op.getCanonicalizationPatterns(patterns, context);
+      target.setOpAction(op, ConversionTarget::LegalizationAction::Illegal);
     }
 
     // Debug ops must not be present when stripping.
     // TODO(benvanik): add RemoveDisabledDebugOp pattern.
-    if (op->hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
+    if (op.hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
         targetOptions.stripDebugOps) {
-      target.setOpAction(OperationName(op->name, context),
-                         ConversionTarget::LegalizationAction::Illegal);
+      target.setOpAction(op, ConversionTarget::LegalizationAction::Illegal);
     }
   }
 
@@ -502,8 +500,8 @@ static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
           funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
     SmallVector<iree_vm_ReflectionAttrDef_ref_t, 4> reflectionAttrRefs;
     for (auto reflectionAttr : reflectionAttrs) {
-      auto key = reflectionAttr.first.strref();
-      auto value = reflectionAttr.second.dyn_cast<StringAttr>();
+      auto key = reflectionAttr.getName().strref();
+      auto value = reflectionAttr.getValue().dyn_cast<StringAttr>();
       if (!value || key.empty()) continue;
       // NOTE: if we actually want to keep these we should dedupe them (as the
       // keys and likely several of the values are shared across all functions).

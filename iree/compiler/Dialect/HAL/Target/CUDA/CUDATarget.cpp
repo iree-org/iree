@@ -165,7 +165,7 @@ class CUDATargetBackend final : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getIdentifier("executable_targets"),
+    configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
 
     auto configAttr = b.getDictionaryAttr(configItems);
@@ -323,8 +323,7 @@ class CUDATargetBackend final : public TargetBackend {
     SmallVector<NamedAttribute> configItems;
     // Add some configurations to the `hal.executable.target` attribute.
     auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(
-          std::make_pair(Identifier::get(name, context), value));
+      configItems.emplace_back(StringAttr::get(context, name), value);
     };
     // Set target arch
     addConfig("target_arch", StringAttr::get(context, clTargetChip));

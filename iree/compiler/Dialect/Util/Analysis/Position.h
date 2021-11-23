@@ -82,7 +82,7 @@ class Position {
   void print(llvm::raw_ostream &os, AsmState &asmState) const;
 
  private:
-  template <typename T>
+  template <typename T, typename Enable>
   friend struct llvm::DenseMapInfo;
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &os, Position pos);
 

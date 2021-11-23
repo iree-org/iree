@@ -383,8 +383,8 @@ class FoldGlobalsPass
     for (auto *dialect : context->getLoadedDialects()) {
       dialect->getCanonicalizationPatterns(patterns);
     }
-    for (auto *op : context->getRegisteredOperations()) {
-      op->getCanonicalizationPatterns(patterns, context);
+    for (auto op : context->getRegisteredOperations()) {
+      op.getCanonicalizationPatterns(patterns, context);
     }
 
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));

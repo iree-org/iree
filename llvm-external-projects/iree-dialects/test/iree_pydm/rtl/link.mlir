@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -verify-diagnostics -split-input-file -lower-iree-pydm-to-rtl -link-iree-pydm-rtl='rtl-file=%resources_dir/PyDMRTL/PyDMRTLBase.mlir' %s | FileCheck --enable-var-scope --dump-input-filter=all %s
+// RUN: iree-dialects-opt -verify-diagnostics -split-input-file -lower-iree-pydm-to-rtl -link-iree-pydm-rtl='rtl-file=%resources_dir/PyDMRTL/PyDMRTLBase.mlir' %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: module @multi_with_private
 // A multiple module import with additional private symbols included.

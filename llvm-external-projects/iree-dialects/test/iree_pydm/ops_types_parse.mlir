@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s | iree-dialects-opt | FileCheck --enable-var-scope --dump-input-filter=all %s
+// RUN: iree-dialects-opt %s | iree-dialects-opt | FileCheck  --dump-input-filter=all %s
 
 iree_pydm.func @free_var(%arg0 : !iree_pydm.bool) -> (!iree_pydm.exception_result, !iree_pydm.bool) {
   %var = alloc_free_var "foo" -> !iree_pydm.free_var_ref

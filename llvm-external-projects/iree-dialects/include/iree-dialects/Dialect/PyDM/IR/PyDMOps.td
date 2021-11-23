@@ -221,7 +221,7 @@ def IREEPyDM_RaiseOnFailureOp : IREEPyDM_Op<"raise_on_failure", [
     $exc_result `:` type($exc_result) attr-dict
   }];
 
-  let hasFolder = 1;
+  let hasCanonicalizeMethod = 1;
 }
 
 def IREEPyDM_CallOp : IREEPyDM_Op<"call", [

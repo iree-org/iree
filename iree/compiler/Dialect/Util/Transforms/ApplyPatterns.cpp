@@ -41,8 +41,8 @@ class ApplyPatternsPass
     for (auto *dialect : context->getLoadedDialects()) {
       dialect->getCanonicalizationPatterns(patterns);
     }
-    for (auto *op : context->getRegisteredOperations()) {
-      op->getCanonicalizationPatterns(patterns, context);
+    for (auto op : context->getRegisteredOperations()) {
+      op.getCanonicalizationPatterns(patterns, context);
     }
     IREE::Util::populateCommonPatterns(context, patterns);
 

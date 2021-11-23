@@ -132,8 +132,8 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   if (!compare_ranges(
           lhs.getAttrs(), rhs.getAttrs(),
           [&](const NamedAttribute &lhs, const NamedAttribute &rhs) {
-            if (lhs.first == "function_ref" ||
-                lhs.first == SymbolTable::getSymbolAttrName()) {
+            if (lhs.getName() == "function_ref" ||
+                lhs.getName() == SymbolTable::getSymbolAttrName()) {
               return true;
             }
             return lhs == rhs;

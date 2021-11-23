@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -pydm-local-propagate-types --allow-unregistered-dialect %s | FileCheck --enable-var-scope --dump-input-filter=all %s
+// RUN: iree-dialects-opt -pydm-local-propagate-types --allow-unregistered-dialect %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @sink_static_info_cast_into_refinable
 // "neg" implements TypeRefinableOpInterface and thus can have casts sunk

@@ -17,11 +17,11 @@ namespace iree_integrations {
 namespace TF {
 
 static bool isTFAttr(NamedAttribute &namedAttr) {
-  auto name = namedAttr.first.strref();
+  auto name = namedAttr.getName().strref();
   if (name.startswith("tf.") || name.startswith("tf_")) {
     return true;
   }
-  StringRef attrNamespace = namedAttr.second.getDialect().getNamespace();
+  StringRef attrNamespace = namedAttr.getValue().getDialect().getNamespace();
   return attrNamespace == mlir::TF::TensorFlowDialect::getDialectNamespace() ||
          attrNamespace == mlir::tf_executor::TensorFlowExecutorDialect::
                               getDialectNamespace() ||
@@ -48,7 +48,7 @@ class StripModuleMetadataPass
         moduleOp->getAttrs(),
         [](NamedAttribute namedAttr) { return isTFAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
-      moduleOp->removeAttr(namedAttr.first);
+      moduleOp->removeAttr(namedAttr.getName());
     }
   }
 };
@@ -70,7 +70,7 @@ class StripFunctionMetadataPass
         funcOp->getAttrs(),
         [](NamedAttribute namedAttr) { return isTFAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
-      funcOp->removeAttr(namedAttr.first);
+      funcOp->removeAttr(namedAttr.getName());
     }
 
     for (int i = 0; i < funcOp.getNumArguments(); ++i) {
@@ -78,7 +78,7 @@ class StripFunctionMetadataPass
           funcOp.getArgAttrs(i),
           [](NamedAttribute namedAttr) { return isTFAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
-        funcOp.removeArgAttr(i, namedAttr.first);
+        funcOp.removeArgAttr(i, namedAttr.getName());
       }
     }
 
@@ -87,7 +87,7 @@ class StripFunctionMetadataPass
           funcOp.getResultAttrs(i),
           [](NamedAttribute namedAttr) { return isTFAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
-        funcOp.removeResultAttr(i, namedAttr.first);
+        funcOp.removeResultAttr(i, namedAttr.getName());
       }
     }
   }
