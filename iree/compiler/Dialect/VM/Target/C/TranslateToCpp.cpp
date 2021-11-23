@@ -663,7 +663,7 @@ CppEmitter::emitOperandsAndAttributes(Operation &op,
   auto emitNamedAttribute = [&](NamedAttribute attr) -> LogicalResult {
     if (llvm::is_contained(exclude, attr.getName().strref()))
       return success();
-    os << "/* " << attr.geyName() << " */";
+    os << "/* " << attr.getName() << " */";
     if (failed(emitAttribute(op.getLoc(), attr.getValue())))
       return failure();
     return success();
