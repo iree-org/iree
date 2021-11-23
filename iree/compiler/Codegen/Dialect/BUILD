@@ -17,7 +17,6 @@ exports_files([
     "IREECodegenAttributes.td",
     "IREECodegenDialect.td",
     "LoweringConfig.td",
-    "ProcessorOpInterfaces.td",
 ])
 
 td_library(
@@ -27,7 +26,6 @@ td_library(
             "IREECodegenAttributes.td",
             "IREECodegenDialect.td",
             "LoweringConfig.td",
-            "ProcessorOpInterfaces.td",
         ],
         include = ["*.td"],
     ),
@@ -63,26 +61,6 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:StandardOps",
-    ],
-)
-
-cc_library(
-    name = "ProcessorOpInterfaces",
-    srcs = [
-        "ProcessorOpInterfaces.cpp",
-    ],
-    hdrs = [
-        "ProcessorOpInterfaces.h",
-    ],
-    textual_hdrs = [
-        "ProcessorOpInterfaces.cpp.inc",
-        "ProcessorOpInterfaces.h.inc",
-    ],
-    deps = [
-        ":ProcessorOpInterfaceGen",
-        "//iree/compiler/Dialect/HAL/IR",
-        "@llvm-project//mlir:GPUDialect",
-        "@llvm-project//mlir:IR",
     ],
 )
 
@@ -125,22 +103,5 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LoweringConfig.td",
-    deps = [":td_files"],
-)
-
-gentbl_cc_library(
-    name = "ProcessorOpInterfaceGen",
-    tbl_outs = [
-        (
-            ["-gen-op-interface-decls"],
-            "ProcessorOpInterfaces.h.inc",
-        ),
-        (
-            ["-gen-op-interface-defs"],
-            "ProcessorOpInterfaces.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "ProcessorOpInterfaces.td",
     deps = [":td_files"],
 )

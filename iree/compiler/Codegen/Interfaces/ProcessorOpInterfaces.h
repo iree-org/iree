@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_DIALECT_PROCESSOROPINTERFACES_H_
-#define IREE_COMPILER_CODEGEN_DIALECT_PROCESSOROPINTERFACES_H_
+#ifndef IREE_COMPILER_CODEGEN_INTERFACES_PROCESSOROPINTERFACES_H_
+#define IREE_COMPILER_CODEGEN_INTERFACES_PROCESSOROPINTERFACES_H_
 
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 
 /// Include the generated interface declarations.
-#include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h.inc"  // IWYU pragma: export
 
 namespace mlir {
 namespace iree_compiler {
@@ -22,4 +22,4 @@ void registerProcessorOpInterfaceExternalModels(DialectRegistry &registry);
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_DIALECT_PROCESSOROPINTERFACES_H_
+#endif  // IREE_COMPILER_CODEGEN_INTERFACES_PROCESSOROPINTERFACES_H_

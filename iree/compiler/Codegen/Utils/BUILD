@@ -23,7 +23,7 @@ cc_library(
         "Utils.h",
     ],
     deps = [
-        "//iree/compiler/Codegen/Dialect:ProcessorOpInterfaces",
+        "//iree/compiler/Codegen/Interfaces:ProcessorOpInterfaces",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
