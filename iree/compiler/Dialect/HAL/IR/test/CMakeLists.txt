@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "allocator_op_folding.mlir"
     "allocator_ops.mlir"
     "attributes.mlir"
     "buffer_folding.mlir"
@@ -23,8 +22,6 @@ iree_lit_test_suite(
     "buffer_view_ops.mlir"
     "command_buffer_folding.mlir"
     "command_buffer_ops.mlir"
-    "constant_folding.mlir"
-    "constant_ops.mlir"
     "descriptor_set_ops.mlir"
     "device_ops.mlir"
     "executable_ops.mlir"

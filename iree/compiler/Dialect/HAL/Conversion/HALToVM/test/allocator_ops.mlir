@@ -1,19 +1,5 @@
 // RUN: iree-opt -split-input-file -canonicalize -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
-// CHECK-LABEL: vm.func private @allocatorComputeSizeFoldsAway
-func @allocatorComputeSizeFoldsAway(%arg0 : !hal.allocator) -> index {
-  // CHECK: %c4194304 = vm.const.i32 4194304 : i32
-  // CHECK-NOT: hal.allocator.compute_size
-  %c1024 = arith.constant 1024 : index
-  %c1_i32 = arith.constant 1 : i32
-  %c32_i32 = arith.constant 32 : i32
-  %0 = hal.allocator.compute_size<%arg0 : !hal.allocator>
-      shape([%c1024, %c1024]) type(%c32_i32) encoding(%c1_i32) : index
-  return %0 : index
-}
-
-// -----
-
 // CHECK-LABEL: vm.func private @allocatorAllocate
 func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
   %c1024 = arith.constant 1024 : index

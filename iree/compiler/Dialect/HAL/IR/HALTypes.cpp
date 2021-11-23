@@ -331,39 +331,6 @@ llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
 }
 
 //===----------------------------------------------------------------------===//
-// Size-aware type utils
-//===----------------------------------------------------------------------===//
-
-// Returns the SSA value containing the size of the given |value|.
-static Value lookupValueSize(Value value) {
-  assert(value.getType().isa<IREE::Util::SizeAwareTypeInterface>());
-
-  auto definingOp = value.getDefiningOp();
-  if (!definingOp) {
-    return {};  // Not yet implemented.
-  }
-
-  // Skip do-not-optimize ops.
-  if (auto dnoOp = dyn_cast<IREE::Util::DoNotOptimizeOp>(definingOp)) {
-    return lookupValueSize(dnoOp.getOperand(0));
-  }
-
-  // Query size from the size-aware op that defined the value, as it knows how
-  // to get/build the right value.
-  unsigned resultIndex = -1;
-  for (unsigned i = 0; i < definingOp->getNumResults(); ++i) {
-    if (definingOp->getResult(i) == value) {
-      resultIndex = i;
-      break;
-    }
-  }
-  assert(resultIndex != -1 && "result not in results");
-  auto sizeAwareOp = dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp);
-  if (!sizeAwareOp) return {};
-  return sizeAwareOp.getResultSize(resultIndex);
-}
-
-//===----------------------------------------------------------------------===//
 // Object types
 //===----------------------------------------------------------------------===//
 
@@ -918,102 +885,6 @@ Value DeviceMatchExecutableFormatAttr::buildConditionExpression(
 }
 
 //===----------------------------------------------------------------------===//
-// Experimental interface plumbing
-//===----------------------------------------------------------------------===//
-
-// static
-Attribute ExConstantStorageAttr::parse(AsmParser &p) {
-  StringAttr bindingAttr;
-  StringAttr storageAttr;
-  IntegerAttr offsetAttr;
-  IntegerAttr lengthAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(storageAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(offsetAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(lengthAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(bindingAttr, storageAttr, offsetAttr, lengthAttr);
-}
-
-void ExConstantStorageAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(bindingAttr());
-  os << ", ";
-  p.printAttribute(storageAttr());
-  os << ", ";
-  p.printAttribute(offsetAttr());
-  os << ", ";
-  p.printAttribute(lengthAttr());
-  os << ">";
-}
-
-// static
-Attribute ExPushConstantAttr::parse(AsmParser &p) {
-  IntegerAttr ordinalAttr;
-  IntegerAttr operandAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(ordinalAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(operandAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(ordinalAttr, operandAttr);
-}
-
-void ExPushConstantAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(ordinalAttr());
-  os << ", ";
-  p.printAttribute(operandAttr());
-  os << ">";
-}
-
-// static
-Attribute ExOperandBufferAttr::parse(AsmParser &p) {
-  StringAttr bindingAttr;
-  IntegerAttr operandAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(operandAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(bindingAttr, operandAttr);
-}
-
-void ExOperandBufferAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(bindingAttr());
-  os << ", ";
-  p.printAttribute(operandAttr());
-  os << ">";
-}
-
-// static
-Attribute ExResultBufferAttr::parse(AsmParser &p) {
-  StringAttr bindingAttr;
-  IntegerAttr resultAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(resultAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(bindingAttr, resultAttr);
-}
-
-void ExResultBufferAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(bindingAttr());
-  os << ", ";
-  p.printAttribute(resultAttr());
-  os << ">";
-}
-
-//===----------------------------------------------------------------------===//
 // Dialect registration
 //===----------------------------------------------------------------------===//
 
@@ -1022,10 +893,7 @@ void ExResultBufferAttr::print(AsmPrinter &p) const {
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
-  addAttributes<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
-                // Experimental:
-                ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
-                ExResultBufferAttr>();
+  addAttributes<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr>();
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
@@ -1055,14 +923,6 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
     return BufferConstraintsAttr::parse(parser);
   } else if (mnemonic == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
-  } else if (mnemonic == ExConstantStorageAttr::getKindName()) {
-    return ExConstantStorageAttr::parse(parser);
-  } else if (mnemonic == ExPushConstantAttr::getKindName()) {
-    return ExPushConstantAttr::parse(parser);
-  } else if (mnemonic == ExOperandBufferAttr::getKindName()) {
-    return ExOperandBufferAttr::parse(parser);
-  } else if (mnemonic == ExResultBufferAttr::getKindName()) {
-    return ExResultBufferAttr::parse(parser);
   }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
@@ -1071,13 +931,11 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
-            // Experimental:
-            ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
-            ExResultBufferAttr>([&](auto typedAttr) {
-        p << typedAttr.getKindName();
-        typedAttr.print(p);
-      })
+      .Case<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr>(
+          [&](auto typedAttr) {
+            p << typedAttr.getKindName();
+            typedAttr.print(p);
+          })
       .Default([&](Attribute) {
         if (failed(generatedAttributePrinter(attr, p))) {
           llvm_unreachable("unhandled HAL attribute kind");

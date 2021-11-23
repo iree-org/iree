@@ -17,8 +17,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "expand_function_dynamic_dims.mlir",
-            "expand_function_ranked_shape_dims.mlir",
             "fold_dim_over_shape_carrying_op.mlir",
         ],
         include = ["*.mlir"],

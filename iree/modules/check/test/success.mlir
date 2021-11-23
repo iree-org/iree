@@ -14,12 +14,9 @@ func @expect_false() {
 }
 
 func @expect_all_true() {
-  %device = hal.ex.shared_device : !hal.device
-  %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
-  %all_true = hal.allocator.constant<%allocator : !hal.allocator>
-         type("HostLocal|DeviceVisible") usage("All") : !hal.buffer_view =
-         dense<1> : tensor<2x2xi32>
-  check.expect_all_true(%all_true) : !hal.buffer_view
+  %all_true = util.unfoldable_constant dense<1> : tensor<2x2xi32>
+  %all_true_view = hal.tensor.cast %all_true : tensor<2x2xi32> -> !hal.buffer_view
+  check.expect_all_true(%all_true_view) : !hal.buffer_view
   return
 }
 

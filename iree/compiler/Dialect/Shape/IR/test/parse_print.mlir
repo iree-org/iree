@@ -7,15 +7,6 @@ func @parse_print_tie_shape(%arg0 : tensor<2x?x4xf32>, %arg1 : !shapex.ranked_sh
   return
 }
 
-
-// -----
-// CHECK-LABEL: @parse_print_get_ranked_shape
-func @parse_print_get_ranked_shape(%arg0 : tensor<2x?x4xi32>) {
-  // CHECK: shapex.get_ranked_shape %arg0 : tensor<2x?x4xi32> -> !shapex.ranked_shape<[2,?,4]>
-  %0 = shapex.get_ranked_shape %arg0 : tensor<2x?x4xi32> -> !shapex.ranked_shape<[2,?,4]>
-  return
-}
-
 // -----
 // CHECK-LABEL: @const_ranked_shape
 func @const_ranked_shape() -> !shapex.ranked_shape<[2,4]> {

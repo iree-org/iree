@@ -30,16 +30,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// TODO(#7277): remove flag when on by default.
-static bool getExperimentalStreamsModeFromFlags() {
-  static llvm::cl::opt<bool> *enableFlag = new llvm::cl::opt<bool>{
-      "iree-experimental-streams",
-      llvm::cl::desc("Enables experimental stream dialect pipelines."),
-      llvm::cl::init(true),
-  };
-  return *enableFlag;
-}
-
 static BindingOptions getBindingOptionsFromFlags() {
   static llvm::cl::OptionCategory bindingOptionsCategory(
       "IREE translation binding support options");
@@ -105,19 +95,12 @@ void buildIREEVMTransformPassPipeline(
       break;
   }
 
-  bool enableNewStreamsDialect = getExperimentalStreamsModeFromFlags();
-
   buildCommonInputConversionPassPipeline(passManager);
   IREE::Flow::TransformOptions flowOptions;
-  flowOptions.streamFormation = !enableNewStreamsDialect;
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
-  if (enableNewStreamsDialect) {
-    IREE::Stream::TransformOptions streamOptions;
-    IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
-    IREE::HAL::buildHALTransformPassPipeline2(passManager, executableOptions);
-  } else {
-    IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
-  }
+  IREE::Stream::TransformOptions streamOptions;
+  IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
+  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());
 }
@@ -207,7 +190,6 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
 #endif  // IREE_HAVE_EMITC_DIALECT
 
 void registerIREEVMTranslationFlags() {
-  getExperimentalStreamsModeFromFlags();
   getBindingOptionsFromFlags();
   getInputDialectOptionsFromFlags();
 }

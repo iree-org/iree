@@ -62,56 +62,6 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape", [
   let hasCanonicalizer = 1;
 }
 
-def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
-  let summary = "Gets the RankedShape associated with the given Tensor.";
-  let description = [{
-    Early in compilation, this op is used to resolve the RankedShape from an
-    arbitrary tensor value. It will typically be converted later to a
-    RankedShape loaded from an appropriate computation.
-
-    Getting the RankedShape of a statically shaped tensor will canonicalize
-    to a static_ranked_shape op and will never cause a further SSA dependency.
-
-    Usage:
-      %0 = shapex.get_ranked_shape %arg0 : tensor<2x?xf32> ->
-          !shapex.ranked_shape<[2,?]>  // based on index type
-      %0 = shapex.get_ranked_shape %arg0 : tensor<2x?xf32> ->
-          !shapex.ranked_shape<[2,?],i32>  // explicit dim type
-
-    Canonicalization: This op includes a canonicalization pattern such that
-    if its operand is supplied by a tie_shape op, then it will replace itself
-    with the tie_shape's shape() operand. In this way, a function with all
-    shapes materialized and tied to intermediate tensors should canonicalize
-    to contain no get_ranked_shape ops.
-
-    Any get_ranked_shape on a fully static shape will canonicalize to a const
-    with unit value:
-      %0 = constant_ranked_shape : !shapex.ranked_shape<[1,2],i32>
-  }];
-
-  let arguments = (ins AnyTensor:$operand);
-  let results = (outs Shape_RankedShape:$shape);
-
-  let assemblyFormat = [{
-    $operand attr-dict `:` type($operand) `->` type($shape)
-  }];
-
-  let verifier = [{ return verify$cppClass(*this); }];
-  let hasCanonicalizer = 1;
-
-  let builders = [
-    // Short-hand for building with a shape equivalent to the tensor operand
-    // and 'index' dim type.
-    OpBuilder<(ins "Value":$operand)>,
-  ];
-
-  let extraClassDeclaration = [{
-    RankedShapeType getRankedShape() {
-      return shape().getType().cast<RankedShapeType>();
-    }
-  }];
-}
-
 def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
     [ConstantLike, DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>]> {
   let summary = "A constant ranked_shape.";

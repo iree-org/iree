@@ -22,20 +22,6 @@ func @tie_shape_mistmatc_dim(%arg0 : tensor<2x?x4xf32>, %arg1 : !shapex.ranked_s
 }
 
 // -----
-func @get_ranked_shape_same_rank(%arg0 : tensor<2x?x4xf32>) {
-  // expected-error @+1 {{op operand and result must be of same rank}}
-  %0 = shapex.get_ranked_shape %arg0 : tensor<2x?x4xf32> -> !shapex.ranked_shape<[2]>
-  return
-}
-
-// -----
-func @get_ranked_shape_not_equal_dims(%arg0 : tensor<2x?x4xf32>) {
-  // expected-error @+1 {{op operand tensor and result shape must be equal}}
-  %0 = shapex.get_ranked_shape %arg0 : tensor<2x?x4xf32> -> !shapex.ranked_shape<[2,2,4]>
-  return
-}
-
-// -----
 func @const_ranked_shape_wrong_type() {
   // expected-error @+1 {{result #0 must be Ranked shape type, but got 'i32'}}
   %0 = shapex.const_ranked_shape : i32

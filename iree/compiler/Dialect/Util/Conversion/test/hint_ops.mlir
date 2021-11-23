@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-convert-to-hal %s --split-input-file | IreeFileCheck %s
+// RUN: iree-opt %s --split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @preserve_compiler_hints
 func @preserve_compiler_hints() {
