@@ -153,7 +153,7 @@ def adb_execute_and_get_output(cmd_args: Sequence[str],
 
 def adb_execute(cmd_args: Sequence[str],
                 relative_dir: str = "",
-                verbose: bool = False) -> str:
+                verbose: bool = False) -> subprocess.CompletedProcess:
   """Executes command with adb shell.
 
   Switches to `relative_dir` relative to the android tmp directory before
@@ -165,7 +165,7 @@ def adb_execute(cmd_args: Sequence[str],
       ANDROID_TMP_DIR.
 
   Returns:
-    A string for the command output.
+    The completed process.
   """
   cmd = ["adb", "shell"]
   cmd.extend(["cd", os.path.join(ANDROID_TMP_DIR, relative_dir)])
