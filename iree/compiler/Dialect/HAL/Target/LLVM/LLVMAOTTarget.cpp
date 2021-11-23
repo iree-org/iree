@@ -305,20 +305,25 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     queryLibraryFunc->setLinkage(
         llvm::GlobalValue::LinkageTypes::ExternalLinkage);
 
-    // Try to grab a linker tool based on the options (and target environment).
-    auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
-    if (!linkerTool) {
-      return mlir::emitError(variantOp.getLoc())
-             << "failed to find a target linker for the given target triple '"
-             << options_.targetTriple << "'";
-    }
+    // If linking dynamically, find a suitable linker tool and configure the
+    // module with any options that tool requires.
+    std::unique_ptr<LinkerTool> linkerTool;
+    if (!options_.linkStatic) {
+      // Grab a linker tool based on the options (and target environment).
+      linkerTool = LinkerTool::getForTarget(targetTriple, options_);
+      if (!linkerTool) {
+        return mlir::emitError(variantOp.getLoc())
+               << "failed to find a target linker for the given target triple '"
+               << options_.targetTriple << "'";
+      }
 
-    // Configure the module with any code generation options required later by
-    // linking (such as initializer functions).
-    if (failed(linkerTool->configureModule(llvmModule.get(),
-                                           {queryLibraryFunc}))) {
-      return variantOp.emitError()
-             << "failed to configure LLVM module for target linker";
+      // Configure the module with any code generation options required later by
+      // linking (such as initializer functions).
+      if (failed(linkerTool->configureModule(llvmModule.get(),
+                                             {queryLibraryFunc}))) {
+        return variantOp.emitError()
+               << "failed to configure LLVM module for target linker";
+      }
     }
 
     // Specialize the module to our target machine.
