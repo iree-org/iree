@@ -13,18 +13,11 @@
 namespace mlir {
 namespace iree_compiler {
 
-// TODO(#7277): remove when switched to streams (happens there now).
-
-// Adds op legality rules to |conversionTarget| to ensure all incoming std ops
-// are removed during ->HAL lowering.
-void setupStandardToHALLegality(MLIRContext *context,
-                                ConversionTarget &conversionTarget,
-                                TypeConverter &typeConverter);
-
 // Populates conversion patterns for std->HAL.
 void populateStandardToHALPatterns(MLIRContext *context,
-                                   OwningRewritePatternList &patterns,
-                                   TypeConverter &typeConverter);
+                                   ConversionTarget &conversionTarget,
+                                   TypeConverter &typeConverter,
+                                   OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

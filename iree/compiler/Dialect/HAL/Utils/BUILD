@@ -12,17 +12,11 @@ package(
 
 cc_library(
     name = "Utils",
-    srcs = [
-        "TypeUtils.cpp",
-    ],
     hdrs = [
         "DeviceSwitchBuilder.h",
-        "TypeUtils.h",
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",

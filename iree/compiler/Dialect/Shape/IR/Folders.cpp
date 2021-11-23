@@ -23,46 +23,6 @@ namespace Shape {
 // Canonicalization
 //===----------------------------------------------------------------------===//
 
-static LogicalResult elideShapeCarryingGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
-    PatternRewriter &rewriter) {
-  auto carryingOp = dyn_cast_or_null<ShapeCarryingInterface>(
-      operands.operand().getDefiningOp());
-  if (!carryingOp) {
-    return rewriter.notifyMatchFailure(op,
-                                       "no associated dynamic-shape aware op");
-  }
-  rewriter.replaceOp(
-      op, carryingOp.buildResultValueRankedShape(operands.operand(), rewriter));
-  return success();
-}
-
-static LogicalResult elideDuplicateGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
-    PatternRewriter &rewriter) {
-  // If the immediate predecessor is a GetRankedShapeOp, then this op can be
-  // erased in favor of the input to the tie op.
-  auto precedingGetRankedShapeOp =
-      dyn_cast_or_null<GetRankedShapeOp>(operands.operand().getDefiningOp());
-  if (!precedingGetRankedShapeOp) return failure();
-
-  rewriter.replaceOp(op, precedingGetRankedShapeOp.shape());
-  return success();
-}
-
-static LogicalResult elideStaticGetRankedShapePattern(
-    GetRankedShapeOp op, GetRankedShapeOp::Adaptor operands,
-    PatternRewriter &rewriter) {
-  auto operandType = operands.operand().getType().dyn_cast<RankedTensorType>();
-  auto resultShapeType = op.shape().getType().dyn_cast<RankedShapeType>();
-  if (!operandType || !resultShapeType || !operandType.hasStaticShape()) {
-    return failure();
-  }
-
-  rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(op, resultShapeType);
-  return success();
-}
-
 static LogicalResult identityMakeRankedShapePattern(
     MakeRankedShapeOp op, MakeRankedShapeOp::Adaptor operands,
     PatternRewriter &rewriter) {
@@ -230,18 +190,6 @@ void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
 }
 
 //===----------------------------------------------------------------------===//
-// shapex.get_ranked_shape
-//===----------------------------------------------------------------------===//
-
-void GetRankedShapeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertGreedyPattern(patterns, context,
-                      elideShapeCarryingGetRankedShapePattern);
-  insertGreedyPattern(patterns, context, elideDuplicateGetRankedShapePattern);
-  insertGreedyPattern(patterns, context, elideStaticGetRankedShapePattern);
-}
-
-//===----------------------------------------------------------------------===//
 // shapex.make_ranked_shape
 //===----------------------------------------------------------------------===//
 
@@ -297,16 +245,11 @@ void populateFoldConversionPatterns(MLIRContext *context,
   patterns.insert<TieShapeTypeConversionPattern>(context);
   insertConversionPattern(patterns, context, eraseUnusedMakeRankedShapeOp);
   insertConversionPattern(patterns, context, dynamicMakeRankedShapeDimPattern);
-  insertConversionPattern(patterns, context,
-                          elideDuplicateGetRankedShapePattern);
   insertConversionPattern(patterns, context, elideDuplicateTieShapePattern);
   insertConversionPattern(patterns, context,
                           elideShapeCarryingOperandTieShapePattern);
   insertConversionPattern(patterns, context, elideTieShapeUsagePattern);
-  insertConversionPattern(patterns, context,
-                          elideShapeCarryingGetRankedShapePattern);
   insertConversionPattern(patterns, context, identityMakeRankedShapePattern);
-  insertConversionPattern(patterns, context, elideStaticGetRankedShapePattern);
 }
 
 }  // namespace Shape

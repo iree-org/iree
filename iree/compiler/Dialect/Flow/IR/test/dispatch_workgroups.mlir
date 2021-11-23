@@ -63,13 +63,11 @@ func @complexWorkgroupsUsage(
 
     // CHECK: %[[ARG0_VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readonly:?x4xf32> -> tensor<?x4xf32>
     %arg0_value = flow.dispatch.tensor.load %arg0_capture, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?x4xf32> -> tensor<?x4xf32>
-    // CHECK-NEXT: %[[ARG0_SHAPE_INDIRECT:.+]] = shapex.get_ranked_shape %[[ARG0_VALUE]] : tensor<?x4xf32> -> !shapex.ranked_shape<[?,4]>
-    %arg0_shape_indirect = shapex.get_ranked_shape %arg0_value : tensor<?x4xf32> -> !shapex.ranked_shape<[?,4]>
 
     // Operate on tensors with full IO shapes:
 
-    // CHECK: %[[RET0_VALUE:.+]] = "test.math"(%[[ARG0_VALUE]], %[[ARG0_SHAPE_INDIRECT]], %[[RET0_SHAPE]])
-    %ret0_value = "test.math"(%arg0_value, %arg0_shape_indirect, %ret0_shape) : (tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>, !shapex.ranked_shape<[4,?]>) -> (tensor<4x?xf32>)
+    // CHECK: %[[RET0_VALUE:.+]] = "test.math"(%[[ARG0_VALUE]], %[[ARG0_SHAPE]], %[[RET0_SHAPE]])
+    %ret0_value = "test.math"(%arg0_value, %arg0_shape, %ret0_shape) : (tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>, !shapex.ranked_shape<[4,?]>) -> (tensor<4x?xf32>)
 
     // Store tensors (optional offsets/sizes/strides):
 

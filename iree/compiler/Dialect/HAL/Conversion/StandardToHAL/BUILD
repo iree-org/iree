@@ -13,7 +13,6 @@ package(
 cc_library(
     name = "StandardToHAL",
     srcs = [
-        "ConvertConstantOps.cpp",
         "ConvertShapeOps.cpp",
         "ConvertStandardToHAL.cpp",
         "ConvertStructuralOps.cpp",
@@ -26,12 +25,12 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target",
-        "//iree/compiler/Dialect/HAL/Utils",
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Util/Conversion",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:TensorDialect",

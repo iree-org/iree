@@ -305,20 +305,25 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     queryLibraryFunc->setLinkage(
         llvm::GlobalValue::LinkageTypes::ExternalLinkage);
 
-    // Try to grab a linker tool based on the options (and target environment).
-    auto linkerTool = LinkerTool::getForTarget(targetTriple, options_);
-    if (!linkerTool) {
-      return mlir::emitError(variantOp.getLoc())
-             << "failed to find a target linker for the given target triple '"
-             << options_.targetTriple << "'";
-    }
+    // If linking dynamically, find a suitable linker tool and configure the
+    // module with any options that tool requires.
+    std::unique_ptr<LinkerTool> linkerTool;
+    if (!options_.linkStatic) {
+      // Grab a linker tool based on the options (and target environment).
+      linkerTool = LinkerTool::getForTarget(targetTriple, options_);
+      if (!linkerTool) {
+        return mlir::emitError(variantOp.getLoc())
+               << "failed to find a target linker for the given target triple '"
+               << options_.targetTriple << "'";
+      }
 
-    // Configure the module with any code generation options required later by
-    // linking (such as initializer functions).
-    if (failed(linkerTool->configureModule(llvmModule.get(),
-                                           {queryLibraryFunc}))) {
-      return variantOp.emitError()
-             << "failed to configure LLVM module for target linker";
+      // Configure the module with any code generation options required later by
+      // linking (such as initializer functions).
+      if (failed(linkerTool->configureModule(llvmModule.get(),
+                                             {queryLibraryFunc}))) {
+        return variantOp.emitError()
+               << "failed to configure LLVM module for target linker";
+      }
     }
 
     // Specialize the module to our target machine.
@@ -429,23 +434,49 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
     }
 
-    if (!options_.staticLibraryOutput.empty()) {
-      if (objectFiles.size() != 1) {
-        // Static library output only supports single object libraries.
-        return variantOp.emitError()
-               << "generating static libraries from "
-                  "multiple object files is not supported";
-      }
+    if (options_.linkStatic) {
+      return serializeStaticLibraryExecutable(variantOp, executableBuilder,
+                                              libraryName, queryFunctionName,
+                                              objectFiles);
+    } else {
+      return serializeDynamicLibraryExecutable(variantOp, executableBuilder,
+                                               libraryName, objectFiles,
+                                               linkerTool.get());
+    }
+  }
 
-      // Copy the static object file to the specified output along with
-      // generated header file.
-      const std::string &libraryPath = options_.staticLibraryOutput;
-      if (!outputStaticLibrary(libraryName, queryFunctionName, libraryPath,
-                               objectFiles[0].path)) {
-        return variantOp.emitError() << "static library generation failed";
-      }
+  LogicalResult serializeStaticLibraryExecutable(
+      IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder,
+      const std::string &libraryName, const std::string &queryFunctionName,
+      const SmallVector<Artifact> &objectFiles) {
+    if (objectFiles.size() != 1) {
+      // Static library output only supports single object libraries.
+      return variantOp.emitError() << "generating static libraries from "
+                                      "multiple object files is not supported";
     }
 
+    // Copy the static object file to the specified output along with
+    // generated header file.
+    if (!outputStaticLibrary(libraryName, queryFunctionName,
+                             options_.staticLibraryOutput,
+                             objectFiles[0].path)) {
+      return variantOp.emitError() << "static library generation failed";
+    }
+
+    // Embed the library name in the executable binary op. This informs the
+    // loader which static library to load for the target binary.
+    std::vector<uint8_t> libraryNameVector(libraryName.begin(),
+                                           libraryName.end());
+    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+        variantOp.getLoc(), variantOp.sym_name(), "static", libraryNameVector);
+
+    return success();
+  }
+
+  LogicalResult serializeDynamicLibraryExecutable(
+      IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder,
+      const std::string &libraryName, const SmallVector<Artifact> &objectFiles,
+      LinkerTool *linkerTool) {
     // Link the generated object files into a dylib.
     auto linkArtifactsOr =
         linkerTool->linkDynamicLibrary(libraryName, objectFiles);
@@ -465,15 +496,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
     }
 
-    if (options_.linkStatic) {
-      // Embed the library name in the executable binary op. This informs the
-      // loader which static library to load for the target binary.
-      std::vector<uint8_t> libraryNameVector(libraryName.begin(),
-                                             libraryName.end());
-      executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.sym_name(), "static",
-          libraryNameVector);
-    } else if (options_.linkEmbedded) {
+    if (options_.linkEmbedded) {
       // Load the linked ELF file and pack into an attr.
       auto elfFile = linkArtifacts.libraryFile.read();
       if (!elfFile.hasValue()) {
@@ -520,6 +543,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           variantOp.getLoc(), variantOp.sym_name(),
           variantOp.target().getFormat(), bufferAttr);
       const char *mimeType = nullptr;
+      llvm::Triple targetTriple(options_.targetTriple);
       switch (targetTriple.getObjectFormat()) {
         case llvm::Triple::ObjectFormatType::COFF:
           mimeType = "application/x-msdownload";
@@ -539,6 +563,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
       binaryOp.mime_typeAttr(executableBuilder.getStringAttr(mimeType));
     }
+
     return success();
   }
 

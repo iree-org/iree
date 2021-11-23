@@ -185,11 +185,11 @@ BindingLayoutAnalysis::BindingLayoutAnalysis(Operation *rootOp) {
   exportLayouts = deriveExportLayouts(rootOp, exportDispatches);
 }
 
-const SmallVector<IREE::Stream::CmdDispatchOp>
-    &BindingLayoutAnalysis::getExportDispatches(
-        IREE::Stream::ExecutableExportOp exportOp) const {
+SmallVector<IREE::Stream::CmdDispatchOp>
+BindingLayoutAnalysis::getExportDispatches(
+    IREE::Stream::ExecutableExportOp exportOp) const {
   auto it = exportDispatches.find(exportOp);
-  assert(it != exportDispatches.end() && "unanalyzed export");
+  if (it == exportDispatches.end()) return {};  // no dispatches
   return it->second;
 }
 

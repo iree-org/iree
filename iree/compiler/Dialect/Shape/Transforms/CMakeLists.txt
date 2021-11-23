@@ -18,7 +18,6 @@ iree_cc_library(
   SRCS
     "CleanupPlaceholdersPass.cpp"
     "FoldDimOverShapeCarryingOpPass.cpp"
-    "FunctionSignatureExpansionPass.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis
@@ -30,7 +29,6 @@ iree_cc_library(
     MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Utils::TypeConversion
     iree::compiler::Utils
   PUBLIC
 )

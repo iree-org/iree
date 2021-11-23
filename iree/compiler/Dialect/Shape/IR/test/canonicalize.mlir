@@ -1,32 +1,5 @@
 // RUN: iree-opt -split-input-file -verify-diagnostics -canonicalize %s | IreeFileCheck %s
 
-
-// CHECK-LABEL: @elideTiedGetRankedShape
-// CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<1x?x2x?xf32>
-// CHECK-SAME: %[[SHAPE:[^:[:space:]]+]]: !shapex.ranked_shape<[1,?,2,?]>
-func @elideTiedGetRankedShape(%arg0: tensor<1x?x2x?xf32>, %arg1: !shapex.ranked_shape<[1,?,2,?]>) -> (tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>) {
-  // Note that canonicalization does *not* remove tie_shape. That must be
-  // removed manually once all shape materialization is complete (otherwise,
-  // information needed to materialize would be lost).
-  // CHECK: %[[TIE_T:.+]] = shapex.tie_shape %[[T]], %[[SHAPE]]
-  %0 = shapex.tie_shape %arg0, %arg1 : tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>
-  // CHECK-NOT: shapex.get_ranked_shape
-  %1 = shapex.get_ranked_shape %0 : tensor<1x?x2x?xf32> -> !shapex.ranked_shape<[1,?,2,?]>
-  // CHECK-DAG: return %[[TIE_T]], %[[SHAPE]]
-  return %0, %1 : tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>
-}
-
-// -----
-// CHECK-LABEL: @staticGetRankedShapeToConst
-// CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<1x2xf32>
-func @staticGetRankedShapeToConst(%arg0: tensor<1x2xf32>) -> (!shapex.ranked_shape<[1,2]>) {
-  // CHECK-NOT: %[[T]]
-  // CHECK: %[[S:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2]>
-  %0 = shapex.get_ranked_shape %arg0 : tensor<1x2xf32> -> !shapex.ranked_shape<[1,2]>
-  // CHECK: return %[[S]]
-  return %0 : !shapex.ranked_shape<[1,2]>
-}
-
 // -----
 // CHECK-LABEL: @foldStaticRankedDim
 // CHECK-SAME: %[[SHAPE:[^:[:space:]]+]]: !shapex.ranked_shape<[1,?,2,?]>
@@ -37,20 +10,6 @@ func @foldStaticRankedDim(%arg0: !shapex.ranked_shape<[1,?,2,?]>) -> (i32, i32) 
   %1 = shapex.ranked_dim %arg0[1] : !shapex.ranked_shape<[1,?,2,?]> -> i32
   // CHECK: return %[[D2]], %[[D1]]
   return %0, %1 : i32, i32
-}
-
-// -----
-// CHECK-LABEL: @foldFullyStaticRankedShape
-// CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<1x2xf32>
-func @foldFullyStaticRankedShape(%arg0: tensor<1x2xf32>) -> (i32, i32) {
-  // CHECK-NOT: shapex.get_ranked_shape
-  // CHECK-NOT: shapex.ranked_dim
-  // CHECK-DAG: constant 1
-  // CHECK-DAG: constant 2
-  %0 = shapex.get_ranked_shape %arg0 : tensor<1x2xf32> -> !shapex.ranked_shape<[1,2]>
-  %1 = shapex.ranked_dim %0[0] : !shapex.ranked_shape<[1,2]> -> i32
-  %2 = shapex.ranked_dim %0[1] : !shapex.ranked_shape<[1,2]> -> i32
-  return %1, %2 : i32, i32
 }
 
 // -----
