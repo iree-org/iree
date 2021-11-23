@@ -108,7 +108,7 @@ def get_git_commit_hash(commit: str) -> str:
 
 
 def adb_push_to_tmp_dir(content: str,
-                        relative_dir: str,
+                        relative_dir: str = "",
                         verbose: bool = False) -> str:
   """Pushes content onto the Android device.
 
@@ -127,11 +127,13 @@ def adb_push_to_tmp_dir(content: str,
   return android_path
 
 
-def adb_execute_in_dir(cmd_args: Sequence[str],
-                       relative_dir: str,
-                       verbose: bool = False) -> str:
-  """Executes command with adb shell in a directory, waits for completion,
-  and returns the output.
+def adb_execute_and_get_output(cmd_args: Sequence[str],
+                               relative_dir: str = "",
+                               verbose: bool = False) -> str:
+  """Executes command with adb shell.
+
+  Switches to `relative_dir` relative to the android tmp directory before
+  executing. Waits for completion and returns the command stdout.
 
   Args:
     cmd_args: a list containing the command to execute and its parameters
@@ -142,16 +144,40 @@ def adb_execute_in_dir(cmd_args: Sequence[str],
     A string for the command output.
   """
   cmd = ["adb", "shell"]
-  cmd.extend(["cd", f"{ANDROID_TMP_DIR}/{relative_dir}"])
+  cmd.extend(["cd", os.path.join(ANDROID_TMP_DIR, relative_dir)])
   cmd.append("&&")
   cmd.extend(cmd_args)
 
   return execute_cmd_and_get_output(cmd, verbose=verbose)
 
 
-def adb_start_in_dir(cmd_args: Sequence[str],
-                     relative_dir: str,
-                     verbose: bool = False) -> subprocess.Popen:
+def adb_execute(cmd_args: Sequence[str],
+                relative_dir: str = "",
+                verbose: bool = False) -> subprocess.CompletedProcess:
+  """Executes command with adb shell.
+
+  Switches to `relative_dir` relative to the android tmp directory before
+  executing. Waits for completion. Output is streamed to the terminal.
+
+  Args:
+    cmd_args: a list containing the command to execute and its parameters
+    relative_dir: the directory to execute the command in; relative to
+      ANDROID_TMP_DIR.
+
+  Returns:
+    The completed process.
+  """
+  cmd = ["adb", "shell"]
+  cmd.extend(["cd", os.path.join(ANDROID_TMP_DIR, relative_dir)])
+  cmd.append("&&")
+  cmd.extend(cmd_args)
+
+  return execute_cmd(cmd, verbose=verbose)
+
+
+def adb_start_cmd(cmd_args: Sequence[str],
+                  relative_dir: str,
+                  verbose: bool = False) -> subprocess.Popen:
   """Executes command with adb shell in a directory and returns the handle
   without waiting for completion.
 
@@ -372,9 +398,9 @@ def run_benchmarks_for_category(
             "--benchmark_out_format=json",
             f"--benchmark_out='{benchmark_results_basename}'",
         ]
-        result_json = adb_execute_in_dir(cmd,
-                                         android_relative_dir,
-                                         verbose=verbose)
+        result_json = adb_execute_and_get_output(cmd,
+                                                 android_relative_dir,
+                                                 verbose=verbose)
 
         # Pull the result file back onto the host and set the filename for later
         # return.
@@ -400,9 +426,7 @@ def run_benchmarks_for_category(
 
         # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
         # waiting for the adb command to complete as that won't happen.
-        process = adb_start_in_dir(run_cmd,
-                                   android_relative_dir,
-                                   verbose=verbose)
+        process = adb_start_cmd(run_cmd, android_relative_dir, verbose=verbose)
         # But we do need to wait for its start; otherwise will see connection
         # failure when opening the catpure tool. Here we cannot just sleep a
         # certain amount of seconds---Pixel 4 seems to have an issue that will
@@ -523,6 +547,14 @@ def filter_and_run_benchmarks(
   return (benchmark_files, captures, errors)
 
 
+def set_frequency_scaling_governor(governor: str):
+  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
+  cpu_script = os.path.join(
+      git_root, "build_tools/benchmarks/set_android_scaling_governor.sh")
+  adb_push_to_tmp_dir(cpu_script)
+  adb_execute(["su", "root", "./set_android_scaling_governor.sh", governor])
+
+
 def parse_arguments():
   """Parses command-line options."""
 
@@ -581,6 +613,11 @@ def parse_arguments():
                       action="store_true",
                       help="Print internal information during execution")
   parser.add_argument(
+      "--pin-cpu-freq",
+      "--pin_cpu_freq",
+      action="store_true",
+      help="Pin CPU frequency for all cores to the maximum. Requires root")
+  parser.add_argument(
       "--keep_going",
       "--keep-going",
       action="store_true",
@@ -619,6 +656,10 @@ def main(args):
   if device_info.gpu_name.lower() not in GPU_NAME_TO_TARGET_ARCH_MAP:
     raise ValueError(f"Unrecognized GPU name: '{device_info.gpu_name}'; "
                      "need to update the map")
+
+  if args.pin_cpu_freq:
+    set_frequency_scaling_governor("performance")
+    atexit.register(set_frequency_scaling_governor, "schedutil")
 
   previous_benchmarks = None
   previous_captures = None
