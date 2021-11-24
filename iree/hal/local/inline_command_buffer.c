@@ -352,12 +352,6 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
                             "set %u out of bounds", set);
   }
 
-  iree_hal_local_executable_layout_t* local_executable_layout =
-      iree_hal_local_executable_layout_cast(executable_layout);
-  iree_hal_local_descriptor_set_layout_t* local_set_layout =
-      iree_hal_local_descriptor_set_layout_cast(
-          local_executable_layout->set_layouts[set]);
-
   iree_host_size_t binding_base =
       set * IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
