@@ -44,7 +44,7 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
         return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })
-      .Case<linalg::DepthwiseConv2DNhwOp>([subgroupSize](auto op) {
+      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
         return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })

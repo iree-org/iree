@@ -46,12 +46,6 @@ static bool isRankZeroOrOneMemRef(Type type) {
   return false;
 }
 
-// Returns the number of bytes an element of the given type occupies
-// post-conversion. For example, the size of i1 would be '1 byte'.
-static int32_t getRoundedElementByteWidth(Type type) {
-  return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
-}
-
 // Returns the offset, in bytes, of an index within a linearized dense buffer.
 // Expects that the |memrefValue| has been linearized already.
 static Value getBufferOffset(Location loc, Value memrefValue,
@@ -68,7 +62,7 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   auto elementType = memrefType.getElementType();
   auto scalingExpr = getAffineBinaryOpExpr(
       AffineExprKind::Mul, getAffineSymbolExpr(0, rewriter.getContext()),
-      getAffineConstantExpr(getRoundedElementByteWidth(elementType),
+      getAffineConstantExpr(IREE::Util::getRoundedElementByteWidth(elementType),
                             rewriter.getContext()));
 
   // Rank 1 memrefs are just offset by their element width by the offset.

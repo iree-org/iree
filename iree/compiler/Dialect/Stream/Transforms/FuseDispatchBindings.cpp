@@ -75,7 +75,8 @@ struct Binding {
 // points if we had minor divergence in order to gain more fusion in the common
 // cases.
 static SmallVector<Binding> findCorrelatedBindings(
-    unsigned bindingCount, ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps) {
+    unsigned bindingCount, ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
+    bool aliasMutableBindings) {
   // For each dispatch build equivalence classes indicating which bindings are
   // from the same base resource. Note that not all dispatches will have the
   // same duplicate bindings (though we hope they do!).
@@ -84,15 +85,32 @@ static SmallVector<Binding> findCorrelatedBindings(
   for (auto dispatchOp : dispatchOps) {
     llvm::EquivalenceClasses<unsigned> ec;
     DenseMap<Value, unsigned> leaders;
-    for (auto resource : llvm::enumerate(dispatchOp.resources())) {
-      auto it = leaders.find(resource.value());
-      if (it == leaders.end()) {
+    for (auto it : llvm::enumerate(llvm::zip(dispatchOp.resources(),
+                                             dispatchOp.resource_accesses()))) {
+      auto resource = std::get<0>(it.value());
+
+      // If the resource is mutable and we were told not to alias mutable
+      // bindings we always put the resource into its own class.
+      auto resourceAccess =
+          std::get<1>(it.value())
+              .cast<IREE::Stream::ResourceAccessBitfieldAttr>();
+      if (!aliasMutableBindings &&
+          bitEnumContains(resourceAccess.getValue(),
+                          IREE::Stream::ResourceAccessBitfield::Write)) {
+        ec.insert(it.index());
+        leaders.insert(std::make_pair(resource, it.index()));
+        continue;
+      }
+
+      // Find or create a class for equivalent aliasable resource bindings.
+      auto ecIt = leaders.find(resource);
+      if (ecIt == leaders.end()) {
         // New unique value.
-        ec.insert(resource.index());
-        leaders.insert(std::make_pair(resource.value(), resource.index()));
+        ec.insert(it.index());
+        leaders.insert(std::make_pair(resource, it.index()));
       } else {
         // Found existing; union with leader.
-        ec.unionSets(it->second, resource.index());
+        ec.unionSets(ecIt->second, it.index());
       }
     }
     ecs.push_back(std::move(ec));
@@ -293,7 +311,7 @@ static void fuseDispatchBindings(
     IREE::Stream::ExecutableOp executableOp,
     IREE::Stream::ExecutableExportOp exportOp,
     ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
-    MemoizedCmdZeros &memoizedZeros) {
+    bool aliasMutableBindings, MemoizedCmdZeros &memoizedZeros) {
   if (dispatchOps.empty()) return;  // no-op if no dispatches
   auto anyDispatchOp = dispatchOps.front();
   unsigned bindingCount = anyDispatchOp.resources().size();
@@ -310,7 +328,8 @@ static void fuseDispatchBindings(
   });
 
   // Analysis to find which bindings we can fuse together based on dispatches.
-  auto bindings = findCorrelatedBindings(bindingCount, dispatchOps);
+  auto bindings =
+      findCorrelatedBindings(bindingCount, dispatchOps, aliasMutableBindings);
 
   // TODO(benvanik): canonicalize bindings and bail early here. Today this
   // rebasing will widen access modes and pass in the offset across the bindings
@@ -424,7 +443,7 @@ class FuseDispatchBindingsPass
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         fuseDispatchBindings(executableOp, exportOp, entryDispatchMap[exportOp],
-                             memoizedZeros);
+                             aliasMutableBindings, memoizedZeros);
       }
     }
   }

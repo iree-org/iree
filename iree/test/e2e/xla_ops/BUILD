@@ -44,6 +44,7 @@ iree_check_single_backend_test_suite(
             "dynamic_slice.mlir",
             "dynamic_update_slice.mlir",
             "exponential.mlir",
+            "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
@@ -122,6 +123,7 @@ iree_check_single_backend_test_suite(
             "dynamic_slice.mlir",
             "dynamic_update_slice.mlir",
             "exponential.mlir",
+            "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
@@ -228,6 +230,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "exponential_fp16.mlir",
             "fft.mlir",  # TODO(#6601): Eanble the test.
             "round.mlir",
             "rng_uniform.mlir",  # TODO(#6995): Enable the test.
@@ -301,6 +304,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "bitcast_convert.mlir",
+            "exponential_fp16.mlir",
             "round.mlir",
         ],
     ),

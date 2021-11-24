@@ -27,6 +27,7 @@ iree_cc_library(
     "LLVMGPUPipelining.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"
+    "LLVMGPUUtils.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
@@ -37,6 +38,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineToStandard
     MLIRArithmeticToLLVM
+    MLIRArithmeticTransforms
     MLIRGPUOps
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms

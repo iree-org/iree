@@ -16,7 +16,9 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -250,103 +252,6 @@ SmallVector<int64_t, 4> TensorCastOp::getTiedResultOperandIndices() {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.allocator.compute_size
-//===----------------------------------------------------------------------===//
-
-void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
-                                   Value allocator, ValueRange shape,
-                                   int32_t elementType, int32_t encodingType) {
-  build(builder, state, allocator, shape,
-        builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
-                                                   32),
-        builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
-                                                   32));
-}
-
-void AllocatorComputeSizeOp::build(OpBuilder &builder, OperationState &state,
-                                   Value allocator, ValueRange shape,
-                                   Value elementType, Value encodingType) {
-  state.addOperands({allocator});
-  state.addOperands(shape);
-  state.addOperands(elementType);
-  state.addOperands(encodingType);
-  state.addTypes({builder.getIndexType()});
-}
-
-void AllocatorComputeSizeOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "sz");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.allocator.compute_offset
-//===----------------------------------------------------------------------===//
-
-void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
-                                     Value allocator, ValueRange shape,
-                                     int32_t elementType, int32_t encodingType,
-                                     ValueRange indices) {
-  build(builder, state, allocator, shape,
-        builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
-                                                   32),
-        builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
-                                                   32),
-        indices);
-}
-
-void AllocatorComputeOffsetOp::build(OpBuilder &builder, OperationState &state,
-                                     Value allocator, ValueRange shape,
-                                     Value elementType, Value encodingType,
-                                     ValueRange indices) {
-  state.addOperands({allocator});
-  state.addOperands(shape);
-  state.addOperands(elementType);
-  state.addOperands(encodingType);
-  state.addOperands(indices);
-  state.addTypes({builder.getIndexType()});
-}
-
-void AllocatorComputeOffsetOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(offset(), "off");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.allocator.compute_range
-//===----------------------------------------------------------------------===//
-
-void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
-                                    Value allocator, ValueRange shape,
-                                    int32_t elementType, int32_t encodingType,
-                                    ValueRange indices, ValueRange lengths) {
-  build(builder, state, allocator, shape,
-        builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
-                                                   32),
-        builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
-                                                   32),
-        indices, lengths);
-}
-
-void AllocatorComputeRangeOp::build(OpBuilder &builder, OperationState &state,
-                                    Value allocator, ValueRange shape,
-                                    Value elementType, Value encodingType,
-                                    ValueRange indices, ValueRange lengths) {
-  state.addOperands({allocator});
-  state.addOperands(shape);
-  state.addOperands(elementType);
-  state.addOperands(encodingType);
-  state.addOperands(indices);
-  state.addOperands(lengths);
-  state.addTypes({builder.getIndexType(), builder.getIndexType()});
-}
-
-void AllocatorComputeRangeOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(offset(), "off");
-  setNameFn(length(), "len");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.allocator.allocate
 //===----------------------------------------------------------------------===//
 
@@ -358,15 +263,6 @@ void AllocatorAllocateOp::getAsmResultNames(
 Value AllocatorAllocateOp::getOperandSize(unsigned idx) { return {}; }
 
 Value AllocatorAllocateOp::getResultSize(unsigned idx) { return result_size(); }
-
-//===----------------------------------------------------------------------===//
-// hal.allocator.constant
-//===----------------------------------------------------------------------===//
-
-void AllocatorConstantOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "cbuffer");
-}
 
 //===----------------------------------------------------------------------===//
 // hal.allocator.map
@@ -394,47 +290,6 @@ void AllocatorTryMapOp::getAsmResultNames(
 Value AllocatorTryMapOp::getOperandSize(unsigned idx) { return {}; }
 
 Value AllocatorTryMapOp::getResultSize(unsigned idx) { return length(); }
-
-//===----------------------------------------------------------------------===//
-// hal.allocator.pack
-//===----------------------------------------------------------------------===//
-
-void AllocatorPackOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  // TODO(benvanik): figure out if we can get the names to coalesce when there
-  // are multiple results. Ideally we'd have `%total_length, %offsets:123` but
-  // unfortunately all get splatted out and create 10k+ char lines that are a
-  // pain to read.
-  // setNameFn(total_length(), "total_length");
-  // for (auto packedOffset : llvm::enumerate(packed_offsets())) {
-  // setNameFn(packedOffset.value(),
-  //           "offset" + std::to_string(packedOffset.index()));
-  // }
-}
-
-static LogicalResult verifyAllocatorPackOp(AllocatorPackOp op) {
-  size_t sliceCount = op.packed_offsets().size();
-  if (op.lifetime_intervals().size() != sliceCount * 2) {
-    return op.emitOpError() << "requires a [start, end] range for each slice";
-  }
-  if (op.dynamic_slice_sizes().size() != sliceCount) {
-    return op.emitOpError() << "requires a size for each slice";
-  }
-  return success();
-}
-
-SmallVector<AllocatorPackOp::Slice> AllocatorPackOp::getSlices() {
-  auto intervalPairs = lifetime_intervals().getValue();
-  auto sizes = dynamic_slice_sizes();
-  auto offsets = packed_offsets();
-  SmallVector<AllocatorPackOp::Slice> slices(offsets.size());
-  for (size_t i = 0; i < offsets.size(); ++i) {
-    int64_t start = intervalPairs[i * 2 + 0].cast<IntegerAttr>().getInt();
-    int64_t end = intervalPairs[i * 2 + 1].cast<IntegerAttr>().getInt();
-    slices[i] = {start, end, sizes[i], offsets[i]};
-  }
-  return slices;
-}
 
 //===----------------------------------------------------------------------===//
 // hal.buffer.allocator
@@ -607,43 +462,6 @@ void CommandBufferPushDescriptorSetOp::build(
   state.addOperands(bindingBuffers);
   state.addOperands(bindingOffsets);
   state.addOperands(bindingLengths);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.constant_pool
-//===----------------------------------------------------------------------===//
-
-void ConstantPoolOp::build(OpBuilder &builder, OperationState &state,
-                           StringRef name,
-                           BufferConstraintsAttr bufferConstraints) {
-  ensureTerminator(*state.addRegion(), builder, state.location);
-  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
-                     builder.getStringAttr(name));
-  state.addAttribute("buffer_constraints", bufferConstraints);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.constant_pool.load
-//===----------------------------------------------------------------------===//
-
-void ConstantPoolLoadOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setNameFn(result(), "const");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.constant_storage.lookup
-//===----------------------------------------------------------------------===//
-
-void ConstantStorageLookupOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setNameFn(result(), "storage");
-}
-
-//===----------------------------------------------------------------------===//
-// hal.constant.subspan
-//===----------------------------------------------------------------------===//
-
-void ConstantSubspanOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  setNameFn(result(), "const_span");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1122,6 +940,58 @@ Value InterfaceBindingSubspanOp::buildResultRankedShape(unsigned idx,
                                                         OpBuilder &builder) {
   return Shape::buildRankedShapeForValue(getLoc(), result(), dynamic_dims(),
                                          builder);
+}
+
+// TODO(benvanik): share with align op folder and analysis.
+// May need an interface for querying the alignment from ops that can carry it.
+
+// Tries to find the alignment of the given |value| based on either the IR
+// structure or annotations.
+static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
+  APInt constantValue;
+  if (matchPattern(value, m_ConstantInt(&constantValue))) {
+    // Value is constant and we can just treat that as if it were an alignment.
+    return constantValue;
+  }
+
+  auto op = value.getDefiningOp();
+  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceLoadConstantOp>(op)) {
+    // Push constants have an optional value alignment.
+    auto alignment = loadOp.alignment();
+    if (alignment.hasValue()) return alignment;
+  }
+
+  // TODO(benvanik): more searching.
+  return llvm::None;
+}
+
+llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
+  // If we can't calculate an alignment we fall back to the natural alignment of
+  // the element type (for example, a memref<?xi32> is known to be at least
+  // 4-byte aligned).
+  llvm::Align naturalAlignment(1);
+  auto resultType = getType();
+  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+    naturalAlignment = llvm::Align(
+        IREE::Util::getRoundedElementByteWidth(shapedType.getElementType()));
+  }
+
+  // If the binding has no assigned alignment we fall back to natural alignment.
+  auto bindingAlignmentInt = alignment();
+  if (!bindingAlignmentInt) return naturalAlignment;
+  auto bindingAlignment =
+      llvm::Align(bindingAlignmentInt.getValue().getZExtValue());
+
+  // Try to get the alignment of the byte offset. If it's a constant then we can
+  // find a common alignment between it and the base and otherwise we need to
+  // try to infer the alignment from the IR - otherwise we fall back.
+  auto offsetOrAlignment = lookupValueOrAlignment(byte_offset());
+  if (!offsetOrAlignment.hasValue()) return naturalAlignment;
+
+  // Compute the common alignment between that of the binding base and that of
+  // the byte offset.
+  return llvm::commonAlignment(bindingAlignment,
+                               offsetOrAlignment->getZExtValue());
 }
 
 //===----------------------------------------------------------------------===//

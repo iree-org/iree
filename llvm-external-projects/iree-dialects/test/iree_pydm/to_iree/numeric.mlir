@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file -convert-iree-pydm-to-iree %s | FileCheck --enable-var-scope --dump-input-filter=all %s
+// RUN: iree-dialects-opt -split-input-file -convert-iree-pydm-to-iree %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL:   func @neg_integer(
 // CHECK-SAME:                      %[[VAL_0:.*]]: i32) -> (i32, i32) {

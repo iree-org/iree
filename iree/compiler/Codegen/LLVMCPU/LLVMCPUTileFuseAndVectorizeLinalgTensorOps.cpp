@@ -54,19 +54,11 @@ struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
 namespace {
 struct LLVMCPUTileFuseAndVectorizePass
     : public LLVMCPUTileFuseAndVectorizeBase<LLVMCPUTileFuseAndVectorizePass> {
-  LLVMCPUTileFuseAndVectorizePass(bool vectorize = true)
-      : lowerToVectors(vectorize) {}
-  LLVMCPUTileFuseAndVectorizePass(const LLVMCPUTileFuseAndVectorizePass &pass) {
-    lowerToVectors = pass.lowerToVectors;
-  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
                     vector::VectorDialect>();
   }
   void runOnOperation() override;
-
- private:
-  bool lowerToVectors;
 };
 
 LogicalResult applyTileAndFuseCanonicalizationPatterns(FuncOp funcOp) {
@@ -107,14 +99,16 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     }
   });
 
-  auto tileAndFuseLinalgOps = [&](TilingLevel level) {
+  // Tile and fuse Linalg ops.
+  {
     OpBuilder builder(funcOp.getContext());
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return signalPassFailure();
     }
-    auto tileSizes = config.getTileSizeVals(static_cast<unsigned>(level));
+    auto tileSizes =
+        config.getTileSizeVals(static_cast<unsigned>(TilingLevel::L1Tiles));
     linalg::LinalgOp consumerOp;
     for (auto iter : llvm::reverse(computeOps)) {
       if (auto op = dyn_cast<linalg::LinalgOp>(iter)) {
@@ -143,15 +137,12 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
-  };
-
-  tileAndFuseLinalgOps(TilingLevel::L1Tiles);
+  }
 
   // Tile and fuse for vector sizes, then tile reduction loops. We don't rely on
   // unroll vector pass because it could introduce register pressure.
   bool hasMatmulAndIsVectorizable = true;
   {
-    tileAndFuseLinalgOps(TilingLevel::VectorTiles);
     OwningRewritePatternList tileReductionPatterns(&getContext());
 
     funcOp.walk([&](linalg::ContractionOpInterface op) {
@@ -185,7 +176,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
                Operation *operation) -> SmallVector<Value, 4> {
               auto tiles =
                   getTileSizes(builder, operation,
-                               static_cast<unsigned>(TilingLevel::VectorTiles));
+                               static_cast<unsigned>(TilingLevel::L1Tiles));
               auto numParallelLoops =
                   dyn_cast<linalg::LinalgOp>(operation).getNumParallelLoops();
               auto zeroTileVal = builder.create<arith::ConstantIndexOp>(
@@ -213,10 +204,6 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
-  }
-
-  if (!lowerToVectors) {
-    return;
   }
 
   {
@@ -267,6 +254,25 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     });
   }
 
+  // Apply vector unroll
+  {
+    RewritePatternSet vectorUnrollPatterns(context);
+    // TODO(hanchung): Set different vector sizes for different operations. Also
+    // it seems that `{16, 16, 16}` is not a good config. We should tune it.
+    vector::populateVectorUnrollPatterns(
+        vectorUnrollPatterns, vector::UnrollVectorOptions().setNativeShape(
+                                  config.getNativeVectorSizeVals()));
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(vectorUnrollPatterns)))) {
+      return signalPassFailure();
+    }
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After vector unrolling ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
+
   linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
   linalg::hoistRedundantVectorTransfers(funcOp);
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
@@ -300,9 +306,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
-    bool lowerToVectors) {
-  return std::make_unique<LLVMCPUTileFuseAndVectorizePass>(lowerToVectors);
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass() {
+  return std::make_unique<LLVMCPUTileFuseAndVectorizePass>();
 }
 
 }  // namespace iree_compiler

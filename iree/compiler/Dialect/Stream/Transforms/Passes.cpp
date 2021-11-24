@@ -234,7 +234,10 @@ void buildStreamOptimizationPassPipeline(
     passManager.addPass(IREE::Stream::createFoldUniformOperandsPass());
 
     // Only want to specialize after we've added all the operands we need above.
-    passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
+    // TODO(benvanik): make codegen more efficient with the specialized
+    // constants. The lookup tables inserted are currently extremely slow on
+    // some backends.
+    // passManager.addPass(IREE::Stream::createSpecializeDispatchesPass());
 
     // TODO(benvanik): canonicalize bindings: we should sort the bindings by
     // the block argument order of the parent stream.cmd.execute. This will get
@@ -243,6 +246,15 @@ void buildStreamOptimizationPassPipeline(
     // make partitioning the bindings easier. Note we need to update both the
     // dispatches and the dispatch function argument order.
   }
+
+  //----------------------------------------------------------------------------
+  // Annotations to aid future lowering pipelines
+  //----------------------------------------------------------------------------
+
+  // Annotate dispatch region arguments based on the operands passed at dispatch
+  // sites. This allows codegen to see the potential values for the operands
+  // when operating locally on executables.
+  passManager.addPass(IREE::Stream::createAnnotateDispatchArgumentsPass());
 }
 
 //===----------------------------------------------------------------------===//

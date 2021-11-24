@@ -577,50 +577,6 @@ def HAL_ExecutableTargetAttr :
 }
 
 //===----------------------------------------------------------------------===//
-// Experimental binding metadata
-//===----------------------------------------------------------------------===//
-// TODO(benvanik): drop this when we have a HAL dispatch abstraction.
-
-def HAL_ExConstantStorageAttr :
-  Util_StructAttr<"ex.constant_storage",
-                  "ExConstantStorageAttr",
-                  HAL_Dialect, [
-    Util_StructFieldAttr<"binding", StrAttr>,
-    Util_StructFieldAttr<"storage", StrAttr>,
-    Util_StructFieldAttr<"offset", IndexAttr>,
-    Util_StructFieldAttr<"length", IndexAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-def HAL_ExPushConstantAttr :
-  Util_StructAttr<"ex.push_constant",
-                  "ExPushConstantAttr",
-                  HAL_Dialect, [
-    Util_StructFieldAttr<"ordinal", IndexAttr>,
-    Util_StructFieldAttr<"operand", IndexAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-def HAL_ExOperandBufferAttr :
-  Util_StructAttr<"ex.operand_buffer",
-                  "ExOperandBufferAttr",
-                  HAL_Dialect, [
-    Util_StructFieldAttr<"binding", StrAttr>,
-    Util_StructFieldAttr<"operand", IndexAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-def HAL_ExResultBufferAttr :
-  Util_StructAttr<"ex.result_buffer",
-                  "ExResultBufferAttr",
-                  HAL_Dialect, [
-    Util_StructFieldAttr<"binding", StrAttr>,
-    Util_StructFieldAttr<"result", IndexAttr>,
-  ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-
-//===----------------------------------------------------------------------===//
 // Expression matching attributes
 //===----------------------------------------------------------------------===//
 

@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file --allow-unregistered-dialect -canonicalize %s | FileCheck --enable-var-scope --dump-input-filter=all %s
+// RUN: iree-dialects-opt -split-input-file --allow-unregistered-dialect -canonicalize %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @elide_boxing_noop
 iree_pydm.func @elide_boxing_noop(%arg0 : !iree_pydm.object) -> (!iree_pydm.exception_result, !iree_pydm.object) {

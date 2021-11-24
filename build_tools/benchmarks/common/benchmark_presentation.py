@@ -56,7 +56,7 @@ def aggregate_all_benchmarks(
       benchmark_case = file_results.benchmarks[benchmark_index]
 
       # Make sure each benchmark has a unique name.
-      name = str(benchmark_case["benchmark"])
+      name = str(benchmark_case.benchmark_info)
       if name in aggregate_results:
         raise ValueError(f"Duplicated benchmarks: {name}")
 

@@ -124,6 +124,9 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldUniformOperandsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseDispatchBindingsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createSpecializeDispatchesPass();
 
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createAnnotateDispatchArgumentsPass();
+
 //===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//

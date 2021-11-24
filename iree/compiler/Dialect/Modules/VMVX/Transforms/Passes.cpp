@@ -16,6 +16,7 @@
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
@@ -57,6 +58,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<FuncOp>(createConvertVectorToSCFPass());
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
   nestedModulePM.addNestedPass<FuncOp>(createStdExpandOpsPass());
 
   // Handle tensor-type constants.

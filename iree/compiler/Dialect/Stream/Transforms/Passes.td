@@ -166,6 +166,11 @@ def FuseDispatchBindings :
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createFuseDispatchBindingsPass()
   }];
+  let options = [
+    Option<"aliasMutableBindings", "alias-mutable-bindings",
+           "bool", /*default=*/"false",
+           "Fuses bindings that are mutable instead of leaving them split.">
+  ];
 }
 
 def SpecializeDispatches :
@@ -173,6 +178,14 @@ def SpecializeDispatches :
   let summary = "Specializes executables by inlining/fusing operands based on dispatch sites.";
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createSpecializeDispatchesPass()
+  }];
+}
+
+def AnnotateDispatchArguments :
+    Pass<"iree-stream-annotate-dispatch-arguments", "mlir::ModuleOp"> {
+  let summary = "Annotates dispatch arguments with potential values derived from dispatch sites.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createAnnotateDispatchArgumentsPass()
   }];
 }
 

@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -iree-linalg-ext-tile -split-input-file %s | FileCheck --enable-var-scope --dump-input=fail %s
+// RUN: iree-dialects-opt -iree-linalg-ext-tile -split-input-file %s | FileCheck  %s
 
 func @scatter_tiling(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,

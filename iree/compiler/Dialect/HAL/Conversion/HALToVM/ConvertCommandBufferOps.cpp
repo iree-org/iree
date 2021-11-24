@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -46,7 +46,7 @@ class CommandBufferFillBufferOpConversion
     // the fill operation will use this length to slice a potentially smaller
     // range of bits from the full pattern.
     auto patternLengthBytes =
-        IREE::HAL::getRoundedElementByteWidth(originalPatternType);
+        IREE::Util::getRoundedElementByteWidth(originalPatternType);
     auto patternLengthConst = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternLengthBytes, 32);
     Value pattern = op.pattern();

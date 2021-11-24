@@ -6,8 +6,6 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -19,68 +17,33 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-// Legalize the type from operand() -> result() for tie_shape op.
-// At this level, we preserve any remaining tie_shapes since they may still
-// provide information in some contexts.
-class LegalizeTieShapePattern : public OpConversionPattern<Shape::TieShapeOp> {
- public:
+struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      Shape::TieShapeOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<Shape::TieShapeOp>(op, adaptor.getOperands()[0],
-                                                   adaptor.getOperands()[1]);
-    return success();
-  }
-};
-
-// Lowers dim operations against values that were originally tensors but have
-// been converted to HAL buffer types.
-class BackingBufferBufferViewDimPattern
-    : public OpConversionPattern<tensor::DimOp> {
- public:
-  using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
       tensor::DimOp dimOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!IREE::HAL::TensorRewriteAdaptor::isValidNewType(
-            adaptor.source().getType())) {
+    if (!adaptor.source().getType().isa<IREE::HAL::BufferViewType>()) {
       return failure();
     }
-    auto rewriteAdaptor = IREE::HAL::TensorRewriteAdaptor::get(
-        dimOp.getLoc(), dimOp.source(), adaptor.source(), rewriter);
-
     Optional<int64_t> index = dimOp.getConstantIndex();
     assert(index.hasValue() && "expect constant index in `std.dim` operation");
-
-    auto dimIndex = rewriter.getIndexAttr(index.getValue());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewDimOp>(
-        dimOp, dimOp.getResult().getType(), rewriteAdaptor.getBufferView(),
-        dimIndex);
+        dimOp, dimOp.getResult().getType(), adaptor.source(),
+        rewriter.getIndexAttr(index.getValue()));
     return success();
   }
 };
 
-// Lowers rank operations against values that were originally tensors but have
-// been converted to HAL buffer types.
-class BackingBufferBufferViewRankPattern : public OpConversionPattern<RankOp> {
- public:
+struct BufferViewRankPattern : public OpConversionPattern<mlir::RankOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult matchAndRewrite(
-      RankOp rankOp, OpAdaptor adaptor,
+      mlir::RankOp rankOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!IREE::HAL::TensorRewriteAdaptor::isValidNewType(
-            adaptor.getOperands()[0].getType())) {
+    if (!adaptor.memrefOrTensor().getType().isa<IREE::HAL::BufferViewType>()) {
       return failure();
     }
-    auto rewriteAdaptor = IREE::HAL::TensorRewriteAdaptor::get(
-        rankOp.getLoc(), rankOp.getOperand(), adaptor.getOperands()[0],
-        rewriter);
-
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewRankOp>(
-        rankOp, rankOp.getResult().getType(), rewriteAdaptor.getBufferView());
+        rankOp, rankOp.getResult().getType(), adaptor.memrefOrTensor());
     return success();
   }
 };
@@ -88,11 +51,15 @@ class BackingBufferBufferViewRankPattern : public OpConversionPattern<RankOp> {
 }  // namespace
 
 void populateStandardShapeToHALPatterns(MLIRContext *context,
+                                        ConversionTarget &conversionTarget,
                                         OwningRewritePatternList &patterns,
-                                        TypeConverter &converter) {
-  patterns.insert<BackingBufferBufferViewDimPattern,
-                  BackingBufferBufferViewRankPattern, LegalizeTieShapePattern>(
-      context);
+                                        TypeConverter &typeConverter) {
+  // Ensure all shape related ops are fully converted as we should no longer
+  // have any types they are valid to be used on after this conversion.
+  conversionTarget.addIllegalOp<mlir::RankOp>();
+  conversionTarget.addIllegalOp<tensor::DimOp>();
+
+  patterns.insert<BufferViewDimPattern, BufferViewRankPattern>(context);
 }
 
 }  // namespace iree_compiler

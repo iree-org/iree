@@ -45,22 +45,10 @@ def DispatchLinalgOnTensors :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
 }
 
-def ExpandGlobalDynamicDims :
-    Pass<"iree-flow-expand-global-dynamic-dims", "mlir::ModuleOp"> {
-  let summary = "Expands !shapex.ranked_shape dynamic dimensions stored in variables.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createExpandGlobalDynamicDimsPass()";
-}
-
 def ExportBenchmarkFuncs :
     Pass<"iree-flow-export-benchmark-funcs-pass", "mlir::ModuleOp"> {
   let summary = "Exports benchmark functions";
   let constructor = "mlir::iree_compiler::IREE::Flow::createExportBenchmarkFuncsPass()";
-}
-
-def FormStreams :
-    Pass<"iree-flow-form-streams", "mlir::FuncOp"> {
-  let summary = "Identifies dispatches that can be grouped into streams within functions.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createFormStreamsPass()";
 }
 
 def FusionOfTensorOps :
@@ -69,22 +57,10 @@ def FusionOfTensorOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFusionOfTensorOpsPass()";
 }
 
-def HoistUnstreamableOps :
-    Pass<"iree-flow-hoist-unstreamable-ops", "mlir::FuncOp"> {
-  let summary = "Hoist ops that cannot be captured in streams to the top of their block.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createHoistUnstreamableOpsPass()";
-}
-
 def InjectDispatchTracing :
     Pass<"iree-flow-inject-dispatch-tracing", "mlir::FuncOp"> {
   let summary = "Injects dispatch region tracing.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
-}
-
-def InsertConstantClones :
-    Pass<"iree-flow-insert-constant-clones", "mlir::FuncOp"> {
-  let summary = "Inserts clones of constant values where they may be required";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createInsertConstantClonesPass()";
 }
 
 def InterchangeGenericOps :
@@ -97,17 +73,6 @@ def OutlineDispatchRegions :
     Pass<"iree-flow-outline-dispatch-regions", "mlir::ModuleOp"> {
   let summary = "Outlines dispatch regions into executables";
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
-}
-
-def OutlineLargeConstants :
-    Pass<"iree-flow-outline-large-constants", "mlir::ModuleOp"> {
-  let summary = "Outlines large tensor constants into util.globals at the module level.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineLargeConstantsPass()";
-  let options = [
-    Option<"minStorageSize", "min-storage-size",
-           "int64_t", /*default=*/"64",
-           "Outlines constants with storage sizes > than this byte size.">
-  ];
 }
 
 def PadLinalgOps :

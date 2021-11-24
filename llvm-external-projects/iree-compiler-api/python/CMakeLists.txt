@@ -35,7 +35,7 @@ declare_mlir_python_extension(IREECompilerAPIPythonExtensions.CompilerDriver
   MODULE_NAME _ireeCompilerDriver
   ADD_TO_PARENT IREECompilerAPIPythonExtensions
   SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/CompilerModule.cpp
+    CompilerModule.cpp
   EMBED_CAPI_LINK_LIBS
     IREECompilerAPICompilerCAPI
   PRIVATE_LINK_LIBS

@@ -34,7 +34,7 @@ func @conv_16433136(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3x4x16xf32>, %
 // -----
 
 func @depthwise_conv_hwc_114x16x3(%input: tensor<1x114x114x16xf32>, %filter: tensor<3x3x16xf32>, %output: tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32> {
-    %0 = linalg.depthwise_conv2D_nhw {
+    %0 = linalg.depthwise_conv_2d_nhwc_hwc {
       dilations = dense<1> : tensor<2xi64>,
       strides = dense<1> : tensor<2xi64>
     } ins(%input, %filter : tensor<1x114x114x16xf32>, tensor<3x3x16xf32>) outs(%output : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>

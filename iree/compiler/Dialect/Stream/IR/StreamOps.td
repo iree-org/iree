@@ -2188,6 +2188,8 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
 
     // Builds a map of operand index to argument index.
     static SmallVector<unsigned> makeOperandToArgMap(mlir::FuncOp funcOp);
+    // Builds a map of resource to argument index of the corresponding binding.
+    static SmallVector<unsigned> makeResourceToArgMap(mlir::FuncOp funcOp);
   }];
 
   let verifier = [{ return verifyOp(*this); }];

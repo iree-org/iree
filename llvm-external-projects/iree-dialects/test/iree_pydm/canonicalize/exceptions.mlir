@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file --allow-unregistered-dialect -canonicalize %s | FileCheck --enable-var-scope --dump-input-filter=all %s
+// RUN: iree-dialects-opt -split-input-file --allow-unregistered-dialect -canonicalize %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @elide_raise_on_failure_success
 iree_pydm.func @elide_raise_on_failure_success() -> (!iree_pydm.exception_result, !iree_pydm.none) {

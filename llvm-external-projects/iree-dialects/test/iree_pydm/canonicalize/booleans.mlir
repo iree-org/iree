@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -split-input-file --allow-unregistered-dialect -canonicalize %s | FileCheck --enable-var-scope --dump-input-filter=all %s
+// RUN: iree-dialects-opt -split-input-file --allow-unregistered-dialect -canonicalize %s | FileCheck  --dump-input-filter=all %s
 
 // CHECK-LABEL: @fold_none
 iree_pydm.func @fold_none(%arg0 : !iree_pydm.none) -> (!iree_pydm.exception_result, !iree_pydm.bool) {

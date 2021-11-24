@@ -131,7 +131,7 @@ static std::string escapeCommandLineComponent(const std::string &commandLine) {
   return "\"" + commandLine + "\"";
 #else
   return commandLine;
-#endif
+#endif  // _MSC_VER
 }
 
 static std::string normalizeToolNameForPlatform(const std::string &toolName) {
@@ -139,7 +139,7 @@ static std::string normalizeToolNameForPlatform(const std::string &toolName) {
   return toolName + ".exe";
 #else
   return toolName;
-#endif
+#endif  // _MSC_VER
 }
 
 static std::string findToolAtPath(
@@ -159,14 +159,22 @@ static std::string findToolAtPath(
   return "";
 }
 
-LogicalResult LinkerTool::runLinkCommand(const std::string &commandLine) {
-  LLVM_DEBUG(llvm::dbgs() << "Running linker command:\n" << commandLine);
-  auto escapedCommandLine = escapeCommandLineComponent(commandLine);
-  int exitCode = system(escapedCommandLine.c_str());
+LogicalResult LinkerTool::runLinkCommand(std::string commandLine,
+                                         StringRef env) {
+  LLVM_DEBUG(llvm::dbgs() << "Running linker command:\n"
+                          << env << " " << commandLine);
+  if (!env.empty()) {
+#if defined(_MSC_VER)
+    commandLine = ("set " + env + " && " + commandLine).str();
+#else
+    commandLine = (env + " " + commandLine).str();
+#endif  // _MSC_VER
+  }
+  int exitCode = system(commandLine.c_str());
   if (exitCode == 0) return success();
   llvm::errs() << "Linking failed; escaped command line returned exit code "
                << exitCode << ":\n\n"
-               << escapedCommandLine << "\n\n";
+               << commandLine << "\n\n";
   return failure();
 }
 

@@ -697,12 +697,10 @@ LogicalResult PromoteNumericOp::canonicalize(PromoteNumericOp op,
 // RaiseOnFailureOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult PYDM::RaiseOnFailureOp::fold(
-    ArrayRef<Attribute> operands, SmallVectorImpl<OpFoldResult> &results) {
-  assert(operands.size() == 1 && "expected one fold operand");
-  // Unit exception result is success. Just elide.
-  if (operands[0] && operands[0].isa<UnitAttr>()) {
-    erase();
+LogicalResult PYDM::RaiseOnFailureOp::canonicalize(RaiseOnFailureOp op,
+                                                   PatternRewriter &rewriter) {
+  if (op.exc_result().getDefiningOp<SuccessOp>()) {
+    op.getOperation()->erase();
     return success();
   }
   return failure();

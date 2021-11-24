@@ -36,8 +36,6 @@ namespace HAL {
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    const TargetOptions &targetOptions);
-void buildHALTransformPassPipeline2(OpPassManager &passManager,
-                                    const TargetOptions &targetOptions);
 
 void registerHALTransformPassPipeline();
 
@@ -47,7 +45,6 @@ void registerHALTransformPassPipeline();
 
 // Converts input flow/std/etc dialects to the IREE HAL dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass();
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToHAL2Pass();
 
 //===----------------------------------------------------------------------===//
 // Device management
@@ -76,11 +73,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // usage within the module. Target backends are queried to check for support and
 // device placements are made.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass();
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfaces2Pass();
-
-// Propagates hal.interface.workload.* information when constant.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createPropagateConstantWorkgroupInfoPass();
 
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
@@ -115,19 +107,6 @@ createSerializeTargetExecutablesPass(StringRef target);
 // Resource initialization, caching, and optimization
 //===----------------------------------------------------------------------===//
 
-// Combines constant variables into one or more hal.constant_pools based on
-// usage semantics.
-std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass();
-
-// Packs all constant data in a hal.constant_pool into their storage formats
-// and maps them with hal.constant_pool.span.
-std::unique_ptr<OperationPass<ConstantPoolOp>>
-createPackConstantPoolStoragePass();
-
-// Materializes runtime buffers for constant pools.
-std::unique_ptr<OperationPass<ModuleOp>>
-createMaterializeConstantPoolBuffersPass();
-
 // Performs packing and materializes runtime packing code when required.
 std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass();
 
@@ -159,20 +138,13 @@ inline void registerHALPasses() {
   createAssignTargetDevicesPass({});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createConvertToHALPass();
-  createConvertToHAL2Pass();
   createElideRedundantCommandsPass();
-  createIdentifyConstantPoolsPass();
   createInlineDeviceSwitchesPass();
   createLinkExecutablesPass();
   createLinkTargetExecutablesPass("");
-  createMaterializeConstantPoolBuffersPass();
   createMaterializeInterfacesPass();
-  createMaterializeInterfaces2Pass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
-  createPackAllocationsPass();
-  createPackConstantPoolStoragePass();
-  createPropagateConstantWorkgroupInfoPass();
   createResolveEntryPointOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");

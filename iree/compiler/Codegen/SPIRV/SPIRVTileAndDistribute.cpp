@@ -96,23 +96,24 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
 
   SmallVector<StringRef, 2> matchMarkers = {getWorkgroupMemoryMarker()};
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::CopyOp>,
-                  linalg::LinalgTilingPattern<linalg::Conv1DNwcWcfOp>,
-                  linalg::LinalgTilingPattern<linalg::Conv3DNdhwcDhwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
-      context, tilingOptions,
-      getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
-                                     context)
-          .setMatchByDefault());
+  patterns
+      .insert<linalg::LinalgTilingPattern<linalg::CopyOp>,
+              linalg::LinalgTilingPattern<linalg::Conv1DNwcWcfOp>,
+              linalg::LinalgTilingPattern<linalg::Conv3DNdhwcDhwcfOp>,
+              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcmOp>,
+              linalg::LinalgTilingPattern<linalg::FillOp>,
+              linalg::LinalgTilingPattern<linalg::GenericOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
+          context, tilingOptions,
+          getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
+                                         context)
+              .setMatchByDefault());
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcOp>,
                   linalg::LinalgTilingPattern<linalg::MatmulOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(matchMarkers, getTileReductionMarker(),
@@ -143,7 +144,7 @@ static void populateTilingReductionPatterns(
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcOp>,
                   linalg::LinalgTilingPattern<linalg::MatmulOp>>(
       context, tilingOptions, marker);
 }

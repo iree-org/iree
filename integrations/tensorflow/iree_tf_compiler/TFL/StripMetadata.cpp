@@ -16,12 +16,12 @@ namespace {
 
 static bool isTFLAttr(NamedAttribute &namedAttr) {
   // NOTE: tflite mixes tf and tfl, for some reason.
-  auto name = namedAttr.first.strref();
+  auto name = namedAttr.getName().strref();
   if (name.startswith("tf.") || name.startswith("tf_") ||
       name.startswith("tfl.") || name.startswith("tfl_")) {
     return true;
   }
-  StringRef attrNamespace = namedAttr.second.getDialect().getNamespace();
+  StringRef attrNamespace = namedAttr.getValue().getDialect().getNamespace();
   return attrNamespace == "tf" || attrNamespace == "tfl";
 }
 
@@ -35,7 +35,7 @@ class StripModuleMetadataPass
         moduleOp->getAttrs(),
         [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
-      moduleOp->removeAttr(namedAttr.first);
+      moduleOp->removeAttr(namedAttr.getName());
     }
   }
 };
@@ -50,7 +50,7 @@ class StripFunctionMetadataPass
         funcOp->getAttrs(),
         [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
-      funcOp->removeAttr(namedAttr.first);
+      funcOp->removeAttr(namedAttr.getName());
     }
 
     for (int i = 0; i < funcOp.getNumArguments(); ++i) {
@@ -58,7 +58,7 @@ class StripFunctionMetadataPass
           funcOp.getArgAttrs(i),
           [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
-        funcOp.removeArgAttr(i, namedAttr.first);
+        funcOp.removeArgAttr(i, namedAttr.getName());
       }
     }
 
@@ -67,7 +67,7 @@ class StripFunctionMetadataPass
           funcOp.getResultAttrs(i),
           [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
-        funcOp.removeResultAttr(i, namedAttr.first);
+        funcOp.removeResultAttr(i, namedAttr.getName());
       }
     }
   }

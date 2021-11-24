@@ -169,8 +169,8 @@ class WrapEntryPointsPass
     SmallVector<NamedAttribute, 4> attrs;
     auto abiAttr = entryFuncOp->getAttr("iree.abi");
     if (abiAttr) {
-      attrs.push_back(std::make_pair(
-          Identifier::get("iree.abi", entryFuncOp.getContext()), abiAttr));
+      attrs.emplace_back(StringAttr::get(entryFuncOp.getContext(), "iree.abi"),
+                         abiAttr);
     }
     if (!attrs.empty()) {
       auto reflectionAttr = DictionaryAttr::get(&getContext(), attrs);

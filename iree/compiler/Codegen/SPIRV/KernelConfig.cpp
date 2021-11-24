@@ -137,7 +137,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   // Tiling along reduction dimensions
   if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});
-  } else if (isa<linalg::DepthwiseConv2DNhwOp>(linalgOp)) {
+  } else if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1});
   } else {
     return success();
@@ -308,6 +308,12 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // No tiled loops means we cannot tile (and distribute) at all. Use just one
     // single thread to run everything.
     auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+    if (auto linalgOp = dyn_cast<linalg::GenericOp>(op)) {
+      auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
+      if (untiledResultShape.empty()) {
+        pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
+      }
+    }
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
     return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, {}, pipeline,
                                                  workgroupSize);
@@ -388,6 +394,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   };
 
   // Whether we can try to use the vectorization pipeline.
+  auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
   bool vectorizable =
       !linalgOp.hasIndexSemantics() &&
       // Skip vectorization for non-minor identity inputs as it generates
@@ -400,7 +407,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       // TODO: Lowering of integers other than i32 may require emulation.
       // This is currently not supported for vector operation.
       llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
-      llvm::none_of(getUntiledResultShape(linalgOp, 0), ShapedType::isDynamic);
+      !untiledResultShape.empty() &&
+      llvm::none_of(untiledResultShape, ShapedType::isDynamic);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Linalg op " << linalgOp << "\n  partitioned loops: [";
@@ -551,7 +559,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
+      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
           [limits](auto op) {
             // Try to tile and vectorize first. It's common to see 32 threads
             // per subgroup for GPUs.
