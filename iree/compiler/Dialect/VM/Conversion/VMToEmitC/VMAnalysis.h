@@ -17,10 +17,12 @@ namespace iree_compiler {
 
 struct VMAnalysis {
  public:
-  VMAnalysis(RegisterAllocation &&registerAllocation,
-             ValueLiveness &&valueLiveness)
-      : registerAllocation(std::move(registerAllocation)),
-        valueLiveness(std::move(valueLiveness)) {}
+  VMAnalysis() = default;
+  VMAnalysis(IREE::VM::FuncOp &funcOp) {
+    Operation *op = funcOp.getOperation();
+    registerAllocation = RegisterAllocation(op);
+    valueLiveness = ValueLiveness(op);
+  }
 
   VMAnalysis(VMAnalysis &&) = default;
   VMAnalysis &operator=(VMAnalysis &&) = default;

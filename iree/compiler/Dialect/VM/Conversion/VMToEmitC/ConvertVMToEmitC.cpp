@@ -183,11 +183,12 @@ Optional<Value> findRef(mlir::FuncOp &parentFuncOp,
 
 LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
                             IREE::VM::EmitCTypeConverter &typeConverter,
-                            VMAnalysisCache &vmAnalysisCache,
+
                             SmallVector<BlockArgument, 4> &blockArgsToRemove) {
   auto ctx = funcOp.getContext();
   auto loc = funcOp.getLoc();
 
+  VMAnalysisCache &vmAnalysisCache = typeConverter.analysisCache;
   OpBuilder builder(funcOp);
 
   auto moduleOp = funcOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
@@ -729,8 +730,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp =
         builder.create<mlir::FuncOp>(loc, moduleName + "_destroy", funcType);
 
-    vmAnalysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis{{}, {}}));
+    vmAnalysisCache.insert(std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
     funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
 
@@ -786,8 +786,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp = builder.create<mlir::FuncOp>(loc, moduleName + "_alloc_state",
                                                funcType);
 
-    vmAnalysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis{{}, {}}));
+    vmAnalysisCache.insert(std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
     funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
 
@@ -1026,8 +1025,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp =
         builder.create<mlir::FuncOp>(loc, moduleName + "_free_state", funcType);
 
-    vmAnalysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis{{}, {}}));
+    vmAnalysisCache.insert(std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
     funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
 
@@ -1127,8 +1125,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp = builder.create<mlir::FuncOp>(
         loc, moduleName + "_resolve_import", funcType);
 
-    vmAnalysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis{{}, {}}));
+    vmAnalysisCache.insert(std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
     funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
 
@@ -1200,8 +1197,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp =
         builder.create<mlir::FuncOp>(loc, moduleName + "_create", funcType);
 
-    vmAnalysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis{{}, {}}));
+    vmAnalysisCache.insert(std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
     funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
 
@@ -1446,11 +1442,6 @@ class FuncOpConversion : public OpConversionPattern<mlir::FuncOp> {
  public:
   using OpConversionPattern<mlir::FuncOp>::OpConversionPattern;
 
-  FuncOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                   VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<mlir::FuncOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
-
  private:
   LogicalResult matchAndRewrite(
       mlir::FuncOp funcOp, OpAdaptor adaptor,
@@ -1474,8 +1465,6 @@ class FuncOpConversion : public OpConversionPattern<mlir::FuncOp> {
     });
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename CallOpTy>
@@ -1483,11 +1472,6 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
  public:
   using Adaptor = typename CallOpTy::Adaptor;
   using OpConversionPattern<CallOpTy>::OpConversionPattern;
-
-  CallOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                   VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<CallOpTy>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -1533,9 +1517,12 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
       return failure();
     };
 
-    returnIfError(/*rewriter=*/rewriter, /*location=*/loc, /*callee=*/funcOp,
-                  /*operands=*/updatedOperands,
-                  /*vmAnalysisCache=*/vmAnalysisCache);
+    returnIfError(
+        /*rewriter=*/rewriter, /*location=*/loc, /*callee=*/funcOp,
+        /*operands=*/updatedOperands,
+        /*vmAnalysisCache=*/
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache);
 
     if (failed(updateResults(op, rewriter, resultOperands))) {
       return failure();
@@ -1633,7 +1620,10 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
         /*callee=*/StringAttr::get(ctx, funcName.getValue()),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/updatedOperands, /*vmAnalysisCache=*/vmAnalysisCache);
+        /*operands=*/updatedOperands,
+        /*vmAnalysisCache=*/
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache);
 
     if (failed(updateResults(op, rewriter, resultOperands))) {
       return failure();
@@ -1652,6 +1642,10 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     auto loc = op->getLoc();
 
     auto funcOp = op->getParentOfType<mlir::FuncOp>();
+    VMAnalysisCache &vmAnalysisCache =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache;
+
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
       return op->emitError() << "parent func op not found in cache.";
@@ -1740,6 +1734,10 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
                               ConversionPatternRewriter &rewriter,
                               SmallVector<Value, 4> &resultOperands) const {
     auto funcOp = op->getParentOfType<mlir::FuncOp>();
+    VMAnalysisCache &vmAnalysisCache =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache;
+
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
       return op->emitError() << "parent func op not found in cache.";
@@ -1755,8 +1753,6 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     }
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename CmpOpTy, typename Adaptor = typename CmpOpTy::Adaptor>
@@ -1765,10 +1761,9 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
   using OpConversionPattern<CmpOpTy>::OpConversionPattern;
 
   CompareRefOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                         StringRef funcName, VMAnalysisCache &vmAnalysisCache)
+                         StringRef funcName)
       : OpConversionPattern<CmpOpTy>(typeConverter, context),
-        funcName(funcName),
-        vmAnalysisCache(vmAnalysisCache) {}
+        funcName(funcName) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -1779,6 +1774,9 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
 
     auto funcOp =
         cmpOp.getOperation()->template getParentOfType<mlir::FuncOp>();
+    VMAnalysisCache &vmAnalysisCache =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache;
 
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
@@ -1836,19 +1834,11 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
   }
 
   StringRef funcName;
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 class CompareRefNotZeroOpConversion
     : public OpConversionPattern<IREE::VM::CmpNZRefOp> {
   using OpConversionPattern<IREE::VM::CmpNZRefOp>::OpConversionPattern;
-
- public:
-  CompareRefNotZeroOpConversion(TypeConverter &typeConverter,
-                                MLIRContext *context,
-                                VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::CmpNZRefOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -1858,6 +1848,9 @@ class CompareRefNotZeroOpConversion
     auto loc = cmpOp.getLoc();
 
     auto funcOp = cmpOp.getOperation()->getParentOfType<mlir::FuncOp>();
+
+    VMAnalysisCache &vmAnalysisCache =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
@@ -1894,8 +1887,6 @@ class CompareRefNotZeroOpConversion
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename ConstOpTy>
@@ -1943,11 +1934,6 @@ class ConstRefZeroOpConversion
  public:
   using OpConversionPattern<IREE::VM::ConstRefZeroOp>::OpConversionPattern;
 
-  ConstRefZeroOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                           VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::ConstRefZeroOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
-
   LogicalResult matchAndRewrite(
       IREE::VM::ConstRefZeroOp constRefZeroOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
@@ -1957,8 +1943,9 @@ class ConstRefZeroOpConversion
     auto funcOp =
         constRefZeroOp.getOperation()->getParentOfType<mlir::FuncOp>();
 
-    Optional<Value> ref =
-        findRef(funcOp, vmAnalysisCache, constRefZeroOp.getResult());
+    Optional<Value> ref = findRef(
+        funcOp, getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache,
+        constRefZeroOp.getResult());
 
     if (!ref.hasValue()) {
       return constRefZeroOp.emitError() << "local ref not found";
@@ -1976,19 +1963,12 @@ class ConstRefZeroOpConversion
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 class ConstRefRodataOpConversion
     : public OpConversionPattern<IREE::VM::ConstRefRodataOp> {
  public:
   using OpConversionPattern<IREE::VM::ConstRefRodataOp>::OpConversionPattern;
-
-  ConstRefRodataOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                             VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::ConstRefRodataOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
   LogicalResult matchAndRewrite(
       IREE::VM::ConstRefRodataOp constRefRodataOp, OpAdaptor adaptor,
@@ -2036,6 +2016,9 @@ class ConstRefRodataOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
+    VMAnalysisCache &vmAnalysisCache =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
+
     Optional<Value> ref =
         findRef(funcOp, vmAnalysisCache, constRefRodataOp.getResult());
 
@@ -2058,18 +2041,10 @@ class ConstRefRodataOpConversion
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
   using OpConversionPattern<IREE::VM::BranchOp>::OpConversionPattern;
-
- public:
-  BranchOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                     VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::BranchOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -2102,6 +2077,9 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
     }
 
     auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+
+    VMAnalysisCache &vmAnalysisCache =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
@@ -2152,8 +2130,6 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 // Basic block arguments are emitted as variable assignments in EmitC. Because
@@ -2183,12 +2159,6 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
 class CondBranchOpConversion
     : public OpConversionPattern<IREE::VM::CondBranchOp> {
   using OpConversionPattern<IREE::VM::CondBranchOp>::OpConversionPattern;
-
- public:
-  CondBranchOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                         VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::CondBranchOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -2237,6 +2207,8 @@ class CondBranchOpConversion
     }
 
     auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+    VMAnalysisCache &vmAnalysisCache =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
@@ -2331,18 +2303,10 @@ class CondBranchOpConversion
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
   using OpConversionPattern<IREE::VM::ReturnOp>::OpConversionPattern;
-
- public:
-  ReturnOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                     VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::ReturnOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -2352,6 +2316,8 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
     auto loc = op.getLoc();
 
     auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+    VMAnalysisCache &vmAnalysisCache =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
     // The result variables are the last N arguments of the function.
     unsigned int firstOutputArgumentIndex =
@@ -2407,18 +2373,10 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
   using OpConversionPattern<IREE::VM::FailOp>::OpConversionPattern;
-
- public:
-  FailOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                   VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::FailOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -2436,6 +2394,8 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
           rewriter.createBlock(parentRegion, parentRegion->end());
 
       auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+      VMAnalysisCache &vmAnalysisCache =
+          getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
       releaseRefs(rewriter, loc, funcOp, vmAnalysisCache);
 
@@ -2455,6 +2415,8 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
       failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
 
       auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+      VMAnalysisCache &vmAnalysisCache =
+          getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
       releaseRefs(rewriter, loc, funcOp, vmAnalysisCache);
 
@@ -2526,8 +2488,6 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename LoadOpTy, typename GlobalOpTy,
@@ -2593,12 +2553,6 @@ class GlobalLoadStoreRefOpConversion
  public:
   using OpConversionPattern<LoadStoreOpTy>::OpConversionPattern;
 
-  GlobalLoadStoreRefOpConversion(TypeConverter &typeConverter,
-                                 MLIRContext *context,
-                                 VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<LoadStoreOpTy>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
-
  private:
   LogicalResult matchAndRewrite(
       LoadStoreOpTy op, Adaptor adaptor,
@@ -2628,6 +2582,9 @@ class GlobalLoadStoreRefOpConversion
     auto globalOrdinal = globalOp.ordinal().getValue().getZExtValue();
 
     auto funcOp = op->getParentOfType<mlir::FuncOp>();
+    VMAnalysisCache &vmAnalysisCache =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache;
 
     auto ptr = vmAnalysisCache.find(funcOp.getOperation());
     if (ptr == vmAnalysisCache.end()) {
@@ -2709,8 +2666,6 @@ class GlobalLoadStoreRefOpConversion
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename StoreOpTy, typename GlobalOpTy,
@@ -2780,13 +2735,11 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
  public:
   ListOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                   StringRef funcName, size_t listArgumentIndex, bool failable,
-                   VMAnalysisCache &vmAnalysisCache)
+                   StringRef funcName, size_t listArgumentIndex, bool failable)
       : OpConversionPattern<SrcOpTy>(typeConverter, context),
         funcName(funcName),
         listArgumentIndex(listArgumentIndex),
-        failable(failable),
-        vmAnalysisCache(vmAnalysisCache) {}
+        failable(failable) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -2794,6 +2747,10 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
+
+    VMAnalysisCache &vmAnalysisCache =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache;
 
     if (listArgumentIndex >= adaptor.getOperands().size()) {
       return op.emitError() << " index for list argument out of range";
@@ -2860,19 +2817,12 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
 
   // Whether the function call can fail, i.e. it returns an iree_status_t.
   bool failable;
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 class ListAllocOpConversion
     : public OpConversionPattern<IREE::VM::ListAllocOp> {
  public:
   using OpConversionPattern<IREE::VM::ListAllocOp>::OpConversionPattern;
-
-  ListAllocOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                        VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::ListAllocOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -2912,6 +2862,8 @@ class ListAllocOpConversion
         /*operand=*/listOp.getResult());
 
     auto funcOp = allocOp.getOperation()->getParentOfType<mlir::FuncOp>();
+    VMAnalysisCache &vmAnalysisCache =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
     BlockArgument stateArg = funcOp.getArgument(2);
     auto allocatorOp = rewriter.create<emitc::CallOp>(
@@ -2965,19 +2917,11 @@ class ListAllocOpConversion
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename GetOpTy, typename Adaptor = typename GetOpTy::Adaptor>
 class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
   using OpConversionPattern<GetOpTy>::OpConversionPattern;
-
- public:
-  ListGetOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                      VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<GetOpTy>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -3024,6 +2968,10 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
         /*applicableOperator=*/StringAttr::get(ctx, "*"),
         /*operand=*/adaptor.getOperands()[0]);
 
+    VMAnalysisCache &vmAnalysisCache =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache;
+
     auto listDerefOp = failListNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
@@ -3059,19 +3007,12 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 class ListGetRefOpConversion
     : public OpConversionPattern<IREE::VM::ListGetRefOp> {
  public:
   using OpConversionPattern<IREE::VM::ListGetRefOp>::OpConversionPattern;
-
-  ListGetRefOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                         VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::ListGetRefOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -3085,6 +3026,9 @@ class ListGetRefOpConversion
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
         /*applicableOperator=*/StringAttr::get(ctx, "*"),
         /*operand=*/adaptor.getOperands()[0]);
+
+    VMAnalysisCache &vmAnalysisCache =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
     auto listDerefOp = failListNull(
         /*rewriter=*/rewriter,
@@ -3240,19 +3184,11 @@ class ListGetRefOpConversion
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 template <typename SetOpTy, typename Adaptor = typename SetOpTy::Adaptor>
 class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
   using OpConversionPattern<SetOpTy>::OpConversionPattern;
-
- public:
-  ListSetOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                      VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<SetOpTy>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -3293,6 +3229,10 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
         /*applicableOperator=*/StringAttr::get(ctx, "*"),
         /*operand=*/adaptor.getOperands()[0]);
 
+    VMAnalysisCache &vmAnalysisCache =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+            ->analysisCache;
+
     auto listDerefOp = failListNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
@@ -3318,19 +3258,11 @@ class ListSetOpConversion : public OpConversionPattern<SetOpTy> {
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 
 class ListSetRefOpConversion
     : public OpConversionPattern<IREE::VM::ListSetRefOp> {
   using OpConversionPattern<IREE::VM::ListSetRefOp>::OpConversionPattern;
-
- public:
-  ListSetRefOpConversion(TypeConverter &typeConverter, MLIRContext *context,
-                         VMAnalysisCache &vmAnalysisCache)
-      : OpConversionPattern<IREE::VM::ListSetRefOp>(typeConverter, context),
-        vmAnalysisCache(vmAnalysisCache) {}
 
  private:
   LogicalResult matchAndRewrite(
@@ -3344,6 +3276,9 @@ class ListSetRefOpConversion
         /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
         /*applicableOperator=*/StringAttr::get(ctx, "*"),
         /*operand=*/adaptor.getOperands()[0]);
+
+    VMAnalysisCache &vmAnalysisCache =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache;
 
     auto listDerefOp = failListNull(
         /*rewriter=*/rewriter,
@@ -3384,30 +3319,25 @@ class ListSetRefOpConversion
 
     return success();
   }
-
-  VMAnalysisCache &vmAnalysisCache;
 };
 }  // namespace
 
-void populateVMToEmitCPatterns(MLIRContext *context,
-                               ConversionTarget &conversionTarget,
+void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
-                               OwningRewritePatternList &patterns,
-                               VMAnalysisCache &vmAnalysisCache) {
+                               OwningRewritePatternList &patterns) {
+  auto context = patterns.getContext();
   populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                  patterns);
 
   // CFG
-  patterns.insert<BranchOpConversion>(typeConverter, context, vmAnalysisCache);
-  patterns.insert<CallOpConversion<IREE::VM::CallOp>>(typeConverter, context,
-                                                      vmAnalysisCache);
-  patterns.insert<CallOpConversion<IREE::VM::CallVariadicOp>>(
-      typeConverter, context, vmAnalysisCache);
-  patterns.insert<CondBranchOpConversion>(typeConverter, context,
-                                          vmAnalysisCache);
-  patterns.insert<FailOpConversion>(typeConverter, context, vmAnalysisCache);
-  patterns.insert<FuncOpConversion>(typeConverter, context, vmAnalysisCache);
-  patterns.insert<ReturnOpConversion>(typeConverter, context, vmAnalysisCache);
+  patterns.insert<BranchOpConversion>(typeConverter, context);
+  patterns.insert<CallOpConversion<IREE::VM::CallOp>>(typeConverter, context);
+  patterns.insert<CallOpConversion<IREE::VM::CallVariadicOp>>(typeConverter,
+                                                              context);
+  patterns.insert<CondBranchOpConversion>(typeConverter, context);
+  patterns.insert<FailOpConversion>(typeConverter, context);
+  patterns.insert<FuncOpConversion>(typeConverter, context);
+  patterns.insert<ReturnOpConversion>(typeConverter, context);
 
   // Globals
   patterns.insert<
@@ -3418,37 +3348,32 @@ void populateVMToEmitCPatterns(MLIRContext *context,
       typeConverter, context, "vm_global_store_i32");
 
   patterns.insert<GlobalLoadStoreRefOpConversion<IREE::VM::GlobalLoadRefOp>>(
-      typeConverter, context, vmAnalysisCache);
+      typeConverter, context);
   patterns.insert<GlobalLoadStoreRefOpConversion<IREE::VM::GlobalStoreRefOp>>(
-      typeConverter, context, vmAnalysisCache);
+      typeConverter, context);
 
   // Constants
   patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(typeConverter,
                                                            context);
   patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI32ZeroOp>>(
       typeConverter, context);
-  patterns.insert<ConstRefZeroOpConversion>(typeConverter, context,
-                                            vmAnalysisCache);
-  patterns.insert<ConstRefRodataOpConversion>(typeConverter, context,
-                                              vmAnalysisCache);
+  patterns.insert<ConstRefZeroOpConversion>(typeConverter, context);
+  patterns.insert<ConstRefRodataOpConversion>(typeConverter, context);
 
   // List ops
-  patterns.insert<ListAllocOpConversion>(typeConverter, context,
-                                         vmAnalysisCache);
+  patterns.insert<ListAllocOpConversion>(typeConverter, context);
   patterns.insert<ListOpConversion<IREE::VM::ListReserveOp>>(
-      typeConverter, context, "iree_vm_list_reserve", 0, true, vmAnalysisCache);
+      typeConverter, context, "iree_vm_list_reserve", 0, true);
   patterns.insert<ListOpConversion<IREE::VM::ListResizeOp>>(
-      typeConverter, context, "iree_vm_list_resize", 0, true, vmAnalysisCache);
+      typeConverter, context, "iree_vm_list_resize", 0, true);
   patterns.insert<ListOpConversion<IREE::VM::ListSizeOp>>(
-      typeConverter, context, "iree_vm_list_size", 0, false, vmAnalysisCache);
-  patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(
-      typeConverter, context, vmAnalysisCache);
-  patterns.insert<ListGetRefOpConversion>(typeConverter, context,
-                                          vmAnalysisCache);
-  patterns.insert<ListSetOpConversion<IREE::VM::ListSetI32Op>>(
-      typeConverter, context, vmAnalysisCache);
-  patterns.insert<ListSetRefOpConversion>(typeConverter, context,
-                                          vmAnalysisCache);
+      typeConverter, context, "iree_vm_list_size", 0, false);
+  patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(typeConverter,
+                                                               context);
+  patterns.insert<ListGetRefOpConversion>(typeConverter, context);
+  patterns.insert<ListSetOpConversion<IREE::VM::ListSetI32Op>>(typeConverter,
+                                                               context);
+  patterns.insert<ListSetRefOpConversion>(typeConverter, context);
 
   // Conditional assignment ops
   patterns.insert<GenericOpConversion<IREE::VM::SelectI32Op>>(
@@ -3514,11 +3439,10 @@ void populateVMToEmitCPatterns(MLIRContext *context,
   patterns.insert<GenericOpConversion<IREE::VM::CmpNZI32Op>>(
       typeConverter, context, "vm_cmp_nz_i32");
   patterns.insert<CompareRefOpConversion<IREE::VM::CmpEQRefOp>>(
-      typeConverter, context, "vm_cmp_eq_ref", vmAnalysisCache);
+      typeConverter, context, "vm_cmp_eq_ref");
   patterns.insert<CompareRefOpConversion<IREE::VM::CmpNERefOp>>(
-      typeConverter, context, "vm_cmp_ne_ref", vmAnalysisCache);
-  patterns.insert<CompareRefNotZeroOpConversion>(typeConverter, context,
-                                                 vmAnalysisCache);
+      typeConverter, context, "vm_cmp_ne_ref");
+  patterns.insert<CompareRefNotZeroOpConversion>(typeConverter, context);
 
   // ExtF32: Globals
   patterns.insert<
@@ -3640,10 +3564,10 @@ void populateVMToEmitCPatterns(MLIRContext *context,
       typeConverter, context);
 
   // ExtI64: List ops
-  patterns.insert<ListGetOpConversion<IREE::VM::ListGetI64Op>>(
-      typeConverter, context, vmAnalysisCache);
-  patterns.insert<ListSetOpConversion<IREE::VM::ListSetI64Op>>(
-      typeConverter, context, vmAnalysisCache);
+  patterns.insert<ListGetOpConversion<IREE::VM::ListGetI64Op>>(typeConverter,
+                                                               context);
+  patterns.insert<ListSetOpConversion<IREE::VM::ListSetI64Op>>(typeConverter,
+                                                               context);
 
   // ExtI64: Conditional assignment ops
   patterns.insert<GenericOpConversion<IREE::VM::SelectI64Op>>(
@@ -3753,7 +3677,7 @@ class ConvertVMToEmitCPass
     EmitCTypeConverter typeConverter;
 
     // Run analysis passes
-    VMAnalysisCache vmAnalysisCache;
+    VMAnalysisCache &vmAnalysisCache = typeConverter.analysisCache;
 
     // Convert vm.func ops to std.func with the calling convention used by
     // EmitC. We convert these upfront to make sure vm.call ops always
@@ -3763,11 +3687,9 @@ class ConvertVMToEmitCPass
     SmallVector<BlockArgument, 4> blockArgsToRemove;
     for (auto funcOp : module.getOps<IREE::VM::FuncOp>()) {
       Operation *op = funcOp.getOperation();
-      vmAnalysisCache.insert(std::make_pair(
-          op, VMAnalysis{RegisterAllocation(op), ValueLiveness(op)}));
+      vmAnalysisCache.insert(std::make_pair(op, VMAnalysis(funcOp)));
 
-      if (failed(convertFuncOp(funcOp, typeConverter, vmAnalysisCache,
-                               blockArgsToRemove))) {
+      if (failed(convertFuncOp(funcOp, typeConverter, blockArgsToRemove))) {
         return signalPassFailure();
       }
       funcsToRemove.push_back(funcOp);
@@ -3783,8 +3705,7 @@ class ConvertVMToEmitCPass
     }
 
     OwningRewritePatternList patterns(&getContext());
-    populateVMToEmitCPatterns(&getContext(), target, typeConverter, patterns,
-                              vmAnalysisCache);
+    populateVMToEmitCPatterns(target, typeConverter, patterns);
 
     target.addLegalDialect<
         emitc::EmitCDialect, mlir::BuiltinDialect, mlir::StandardOpsDialect,

@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_
 
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/VMAnalysis.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -55,6 +56,7 @@ class EmitCTypeConverter : public mlir::TypeConverter {
   }
 
   SetVector<Operation *> sourceMaterializations;
+  VMAnalysisCache analysisCache;
 };
 
 }  // namespace VM
