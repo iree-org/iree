@@ -217,9 +217,9 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
   if (!loadOp) return failure();
 
   Value loaded = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      op.getLoc(), op.getResult().getType(), loadOp.source(), op.offsets(),
-      op.sizes(), op.strides(), op.static_offsets(), op.static_sizes(),
-      op.static_strides());
+      op.getLoc(), op.getResult().getType(), loadOp.source(),
+      loadOp.source_dims(), op.offsets(), op.sizes(), op.strides(),
+      op.static_offsets(), op.static_sizes(), op.static_strides());
 
   op.getResult().replaceAllUsesWith(loaded);
   op.erase();
@@ -227,9 +227,9 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
 }
 
 template <typename OpTy>
-static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b,
-                                                     OpTy linalgLikeOp,
-                                                     Value target) {
+static LogicalResult rewriteDestructiveUpdateInPlace(
+    OpBuilder &b, OpTy linalgLikeOp, Value target,
+    ValueRange targetDynamicDims) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
                           << *linalgLikeOp.getOperation() << "\n");
   if (!linalgLikeOp->hasOneUse()) {
@@ -250,8 +250,8 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b,
     // Kills the SSA use-def chain.
     usedResult.replaceAllUsesWith(dest);
 
-    b.create<IREE::Flow::DispatchTensorStoreOp>(linalgLikeOp.getLoc(),
-                                                usedResult, target);
+    b.create<IREE::Flow::DispatchTensorStoreOp>(
+        linalgLikeOp.getLoc(), usedResult, target, targetDynamicDims);
 
     return success();
   }
@@ -262,7 +262,8 @@ static LogicalResult rewriteDestructiveUpdateInPlace(OpBuilder &b,
 /// tensor.insert_slice.
 template <>
 LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
-    OpBuilder &b, tensor::InsertSliceOp insertSliceOp, Value target) {
+    OpBuilder &b, tensor::InsertSliceOp insertSliceOp, Value target,
+    ValueRange targetDynamicDims) {
   LLVM_DEBUG(llvm::dbgs() << "RewriteDestructiveUpdateInPlace: "
                           << *insertSliceOp.getOperation() << "\n");
   if (!insertSliceOp->hasOneUse()) {
@@ -284,9 +285,9 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
 
     b.create<IREE::Flow::DispatchTensorStoreOp>(
         insertSliceOp->getLoc(), insertSliceOp.source(), target,
-        insertSliceOp.offsets(), insertSliceOp.sizes(), insertSliceOp.strides(),
-        insertSliceOp.static_offsets(), insertSliceOp.static_sizes(),
-        insertSliceOp.static_strides());
+        targetDynamicDims, insertSliceOp.offsets(), insertSliceOp.sizes(),
+        insertSliceOp.strides(), insertSliceOp.static_offsets(),
+        insertSliceOp.static_sizes(), insertSliceOp.static_strides());
 
     return success();
   }
@@ -310,7 +311,8 @@ static bool hasNonScfForControlFlow(
 }
 
 static LogicalResult rewriteDestructiveUpdateInPlace(
-    OpBuilder &b, SpecialTerminatorOpCapture &capture, Value target) {
+    OpBuilder &b, SpecialTerminatorOpCapture &capture, Value target,
+    ValueRange targetDynamicDims) {
   Operation *outermostProducingOp = (capture.loops.empty())
                                         ? capture.rootDestructiveUpdate
                                         : capture.loops.front();
@@ -322,7 +324,8 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
       TypeSwitch<Operation *, LogicalResult>(capture.rootDestructiveUpdate)
           .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp,
                 tensor::InsertSliceOp>([&](auto op) {
-            return rewriteDestructiveUpdateInPlace(b, op, target);
+            return rewriteDestructiveUpdateInPlace(b, op, target,
+                                                   targetDynamicDims);
           })
           .Default([&](Operation *) { return failure(); });
   if (failed(status)) return failure();
@@ -349,7 +352,8 @@ LogicalResult rewriteLinalgDestructiveUpdates(
     capture.initValue = op.value();
     Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
     if (!sourceValue) return WalkResult::advance();
-    if (failed(rewriteDestructiveUpdateInPlace(b, capture, op.target()))) {
+    if (failed(rewriteDestructiveUpdateInPlace(b, capture, op.target(),
+                                               op.target_dims()))) {
       return WalkResult::interrupt();
     }
     processedStores.push_back(op);

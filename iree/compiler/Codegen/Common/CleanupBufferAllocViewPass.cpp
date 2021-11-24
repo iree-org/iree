@@ -88,7 +88,8 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
-        reshapeOp, reshapeOp.getResultType(), newSubspanOp);
+        reshapeOp, reshapeOp.getResultType(), newSubspanOp,
+        loadOp.source_dims());
 
     return success();
   }

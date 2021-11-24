@@ -27,11 +27,12 @@ func @tile_generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //      CHECK:   flow.dispatch.workgroups
-// CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[ARG1]])
-// CHECK-NEXT:     %[[ARG2:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
-// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
-// CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
+// CHECK-SAME:     [%[[D1]], %[[D0]], %[[C1]]](%[[ARG0]], %[[D0]], %[[D1]], %[[ARG1]], %[[D2]], %[[D0]], %[[D1]])
+// CHECK-NEXT:     %[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>, %[[ARG0_D0:[a-zA-Z0-9_]+]]: index, %[[ARG0_D1:[a-zA-Z0-9_]+]]: index,
+// CHECK-SAME:     %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>, %[[ARG1_D0:[a-zA-Z0-9_]+]]: index,
+// CHECK-SAME:     %[[RET0_D0:[a-zA-Z0-9_]+]]: index, %[[RET0_D1:[a-zA-Z0-9_]+]]: index, %[[RET_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
 //  CHECK-DAG:     %[[WGSIZE_X:.+]] = flow.dispatch.workgroup.size[0]
 //  CHECK-DAG:     %[[WGSIZE_Y:.+]] = flow.dispatch.workgroup.size[1]
 //  CHECK-DAG:     %[[WGID_X:.+]] = flow.dispatch.workgroup.id[0]
@@ -46,13 +47,13 @@ func @tile_generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x
 //      CHECK:       %[[STEP_X:.+]] = affine.apply #[[MULMAP]]()[%[[WGCOUNT_X]], %[[WGSIZE_X]]]
 //      CHECK:       scf.for %[[ARG8:.+]] = %[[OFFSET_X]]
 // CHECK-SAME:         to %{{.+}} step %[[STEP_X]]
-//  CHECK-DAG:         %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG2]], {{.*}}
+//  CHECK-DAG:         %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]], {{.*}} : !flow.dispatch.tensor<readonly:?x?xf32>{%[[ARG0_D0]], %[[ARG0_D1]]}
 //  CHECK-DAG:         %[[INIT:.+]] = linalg.init_tensor
-//  CHECK-DAG:         %[[LOAD3:.+]] = flow.dispatch.tensor.load %[[ARG3]], {{.*}}
+//  CHECK-DAG:         %[[LOAD3:.+]] = flow.dispatch.tensor.load %[[ARG1_CAPTURE]], {{.*}} : !flow.dispatch.tensor<readonly:?xf32>{%[[ARG1_D0]]}
 //      CHECK:         %[[RESULT:.+]] = linalg.generic
 // CHECK-SAME:           ins(%[[LOAD2]], %[[LOAD3]] : tensor<?x?xf32>, tensor<?xf32>)
 // CHECK-SAME:           outs(%[[INIT]] : tensor<?x?xf32>)
-//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %[[ARG6]], {{.*}}
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %[[RET_CAPTURE]], {{.*}} -> !flow.dispatch.tensor<writeonly:?x?xf32>{%[[RET0_D0]], %[[RET0_D1]]}
 
 // -----
 

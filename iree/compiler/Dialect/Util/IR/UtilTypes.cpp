@@ -418,24 +418,31 @@ ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
   return dynamicDims.slice(offset, shapedType.getNumDynamicDims());
 }
 
-Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
-                                     Block::iterator insertionPoint) {
+Optional<ValueRange> findDynamicDims(Value shapedValue) {
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
   SmallVector<Value> worklist;
   worklist.push_back(shapedValue);
   while (!worklist.empty()) {
     auto workValue = worklist.pop_back_val();
-    if (auto shapeAwareOp = dyn_cast_or_null<ShapeAwareOpInterface>(
-            workValue.getDefiningOp())) {
+    auto workOp = workValue.getDefiningOp();
+    if (!workOp) continue;
+    if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(workOp)) {
       return shapeAwareOp.getResultDynamicDimsFromValue(workValue);
-    }
-    if (auto tiedOp =
-            dyn_cast_or_null<TiedOpInterface>(workValue.getDefiningOp())) {
+    } else if (auto tiedOp = dyn_cast<TiedOpInterface>(workOp)) {
       auto tiedValue = tiedOp.getTiedResultOperand(workValue);
       if (tiedValue) worklist.push_back(tiedValue);
     }
   }
+  return llvm::None;
+}
+
+Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
+                                     Block::iterator insertionPoint) {
+  // Look up the use-def chain: always safe, as any value we reach dominates
+  // {|block|, |insertionPoint|} implicitly.
+  auto upwardRange = findDynamicDims(shapedValue);
+  if (upwardRange.hasValue()) return upwardRange.getValue();
 
   // Look down the use-def chain: not safe at some point because we'll move past
   // where {|block|, |insertionPoint|} is dominated. This is often fine for a
