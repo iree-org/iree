@@ -371,8 +371,8 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
     iree_hal_buffer_mapping_t buffer_mapping;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        bindings[i].buffer, local_set_layout->bindings[binding_ordinal].access,
-        bindings[i].offset, bindings[i].length, &buffer_mapping));
+        bindings[i].buffer, IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset,
+        bindings[i].length, &buffer_mapping));
     command_buffer->state.full_bindings[binding_ordinal] =
         buffer_mapping.contents.data;
     command_buffer->state.full_binding_lengths[binding_ordinal] =

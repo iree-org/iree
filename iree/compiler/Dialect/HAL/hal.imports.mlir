@@ -296,8 +296,8 @@ vm.import @descriptor_set.create(
 vm.import @descriptor_set_layout.create(
   %device : !vm.ref<!hal.device>,
   %usage_type : i32,
-  // <binding, type, access>
-  %bindings : tuple<i32, i32, i32>...
+  // <binding, type>
+  %bindings : tuple<i32, i32>...
 ) -> !vm.ref<!hal.descriptor_set_layout>
 attributes {nosideeffects}
 

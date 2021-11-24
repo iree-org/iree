@@ -106,6 +106,8 @@ enum iree_hal_memory_access_bits_t {
   // within or across operations. The lack of the flag indicates that the access
   // is guaranteed not to alias (ala C's `restrict` keyword).
   IREE_HAL_MEMORY_ACCESS_MAY_ALIAS = 1u << 3,
+  // Memory may have any access.
+  IREE_HAL_MEMORY_ACCESS_ANY = 1u << 4,
   // Memory may have any operation performed on it.
   IREE_HAL_MEMORY_ACCESS_ALL = IREE_HAL_MEMORY_ACCESS_READ |
                                IREE_HAL_MEMORY_ACCESS_WRITE |

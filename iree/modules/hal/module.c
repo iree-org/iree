@@ -1129,7 +1129,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_create,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
                    iree_hal_module_state_t,                       //
-                   riCiiiD, r) {
+                   riCiiD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_descriptor_set_layout_usage_type_t usage_type =
@@ -1148,7 +1148,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     bindings[i].binding = (uint32_t)args->a2[i].i0;
     bindings[i].type = (iree_hal_descriptor_type_t)args->a2[i].i1;
-    bindings[i].access = (iree_hal_memory_access_t)args->a2[i].i2;
   }
 
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
