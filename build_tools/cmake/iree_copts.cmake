@@ -126,7 +126,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
     "/bigobj"
 
-    # TODO(benvanik): add comment
+    # Use the modern C preprocessor to more closely match standards/clang/gcc behavior.
     "/Zc:preprocessor"
 )
 
