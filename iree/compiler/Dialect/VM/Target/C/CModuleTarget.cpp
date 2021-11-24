@@ -136,7 +136,11 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   llvm::raw_ostream &output = emitter.ostream();
 
   auto printStringView = [](StringRef s) -> std::string {
-    return ("IREE_SVL(\"" + s + "\")").str();
+    // We can't use iree_make_string_view because function calls are not allowed
+    // for constant expressions in C.
+    // TODO(#7605): Switch to IREE_SVL. We can't use IREE_SVL today because it
+    // uses designated initializers, which cause issues when compiled as C++.
+    return ("{\"" + s + "\", " + std::to_string(s.size()) + "}").str();
   };
 
   // exports
