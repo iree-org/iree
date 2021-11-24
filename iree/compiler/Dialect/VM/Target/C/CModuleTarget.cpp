@@ -70,7 +70,7 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
     output << "iree_alignas(" << alignment << ") static const uint8_t "
            << bufferName << "[] = {";
     llvm::interleaveComma(byteBuffer, output, [&](char value) {
-      output << static_cast<unsigned int>(value);
+      output << static_cast<unsigned int>(static_cast<unsigned char>(value));
     });
     output << "};\n";
   }
@@ -191,9 +191,10 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
     // Empty list placeholder.
     output << "    {0},\n";
   } else {
-    // sort import ops
+    // sort import ops by ordinal
     llvm::sort(importOps, [](auto &lhs, auto &rhs) {
-      return lhs.getName().compare(rhs.getName()) < 0;
+      return lhs.ordinal().getValue().getZExtValue() <
+             rhs.ordinal().getValue().getZExtValue();
     });
     for (auto importOp : importOps) {
       output << "{" << printStringView(importOp.getName()) << "},\n";
