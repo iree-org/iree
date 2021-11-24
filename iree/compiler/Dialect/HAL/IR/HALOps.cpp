@@ -197,7 +197,7 @@ void TensorCastOp::build(OpBuilder &builder, OperationState &result,
     }
   } else {
     dynamicDims =
-        Shape::buildOrFindDynamicDimsForValue(result.location, source, builder);
+        IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
   }
   build(builder, result, resultType, source, dynamicDims, attrs);
 }
@@ -218,24 +218,6 @@ void TensorCastOp::build(OpBuilder &builder, OperationState &result,
           static_cast<int32_t>(resultType.isa<TensorType>() ? dynamicDims.size()
                                                             : 0),
       }));
-}
-
-Value TensorCastOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  if (source().getType().isa<TensorType>()) {
-    return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
-                                           builder);
-  } else {
-    return buildResultRankedShape(idx, builder);
-  }
-}
-
-Value TensorCastOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  if (target().getType().isa<TensorType>()) {
-    return Shape::buildRankedShapeForValue(getLoc(), target(), target_dims(),
-                                           builder);
-  } else {
-    return buildOperandRankedShape(idx, builder);
-  }
 }
 
 Value TensorCastOp::getTiedResult(unsigned resultIndex) {
@@ -924,17 +906,6 @@ static LogicalResult verifyInterfaceBindingSubspanOp(
 InterfaceBindingOp InterfaceBindingSubspanOp::queryBindingOp() {
   return dyn_cast_or_null<InterfaceBindingOp>(
       SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
-Value InterfaceBindingSubspanOp::buildOperandRankedShape(unsigned idx,
-                                                         OpBuilder &builder) {
-  return {};
-}
-
-Value InterfaceBindingSubspanOp::buildResultRankedShape(unsigned idx,
-                                                        OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), dynamic_dims(),
-                                         builder);
 }
 
 // TODO(benvanik): share with align op folder and analysis.

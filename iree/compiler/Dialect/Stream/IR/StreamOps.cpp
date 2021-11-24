@@ -1823,17 +1823,6 @@ static LogicalResult verifyOp(BindingSubspanOp op) {
   return success();
 }
 
-Value BindingSubspanOp::buildOperandRankedShape(unsigned idx,
-                                                OpBuilder &builder) {
-  return {};
-}
-
-Value BindingSubspanOp::buildResultRankedShape(unsigned idx,
-                                               OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), dynamic_dims(),
-                                         builder);
-}
-
 //===----------------------------------------------------------------------===//
 // stream.yield
 //===----------------------------------------------------------------------===//

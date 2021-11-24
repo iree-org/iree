@@ -66,7 +66,6 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
         "getTiedResultOperandIndex",
         "getTiedResultOperandIndices",
     ]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{conversion placeholder for HAL<->tensor type conversion}];
@@ -1919,7 +1918,6 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
 
 def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];

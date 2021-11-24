@@ -49,7 +49,7 @@ static Value buildTensorImportOp(Location loc, Value sourceTensor,
                                  OpBuilder &builder) {
   // Gather dynamic dimensions from the input value.
   auto dynamicDims =
-      Shape::buildOrFindDynamicDimsForValue(loc, sourceTensor, builder);
+      IREE::Util::buildDynamicDimsForValue(loc, sourceTensor, builder);
 
   // Compute the size of the tensor once in the stream resource.
   // This may differ from the external encoding of the tensor as imports are
@@ -154,7 +154,7 @@ struct GenericResourcePattern : public ConversionPattern {
       auto tensorType = oldOperand.getType().dyn_cast<TensorType>();
       assert(tensorType && "must have a tensor type to map to a resource");
 
-      auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
+      auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           op->getLoc(), oldOperand, rewriter);
       newOperands.push_back(buildTensorExportOp(
           op->getLoc(), newOperand, tensorType, dynamicDims, rewriter));
@@ -168,7 +168,7 @@ struct GenericResourcePattern : public ConversionPattern {
       if (!tensorType) continue;
 
       auto dynamicDims =
-          Shape::buildOrFindDynamicDimsForValue(op->getLoc(), result, rewriter);
+          IREE::Util::buildDynamicDimsForValue(op->getLoc(), result, rewriter);
       SmallPtrSet<Operation *, 4> consumingOps;
       auto importedValue = buildTensorImportOp(
           op->getLoc(), result, rewriter.getType<IREE::Stream::ResourceType>(),
