@@ -8,7 +8,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"

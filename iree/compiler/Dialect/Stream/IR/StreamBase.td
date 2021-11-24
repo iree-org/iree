@@ -10,7 +10,6 @@
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 include "mlir/IR/SubElementInterfaces.td"
 
 //===----------------------------------------------------------------------===//

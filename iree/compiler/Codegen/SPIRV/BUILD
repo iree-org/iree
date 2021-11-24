@@ -42,8 +42,6 @@ cc_library(
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
-        "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/Util/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",

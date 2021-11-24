@@ -7,7 +7,6 @@
 #include <memory>
 #include <tuple>
 
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -139,7 +138,6 @@ class ConversionPass
       dialectInterface->populateVMConversionPatterns(
           importSymbols, conversionPatterns, typeConverter);
     }
-    Shape::populateFoldConversionPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
                                       std::move(conversionPatterns)))) {

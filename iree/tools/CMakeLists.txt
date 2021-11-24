@@ -224,8 +224,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms
-      iree::compiler::Dialect::Shape::IR
-      iree::compiler::Dialect::Shape::Transforms
       iree::compiler::Dialect::Stream::IR
       iree::compiler::Dialect::Stream::Transforms
       iree::compiler::Dialect::Util::IR

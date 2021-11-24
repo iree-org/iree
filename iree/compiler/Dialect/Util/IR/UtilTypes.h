@@ -37,7 +37,6 @@ namespace detail {
 
 struct ListTypeStorage;
 struct PtrTypeStorage;
-struct RankedShapeTypeStorage;
 
 }  // namespace detail
 

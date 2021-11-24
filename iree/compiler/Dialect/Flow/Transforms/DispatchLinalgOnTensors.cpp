@@ -985,7 +985,7 @@ struct DispatchLinalgOnTensorsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, ShapeDialect, tensor::TensorDialect>();
+                scf::SCFDialect, tensor::TensorDialect>();
   }
   DispatchLinalgOnTensorsPass() = default;
   DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}

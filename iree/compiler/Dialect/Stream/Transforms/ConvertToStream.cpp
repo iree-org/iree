@@ -5,9 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Shape/IR/Builders.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Stream/Conversion/FlowToStream/ConvertFlowToStream.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/Conversion/StandardToStream/ConvertStandardToStream.h"
@@ -183,9 +180,9 @@ struct GenericResourcePattern : public ConversionPattern {
 class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<ShapeDialect>();
     registry.insert<mlir::StandardOpsDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }
