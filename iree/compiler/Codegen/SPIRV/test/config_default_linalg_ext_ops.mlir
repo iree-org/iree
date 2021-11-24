@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
 hal.executable private @static_1d_sort  {
   hal.interface @io {
-    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
   }
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
@@ -25,7 +25,7 @@ hal.executable private @static_1d_sort  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
+        hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
       }
     }
   }
@@ -50,8 +50,8 @@ hal.executable private @static_1d_sort  {
 
 hal.executable private @static_3d_sort  {
   hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
@@ -118,8 +118,8 @@ hal.executable private @static_3d_sort  {
 
 hal.executable private @static_1d_fft_stage2  {
   hal.interface @io {
-    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
-    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirvfb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
@@ -168,8 +168,8 @@ hal.executable private @static_1d_fft_stage2  {
 
 hal.executable private @static_3d_fft_stage3  {
   hal.interface @io {
-    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer", access="Read|Write"
-    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirvfb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {

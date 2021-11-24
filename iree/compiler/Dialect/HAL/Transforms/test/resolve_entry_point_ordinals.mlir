@@ -2,8 +2,8 @@
 
 hal.executable @exe {
   hal.interface @interface {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @target, target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb"> {
     hal.executable.entry_point @entry attributes {
@@ -58,8 +58,8 @@ func @dispatch_already_using_ordinals(
 
 hal.executable @exe {
   hal.interface @interface {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @target, target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb"> {
     hal.executable.entry_point @entry attributes {

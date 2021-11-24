@@ -4,9 +4,9 @@
 
 hal.executable private @dispatch_0 {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
@@ -22,9 +22,9 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
@@ -40,10 +40,10 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
@@ -74,15 +74,15 @@ func @basic_linking() -> () {
 // CHECK-NOT: hal.executable private @dispatch_2
 // CHECK:       hal.executable private @vmvx_linked {
 // CHECK-NEXT:    hal.interface public @io_0 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.interface public @io_1 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @arg2, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @arg2, set=0, binding=1, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
@@ -121,9 +121,9 @@ func @basic_linking() -> () {
 
 hal.executable private @dispatch_0 {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
@@ -143,8 +143,8 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
     hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
@@ -185,13 +185,13 @@ func @other_targets() -> () {
 // untouched.
 // CHECK:       hal.executable private @vmvx_linked {
 // CHECK-NEXT:    hal.interface public @io_0 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.interface public @io_1 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
@@ -243,9 +243,9 @@ func @other_targets() -> () {
 module {
   hal.executable private @dispatch_0 {
     hal.interface @io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
       hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
@@ -256,9 +256,9 @@ module {
   }
   hal.executable private @dispatch_1 {
     hal.interface @io attributes {push_constants = 2 : index} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
       hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
@@ -269,9 +269,9 @@ module {
   }
   hal.executable private @dispatch_2 {
     hal.interface @io attributes {push_constants = 2 : index} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
       hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
@@ -288,14 +288,14 @@ module {
 // CHECK-NOT: hal.executable private @dispatch_2
 // CHECK:       hal.executable private @vmvx_linked {
 // CHECK-NEXT:    hal.interface public @io_0 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.interface public @io_1 attributes {push_constants = 2 : index} {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
 // CHECK-NEXT:    }
 
 // -----

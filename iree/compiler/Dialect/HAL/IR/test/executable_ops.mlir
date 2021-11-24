@@ -18,10 +18,10 @@ hal.executable @ex {
   }
   // CHECK-DAG: hal.interface public @interface
   hal.interface @interface {
-    // CHECK-NEXT: hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    // CHECK-NEXT: hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    // CHECK-NEXT: hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    // CHECK-NEXT: hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   // CHECK: hal.executable.binary
   hal.executable.binary @backend_binary attributes {
@@ -55,10 +55,10 @@ hal.executable @ex_with_workgroup_count_region {
   }
   // CHECK-DAG: hal.interface public @interface
   hal.interface @interface {
-    // CHECK-NEXT: hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    // CHECK-NEXT: hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    // CHECK-NEXT: hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    // CHECK-NEXT: hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   // CHECK: hal.executable.binary
   hal.executable.binary @backend_binary attributes {

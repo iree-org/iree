@@ -8,9 +8,9 @@
 #config = #iree_codegen.lowering.config<tile_sizes = [[128], [4]], native_vector_size = []>
 hal.executable private @elementwise_static_shape  {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @elementwise_static_shape attributes {
@@ -38,9 +38,9 @@ hal.executable private @elementwise_static_shape  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -57,9 +57,9 @@ hal.executable private @elementwise_static_shape  {
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 32], [1, 1]], native_vector_size = []>
 hal.executable private @elementwise_transpose  {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @elementwise_transpose attributes {
@@ -87,9 +87,9 @@ hal.executable private @elementwise_transpose  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

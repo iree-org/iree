@@ -5,8 +5,8 @@
 
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
@@ -28,9 +28,9 @@ hal.executable @simpleMath_ex_dispatch_0 {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -47,9 +47,9 @@ hal.executable @simpleMath_ex_dispatch_0 {
 #map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 hal.executable @dot_dispatch_0 {
   hal.interface @io {
-    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
@@ -91,9 +91,9 @@ hal.executable @dot_dispatch_0 {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -135,9 +135,9 @@ hal.executable @dot_dispatch_0 {
 
 hal.executable @dot_dispatch_0 {
   hal.interface @io {
-    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
@@ -184,9 +184,9 @@ hal.executable @dot_dispatch_0 {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -204,9 +204,9 @@ hal.executable @dot_dispatch_0 {
 hal.executable @conv2d_dispatch_0 {
 hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.interface @io {
-    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.entry_point @conv2d_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   builtin.module  {
@@ -258,9 +258,9 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
       return
     }
     hal.interface private @io  {
-      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
     }
   }
 }
@@ -277,8 +277,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
@@ -299,8 +299,8 @@ hal.executable @simpleMath_ex_dispatch_0 {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
       }
     }
   }
@@ -345,8 +345,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
       return
     }
     hal.interface private @io  {
-      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+      hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
     }
   }
 }
@@ -390,9 +390,9 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
       return
     }
     hal.interface private @io  {
-      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-       hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+       hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
     }
   }
 }
@@ -443,8 +443,8 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
           return
         }
         hal.interface private @io  {
-          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+          hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
         }
     }
   }
@@ -462,9 +462,9 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 #map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 hal.executable @mma_fused {
   hal.interface @io {
-    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
     hal.executable.entry_point @mma_fused attributes {interface = @io, ordinal = 0 : index}
@@ -512,9 +512,9 @@ hal.executable @mma_fused {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
