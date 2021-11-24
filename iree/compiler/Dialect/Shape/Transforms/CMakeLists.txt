@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
-    "CleanupPlaceholdersPass.cpp"
     "FoldDimOverShapeCarryingOpPass.cpp"
   DEPS
     LLVMSupport

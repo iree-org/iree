@@ -36,19 +36,6 @@ namespace IREE {
 namespace VM {
 namespace {
 
-// When converting to the VM, it is safe to remove any identity tie_shape
-// ops that remain.
-class ElideTieShapeOp : public OpConversionPattern<Shape::TieShapeOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      Shape::TieShapeOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, adaptor.getOperands()[0]);
-    return success();
-  }
-};
-
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
 template <typename T>
@@ -139,7 +126,6 @@ class ConversionPass
     populateMemRefToVMPatterns(context, conversionTarget, typeConverter,
                                conversionPatterns);
     populateAffineToStdConversionPatterns(conversionPatterns);
-    conversionPatterns.insert<ElideTieShapeOp>(context);
 
     conversionTarget.addIllegalDialect<StandardOpsDialect,
                                        mlir::arith::ArithmeticDialect>();

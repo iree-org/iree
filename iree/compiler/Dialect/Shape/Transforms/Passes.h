@@ -19,15 +19,8 @@ namespace Shape {
 // Folds tensor.dim/memref.dim ops taking shape carrying ops as operands.
 std::unique_ptr<OperationPass<FuncOp>> createFoldDimOverShapeCarryingOpPass();
 
-// Cleans up any unnecessary shape placeholder ops. Can be run after all
-// shape calculation code has been lowered.
-std::unique_ptr<OperationPass<FuncOp>> createCleanupShapePlaceholdersPass();
-
 // Register all Passes
-inline void registerShapePasses() {
-  createFoldDimOverShapeCarryingOpPass();
-  createCleanupShapePlaceholdersPass();
-}
+inline void registerShapePasses() { createFoldDimOverShapeCarryingOpPass(); }
 
 }  // namespace Shape
 }  // namespace iree_compiler

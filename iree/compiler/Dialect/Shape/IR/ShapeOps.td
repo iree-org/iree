@@ -31,37 +31,6 @@ class Shape_PureOp<string mnemonic, list<OpTrait> traits = []> :
 // RankedShapeType manipulation
 //===----------------------------------------------------------------------===//
 
-def Shape_TieShapeOp : Shape_PureOp<"tie_shape", [
-    Shape_ShapeCarryingOpInterface,
-    AllTypesMatch<["operand", "result"]>,
-    DeclareOpInterfaceMethods<ViewLikeOpInterface>,
-  ]> {
-  let summary = "Ties a tensor and a shape together.";
-  let description = [{
-    Ties a specific tensor and its shape together in the IR, allowing further
-    conversions to re-associate the two. This has no runtime implication and
-    will be removed late in conversion.
-
-    Usage:
-      %0 = shapex.tie_shape %1, %2 : tensor<...>, shapex.ranked_shape<...>
-  }];
-
-  let arguments = (ins AnyType:$operand, Shape_RankedShape:$shape);
-  let results = (outs AnyType:$result);
-
-  let assemblyFormat = "operands attr-dict `:` type($operand) `,` type($shape)";
-
-  let extraClassDeclaration = [{
-    // ShapeCarryingInterface:
-    Value buildOperandRankedShape(unsigned, OpBuilder) { return shape(); }
-    Value buildResultRankedShape(unsigned, OpBuilder) { return shape(); }
-  }];
-
-  let verifier = [{ return verify$cppClass(*this); }];
-
-  let hasCanonicalizer = 1;
-}
-
 def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
     [ConstantLike, DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>]> {
   let summary = "A constant ranked_shape.";

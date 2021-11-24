@@ -1,27 +1,6 @@
 // RUN: iree-opt -split-input-file -verify-diagnostics %s
 
 // -----
-func @tie_shape_mismatch_rank(%arg0 : tensor<2x?x4xf32>, %arg1 : !shapex.ranked_shape<[1]>) {
-  // expected-error @+1 {{dims must match between tensor and shape}}
-  %0 = shapex.tie_shape %arg0, %arg1 : tensor<2x?x4xf32>, !shapex.ranked_shape<[1]>
-  return
-}
-
-// -----
-func @tie_shape_dynamic_tensor(%arg0 : tensor<2x?x4xf32>, %arg1 : !shapex.ranked_shape<[2, 1]>) {
-  %0 = shapex.tie_shape %arg0, %arg1 : tensor<2x?x4xf32>, !shapex.ranked_shape<[2, 1]>
-  return
-}
-
-// -----
-
-func @tie_shape_mistmatc_dim(%arg0 : tensor<2x?x4xf32>, %arg1 : !shapex.ranked_shape<[1, 1]>) {
-  // expected-error @+1 {{dims must match between tensor and shape}}
-  %0 = shapex.tie_shape %arg0, %arg1 : tensor<2x?x4xf32>, !shapex.ranked_shape<[1, 1]>
-  return
-}
-
-// -----
 func @const_ranked_shape_wrong_type() {
   // expected-error @+1 {{result #0 must be Ranked shape type, but got 'i32'}}
   %0 = shapex.const_ranked_shape : i32
