@@ -66,8 +66,10 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTensorBufferizableOpInterfaceImpl
     MLIRTransforms
     MLIRVector
+    MLIRVectorBufferizableOpInterfaceImpl
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders

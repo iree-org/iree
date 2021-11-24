@@ -33,6 +33,8 @@
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/TensorInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -250,6 +252,10 @@ class IREEComprehensiveBufferizePass
     linalg::comprehensive_bufferize::
         registerBufferizableOpInterfaceExternalModels(registry);
     linalg::comprehensive_bufferize::linalg_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::tensor_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::vector_ext::
         registerBufferizableOpInterfaceExternalModels(registry);
 
     // Register IREE operations.

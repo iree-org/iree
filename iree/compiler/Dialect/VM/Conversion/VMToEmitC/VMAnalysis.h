@@ -53,6 +53,7 @@ struct VMAnalysis {
   }
 
   DenseMap<int64_t, Operation *> &localRefs() { return refs; }
+  size_t numRefArguments;
 
  private:
   RegisterAllocation registerAllocation;

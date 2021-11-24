@@ -13,6 +13,7 @@ endif()
 # Set iree-translate binary.
 set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-translate>)
 
+## Example with VM bytecode module.
 # Setup args for iree-translate.
 set(_TRANSLATE_ARGS)
 list(APPEND _TRANSLATE_ARGS "-iree-mlir-to-vm-bytecode-module")
@@ -71,13 +72,13 @@ iree_cc_binary(
 NAME
   static_library_demo
 SRCS
+  "create_bytecode_module.c"
   "static_library_demo.c"
 DEPS
   ::simple_mul_c
   iree::runtime
   iree::hal::local::loaders::static_library_loader
   iree::hal::local::sync_driver
-  iree::task::api
   simple_mul
 )
 
@@ -88,6 +89,80 @@ iree_lit_test(
     "static_library_demo_test.txt"
   DATA
     ::static_library_demo
+    iree::tools::IreeFileCheck
+  LABELS
+    "hostonly"
+)
+
+
+if(NOT (${IREE_ENABLE_EMITC} OR DEFINED IREE_HOST_BINARY_ROOT))
+  return()
+endif()
+
+## Example with VM C module.
+# Setup args for iree-translate.
+set(_TRANSLATE_ARGS)
+list(APPEND _TRANSLATE_ARGS "-iree-mlir-to-vm-c-module")
+list(APPEND _TRANSLATE_ARGS "-iree-hal-target-backends=dylib-llvm-aot")
+list(APPEND _TRANSLATE_ARGS "-iree-llvm-link-embedded=false")
+list(APPEND _TRANSLATE_ARGS "-iree-llvm-link-static")
+list(APPEND _TRANSLATE_ARGS "-iree-llvm-static-library-output-path=simple_mul_c_module.o")
+list(APPEND _TRANSLATE_ARGS "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir")
+list(APPEND _TRANSLATE_ARGS "-o")
+list(APPEND _TRANSLATE_ARGS "simple_mul_emitc.h")
+
+# Custom command for iree-translate to generate static library and C module.
+add_custom_command(
+  OUTPUT
+    ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.h
+    ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.o
+    ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_emitc.h
+  COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_TRANSLATE_ARGS}
+  DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} "simple_mul.mlir"
+)
+
+# TODO(marbre): Cleanup custom targets and libraries.
+add_custom_target(
+  simple_mul_gen
+  DEPENDS
+    "simple_mul_emitc.h"
+)
+
+add_library(simple_mul_c_module
+ STATIC
+ ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_c_module.o
+)
+add_dependencies(simple_mul_c_module simple_mul_gen)
+
+SET_TARGET_PROPERTIES(
+  simple_mul_c_module
+  PROPERTIES
+  LINKER_LANGUAGE C
+)
+
+# TODO(marbre): Cleanup SRCS and DEPS.
+iree_cc_binary(
+NAME
+  static_library_demo_c
+SRCS
+  "create_c_module.c"
+  "static_library_demo.c"
+  "simple_mul_emitc.h"
+DEPS
+  iree::runtime
+  iree::hal::local::loaders::static_library_loader
+  iree::hal::local::sync_driver
+  iree::vm::shims_emitc
+  simple_mul_c_module
+)
+
+iree_lit_test(
+  NAME
+    static_library_demo_c_test
+  TEST_FILE
+    "static_library_demo_c_test.txt"
+  DATA
+    ::static_library_demo_c
     iree::tools::IreeFileCheck
   LABELS
     "hostonly"

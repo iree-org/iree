@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -80,31 +81,29 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     Type rhsElementType = rhsType.getElementType();
     Type dstElementType = dstType.getElementType();
 
-    auto lhsVecType = VectorType::get({1, 1, M0, K0}, lhsElementType);
-    auto rhsVecType = VectorType::get({1, 1, N0, K0}, rhsElementType);
-    auto dstVecType = VectorType::get({1, 1, M0, N0}, dstElementType);
-
     auto lhsVecType2D = VectorType::get({M0, K0}, lhsElementType);
     auto rhsVecType2D = VectorType::get({N0, K0}, rhsElementType);
     auto dstVecType2D = VectorType::get({M0, N0}, dstElementType);
 
-    auto identityMap = rewriter.getMultiDimIdentityMap(4);
+    auto lhs2DTensorType = RankedTensorType::get({M0, K0}, lhsElementType);
+    auto rhs2DTensorType = RankedTensorType::get({N0, K0}, rhsElementType);
+    auto dst2DTensorType = RankedTensorType::get({M0, N0}, dstElementType);
 
-    // Read the input tensors into vectors.
-    auto lhsVec = rewriter.create<vector::TransferReadOp>(
-        loc, lhsVecType, lhs, ValueRange{c0, c0, c0, c0}, identityMap);
-    auto rhsVec = rewriter.create<vector::TransferReadOp>(
-        loc, rhsVecType, rhs, ValueRange{c0, c0, c0, c0}, identityMap);
-    auto dstVec = rewriter.create<vector::TransferReadOp>(
-        loc, dstVecType, dst, ValueRange{c0, c0, c0, c0}, identityMap);
+    Value lhs2D = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, lhs, lhs2DTensorType);
+    Value rhs2D = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, rhs, rhs2DTensorType);
+    Value dst2D = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, dst, dst2DTensorType);
 
-    // Convert the input vectors from 4D shapes (1x1xM0xK0) to 2D shapes (M0xK0)
-    Value lhsVec2D =
-        rewriter.create<vector::ShapeCastOp>(loc, lhsVecType2D, lhsVec);
-    Value rhsVec2D =
-        rewriter.create<vector::ShapeCastOp>(loc, rhsVecType2D, rhsVec);
-    Value dstVec2D =
-        rewriter.create<vector::ShapeCastOp>(loc, dstVecType2D, dstVec);
+    auto identityMap2D = rewriter.getMultiDimIdentityMap(2);
+
+    Value lhsVec2D = rewriter.create<vector::TransferReadOp>(
+        loc, lhsVecType2D, lhs2D, ValueRange{c0, c0}, identityMap2D);
+    Value rhsVec2D = rewriter.create<vector::TransferReadOp>(
+        loc, rhsVecType2D, rhs2D, ValueRange{c0, c0}, identityMap2D);
+    Value dstVec2D = rewriter.create<vector::TransferReadOp>(
+        loc, dstVecType2D, dst2D, ValueRange{c0, c0}, identityMap2D);
 
     // Promote, if needed, the element type in the lhs and rhs vectors to
     // match the dst vector, so that the vector.contract below will involve
@@ -114,7 +113,6 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     Value promLhsVec2d = promoteVector(loc, lhsVec2D, dstElementType, rewriter);
     Value promRhsVec2d = promoteVector(loc, rhsVec2D, dstElementType, rewriter);
 
-    // Generate the vector.contract on 2D vectors replacing the mmt4d op.
     auto m = rewriter.getAffineDimExpr(0);
     auto n = rewriter.getAffineDimExpr(1);
     auto k = rewriter.getAffineDimExpr(2);
@@ -127,15 +125,14 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
          getReductionIteratorTypeName()});
     Value contractResult = rewriter.create<vector::ContractionOp>(
         loc, promLhsVec2d, promRhsVec2d, dstVec2D, indexingMaps, iterators);
-
-    // Convert the output vector from 2D shape (M0xN0) to 4D shape (1x1xM0xN0)
-    Value contractResult4D =
-        rewriter.create<vector::ShapeCastOp>(loc, dstVecType, contractResult);
-
-    // Replace the mmt4d op by the equivalent graph.
-    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-        mmt4DOp, contractResult4D, dst, ValueRange{c0, c0, c0, c0},
-        identityMap);
+    Value contractResultTensor =
+        rewriter
+            .create<vector::TransferWriteOp>(loc, contractResult, dst2D,
+                                             ValueRange{c0, c0}, identityMap2D)
+            .getResult(0);
+    Value insertSlice = tensor::createCanonicalRankReducingInsertSliceOp(
+        rewriter, loc, contractResultTensor, dst);
+    rewriter.replaceOp(mmt4DOp, insertSlice);
     return success();
   }
 };
