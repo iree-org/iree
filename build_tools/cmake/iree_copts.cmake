@@ -125,6 +125,9 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # but it's better to not get spurious failures during LTCG.
     # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
     "/bigobj"
+
+    # Use the modern C preprocessor to more closely match standards/clang/gcc behavior.
+    "/Zc:preprocessor"
 )
 
 # Compiler diagnostics.
