@@ -49,6 +49,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
       {IREE_HAL_MEMORY_ACCESS_WRITE, IREE_SVL("WRITE")},
       {IREE_HAL_MEMORY_ACCESS_DISCARD, IREE_SVL("DISCARD")},
       {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, IREE_SVL("MAY_ALIAS")},
+      {IREE_HAL_MEMORY_ACCESS_ANY, IREE_SVL("ANY")},
   };
   return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
                                      out_temp);
