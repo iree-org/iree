@@ -1694,8 +1694,6 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
             ArrayRef<Value>{operandRef.getValue(), refPtrOp.getResult()});
 
         updatedOperands.push_back(refPtrOp.getResult());
-
-        // updatedOperands.push_back(operandRef.getValue());
       } else {
         updatedOperands.push_back(operand);
       }
