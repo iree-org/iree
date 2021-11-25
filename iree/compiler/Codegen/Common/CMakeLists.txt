@@ -47,6 +47,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineUtils
     MLIRAnalysis
+    MLIRArithBufferizableOpInterfaceImpl
     MLIRArithmetic
     MLIRBufferizableOpInterface
     MLIRComprehensiveBufferize
@@ -61,6 +62,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
+    MLIRSCFBufferizableOpInterfaceImpl
     MLIRSCFToStandard
     MLIRSideEffectInterfaces
     MLIRStandard

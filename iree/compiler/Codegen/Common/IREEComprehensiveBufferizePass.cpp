@@ -30,9 +30,11 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ArithInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/SCFInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/TensorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -251,7 +253,11 @@ class IREEComprehensiveBufferizePass
     // Registers operations of other dialects.
     linalg::comprehensive_bufferize::
         registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::arith_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
     linalg::comprehensive_bufferize::linalg_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::scf_ext::
         registerBufferizableOpInterfaceExternalModels(registry);
     linalg::comprehensive_bufferize::tensor_ext::
         registerBufferizableOpInterfaceExternalModels(registry);
