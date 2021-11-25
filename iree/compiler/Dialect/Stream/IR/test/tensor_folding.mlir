@@ -20,6 +20,20 @@ func @FoldTensorExportOp(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_v
   // CHECK: return %arg0 : !hal.buffer_view
   %c20 = arith.constant 20 : index
   %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.export %0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
+  return %1 : !hal.buffer_view
+}
+
+
+// -----
+
+// CHECK-LABEL: @KeepTensorExportOpWithDifferingEncodings
+func @KeepTensorExportOpWithDifferingEncodings(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
+  // CHECK: %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  // CHECK: %1 = stream.tensor.export %0 : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
+  // CHECK: return %1 : !hal.buffer_view
+  %c20 = arith.constant 20 : index
+  %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
   %1 = stream.tensor.export %0 : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
   return %1 : !hal.buffer_view
 }
