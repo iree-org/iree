@@ -46,6 +46,10 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
 }
 
+//===----------------------------------------------------------------------===//
+// Common Pass Recipes
+//===----------------------------------------------------------------------===//
+
 void addSPIRVBufferizePasses(OpPassManager &passManager,
                              WorkgroupMemoryAllocationFn allocationFn) {
   // Resolve dim ops first so that we don't have compute Linalg ops lingering on
@@ -121,6 +125,10 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   spirvPM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
 
+//===----------------------------------------------------------------------===//
+// Pass Pipelines
+//===----------------------------------------------------------------------===//
+
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -177,6 +185,44 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 
   addLoopMaterializationPasses(pm);
 }
+
+// An ad-hoc pipeline for tiling and distributing padding/copy ops. This is
+// needed to migrate from a bufferization-first world to a vectorization-first
+// world.
+//
+// In the former path for CodeGen, we perform bufferization first, which will
+// turn padding/copy (via flow.dispatch.tensor.load/store pairs) into
+// linalg.copy ops. Then we deduce CodeGen configuration from the linalg.copy op
+// and use a `lowering.config` attribute on it to drive transformations.
+//
+// In the latter path for CodeGen, we will see linalg.pad_tensor directly.
+// However, properly tiling and distributing it is an ongoing work. So for now
+// still perform bufferization first for copies specifically.
+void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
+  addLinalgBufferizePasses(pm.nest<ModuleOp>(), gpuAllocationFunction);
+
+  // Rerun CodeGen configuration deduction after bufferization. This enables
+  // us to find a better configuration for linalg.copy ops and attach the
+  // `lowering.config` attribute properly to drive transformations.
+  pm.addPass(createSPIRVInitConfigPass());
+  pm.addPass(createSetNumWorkgroupsPass());
+
+  OpPassManager &modulePM = pm.nest<ModuleOp>();
+
+  modulePM.addPass(createCanonicalizerPass());
+  modulePM.addPass(createCSEPass());
+
+  // Tile and distribute to GPU invocations.
+  modulePM.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  modulePM.addPass(createCanonicalizerPass());
+  modulePM.addPass(createCSEPass());
+
+  addLoopMaterializationPasses(modulePM);
+}
+
+//===----------------------------------------------------------------------===//
+// Entry Point
+//===----------------------------------------------------------------------===//
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
   pm.addPass(createSPIRVLowerExecutableTargetPass());

@@ -26,6 +26,7 @@ iree_cc_library(
     "Passes.cpp"
     "SPIRVCopyToWorkgroupMemory.cpp"
     "SPIRVDistribute.cpp"
+    "SPIRVInitConfigPass.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVTile.cpp"
     "SPIRVTileAndDistribute.cpp"

@@ -48,15 +48,10 @@ hal.executable @tensor_insert {
   }
 }
 
-//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [16, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistributeCopy", workload_per_wg = [16, 1]>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
-// CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[NWGSX:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
-//      CHECK:   hal.return %[[NWGSX]], %[[ARG1]], %[[C1]]
+//  CHECK-NOT:   hal.return
 
 // -----
 

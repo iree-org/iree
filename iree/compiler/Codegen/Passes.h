@@ -279,6 +279,11 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables with workgroup tiled and
+/// distributed copies to SPIR-V scalar code. Additionally performs distribution
+/// to threads without vectorization.
+void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) ;
+
+/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
 /// distributed Linalg ops to SPIR-V scalar and vector code. Additionally
 /// performs distribution to threads with vectorization.
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
@@ -303,6 +308,10 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
 /// scalar + vector code.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
+
+/// Initializes CodeGen configuration for the given dispatch region.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSPIRVInitConfigPass();
 
 /// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
