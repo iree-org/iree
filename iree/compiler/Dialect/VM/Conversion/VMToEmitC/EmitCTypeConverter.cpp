@@ -31,8 +31,7 @@ EmitCTypeConverter::EmitCTypeConverter() {
   addSourceMaterialization([this](OpBuilder &builder, IREE::VM::RefType type,
                                   ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
-    Value input = inputs[0];
-    assert(input.getType().isa<emitc::OpaqueType>());
+    assert(inputs[0].getType().isa<emitc::OpaqueType>());
 
     Type objectType = IREE::VM::OpaqueType::get(builder.getContext());
     Type refType = IREE::VM::RefType::get(objectType);
@@ -57,6 +56,45 @@ EmitCTypeConverter::lookupAnalysis(Operation *op) {
     return failure();
   }
   return std::ref(ptr->second);
+}
+
+// TODO(simon-camp): Make this a target materialization and cleanup the call
+// sites in the conversion.
+Optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
+  assert(ref.getType().isa<IREE::VM::RefType>());
+
+  mlir::FuncOp funcOp;
+  if (auto definingOp = ref.getDefiningOp()) {
+    funcOp = definingOp->getParentOfType<mlir::FuncOp>();
+  } else {
+    Operation *op = ref.cast<BlockArgument>().getOwner()->getParentOp();
+    funcOp = cast<mlir::FuncOp>(op);
+  }
+
+  auto vmAnalysis = lookupAnalysis(funcOp);
+  if (failed(vmAnalysis)) {
+    funcOp.emitError() << "parent func op not found in cache.";
+    return None;
+  }
+
+  int32_t ordinal = vmAnalysis.getValue().get().getRefRegisterOrdinal(ref);
+
+  auto ctx = funcOp.getContext();
+
+  // Search block arguments
+  int refArgCounter = 0;
+  for (BlockArgument arg : funcOp.getArguments()) {
+    assert(!arg.getType().isa<IREE::VM::RefType>());
+
+    if (arg.getType() == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*")) {
+      if (ordinal == refArgCounter++) {
+        return arg;
+      }
+    }
+  }
+
+  emitc::ApplyOp applyOp = vmAnalysis.getValue().get().lookupLocalRef(ordinal);
+  return applyOp.getResult();
 }
 
 }  // namespace VM

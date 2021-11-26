@@ -28,6 +28,7 @@ class EmitCTypeConverter : public mlir::TypeConverter {
       IREE::VM::FuncOp &funcOp) {
     return lookupAnalysis(funcOp.getOperation());
   }
+  Optional<Value> materializeRef(Value ref);
 
   SetVector<Operation *> sourceMaterializations;
   VMAnalysisCache analysisCache;

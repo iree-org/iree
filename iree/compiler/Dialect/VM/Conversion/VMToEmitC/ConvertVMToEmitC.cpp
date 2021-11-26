@@ -135,54 +135,6 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue,
   return success();
 }
 
-Optional<Value> findRefByOrdinal(mlir::FuncOp &parentFuncOp,
-                                 IREE::VM::EmitCTypeConverter &typeConverter,
-                                 size_t ordinal) {
-  auto ctx = parentFuncOp.getContext();
-
-  // Search block arguments
-  int refArgCounter = 0;
-  for (BlockArgument arg : parentFuncOp.getArguments()) {
-    assert(!arg.getType().isa<IREE::VM::RefType>());
-
-    if (arg.getType() == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*")) {
-      if (ordinal == refArgCounter++) {
-        return arg;
-      }
-    }
-  }
-
-  auto vmAnalysis = typeConverter.lookupAnalysis(parentFuncOp);
-  if (failed(vmAnalysis)) {
-    return None;
-  }
-
-  emitc::ApplyOp applyOp = vmAnalysis.getValue().get().lookupLocalRef(ordinal);
-  return applyOp.getResult();
-}
-
-/// Find a local ref of type `iree_vm_ref_t*` matching the ordinal of the given
-/// `IREE::VM::Ref` value.
-Optional<Value> findRef(mlir::FuncOp &parentFuncOp,
-                        IREE::VM::EmitCTypeConverter &typeConverter,
-                        Value refResult) {
-  assert(refResult.getType().isa<IREE::VM::RefType>());
-
-  auto vmAnalysis = typeConverter.lookupAnalysis(parentFuncOp);
-  if (failed(vmAnalysis)) {
-    parentFuncOp.emitError() << "parent func op not found in cache.";
-    return None;
-  }
-
-  int32_t ordinal =
-      vmAnalysis.getValue().get().getRefRegisterOrdinal(refResult);
-
-  Optional<Value> result =
-      findRefByOrdinal(parentFuncOp, typeConverter, ordinal);
-
-  return result;
-}
-
 LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
                             IREE::VM::EmitCTypeConverter &typeConverter,
                             SmallVector<BlockArgument, 4> &blockArgsToRemove) {
@@ -1646,7 +1598,6 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     auto ctx = op->getContext();
     auto loc = op->getLoc();
 
-    auto funcOp = op->getParentOfType<mlir::FuncOp>();
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
@@ -1655,7 +1606,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
              emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"));
 
       if (operand.getType().isa<IREE::VM::RefType>()) {
-        Optional<Value> operandRef = findRef(funcOp, *typeConverter, operand);
+        Optional<Value> operandRef = typeConverter->materializeRef(operand);
 
         if (!operandRef.hasValue()) {
           return op->emitError() << "local ref not found";
@@ -1696,7 +1647,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     // parameter to the call.
     for (OpResult result : op->getResults()) {
       if (result.getType().isa<IREE::VM::RefType>()) {
-        Optional<Value> ref = findRef(funcOp, *typeConverter, result);
+        Optional<Value> ref = typeConverter->materializeRef(result);
 
         if (!ref.hasValue()) {
           return op->emitError() << "local ref not found";
@@ -1778,13 +1729,13 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
                        cmpOp.rhs(), cmpOp.getOperation()) &&
                    false;
 
-    Optional<Value> refLhs = findRef(funcOp, *typeConverter, cmpOp.lhs());
+    Optional<Value> refLhs = typeConverter->materializeRef(cmpOp.lhs());
 
     if (!refLhs.hasValue()) {
       return cmpOp.emitError() << "local ref not found";
     }
 
-    Optional<Value> refRhs = findRef(funcOp, *typeConverter, cmpOp.rhs());
+    Optional<Value> refRhs = typeConverter->materializeRef(cmpOp.rhs());
 
     if (!refRhs.hasValue()) {
       return cmpOp.emitError() << "local ref not found";
@@ -1851,7 +1802,7 @@ class CompareRefNotZeroOpConversion
                     cmpOp.operand(), cmpOp.getOperation()) &&
                 false;
 
-    Optional<Value> ref = findRef(funcOp, *typeConverter, cmpOp.operand());
+    Optional<Value> ref = typeConverter->materializeRef(cmpOp.operand());
 
     if (!ref.hasValue()) {
       return cmpOp.emitError() << "local ref not found";
@@ -1930,12 +1881,11 @@ class ConstRefZeroOpConversion
     auto ctx = constRefZeroOp.getContext();
     auto loc = constRefZeroOp.getLoc();
 
-    auto funcOp =
-        constRefZeroOp.getOperation()->getParentOfType<mlir::FuncOp>();
+    IREE::VM::EmitCTypeConverter *typeConverter =
+        getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
     Optional<Value> ref =
-        findRef(funcOp, *getTypeConverter<IREE::VM::EmitCTypeConverter>(),
-                constRefZeroOp.getResult());
+        typeConverter->materializeRef(constRefZeroOp.getResult());
 
     if (!ref.hasValue()) {
       return constRefZeroOp.emitError() << "local ref not found";
@@ -2010,7 +1960,7 @@ class ConstRefRodataOpConversion
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
     Optional<Value> ref =
-        findRef(funcOp, *typeConverter, constRefRodataOp.getResult());
+        typeConverter->materializeRef(constRefRodataOp.getResult());
 
     if (!ref.hasValue()) {
       return constRefRodataOp.emitError() << "local ref not found";
@@ -2092,8 +2042,8 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
         assert(operand.getType().isa<IREE::VM::RefType>());
         assert(blockArg.getType().isa<IREE::VM::RefType>());
 
-        Optional<Value> operandRef = findRef(funcOp, *typeConverter, operand);
-        Optional<Value> blockArgRef = findRef(funcOp, *typeConverter, blockArg);
+        Optional<Value> operandRef = typeConverter->materializeRef(operand);
+        Optional<Value> blockArgRef = typeConverter->materializeRef(blockArg);
 
         if (!operandRef.hasValue()) {
           return op.emitError() << "local ref not found";
@@ -2221,8 +2171,8 @@ class CondBranchOpConversion
         assert(operand.getType().isa<IREE::VM::RefType>());
         assert(blockArg.getType().isa<IREE::VM::RefType>());
 
-        Optional<Value> operandRef = findRef(funcOp, *typeConverter, operand);
-        Optional<Value> blockArgRef = findRef(funcOp, *typeConverter, blockArg);
+        Optional<Value> operandRef = typeConverter->materializeRef(operand);
+        Optional<Value> blockArgRef = typeConverter->materializeRef(blockArg);
 
         if (!operandRef.hasValue()) {
           return op.emitError() << "local ref not found";
@@ -2261,8 +2211,8 @@ class CondBranchOpConversion
         assert(operand.getType().isa<IREE::VM::RefType>());
         assert(blockArg.getType().isa<IREE::VM::RefType>());
 
-        Optional<Value> operandRef = findRef(funcOp, *typeConverter, operand);
-        Optional<Value> blockArgRef = findRef(funcOp, *typeConverter, blockArg);
+        Optional<Value> operandRef = typeConverter->materializeRef(operand);
+        Optional<Value> blockArgRef = typeConverter->materializeRef(blockArg);
 
         if (!operandRef.hasValue()) {
           return op.emitError() << "local ref not found";
@@ -2321,7 +2271,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
         assert(operand.getType() !=
                emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"));
 
-        Optional<Value> operandRef = findRef(funcOp, *typeConverter, operand);
+        Optional<Value> operandRef = typeConverter->materializeRef(operand);
 
         if (!operandRef.hasValue()) {
           return op->emitError() << "local ref not found";
@@ -2579,7 +2529,7 @@ class GlobalLoadStoreRefOpConversion
 
     Value localValue = isLoad ? op->getResult(0) : op->getOperand(0);
 
-    Optional<Value> localRef = findRef(funcOp, *typeConverter, localValue);
+    Optional<Value> localRef = typeConverter->materializeRef(localValue);
 
     if (!localRef.hasValue()) {
       return op->emitError() << "local ref not found";
@@ -2874,7 +2824,7 @@ class ListAllocOpConversion
                         listPtrOp.getResult()},
         /*typeConverter=*/*typeConverter);
 
-    auto ref = findRef(funcOp, *typeConverter, allocOp.getResult());
+    auto ref = typeConverter->materializeRef(allocOp.getResult());
 
     if (!ref.hasValue()) {
       return allocOp.emitError() << "local ref not found";
@@ -3025,9 +2975,7 @@ class ListGetRefOpConversion
         /*operands=*/ArrayRef<Value>{listRefOp.getResult()},
         /*typeConverter=*/*typeConverter);
 
-    auto funcOp = getOp.getOperation()->getParentOfType<mlir::FuncOp>();
-
-    auto ref = findRef(funcOp, *typeConverter, getOp.getResult());
+    auto ref = typeConverter->materializeRef(getOp.getResult());
 
     if (!ref.hasValue()) {
       return getOp.emitError() << "local ref not found";
