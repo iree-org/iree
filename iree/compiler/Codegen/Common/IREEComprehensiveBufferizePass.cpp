@@ -288,10 +288,10 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 
   linalg::comprehensive_bufferize::BufferizationOptions options;
   options.testAnalysisOnly = false;
-
   // Enable InitTensorOp elimination.
   options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
-
+  options.addPostAnalysisStep<linalg::comprehensive_bufferize::tensor_ext::
+                                  InplaceInsertSliceOpAnalysis>();
   // TODO: Use allocationFn.
 
   if (failed(runComprehensiveBufferize(moduleOp, options))) signalPassFailure();
