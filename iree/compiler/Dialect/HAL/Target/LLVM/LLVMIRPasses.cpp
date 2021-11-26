@@ -120,11 +120,11 @@ LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
                                    std::string *objData) {
   llvm::SmallVector<char, 0> stream_buffer;
   {
+    llvm::raw_svector_ostream ostream(stream_buffer);
     // TODO(ataei): Use non legacy pass mamanger for this.
     llvm::legacy::PassManager passManager;
     passManager.add(
         new llvm::TargetLibraryInfoWrapperPass(machine->getTargetTriple()));
-    llvm::raw_svector_ostream ostream(stream_buffer);
     if (machine->addPassesToEmitFile(passManager, ostream,
                                      /*DwoOut=*/nullptr, fileType)) {
       return failure();
