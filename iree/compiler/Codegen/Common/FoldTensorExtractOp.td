@@ -7,12 +7,13 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_FOLDTENSOREXTRACTOP
 #define IREE_COMPILER_CODEGEN_COMMON_FOLDTENSOREXTRACTOP
 
+include "mlir/Dialect/Bufferization/IR/BufferizationOps.td"
 include "mlir/Dialect/MemRef/IR/MemRefOps.td"
 include "mlir/Dialect/Tensor/IR/TensorOps.td"
 
 // Canonicalize unnecessary tensor_load when the load is used just for
 // an extract
-def : Pat<(Tensor_ExtractOp (TensorLoadOp $value), $indices),
+def : Pat<(Tensor_ExtractOp (Bufferization_ToTensorOp $value), $indices),
           (LoadOp $value, $indices)>;
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_FOLDTENSOREXTRACTOP

@@ -52,6 +52,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -632,8 +633,8 @@ static LogicalResult convertConstantOp(OpBuilder &b,
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPointAfter(constantOp);
   auto memrefType = getMemrefTypeForTensor(tensorType);
-  Value memref =
-      b.create<memref::BufferCastOp>(constantOp.getLoc(), memrefType, result);
+  Value memref = b.create<bufferization::ToMemrefOp>(constantOp.getLoc(),
+                                                     memrefType, result);
   bvm.map(result, memref);
   return success();
 }
@@ -883,7 +884,8 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
  public:
   LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect, linalg::LinalgDialect,
+    registry.insert<mlir::bufferization::BufferizationDialect,
+                    IREE::Util::UtilDialect, linalg::LinalgDialect,
                     memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect,
                     mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
