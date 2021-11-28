@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/IR/DialectImplementation.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
@@ -22,6 +23,20 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Stream {
+
+static llvm::cl::opt<Favor> partitioningFavor(
+    "iree-stream-partitioning-favor",
+    llvm::cl::desc("Default stream partitioning favor configuration."),
+    llvm::cl::init(Favor::MaxConcurrency),
+    llvm::cl::values(
+        clEnumValN(Favor::Debug, "debug",
+                   "Force debug partitioning (no concurrency or pipelining)."),
+        clEnumValN(Favor::MinPeakMemory, "min-peak-memory",
+                   "Favor minimizing memory consumption at the cost of "
+                   "additional concurrency."),
+        clEnumValN(Favor::MaxConcurrency, "max-concurrency",
+                   "Favor maximizing concurrency at the cost of additional "
+                   "memory consumption.")));
 
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
@@ -219,7 +234,9 @@ PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
     if (attr) return attr;
     op = op->getParentOp();
   }
-  return {};  // No config found; let caller decide what to do.
+  // No config found; use defaults.
+  auto favorAttr = FavorAttr::get(attrId.getContext(), partitioningFavor);
+  return PartitioningConfigAttr::get(favorAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -292,6 +309,9 @@ bool ResourceType::isAccessStorageCompatible(Type accessType) const {
 #include "iree/compiler/Dialect/Stream/IR/StreamTypeInterfaces.cpp.inc"  // IWYU pragma: keep
 
 void StreamDialect::registerAttributes() {
+  // Register command line flags:
+  (void)partitioningFavor;
+
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/Stream/IR/StreamAttrs.cpp.inc"  // IWYU pragma: keep

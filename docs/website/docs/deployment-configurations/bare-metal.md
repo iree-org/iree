@@ -30,6 +30,7 @@ build directory
 ``` shell hl_lines="3 4 5"
 iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
+    -iree-stream-partitioning-favor=min-peak-memory \
     -iree-hal-target-backends=dylib-llvm-aot \
     -iree-llvm-target-triple=x86_64-pc-linux-elf \
     -iree-llvm-debug-symbols=false \
@@ -40,6 +41,9 @@ iree/tools/iree-translate \
 
 In which
 
+* `-iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
+memory usage at the cost of concurrency - include when targeting single-threaded
+execution to reduce memory consumption.
 * `iree-hal-target-backends=dylib-llvm-aot`: Build the model for the dynamic
 library CPU HAL driver
 * `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple so
