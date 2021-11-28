@@ -392,9 +392,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
   bool vectorizable =
       !linalgOp.hasIndexSemantics() &&
-      // TODO: Skip vectorization for linalg.copy ops. Right now handling of it
-      // still goes through the old bufferization-first pipeline, while
-      // vectorization pipeline expects tensor-semantic ops now.
+      // TODO: Skip vectorization for linalg.copy ops. Right now handling of
+      // it still goes through the old bufferization-first pipeline, while
+      // vectorization pipeline expects tensor-semantic ops.
       !isa<linalg::CopyOp>(op) &&
       // Skip vectorization for non-minor identity inputs as it generates
       // vector.transfer_read ops with permutation maps that we currently
@@ -651,6 +651,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       // indicator of that. Need a better way of information flow from flow
       // dialect to hal.
       if (!tiledLoops.empty()) {
+        // These configuration parameters will be overwritten by the
+        // SPIRVDistributeCopy pipeline later.
         const int64_t subgroupSize =
             limits.subgroup_size().getValue().getSExtValue();
         std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};

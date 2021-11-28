@@ -197,7 +197,8 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 //
 // In the latter path for CodeGen, we will see linalg.pad_tensor directly.
 // However, properly tiling and distributing it is an ongoing work. So for now
-// still perform bufferization first for copies specifically.
+// still perform bufferization first to expose a linalg.copy op, from which we
+// can deduce the configuration.
 void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
   addLinalgBufferizePasses(pm.nest<ModuleOp>(), gpuAllocationFunction);
 
