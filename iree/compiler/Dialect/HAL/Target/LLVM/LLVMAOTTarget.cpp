@@ -253,12 +253,16 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       int64_t localMemorySize = entryPointOp.workgroup_local_memory()
                                     .getValueOr(APInt(64, 0))
                                     .getSExtValue();
-      // Grab source IR code here to pass it down as a string for dispatch user tags.
-      llvm::StringRef source_code = variantOp->getParentOfType<mlir::FuncOp>()
-	      				 ->getAttr("source_code")
-					 .cast<mlir::StringAttr>().getValue();
+      // Get source location info from GenerateDispatchTagsPass in Flow pass pipeline.
+      auto execOp = variantOp->getParentOfType<IREE::Flow::ExecutableOp>();
 
-      libraryBuilder.addExport(entryPointOp.getName(), source_code,
+      mlir::NamedAttrList source_loc_tags = execOp->getAttrOfType<mlir::DictionaryAttr>("source_loc_tags").getValue();
+
+      mlir::NamedAttribute sourceIRSummary = source_loc_tags.getNamed("sourceIRSummary").getValue();
+
+      llvm::StringRef source_loc_tag = std::get<1>(sourceIRSummary).cast<mlir::StringAttr>().getValue();				 
+
+      libraryBuilder.addExport(entryPointOp.getName(), source_loc_tag,
                                LibraryBuilder::DispatchAttrs{localMemorySize},
                                llvmFunc);
     }

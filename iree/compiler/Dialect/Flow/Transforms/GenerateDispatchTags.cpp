@@ -52,27 +52,30 @@ static std::string getIRString(Operation *op) {
 
   return out.str();
 }
-//Create mlir::Attribute for source code.
-static mlir::Attribute getStringAsAttr(std::string str) {
-  const void * pointer = str.c_str();
-  return Attribute::getFromOpaquePointer(pointer);
-}
-
 } // namespace
 
 class GenerateDispatchTagsPass
     : public GenerateDispatchTagsBase<GenerateDispatchTagsPass> {
  public:
   GenerateDispatchTagsPass() = default;
- 
+
+  void getDependentDialects(DialectRegistry& registry) const override {
+    registry.insert<IREE::Flow::FlowDialect>();
+  }
+
   void runOnOperation() override {
-    // Generate module IR string for each dispatch region and store
-    // it as a dispatch attribute..
-    for (auto funcOp : getOperation().getOps<mlir::FuncOp>()) {
-      // Generate module IR string. 
-      // Store IR string as attribute.
-      auto sourcecodeattr = getStringAsAttr(getIRString(funcOp.getOperation()));
-      funcOp.getOperation()->setAttr("source_code", sourcecodeattr);
+    // Generate dispatch tag contents and store them as executableop attributes.
+    for (auto execOp : getOperation().getOps<IREE::Flow::ExecutableOp>()) {
+      // Generate executable IR summary string. 
+      auto IRSummary = getIRString(execOp);
+      // Store source location tag strings as attributes.
+      OpBuilder builder(execOp);;
+
+      SmallVector<NamedAttribute> source_loc_tags = {
+      	  builder.getNamedAttr("sourceIRSummary",
+      			       builder.getStringAttr(IRSummary)),
+      };
+      execOp.getOperation()->setAttr("source_loc_tags", builder.getDictionaryAttr(source_loc_tags));
     }
   }
 };

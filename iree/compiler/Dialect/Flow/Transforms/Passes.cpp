@@ -176,13 +176,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       mlir::createCanonicalizerPass());
   passManager.addNestedPass<IREE::Flow::ExecutableOp>(mlir::createCSEPass());
 
+  // Generate IR summary to be exported as profiler tags (specific to each 
+  // executable)
+  passManager.addPass(createGenerateDispatchTagsPass());
+
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(mlir::createSymbolDCEPass());
   
-  // Generate tag for each executable and store it in an attribute.
-  passManager.addPass(createGenerateDispatchTagsPass());
-
   //----------------------------------------------------------------------------
   // Stream formation.
   // Pre-conditions:
