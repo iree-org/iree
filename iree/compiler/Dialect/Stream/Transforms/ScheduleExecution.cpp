@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -284,28 +285,9 @@ class ScheduleExecutionPass
           deadOps.insert(oldResult.getDefiningOp());
         }
 
-        // Extremely shady reordering of ops we know (should) be safe to move
-        // after the partition - otherwise, we shouldn't have moved the source
-        // ops into the partition.
-        SetVector<Operation *> worklist;
-        for (auto user : executeOp->getUsers()) {
-          worklist.insert(user);
-        }
-        while (!worklist.empty()) {
-          auto *user = worklist.pop_back_val();
-          if (user->getBlock() == executeOp->getBlock() &&
-              user->isBeforeInBlock(executeOp)) {
-            LLVM_DEBUG({
-              llvm::dbgs() << "Shady move of op to after partition: ";
-              user->dump();
-            });
-            user->moveAfter(builder.getInsertionBlock(),
-                            builder.getInsertionPoint());
-          }
-          for (auto subUser : user->getUsers()) {
-            worklist.insert(subUser);
-          }
-        }
+        // Sort the ops in the execution region. This is safe because we are
+        // still unaliased and SSA values imply ordering.
+        sortBlockTopologically(block);
       }
       for (auto *deadOp : llvm::reverse(deadOps)) {
         deadOp->erase();
