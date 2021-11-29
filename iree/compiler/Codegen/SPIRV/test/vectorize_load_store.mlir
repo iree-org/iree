@@ -55,8 +55,8 @@ func @resource_copy() {
 }
 
 hal.interface private @io attributes {push_constants = 5 : index} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -81,8 +81,8 @@ func @resource_copy_f16() {
 }
 
 hal.interface private @io attributes {push_constants = 5 : index} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -107,8 +107,8 @@ func @resource_copy_8xf16() {
 }
 
 hal.interface private @io attributes {push_constants = 5 : index} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -140,8 +140,8 @@ func @resource_copy_dynamic_shape() {
 }
 
 hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -161,8 +161,8 @@ func @resource_copy_dynamic_last_dim() {
 }
 
 hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -183,8 +183,8 @@ func @do_not_vectorize_odd_vector_size() {
 }
 
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -204,8 +204,8 @@ func @vectorize_binding_subspan() {
 }
 
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
 }
 
 // -----

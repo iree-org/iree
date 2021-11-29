@@ -49,8 +49,6 @@ typedef struct iree_hal_descriptor_set_layout_binding_t {
   uint32_t binding;
   // Specifies which type of resource descriptors are used for this binding.
   iree_hal_descriptor_type_t type;
-  // Specifies the memory access performed by the executables.
-  iree_hal_memory_access_t access;
 } iree_hal_descriptor_set_layout_binding_t;
 
 //===----------------------------------------------------------------------===//
@@ -62,7 +60,7 @@ typedef struct iree_hal_descriptor_set_layout_binding_t {
 // one or more "descriptor sets" to access their I/O memory. A "descriptor set
 // layout" defines the types and usage semantics of the descriptors that make up
 // one set. Implementations can use this to verify program correctness and
-// accelerate reservation/allocatation/computation of descriptor-related
+// accelerate reservation/allocation/computation of descriptor-related
 // operations.
 //
 // Maps to VkDescriptorSetLayout:

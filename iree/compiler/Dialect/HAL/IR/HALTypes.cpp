@@ -150,74 +150,6 @@ static void printMemoryType(AsmPrinter &printer,
   }
 }
 
-static LogicalResult parseMemoryAccess(AsmParser &parser, Attribute &attr) {
-  if (succeeded(parser.parseOptionalQuestion())) {
-    attr = parser.getBuilder().getI32IntegerAttr(0);
-    return success();
-  }
-
-  std::string fullString;
-  if (succeeded(parser.parseOptionalString(&fullString))) {
-    auto symbolized = symbolizeEnum<MemoryAccessBitfield>(fullString);
-    if (!symbolized.hasValue()) {
-      return parser.emitError(parser.getCurrentLocation())
-             << "failed to parse memory access enum value";
-    }
-    attr = parser.getBuilder().getI32IntegerAttr(
-        static_cast<int32_t>(symbolized.getValue()));
-    return success();
-  }
-
-  StringRef shortString;
-  if (failed(parser.parseKeyword(&shortString))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "failed to find memory access short string";
-  }
-  MemoryAccessBitfield memoryAccess = MemoryAccessBitfield::None;
-  for (char c : shortString) {
-    switch (c) {
-      case 'R':
-        memoryAccess = memoryAccess | MemoryAccessBitfield::Read;
-        break;
-      case 'W':
-        memoryAccess = memoryAccess | MemoryAccessBitfield::Write;
-        break;
-      case 'D':
-        memoryAccess = memoryAccess | MemoryAccessBitfield::Discard;
-        break;
-      case 'A':
-        memoryAccess = memoryAccess | MemoryAccessBitfield::MayAlias;
-        break;
-      default:
-        return parser.emitError(parser.getCurrentLocation())
-               << "unknown memory access short-form char: " << c;
-    }
-  }
-  attr =
-      parser.getBuilder().getI32IntegerAttr(static_cast<int32_t>(memoryAccess));
-  return success();
-}
-
-static void printMemoryAccess(AsmPrinter &printer,
-                              MemoryAccessBitfield memoryAccess) {
-  if (memoryAccess == MemoryAccessBitfield::None) {
-    printer << '?';
-    return;
-  }
-  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Read)) {
-    printer << 'R';
-  }
-  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Discard)) {
-    printer << 'D';
-  }
-  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Write)) {
-    printer << 'W';
-  }
-  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::MayAlias)) {
-    printer << 'A';
-  }
-}
-
 static LogicalResult parseBufferUsage(DialectAsmParser &parser,
                                       Attribute &attr) {
   if (succeeded(parser.parseOptionalQuestion())) {
@@ -457,23 +389,20 @@ Attribute DescriptorSetLayoutBindingAttr::parse(AsmParser &p) {
   auto b = p.getBuilder();
   IntegerAttr bindingAttr;
   DescriptorTypeAttr typeAttr;
-  MemoryAccessBitfieldAttr accessAttr;
   if (failed(p.parseLess()) ||
       failed(p.parseAttribute(bindingAttr, b.getIntegerType(32))) ||
       failed(p.parseComma()) || failed(parseEnumAttr(p, "type", typeAttr)) ||
-      failed(p.parseComma()) || failed(parseMemoryAccess(p, accessAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(bindingAttr, typeAttr, accessAttr);
+  return get(bindingAttr, typeAttr);
 }
 
 void DescriptorSetLayoutBindingAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
   os << binding() << ", ";
-  os << "\"" << stringifyDescriptorType(type()) << "\", ";
-  printMemoryAccess(p, access());
+  os << "\"" << stringifyDescriptorType(type()) << "\"";
   os << ">";
 }
 

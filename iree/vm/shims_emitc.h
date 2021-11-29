@@ -305,7 +305,7 @@ EMITC_DEFINE_SHIMS((v), (i))
 EMITC_DEFINE_SHIMS((v), (r))
 EMITC_DEFINE_SHIMS((v), (v))
 
-EMITC_VLA_IMPORT((r, i), (i, i, i), (r))
+EMITC_VLA_IMPORT((r, i), (i, i), (r))
 EMITC_VLA_IMPORT((r, i), (r), (r))
 EMITC_VLA_IMPORT((r, i, i), (i), (r))
 EMITC_VLA_IMPORT((r, r, i), (i, r, i, i), (v))

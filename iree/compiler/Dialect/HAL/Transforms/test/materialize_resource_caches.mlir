@@ -7,8 +7,8 @@
 // CHECK-SAME:     device(%device : !hal.device)
 // CHECK-SAME:     usage(PushOnly)
 // CHECK-SAME:     bindings([
-// CHECK-SAME:       #hal.descriptor_set_layout_binding<0, "StorageBuffer", R>,
-// CHECK-SAME:       #hal.descriptor_set_layout_binding<1, "StorageBuffer", W>
+// CHECK-SAME:       #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
+// CHECK-SAME:       #hal.descriptor_set_layout_binding<1, "StorageBuffer">
 // CHECK-SAME:     ]) : !hal.descriptor_set_layout
 // CHECK-NEXT:   util.global.store %descriptor_set_layout, @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 
@@ -18,8 +18,8 @@ func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_la
   %0 = hal.descriptor_set_layout.lookup device(%device : !hal.device)
                                         usage(PushOnly)
                                         bindings([
-    #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
-    #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
+    #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
+    #hal.descriptor_set_layout_binding<1, "StorageBuffer">
   ]) : !hal.descriptor_set_layout
   // CHECK-NEXT: return %[[LAYOUT]]
   return %0 : !hal.descriptor_set_layout
@@ -45,8 +45,8 @@ func @exeLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
   %0 = hal.executable_layout.lookup device(%device : !hal.device)
                                     layouts([
     [
-      #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
-      #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
+      #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
+      #hal.descriptor_set_layout_binding<1, "StorageBuffer">
     ]
   ]) : !hal.executable_layout
   // CHECK-NEXT: return %[[LAYOUT]]
@@ -75,12 +75,12 @@ func @sharedLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
   %0 = hal.executable_layout.lookup device(%device : !hal.device)
                                     layouts([
     [
-      #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
-      #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
+      #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
+      #hal.descriptor_set_layout_binding<1, "StorageBuffer">
     ],
     [
-      #hal.descriptor_set_layout_binding<0, "UniformBuffer", "Read">,
-      #hal.descriptor_set_layout_binding<1, "UniformBuffer", "Write">
+      #hal.descriptor_set_layout_binding<0, "UniformBuffer">,
+      #hal.descriptor_set_layout_binding<1, "UniformBuffer">
     ]
   ]) : !hal.executable_layout
   // CHECK-NEXT: return %[[LAYOUT]]
@@ -93,8 +93,8 @@ func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_s
   %0 = hal.descriptor_set_layout.lookup device(%device : !hal.device)
                                         usage(PushOnly)
                                         bindings([
-    #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
-    #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
+    #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
+    #hal.descriptor_set_layout_binding<1, "StorageBuffer">
   ]) : !hal.descriptor_set_layout
   // CHECK-NEXT: return %[[LAYOUT]]
   return %0 : !hal.descriptor_set_layout
@@ -108,13 +108,13 @@ module attributes {hal.device.targets = [#hal.device.target<"cpu">]} {
 //   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
   hal.interface @interface0 {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   hal.interface @interface1 {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2, set=0, binding=2, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @s0b2, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb"> {
     hal.executable.entry_point @entry0 attributes {

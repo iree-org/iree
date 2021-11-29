@@ -738,12 +738,6 @@ static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
                             "set %u out of bounds", set);
   }
 
-  iree_hal_local_executable_layout_t* local_executable_layout =
-      iree_hal_local_executable_layout_cast(executable_layout);
-  iree_hal_local_descriptor_set_layout_t* local_set_layout =
-      iree_hal_local_descriptor_set_layout_cast(
-          local_executable_layout->set_layouts[set]);
-
   iree_host_size_t binding_base =
       set * IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
@@ -757,8 +751,8 @@ static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
     iree_hal_buffer_mapping_t buffer_mapping;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        bindings[i].buffer, local_set_layout->bindings[binding_ordinal].access,
-        bindings[i].offset, bindings[i].length, &buffer_mapping));
+        bindings[i].buffer, IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset,
+        bindings[i].length, &buffer_mapping));
     command_buffer->state.bindings[binding_ordinal] =
         buffer_mapping.contents.data;
     command_buffer->state.binding_lengths[binding_ordinal] =

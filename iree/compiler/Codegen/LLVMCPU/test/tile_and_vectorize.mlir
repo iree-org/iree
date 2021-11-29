@@ -41,9 +41,9 @@ module  {
     return
   }
   hal.interface private @io  {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
 }
 //      CHECK: #[[MAP1:.+]] = affine_map<(d0) -> (64, -d0 + 383)>

@@ -132,25 +132,10 @@ static Interface createInterface(Location loc,
     for (const auto &binding : setLayout.bindings) {
       std::string bindingName = "s" + std::to_string(setLayout.ordinal) + "b" +
                                 std::to_string(binding.ordinal);
-      if (allEnumBitsSet(binding.access,
-                         IREE::HAL::MemoryAccessBitfield::Read |
-                             IREE::HAL::MemoryAccessBitfield::Write)) {
-        bindingName += "_rw";
-      } else if (allEnumBitsSet(binding.access,
-                                IREE::HAL::MemoryAccessBitfield::Read)) {
-        bindingName += "_ro";
-      } else if (allEnumBitsSet(binding.access,
-                                IREE::HAL::MemoryAccessBitfield::Discard |
-                                    IREE::HAL::MemoryAccessBitfield::Write)) {
-        bindingName += "_xw";
-      } else if (allEnumBitsSet(binding.access,
-                                IREE::HAL::MemoryAccessBitfield::Write)) {
-        bindingName += "_wo";
-      }
       auto bindingOp = interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
           interface.op.getLoc(), bindingName,
           /*set=*/APInt(64, setLayout.ordinal),
-          /*binding=*/APInt(64, binding.ordinal), binding.type, binding.access);
+          /*binding=*/APInt(64, binding.ordinal), binding.type);
       bindingMap.insert(
           {std::make_pair(setLayout.ordinal, binding.ordinal), bindingOp});
     }

@@ -16,7 +16,7 @@ func @memrefDim(%d0: index, %d1: index) -> (index, index, index) {
 }
 
 hal.interface @io attributes {sym_visibility = "private"} {
-  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
+  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
 }
 
 // -----

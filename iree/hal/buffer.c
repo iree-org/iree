@@ -49,6 +49,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_memory_access_format(
       {IREE_HAL_MEMORY_ACCESS_WRITE, IREE_SVL("WRITE")},
       {IREE_HAL_MEMORY_ACCESS_DISCARD, IREE_SVL("DISCARD")},
       {IREE_HAL_MEMORY_ACCESS_MAY_ALIAS, IREE_SVL("MAY_ALIAS")},
+      {IREE_HAL_MEMORY_ACCESS_ANY, IREE_SVL("ANY")},
   };
   return iree_bitfield_format_inline(value, mappings, IREE_ARRAYSIZE(mappings),
                                      out_temp);
@@ -186,6 +187,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_access(
     iree_hal_memory_access_t allowed_memory_access,
     iree_hal_memory_access_t required_memory_access) {
+  if (iree_all_bits_set(required_memory_access, IREE_HAL_MEMORY_ACCESS_ANY)) {
+    return iree_ok_status();
+  }
   if (IREE_UNLIKELY(!iree_any_bit_set(
           required_memory_access,
           IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE))) {

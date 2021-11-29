@@ -23,8 +23,6 @@ struct DescriptorSetLayoutBinding {
   unsigned ordinal;
   // Storage type of the descriptor resource.
   IREE::HAL::DescriptorType type;
-  // Memory access requirements across all dispatch sites.
-  IREE::HAL::MemoryAccessBitfield access;
 };
 
 struct DescriptorSetLayout {
