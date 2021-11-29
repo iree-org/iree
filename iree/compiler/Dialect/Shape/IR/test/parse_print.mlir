@@ -1,13 +1,6 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // -----
-// CHECK-LABEL: @parse_print_tie_shape
-func @parse_print_tie_shape(%arg0 : tensor<2x?x4xf32>, %arg1 : !shapex.ranked_shape<[2,?,4]>) {
-  %0 = shapex.tie_shape %arg0, %arg1 : tensor<2x?x4xf32>, !shapex.ranked_shape<[2,?,4]>
-  return
-}
-
-// -----
 // CHECK-LABEL: @const_ranked_shape
 func @const_ranked_shape() -> !shapex.ranked_shape<[2,4]> {
   // CHECK: %rs2_4 = shapex.const_ranked_shape : !shapex.ranked_shape<[2,4]>

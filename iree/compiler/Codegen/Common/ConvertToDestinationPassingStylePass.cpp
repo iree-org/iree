@@ -57,23 +57,8 @@ class ConvertToDestinationPassingStylePass
 /// Returns the subview into the buffer that is supposed to be populated with
 /// the `value` of the `flow.dispatch.tensor.store` operation. This can be used
 /// to compute the results in place.
-static Value getTensorLoadOpForTensorStoreOp(OpBuilder &b, Operation *storeOp) {
-  SmallVector<Value, 4> operandsOfLoadOp;
-  auto op = cast<OffsetSizeAndStrideOpInterface>(storeOp);
-  Value target, source;
-  std::tie(source, target) =
-      TypeSwitch<Operation *, std::tuple<Value, Value>>(op)
-          .Case<IREE::Flow::DispatchTensorStoreOp>([&](auto storeOp) {
-            return std::make_tuple(storeOp.value(), storeOp.target());
-          })
-          .Case<tensor::InsertSliceOp>([&](auto storeOp) {
-            return std::make_tuple(storeOp.source(), storeOp.dest());
-          })
-          .Default([](Operation *) {
-            return std::make_tuple<Value, Value>(nullptr, nullptr);
-          });
-  if (!target) return nullptr;
-
+static Value getTensorLoadOpForTensorStoreOp(
+    OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp) {
   // Clone the offset, size and stride values. They will be CSE-ed later.
   Operation *parentOp = storeOp->getParentOp();
   BlockAndValueMapping indexValMap;
@@ -116,12 +101,13 @@ static Value getTensorLoadOpForTensorStoreOp(OpBuilder &b, Operation *storeOp) {
     return clonedVals;
   };
   SmallVector<OpFoldResult> loadOffsets, loadSizes, loadStrides;
-  loadOffsets = cloneIndexValues(op.getMixedOffsets());
-  loadSizes = cloneIndexValues(op.getMixedSizes());
-  loadStrides = cloneIndexValues(op.getMixedStrides());
+  loadOffsets = cloneIndexValues(storeOp.getMixedOffsets());
+  loadSizes = cloneIndexValues(storeOp.getMixedSizes());
+  loadStrides = cloneIndexValues(storeOp.getMixedStrides());
   Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      op.getLoc(), source.getType().cast<RankedTensorType>(), target,
-      loadOffsets, loadSizes, loadStrides);
+      storeOp.getLoc(), storeOp.value().getType().cast<RankedTensorType>(),
+      storeOp.target(), storeOp.target_dims(), loadOffsets, loadSizes,
+      loadStrides);
   return tensorLoadOp;
 }
 

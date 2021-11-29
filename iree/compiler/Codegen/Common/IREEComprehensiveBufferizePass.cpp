@@ -219,8 +219,9 @@ struct StoreTensorOpAnchoredInitTensorEliminationStep
               cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
           auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
               loc, storeOp.value().getType().cast<RankedTensorType>(),
-              storeOp.target(), storeOp.getMixedOffsets(),
-              storeOp.getMixedSizes(), storeOp.getMixedStrides());
+              storeOp.target(), storeOp.target_dims(),
+              storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
+              storeOp.getMixedStrides());
           return loadOp.result();
         },
         newOps);

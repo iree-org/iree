@@ -31,35 +31,6 @@ func @dynamicMakeRankedShapeDim(%arg0: index, %arg1 : index) -> (index, index, i
 }
 
 //===----------------------------------------------------------------------===//
-// ElideDuplicateTieShapePattern tests
-//===----------------------------------------------------------------------===//
-
-// -----
-// CHECK-LABEL: @elideDuplicateTieShapePattern_match
-// CHECK-SAME: %[[ARGT:[^:[:space:]]+]]: tensor
-// CHECK-SAME: %[[ARGRS:[^:[:space:]]+]]: !shapex.ranked_shape
-func @elideDuplicateTieShapePattern_match(%arg0 : tensor<?xf32>, %arg1 : !shapex.ranked_shape<[?]>) -> (tensor<?xf32>) {
-  %0 = shapex.tie_shape %arg0, %arg1 : tensor<?xf32>, !shapex.ranked_shape<[?]>
-  %1 = shapex.tie_shape %0, %arg1 : tensor<?xf32>, !shapex.ranked_shape<[?]>
-  // CHECK: %[[T:.+]] = shapex.tie_shape %[[ARGT]], %[[ARGRS]]
-  // CHECK: return %[[T]]
-  return %1 : tensor<?xf32>
-}
-
-// -----
-// CHECK-LABEL: @elideDuplicateTieShapePattern_different_shapes
-// CHECK-SAME: %[[ARGT:[^:[:space:]]+]]: tensor
-// CHECK-SAME: %[[ARGRS1:[^:[:space:]]+]]: !shapex.ranked_shape
-// CHECK-SAME: %[[ARGRS2:[^:[:space:]]+]]: !shapex.ranked_shape
-func @elideDuplicateTieShapePattern_different_shapes(%arg0 : tensor<?xf32>, %arg1 : !shapex.ranked_shape<[?]>, %arg2 : !shapex.ranked_shape<[?]>) -> (tensor<?xf32>) {
-  %0 = shapex.tie_shape %arg0, %arg1 : tensor<?xf32>, !shapex.ranked_shape<[?]>
-  %1 = shapex.tie_shape %0, %arg2 : tensor<?xf32>, !shapex.ranked_shape<[?]>
-  // CHECK: %[[T:.+]] = shapex.tie_shape %[[ARGT]], %[[ARGRS2]]
-  // CHECK: return %[[T]]
-  return %1 : tensor<?xf32>
-}
-
-//===----------------------------------------------------------------------===//
 // IdentityMakeRankedShapePattern tests
 //===----------------------------------------------------------------------===//
 

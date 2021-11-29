@@ -188,7 +188,8 @@ static bool isClonableIntoDispatchOp(Operation *op) {
 // operands. This greatly simplifies transformations into the resulting op.
 static std::pair<IREE::Flow::DispatchWorkgroupsOp, Operation *>
 buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
-                                        ArrayRef<Value> count, Operation *op) {
+                                        ArrayRef<Value> count, Operation *op,
+                                        ValueRange resultDynamicDims) {
   SmallVector<Value> operands, operandDims;
   SmallVector<int64_t> tiedOperands;
   if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(op)) {
@@ -204,33 +205,39 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
     (void)insertSliceOp.reifyResultShapes(rewriter, resultShapes);
     auto destType = insertSliceOp.dest().getType().cast<ShapedType>();
     for (auto shape : enumerate(destType.getShape())) {
-      if (shape.value() != ShapedType::kDynamicSize) {
-        continue;
-      }
+      if (shape.value() != ShapedType::kDynamicSize) continue;
       operandDims.push_back(resultShapes[0][shape.index()]);
     }
     tiedOperands.push_back(0);
   }
+
   auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-      loc, count, op->getResultTypes(), /*result_dims=*/ValueRange{}, operands,
+      loc, count, op->getResultTypes(), resultDynamicDims, operands,
       operandDims, tiedOperands);
   Region &region = dispatchOp.body();
   Block *block = &region.front();
+
   Operation *clonedOp;
   {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(block);
     clonedOp = rewriter.clone(*op);
+    unsigned dynamicDimIdx = 0;
     for (auto it : llvm::zip(clonedOp->getResults(),
                              dispatchOp.body().getArguments().take_back(
                                  clonedOp->getNumResults()))) {
+      auto resultType = std::get<0>(it).getType().cast<ShapedType>();
       rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
-          loc, std::get<0>(it), std::get<1>(it), llvm::None, llvm::None,
-          llvm::None, rewriter.getArrayAttr({}), rewriter.getArrayAttr({}),
-          rewriter.getArrayAttr({}));
+          loc, std::get<0>(it), std::get<1>(it),
+          resultDynamicDims.slice(dynamicDimIdx,
+                                  resultType.getNumDynamicDims()),
+          llvm::None, llvm::None, llvm::None, rewriter.getArrayAttr({}),
+          rewriter.getArrayAttr({}), rewriter.getArrayAttr({}));
+      dynamicDimIdx += resultType.getNumDynamicDims();
     }
     rewriter.create<IREE::Flow::ReturnOp>(loc);
   }
+
   LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell \n"
                           << *dispatchOp << "\n");
   return {dispatchOp, clonedOp};
@@ -552,8 +559,6 @@ static void tryToTieOperandsAndResults(
 
 // After outlining in dispatch region we can rewrite the dispatch ops with
 // proper captures.
-// A later RematerializeDispatchConstants should be called to avoid passing
-// unnecessary constant arguments.
 static LogicalResult legalizeDispatchWorkgroupOperands(
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Location loc = dispatchOp.getLoc();
@@ -584,6 +589,7 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   unsigned numOperandDims = operandDimsIndexAndLength.second;
   for (auto value : valuesDefinedAbove) {
     BlockArgument bbArg = operandToBBArg.lookup(value);
+    bool wasPresent = bbArg != nullptr;
     auto tensorType = value.getType().dyn_cast<RankedTensorType>();
     if (!bbArg) {
       // Create a new basic block argument for this value.
@@ -596,12 +602,56 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
       bbArg = block.insertArgument(numOperands, bbArgType, value.getLoc());
     }
 
+    // Insert the operand if this is not already one.
+    if (!wasPresent) {
+      unsigned insertIdx = operandsIndexAndLength.first + numOperands;
+      dispatchOp->insertOperands(insertIdx, {value});
+      operandToBBArg[dispatchOp->getOperand(insertIdx)] = bbArg;
+      numOperands++;
+    }
+
     Value repl = bbArg;
-    if (bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
+    if (!wasPresent && bbArg.getType().isa<IREE::Flow::DispatchTensorType>()) {
+      // This dims for this operand does not exist. Add those.
+      SmallVector<Value> dynamicDimArgs;
+      {
+        OpBuilder::InsertionGuard g(b);
+        b.setInsertionPoint(dispatchOp);
+
+        // Fast-path for if the value comes from ops that support our dynamic
+        // shape interfaces. Otherwise we have to insert tensor.dim ops.
+        auto availableDims = IREE::Util::findDynamicDims(value);
+
+        // Add operands/args for each dynamic shape dimension.
+        SmallVector<Value> dynamicDimOperands;
+        unsigned dynamicDimIdx = 0;
+        for (auto dim : llvm::enumerate(tensorType.getShape())) {
+          if (dim.value() != ShapedType::kDynamicSize) continue;
+          if (availableDims.hasValue()) {
+            dynamicDimOperands.push_back(
+                availableDims.getValue()[dynamicDimIdx]);
+          } else {
+            dynamicDimOperands.push_back(b.createOrFold<tensor::DimOp>(
+                dispatchOp.getLoc(), value, dim.index()));
+          }
+          dynamicDimArgs.push_back(
+              block.insertArgument(numOperands + dynamicDimIdx,
+                                   b.getIndexType(), dispatchOp.getLoc()));
+          ++dynamicDimIdx;
+        }
+        dispatchOp->insertOperands(
+            operandsIndexAndLength.first + numOperands + numOperandDims,
+            dynamicDimOperands);
+        numOperandDims += dynamicDimOperands.size();
+        dispatchOp->insertOperands(operandsIndexAndLength.first + numOperands,
+                                   dynamicDimOperands);
+        numOperands += dynamicDimOperands.size();
+      }
+
       // For arguments of type flow.dispatch.tensor, create a
       // flow.dispatch.tensor.load to get the replacement values.
       repl = b.create<IREE::Flow::DispatchTensorLoadOp>(
-          loc, value.getType().cast<RankedTensorType>(), bbArg);
+          loc, value.getType().cast<RankedTensorType>(), bbArg, dynamicDimArgs);
     }
 
     value.replaceUsesWithIf(repl, [&](OpOperand &use) {
@@ -609,29 +659,6 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
                  ->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ==
              dispatchOp;
     });
-
-    // Insert the operand if this is not already one. Also need to account for
-    // dynamic dim values for the operands.
-    if (!operandToBBArg.count(value)) {
-      dispatchOp->insertOperands(operandsIndexAndLength.first + numOperands,
-                                 {value});
-      numOperands++;
-      if (tensorType) {
-        // This dims for this operand does not exist. Add those.
-        OpBuilder::InsertionGuard g(b);
-        b.setInsertionPoint(dispatchOp);
-        SmallVector<Value> dynamicDims;
-        for (auto dim : llvm::enumerate(tensorType.getShape())) {
-          if (dim.value() != ShapedType::kDynamicSize) continue;
-          dynamicDims.push_back(b.createOrFold<tensor::DimOp>(
-              dispatchOp.getLoc(), value, dim.index()));
-        }
-        dispatchOp->insertOperands(
-            operandsIndexAndLength.first + numOperands + numOperandDims,
-            dynamicDims);
-        numOperandDims += dynamicDims.size();
-      }
-    }
   }
 
   // Update the `operand_segment_sizes`.
@@ -687,7 +714,7 @@ static void appendDynamicDims(OpBuilder &builder, Location loc, Value v,
   if (!shapedType) return;
   for (auto shape : enumerate(shapedType.getShape())) {
     if (shape.value() != ShapedType::kDynamicSize) continue;
-    Value dim = builder.create<tensor::DimOp>(loc, v, shape.index());
+    Value dim = builder.createOrFold<tensor::DimOp>(loc, v, shape.index());
     dynamicDims.push_back(dim);
   }
 }
@@ -746,11 +773,10 @@ struct TileAndDistributeLinalgOpsPattern
     // output tensors".  Similarly to sequentialized SPMD loops, the semantics
     // is valid assuming a sequential ordering of execution.  After destructive
     // update rewrites, the abstraction gap disappears.
-    auto en = buildOperandLessFlowDispatchWorkgroupOp(rewriter, loc, workload,
-                                                      linalgOp);
+    auto en = buildOperandLessFlowDispatchWorkgroupOp(
+        rewriter, loc, workload, linalgOp, resultDynamicDims);
     IREE::Flow::DispatchWorkgroupsOp dispatchOp = en.first;
     linalg::LinalgOp clonedLinalgOp = cast<linalg::LinalgOp>(en.second);
-    dispatchOp.result_dimsMutable().assign(resultDynamicDims);
 
     // Scoped within DispatchWorkgroupOp.
     OpBuilder::InsertionGuard g(rewriter);
@@ -833,11 +859,10 @@ struct TiledOpInterfacePattern
     // output tensors".  Similarly to sequentialized SPMD loops, the semantics
     // is valid assuming a sequential ordering of execution.  After destructive
     // update rewrites, the abstraction gap disappears.
-    auto en = buildOperandLessFlowDispatchWorkgroupOp(rewriter, loc, workload,
-                                                      tilableOp);
+    auto en = buildOperandLessFlowDispatchWorkgroupOp(
+        rewriter, loc, workload, tilableOp, resultDynamicDims);
     IREE::Flow::DispatchWorkgroupsOp dispatchOp = en.first;
     Operation *clonedOp = en.second;
-    dispatchOp.result_dimsMutable().assign(resultDynamicDims);
 
     // Scoped within DispatchWorkgroupOp.
     OpBuilder::InsertionGuard g(rewriter);
