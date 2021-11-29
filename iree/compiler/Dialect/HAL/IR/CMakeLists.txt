@@ -71,7 +71,6 @@ iree_cc_library(
     MLIRParser
     MLIRStandard
     MLIRTransformUtils
-    iree::compiler::Dialect::HAL::Conversion::HALToHAL
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::Shape::IR

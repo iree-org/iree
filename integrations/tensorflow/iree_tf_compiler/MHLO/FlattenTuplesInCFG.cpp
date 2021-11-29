@@ -53,11 +53,11 @@ void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
   for (const auto &oldAttr : oldOp->getAttrs()) {
     // Don't copy segment attributes as these correspond to the number operands,
     // which may be different.
-    if (oldAttr.first == "operand_segment_sizes" ||
-        oldAttr.first == "result_segment_sizes")
+    if (oldAttr.getName() == "operand_segment_sizes" ||
+        oldAttr.getName() == "result_segment_sizes")
       continue;
 
-    newOp->setAttr(oldAttr.first, oldAttr.second);
+    newOp->setAttr(oldAttr.getName(), oldAttr.getValue());
   }
 }
 
@@ -237,8 +237,8 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
   BlockAndValueMapping mapping;
 
   for (auto attr : oldFunction->getAttrs()) {
-    if (attr.first != oldFunction.getTypeAttrName()) {
-      newFunction->setAttr(attr.first, attr.second);
+    if (attr.getName() != oldFunction.getTypeAttrName()) {
+      newFunction->setAttr(attr.getName(), attr.getValue());
     }
   }
 

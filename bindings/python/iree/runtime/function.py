@@ -496,8 +496,8 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
     descs = [None] * len(py_list)
   elif len(py_list) != len(descs):
     _raise_argument_error(
-        inv, f"mismatched function call arity: "
-        f"expected={descs}, got={py_list}")
+        inv, f"mismatched call arity: expected {len(descs)} arguments but got "
+        f"{len(py_list)}. Expected signature=\n{descs}\nfor input=\n{py_list}")
   for py_value, desc in zip(py_list, descs):
     inv.current_arg = py_value
     inv.current_desc = desc

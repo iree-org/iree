@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "materialize_shape_support.mlir"
     "wrap_entry_points.mlir"
   DATA
     iree::tools::IreeFileCheck

@@ -15,18 +15,16 @@ vm.module @call_ops {
     vm.return
   }
 
-  // TODO(#7487): Enable the test for emitc.
-  vm.export @test_call_r_v attributes {emitc.exclude}
-  vm.func private @test_call_r_v() {
+  vm.export @test_call_r_v
+  vm.func @test_call_r_v() {
     %ref = vm.const.ref.zero : !vm.ref<?>
     vm.call @_r_v(%ref) : (!vm.ref<?>) -> ()
     vm.return
   }
 
   // Check that reused ref argument slots are handled properly
-  // TODO(#7487): Enable the test for emitc.
-  vm.export @test_call_r_v_reuse_reg attributes {emitc.exclude}
-  vm.func private @test_call_r_v_reuse_reg() {
+  vm.export @test_call_r_v_reuse_reg
+  vm.func @test_call_r_v_reuse_reg() {
     %ref = vm.const.ref.zero : !vm.buffer
     %unused = vm.const.ref.zero : !vm.buffer
     vm.call @_r_v_reuse_reg(%ref, %unused) : (!vm.buffer, !vm.buffer) -> ()
@@ -39,7 +37,7 @@ vm.module @call_ops {
   // of the tests during the lattter. This means we would need to add a pattern
   // that inserts calls to `iree_vm_ref_retain` for operand/result pairs of the
   // do_not_optimize op.
-  // TODO(#7487): Enable the test for emitc.
+  // TODO(simon-camp): Enable the test for emitc.
   vm.export @test_call_r_v_preserve_ref attributes {emitc.exclude}
   vm.func private @test_call_r_v_preserve_ref() {
     %ref = vm.const.ref.zero : !vm.buffer

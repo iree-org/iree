@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @command_buffer_create
 func @command_buffer_create(%arg0: !hal.device) {
@@ -35,18 +35,39 @@ func @command_buffer_execution_barrier(
 
 // -----
 
-// CHECK-LABEL: @command_buffer_fill_buffer
-func @command_buffer_fill_buffer(
+// CHECK-LABEL: @command_buffer_fill_buffer_i1
+func @command_buffer_fill_buffer_i1(
   %arg0: !hal.command_buffer,
-  %arg1: !hal.buffer
+  %arg1: !hal.buffer,
+  %arg2: i1
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  %c300 = arith.constant 300 : i32
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %c300, %c4) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  // CHECK-DAG: %[[C1:.+]] = vm.const.i32 1 : i32
+  // CHECK-DAG: %[[EXTEND:.+]] = vm.and.i32 %arg2, %[[C1]] : i32
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[C1]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
-      pattern(%c300 : i32)
+      pattern(%arg2 : i1)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_fill_buffer_i8
+func @command_buffer_fill_buffer_i8(
+  %arg0: !hal.command_buffer,
+  %arg1: !hal.buffer,
+  %arg2: i8
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 1 : i32
+  // CHECK-DAG: %[[EXTEND:.+]] = vm.ext.i8.i32.u %arg2 : i32 -> i32
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
+      target(%arg1 : !hal.buffer)[%c100, %c200]
+      pattern(%arg2 : i8)
   return
 }
 
@@ -55,15 +76,54 @@ func @command_buffer_fill_buffer(
 // CHECK-LABEL: @command_buffer_fill_buffer_i16
 func @command_buffer_fill_buffer_i16(
   %arg0: !hal.command_buffer,
-  %arg1: !hal.buffer
+  %arg1: !hal.buffer,
+  %arg2: i16
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  %cst = arith.constant 1234 : i16
-  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %c1234_0, %c2) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 2 : i32
+  // CHECK-DAG: %[[EXTEND:.+]] = vm.ext.i16.i32.u %arg2 : i32 -> i32
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
-      pattern(%cst : i16)
+      pattern(%arg2 : i16)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_fill_buffer_i32
+func @command_buffer_fill_buffer_i32(
+  %arg0: !hal.command_buffer,
+  %arg1: !hal.buffer,
+  %arg2: i32
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 4 : i32
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %arg2, %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
+      target(%arg1 : !hal.buffer)[%c100, %c200]
+      pattern(%arg2 : i32)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_fill_buffer_f32
+func @command_buffer_fill_buffer_f32(
+  %arg0: !hal.command_buffer,
+  %arg1: !hal.buffer,
+  %arg2: f32
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 4 : i32
+  // CHECK-DAG: %[[BITCAST:.+]] = vm.bitcast.f32.i32 %arg2 : f32 -> i32
+  // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[BITCAST]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
+  hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
+      target(%arg1 : !hal.buffer)[%c100, %c200]
+      pattern(%arg2 : f32)
   return
 }
 

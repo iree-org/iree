@@ -20,7 +20,7 @@ func @rangeMinConstant() -> (index, index) {
 
 // CHECK-LABEL: @rangeMinExpand
 func @rangeMinExpand(%arg0: index, %arg1: index) -> index {
-  // CHECK: %[[MIN:.+]] = minui %arg0, %arg1 : index
+  // CHECK: %[[MIN:.+]] = arith.minui %arg0, %arg1 : index
   %0 = util.range.min %arg0, %arg1 : index
   // CHECK: return %[[MIN]]
   return %0 : index
@@ -63,8 +63,8 @@ func @rangeExtentsFoldConstantsDynamic(%arg0: index, %arg1: index) -> (index, in
   %c3 = arith.constant 3 : index
   // CHECK: %[[RANGE_MAX_EXC:.+]] = arith.addi %arg0, %arg1
   // CHECK: %[[RANGE_MAX_INC:.+]] = arith.subi %[[RANGE_MAX_EXC]], %c1
-  // CHECK: %[[RANGE_MIN:.+]] = minui %arg0, %c1
-  // CHECK: %[[RANGE_MAX:.+]] = maxui %[[RANGE_MAX_INC]], %c4
+  // CHECK: %[[RANGE_MIN:.+]] = arith.minui %arg0, %c1
+  // CHECK: %[[RANGE_MAX:.+]] = arith.maxui %[[RANGE_MAX_INC]], %c4
   %0:2 = util.range.extents [%c1 for %c2], [%arg0 for %arg1], [%c2 for %c3] : index
   // CHECK: return %[[RANGE_MIN]], %[[RANGE_MAX]]
   return %0#0, %0#1 : index, index
@@ -85,12 +85,12 @@ func @rangeExtentsExpand1(%arg0: index, %arg1: index) -> (index, index) {
 
 // CHECK-LABEL: @rangeExtentsExpand2
 func @rangeExtentsExpand2(%arg0: index, %arg1: index, %arg2: index, %arg3: index) -> (index, index) {
-  // CHECK: %[[RANGE_MIN:.+]] = minui %arg0, %arg2
+  // CHECK: %[[RANGE_MIN:.+]] = arith.minui %arg0, %arg2
   // CHECK: %[[RANGE0_MAX_EXC:.+]] = arith.addi %arg0, %arg1
   // CHECK: %[[RANGE0_MAX_INC:.+]] = arith.subi %[[RANGE0_MAX_EXC]], %c1
   // CHECK: %[[RANGE1_MAX_EXC:.+]] = arith.addi %arg2, %arg3
   // CHECK: %[[RANGE1_MAX_INC:.+]] = arith.subi %[[RANGE1_MAX_EXC]], %c1
-  // CHECK: %[[RANGE_MAX:.+]] = maxui %[[RANGE0_MAX_INC]], %[[RANGE1_MAX_INC]]
+  // CHECK: %[[RANGE_MAX:.+]] = arith.maxui %[[RANGE0_MAX_INC]], %[[RANGE1_MAX_INC]]
   %0:2 = util.range.extents [%arg0 for %arg1], [%arg2 for %arg3] : index
   // CHECK: return %[[RANGE_MIN]], %[[RANGE_MAX]]
   return %0#0, %0#1 : index, index

@@ -147,7 +147,6 @@ def Util_AnyPtr : DialectType<
   let description = [{
     Pointer to a typed value.
   }];
-  let builderCall = "$_builder.getType<IREE::Util::PtrType>()";
 }
 
 class Util_PtrOf<Type type> :
@@ -183,7 +182,10 @@ def Util_GlobalRefAttr : Confined<FlatSymbolRefAttr, [
 
 def Util_AnyGlobalPtr : TypeAlias<Util_AnyPtr>;
 // TODO(benvanik): actually implement Util_GlobalPtrOf.
-class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtr>;
+class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtr> {
+  // Suppress unused template argument warning.
+  int unused = !size(types);
+}
 
 //===----------------------------------------------------------------------===//
 // Buffer types

@@ -161,7 +161,7 @@ struct HALInterfaceLoadConstantConverter final
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceLoadConstantOp loadOp, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceLoadConstantOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(#1519): hal.interface.load.constant should point to the
     // hal.interface op.
@@ -194,7 +194,7 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      InterfaceOpTy op, ArrayRef<Value> operands,
+      InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
     auto i32Type = rewriter.getIntegerType(32);
@@ -219,8 +219,7 @@ struct HALInterfaceBindingSubspanConverter final
         interfaceToResourceVars(interfaceToResourceVars) {}
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp interfaceOp,
-      ArrayRef<Value> operands,
+      IREE::HAL::InterfaceBindingSubspanOp interfaceOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (interfaceOp.use_empty()) {
       rewriter.eraseOp(interfaceOp);
@@ -252,9 +251,9 @@ template <typename OpTy>
 struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      OpTy op, ArrayRef<Value> operands,
+      OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, operands);
+    rewriter.replaceOp(op, adaptor.getOperands());
     return success();
   }
 };
@@ -265,11 +264,12 @@ struct RemoveIdentityConversionCast final
     : public OpConversionPattern<UnrealizedConversionCastOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      UnrealizedConversionCastOp op, ArrayRef<Value> operands,
+      UnrealizedConversionCastOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (op->getNumOperands() == 1 && op->getNumResults() == 1 &&
-        operands.front().getType() == op->getResultTypes().front()) {
-      rewriter.replaceOp(op, operands);
+        adaptor.getOperands().front().getType() ==
+            op->getResultTypes().front()) {
+      rewriter.replaceOp(op, adaptor.getOperands());
       return success();
     }
 

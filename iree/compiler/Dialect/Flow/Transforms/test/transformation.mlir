@@ -24,13 +24,9 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 //  CHECK-NEXT:         %{{.+}} = arith.subf %{{.+}}, %{{.+}} : f32
 //  CHECK-NEXT:         %{{.+}} = arith.mulf %{{.+}}, %{{.+}} : f32
 //       CHECK: func @hloElementwiseOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-//  CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg0) : (tensor<4xf32>) -> tensor<4xf32> =
-//  CHECK-NEXT:       (%arg1: tensor<4xf32>) -> tensor<4xf32> {
-//   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-NEXT:     %1 = flow.dispatch @hloElementwiseOps_dispatch_0::@hloElementwiseOps_dispatch_0[%[[C4]], %[[C1]], %[[C1]]](%arg1) : (tensor<4xf32>) -> tensor<4xf32>
-//  CHECK-NEXT:     flow.return %1 : tensor<4xf32>
-//  CHECK-NEXT:   }
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-NEXT:   %0 = flow.dispatch @hloElementwiseOps_dispatch_0::@hloElementwiseOps_dispatch_0[%[[C4]], %[[C1]], %[[C1]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
 //  CHECK-NEXT:   return %0 : tensor<4xf32>
 //  CHECK-NEXT: }
 
@@ -57,15 +53,11 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.mulf %{{.+}}, %{{.+}} : f32
 //       CHECK: func @interleavedDot(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
-//  CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg0) : (tensor<4x4xf32>) -> tensor<4x4xf32> =
-//  CHECK-NEXT:        (%arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
-//   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-NEXT:     %1 = flow.dispatch @interleavedDot_dispatch_0::@interleavedDot_dispatch_0[%[[C4]], %[[C4]], %[[C1]]](%arg1) : (tensor<4x4xf32>) -> tensor<4x4xf32>
-//  CHECK-NEXT:     %2 = flow.dispatch @interleavedDot_dispatch_1::@interleavedDot_dispatch_1[%[[C4]], %[[C4]], %[[C1]]](%arg1, %1) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-//  CHECK-NEXT:     flow.return %2 : tensor<4x4xf32>
-//  CHECK-NEXT:   }
-//  CHECK-NEXT:   return %0 : tensor<4x4xf32>
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-NEXT:   %0 = flow.dispatch @interleavedDot_dispatch_0::@interleavedDot_dispatch_0[%[[C4]], %[[C4]], %[[C1]]](%arg0) : (tensor<4x4xf32>) -> tensor<4x4xf32>
+//  CHECK-NEXT:   %1 = flow.dispatch @interleavedDot_dispatch_1::@interleavedDot_dispatch_1[%[[C4]], %[[C4]], %[[C1]]](%arg0, %0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+//  CHECK-NEXT:   return %1 : tensor<4x4xf32>
 //  CHECK-NEXT: }
 
 // -----
@@ -87,12 +79,8 @@ func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.addf %{{.+}}, %{{.+}} : f32
 //       CHECK: func @reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
-//  CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg0) : (tensor<4x8xf32>) -> tensor<4xf32> =
-//  CHECK-NEXT:       (%arg1: tensor<4x8xf32>) -> tensor<4xf32> {
-//   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-NEXT:     %1 = flow.dispatch @reduction_dispatch_0::@reduction_dispatch_0[%[[C4]], %[[C1]], %[[C1]]](%arg1) : (tensor<4x8xf32>) -> tensor<4xf32>
-//  CHECK-NEXT:     flow.return %1 : tensor<4xf32>
-//  CHECK-NEXT:   }
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-NEXT:   %0 = flow.dispatch @reduction_dispatch_0::@reduction_dispatch_0[%[[C4]], %[[C1]], %[[C1]]](%arg0) : (tensor<4x8xf32>) -> tensor<4xf32>
 //  CHECK-NEXT:   return %0 : tensor<4xf32>
 //  CHECK-NEXT: }

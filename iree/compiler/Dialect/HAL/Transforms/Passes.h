@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/ADT/StringMap.h"
@@ -75,10 +74,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 // device placements are made.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass();
 
-// Propagates hal.interface.workload.* information when constant.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createPropagateConstantWorkgroupInfoPass();
-
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createTranslateExecutablesPass();
@@ -112,19 +107,6 @@ createSerializeTargetExecutablesPass(StringRef target);
 // Resource initialization, caching, and optimization
 //===----------------------------------------------------------------------===//
 
-// Combines constant variables into one or more hal.constant_pools based on
-// usage semantics.
-std::unique_ptr<OperationPass<ModuleOp>> createIdentifyConstantPoolsPass();
-
-// Packs all constant data in a hal.constant_pool into their storage formats
-// and maps them with hal.constant_pool.span.
-std::unique_ptr<OperationPass<ConstantPoolOp>>
-createPackConstantPoolStoragePass();
-
-// Materializes runtime buffers for constant pools.
-std::unique_ptr<OperationPass<ModuleOp>>
-createMaterializeConstantPoolBuffersPass();
-
 // Performs packing and materializes runtime packing code when required.
 std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass();
 
@@ -157,17 +139,12 @@ inline void registerHALPasses() {
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createConvertToHALPass();
   createElideRedundantCommandsPass();
-  createIdentifyConstantPoolsPass();
   createInlineDeviceSwitchesPass();
   createLinkExecutablesPass();
   createLinkTargetExecutablesPass("");
-  createMaterializeConstantPoolBuffersPass();
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
-  createPackAllocationsPass();
-  createPackConstantPoolStoragePass();
-  createPropagateConstantWorkgroupInfoPass();
   createResolveEntryPointOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");

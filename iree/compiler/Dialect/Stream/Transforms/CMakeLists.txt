@@ -17,11 +17,26 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   SRCS
+    "AnnotateDispatchArguments.cpp"
     "ConvertToStream.cpp"
+    "ElideAsyncCopies.cpp"
     "EncodeTensors.cpp"
+    "FoldUniformOperands.cpp"
+    "FuseDispatchBindings.cpp"
+    "LayoutSlices.cpp"
+    "MaterializeCopyOnWrite.cpp"
     "OutlineConstants.cpp"
+    "PackAllocations.cpp"
+    "PackConstants.cpp"
     "PassDetail.h"
     "Passes.cpp"
+    "PropagateSubviews.cpp"
+    "PropagateTimepoints.cpp"
+    "RefineUsage.cpp"
+    "ScheduleAllocation.cpp"
+    "ScheduleConcurrency.cpp"
+    "ScheduleExecution.cpp"
+    "SpecializeDispatches.cpp"
     "VerifyLowerings.cpp"
   DEPS
     ::PassesIncGen
@@ -40,11 +55,14 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::Shape::Utils::TypeConversion
+    iree::compiler::Dialect::Stream::Analysis
+    iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::Conversion::FlowToStream
     iree::compiler::Dialect::Stream::Conversion::StandardToStream
     iree::compiler::Dialect::Stream::Conversion::UtilToStream
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Util::Analysis
+    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

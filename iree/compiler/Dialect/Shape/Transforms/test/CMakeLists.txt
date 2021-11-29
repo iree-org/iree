@@ -14,8 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "expand_function_dynamic_dims.mlir"
-    "expand_function_ranked_shape_dims.mlir"
     "fold_dim_over_shape_carrying_op.mlir"
   DATA
     iree::tools::IreeFileCheck

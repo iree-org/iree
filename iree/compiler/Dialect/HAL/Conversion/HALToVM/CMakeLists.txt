@@ -20,7 +20,6 @@ iree_cc_library(
     "ConvertBufferOps.cpp"
     "ConvertBufferViewOps.cpp"
     "ConvertCommandBufferOps.cpp"
-    "ConvertConstantOps.cpp"
     "ConvertDeviceOps.cpp"
     "ConvertExecutableOps.cpp"
     "ConvertExperimentalOps.cpp"

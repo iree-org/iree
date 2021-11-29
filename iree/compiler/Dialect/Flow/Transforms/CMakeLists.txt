@@ -35,17 +35,12 @@ iree_cc_library(
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchLinalgOnTensors.cpp"
-    "ExpandGlobalDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
-    "FormStreams.cpp"
     "FusionOfTensorOps.cpp"
     "GenerateDispatchTags.cpp"
-    "HoistUnstreamableOps.cpp"
     "InjectDispatchTracing.cpp"
-    "InsertConstantClones.cpp"
     "InterchangeGenericOps.cpp"
     "OutlineDispatchRegions.cpp"
-    "OutlineLargeConstants.cpp"
     "PadLinalgOps.cpp"
     "PadTensorToSubTensorInsert.cpp"
     "PassDetail.h"
@@ -57,6 +52,8 @@ iree_cc_library(
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRIR
@@ -75,11 +72,8 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::Shape::Utils::TypeConversion
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils

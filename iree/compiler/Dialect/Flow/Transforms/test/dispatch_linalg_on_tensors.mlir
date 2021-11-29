@@ -423,14 +423,14 @@ func @depthwise_conv2d(%input: tensor<1x113x113x96xf32>, %filter: tensor<3x3x96x
   %cst = arith.constant 0.000000e+00 : f32
   %1 = linalg.init_tensor [1, 56, 56, 96] : tensor<1x56x56x96xf32>
   %2 = linalg.fill(%cst, %1) : f32, tensor<1x56x56x96xf32> -> tensor<1x56x56x96xf32>
-  %4 = linalg.depthwise_conv2D_nhw {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%input, %filter : tensor<1x113x113x96xf32>, tensor<3x3x96xf32>) outs(%2 : tensor<1x56x56x96xf32>) -> tensor<1x56x56x96xf32>
+  %4 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%input, %filter : tensor<1x113x113x96xf32>, tensor<3x3x96xf32>) outs(%2 : tensor<1x56x56x96xf32>) -> tensor<1x56x56x96xf32>
   return %4 : tensor<1x56x56x96xf32>
 }
 
 // CHECK-LABEL: func @depthwise_conv2d
 // CHECK: scf.for
 // CHECK: scf.for
-// CHECK: linalg.depthwise_conv2D_nhw
+// CHECK: linalg.depthwise_conv_2d_nhwc_hwc
 
 // -----
 
@@ -862,12 +862,12 @@ func @dynamic_dot() -> !hal.buffer_view attributes {iree.abi.stub} {
 func @scatter(
     %original : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  %0 = linalg_ext.scatter
+  %0 = iree_linalg_ext.scatter
       ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
       ^bb0(%arg0: f32, %arg1: f32):
         %1 = arith.addf %arg0, %arg1 : f32
-        linalg_ext.yield %1 : f32
+        iree_linalg_ext.yield %1 : f32
   } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
@@ -901,8 +901,7 @@ func @scatter(
 //  CHECK-DAG:           %[[UPDATE_TILE:.+]] = flow.dispatch.tensor.load %[[ARG3]], offsets = [%[[IV0]], %[[IV1]]]
 //  CHECK-DAG:           %[[INDICES_TILE:.+]] = flow.dispatch.tensor.load %[[ARG4]], offsets = [%[[IV0]], 0]
 //  CHECK-DAG:           %[[ORIGINAL_TILE:.+]] = flow.dispatch.tensor.load %[[ARG5]], offsets = [0, %[[IV1]]]
-//  CHECK-DAG:           %[[SCATTER_TILE:.+]] = linalg_ext.scatter
-// CHECK-SAME:               {__internal_linalg_transform__ = "workgroup"}
+//  CHECK-DAG:           %[[SCATTER_TILE:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:               ins(%[[UPDATE_TILE]], %[[INDICES_TILE]] : tensor<?x?xf32>, tensor<?x1xi32>)
 // CHECK-SAME:               outs(%[[ORIGINAL_TILE]] : tensor<?x?xf32>)
 //      CHECK:           flow.dispatch.tensor.store %[[SCATTER_TILE]], %[[ARG5]], offsets = [0, %[[IV1]]]
@@ -912,11 +911,11 @@ func @scatter(
 
 func @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
     -> (tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
-  %0, %1 = linalg_ext.sort dimension(0)
+  %0, %1 = iree_linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
         %2 = arith.cmpf ogt, %arg4, %arg5 : f32
-        linalg_ext.yield %2 : i1
+        iree_linalg_ext.yield %2 : i1
       } -> tensor<?x?x?xi32>, tensor<?x?x?xf32>
   return %0, %1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>
 }
@@ -957,8 +956,7 @@ func @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
 //  CHECK-DAG:         %[[OUT2_TILE:.+]] = flow.dispatch.tensor.load %[[ARG3]]
 // CHECK-SAME:             offsets = [0, %[[IV0]], %[[IV1]]]
 // CHECK-SAME:             sizes = [%[[D0]], %[[TS_Y]], %[[TS_X]]]
-//      CHECK:         %[[RESULT_TILE:.+]]:2 = linalg_ext.sort dimension(0)
-// CHECK-SAME:             {__internal_linalg_transform__ = "workgroup"}
+//      CHECK:         %[[RESULT_TILE:.+]]:2 = iree_linalg_ext.sort dimension(0)
 // CHECK-SAME:             outs(%[[OUT1_TILE]], %[[OUT2_TILE]] :   tensor<?x?x?xi32>, tensor<?x?x?xf32>)
 //  CHECK-DAG:         flow.dispatch.tensor.store %[[RESULT_TILE]]#0
 // CHECK-SAME:             offsets = [0, %[[IV0]], %[[IV1]]]
@@ -976,11 +974,11 @@ func @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
 
 func @sort_1d(%arg0: tensor<?xi32>, %arg1 : tensor<?xf32>)
     -> (tensor<?xi32>, tensor<?xf32>) {
-  %0, %1 = linalg_ext.sort dimension(0)
+  %0, %1 = iree_linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?xi32>, tensor<?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
         %2 = arith.cmpf ogt, %arg4, %arg5 : f32
-        linalg_ext.yield %2 : i1
+        iree_linalg_ext.yield %2 : i1
       } -> tensor<?xi32>, tensor<?xf32>
   return %0, %1 : tensor<?xi32>, tensor<?xf32>
 }
@@ -994,8 +992,7 @@ func @sort_1d(%arg0: tensor<?xi32>, %arg1 : tensor<?xf32>)
 // CHECK-SAME:       %[[ARG3:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readwrite:?xf32>) {
 //  CHECK-DAG:     %[[OUT1_TILE:.+]] = flow.dispatch.tensor.load %[[ARG2]], offsets = [], sizes = []
 //  CHECK-DAG:     %[[OUT2_TILE:.+]] = flow.dispatch.tensor.load %[[ARG3]], offsets = [], sizes = []
-//      CHECK:     %[[RESULT_TILE:.+]]:2 = linalg_ext.sort dimension(0)
-// CHECK-SAME:         {__internal_linalg_transform__ = "workgroup"}
+//      CHECK:     %[[RESULT_TILE:.+]]:2 = iree_linalg_ext.sort dimension(0)
 // CHECK-SAME:         outs(%[[OUT1_TILE]], %[[OUT2_TILE]] : tensor<?xi32>, tensor<?xf32>)
 //  CHECK-DAG:     flow.dispatch.tensor.store %[[RESULT_TILE]]#0, %[[ARG2]]
 //  CHECK-DAG:     flow.dispatch.tensor.store %[[RESULT_TILE]]#1, %[[ARG3]]
@@ -1011,11 +1008,11 @@ func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : ten
   %cst_0 = arith.constant dense<[9, 10, 11, 12]> : tensor<4xi32>
   %cst_1 = arith.constant dense<[[1], [3], [4], [7]]> : tensor<4x1xi32>
   %cst_2 = arith.constant dense<0> : tensor<8xi32>
-  %0 = linalg_ext.scatter
+  %0 = iree_linalg_ext.scatter
       ins(%arg0, %arg1 : tensor<4xi32>, tensor<4x1xi32>)
       outs(%arg2 : tensor<8xi32>)  {
     ^bb0(%arg3: i32, %arg4: i32):  // no predecessors
-      linalg_ext.yield %arg3 : i32
+      iree_linalg_ext.yield %arg3 : i32
     } -> tensor<8xi32>
   return %0 : tensor<8xi32>
 }
@@ -1028,7 +1025,7 @@ func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : ten
 // CHECK-SAME:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:4x1xi32>
 // CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readwrite:8xi32>
 //      CHECK:     scf.for %[[IV:.+]] = %{{.+}} to %{{.+}} step %{{.+}} {
-//      CHECK:       %[[SCATTER_TILE:.+]] = linalg_ext.scatter
+//      CHECK:       %[[SCATTER_TILE:.+]] = iree_linalg_ext.scatter
 //      CHECK:       flow.dispatch.tensor.store %[[SCATTER_TILE]], %[[ARG5]], offsets = [], sizes = [], strides = []
 // CHECK-NEXT:     }
 //      CHECK:  return %[[RESULT]]
@@ -1128,3 +1125,21 @@ func @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
 // CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
 //      CHECK:   %[[SLICE:.+]] = flow.dispatch.tensor.load %[[INPUT]]
 //      CHECK:   flow.dispatch.tensor.store %[[SLICE]], %[[OUTPUT]]
+
+// -----
+
+func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
+    %arg3 : index, %arg4 : index, %arg5 : f32) -> tensor<?x?xf32> {
+  %0 = linalg.pad_tensor %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
+    ^bb0(%arg6 : index, %arg7 : index):
+      linalg.yield %arg5 : f32
+  } :  tensor<?x?xf32> to tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+//      CHECK: flow.dispatch.workgroups
+// CHECK-NEXT:   %[[ARG6:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+// CHECK-SAME:   %[[ARG12:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>
+//      CHECK:   scf.for
+//      CHECK:     scf.for
+//      CHECK:       flow.dispatch.tensor.load %[[ARG6]]
+//      CHECK:       flow.dispatch.tensor.store %{{.+}}, %[[ARG12]]

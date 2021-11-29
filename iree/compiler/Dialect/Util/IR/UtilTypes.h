@@ -187,8 +187,21 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
   return align(value, alignment.getZExtValue());
 }
 
-// Aligns |value| to |alignment|, rounding up if needed.
-Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder);
+// Returns the number of bytes an element of the given type occupies in memory.
+// This is in the default dense conversion to machine words where sizes must be
+// powers of two aligned to bytes.
+//
+// Example:
+//   getRoundedElementByteWidth(i1) = 1
+//   getRoundedElementByteWidth(i23) = 4
+//   getRoundedElementByteWidth(i32) = 4
+//   getRoundedElementByteWidth(bf16) = 2
+static inline int32_t getRoundedElementByteWidth(Type type) {
+  // Round up to 8-bit aligned bytes.
+  unsigned byteAligned = (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
+  // Round up to the next power of two (unless already a power of two).
+  return llvm::PowerOf2Ceil(byteAligned);
+}
 
 }  // namespace Util
 }  // namespace IREE

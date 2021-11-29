@@ -211,18 +211,17 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_dialects.h"
       "init_iree_passes.h"
     DEPS
-      IREEDialectsIREEPyDMDialect
-      IREEDialectsIREEDialect
+      IREEInputDialect
+      IREEPyDMDialect
       MLIRIR
       iree::compiler::Bindings::Native::Transforms
       iree::compiler::Bindings::TFLite::Transforms
+      iree::compiler::Codegen::Dialect::IREECodegenDialect
+      iree::compiler::Codegen::Dialect::ProcessorOpInterfaces
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect
       iree::compiler::Dialect::HAL::Transforms
-      iree::compiler::Dialect::LinalgExt::IR
-      iree::compiler::Dialect::LinalgExt::IR::TiledOpInterface
-      iree::compiler::Dialect::LinalgExt::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms
       iree::compiler::Dialect::Shape::IR

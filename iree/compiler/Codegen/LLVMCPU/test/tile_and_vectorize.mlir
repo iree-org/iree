@@ -33,8 +33,8 @@ module  {
         %11 = affine.min #map3(%arg0)
         %12 = affine.min #map4(%arg1)
         %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf32>
-        %14 = linalg.fill(%cst, %13) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-        %15 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config1} ins(%8, %10 : tensor<?x383xf32>, tensor<383x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %14 = linalg.fill(%cst, %13) {lowering.config = #config0} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+        %15 = linalg.matmul {lowering.config = #config1} ins(%8, %10 : tensor<?x383xf32>, tensor<383x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:383x513xf32>
       }
     }

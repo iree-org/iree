@@ -264,19 +264,22 @@ static ParseResult parseResourceRegion(
     }
   }
 
-  if (failed(parser.parseArrow())) return failure();
-  if (succeeded(parser.parseOptionalLParen())) {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandSizes, resultTypes, resultSizes,
-                                     tiedOperands)) ||
-        failed(parser.parseRParen())) {
-      return failure();
-    }
-  } else {
-    if (failed(parseShapedResultList(parser, operands, operandTypes,
-                                     operandSizes, resultTypes, resultSizes,
-                                     tiedOperands))) {
-      return failure();
+  if (succeeded(parser.parseOptionalArrow())) {
+    if (succeeded(parser.parseOptionalLParen())) {
+      if (succeeded(parser.parseOptionalRParen())) {
+        // -> ()
+      } else if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                              operandSizes, resultTypes,
+                                              resultSizes, tiedOperands)) ||
+                 failed(parser.parseRParen())) {
+        return failure();
+      }
+    } else {
+      if (failed(parseShapedResultList(parser, operands, operandTypes,
+                                       operandSizes, resultTypes, resultSizes,
+                                       tiedOperands))) {
+        return failure();
+      }
     }
   }
   return parser.parseRegion(body, regionArgs, operandTypes,
@@ -303,11 +306,14 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
           operandSizes = operandSizes.drop_front(1);
         }
       });
-  p << ") -> ";
-  if (resultTypes.size() != 1) p << "(";
-  printShapedResultList(p, op, operands, operandTypes, operandSizes,
-                        resultTypes, resultSizes, tiedOperands);
-  if (resultTypes.size() != 1) p << ")";
+  p << ")";
+  if (!resultTypes.empty()) {
+    p << " -> ";
+    if (resultTypes.size() != 1) p << "(";
+    printShapedResultList(p, op, operands, operandTypes, operandSizes,
+                          resultTypes, resultSizes, tiedOperands);
+    if (resultTypes.size() != 1) p << ")";
+  }
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }
@@ -1541,6 +1547,23 @@ SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(mlir::FuncOp funcOp) {
     unsigned argIdx = it.index();
     auto argType = it.value();
     if (!argType.isa<IREE::Stream::BindingType>()) {
+      map[operandIdx++] = argIdx;
+    }
+  }
+  return map;
+}
+
+// static
+SmallVector<unsigned> CmdDispatchOp::makeResourceToArgMap(mlir::FuncOp funcOp) {
+  unsigned operandCount = llvm::count_if(
+      funcOp.getArgumentTypes(),
+      [](Type type) { return type.isa<IREE::Stream::BindingType>(); });
+  SmallVector<unsigned> map(operandCount);
+  unsigned operandIdx = 0;
+  for (auto it : llvm::enumerate(funcOp.getArgumentTypes())) {
+    unsigned argIdx = it.index();
+    auto argType = it.value();
+    if (argType.isa<IREE::Stream::BindingType>()) {
       map[operandIdx++] = argIdx;
     }
   }

@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
+#include "llvm/Support/Alignment.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"

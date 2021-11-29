@@ -56,6 +56,19 @@ func @PropagateClonableOps(%arg0: index) -> !stream.resource<*> {
 
 // -----
 
+// CHECK-LABEL: @ConvertSplatConstantsIntoSplats
+func @ConvertSplatConstantsIntoSplats(%arg0: index) -> (!stream.resource<transient>, !stream.resource<transient>) {
+  // CHECK-NOT: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[3]> : tensor<8xi32>
+  // CHECK: %[[CST:.+]] = arith.constant 3 : i32
+  // CHECK: %0 = stream.async.splat %[[CST]] : i32 -> !stream.resource<transient>{%arg0}
+  %0 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<3> : tensor<8xi32>
+  // CHECK: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[1, 2, 3, 4, 5, 6, 7, 8]> : tensor<8xi32>
+  %1 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<[1, 2, 3, 4, 5, 6, 7, 8]> : tensor<8xi32>
+  return %0, %1 : !stream.resource<transient>, !stream.resource<transient>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldAsyncSliceOp
 func @FoldAsyncSliceOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
@@ -134,11 +147,20 @@ func @CombineSliceUpdateFromToCopy(%arg0: !stream.resource<*>, %arg1: index, %ar
 // -----
 
 // CHECK-LABEL: @AsyncCopyFullSourceToUpdate
-func @AsyncCopyFullSourceToUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
+func @AsyncCopyFullSourceToUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+
+  // This copy is from the full source (0..%arg3) so it can be turned into an update.
   // CHECK: = stream.async.update %arg2, %arg0[%c0 to %arg3] : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
   %0 = stream.async.copy %arg2[%c0 to %arg3], %arg0[%c0 to %arg3], %arg3 : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
-  return %0 : !stream.resource<*>
+
+  // This copy is only a partial section of the source and needs to remain a copy.
+  // CHECK: = stream.async.copy %arg2[%c16 to %arg3], %arg0[%c0 to %arg3], %c8 : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
+  %1 = stream.async.copy %arg2[%c16 to %arg3], %arg0[%c0 to %arg3], %c8 : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
+
+  return %0, %1 : !stream.resource<*>, !stream.resource<*>
 }
 
 // -----

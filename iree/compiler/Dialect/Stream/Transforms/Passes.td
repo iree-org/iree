@@ -45,6 +45,157 @@ def EncodeTensors :
   }];
 }
 
+def MaterializeCopyOnWrite :
+    Pass<"iree-stream-materialize-copy-on-write", ""> {
+  let summary = "Materializes copy-on-write (🐄) behavior as explicit ops.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createMaterializeCopyOnWritePass()
+  }];
+}
+
+def ElideAsyncCopies :
+    Pass<"iree-stream-elide-async-copies", "mlir::ModuleOp"> {
+  let summary = "Elides copies when they are not performing meaningful work.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createElideAsyncCopiesPass()
+  }];
+}
+
+def RefineUsage :
+    Pass<"iree-stream-refine-usage", "mlir::ModuleOp"> {
+  let summary = "Refines resource usage bits and inserts transfers where appropriate.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createRefineUsagePass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Stream formation and scheduling
+//===----------------------------------------------------------------------===//
+
+def ScheduleExecution :
+    Pass<"iree-stream-schedule-execution", ""> {
+  let summary = "Identifies and groups asynchronous operations into executable regions within function-like regions.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createScheduleExecutionPass()
+  }];
+}
+
+def ScheduleConcurrency :
+    Pass<"iree-stream-schedule-concurrency", ""> {
+  let summary = "Identifies and groups asynchronous operations within executable regions that can run concurrently and groups them into streams.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createScheduleConcurrencyPass()
+  }];
+}
+
+def PropagateTimepoints :
+    Pass<"iree-stream-propagate-timepoints", "mlir::ModuleOp"> {
+  let summary = "Materializes timepoints and sinks them to consumers throughout the whole program.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPropagateTimepointsPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Allocation and command issuing
+//===----------------------------------------------------------------------===//
+
+def ScheduleAllocation :
+    Pass<"iree-stream-schedule-allocation", ""> {
+  let summary = "Allocates resources and converts to explicit stream commands.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createScheduleAllocationPass()
+  }];
+}
+
+def PackConstants :
+    Pass<"iree-stream-pack-constants", ""> {
+  let summary = "Packs and allocate backing storage for fused constant resources.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPackConstantsPass()
+  }];
+}
+
+def PackAllocations :
+    Pass<"iree-stream-pack-allocations", ""> {
+  let summary = "Packs fused allocations based on lifetime.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPackAllocationsPass()
+  }];
+}
+
+def LayoutSlices :
+    Pass<"iree-stream-layout-slices", ""> {
+  let summary = "Lays out packed slices and produces arithmetic required for all offsets.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createLayoutSlicesPass()
+  }];
+}
+
+def PropagateSubviews :
+    Pass<"iree-stream-propagate-subviews", "mlir::ModuleOp"> {
+  let summary = "Propagates resource subviews throughout the whole program.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createPropagateSubviewsPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Stream memoization
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): outline streams (ala dispatch regions).
+// TODO(benvanik): deduplicate outlined streams.
+
+//===----------------------------------------------------------------------===//
+// Dispatch optimization
+//===----------------------------------------------------------------------===//
+
+def FoldUniformOperands :
+    Pass<"iree-stream-fold-uniform-operands", "mlir::ModuleOp"> {
+  let summary = "Folds redundant and uniformly constant dispatch operands.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createFoldUniformOperandsPass()
+  }];
+}
+
+def FuseDispatchBindings :
+    Pass<"iree-stream-fuse-dispatch-bindings", "mlir::ModuleOp"> {
+  let summary = "Fuses bindings to the same underlying storage to reduce binding count.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createFuseDispatchBindingsPass()
+  }];
+  let options = [
+    Option<"aliasMutableBindings", "alias-mutable-bindings",
+           "bool", /*default=*/"false",
+           "Fuses bindings that are mutable instead of leaving them split.">
+  ];
+}
+
+def SpecializeDispatches :
+    Pass<"iree-stream-specialize-dispatches", "mlir::ModuleOp"> {
+  let summary = "Specializes executables by inlining/fusing operands based on dispatch sites.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createSpecializeDispatchesPass()
+  }];
+}
+
+def AnnotateDispatchArguments :
+    Pass<"iree-stream-annotate-dispatch-arguments", "mlir::ModuleOp"> {
+  let summary = "Annotates dispatch arguments with potential values derived from dispatch sites.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createAnnotateDispatchArgumentsPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Stream memoization
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): outline streams (ala dispatch regions).
+// TODO(benvanik): deduplicate outlined streams.
+
 //===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//

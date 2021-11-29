@@ -2425,21 +2425,21 @@ hal.interface private @io  {
 
 // -----
 
-func @linalg_ext_sort_1d() {
+func @iree_linalg_ext.sort_1d() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan @io::@rw[%c0] : !flow.dispatch.tensor<readwrite:128xi32>
   %1 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:128xi32> -> tensor<128xi32>
-  %2 = linalg_ext.sort dimension(0) outs(%1 : tensor<128xi32>) {
+  %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<128xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
     %3 = arith.cmpi sgt, %arg0, %arg1 : i32
-    linalg_ext.yield %3 : i1
+    iree_linalg_ext.yield %3 : i1
   } -> tensor<128xi32>
   flow.dispatch.tensor.store %2, %0, offsets = [], sizes = [], strides = [] : tensor<128xi32> -> !flow.dispatch.tensor<readwrite:128xi32>
   return
 }
-// CHECK-LABEL: func @linalg_ext_sort_1d()
+// CHECK-LABEL: func @iree_linalg_ext.sort_1d()
 //   CHECK-DAG:   %[[INOUT:.+]] = hal.interface.binding.subspan @io::@rw
-//       CHECK:   linalg_ext.sort
+//       CHECK:   iree_linalg_ext.sort
 //  CHECK-SAME:     dimension(0)
 //  CHECK-SAME:     outs(%[[INOUT]] : memref<128xi32>)
 
@@ -2724,3 +2724,96 @@ hal.interface private @io {
 //       CHECK:       linalg.generic
 //  CHECK-SAME:           ins(%[[SCALAR]], %[[OUT_SUBVIEW1]] :
 //  CHECK-SAME:           outs(%[[OUT_SUBVIEW1]] :
+
+// -----
+
+#map_dist = affine_map<()[s0, s1] -> (s0 * s1)>
+#map_min = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
+#map_indexing = affine_map<(d0, d1) -> (d0, d1)>
+func @two_level_tile_and_fuse()
+{
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+  %cst = arith.constant 0.0 : f32
+  %m = hal.interface.load.constant offset = 0 : index
+  %n = hal.interface.load.constant offset = 1 : index
+  %k = hal.interface.load.constant offset = 2 : index
+  %lhs = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
+  %rhs = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
+  %bias = hal.interface.binding.subspan @io::@arg2[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %n}
+  %result = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
+  %id_x = hal.interface.workgroup.id[0] : index
+  %count_x = hal.interface.workgroup.count[0] : index
+  %size_x = hal.interface.workgroup.size[0] : index
+  %id_y = hal.interface.workgroup.id[1] : index
+  %count_y = hal.interface.workgroup.count[1] : index
+  %size_y = hal.interface.workgroup.size[1] : index
+  %lb_y = affine.apply #map_dist()[%id_y, %count_y]
+  %step_y = affine.apply #map_dist()[%count_y, %count_y]
+  scf.for %iv0 = %lb_y to %m step %step_y {
+    %lb_x = affine.apply #map_dist()[%id_x, %count_x]
+    %step_x = affine.apply #map_dist()[%count_x, %count_x]
+    scf.for %iv1 = %lb_x to %n step %step_x {
+      %ts_m = affine.min #map_min(%iv0)[%size_y, %m]
+      %ts_n = affine.min #map_min(%iv1)[%size_x, %n]
+      %lhs_tile = flow.dispatch.tensor.load %lhs, offsets = [%iv0, 0], sizes = [%ts_m, %k], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+      %rhs_tile = flow.dispatch.tensor.load %rhs, offsets = [0, %iv1], sizes = [%k, %ts_n], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+      %bias_tile = flow.dispatch.tensor.load %bias, offsets = [%iv0, %iv1], sizes = [%ts_m, %ts_n], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+      %tile_init = linalg.init_tensor [%ts_m, %ts_n] : tensor<?x?xf32>
+      %tile_result = scf.for %iv2 = %c0 to %ts_m step %c16 iter_args(%arg0 = %tile_init) -> (tensor<?x?xf32>) {
+        %tile_yield = scf.for %iv3 = %c0 to %ts_n step %c8 iter_args(%arg1 = %arg0) -> (tensor<?x?xf32>) {
+          %ts_2_m = affine.min #map_min(%iv2)[%c16, %ts_m]
+          %ts_2_n = affine.min #map_min(%iv3)[%c8, %ts_n]
+          %tile_init_2 = linalg.init_tensor [%ts_2_m, %ts_2_n] : tensor<?x?xf32>
+          %fill_tile_2 = linalg.fill(%cst, %tile_init_2) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+          %lhs_tile_2 = tensor.extract_slice %lhs_tile[%iv2, 0] [%ts_2_m, %k] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+          %rhs_tile_2 = tensor.extract_slice %rhs_tile[0, %iv3] [%k, %ts_2_n] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+          %matmul_tile_2 = linalg.matmul
+              ins(%lhs_tile_2, %rhs_tile_2 : tensor<?x?xf32>, tensor<?x?xf32>)
+              outs(%fill_tile_2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+          %bias_tile_2 = tensor.extract_slice %bias_tile[%iv2, %iv3] [%ts_2_m, %ts_2_n] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+          %init_slice = tensor.extract_slice %arg1[%iv2, %iv3] [%ts_2_m, %ts_2_n] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+          %tile_result_2 = linalg.generic {
+              indexing_maps = [#map_indexing, #map_indexing, #map_indexing],
+              iterator_types = ["parallel", "parallel"]}
+              ins(%matmul_tile_2, %bias_tile_2 : tensor<?x?xf32>, tensor<?x?xf32>)
+              outs(%init_slice : tensor<?x?xf32>) {
+              ^bb0(%arg2 : f32, %arg3 : f32, %arg4 : f32):
+                %bias_add = arith.addf %arg2, %arg3 : f32
+                linalg.yield %bias_add : f32
+              } -> tensor<?x?xf32>
+          %insert = tensor.insert_slice %tile_result_2 into %arg1[%iv2, %iv3] [%ts_2_m, %ts_2_n] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
+          scf.yield %insert : tensor<?x?xf32>
+        }
+        scf.yield %tile_yield : tensor<?x?xf32>
+      }
+      flow.dispatch.tensor.store %tile_result, %result, offsets = [%iv0, %iv1], sizes = [%ts_m, %ts_n], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+    }
+  }
+  return
+}
+// CHECK-LABEL: func @two_level_tile_and_fuse()
+//   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
+//   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @io::@arg1
+//   CHECK-DAG:   %[[BIAS:.+]] = hal.interface.binding.subspan @io::@arg2
+//   CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @io::@ret0
+//       CHECK:   scf.for %[[IV0:[a-zA-Z0-9]+]] =
+//       CHECK:     scf.for %[[IV1:[a-zA-Z0-9]+]] =
+//   CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[LHS]][%[[IV0]], 0]
+//   CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]]
+//   CHECK-DAG:       %[[BIAS_TILE:.+]] = memref.subview %[[BIAS]][%[[IV0]], %[[IV1]]]
+//   CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]]
+//       CHECK:       scf.for %[[IV2:[a-zA-Z0-9]+]] =
+//       CHECK:         scf.for %[[IV3:[a-zA-Z0-9]+]] =
+//       CHECK:           %[[RESULT_TILE_2:.+]] = memref.subview %[[RESULT_TILE]][%[[IV2]], %[[IV3]]]
+//       CHECK:           linalg.fill(%{{.+}}, %[[RESULT_TILE_2]])
+//   CHECK-DAG:           %[[LHS_TILE_2:.+]] = memref.subview %[[LHS_TILE]][%[[IV2]], 0]
+//   CHECK-DAG:           %[[RHS_TILE_2:.+]] = memref.subview %[[RHS_TILE]][0, %[[IV3]]]
+//       CHECK:           linalg.matmul
+//  CHECK-SAME:               ins(%[[LHS_TILE_2]], %[[RHS_TILE_2]]
+//  CHECK-SAME:               outs(%[[RESULT_TILE_2]]
+//       CHECK:           %[[BIAS_TILE_2:.+]] = memref.subview %[[BIAS_TILE]][%[[IV2]], %[[IV3]]]
+//       CHECK:           linalg.generic
+//  CHECK-SAME:               ins(%[[RESULT_TILE_2]], %[[BIAS_TILE_2]]
+//  CHECK-SAME:               outs(%[[RESULT_TILE_2]]

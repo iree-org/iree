@@ -1,5 +1,27 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-hal-elide-redundant-commands)' %s | IreeFileCheck %s
 
+// Tests that redundant barriers are elided but barriers gaurding ops are not.
+
+// CHECK-LABEL: @elideRedundantBarriers
+// CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer, %[[LAYOUT:.+]]: !hal.executable_layout)
+func @elideRedundantBarriers(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c42_i32 = arith.constant 42 : i32
+  // CHECK: hal.command_buffer.execution_barrier
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|Transfer|CommandRetire") target("CommandIssue|Dispatch|Transfer") flags("None")
+  // CHECK-NOT: hal.command_buffer.execution_barrier
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|Transfer|CommandRetire") target("CommandIssue|Dispatch|Transfer") flags("None")
+  // CHECK: hal.command_buffer.push_constants
+  hal.command_buffer.push_constants<%cmd : !hal.command_buffer> layout(%executable_layout : !hal.executable_layout) offset(0) values([%c42_i32]) : i32
+  // CHECK: hal.command_buffer.execution_barrier
+  hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|Transfer|CommandRetire") target("CommandIssue|Dispatch|Transfer") flags("None")
+  // CHECK: return
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @elidePushConstants
 func @elidePushConstants(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0

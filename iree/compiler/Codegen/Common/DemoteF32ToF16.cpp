@@ -97,7 +97,7 @@ class GenericTypeConvert : public ConversionPattern {
                                 ConversionPatternRewriter &rewriter,
                                 SmallVectorImpl<NamedAttribute> &newAttrs) {
     for (auto attr : attrs) {
-      if (auto fpAttr = attr.second.dyn_cast<DenseFPElementsAttr>()) {
+      if (auto fpAttr = attr.getValue().dyn_cast<DenseFPElementsAttr>()) {
         std::vector<llvm::APFloat> args;
         if (!fpAttr.getType().getElementType().isF32()) continue;
         for (llvm::APFloat f : fpAttr.getValues<APFloat>()) {
@@ -107,16 +107,15 @@ class GenericTypeConvert : public ConversionPattern {
         }
         auto tensorType = RankedTensorType::get(fpAttr.getType().getShape(),
                                                 rewriter.getF16Type());
-        newAttrs.push_back(std::make_pair(
-            attr.first, DenseElementsAttr::get(tensorType, args)));
-      } else if (auto typeAttr = attr.second.dyn_cast<TypeAttr>()) {
+        newAttrs.emplace_back(attr.getName(),
+                              DenseElementsAttr::get(tensorType, args));
+      } else if (auto typeAttr = attr.getValue().dyn_cast<TypeAttr>()) {
         if (isIllegalType(typeAttr.getValue())) {
           if (auto tensorType =
                   typeAttr.getValue().dyn_cast<RankedTensorType>()) {
             Type newType = RankedTensorType::get(tensorType.getShape(),
                                                  rewriter.getF16Type());
-            newAttrs.push_back(
-                std::make_pair(attr.first, TypeAttr::get(newType)));
+            newAttrs.emplace_back(attr.getName(), TypeAttr::get(newType));
           }
         }
       } else {

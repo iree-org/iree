@@ -31,9 +31,9 @@ template <typename OpTy>
 struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      OpTy op, ArrayRef<Value> operands,
+      OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, operands);
+    rewriter.replaceOp(op, adaptor.getOperands());
     return success();
   }
 };
@@ -44,12 +44,6 @@ static bool isRankZeroOrOneMemRef(Type type) {
     return memrefType.hasRank() && memrefType.getRank() <= 1;
   }
   return false;
-}
-
-// Returns the number of bytes an element of the given type occupies
-// post-conversion. For example, the size of i1 would be '1 byte'.
-static int32_t getRoundedElementByteWidth(Type type) {
-  return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
 }
 
 // Returns the offset, in bytes, of an index within a linearized dense buffer.
@@ -68,7 +62,7 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   auto elementType = memrefType.getElementType();
   auto scalingExpr = getAffineBinaryOpExpr(
       AffineExprKind::Mul, getAffineSymbolExpr(0, rewriter.getContext()),
-      getAffineConstantExpr(getRoundedElementByteWidth(elementType),
+      getAffineConstantExpr(IREE::Util::getRoundedElementByteWidth(elementType),
                             rewriter.getContext()));
 
   // Rank 1 memrefs are just offset by their element width by the offset.
@@ -82,9 +76,8 @@ class ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      memref::GlobalOp globalOp, ArrayRef<Value> rawOperands,
+      memref::GlobalOp globalOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    memref::GlobalOpAdaptor operands(rawOperands);
     if (!isRankZeroOrOneMemRef(globalOp.type())) {
       return rewriter.notifyMatchFailure(
           globalOp,
@@ -112,9 +105,8 @@ class ConvertMemRefGetGlobalOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      memref::GetGlobalOp getOp, ArrayRef<Value> rawOperands,
+      memref::GetGlobalOp getOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    memref::GetGlobalOpAdaptor operands(rawOperands);
     if (!isRankZeroOrOneMemRef(getOp.result().getType())) {
       return rewriter.notifyMatchFailure(
           getOp, "only rank-0 and rank-1 memrefs are supported; flatten first");
@@ -130,9 +122,8 @@ class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      memref::LoadOp loadOp, ArrayRef<Value> rawOperands,
+      memref::LoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    memref::LoadOpAdaptor operands(rawOperands);
     if (!isRankZeroOrOneMemRef(loadOp.memref().getType())) {
       return rewriter.notifyMatchFailure(
           loadOp,
@@ -147,35 +138,35 @@ class ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
       if (integerType.isInteger(1) || integerType.isInteger(8)) {
         if (integerType.isSigned() || integerType.isSignless()) {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI8SOp>(
-              loadOp, newType, operands.memref(), byteOffset);
+              loadOp, newType, adaptor.memref(), byteOffset);
         } else {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI8UOp>(
-              loadOp, newType, operands.memref(), byteOffset);
+              loadOp, newType, adaptor.memref(), byteOffset);
         }
       } else if (integerType.isInteger(16)) {
         if (integerType.isSigned() || integerType.isSignless()) {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI16SOp>(
-              loadOp, newType, operands.memref(), byteOffset);
+              loadOp, newType, adaptor.memref(), byteOffset);
         } else {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI16UOp>(
-              loadOp, newType, operands.memref(), byteOffset);
+              loadOp, newType, adaptor.memref(), byteOffset);
         }
       } else if (integerType.isInteger(32)) {
         rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI32Op>(
-            loadOp, newType, operands.memref(), byteOffset);
+            loadOp, newType, adaptor.memref(), byteOffset);
       } else if (integerType.isInteger(64)) {
         rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI64Op>(
-            loadOp, newType, operands.memref(), byteOffset);
+            loadOp, newType, adaptor.memref(), byteOffset);
       } else {
         return rewriter.notifyMatchFailure(
             loadOp, "invalid integer buffer element type");
       }
     } else if (oldType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadF32Op>(
-          loadOp, newType, operands.memref(), byteOffset);
+          loadOp, newType, adaptor.memref(), byteOffset);
     } else if (oldType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadF64Op>(
-          loadOp, newType, operands.memref(), byteOffset);
+          loadOp, newType, adaptor.memref(), byteOffset);
     } else {
       return rewriter.notifyMatchFailure(loadOp,
                                          "invalid float buffer element type");
@@ -189,9 +180,8 @@ class ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      memref::StoreOp storeOp, ArrayRef<Value> rawOperands,
+      memref::StoreOp storeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    memref::StoreOpAdaptor operands(rawOperands);
     if (!isRankZeroOrOneMemRef(storeOp.memref().getType())) {
       return rewriter.notifyMatchFailure(
           storeOp,
@@ -203,22 +193,22 @@ class ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
         getTypeConverter()->convertType(rewriter.getIndexType()), rewriter);
     if (oldType.isInteger(1) || oldType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI8Op>(
-          storeOp, operands.memref(), byteOffset, operands.value());
+          storeOp, adaptor.memref(), byteOffset, adaptor.value());
     } else if (oldType.isInteger(16)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI16Op>(
-          storeOp, operands.memref(), byteOffset, operands.value());
+          storeOp, adaptor.memref(), byteOffset, adaptor.value());
     } else if (oldType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI32Op>(
-          storeOp, operands.memref(), byteOffset, operands.value());
+          storeOp, adaptor.memref(), byteOffset, adaptor.value());
     } else if (oldType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI64Op>(
-          storeOp, operands.memref(), byteOffset, operands.value());
+          storeOp, adaptor.memref(), byteOffset, adaptor.value());
     } else if (oldType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreF32Op>(
-          storeOp, operands.memref(), byteOffset, operands.value());
+          storeOp, adaptor.memref(), byteOffset, adaptor.value());
     } else if (oldType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreF64Op>(
-          storeOp, operands.memref(), byteOffset, operands.value());
+          storeOp, adaptor.memref(), byteOffset, adaptor.value());
     } else {
       return rewriter.notifyMatchFailure(storeOp,
                                          "invalid buffer element type");

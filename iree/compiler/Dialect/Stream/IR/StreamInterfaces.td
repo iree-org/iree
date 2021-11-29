@@ -100,19 +100,27 @@ def Stream_SubviewEffectOp : OpInterface<"SubviewEffectOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
-// IREE::Stream::AsyncOpInterface
+// IREE::Stream::TimelineOpInterface
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): add interface for async ops:
-//   getWaitTimepoint
-//   setWaitTimepoint
-//   getWaitResources
-//   getSignalTimepoint
-//   setSignalTimepoint
-//   getSignalResources
-//   + maybe mutable resource accessors? (MutableOperandRange)
-// This would let us rework code relying on AsyncExecuteOp/CmdExecuteOp to work
-// with both, and wait elision canonicalization patterns to be shared across
-// the async resource ops and execution ops.
+def Stream_TimelineOp : OpInterface<"TimelineOpInterface"> {
+  let description = [{
+    Interface for ops that operate in an ordered sequence defined by timepoints.
+  }];
+
+  let methods = [
+    // TODO(benvanik): implement interface methods:
+    //   getWaitTimepoints
+    //   setWaitTimepoints
+    //   getWaitResources
+    //   getSignalTimepoint
+    //   setSignalTimepoint
+    //   getSignalResources
+    //   + maybe mutable resource accessors? (MutableOperandRange)
+    // This would let us rework code relying on AsyncExecuteOp/CmdExecuteOp to
+    // work with both, and wait elision canonicalization patterns to be shared
+    // across the async resource ops and execution ops.
+  ];
+}
 
 #endif  // IREE_DIALECT_STREAM_INTERFACES

@@ -12,7 +12,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -29,12 +28,6 @@ Value buildRankedShapeForValueInList(Location loc, unsigned index,
                                      ValueRange flatValues,
                                      ValueRange flatDynamicDims,
                                      OpBuilder &builder);
-
-// Returns dimension values for each dimension of the given |value|.
-// |value| must be a ShapedType and may optionally have a ranked_shape tied.
-Optional<SmallVector<Value, 4>> buildOrFindDimsForValue(Location loc,
-                                                        Value value,
-                                                        OpBuilder &builder);
 
 // Returns dimension values for each dynamic dimension of the given |value|.
 // |value| must be a ShapedType and may optionally have a ranked_shape tied.

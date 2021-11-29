@@ -154,7 +154,7 @@ struct ConvertConstantMatrix final
     // Only convert splat integer/float vectors.
     auto values = op.value().dyn_cast<DenseIntOrFPElementsAttr>();
     if (!values || !values.isSplat()) return failure();
-    Attribute value = values.getSplatValue();
+    Attribute value = values.getSplatValue<Attribute>();
 
     auto elementType = values.getType().getElementType();
     Value splatValue = rewriter.create<spirv::ConstantOp>(
@@ -173,10 +173,10 @@ struct ConvertElementwiseOp final : public OpConversionPattern<SrcOpType> {
   using OpConversionPattern<SrcOpType>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      SrcOpType op, ArrayRef<Value> operands,
+      SrcOpType op, typename SrcOpType::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // All operands should be of cooperative matrix types.
-    for (Value operand : operands) {
+    for (Value operand : adaptor.getOperands()) {
       if (!operand.getType().isa<spirv::CooperativeMatrixNVType>())
         return failure();
     }
@@ -185,7 +185,7 @@ struct ConvertElementwiseOp final : public OpConversionPattern<SrcOpType> {
     if (op->getNumResults() != 1) return failure();
 
     auto matType = this->typeConverter->convertType(op.getType());
-    rewriter.replaceOpWithNewOp<DstOpType>(op, matType, operands);
+    rewriter.replaceOpWithNewOp<DstOpType>(op, matType, adaptor.getOperands());
     return success();
   }
 };

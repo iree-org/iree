@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Utils/ConversionUtils.h"
+#include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -16,31 +17,25 @@
 namespace mlir {
 namespace iree_integrations {
 namespace TFL {
+namespace {
 
 class VerifyFullyConvertedPass
-    : public PassWrapper<VerifyFullyConvertedPass, FunctionPass> {
+    : public VerifyFullyConvertedBase<VerifyFullyConvertedPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-tflite-verify-fully-converted";
-  }
-
-  StringRef getDescription() const override {
-    return "Verifies that all TFLite frontend ops were converted and none "
-           "remain";
-  }
 
   // Validates that no TFLite frontends ops are in the function.
-  void runOnFunction() override {
+  void runOnOperation() override {
     ConversionTarget target(getContext());
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addIllegalDialect<mlir::TFL::TensorFlowLiteDialect>();
+    target.addIllegalOp<mlir::UnrealizedConversionCastOp>();
     if (failed(
             iree_compiler::verifyAllOperationsAreLegal(getOperation(), target)))
       return signalPassFailure();
   }
 };
 
-static PassRegistration<VerifyFullyConvertedPass> pass;
+}  // anonymous namespace
 
 std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass() {
   return std::make_unique<VerifyFullyConvertedPass>();

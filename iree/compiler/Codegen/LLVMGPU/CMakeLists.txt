@@ -25,16 +25,20 @@ iree_cc_library(
     "LLVMGPUDistributeSharedMemoryCopy.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPipelining.cpp"
-    "LLVMGPURemoveTrivialLoops.cpp"
+    "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"
+    "LLVMGPUUtils.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
   DEPS
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
     MLIRArithmeticToLLVM
+    MLIRArithmeticTransforms
     MLIRGPUOps
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
@@ -58,6 +62,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     MLIRVector
+    MLIRVectorToGPU
     MLIRVectorToLLVM
     MLIRVectorToSCF
     iree::compiler::Codegen::Common
@@ -67,8 +72,6 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Util::IR
     tensorflow::mlir_hlo

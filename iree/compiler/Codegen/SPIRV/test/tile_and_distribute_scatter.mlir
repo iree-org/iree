@@ -38,9 +38,9 @@ hal.executable private @static_scatter_update_slice  {
             %8 = memref.subview %1[%arg0, 0] [1, 1] [1, 1] : memref<40x1xi32> to memref<1x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>
             %9 = memref.cast %8 : memref<1x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>> to memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>
             %10 = memref.subview %2[0, %arg1] [100, %5] [1, 1] : memref<100x500xi32> to memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>
-            linalg_ext.scatter {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%7, %9 : memref<?x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>, memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>) outs(%10 : memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>)  {
+            iree_linalg_ext.scatter {lowering.config = #config} ins(%7, %9 : memref<?x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>, memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>) outs(%10 : memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
-              linalg_ext.yield %arg2 : i32
+              iree_linalg_ext.yield %arg2 : i32
             }
           }
         }
@@ -64,15 +64,17 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:     %[[WG_UPDATE:.+]] = memref.subview %[[ARG0]]
 //       CHECK:     %[[WG_INDEX:.+]] = memref.subview %[[ARG1]]
 //       CHECK:     %[[WG_TARGET:.+]] = memref.subview %[[ARG2]]
-//       CHECK:     %[[TID_X:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
-//       CHECK:     %[[DIM_X:.+]] = "gpu.block_dim"() {dimension = "x"} : () -> index
-//       CHECK:     %[[TID_Y:.+]] = "gpu.thread_id"() {dimension = "y"} : () -> index
-//       CHECK:     scf.for %[[IV:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
-//       CHECK:       %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][%[[TID_Y]], %[[IV]]] [1, 1] [1, 1]
-//       CHECK:       %[[T_UPDATE_CAST:.+]] = memref.cast %[[T_UPDATE]]
-//       CHECK:       %[[T_INDEX:.+]] = memref.cast %[[WG_INDEX]]
-//       CHECK:       %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV]]] [100, 1] [1, 1]
-//       CHECK:       %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
-//       CHECK:       linalg_ext.scatter
-//  CHECK-SAME:         ins(%[[T_UPDATE_CAST]], %[[T_INDEX]]
-//  CHECK-SAME:         outs(%[[T_TARGET_CAST]]
+//       CHECK:     %[[TID_X:.+]] = "gpu.thread_id"() {dimension = "x"}
+//       CHECK:     %[[DIM_X:.+]] = "gpu.block_dim"() {dimension = "x"}
+//       CHECK:     %[[TID_Y:.+]] = "gpu.thread_id"() {dimension = "y"}
+//       CHECK:     %[[DIM_Y:.+]] = "gpu.block_dim"() {dimension = "y"}
+//       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
+//       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
+//       CHECK:         %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][%[[IV_Y]], %[[IV_X]]] [1, 1] [1, 1]
+//       CHECK:         %[[T_UPDATE_CAST:.+]] = memref.cast %[[T_UPDATE]]
+//       CHECK:         %[[T_INDEX:.+]] = memref.cast %[[WG_INDEX]]
+//       CHECK:         %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV_X]]] [100, 1] [1, 1]
+//       CHECK:         %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
+//       CHECK:         iree_linalg_ext.scatter
+//  CHECK-SAME:           ins(%[[T_UPDATE_CAST]], %[[T_INDEX]]
+//  CHECK-SAME:           outs(%[[T_TARGET_CAST]]

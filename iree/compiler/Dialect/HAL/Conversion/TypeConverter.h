@@ -18,15 +18,16 @@ namespace iree_compiler {
 
 class HALTypeConverter : public TypeConverter {
  public:
-  HALTypeConverter(
-      ArrayRef<const HALConversionDialectInterface *> conversionInterfaces,
-      bool supportTensors);
+  explicit HALTypeConverter(
+      ArrayRef<const HALConversionDialectInterface *> conversionInterfaces);
 
   // TODO(benvanik): signature conversion for output buffers.
 
-  static bool shouldConvertToBuffer(Type type) {
-    if (TensorType tensor_type = type.template dyn_cast<TensorType>()) {
-      return tensor_type.getElementType().isIntOrFloat();
+  // Returns true if the given |type| maps to !hal.buffer_view by default.
+  // hal.tensor.cast can be used by frontends to map to other types.
+  static bool shouldConvertToBufferView(Type type) {
+    if (auto tensorType = type.template dyn_cast<TensorType>()) {
+      return tensorType.getElementType().isIntOrFloat();
     }
     return false;
   }

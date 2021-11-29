@@ -14,9 +14,25 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_dispatch_arguments.mlir"
     "convert_to_stream.mlir"
+    "elide_async_copies.mlir"
     "encode_tensors.mlir"
+    "fold_uniform_operands.mlir"
+    "fuse_dispatch_bindings.mlir"
+    "fuse_dispatch_bindings_noalias.mlir"
+    "layout_slices.mlir"
+    "materialize_copy_on_write.mlir"
     "outline_constants.mlir"
+    "pack_allocations.mlir"
+    "pack_constants.mlir"
+    "propagate_subviews.mlir"
+    "propagate_timepoints.mlir"
+    "refine_usage.mlir"
+    "schedule_allocation.mlir"
+    "schedule_concurrency.mlir"
+    "schedule_execution.mlir"
+    "specialize_dispatches.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

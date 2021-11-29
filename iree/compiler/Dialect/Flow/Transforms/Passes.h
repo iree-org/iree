@@ -23,13 +23,7 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  // TODO(#7277): remove when switched to streams by default.
-  Option<bool> streamFormation{
-      *this, "stream-formation",
-      llvm::cl::desc("Whether to build flow.streams for async scheduling."),
-      llvm::cl::init(true)};
-};
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
 
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
@@ -90,10 +84,6 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
 // Strips the signed/unsigned portion off of tensors.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createStripSignednessPass();
 
-// Expands dynamic !shapex.ranked_shape dimensions in variables.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createExpandGlobalDynamicDimsPass();
-
 /// Verifies that the input to the Flow transformation pipeline is legal.
 /// This includes checking for operations from dialects that are expected
 /// to be legalized before this pass.
@@ -137,21 +127,6 @@ createOutlineLargeConstantsPass();
 // Deduplicates equivalent executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDeduplicateExecutablesPass();
-
-//===----------------------------------------------------------------------===//
-// Stream Formation and Folding
-//===----------------------------------------------------------------------===//
-
-// Identifies dispatches that can be grouped into streams within functions.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createFormStreamsPass();
-
-// Reorders blocks to hoist ops that cannot be put into streams.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createHoistUnstreamableOpsPass();
-
-// TODO(benvanik): cross-function stream flows.
-
-// Inserts clones of constant values where they may be required.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createInsertConstantClonesPass();
 
 //===----------------------------------------------------------------------===//
 // Module Analysis and Finalization

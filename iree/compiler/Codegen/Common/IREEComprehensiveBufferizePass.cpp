@@ -9,15 +9,16 @@
 // Wrapper pass to use MLIRs ComprehensiveBufferization pass.
 //
 //===----------------------------------------------------------------------===//
-
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -28,8 +29,13 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/TensorInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/Linalg/Transforms/ComprehensiveBufferize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -50,6 +56,12 @@
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
 namespace mlir {
+namespace iree_compiler {
+
+//===----------------------------------------------------------------------===//
+// Pass that interfaces with ComprehensiveBufferization in core.
+//===----------------------------------------------------------------------===//
+
 template <typename TensorType>
 static MemRefType getMemrefTypeForTensor(TensorType tensorType,
                                          MemRefLayoutAttrInterface layout = {},
@@ -58,162 +70,224 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
                          layout, memorySpace);
 }
 
-namespace iree_compiler {
+using linalg::comprehensive_bufferize::BufferizableOpInterface;
+using linalg::comprehensive_bufferize::BufferizationAliasInfo;
+using linalg::comprehensive_bufferize::BufferizationState;
+
+Value getSubspanBuffer(Value tensor, OpBuilder &b, BufferizationState &state) {
+  if (!state.isMapped(tensor)) {
+    OpBuilder::InsertionGuard g(b);
+    auto subspanOp =
+        tensor.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    assert(subspanOp && "expected LoadOp/StoreOp source/target is SubspanOp");
+
+    auto shapedType = subspanOp.getResult()
+                          .getType()
+                          .dyn_cast<IREE::Flow::DispatchTensorType>();
+    assert(shapedType && shapedType.hasRank());
+
+    b.setInsertionPoint(subspanOp);
+    // Just change the result type of the InterfaceBindingSubspanOp.
+    auto memRefType = getMemrefTypeForTensor(shapedType);
+    auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
+        subspanOp->getLoc(), memRefType, subspanOp.binding(),
+        subspanOp.byte_offset(), subspanOp.byte_length(),
+        subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
+    state.mapValue(subspanOp, baseBuffer);
+    state.aliasInfo.createAliasInfoEntry(subspanOp.result());
+  }
+
+  return state.lookupValue(tensor);
+}
 
 namespace {
+
+struct DispatchTensorLoadOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
+  SmallVector<OpOperand *> getAliasingOpOperand(Operation *op,
+                                                OpResult opResult) const {
+    return {};
+  }
+
+  bool isWritable(Operation *op, Value value) const {
+    auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
+    auto shapedType =
+        loadOp.source().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+    assert(shapedType && "unexpected source type");
+    return shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly;
+  }
+
+  LogicalResult bufferize(Operation *op, OpBuilder &b,
+                          BufferizationState &state) const {
+    OpBuilder::InsertionGuard g(b);
+    b.setInsertionPoint(op);
+    auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
+    Value source = getSubspanBuffer(loadOp.source(), b, state);
+
+    // Bufferize to subview.
+    Value subView = b.create<memref::SubViewOp>(
+        loadOp->getLoc(), source, loadOp.getMixedOffsets(),
+        loadOp.getMixedSizes(), loadOp.getMixedStrides());
+    state.mapBuffer(loadOp.result(), subView);
+
+    return success();
+  }
+};
+
+/// Return true if the value of a `storeOp` bufferizes to an equivalent
+/// DispatchTensorLoadOp result that bufferizes inplace.
+static bool isValueEquivalentToAnInplaceTensorLoadOp(
+    const BufferizationAliasInfo &aliasInfo,
+    IREE::Flow::DispatchTensorStoreOp storeOp) {
+  bool foundOp = false;
+  aliasInfo.applyOnEquivalenceClass(storeOp.value(), [&](Value value) {
+    auto loadOp = value.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+    // TODO: Assert that offsets, sizes and strides are the same.
+    if (loadOp &&
+        aliasInfo.areEquivalentBufferizedValues(loadOp.result(),
+                                                storeOp.value()) &&
+        loadOp.source() == storeOp.target()) {
+      foundOp = true;
+    }
+  });
+
+  return foundOp;
+}
+
+struct DispatchTensorStoreOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          DispatchTensorStoreOpInterface, IREE::Flow::DispatchTensorStoreOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand) const {
+    return true;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand) const {
+    return false;
+  }
+
+  OpResult getAliasingOpResult(Operation *op, OpOperand &opOperand) const {
+    return OpResult();
+  }
+
+  LogicalResult bufferize(Operation *op, OpBuilder &b,
+                          BufferizationState &state) const {
+    OpBuilder::InsertionGuard g(b);
+    b.setInsertionPoint(op);
+    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+
+    // If everything bufferized inplace, no copy is needed. We wrote to the
+    // target buffer already.
+    if (!isValueEquivalentToAnInplaceTensorLoadOp(state.aliasInfo, storeOp)) {
+      Value target = getSubspanBuffer(storeOp.target(), b, state);
+      Value subView = b.create<memref::SubViewOp>(
+          storeOp->getLoc(), target, storeOp.getMixedOffsets(),
+          storeOp.getMixedSizes(), storeOp.getMixedStrides());
+      Value srcMemref = state.lookupBuffer(storeOp.value());
+      state.allocationFns.memCpyFn(b, storeOp->getLoc(), srcMemref, subView);
+    }
+
+    state.markOpObsolete(storeOp);
+    return success();
+  }
+};
+
+using mlir::linalg::comprehensive_bufferize::linalg_ext::
+    InitTensorEliminationStep;
+
+/// Try to eliminate InitTensorOps that are eventually fed into a
+/// DispatchTensorStoreOp. Such InitTensorOps are replaced with matching
+/// DispatchTensorLoadOps. Two conditions must be met:
+///
+/// * The target must be a "readwrite" tensor.
+/// * All ops along the reverse SSA use-def chain from the
+///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
+struct StoreTensorOpAnchoredInitTensorEliminationStep
+    : public InitTensorEliminationStep {
+  LogicalResult run(FuncOp funcOp, BufferizationAliasInfo &aliasInfo,
+                    DominanceInfo &domInfo,
+                    SmallVector<Operation *> &newOps) override {
+    return eliminateInitTensors(
+        funcOp, aliasInfo, domInfo,
+        /*anchorMatchFunc=*/
+        [&](OpOperand &operand) {
+          return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+        },
+        /*rewriteFunc=*/
+        [](OpBuilder &b, Location loc, OpOperand &operand) {
+          auto storeOp =
+              cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
+          auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
+              loc, storeOp.value().getType().cast<RankedTensorType>(),
+              storeOp.target(), storeOp.getMixedOffsets(),
+              storeOp.getMixedSizes(), storeOp.getMixedStrides());
+          return loadOp.result();
+        },
+        newOps);
+  }
+};
+
 /// Pass to convert from tensor based ops to memref based ops.
 class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
-  IREEComprehensiveBufferizePass(
-      linalg::AllocationCallbacks allocationFn = linalg::AllocationCallbacks())
-      : allocationFn(allocationFn) {}
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Util::UtilDialect, linalg::LinalgDialect,
-                memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect>();
+  explicit IREEComprehensiveBufferizePass(
+      std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+          allocationFn)
+      : allocationFn(std::move(allocationFn)) {}
+
+  IREEComprehensiveBufferizePass(const IREEComprehensiveBufferizePass &other) {
+    llvm_unreachable("pass cannot be copied");
   }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
+                    linalg::LinalgDialect, memref::MemRefDialect,
+                    scf::SCFDialect, StandardOpsDialect, tensor::TensorDialect,
+                    vector::VectorDialect, AffineDialect,
+                    IREE::Flow::FlowDialect>();
+
+    // TODO: Find a better place to register external models.
+    // Registers operations of other dialects.
+    linalg::comprehensive_bufferize::
+        registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::linalg_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::tensor_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::vector_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
+
+    // Register IREE operations.
+    registry.addOpInterface<IREE::Flow::DispatchTensorLoadOp,
+                            DispatchTensorLoadOpInterface>();
+    registry.addOpInterface<IREE::Flow::DispatchTensorStoreOp,
+                            DispatchTensorStoreOpInterface>();
+  }
+
   void runOnOperation() override;
 
  private:
-  linalg::AllocationCallbacks allocationFn;
+  std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+      allocationFn;
 };
 }  // namespace
 
 static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 
-/// Stitch comprehensive bufferization inside of IREE by proceeding as follows:
-///   1. a. Bufferizes InterfaceBindingSubspanOp optimistically
-///      b. Insert a memref::TensorLoad to serve as glue between the buffer and
-///         tensor worlds.
-///      c. Record aliasInfo of memref::TensorLoad manually
-///      d. Record inplaceability of memref::TensorLoad manually
-///      e. Record the bufferization of memref::TensorLoad manually
-///   2. Rewrite all Flow::Dispatch::TensorLoad ops as Tensor::ExtractSliceOp
-///      that comprehensive bufferization understands.
-///   3. Specifically select the ops we want to bufferize / skip. In the future,
-///      this may be better specified with a BufferizationOpInterface.
-///   4. Perform analysis and bufferization on the ops.
+/// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-  MLIRContext *context = &getContext();
 
-  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-    OpBuilder b(context);
+  linalg::comprehensive_bufferize::BufferizationOptions options;
+  options.testAnalysisOnly = false;
 
-    // 1. First go over all hal.interface.binding.subspan ops and create
-    // counterparts working with memrefs.
-    BlockAndValueMapping bvm, tensorLoads;
-    linalg::BufferizationAliasInfo aliasInfo(funcOp);
-    // These are used until late, erase on scoped exit.
-    SmallVector<Operation *> toEraseLate;
-    auto scopeGuard = llvm::make_scope_exit([&]() {
-      for (Operation *op : llvm::reverse(toEraseLate)) op->erase();
-    });
-    funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
-      auto shapedType =
-          op.getResult().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
-      if (!shapedType || !shapedType.hasRank()) return;
-      OpBuilder::InsertionGuard g(b);
-      b.setInsertionPoint(op);
-      // 1.a. Just change the result type of the InterfaceBindingSubspanOp to
-      // from the base buffer.
-      auto memRefType = getMemrefTypeForTensor(shapedType);
-      auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          op->getLoc(), memRefType, op.binding(), op.byte_offset(),
-          op.byte_length(), op.dynamic_dims());
-      bvm.map(op, baseBuffer);
+  // Enable InitTensorOp elimination.
+  options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
 
-      // This op does not operate on core tensor types and has half-side
-      // effecting semantics. It cannot be added to BufferizationAliasInfo.
-      // Instead:
-      // 1.b. Insert a memref::TensorLoad to serve as glue between the buffer
-      // and tensor worlds.
-      Value tensor = b.create<memref::TensorLoadOp>(op->getLoc(), baseBuffer);
-      // 1.c. Insert a new entry manually into the existing aliasInfo.
-      aliasInfo.createAliasInfoEntry(op.result());
-      aliasInfo.createAliasInfoEntry(tensor);
-      tensorLoads.map(op.result(), tensor);
-      // 1.d. Mark tensors that bufferize to writeable memory as such.
-      if (shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly) {
-        aliasInfo.setBufferizesToWritableMemory(tensor);
-      }
-      // 1.e. Save tensor -> baseBuffer into BVM.
-      bvm.map(tensor, baseBuffer);
+  // TODO: Use allocationFn.
 
-      // Drop the original op that is now bufferized.
-      toEraseLate.push_back(op);
-    });
-
-    // 2. Rewrite all Flow::Dispatch::TensorLoad ops as Tensor::ExtractSliceOp.
-    funcOp.walk<WalkOrder::PostOrder>([&](IREE::Flow::DispatchTensorLoadOp op) {
-      OpBuilder b(op);
-      Value v = b.create<tensor::ExtractSliceOp>(
-          op->getLoc(), op.result().getType().cast<RankedTensorType>(),
-          tensorLoads.lookup(op.source()), op.getMixedOffsets(),
-          op.getMixedSizes(), op.getMixedStrides());
-      // Insert a new entry manually into the existing aliasInfo.
-      aliasInfo.createAliasInfoEntry(v);
-      op.result().replaceAllUsesWith(v);
-      toEraseLate.push_back(op);
-    });
-    funcOp.walk<WalkOrder::PostOrder>(
-        [&](IREE::Flow::DispatchTensorStoreOp op) {
-          OpBuilder b(op);
-          Value v = b.create<tensor::InsertSliceOp>(
-              op->getLoc(), op.value(), tensorLoads.lookup(op.target()),
-              op.getMixedOffsets(), op.getMixedSizes(), op.getMixedStrides());
-          // Insert a new entry manually into the existing aliasInfo.
-          aliasInfo.createAliasInfoEntry(v);
-          toEraseLate.push_back(op);
-        });
-
-    // TODO: Visit all the operations that return `tensor`s that are not handled
-    // by comprehensive bufferize.
-
-    // 3. Specifically select the ops we want to bufferize / skip. In the
-    // future, this may be better specified with a BufferizationOpInterface.
-    DominanceInfo domInfo(funcOp);
-    SmallVector<Operation *> ops;
-    ops.reserve(funcOp.body().front().getOperations().size());
-    WalkResult opsSelected =
-        funcOp.body().walk([&](Operation *op) -> WalkResult {
-          if (isa<IREE::HAL::InterfaceBindingSubspanOp,
-                  IREE::Flow::DispatchTensorLoadOp,
-                  IREE::Flow::DispatchTensorStoreOp>(op)) {
-            return WalkResult::advance();
-          }
-          if (llvm::none_of(op->getOperandTypes(), isaTensor) &&
-              llvm::none_of(op->getResultTypes(), isaTensor)) {
-            return WalkResult::advance();
-          }
-          if (op->getParentOfType<linalg::LinalgOp>())
-            return WalkResult::advance();
-          // TODO: if we want to bufferize function calls, we need FuncOp
-          // and to pass a proper bufferizedFunctionTypes.
-          if (isa<CallOpInterface>(op)) {
-            return static_cast<LogicalResult>(op->emitError(
-                "CallOpInterface bufferization not supported in IREE"));
-          }
-          ops.push_back(op);
-          return WalkResult::advance();
-        });
-
-    // 4. Perform inplaceability analysis of `ops`.
-    if (opsSelected.wasInterrupted() ||
-        failed(linalg::inPlaceAnalysis(ops, aliasInfo, domInfo))) {
-      return signalPassFailure();
-    }
-
-    // 5. Perform bufferization.
-    for (Operation *op : ops) {
-      if (failed(linalg::bufferizeOp(op, bvm, aliasInfo,
-                                     linalg::AllocationCallbacks(),
-                                     /*bufferizedFunctionTypes=*/nullptr))) {
-        return signalPassFailure();
-      }
-    }
-  }
+  if (failed(runComprehensiveBufferize(moduleOp, options))) signalPassFailure();
 }
 
 // TODO: pass this to comprehensive bufferize.
@@ -226,13 +300,18 @@ static Value defaultAllocationFn(OpBuilder &builder, Location loc,
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    linalg::AllocationCallbacks allocationFns) {
-  return std::make_unique<IREEComprehensiveBufferizePass>(allocationFns);
+    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+        allocationFns) {
+  return std::make_unique<IREEComprehensiveBufferizePass>(
+      std::move(allocationFns));
 }
 
 void addIREEComprehensiveBufferizePasses(
-    OpPassManager &passManager, linalg::AllocationCallbacks allocationFns) {
-  passManager.addPass(createIREEComprehensiveBufferizePass(allocationFns));
+    OpPassManager &passManager,
+    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+        allocationFns) {
+  passManager.addPass(
+      createIREEComprehensiveBufferizePass(std::move(allocationFns)));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());

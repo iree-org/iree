@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <array>
+
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -18,50 +20,72 @@ namespace Flow {
 
 namespace {
 
-// Expands a 2d tensor operand to 4d given its target shape.
+// Expands a 2D tensor input to a 4D tensor representing the same underlying
+// data but now in a tiled layout, given a static 2D tile shape.
 // Does not transpose.
 // Example: (M, N) --> (M1, M0, N1, N0)
 static Value expandTo4D(mlir::Location loc, PatternRewriter &rewriter,
-                        Value operand, ArrayRef<int64_t> targetShape) {
-  auto operandType = operand.getType().cast<RankedTensorType>();
-  auto targetType =
-      RankedTensorType::get(targetShape, operandType.getElementType());
-  SmallVector<ReassociationIndices> expandIndices = {{0, 1}, {2, 3}};
+                        Value input, ArrayRef<int64_t> tileShape) {
+  RankedTensorType inputType = input.getType().cast<RankedTensorType>();
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  std::array<int64_t, 4> targetShape;
+  // Generate a 4D shape of the form (M1, M0, N1, N0),
+  // where M0, N0 are always static and M1, N1 are static if and only if M, N
+  // are.
+  for (int i : {0, 1}) {
+    if (inputShape[i] == ShapedType::kDynamicSize) {
+      targetShape[2 * i] = ShapedType::kDynamicSize;
+    } else {
+      targetShape[2 * i] = inputShape[i] / tileShape[i];
+    }
+    targetShape[2 * i + 1] = tileShape[i];
+  }
+  RankedTensorType targetType =
+      RankedTensorType::get(targetShape, inputType.getElementType());
+  std::array<ReassociationIndices, 2> expandIndices = {
+      ReassociationIndices{0, 1}, ReassociationIndices{2, 3}};
   Value reshapedOperand = rewriter.create<linalg::TensorExpandShapeOp>(
-      loc, targetType, operand, expandIndices);
+      loc, targetType, input, expandIndices);
   return reshapedOperand;
 }
 
-// Creates a linalg.generic that transposes operand using permutation indices.
+// Creates a linalg.generic that transposes input using permutation indices.
 // Example: (M1, M0, N1, N0) -> (M1, N1, M0, N0) if indices = {0, 2, 1, 3}.
 static Value transpose(mlir::Location loc, PatternRewriter &rewriter,
-                       Value operand, ArrayRef<int64_t> indices) {
-  RankedTensorType operandTensorType =
-      operand.getType().cast<RankedTensorType>();
+                       Value input, ArrayRef<int64_t> indices) {
+  RankedTensorType inputType = input.getType().cast<RankedTensorType>();
   auto nloops = indices.size();
-  auto inputShape = operandTensorType.getShape();
 
+  // TODO: use AffineMap::getPermutationMap?
   SmallVector<AffineExpr, 4> exprs = llvm::to_vector<4>(
       llvm::map_range(indices, [&](int64_t index) -> AffineExpr {
         return rewriter.getAffineDimExpr(index);
       }));
 
-  SmallVector<int64_t> targetShape = llvm::to_vector<4>(llvm::map_range(
-      indices, [&](int64_t index) -> int64_t { return inputShape[index]; }));
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  SmallVector<OpFoldResult, 4> targetShape;
+  for (int i = 0; i < 4; i++) {
+    if (inputShape[indices[i]] == ShapedType::kDynamicSize) {
+      targetShape.emplace_back(
+          rewriter.create<tensor::DimOp>(loc, input, indices[i]));
+    } else {
+      targetShape.push_back(rewriter.getIndexAttr(inputShape[indices[i]]));
+    }
+  }
 
   Value outputTensor = rewriter.create<linalg::InitTensorOp>(
-      loc, targetShape, operandTensorType.getElementType());
+      loc, targetShape, inputType.getElementType());
 
-  SmallVector<StringRef> loopAttributeTypes(nloops, "parallel");
+  SmallVector<StringRef, 4> loopAttributeTypes(nloops, "parallel");
 
-  SmallVector<AffineMap> indexingMaps = {
+  SmallVector<AffineMap, 2> indexingMaps = {
       inversePermutation(
           AffineMap::get(nloops, 0, exprs, rewriter.getContext())),
       AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
   auto transposedOp = rewriter.create<linalg::GenericOp>(
       loc, outputTensor.getType(),
-      /*inputs=*/operand, /*outputs=*/outputTensor, indexingMaps,
+      /*inputs=*/input, /*outputs=*/outputTensor, indexingMaps,
       loopAttributeTypes,
       [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
         nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
@@ -70,17 +94,124 @@ static Value transpose(mlir::Location loc, PatternRewriter &rewriter,
   return transposedOp.getResult(0);
 };
 
-// Collapses a 4d tensor operand to 2d given its target shape.
+// Collapses a 4d tensor input to 2d given its target shape.
 // Example: (M1, M0, N1, N0) -> (M, N)
 static Value collapseTo2D(mlir::Location loc, PatternRewriter &rewriter,
-                          Value operand, ArrayRef<int64_t> targetShape) {
-  auto operandType = operand.getType().cast<RankedTensorType>();
+                          Value input, ArrayRef<int64_t> targetShape) {
+  auto inputType = input.getType().cast<RankedTensorType>();
   auto targetType =
-      RankedTensorType::get(targetShape, operandType.getElementType());
-  SmallVector<ReassociationIndices> collapseIndices = {{0, 1}, {2, 3}};
+      RankedTensorType::get(targetShape, inputType.getElementType());
+  std::array<ReassociationIndices, 2> collapseIndices = {
+      ReassociationIndices{0, 1}, ReassociationIndices{2, 3}};
   Value reshapedOperand = rewriter.create<linalg::TensorCollapseShapeOp>(
-      loc, targetType, operand, collapseIndices);
+      loc, targetType, input, collapseIndices);
   return reshapedOperand;
+}
+
+// Returns true if an input of the given |inputShape| needs padding to
+// ensure that its shape will be a multiple of |tileShape|. That's always true
+// in the dynamic shape case.
+static bool needsPadding(ArrayRef<int64_t> inputShape,
+                         ArrayRef<int64_t> tileShape) {
+  assert(inputShape.size() == tileShape.size());
+  for (int i = 0; i < inputShape.size(); i++) {
+    if (inputShape[i] == ShapedType::kDynamicSize) {
+      return true;
+    }
+    if (inputShape[i] % tileShape[i] != 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Pads |input| on the bottom and on the right to the next multiple of
+// |tileShape|.
+static Value pad(Location loc, PatternRewriter &rewriter, Value input,
+                 ArrayRef<int64_t> tileShape) {
+  SmallVector<OpFoldResult, 2> lowPadding, highPadding;
+  SmallVector<int64_t, 2> resultTypeShape;
+  RankedTensorType inputType = input.getType().cast<RankedTensorType>();
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  if (!needsPadding(inputShape, tileShape)) {
+    return input;
+  }
+  int rank = inputType.getRank();
+  for (int i = 0; i < rank; ++i) {
+    // No 'low' padding i.e. no padding at the top and on the left.
+    lowPadding.push_back(rewriter.getIndexAttr(0));
+    // 'High' padding i.e. padding at the bottom and on the right, and the
+    // result type shape, will be dynamic in any dimension if and only if the
+    // input shape is.
+    if (inputShape[i] == ShapedType::kDynamicSize) {
+      resultTypeShape.push_back(ShapedType::kDynamicSize);
+      // There only remains to compute the 'high' padding Value.
+      auto add = [&](Value a, Value b) {
+        return rewriter.create<arith::AddIOp>(loc, a, b);
+      };
+      auto sub = [&](Value a, Value b) {
+        return rewriter.create<arith::SubIOp>(loc, a, b);
+      };
+      auto rem = [&](Value a, Value b) {
+        return rewriter.create<arith::RemSIOp>(loc, a, b);
+      };
+      // Compare to the plainer distance_to_next_multiple_of in the static
+      // dimension case below.
+      auto distance_to_next_multiple_of = [&](Value a, Value b) {
+        Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+        Value b_minus_one = sub(b, one);
+        return sub(b_minus_one, rem(add(a, b_minus_one), b));
+      };
+      Value inputDim = rewriter.create<tensor::DimOp>(loc, input, i);
+      Value tileDim =
+          rewriter.create<arith::ConstantIndexOp>(loc, tileShape[i]);
+      Value padding = distance_to_next_multiple_of(inputDim, tileDim);
+      highPadding.push_back(padding);
+    } else {
+      auto distance_to_next_multiple_of = [=](int64_t a, int64_t b) {
+        int64_t b_minus_one = b - 1;
+        return b_minus_one - ((a + b_minus_one) % b);
+      };
+      int64_t inputDim = inputShape[i];
+      int64_t tileDim = tileShape[i];
+      int64_t padding = distance_to_next_multiple_of(inputDim, tileDim);
+      resultTypeShape.push_back(inputDim + padding);
+      highPadding.push_back(rewriter.getIndexAttr(padding));
+    }
+  }
+  Type elementType = inputType.getElementType();
+  RankedTensorType resultType =
+      RankedTensorType::get(resultTypeShape, elementType);
+  Value padValue = rewriter.create<arith::ConstantOp>(
+      loc, elementType, rewriter.getZeroAttr(elementType));
+  return linalg::PadTensorOp::createPadScalarOp(
+      resultType, input, padValue, lowPadding, highPadding,
+      /* nofold = */ false, loc, rewriter);
+}
+
+// Returns a top-left slice from |input| shaped like |likeWhat|.
+static Value extractSliceLike(Location loc, PatternRewriter &rewriter,
+                              Value input, Value likeWhat) {
+  SmallVector<OpFoldResult, 2> offsets, dims, strides;
+  RankedTensorType resultType = likeWhat.getType().cast<RankedTensorType>();
+  int rank = resultType.getRank();
+  auto resultShape = likeWhat.getType().cast<ShapedType>().getShape();
+  for (int i = 0; i < rank; ++i) {
+    offsets.push_back(rewriter.getIndexAttr(0));
+    strides.push_back(rewriter.getIndexAttr(1));
+    if (resultShape[i] == ShapedType::kDynamicSize) {
+      dims.emplace_back(rewriter.create<tensor::DimOp>(loc, likeWhat, i));
+    } else {
+      dims.push_back(rewriter.getIndexAttr(resultShape[i]));
+    }
+  }
+  return rewriter.create<tensor::ExtractSliceOp>(loc, resultType, input,
+                                                 offsets, dims, strides);
+}
+
+static bool haveEqualShapeDim(Value x, Value y, int i) {
+  return x.getType().cast<ShapedType>().getDimSize(i) ==
+         y.getType().cast<ShapedType>().getDimSize(i);
 }
 
 // Converts linalg.matmul to an equivalent subgraph using linalg.mmt4d.
@@ -98,45 +229,47 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
-    auto loc = matmulOp.getLoc();
+    Location loc = matmulOp.getLoc();
 
     Value lhs = matmulOp.getInputOperand(0)->get();
     Value rhs = matmulOp.getInputOperand(1)->get();
-    Value dst = matmulOp.getOutputOperand(0)->get();
+    Value acc = matmulOp.getOutputOperand(0)->get();
 
-    RankedTensorType lhsType = lhs.getType().dyn_cast<RankedTensorType>();
-    RankedTensorType rhsType = rhs.getType().dyn_cast<RankedTensorType>();
-
-    if (!lhsType || !rhsType || !lhsType.hasStaticShape() ||
-        !rhsType.hasStaticShape()) {
+    // This transformation supports any mixing of static and dynamic dimensions,
+    // with one exception: the dynamic-ness of each dimension of the accumulator
+    // must match the dynamic-ness of the corresponding lhs/rhs dimension.
+    // This limitation is not inherent to this transformation's code, it's just
+    // here to avoid a current linalg folding limitation: at the moment,
+    // removing this gives the following error in e2e matmul tests,
+    //   "error: failed to legalize operation 'tensor.cast' that was explicitly
+    //   marked illegal"
+    // apparently due to some missing folding of tensor.cast op into reshapes.
+    if (!haveEqualShapeDim(lhs, acc, 0) || !haveEqualShapeDim(rhs, acc, 1)) {
       return failure();
     }
 
-    int m = lhsType.getShape()[0];
-    int k = rhsType.getShape()[0];
-    int n = rhsType.getShape()[1];
+    Value paddedLhs = pad(loc, rewriter, lhs, {M0, K0});
+    Value paddedRhs = pad(loc, rewriter, rhs, {K0, N0});
+    Value paddedAcc = pad(loc, rewriter, acc, {M0, N0});
 
-    if (m % M0 != 0 || n % N0 != 0 || k % K0 != 0) return failure();
+    Value lhs4D = expandTo4D(loc, rewriter, paddedLhs, {M0, K0});
+    Value rhs4D = expandTo4D(loc, rewriter, paddedRhs, {K0, N0});
+    Value acc4D = expandTo4D(loc, rewriter, paddedAcc, {M0, N0});
 
-    int m1 = m / M0;
-    int k1 = k / K0;
-    int n1 = n / N0;
-
-    auto lhs4D = expandTo4D(loc, rewriter, lhs, {m1, M0, k1, K0});
-    auto rhs4D = expandTo4D(loc, rewriter, rhs, {k1, K0, n1, N0});
-    auto dst4D = expandTo4D(loc, rewriter, dst, {m1, M0, n1, N0});
-
-    auto lhs4DT = transpose(loc, rewriter, lhs4D, {0, 2, 1, 3});
-    auto rhs4DT = transpose(loc, rewriter, rhs4D, {2, 0, 3, 1});
-    auto dst4DT = transpose(loc, rewriter, dst4D, {0, 2, 1, 3});
+    Value lhs4DT = transpose(loc, rewriter, lhs4D, {0, 2, 1, 3});
+    Value rhs4DT = transpose(loc, rewriter, rhs4D, {2, 0, 3, 1});
+    Value acc4DT = transpose(loc, rewriter, acc4D, {0, 2, 1, 3});
 
     auto mmt4dResult = rewriter.create<linalg::Mmt4DOp>(
-        loc, dst4DT.getType(), ValueRange{lhs4DT, rhs4DT}, ValueRange{dst4DT});
+        loc, acc4DT.getType(), ValueRange{lhs4DT, rhs4DT}, ValueRange{acc4DT});
 
-    auto mmt4dResultTransposed =
+    Value mmt4dResultTransposed =
         transpose(loc, rewriter, mmt4dResult.getResult(0), {0, 2, 1, 3});
 
-    Value result = collapseTo2D(loc, rewriter, mmt4dResultTransposed, {m, n});
+    Value paddedResult =
+        collapseTo2D(loc, rewriter, mmt4dResultTransposed,
+                     paddedAcc.getType().cast<ShapedType>().getShape());
+    Value result = extractSliceLike(loc, rewriter, paddedResult, acc);
 
     rewriter.replaceOp(matmulOp, ArrayRef<Value>{result});
 

@@ -1,13 +1,19 @@
 set(LIBS
+  MLIRArithmetic
   MLIRDialect
+  MLIRLinalg
+  MLIRMemRef
   MLIROptLib
   MLIRSCF
   MLIRSCFTransforms
   MLIRStandard
+  MLIRTensor
   MLIRTransforms
-  IREEDialectsIREEDialect
-  IREEDialectsIREEPyDMDialect
-  IREEDialectsIREEPyDMPasses
+  IREEInputDialect
+  IREELinalgExtDialect
+  IREELinalgExtPasses
+  IREEPyDMDialect
+  IREEPyDMPasses
 )
 
 add_llvm_tool(iree-dialects-opt

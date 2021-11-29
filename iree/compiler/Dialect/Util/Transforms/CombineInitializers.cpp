@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -76,7 +77,7 @@ class CombineInitializersPass
             << "failed to inline into combined initializer";
         return signalPassFailure();
       }
-      builder.setInsertionPointToEnd(builder.getInsertionBlock());
+      builder.setInsertionPointToEnd(&newOp.back());
       initializerOp.erase();
     }
     builder.create<IREE::Util::InitializerReturnOp>(fusedLoc);

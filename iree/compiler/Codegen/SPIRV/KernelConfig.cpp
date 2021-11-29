@@ -6,11 +6,11 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
@@ -31,35 +31,13 @@ namespace iree_compiler {
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
 
-/// Lets the entry point region to return fully static number of workgroups.
-// This is needed for folding `affine.min` ops to expose static-shaped tiled
-// convolution for vectorization.
-// TODO(#5034): Use a proper way to prove tilability and fold `affine.min`s.
-static LogicalResult defineConvWorkgroupCountRegion(
-    Operation *op, ArrayRef<int64_t> outputShape,
-    ArrayRef<int64_t> workgroupTileSizes) {
-  auto numWorkgroupsFn = [&](OpBuilder &b, Location loc, std::array<Value, 3>) {
-    std::array<Value, 3> xyz;
-    for (unsigned i = 0; i < 3; ++i) {
-      int64_t count = outputShape[i] / workgroupTileSizes[i];
-      // This is meant for perfectly tilable cases. Double check that.
-      assert(outputShape[i] % workgroupTileSizes[i] == 0 && count != 0);
-      xyz[2 - i] = b.create<arith::ConstantIndexOp>(loc, count);
-    }
-    return xyz;
-  };
-  OpBuilder builder(op->getContext());
-  return defineWorkgroupCountRegion(builder, op->getParentOfType<FuncOp>(),
-                                    numWorkgroupsFn);
-}
-
 namespace detail {
 
 LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                               const int64_t subgroupSize,
                               const int64_t bestTilingFactor) {
   ArrayRef<int64_t> inputShape = getUntiledShape(linalgOp.inputs()[0]);
-  ArrayRef<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
+  SmallVector<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
   if (llvm::any_of(inputShape, ShapedType::isDynamic)) return success();
   if (llvm::any_of(outputShape, ShapedType::isDynamic)) return success();
 
@@ -159,20 +137,15 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   // Tiling along reduction dimensions
   if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});
-  } else if (isa<linalg::DepthwiseConv2DNhwOp>(linalgOp)) {
+  } else if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1});
   } else {
     return success();
   }
 
   auto funcOp = linalgOp->getParentOfType<FuncOp>();
-  if (failed(setOpConfigAndEntryPointFnTranslation(
-          funcOp, linalgOp, tileSizes, {}, pipeline, workgroupSize))) {
-    return failure();
-  }
-  return defineConvWorkgroupCountRegion(
-      linalgOp, llvm::makeArrayRef(outputShape).drop_front(),
-      llvm::makeArrayRef(workgroupTileSizes).drop_front());
+  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes, {},
+                                               pipeline, workgroupSize);
 }
 
 }  // namespace detail
@@ -290,7 +263,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
-                                    linalg_ext::FftOp op) {
+                                    IREE::LinalgExt::FftOp op) {
   const int64_t subgroupSize = limits.subgroup_size().getValue().getSExtValue();
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
@@ -335,6 +308,12 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // No tiled loops means we cannot tile (and distribute) at all. Use just one
     // single thread to run everything.
     auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+    if (auto linalgOp = dyn_cast<linalg::GenericOp>(op)) {
+      auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
+      if (untiledResultShape.empty()) {
+        pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
+      }
+    }
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
     return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, {}, pipeline,
                                                  workgroupSize);
@@ -385,7 +364,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // 1) distributing to as many threads as possible, and 2) avoid assigning too
   // many threads to handle out-of-bound elements (thus idle).
 
-  SmallVector<TiledLoopInfo> tiledLoopInfo = getTiledLoopInfo(funcOp);
+  SmallVector<LoopTilingAndDistributionInfo> tiledLoopInfo =
+      getTiledAndDistributedLoopInfo(funcOp);
   // The number of linalg implicit loops to partition and tiled loops
   // surrounding the op should match. Otherwise, something is incorrect.
   assert(partitionedLoops.size() == tiledLoopInfo.size());
@@ -395,8 +375,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // tiledLoopInfo uses the reverse order of partitionedLoops.
   for (auto pair : llvm::zip(llvm::reverse(partitionedLoops), tiledLoopInfo)) {
     unsigned loopIndex = std::get<0>(pair);
-    const TiledLoopInfo &loopInfo = std::get<1>(pair);
-    Optional<int64_t> attrValue = getConstantIntValue(loopInfo.ub);
+    const LoopTilingAndDistributionInfo &loopInfo = std::get<1>(pair);
+    Optional<int64_t> attrValue =
+        getConstantIntValue(loopInfo.untiledUpperBound);
     if (attrValue) {
       loopBounds[loopIndex] = *attrValue;
     } else {
@@ -413,6 +394,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   };
 
   // Whether we can try to use the vectorization pipeline.
+  auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
   bool vectorizable =
       !linalgOp.hasIndexSemantics() &&
       // Skip vectorization for non-minor identity inputs as it generates
@@ -425,7 +407,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       // TODO: Lowering of integers other than i32 may require emulation.
       // This is currently not supported for vector operation.
       llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
-      llvm::none_of(getUntiledResultShape(linalgOp, 0), ShapedType::isDynamic);
+      !untiledResultShape.empty() &&
+      llvm::none_of(untiledResultShape, ShapedType::isDynamic);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Linalg op " << linalgOp << "\n  partitioned loops: [";
@@ -576,7 +559,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwOp>(
+      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
           [limits](auto op) {
             // Try to tile and vectorize first. It's common to see 32 threads
             // per subgroup for GPUs.
@@ -588,8 +571,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
             // If unsuccessful, try to tile and distribute.
             return setDefaultOpConfig(limits, op);
           })
-      .Case<linalg_ext::FftOp>(
-          [limits](linalg_ext::FftOp op) { return setFftOpConfig(limits, op); })
+      .Case<IREE::LinalgExt::FftOp>([limits](IREE::LinalgExt::FftOp op) {
+        return setFftOpConfig(limits, op);
+      })
       .Case<linalg::GenericOp>([limits](linalg::GenericOp op) {
         // If a generic op has reduction iterator types, it can be treated as a
         // root op for configuration as well. Use the default configuration,
@@ -624,7 +608,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     if (getTranslationInfo(entryPointOp)) continue;
 
     SmallVector<Operation *> computeOps;
-    SmallVector<TiledLoopInfo> tiledLoops;
+    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return funcOp.emitOpError("failed to get compute ops");
     }

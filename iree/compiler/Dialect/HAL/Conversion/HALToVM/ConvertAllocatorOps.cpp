@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -57,22 +56,21 @@ class AllocatorTryMapOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::AllocatorTryMapOp op, llvm::ArrayRef<Value> rawOperands,
+      IREE::HAL::AllocatorTryMapOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::AllocatorTryMapOp::Adaptor operands(rawOperands);
     auto callOp = rewriter.create<IREE::VM::CallOp>(
         op.getLoc(), importOp.getName(),
         ArrayRef<Type>{getTypeConverter()->convertType(op.result().getType())},
         ArrayRef<Value>{
-            operands.allocator(),
+            adaptor.allocator(),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), /*try=*/1),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
                                                         op.memory_typesAttr()),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
                                                         op.buffer_usageAttr()),
-            operands.source(),
-            operands.offset(),
-            operands.length(),
+            adaptor.source(),
+            adaptor.offset(),
+            adaptor.length(),
         });
     copyImportAttrs(importOp, callOp);
     auto result = callOp.results().front();

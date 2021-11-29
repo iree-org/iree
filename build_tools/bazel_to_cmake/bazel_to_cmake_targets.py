@@ -13,13 +13,25 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:IREEDialect": [
-        "IREEDialectsIREEDialect"
+    "//llvm-external-projects/iree-dialects:IREEInputDialect": [
+        "IREEInputDialect"
+    ],
+    "//llvm-external-projects/iree-dialects:IREELinalgExtDialect": [
+        "IREELinalgExtDialect"
+    ],
+    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
+        "IREELinalgExtPasses"
+    ],
+    "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
+        "IREEPyDMDialect"
+    ],
+    "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
+        "IREEPyDMPasses"
     ],
 
     # LLVM
     "@llvm-project//llvm:IPO": ["LLVMipo"],
-    "@llvm-project//lld:lld": ["lld"],
+    "@llvm-project//lld": ["lld"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],

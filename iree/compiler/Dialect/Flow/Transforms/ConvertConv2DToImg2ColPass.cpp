@@ -98,7 +98,7 @@ class Conv2DImg2ColMatmulConversion
 
     auto s = [&](unsigned i) {
       return rewriter.getAffineConstantExpr(
-          convOp.strides().getValue<int64_t>({i}));
+          convOp.strides().getValues<int64_t>()[i]);
     };
 
     SmallVector<AffineExpr, 4> inputExprs = {n, d(1) * s(0) + k(1),
@@ -170,11 +170,11 @@ class Conv2DImg2ColMatmulConversion
 // by transposing both input filter so channles are outer most the computation
 // is a batched matrix-vector product.
 class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
-    : public OpRewritePattern<linalg::DepthwiseConv2DNhwOp> {
+    : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
  public:
-  using OpRewritePattern<linalg::DepthwiseConv2DNhwOp>::OpRewritePattern;
+  using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwOp convOp,
+  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
                                 PatternRewriter &rewriter) const override {
     RankedTensorType inputTensorType =
         convOp.getInputOperand(0)->get().getType().dyn_cast<RankedTensorType>();
@@ -263,7 +263,7 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
 
     auto s = [&](unsigned i) {
       return rewriter.getAffineConstantExpr(
-          convOp.strides().getValue<int64_t>({i}));
+          convOp.strides().getValues<int64_t>()[i]);
     };
 
     SmallVector<AffineExpr> inputExprs = {n, ci, d(1) * s(0) + k(1),

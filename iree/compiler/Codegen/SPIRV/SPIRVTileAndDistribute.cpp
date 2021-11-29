@@ -11,14 +11,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -65,11 +65,6 @@ static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
   return linalg::LinalgTransformationFilter(matchIds, replaceId);
 }
 
-/// Converts a symbolic GPU processor dimension to its numeric one.
-static unsigned dimToIndex(StringRef dim) {
-  return StringSwitch<unsigned>(dim).Case("x", 0).Case("y", 1).Case("z", 2);
-}
-
 //===----------------------------------------------------------------------===//
 // Invocation tiling patterns
 //===----------------------------------------------------------------------===//
@@ -99,54 +94,37 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  SmallVector<StringRef, 2> matchMarkers = {getWorkgroupMemoryMarker(),
-                                            getWorkgroupMarker()};
+  SmallVector<StringRef, 2> matchMarkers = {getWorkgroupMemoryMarker()};
 
-  patterns.insert<linalg::LinalgTilingPattern<linalg::CopyOp>,
-                  linalg::LinalgTilingPattern<linalg::Conv1DNwcWcfOp>,
-                  linalg::LinalgTilingPattern<linalg::Conv3DNdhwcDhwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
-                  linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
-      context, tilingOptions,
-      getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
-                                     context));
+  patterns
+      .insert<linalg::LinalgTilingPattern<linalg::CopyOp>,
+              linalg::LinalgTilingPattern<linalg::Conv1DNwcWcfOp>,
+              linalg::LinalgTilingPattern<linalg::Conv3DNdhwcDhwcfOp>,
+              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcmOp>,
+              linalg::LinalgTilingPattern<linalg::FillOp>,
+              linalg::LinalgTilingPattern<linalg::GenericOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
+              linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>>(
+          context, tilingOptions,
+          getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
+                                         context)
+              .setMatchByDefault());
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcOp>,
                   linalg::LinalgTilingPattern<linalg::MatmulOp>>(
       context, tilingOptions,
       getLinalgMatchAndReplaceMarker(matchMarkers, getTileReductionMarker(),
-                                     context));
+                                     context)
+          .setMatchByDefault());
 
-  patterns.insert<linalg_ext::TiledOpInterfaceTilingPattern>(
+  patterns.insert<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
       context, tilingOptions,
-      getLinalgMatchAndReplaceMarker(matchMarkers, llvm::None, context));
-}
-
-/// Returns the corresponding range for the given `processorValue` is a GPU
-/// thread id or block dim.
-static Optional<std::pair<AffineExpr, AffineExpr>> getThreadRange(
-    Value processorValue, SmallVectorImpl<Value> & /*dims*/,
-    SmallVectorImpl<Value> & /*symbols*/, ArrayRef<int64_t> workgroupSize) {
-  if (auto idOp = processorValue.getDefiningOp<gpu::ThreadIdOp>()) {
-    OpBuilder builder(processorValue.getContext());
-    unsigned index = dimToIndex(idOp.dimension());
-    AffineExpr zero = builder.getAffineConstantExpr(0);
-    AffineExpr ubExpr = builder.getAffineConstantExpr(workgroupSize[index]);
-    return std::make_pair(zero, ubExpr - 1);
-  }
-  if (auto dimOp = processorValue.getDefiningOp<gpu::BlockDimOp>()) {
-    OpBuilder builder(processorValue.getContext());
-    unsigned index = dimToIndex(dimOp.dimension());
-    AffineExpr bound = builder.getAffineConstantExpr(workgroupSize[index]);
-    return std::make_pair(bound, bound);
-  }
-  return llvm::None;
+      getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
+                                     context)
+          .setMatchByDefault());
 }
 
 //====---------------------------------------------------------------------===//
@@ -166,7 +144,7 @@ static void populateTilingReductionPatterns(
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwOp>,
+                  linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcOp>,
                   linalg::LinalgTilingPattern<linalg::MatmulOp>>(
       context, tilingOptions, marker);
 }
@@ -221,33 +199,13 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
 
-    populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
-
-    // Add patterns to fold affine.min ops created for convolution input
-    // subtensor/subview sizes. They have the affine map of
-    // (d0) -> (<tile-size>, <dim-size> - d0 * <stride>)>(%<processor-id>)`.
-    populateFoldGPUProcessorIDUsesPatterns(context, canonicalizationPatterns);
-
-    // Add patterns to remove trip-one loops created during cyclic loop
-    // distribution, if we can prove the tiling was perfect.
-    SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
-    if (workgroupSize.empty()) {
-      entryPointOp.emitError("expected to have workgroup_size attribute");
-      return signalPassFailure();
-    }
-    auto getThreadRangeFn = [workgroupSize](Value processorValue,
-                                            SmallVectorImpl<Value> &dims,
-                                            SmallVectorImpl<Value> &symbols) {
-      return getThreadRange(processorValue, dims, symbols, workgroupSize);
-    };
-    populateRemoveSingleIterationLoopPattern(canonicalizationPatterns,
-                                             getThreadRangeFn);
+    populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
 
     (void)applyPatternsAndFoldGreedily(funcOp,
                                        std::move(canonicalizationPatterns));
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After loop/affine canonicalization ---\n";
+      llvm::dbgs() << "--- After tiling canonicalization ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });

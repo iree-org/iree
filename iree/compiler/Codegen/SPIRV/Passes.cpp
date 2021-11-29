@@ -13,13 +13,14 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/MemorySpace.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -49,7 +50,7 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
 /// ops with loop nests containing payloads, so it should be invoked after
 /// tiling and vectorization and before buffer transformations.
 static void addLoopMaterializationPasses(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(linalg_ext::createLinalgExtToLoopsPass());
+  pm.addNestedPass<FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
   pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
 }
 
@@ -66,6 +67,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // subview ops.
   pm.addPass(memref::createFoldSubViewOpsPass());
   pm.addNestedPass<FuncOp>(Shape::createFoldDimOverShapeCarryingOpPass());
+  pm.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
   pm.addNestedPass<FuncOp>(createStdExpandOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -104,9 +106,9 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createSPIRVRemoveOneTripTiledLoopPass());
   // Tile and distribute to GPU invocations and vectorize.
   pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
   pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

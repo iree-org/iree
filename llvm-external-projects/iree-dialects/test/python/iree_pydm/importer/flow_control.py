@@ -77,3 +77,80 @@ def if_elif(cond, a, b):
   else:
     c = 3
   return c
+
+
+# CHECK-LABEL: @simple_while
+# CHECK: std.br ^bb1
+# CHECK: ^bb1:  // 2 preds: ^bb0, ^bb2
+# CHECK:   %[[COND:.*]] = load_var %cond
+# CHECK:   %[[COND_BOOL:.*]] = as_bool %[[COND]]
+# CHECK:   %[[COND_PRED:.*]] = bool_to_pred %[[COND_BOOL]]
+# CHECL:   std.cond_br %2, ^bb2, ^bb3
+# CHECK: ^bb2:  // pred: ^bb1
+# CHECK:   store_var %a
+# CHECK:   std.br ^bb1
+# CHECK: ^bb3:  // pred: ^bb1
+# CHECK:   load_var %a
+@test_import_global
+def simple_while(cond):
+  while cond:
+    a = 1
+  return a
+
+
+# CHECK-LABEL: @while_break
+# CHECK: ^bb1:  // 2 preds: ^bb0, ^bb4
+# CHECK: ^bb2:  // pred: ^bb1
+# CHECK: ^bb3:  // pred: ^bb2
+# CHECK:   std.br ^bb5
+# CHECK: ^bb4:  // pred: ^bb2
+# CHECK: ^bb5:  // 2 preds: ^bb1, ^bb3
+# CHECK:   load_var %a
+@test_import_global
+def while_break(cond):
+  while cond:
+    a = 1
+    if a:
+      break
+    b = 2
+  return a
+
+
+# CHECK-LABEL: @while_continue
+# CHECK: ^bb1:  // 3 preds: ^bb0, ^bb3, ^bb4
+# CHECK: ^bb2:  // pred: ^bb1
+# CHECK: ^bb3:  // pred: ^bb2
+# CHECK:   std.br ^bb1
+# CHECK: ^bb4:  // pred: ^bb2
+# CHECK: ^bb5:  // pred: ^bb1
+# CHECK:   load_var %a
+@test_import_global
+def while_continue(cond):
+  while cond:
+    a = 1
+    if a:
+      continue
+    b = 2
+  return a
+
+
+# CHECK-LABEL: @while_orelse
+# CHECK: ^bb1:  // 2 preds: ^bb0, ^bb4
+# CHECK: ^bb2:  // pred: ^bb1
+# CHECK: ^bb3:  // pred: ^bb2
+# CHECK:   std.br ^bb6
+# CHECK: ^bb4:  // pred: ^bb2
+# CHECK: ^bb5:  // pred: ^bb1
+# CHECK:   store_var %c
+# CHECK: ^bb6:  // 2 preds: ^bb3, ^bb5
+# CHECK:   load_var %a
+@test_import_global
+def while_orelse(cond):
+  while cond:
+    a = 1
+    if a:
+      break
+    b = 2
+  else:
+    c = 3
+  return a

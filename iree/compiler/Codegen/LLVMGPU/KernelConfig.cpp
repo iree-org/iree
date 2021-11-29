@@ -8,9 +8,9 @@
 
 #include <numeric>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
@@ -46,13 +46,75 @@ static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
   tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}}));
 }
 
+/// Return the best combination of tile size and wg size when using tensorcore
+/// operations.
+static void getTensorCoreConfig(
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
+  // Tile sizes are skewed towards small matmul for now. Long term the plan is
+  // to not rely on hardcoded configurations.
+  tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
+}
+
+static std::string getTargetArch(FuncOp entryPoint) {
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+    if (auto config = targetAttr.getConfiguration()) {
+      if (auto attr = config.getAs<StringAttr>("target_arch")) {
+        return attr.getValue().str();
+      }
+    }
+  }
+  return "";
+}
+
+static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
+  // Limit tensor core pipeline to matmul as not all combinations of transpose
+  // are supported upstream.
+  // TODO(thomasraoux): Enable batchMatmul and generic contraction.
+  if (getTargetArch(entryPoint) != "sm_80" || !isa<linalg::MatmulOp>(op))
+    return false;
+  // Check that we support converting any fused operation. When using the
+  // tensorcore pipeline we need to be sure we can generate MMA ops otherwise
+  // the code will be highly inneficent.
+  bool fusedOpSupported = true;
+  entryPoint.walk([&fusedOpSupported](linalg::GenericOp linalgOp) {
+    for (Operation &fusedOp : linalgOp.getOps()) {
+      if (!isa<arith::AddFOp, arith::MulFOp, arith::MaxFOp, arith::MinFOp,
+               linalg::YieldOp, arith::DivFOp>(fusedOp)) {
+        fusedOpSupported = false;
+        break;
+      }
+    }
+  });
+  if (!fusedOpSupported) return false;
+  return true;
+}
+
 static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
-  TileSizesListType tileSizes;
+  auto setMatmulConfig =
+      [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
+                         llvm::ArrayRef<int64_t> workgroupSize,
+                         IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
+        TileSizesListType tileSizes;
+        SmallVector<int64_t> ts;
+        // Tile all the higher parallel dimension with a size of 1 and the 2
+        // most inner dimension with the tileX/tileY size.
+        ts.append(op.getNumParallelLoops() - 2, 1);
+        ts.append({tileX, tileY});
+        // Tile all the reduction dimensions.
+        ts.append(op.getNumReductionLoops(), tileK);
+        tileSizes.push_back(ts);  // Workgroup level.
+        return setOpConfigAndEntryPointFnTranslation(
+            entryPoint, op, tileSizes,
+            /*nativeVectorSizes=*/ArrayRef<int64_t>{}, pipeline, workgroupSize);
+      };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape = getUntiledShape(op.getInputOperand(0)->get());
   auto rhsShape = getUntiledShape(op.getInputOperand(1)->get());
   int64_t sizeM = ShapedType::kDynamicSize;
   int64_t sizeN = ShapedType::kDynamicSize;
+  int64_t sizeK = ShapedType::kDynamicSize;
   auto outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
   for (unsigned i = 0; i < lhsShape.size(); i++) {
     if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
@@ -68,20 +130,45 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       break;
     }
   }
-  // Default tile size and workgroup size.
-  int64_t tileX = 2;
-  int64_t tileY = 256;
-  int64_t tileK = 4;
-  SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
-  bool isStaticSize =
-      sizeM != ShapedType::kDynamicSize && sizeN != ShapedType::kDynamicSize;
+  SmallVector<AffineExpr> exprs;
+  op.getReductionDims(exprs);
+  if (exprs.size() == 1) {
+    for (unsigned i = 0; i < lhsShape.size(); i++) {
+      if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
+          exprs[0].cast<AffineDimExpr>().getPosition()) {
+        sizeK = lhsShape[i];
+        break;
+      }
+    }
+  }
+  bool isStaticSize = sizeM != ShapedType::kDynamicSize &&
+                      sizeN != ShapedType::kDynamicSize &&
+                      sizeK != ShapedType::kDynamicSize;
   if (isStaticSize) {
+    /// Try tensorcore config first.
+    if (supportsTensorCore(entryPoint, op)) {
+      SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
+      getTensorCoreConfig(TCtileSizeConfig);
+      // Pick the best configuration where the original shape is aligned on the
+      // tile size.
+      for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
+        if (sizeK % config.tileSize[2] == 0 &&
+            sizeN % config.tileSize[1] == 0 &&
+            sizeM % config.tileSize[0] == 0) {
+          return setMatmulConfig(config.tileSize[0], config.tileSize[1],
+                                 config.tileSize[2], config.workgroupSize,
+                                 IREE::Codegen::DispatchLoweringPassPipeline::
+                                     LLVMGPUMatmulTensorCore);
+        }
+      }
+    }
     // Special case for very small matrices.
     if (sizeM * sizeN <= cudaWarpSize) {
-      tileX = sizeN;
-      tileY = sizeM;
-      workgroupSize = {sizeM, sizeN, 1};
+      return setMatmulConfig(
+          sizeN, sizeM, 4, {sizeM, sizeN, 1},
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
     }
+    // simt matmul case
     SmallVector<TileWorkgroupSizePair> tileSizeConfig;
     // Query the best configuration.
     getMatmulConfig(tileSizeConfig);
@@ -89,32 +176,25 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
       if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0) {
-        tileX = config.tileSize[0];
-        tileY = config.tileSize[1];
-        tileK = config.tileSize[2];
-        workgroupSize.assign(config.workgroupSize.begin(),
-                             config.workgroupSize.end());
-        break;
+        return setMatmulConfig(
+            config.tileSize[0], config.tileSize[1], config.tileSize[2],
+            config.workgroupSize,
+            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
       }
     }
   }
-  // Currently just a basic tile size to enable tiling and vectorization.
-  // TODO: pick a more efficient tile size and tile at subgroup level.
-  SmallVector<int64_t> ts;
-  // Tile all the higher parallel dimension with a size of 1 and the 2 most
-  // inner dimension with the tileX/tileY size.
-  ts.append(op.getNumParallelLoops() - 2, 1);
-  ts.append({tileX, tileY});
-  // Tile all the reduction dimensions.
-  ts.append(op.getNumReductionLoops(), tileK);
-  tileSizes.push_back(ts);  // Workgroup level.
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt,
-      workgroupSize);
+  // If we haven't found any config, fall back to default config.
+  int64_t tileX = 2;
+  int64_t tileY = 256;
+  int64_t tileK = 4;
+  SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  return setMatmulConfig(
+      tileX, tileY, tileK, workgroupSize,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
 }
 
-static LogicalResult setFftConfig(FuncOp entryPoint, linalg_ext::FftOp op) {
+static LogicalResult setFftConfig(FuncOp entryPoint,
+                                  IREE::LinalgExt::FftOp op) {
   auto partitionedLoops = getPartitionedLoops(op);
   unsigned loopDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
@@ -175,7 +255,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
         vectorSize = 1;
         break;
       }
-      ArrayRef<int64_t> shape = getUntiledResultShape(
+      SmallVector<int64_t> shape = getUntiledResultShape(
           cast<linalg::LinalgOp>(op), outputOperand.index());
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         vectorSize = 1;
@@ -245,7 +325,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
       return setContractConfig(entryPointFn, linalgOp);
     }
   }
-  if (auto fftOp = dyn_cast<linalg_ext::FftOp>(computeOp)) {
+  if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
   }
   return setRootDefaultConfig(entryPointFn, computeOp);
@@ -263,7 +343,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;
     SmallVector<Operation *> computeOps;
-    SmallVector<TiledLoopInfo> tiledLoops;
+    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
       return funcOp.emitOpError("failed to get compute ops");
     }

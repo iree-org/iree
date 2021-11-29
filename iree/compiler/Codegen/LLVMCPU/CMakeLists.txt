@@ -21,15 +21,18 @@ iree_cc_library(
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
+    "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
-    "LLVMCPUVectorization.cpp"
     "Passes.cpp"
     "VectorContractToAArch64InlineAsmOp.cpp"
   DEPS
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRArithmeticToLLVM
+    MLIRArithmeticTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR
@@ -64,8 +67,6 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Util::IR

@@ -17,6 +17,7 @@ iree_cc_library(
     "ConversionUtils.h"
     "FlatbufferUtils.h"
     "GraphUtils.h"
+    "IndexSet.h"
     "PatternUtils.h"
     "TracingUtils.h"
   SRCS
@@ -26,6 +27,7 @@ iree_cc_library(
     "TracingUtils.cpp"
   DEPS
     LLVMSupport
+    MLIRArithmetic
     MLIRIR
     MLIRPass
     MLIRStandard

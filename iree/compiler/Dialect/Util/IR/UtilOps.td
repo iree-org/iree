@@ -12,6 +12,7 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -174,6 +175,45 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
   }];
 
   let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Address/offset Arithmetic
+//===----------------------------------------------------------------------===//
+
+def Util_AlignOp : Util_PureOp<"align", [
+  SameOperandsAndResultType
+  ]> {
+  let summary = "Aligns up to a power-of-two alignment if required";
+  let description = [{
+     Aligns |value| up to the given power-of-two |alignment| if required.
+  }];
+
+  let arguments = (ins
+    SignlessIntegerLike:$value,
+    SignlessIntegerLike:$alignment
+  );
+
+  let results = (outs
+    SignlessIntegerLike:$result
+  );
+
+  let assemblyFormat = [{
+    $value `,` $alignment attr-dict `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$value,
+      "int64_t":$alignment
+    ),
+    [{
+      build($_builder, $_state, value.getType(), value,
+       $_builder.createOrFold<arith::ConstantIndexOp>($_state.location, alignment));
+    }]>,
+  ];
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//

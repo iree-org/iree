@@ -41,10 +41,6 @@ extern void populateHALBufferViewToVMPatterns(
 extern void populateHALCommandBufferToVMPatterns(
     MLIRContext *context, SymbolTable &importSymbols,
     TypeConverter &typeConverter, OwningRewritePatternList &patterns);
-extern void populateHALConstantToVMPatterns(MLIRContext *context,
-                                            SymbolTable &importSymbols,
-                                            TypeConverter &typeConverter,
-                                            OwningRewritePatternList &patterns);
 extern void populateHALDeviceToVMPatterns(MLIRContext *context,
                                           SymbolTable &importSymbols,
                                           TypeConverter &typeConverter,
@@ -70,8 +66,6 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                                     patterns);
   populateHALCommandBufferToVMPatterns(context, importSymbols, typeConverter,
                                        patterns);
-  populateHALConstantToVMPatterns(context, importSymbols, typeConverter,
-                                  patterns);
   populateHALDeviceToVMPatterns(context, importSymbols, typeConverter,
                                 patterns);
   populateHALExecutableToVMPatterns(context, importSymbols, typeConverter,

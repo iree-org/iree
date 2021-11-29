@@ -40,6 +40,7 @@ hal.interface private @io  {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
 //      CHECK: func @matmul()
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.load.constant offset = 0
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.load.constant offset = 1
@@ -64,15 +65,17 @@ hal.interface private @io  {
 //      CHECK:       %[[TILESIZE_X:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[WG_SIZE_X]], %[[N]]]
 //  CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[LHS]][%[[IV0]], 0] [%[[TILESIZE_Y]], %[[K]]]
 //  CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]] [%[[K]], %[[TILESIZE_X]]]
-//  CHECK-DAG:       %[[ALLOC:.+]] = memref.alloc(%[[TILESIZE_Y]], %[[TILESIZE_X]]) {alignment = 128 : i64}
 //  CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
-//      CHECK:       linalg.copy(%[[INIT_TILE]], %[[ALLOC]])
+//  CHECK-DAG:       %[[ALLOC:.+]] = memref.alloc(%[[TILESIZE_Y]], %[[TILESIZE_X]]) {alignment = 128 : i64}
+//      CHECK:       %[[ALLOC_CASTED:.+]] = memref.cast %[[ALLOC]] : memref<?x?xf32> to memref<?x?xf32, #[[MAP2]]>
+//      CHECK:       memref.copy %[[INIT_TILE]], %[[ALLOC_CASTED]]
 //      CHECK:       linalg.matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
 // CHECK-SAME:           outs(%[[ALLOC]]
 //      CHECK:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
-//      CHECK:       linalg.copy(%[[ALLOC]], %[[RESULT_TILE]])
+//      CHECK:       memref.copy %[[ALLOC_CASTED]], %[[RESULT_TILE]]
 //      CHECK:       memref.dealloc %[[ALLOC]]
+
 
 // -----
 
@@ -84,7 +87,7 @@ func @matmul_fill() {
   %k = hal.interface.load.constant offset = 2 : index
   %lhs = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %rhs = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
-  %result = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
+  %result = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<readwrite:?x?xf32>{%m, %n}
   %wg_id_y = hal.interface.workgroup.id[1] : index
   %wg_count_y = hal.interface.workgroup.count[1] : index
   %wg_size_y = hal.interface.workgroup.size[1] : index
@@ -104,7 +107,7 @@ func @matmul_fill() {
       %init_tile = linalg.init_tensor [%tilesize_y, %tilesize_x] : tensor<?x?xf32>
       %fill_tile = linalg.fill(%cst, %init_tile) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
       %matmul_tile = linalg.matmul ins(%lhs_tile, %rhs_tile : tensor<?x?xf32>, tensor<?x?xf32>) outs(%fill_tile : tensor<?x?xf32>) -> tensor<?x?xf32>
-      flow.dispatch.tensor.store %matmul_tile, %result, offsets = [%iv0, %iv1], sizes = [%tilesize_y, %tilesize_x], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+      flow.dispatch.tensor.store %matmul_tile, %result, offsets = [%iv0, %iv1], sizes = [%tilesize_y, %tilesize_x], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<readwrite:?x?xf32>
     }
   }
   return
@@ -137,14 +140,13 @@ hal.interface private @io  {
 //      CHECK:   scf.for %[[IV0:.+]] = %[[OFFSET_Y]] to %[[M]] step %[[STEP_Y]]
 //      CHECK:     %[[TILESIZE_Y:.+]] = affine.min #[[MAP1]](%[[IV0]])[%[[WG_SIZE_Y]], %[[M]]]
 //      CHECK:     scf.for %[[IV1:.+]] = %[[OFFSET_X]] to %[[N]] step %[[STEP_X]]
+//  CHECK-NOT:       memref.copy
 //      CHECK:       %[[TILESIZE_X:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[WG_SIZE_X]], %[[N]]]
 //  CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[LHS]][%[[IV0]], 0] [%[[TILESIZE_Y]], %[[K]]]
 //  CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]] [%[[K]], %[[TILESIZE_X]]]
-//  CHECK-DAG:       %[[ALLOC:.+]] = memref.alloc(%[[TILESIZE_Y]], %[[TILESIZE_X]]) {alignment = 128 : i64}
-//      CHECK:       linalg.fill(%[[CST]], %[[ALLOC]])
+//  CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
+//      CHECK:       linalg.fill(%[[CST]], %[[RESULT_TILE]])
 //      CHECK:       linalg.matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
-// CHECK-SAME:           outs(%[[ALLOC]]
-//  CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
-//      CHECK:       linalg.copy(%[[ALLOC]], %[[RESULT_TILE]])
-//      CHECK:       memref.dealloc %[[ALLOC]]
+// CHECK-SAME:           outs(%[[RESULT_TILE]]
+

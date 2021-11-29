@@ -58,9 +58,14 @@ class EmbeddedLinkerTool : public LinkerTool {
         findToolInEnvironment({"iree-lld", "lld", "ld.lld", "lld-link"});
     if (!environmentPath.empty()) return environmentPath;
 
-    llvm::errs() << "LLD (ld.lld) not found on path; specify with the "
-                    "IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment variable or "
-                    "-iree-llvm-embedded-linker-path=\n";
+    llvm::errs()
+        << "error: required embedded linker tool (typically `lld`) not found "
+           "after searching:\n"
+           "  * -iree-llvm-embedded-linker-path= flag\n"
+           "  * IREE_LLVMAOT_EMBEDDED_LINKER_PATH environment variable\n"
+           "  * common locations at relative file paths\n"
+           "  * system PATH\n"
+           "Run with -debug-only=llvmaot-linker for search details\n";
     return "";
   }
 
@@ -88,8 +93,11 @@ class EmbeddedLinkerTool : public LinkerTool {
     }
     artifacts.libraryFile.close();
 
+    std::string embeddedToolPath = getEmbeddedToolPath();
+    if (embeddedToolPath.empty()) return llvm::None;
+
     SmallVector<std::string, 8> flags = {
-        getEmbeddedToolPath(),
+        embeddedToolPath,
 
         // Forces LLD to act like gnu ld and produce ELF files.
         // If not specified then lld tries to figure out what it is by progname
@@ -100,6 +108,9 @@ class EmbeddedLinkerTool : public LinkerTool {
         "-o " + artifacts.libraryFile.path,
     };
 
+    // Hide build info that makes files unreproducable.
+    flags.push_back("--build-id=none");
+
     // Avoids including any libc/startup files that initialize the CRT as
     // we don't use any of that. Our shared libraries must be freestanding.
     flags.push_back("-nostdlib");  // -nodefaultlibs + -nostartfiles
@@ -108,8 +119,10 @@ class EmbeddedLinkerTool : public LinkerTool {
     // We cannot have any imports in the module we produce.
     flags.push_back("-static");
 
-    // Creating a shared library.
+    // Creating a hermetic shared library.
     flags.push_back("-shared");
+    flags.push_back("--no-undefined");
+    flags.push_back("--no-allow-shlib-undefined");
 
     // Drop unused sections.
     flags.push_back("--gc-sections");
@@ -124,6 +137,14 @@ class EmbeddedLinkerTool : public LinkerTool {
     // Strip local symbols; we only care about the global ones for lookup.
     // This shrinks the .symtab to a single entry.
     flags.push_back("--discard-all");
+
+    // Identical code folding.
+    flags.push_back("--icf=all");
+
+    // To aid ICF we allow functions and data to be aliased - we never expose
+    // pointers to our internal functions and don't care if they alias.
+    flags.push_back("--ignore-data-address-equality");
+    flags.push_back("--ignore-function-address-equality");
 
     // Use sysv .hash lookup table only; we have literally a single symbol and
     // the .gnu.hash overhead is not worth it (either in the ELF or in the
@@ -141,8 +162,9 @@ class EmbeddedLinkerTool : public LinkerTool {
       flags.push_back(objectFile.path);
     }
 
-    auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine))) {
+    // LLD inserts its own identifier unless the LLD_VERSION env var is set:
+    // third_party/llvm-project/lld/ELF/SyntheticSections.cpp
+    if (failed(runLinkCommand(llvm::join(flags, " "), "LLD_VERSION=IREE"))) {
       // Ensure we save inputs if we fail so that the user can replicate the
       // command themselves.
       if (targetOptions.keepLinkerArtifacts) {

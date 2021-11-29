@@ -134,7 +134,7 @@ Type RefType::getObjectType() { return getImpl()->objectType; }
 // Attribute printing and parsing
 //===----------------------------------------------------------------------===//
 
-Attribute OrdinalCountsAttr::parse(DialectAsmParser &p) {
+Attribute OrdinalCountsAttr::parse(AsmParser &p) {
   Type i32 = p.getBuilder().getIntegerType(32);
   IntegerAttr importFuncsAttr;
   IntegerAttr exportFuncsAttr;
@@ -168,9 +168,9 @@ Attribute OrdinalCountsAttr::parse(DialectAsmParser &p) {
              globalBytesAttr, globalRefsAttr, rodatasAttr, rwdatasAttr);
 }
 
-void OrdinalCountsAttr::print(DialectAsmPrinter &p) const {
+void OrdinalCountsAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   os << "import_funcs = " << import_funcs() << ", ";
   os << "export_funcs = " << export_funcs() << ", ";
   os << "internal_funcs = " << internal_funcs() << ", ";
