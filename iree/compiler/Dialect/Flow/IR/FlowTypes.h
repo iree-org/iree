@@ -8,7 +8,6 @@
 #define IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
@@ -134,10 +133,6 @@ class DispatchTensorType
 
   TensorType asTensorType() const {
     return RankedTensorType::get(getShape(), getElementType());
-  }
-
-  Shape::RankedShapeType asRankedShapeType() const {
-    return Shape::RankedShapeType::get(getShape(), getContext());
   }
 };
 

@@ -11,7 +11,6 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -66,7 +65,6 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
         "getTiedResultOperandIndex",
         "getTiedResultOperandIndices",
     ]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{conversion placeholder for HAL<->tensor type conversion}];
@@ -1919,7 +1917,6 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
 
 def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];

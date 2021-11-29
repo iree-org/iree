@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -397,27 +398,6 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
 // IREE::Util::ShapeAware*
 //===----------------------------------------------------------------------===//
 
-ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
-                                   ValueRange dynamicDims) {
-  auto value = values[idx];
-  auto shapedType = value.getType().dyn_cast<ShapedType>();
-  if (!shapedType) return ValueRange{};
-
-  // Bail immediately if the shape is static.
-  if (shapedType.hasStaticShape()) return ValueRange{};
-
-  // Find where the dynamic dims start in the flattened list.
-  unsigned offset = 0;
-  for (unsigned i = 0; i < idx; ++i) {
-    if (auto type = values[i].getType().dyn_cast<ShapedType>()) {
-      offset += type.getNumDynamicDims();
-    }
-  }
-
-  // Return the subrange of dynamic dims for the value being queried.
-  return dynamicDims.slice(offset, shapedType.getNumDynamicDims());
-}
-
 Optional<ValueRange> findDynamicDims(Value shapedValue) {
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
@@ -461,6 +441,107 @@ Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
   }
 
   return None;
+}
+
+ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
+                                   ValueRange dynamicDims) {
+  auto value = values[idx];
+  auto shapedType = value.getType().dyn_cast<ShapedType>();
+  if (!shapedType) return ValueRange{};
+
+  // Bail immediately if the shape is static.
+  if (shapedType.hasStaticShape()) return ValueRange{};
+
+  // Find where the dynamic dims start in the flattened list.
+  unsigned offset = 0;
+  for (unsigned i = 0; i < idx; ++i) {
+    if (auto type = values[i].getType().dyn_cast<ShapedType>()) {
+      offset += type.getNumDynamicDims();
+    }
+  }
+
+  // Return the subrange of dynamic dims for the value being queried.
+  return dynamicDims.slice(offset, shapedType.getNumDynamicDims());
+}
+
+SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
+                                            OpBuilder &builder) {
+  auto valueType = value.getType().dyn_cast<ShapedType>();
+  if (!valueType) {
+    mlir::emitError(loc) << "cannot construct shape for non shaped value: "
+                         << value.getType();
+    return {};
+  }
+
+  // Early-exit if all dimensions are static.
+  if (valueType.hasStaticShape()) {
+    return {};
+  }
+
+  // Try the fast-path of scanning for the dynamic dims that exist in the IR
+  // already. For shape-aware ops this is free as the dynamic dim SSA values are
+  // always available.
+  auto foundDynamicDims = IREE::Util::findDynamicDims(
+      value, builder.getBlock(), builder.getInsertionPoint());
+  if (foundDynamicDims.hasValue()) {
+    return llvm::to_vector<4>(foundDynamicDims.getValue());
+  }
+
+  // Slower path that materializes the entire shape for a result. Some
+  // implementations may only support this (vs the fast find above).
+  if (auto shapeAwareOp = dyn_cast_or_null<IREE::Util::ShapeAwareOpInterface>(
+          value.getDefiningOp())) {
+    return shapeAwareOp.buildResultValueShape(value, builder);
+  }
+
+  // TODO(benvanik): add support for ReifyRankedShapedTypeOpInterface;
+  // unfortunately it is for all results and all dimensions so a lot of unneeded
+  // IR will be inserted.
+
+  // Fallback to inserting dim ops that can be resolved via normal upstream
+  // mechanisms. Depending on where this is called from within the parent
+  // pipeline these ops may not be desirable, but that's what the
+  // ShapeAwareOpInterface is for.
+  SmallVector<Value> dynamicDims;
+  for (unsigned i = 0; i < valueType.getRank(); ++i) {
+    if (valueType.isDynamicDim(i)) {
+      dynamicDims.push_back(builder.createOrFold<tensor::DimOp>(loc, value, i));
+    }
+  }
+  return dynamicDims;
+}
+
+static SmallVector<Value> buildShape(Location loc, ShapedType type,
+                                     ValueRange dynamicDims,
+                                     OpBuilder &builder) {
+  SmallVector<Value> dims;
+  dims.reserve(type.getRank());
+  unsigned dynamicIdx = 0;
+  for (unsigned i = 0; i < type.getRank(); ++i) {
+    int64_t dim = type.getDimSize(i);
+    if (dim == ShapedType::kDynamicSize) {
+      dims.push_back(dynamicDims[dynamicIdx++]);
+    } else {
+      dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));
+    }
+  }
+  return dims;
+}
+
+SmallVector<Value> buildOperandShape(ShapeAwareOpInterface op,
+                                     unsigned operandIdx, OpBuilder &builder) {
+  auto operand = op->getOperand(operandIdx);
+  auto type = operand.getType().cast<ShapedType>();
+  auto dynamicDims = op.getOperandDynamicDims(operandIdx);
+  return buildShape(op.getLoc(), type, dynamicDims, builder);
+}
+
+SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
+                                    unsigned resultIdx, OpBuilder &builder) {
+  auto result = op->getResult(resultIdx);
+  auto type = result.getType().cast<ShapedType>();
+  auto dynamicDims = op.getResultDynamicDims(resultIdx);
+  return buildShape(op.getLoc(), type, dynamicDims, builder);
 }
 
 //===----------------------------------------------------------------------===//

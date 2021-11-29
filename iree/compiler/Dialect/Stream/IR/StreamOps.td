@@ -7,7 +7,6 @@
 #ifndef IREE_DIALECT_STREAM_OPS
 #define IREE_DIALECT_STREAM_OPS
 
-include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
@@ -2607,7 +2606,6 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
 }
 
 def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];

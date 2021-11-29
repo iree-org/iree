@@ -64,7 +64,6 @@ cc_library(
         ":PassesIncGen",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/InputConversion/Common",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",

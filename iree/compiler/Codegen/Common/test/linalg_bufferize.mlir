@@ -992,12 +992,11 @@ hal.interface private @io  {
 }
 // CHECK-LABEL: func @subtensor_insert()
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0
-//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
-//   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[ARG0]], %[[C0]]
-//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[ARG0]], %[[C1]]
+//   CHECK-DAG:   %[[D0:.+]] = hal.interface.load.constant offset = 0 : index
+//   CHECK-DAG:   %[[D1:.+]] = hal.interface.load.constant offset = 1 : index
 //       CHECK:   linalg.copy(%[[ARG1]], %[[RET0]])
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET0]][3, 4] [%[[D0]], %[[D1]]] [1, 1]
 //       CHECK:   linalg.copy(%[[ARG0]], %[[SUBVIEW]])

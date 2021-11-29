@@ -27,7 +27,6 @@ cc_library(
         "@iree//iree/compiler/Codegen:PassHeaders",
         "@iree//iree/compiler/Dialect/Flow/IR",
         "@iree//iree/compiler/Dialect/Flow/Transforms",
-        "@iree//iree/compiler/Dialect/Shape/Transforms",
         "@iree//iree/compiler/Dialect/Util/IR",
         "@iree//iree/compiler/InputConversion/MHLO",
         "@llvm-project//llvm:Support",

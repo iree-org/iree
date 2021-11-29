@@ -48,7 +48,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTensor
     MLIRTransformUtils
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/Triple.h"
@@ -755,8 +754,7 @@ void ConvertToLLVMPass::runOnOperation() {
   // rest of the IR.
   target.addLegalOp<ModuleOp, IREE::HAL::InterfaceOp,
                     IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
-  target.addIllegalDialect<ShapeDialect, StandardOpsDialect,
-                           mlir::arith::ArithmeticDialect,
+  target.addIllegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();
   target.addIllegalOp<UnrealizedConversionCastOp>();
@@ -766,15 +764,16 @@ void ConvertToLLVMPass::runOnOperation() {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
-  target.addDynamicallyLegalDialect<
-      ShapeDialect, StandardOpsDialect, mlir::math::MathDialect,
-      mlir::arith::ArithmeticDialect, IREE::Util::UtilDialect,
-      IREE::HAL::HALDialect, math::MathDialect>([&](Operation *op) {
-    auto funcParent = op->getParentOfType<FuncOp>();
-    if (!funcParent) return false;
-    if (isEntryPoint(funcParent)) return false;
-    return true;
-  });
+  target.addDynamicallyLegalDialect<StandardOpsDialect, mlir::math::MathDialect,
+                                    mlir::arith::ArithmeticDialect,
+                                    IREE::Util::UtilDialect,
+                                    IREE::HAL::HALDialect, math::MathDialect>(
+      [&](Operation *op) {
+        auto funcParent = op->getParentOfType<FuncOp>();
+        if (!funcParent) return false;
+        if (isEntryPoint(funcParent)) return false;
+        return true;
+      });
 
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();

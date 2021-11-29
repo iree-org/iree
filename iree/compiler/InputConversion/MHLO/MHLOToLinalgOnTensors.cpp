@@ -14,8 +14,6 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/InputConversion/MHLO/ConvertMHLOToFlow.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -214,9 +212,8 @@ struct ConvertMHLOToLinalgOnTensorsPass
           ConvertMHLOToLinalgOnTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                    mhlo::MhloDialect, shape::ShapeDialect, ShapeDialect,
-                    math::MathDialect, memref::MemRefDialect,
-                    complex::ComplexDialect>();
+                    mhlo::MhloDialect, shape::ShapeDialect, math::MathDialect,
+                    memref::MemRefDialect, complex::ComplexDialect>();
   }
 
   void runOnOperation() override {

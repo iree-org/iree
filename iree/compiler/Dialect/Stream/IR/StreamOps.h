@@ -9,8 +9,6 @@
 
 #include <cstdint>
 
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTraits.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"

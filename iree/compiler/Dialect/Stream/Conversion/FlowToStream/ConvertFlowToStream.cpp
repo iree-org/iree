@@ -9,8 +9,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/Builders.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -277,7 +275,7 @@ struct ConvertTensorTraceOp
             /*source_affinity=*/nullptr,
             /*result_affinity=*/nullptr);
       }
-      auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
+      auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           op.getLoc(), tensorOperand, rewriter);
       exportedTensors.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
           op.getLoc(), tensorOperand.getType(), exportSource,
@@ -332,7 +330,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
         resultSizes.push_back(operandSizes[operandIndex]);
         resultTypes.push_back(dispatchOperands[operandIndex].getType());
       } else {
-        auto resultDynamicDims = Shape::buildOrFindDynamicDimsForValue(
+        auto resultDynamicDims = IREE::Util::buildDynamicDimsForValue(
             op.getLoc(), result.value(), rewriter);
         resultSizes.push_back(buildResultSizeOf(op.getLoc(), result.value(),
                                                 resultDynamicDims, rewriter));
