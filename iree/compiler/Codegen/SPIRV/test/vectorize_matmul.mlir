@@ -81,3 +81,37 @@ func @matmul_2x128x4() {
 //       CHECK:       %[[FMA_3:.+]] = vector.fma %[[LHS_3_VECTOR]], %[[RHS_3_VECTOR]], %[[FMA_2]] : vector<4xf32>
 //       CHECK:       %[[INSERT:.+]] = vector.insert %[[FMA_3]], %[[ZERO]] [0]
 //       CHECK:       vector.transfer_write %[[INSERT]], %[[ACC_TILE]][%[[C0]], %[[C0]]]
+
+// -----
+
+// Check that we can vectorize shape dimensions not divisible by 4 but divisible by 2.
+
+func @matmul_8x8x2(%lhs: memref<8x2xf32>, %rhs: memref<2x8xf32>, %output: memref<8x8xf32>) {
+  linalg.matmul {__internal_linalg_transform__ = "vectorize"} ins(%lhs, %rhs: memref<8x2xf32>, memref<2x8xf32>) outs(%output: memref<8x8xf32>)
+  return
+}
+
+//    CHECK-LABEL: func @matmul_8x8x2
+
+//  CHECK-COUNT-8: vector.transfer_read {{.*}} : memref<8x2xf32>, vector<1x2xf32>
+//  CHECK-COUNT-4: vector.transfer_read {{.*}} : memref<2x8xf32>, vector<1x4xf32>
+// CHECK-COUNT-16: vector.transfer_read {{.*}} : memref<8x8xf32>, vector<1x4xf32>
+// CHECK-COUNT-16: vector.fma
+// CHECK-COUNT-16: vector.transfer_write {{.*}} : vector<1x4xf32>, memref<8x8xf32>
+
+// -----
+
+// Check that we can vectorize shape dimensions not divisible by 4/2 but divisible by 1.
+
+func @matmul_8x8x1(%lhs: memref<8x1xf32>, %rhs: memref<1x8xf32>, %output: memref<8x8xf32>) {
+  linalg.matmul {__internal_linalg_transform__ = "vectorize"} ins(%lhs, %rhs: memref<8x1xf32>, memref<1x8xf32>) outs(%output: memref<8x8xf32>)
+  return
+}
+
+//    CHECK-LABEL: func @matmul_8x8x1
+
+//  CHECK-COUNT-8: vector.transfer_read {{.*}} : memref<8x1xf32>, vector<1x1xf32>
+//  CHECK-COUNT-2: vector.transfer_read {{.*}} : memref<1x8xf32>, vector<1x4xf32>
+// CHECK-COUNT-16: vector.transfer_read {{.*}} : memref<8x8xf32>, vector<1x4xf32>
+// CHECK-COUNT-16: vector.fma
+// CHECK-COUNT-16: vector.transfer_write {{.*}} : vector<1x4xf32>, memref<8x8xf32>

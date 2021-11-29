@@ -33,21 +33,27 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
+int getNativeVectorSize(int64_t size) {
+  // Try to use 4 first, and then 2, and then 1.
+  return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 1);
+}
+
+Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
-      // Use 4-element vectors for elementwise ops.
       SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
-      nativeSize.back() = 4;
+      nativeSize.back() = getNativeVectorSize(vecType.getShape().back());
       return nativeSize;
     }
   } else if (auto vtOp = dyn_cast<VectorTransferOpInterface>(op)) {
-    auto rank = vtOp.getVectorType().getRank();
-    SmallVector<int64_t, 4> nativeSize(rank, 1);
+    auto vecType = vtOp.getVectorType();
+    SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
     for (auto dim : llvm::enumerate(vtOp.permutation_map().getResults())) {
       if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
-        if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1)
-          nativeSize[dim.index()] = 4;
+        if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1) {
+          nativeSize[dim.index()] =
+              getNativeVectorSize(vecType.getShape()[dim.index()]);
+        }
       }
     }
     return nativeSize;
@@ -57,8 +63,7 @@ Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
       if (isParallelIterator(it.value())) lastParalleldim = it.index();
     }
     SmallVector<int64_t, 4> nativeSize(contractOp.iterator_types().size(), 1);
-    nativeSize[lastParalleldim] = 4;
-    // Map to vec4 fma operations.
+    nativeSize[lastParalleldim] = 4;  // Map to vec4 fma operations.
     return nativeSize;
   }
   return llvm::None;
@@ -81,7 +86,7 @@ void populateVectorUnrollPatterns(MLIRContext *context,
                                   RewritePatternSet &patterns) {
   vector::populateVectorUnrollPatterns(
       patterns,
-      vector::UnrollVectorOptions().setNativeShapeFn(getSPIRVNativeVectorSize));
+      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorShape));
 }
 
 /// Vectorizes Linalg ops on buffer semantics.
