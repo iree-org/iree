@@ -34,10 +34,8 @@ namespace iree_compiler {
 namespace {
 
 int getNativeVectorSize(int64_t size) {
-  // Try to use 4 first and then 2. Otherwise return 4 to effectively disable
-  // (as vectorization just fails if the original size does not divide the
-  // native size).
-  return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 4);
+  // Try to use 4 first, and then 2, and then 1.
+  return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 1);
 }
 
 Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
