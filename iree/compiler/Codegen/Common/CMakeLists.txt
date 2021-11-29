@@ -51,6 +51,7 @@ iree_cc_library(
     MLIRArithBufferizableOpInterfaceImpl
     MLIRArithmetic
     MLIRBufferizableOpInterface
+    MLIRBufferizationDialect
     MLIRComprehensiveBufferize
     MLIRGPUOps
     MLIRIR

@@ -20,6 +20,7 @@ iree_cc_library(
   DEPS
     MLIRAffine
     MLIRArithmetic
+    MLIRBufferizationDialect
     MLIRIR
     MLIRMemRef
     MLIRPass
