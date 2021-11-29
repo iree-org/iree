@@ -414,27 +414,33 @@ static Value getAliasingBufferForResult(OpBuilder &b,
                          loadOp.getMixedSizes(), loadOp.getMixedStrides());
 }
 
-/// Converts a `linalg.tensor_collapse/expand_shape` operation to a
-/// `linalg.collapse/expand_shape` operation with the result aliasing the buffer
+/// Converts a `linalg.tensor_expand_shape` operation to a
+/// `memref.expand_shape` operation with the result aliasing the buffer
 /// for the operand.
-template <typename TensorReshapeOpTy>
-static Value getAliasingBufferForReshapeResult(OpBuilder &b,
-                                               TensorReshapeOpTy op,
-                                               BlockAndValueMapping &bvm) {
+static Value getAliasingBufferForExpandShapeResult(
+    OpBuilder &b, linalg::TensorExpandShapeOp op, BlockAndValueMapping &bvm) {
   Location loc = op.getLoc();
   Value srcTensor = op.src();
   RankedTensorType resultTensorType = op.getResultType();
   Value inputBuffer = bvm.lookup(srcTensor);
-
-  // Create the reshape op.
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
   auto reshapeResultType = getMemrefTypeForTensor(
       resultTensorType, {}, inputBufferType.getMemorySpace());
-  using ReshapeOpTy = typename std::conditional<
-      std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
-      memref::CollapseShapeOp, memref::ExpandShapeOp>::type;
-  Value bufferReshape = b.create<ReshapeOpTy>(loc, reshapeResultType,
-                                              inputBuffer, op.reassociation());
+  Value bufferReshape = b.create<memref::ExpandShapeOp>(
+      loc, reshapeResultType, inputBuffer, op.reassociation());
+  return bufferReshape;
+}
+
+/// Converts a `linalg.tensor_collapse_shape` operation to a
+/// `memref.collapse_shape` operation with the result aliasing the buffer
+/// for the operand.
+static Value getAliasingBufferForCollapseShapeResult(
+    OpBuilder &b, linalg::TensorCollapseShapeOp op, BlockAndValueMapping &bvm) {
+  Location loc = op.getLoc();
+  Value srcTensor = op.src();
+  Value inputBuffer = bvm.lookup(srcTensor);
+  Value bufferReshape = b.create<memref::CollapseShapeOp>(
+      loc, inputBuffer, op.getReassociationIndices());
   return bufferReshape;
 }
 
@@ -472,9 +478,12 @@ static SmallVector<Value, 4> getAliasingBuffersForResults(
             tensor::CastOp>([&](auto singleResultOp) -> SmallVector<Value, 4> {
         return {getAliasingBufferForResult(b, singleResultOp, bvm)};
       })
-      .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
-          [&](auto reshapeOp) -> SmallVector<Value, 4> {
-            return {getAliasingBufferForReshapeResult(b, reshapeOp, bvm)};
+      .Case<linalg::TensorExpandShapeOp>([&](auto op) -> SmallVector<Value, 4> {
+        return {getAliasingBufferForExpandShapeResult(b, op, bvm)};
+      })
+      .Case<linalg::TensorCollapseShapeOp>(
+          [&](auto op) -> SmallVector<Value, 4> {
+            return {getAliasingBufferForCollapseShapeResult(b, op, bvm)};
           })
       .Case<scf::ForOp>([&](auto scfFor) -> SmallVector<Value> {
         return getAliasingBuffersForResult(scfFor, bvm);
