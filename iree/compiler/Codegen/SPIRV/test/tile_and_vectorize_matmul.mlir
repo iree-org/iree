@@ -4,9 +4,9 @@
 #translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @matmul_static_shape_f16  {
   hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul_static_shape_f16 attributes {
@@ -46,9 +46,9 @@ hal.executable private @matmul_static_shape_f16  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -70,9 +70,9 @@ hal.executable private @matmul_static_shape_f16  {
 #translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @matmul_static_shape_f32  {
   hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul_static_shape_f32 attributes {
@@ -112,9 +112,9 @@ hal.executable private @matmul_static_shape_f32  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

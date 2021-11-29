@@ -40,9 +40,6 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Linalg -> Vectors
   // ---------------------------------------------------------------------------
 
-  nestedModulePM.addNestedPass<FuncOp>(
-      Shape::createCleanupShapePlaceholdersPass());
-
   // Tiling and distribution.
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   // TODO(#5925): This can also be modified to just use the dynamic pass

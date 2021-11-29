@@ -47,6 +47,6 @@ func @binding_ptrs() {
   return
 }
 hal.interface private @io attributes {push_constants = 2 : index} {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
 }

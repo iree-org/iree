@@ -299,6 +299,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     // Query and resolve all operands and their sizes.
     SmallVector<Value> dispatchOperands;
     SmallVector<Value> dispatchOperandSizes;
+    SmallVector<Value> operandSizes;
     for (auto oldNewOperand : llvm::zip(op.operands(), adaptor.operands())) {
       auto oldOperand = std::get<0>(oldNewOperand);
       auto newOperand = std::get<1>(oldNewOperand);
@@ -307,6 +308,9 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
             consumeTensorOperand(op.getLoc(), newOperand, rewriter);
         newOperand = newOperandCast.resource;
         dispatchOperandSizes.push_back(newOperandCast.resourceSize);
+        operandSizes.push_back(newOperandCast.resourceSize);
+      } else {
+        operandSizes.push_back({});
       }
       dispatchOperands.push_back(newOperand);
     }
@@ -325,7 +329,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
       auto tiedOperand = op.getTiedResultOperandIndex(result.index());
       if (tiedOperand.hasValue()) {
         auto operandIndex = tiedOperand.getValue() - tiedOperandBase;
-        resultSizes.push_back(dispatchOperandSizes[operandIndex]);
+        resultSizes.push_back(operandSizes[operandIndex]);
         resultTypes.push_back(dispatchOperands[operandIndex].getType());
       } else {
         auto resultDynamicDims = Shape::buildOrFindDynamicDimsForValue(
@@ -348,31 +352,16 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
 static SmallVector<Value> makeBindingDynamicDims(
     Location loc, IREE::Flow::DispatchTensorType tensorType, BlockArgument arg,
     OpBuilder &builder) {
+  assert(!arg.use_empty() && "must have uses to query dims");
   if (tensorType.hasStaticShape()) return {};
 
-  // We can expect its first user to be a tie_shape op to associate
-  // concrete dimension values. Originally we have such information
-  // maintained in the flow ops handling dynamic tensors. But during
-  // flow executable outlining, such information is transferred to
-  // tie_shape ops.
-  //
-  // HACK: this is disgusting - we should carry this from the flow level in the
-  // right way such that we don't need to make this assumption.
-  auto tieShapeOp = dyn_cast<IREE::Flow::DispatchTieShapeOp>(*arg.user_begin());
-  assert(tieShapeOp && "missing flow tie shape for dynamic value");
-  builder.setInsertionPointAfter(tieShapeOp.shape().getDefiningOp());
+  // 95% of the time the dims come right from the arguments so look there first.
+  auto foundDims = IREE::Util::findDynamicDims(arg, builder.getInsertionBlock(),
+                                               builder.getInsertionPoint());
+  if (foundDims.hasValue()) return llvm::to_vector<4>(foundDims.getValue());
 
-  // Get the SSA values for all dynamic dimensions.
-  SmallVector<Value> dynamicDims;
-  dynamicDims.reserve(tensorType.getNumDynamicDims());
-  for (int i = 0; i < tensorType.getRank(); ++i) {
-    if (!tensorType.isDynamicDim(i)) continue;
-    dynamicDims.push_back(builder.create<Shape::RankedDimOp>(
-        tieShapeOp.getLoc(), tieShapeOp.shape(), i));
-  }
-  assert(dynamicDims.size() == tensorType.getNumDynamicDims());
-
-  return dynamicDims;
+  llvm_unreachable("TODO: synthesize dynamic dimensions/hoist logic");
+  return {};
 }
 
 struct ConvertExecutableOp

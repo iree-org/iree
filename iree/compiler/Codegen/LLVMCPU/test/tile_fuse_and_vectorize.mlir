@@ -39,9 +39,9 @@ module  {
     return
   }
   hal.interface private @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
 }
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 64)>
@@ -113,7 +113,7 @@ func @matmul_gather() {
       %14 = flow.dispatch.tensor.load %2, offsets = [%arg0, 0], sizes = [64, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x384xf32> -> tensor<64x384xf32>
       %15 = flow.dispatch.tensor.load %3, offsets = [0, %arg1], sizes = [384, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x512xf32> -> tensor<384x64xf32>
       %16 = linalg.init_tensor [64, 64] : tensor<64x64xf32>
-      %17 = linalg.fill(%cst, %16) : f32, tensor<64x64xf32> -> tensor<64x64xf32> 
+      %17 = linalg.fill(%cst, %16) : f32, tensor<64x64xf32> -> tensor<64x64xf32>
       %18 = linalg.matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[], [32, 32, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>} ins(%14, %15 : tensor<64x384xf32>, tensor<384x64xf32>) outs(%17 : tensor<64x64xf32>) -> tensor<64x64xf32>
       %19 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%18, %11, %12 : tensor<64x64xf32>, tensor<64xi32>, tensor<64x64xf32>) outs(%13 : tensor<64x64xf32>) {
       ^bb0(%arg2: f32, %arg3: i32, %arg4: f32, %arg5: f32):  // no predecessors
@@ -182,7 +182,7 @@ func @nonvectorizable_matmul_and_vectorizable_generic() {
       %16 = flow.dispatch.tensor.load %4, offsets = [%arg0, 0], sizes = [16, 24], strides = [1, 1] : !flow.dispatch.tensor<readonly:784x24xf32> -> tensor<16x24xf32>
       %17 = flow.dispatch.tensor.load %5, offsets = [0, %arg1], sizes = [24, 48], strides = [1, 1] : !flow.dispatch.tensor<readonly:24x96xf32> -> tensor<24x48xf32>
       %18 = linalg.init_tensor [16, 48] : tensor<16x48xf32>
-      %19 = linalg.fill(%cst, %18) : f32, tensor<16x48xf32> -> tensor<16x48xf32> 
+      %19 = linalg.fill(%cst, %18) : f32, tensor<16x48xf32> -> tensor<16x48xf32>
       %20 = linalg.matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>} ins(%16, %17 : tensor<16x24xf32>, tensor<24x48xf32>) outs(%19 : tensor<16x48xf32>) -> tensor<16x48xf32>
       %21 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%20, %11, %12, %13, %14 : tensor<16x48xf32>, tensor<48xf32>, tensor<48xf32>, tensor<48xf32>, tensor<48xf32>) outs(%15 : tensor<16x48xf32>) {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32, %arg5: f32, %arg6: f32, %arg7: f32):  // no predecessors

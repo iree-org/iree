@@ -31,30 +31,6 @@ namespace iree_compiler {
 namespace Shape {
 
 //===----------------------------------------------------------------------===//
-// shapex.tie_shape
-//===----------------------------------------------------------------------===//
-
-static LogicalResult verifyTieShapeOp(TieShapeOp op) {
-  // Validate shapedType and ranked_shape_type conservatively in this
-  // case (tie_shape supports arbitrary operand() but we constrain it if
-  // it is specific enough.
-  auto shapedType = op.operand().getType().dyn_cast<ShapedType>();
-  auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();
-  if (shapedType && shapedType.hasRank() && rsType) {
-    for (auto it : llvm::zip(shapedType.getShape(), rsType.getAllDims())) {
-      if ((std::get<0>(it) != -1 && std::get<1>(it) != -1) &&
-          std::get<0>(it) != std::get<1>(it)) {
-        return op.emitOpError("dims must match between tensor and shape");
-      }
-    }
-  }
-
-  return success();
-}
-
-Value TieShapeOp::getViewSource() { return operand(); }
-
-//===----------------------------------------------------------------------===//
 // shapex.const_ranked_shape
 //===----------------------------------------------------------------------===//
 

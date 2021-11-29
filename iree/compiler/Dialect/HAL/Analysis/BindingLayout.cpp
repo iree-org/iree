@@ -29,8 +29,7 @@ void ExecutableLayout::print(llvm::raw_ostream &os) const {
        << "\n";
     for (auto &binding : setLayout.bindings) {
       os << "      binding[" << binding.ordinal
-         << "]: " << stringifyDescriptorType(binding.type) << " / "
-         << stringifyMemoryAccessBitfield(binding.access) << "\n";
+         << "]: " << stringifyDescriptorType(binding.type) << "\n";
     }
   }
   os << "  resource map:\n";
@@ -108,36 +107,6 @@ static ExecutableLayout deriveExportLayout(
     }
   }
 
-  // Compute the access requirements of the binding based on any dispatch (as
-  // they should all have the same requirements). If we have no dispatches then
-  // we don't need access. Note that as we start to reuse bindings across
-  // multiple executables we may want to widen the access.
-  //
-  // TODO(benvanik): set MayAlias if multiple bindings share the same resource
-  // and may have overlapping ranges.
-  SmallVector<IREE::HAL::MemoryAccessBitfield> bindingAccess(
-      bindingCount, IREE::HAL::MemoryAccessBitfield::None);
-  if (!dispatchOps.empty()) {
-    auto anyDispatchOp = dispatchOps.front();
-    for (unsigned i = 0; i < bindingCount; ++i) {
-      auto resourceAccess =
-          anyDispatchOp.resource_accesses()[i]
-              .cast<IREE::Stream::ResourceAccessBitfieldAttr>()
-              .getValue();
-      // MLIR's generated bitfield enums could use some ergonomic improvements.
-      auto memoryAccess = IREE::HAL::MemoryAccessBitfield::None;
-      if (bitEnumContains(resourceAccess,
-                          IREE::Stream::ResourceAccessBitfield::Read)) {
-        memoryAccess = memoryAccess | IREE::HAL::MemoryAccessBitfield::Read;
-      }
-      if (bitEnumContains(resourceAccess,
-                          IREE::Stream::ResourceAccessBitfield::Write)) {
-        memoryAccess = memoryAccess | IREE::HAL::MemoryAccessBitfield::Write;
-      }
-      bindingAccess[i] = bindingAccess[i] | memoryAccess;
-    }
-  }
-
   ExecutableLayout executableLayout;
   executableLayout.pushConstantCount = operandCount;
   executableLayout.resourceMap.resize(bindingCount);
@@ -154,7 +123,6 @@ static ExecutableLayout deriveExportLayout(
     setBinding.type = staticBindings.test(i)
                           ? IREE::HAL::DescriptorType::StorageBuffer
                           : IREE::HAL::DescriptorType::StorageBufferDynamic;
-    setBinding.access = bindingAccess[i];
     setLayout.bindings[i] = setBinding;
     executableLayout.resourceMap[i] =
         std::make_pair(setLayout.ordinal, setBinding.ordinal);

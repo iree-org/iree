@@ -16,9 +16,9 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: hal.executable private @ex
   hal.executable private @ex {
     hal.interface public @io attributes {push_constants = 0 : index} {
-      hal.interface.binding public @s0b0_ro, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding public @s0b1_ro, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding public @s0b2_wo, set=0, binding=2, type="StorageBuffer", access="Write"
+      hal.interface.binding public @s0b0_ro, set=0, binding=0, type="StorageBuffer"
+      hal.interface.binding public @s0b1_ro, set=0, binding=1, type="StorageBuffer"
+      hal.interface.binding public @s0b2_wo, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
       hal.executable.entry_point public @dispatch attributes {
@@ -100,9 +100,9 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
       // CHECK-SAME: push_constants(0)
       // CHECK-SAME: layouts([
-      // CHECK-SAME:   #hal.descriptor_set_layout_binding<0, "StorageBuffer", R>,
-      // CHECK-SAME:   #hal.descriptor_set_layout_binding<1, "StorageBuffer", R>,
-      // CHECK-SAME:   #hal.descriptor_set_layout_binding<2, "StorageBuffer", W>
+      // CHECK-SAME:   #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
+      // CHECK-SAME:   #hal.descriptor_set_layout_binding<1, "StorageBuffer">,
+      // CHECK-SAME:   #hal.descriptor_set_layout_binding<2, "StorageBuffer">
       // CHECK-SAME: ]) : !hal.executable_layout
       // CHECK:   hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer>
       // CHECK-SAME: layout(%[[EXECUTABLE_LAYOUT]] : !hal.executable_layout)[%c0]

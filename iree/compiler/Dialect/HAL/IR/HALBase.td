@@ -46,26 +46,6 @@ def HAL_MemoryTypeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_MemoryAccess_None         : BitEnumAttrCase<"None",         0x0000>;  // ?
-def HAL_MemoryAccess_Read         : BitEnumAttrCase<"Read",         0x0001>;  // R
-def HAL_MemoryAccess_Write        : BitEnumAttrCase<"Write",        0x0002>;  // W
-def HAL_MemoryAccess_Discard      : BitEnumAttrCase<"Discard",      0x0004>;  // D
-def HAL_MemoryAccess_DiscardWrite : BitEnumAttrCase<"DiscardWrite", 0x0006>;
-def HAL_MemoryAccess_MayAlias     : BitEnumAttrCase<"MayAlias",     0x0008>;  // A
-def HAL_MemoryAccess_All          : BitEnumAttrCase<"All",          0x0007>;
-def HAL_MemoryAccessBitfieldAttr :
-    BitEnumAttr<"MemoryAccessBitfield", "valid MemoryAccess", [
-      HAL_MemoryAccess_None,
-      HAL_MemoryAccess_Read,
-      HAL_MemoryAccess_Write,
-      HAL_MemoryAccess_Discard,
-      HAL_MemoryAccess_DiscardWrite,
-      HAL_MemoryAccess_MayAlias,
-      HAL_MemoryAccess_All,
-    ]> {
-  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
-}
-
 def HAL_BufferUsage_None      : BitEnumAttrCase<"None",     0x0000>;  // ?
 def HAL_BufferUsage_Constant  : BitEnumAttrCase<"Constant", 0x0001>;  // C
 def HAL_BufferUsage_Transfer  : BitEnumAttrCase<"Transfer", 0x0002>;  // T
@@ -441,7 +421,6 @@ def HAL_DescriptorSetLayoutBindingAttr :
                   HAL_Dialect, [
     Util_StructFieldAttr<"binding", I32Attr>,
     Util_StructFieldAttr<"type", HAL_DescriptorTypeAttr>,
-    Util_StructFieldAttr<"access", HAL_MemoryAccessBitfieldAttr>,
   ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }

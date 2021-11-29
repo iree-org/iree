@@ -810,7 +810,7 @@ ArrayAttr InterfaceOp::getExecutableSetLayoutsAttr() {
     auto &bindingAttrs = setAttrs[set];
     if (binding >= bindingAttrs.size()) bindingAttrs.resize(binding + 1);
     bindingAttrs[binding] = DescriptorSetLayoutBindingAttr::get(
-        bindingOp.bindingAttr(), bindingOp.typeAttr(), bindingOp.accessAttr());
+        bindingOp.bindingAttr(), bindingOp.typeAttr());
   }
   return builder.getArrayAttr(llvm::to_vector<4>(
       llvm::map_range(setAttrs, [&](ArrayRef<Attribute> bindingsArray) {
@@ -872,10 +872,6 @@ static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
       failed(parser.parseEqual()) ||
       failed(
           parseEnumAttr<DescriptorType>(parser, "type", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("access")) ||
-      failed(parser.parseEqual()) ||
-      failed(parseEnumAttr<MemoryAccessBitfield>(parser, "access",
-                                                 result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -890,7 +886,6 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
   p << ", set=" << op.set();
   p << ", binding=" << op.binding();
   p << ", type=\"" << stringifyDescriptorType(op.type()) << "\"";
-  p << ", access=\"" << stringifyMemoryAccessBitfield(op.access()) << "\"";
   p.printOptionalAttrDictWithKeyword(op->getAttrs(),
                                      /*elidedAttrs=*/{
                                          mlir::SymbolTable::getSymbolAttrName(),
@@ -905,7 +900,7 @@ llvm::hash_code InterfaceBindingOp::getDescriptorHash() {
   // Use the unwrapped attribute accessors so that we can have determinstic
   // hashes. Hashing against the wrapped attributes are hashing against pointer
   // values, which change per run.
-  return llvm::hash_combine(set(), binding(), type(), access());
+  return llvm::hash_combine(set(), binding(), type());
 }
 
 //===----------------------------------------------------------------------===//

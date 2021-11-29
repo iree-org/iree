@@ -506,11 +506,6 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return analyseInterfaceStoreTensorOp(storeOp, plan);
             })
-        .Case<IREE::Flow::DispatchTieShapeOp>(
-            [&](IREE::Flow::DispatchTieShapeOp tieShapeOp) {
-              return analyseSingleOperandResultOp(tieShapeOp.operand(),
-                                                  tieShapeOp.result(), plan);
-            })
         .Case<IREE::HAL::InterfaceBindingSubspanOp>(
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
               return analyseInterfaceBindingSubspanOp(subspanOp, plan);

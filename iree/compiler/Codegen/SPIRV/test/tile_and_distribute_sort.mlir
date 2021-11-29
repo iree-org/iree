@@ -4,8 +4,8 @@
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [16, 1]>
 hal.executable private @static_3d_sort  {
   hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @static_3d_sort attributes {

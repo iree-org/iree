@@ -4,9 +4,9 @@
 
 hal.executable @conv_112x112x512 {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
@@ -66,9 +66,9 @@ hal.executable @conv_112x112x512 {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -96,9 +96,9 @@ hal.executable @conv_112x112x512 {
 
 hal.executable @conv_112x112x32 {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
@@ -158,9 +158,9 @@ hal.executable @conv_112x112x32 {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -190,9 +190,9 @@ hal.executable @conv_112x112x32 {
 
 hal.executable @conv_16x16x16 {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
@@ -251,9 +251,9 @@ hal.executable @conv_16x16x16 {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -282,9 +282,9 @@ hal.executable @conv_16x16x16 {
 
 hal.executable @dwconv_28x28x144 {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
@@ -345,9 +345,9 @@ hal.executable @dwconv_28x28x144 {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -376,9 +376,9 @@ hal.executable @dwconv_28x28x144 {
 
 hal.executable @dwconv_4x4x8 {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, {
@@ -439,9 +439,9 @@ hal.executable @dwconv_4x4x8 {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

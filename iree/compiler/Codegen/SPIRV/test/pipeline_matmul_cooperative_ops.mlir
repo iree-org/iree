@@ -9,11 +9,11 @@
 
 hal.executable public @matmul_256x1024x128_div_sub {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer"
+    hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer"
+    hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
@@ -89,11 +89,11 @@ hal.executable public @matmul_256x1024x128_div_sub {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer"
+        hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer"
+        hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer"
       }
     }
   }

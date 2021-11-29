@@ -18,9 +18,9 @@ func @abs_ex_dispatch_0() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
 }
 
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0

@@ -18,8 +18,8 @@ func @fold_reshape() {
 }
 
 hal.interface private @interface_io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer"
 }
 
 
@@ -43,8 +43,8 @@ func @dont_fold_reshape_with_not_full_load() {
 }
 
 hal.interface private @interface_io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer"
 }
 
 // -----

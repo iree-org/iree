@@ -33,10 +33,10 @@ func @matmul() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer"
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
@@ -113,9 +113,9 @@ func @matmul_fill() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
@@ -149,4 +149,3 @@ hal.interface private @io  {
 //      CHECK:       linalg.matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
 // CHECK-SAME:           outs(%[[RESULT_TILE]]
-

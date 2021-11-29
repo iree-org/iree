@@ -639,17 +639,6 @@ static LogicalResult convertConstantOp(OpBuilder &b,
   return success();
 }
 
-static LogicalResult convertDispatchTieShapeOp(
-    OpBuilder &b, IREE::Flow::DispatchTieShapeOp shapeOp,
-    BlockAndValueMapping &bvm) {
-  if (Value v = bvm.lookupOrNull(shapeOp.operand())) {
-    auto tieShapeOp = b.create<Shape::TieShapeOp>(shapeOp.getLoc(), v.getType(),
-                                                  v, shapeOp.shape());
-    bvm.map(shapeOp.getResult(), tieShapeOp.getResult());
-  }
-  return success();
-}
-
 /// Converts a `tensor.extract` operation into a `load`.
 static LogicalResult convertTensorExtractOp(OpBuilder &b, tensor::ExtractOp op,
                                             const BlockAndValueMapping &bvm) {
@@ -937,10 +926,6 @@ void LinalgBufferizePass::runOnOperation() {
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return convertInterfaceStoreTensorOp(b, storeOp, bvm, plan);
-            })
-        .Case<IREE::Flow::DispatchTieShapeOp>(
-            [&](IREE::Flow::DispatchTieShapeOp shapeOp) {
-              return convertDispatchTieShapeOp(b, shapeOp, bvm);
             })
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           if (failed(getOrAllocateResultBuffers(b, forOp, bvm, plan,

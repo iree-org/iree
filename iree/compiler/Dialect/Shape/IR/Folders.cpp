@@ -120,76 +120,6 @@ static LogicalResult dynamicMakeRankedShapeDimPattern(
   return success();
 }
 
-static LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
-                                                   TieShapeOp::Adaptor operands,
-                                                   PatternRewriter &rewriter) {
-  // If the immediate predecessor is a TieShapeOp, then it can be possible
-  // to merge these. This can often happen when function/block tie_shape
-  // placeholders are inserted prior to materializing later parts of the
-  // computation.
-  auto precedingTieShapeOp =
-      dyn_cast_or_null<TieShapeOp>(operands.operand().getDefiningOp());
-  if (!precedingTieShapeOp) return failure();
-
-  if (operands.shape() != precedingTieShapeOp.shape()) {
-    // This can happen in intermediate states before all shape calculations
-    // are collapsed (i.e. the shapes may actually be equivalent but
-    // constructed through different branches).
-    return failure();
-  }
-
-  rewriter.replaceOp(op, precedingTieShapeOp.result());
-  return success();
-}
-
-// Removes tie_shape ops when the operand is produced by a shape-aware op.
-static LogicalResult elideShapeCarryingOperandTieShapePattern(
-    TieShapeOp op, TieShapeOp::Adaptor operands, PatternRewriter &rewriter) {
-  auto definingOp = operands.operand().getDefiningOp();
-  if (!definingOp) return failure();
-  if (isa<TieShapeOp>(definingOp)) {
-    return failure();  // ignore tie-shape handled above
-  } else if (isa<ShapeCarryingInterface>(definingOp)) {
-    rewriter.replaceOp(op, operands.operand());
-    return success();
-  } else {
-    return failure();
-  }
-}
-
-// Reroutes uses of tie_shape ops by ops that are shape-aware or dim ops.
-static LogicalResult elideTieShapeUsagePattern(TieShapeOp op,
-                                               TieShapeOp::Adaptor operands,
-                                               PatternRewriter &rewriter) {
-  bool didAnything = false;
-  for (auto &use : llvm::make_early_inc_range(op.result().getUses())) {
-    if (auto carryingOp = dyn_cast<ShapeCarryingInterface>(use.getOwner())) {
-      carryingOp->setOperand(use.getOperandNumber(), operands.operand());
-      didAnything = true;
-    } else if (auto dimOp = dyn_cast<tensor::DimOp>(use.getOwner())) {
-      auto index = dimOp.getConstantIndex();
-      if (index.hasValue()) {
-        rewriter.replaceOpWithNewOp<RankedDimOp>(dimOp, op.shape(),
-                                                 index.getValue());
-        didAnything = true;
-      }
-    }
-  }
-  return didAnything ? success() : failure();
-}
-
-//===----------------------------------------------------------------------===//
-// shapex.tie_shape
-//===----------------------------------------------------------------------===//
-
-void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
-                                             MLIRContext *context) {
-  insertGreedyPattern(patterns, context, elideDuplicateTieShapePattern);
-  insertGreedyPattern(patterns, context,
-                      elideShapeCarryingOperandTieShapePattern);
-  insertGreedyPattern(patterns, context, elideTieShapeUsagePattern);
-}
-
 //===----------------------------------------------------------------------===//
 // shapex.make_ranked_shape
 //===----------------------------------------------------------------------===//
@@ -222,34 +152,10 @@ void RankedDimOp::getCanonicalizationPatterns(
 // Standard folding and canonicalization conversion patterns.
 //===----------------------------------------------------------------------===//
 
-// Since tie_shape ops are an identity, a pattern must exist for type conversion
-// to properly propagate across the operand->result edge.
-struct TieShapeTypeConversionPattern : public OpConversionPattern<TieShapeOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      TieShapeOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    Type operandType = adaptor.operand().getType();
-    if (operandType == srcOp.getType()) {
-      return failure();
-    }
-
-    rewriter.replaceOpWithNewOp<TieShapeOp>(srcOp, operandType,
-                                            adaptor.operand(), adaptor.shape());
-    return success();
-  }
-};
-
 void populateFoldConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns) {
-  patterns.insert<TieShapeTypeConversionPattern>(context);
   insertConversionPattern(patterns, context, eraseUnusedMakeRankedShapeOp);
   insertConversionPattern(patterns, context, dynamicMakeRankedShapeDimPattern);
-  insertConversionPattern(patterns, context, elideDuplicateTieShapePattern);
-  insertConversionPattern(patterns, context,
-                          elideShapeCarryingOperandTieShapePattern);
-  insertConversionPattern(patterns, context, elideTieShapeUsagePattern);
   insertConversionPattern(patterns, context, identityMakeRankedShapePattern);
 }
 

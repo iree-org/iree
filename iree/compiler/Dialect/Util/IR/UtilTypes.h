@@ -169,6 +169,10 @@ void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedResultIndices,
     SmallVector<int64_t, 4> &tiedOperandIndices);
 
+// Walks the SSA use-def chain upwards to find the dynamic dimensions of the
+// value. Returns None if the shape cannot be found.
+Optional<ValueRange> findDynamicDims(Value shapedValue);
+
 // Walks the SSA use-def chain to find the dynamic dimensions of the value.
 // Returns None if the shape cannot be found or if it is defined after
 // {|block|, |insertionPoint|}.
