@@ -48,5 +48,14 @@ std::vector<Operation *> sortOpsTopologically(
   return sortedOps;
 }
 
+void sortBlockTopologically(Block *block) {
+  SetVector<Operation *> unsortedOps;
+  for (auto &op : *block) unsortedOps.insert(&op);
+  auto sortedOps = sortOpsTopologically(unsortedOps);
+  for (auto *op : llvm::reverse(sortedOps)) {
+    op->moveBefore(block, block->begin());
+  }
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

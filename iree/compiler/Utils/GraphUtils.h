@@ -32,6 +32,9 @@ SmallVector<Operation *, N> sortOpsTopologically(
   return SmallVector<Operation *, N>(result.begin(), result.end());
 }
 
+// Sorts all of the ops within |block| into an arbitrary topological order.
+void sortBlockTopologically(Block *block);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
