@@ -318,8 +318,10 @@ struct TensorExportBufferViewOpPattern
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::Inline::BufferViewCreateOp>(
-        exportOp, adaptor.getSource(), elementType.value(),
-        encodingType.value(), dims);
+        exportOp, adaptor.getSource(),
+        rewriter.create<arith::ConstantIndexOp>(loc, 0),
+        adaptor.getSourceSize(), elementType.value(), encodingType.value(),
+        dims);
     return success();
   }
 };

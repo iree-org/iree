@@ -91,7 +91,8 @@ struct BufferViewCreateOpPattern
       IREE::HAL::BufferViewCreateOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::Inline::BufferViewCreateOp>(
-        op, adaptor.getBuffer(), adaptor.getElementType(),
+        op, adaptor.getSourceBuffer(), adaptor.getSourceOffset(),
+        adaptor.getSourceLength(), adaptor.getElementType(),
         adaptor.getEncodingType(), adaptor.getShape());
     return success();
   }

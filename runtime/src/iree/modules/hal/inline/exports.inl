@@ -33,7 +33,7 @@ EXPORT_FN("buffer.wrap", iree_hal_inline_module_buffer_wrap, rII, r)
 
 EXPORT_FN("buffer_view.assert", iree_hal_inline_module_buffer_view_assert, rriiCID, v)
 EXPORT_FN("buffer_view.buffer", iree_hal_inline_module_buffer_view_buffer, r, r)
-EXPORT_FN("buffer_view.create", iree_hal_inline_module_buffer_view_create, riiCID, r)
+EXPORT_FN("buffer_view.create", iree_hal_inline_module_buffer_view_create, rIIiiCID, r)
 EXPORT_FN("buffer_view.dim", iree_hal_inline_module_buffer_view_dim, ri, I)
 EXPORT_FN("buffer_view.element_type", iree_hal_inline_module_buffer_view_element_type, r, i)
 EXPORT_FN("buffer_view.encoding_type", iree_hal_inline_module_buffer_view_encoding_type, r, i)
