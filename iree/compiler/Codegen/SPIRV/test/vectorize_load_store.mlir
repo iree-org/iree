@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-spirv-vectorize-load-store -canonicalize %s | IreeFileCheck %s
 
-// CHECK-LABEL: func @copy
+// CHECK-LABEL: func @alloc_copy
 //  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x1024xvector<4xf32>>
 //       CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<128x8xvector<4xf32>, 3>
 //       CHECK: %[[V:.+]] = memref.load %[[ARG0]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
@@ -8,7 +8,7 @@
 //       CHECK: %[[MAT:.+]] = vector.transfer_read %[[ARG0]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x1024xvector<4xf32>>, vector<32x8xf32>
 //       CHECK: vector.transfer_write %[[MAT]], %[[ALLOC]][%{{.*}}, %{{.*}}] : vector<32x8xf32>, memref<128x8xvector<4xf32>, 3>
 //       CHECK: memref.dealloc %[[ALLOC]] : memref<128x8xvector<4xf32>, 3>
-func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
+func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<128x32xf32, 3>
   %v = vector.transfer_read %arg0[%x, %y], %cst : memref<4096x4096xf32>, vector<1x4xf32>
@@ -22,9 +22,10 @@ func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 // -----
 
 // Test that the memref is not vectorized if used by scalar load or store.
-// CHECK-LABEL: func @copy
+
+// CHECK-LABEL: func @alloc_copy
 //  CHECK-SAME: %[[ARG0:.+]]: memref<4096x4096xf32>
-func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
+func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<128x32xf32, 3>
   %s = memref.load %arg0[%x, %y] : memref<4096x4096xf32>
