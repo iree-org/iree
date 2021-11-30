@@ -35,8 +35,11 @@ iree_lit_test_suite(
         "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-run-module",
         "//iree/tools:iree-translate",
+        "@llvm-project//lld",
     ],
-    tags = ["hostonly"],
+    tags = [
+        "hostonly",
+    ],
 )
 
 iree_lit_test_suite(
@@ -47,5 +50,7 @@ iree_lit_test_suite(
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-translate",
     ],
-    tags = ["hostonly"],
+    tags = [
+        "hostonly",
+    ],
 )

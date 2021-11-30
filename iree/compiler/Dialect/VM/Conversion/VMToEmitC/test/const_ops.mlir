@@ -30,12 +30,11 @@ vm.module @my_module {
 vm.module @my_module {
   // CHECK-LABEL: @my_module_const_ref_zero
   vm.func @const_ref_zero() {
-    // CHECK: %[[REF:.+]] = "emitc.constant"() {ref_ordinal = 0 : index, value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[REF:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.opaque<"iree_vm_ref_t*">
-    // CHECK-NEXT: %[[SIZE:.+]] = emitc.call "sizeof"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> i32
+    // CHECK-NEXT: %[[SIZE:.+]] = emitc.call "sizeof"() {args = [#emitc.opaque<"iree_vm_ref_t">]} : () -> i32
     // CHECK-NEXT: emitc.call "memset"(%[[REFPTR]], %[[SIZE]]) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.opaque<"iree_vm_ref_t*">, i32) -> ()
-    // CHECK-NEXT: %[[REFPTR2:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.opaque<"iree_vm_ref_t*">
-    // CHECK-NEXT: emitc.call "iree_vm_ref_release"(%[[REFPTR2]]) : (!emitc.opaque<"iree_vm_ref_t*">) -> ()
+    // CHECK-NEXT: emitc.call "iree_vm_ref_release"(%[[REFPTR]]) : (!emitc.opaque<"iree_vm_ref_t*">) -> ()
     %null = vm.const.ref.zero : !vm.ref<?>
     vm.return
   }

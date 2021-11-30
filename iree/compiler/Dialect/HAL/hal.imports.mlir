@@ -28,6 +28,20 @@ vm.import @allocator.allocate(
   %allocation_size : i32
 ) -> !vm.ref<!hal.buffer>
 
+// Maps a host byte buffer into a device buffer.
+// If try!=0 then returns null if the given memory type cannot be mapped.
+// Host-local+constant requests will always succeed.
+vm.import @allocator.map.byte_buffer(
+  %allocator : !vm.ref<!hal.allocator>,
+  %try : i32,
+  %memory_types : i32,
+  %buffer_usage : i32,
+  %source : !vm.buffer,
+  %offset : i32,
+  %length : i32
+) -> !vm.ref<!hal.buffer>
+
+// TODO(benvanik): remove wrap.
 // Wraps a subrange of a read-only host memory buffer.
 // Host mapping must be supported by the allocator.
 vm.import @allocator.wrap.byte_buffer(
@@ -44,9 +58,20 @@ vm.import @allocator.wrap.byte_buffer(
 //===----------------------------------------------------------------------===//
 
 // Returns the allocator the buffer was allocated with.
+vm.import @buffer.assert(
+  %buffer : !vm.ref<!hal.buffer>,
+  %message : !vm.buffer,
+  %allocator : !vm.ref<!hal.allocator>,
+  %minimum_length : i32,
+  %memory_types : i32,
+  %buffer_usage : i32
+)
+
+// Returns the allocator the buffer was allocated with.
 vm.import @buffer.allocator(
   %buffer : !vm.ref<!hal.buffer>
 ) -> !vm.ref<!hal.allocator>
+attributes {nosideeffects}
 
 // Returns a reference to a subspan of the buffer.
 vm.import @buffer.subspan(
@@ -54,6 +79,13 @@ vm.import @buffer.subspan(
   %source_offset : i32,
   %length : i32
 ) -> !vm.ref<!hal.buffer>
+attributes {nosideeffects}
+
+// Returns the byte length of the buffer (may be less than total allocation).
+vm.import @buffer.length(
+  %buffer : !vm.ref<!hal.buffer>
+) -> i32
+attributes {nosideeffects}
 
 // Loads a value from a buffer by mapping it.
 vm.import @buffer.load(
@@ -82,6 +114,15 @@ vm.import @buffer_view.create(
   %shape : i32 ...
 ) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
+
+// Asserts a buffer view matches the given tensor encoding and shape.
+vm.import @buffer_view.assert(
+  %buffer_view : !vm.ref<!hal.buffer_view>,
+  %message : !vm.buffer,
+  %element_type : i32,
+  %encoding_type : i32,
+  %shape : i32 ...
+)
 
 // Returns the backing buffer of the buffer view.
 vm.import @buffer_view.buffer(
@@ -175,7 +216,8 @@ vm.import @command_buffer.fill_buffer(
   %target_buffer : !vm.ref<!hal.buffer>,
   %target_offset : i32,
   %length : i32,
-  %pattern : i32
+  %pattern : i32,
+  %pattern_length: i32
 )
 
 // Copies a range of one buffer to another.
@@ -254,8 +296,8 @@ vm.import @descriptor_set.create(
 vm.import @descriptor_set_layout.create(
   %device : !vm.ref<!hal.device>,
   %usage_type : i32,
-  // <binding, type, access>
-  %bindings : tuple<i32, i32, i32>...
+  // <binding, type>
+  %bindings : tuple<i32, i32>...
 ) -> !vm.ref<!hal.descriptor_set_layout>
 attributes {nosideeffects}
 

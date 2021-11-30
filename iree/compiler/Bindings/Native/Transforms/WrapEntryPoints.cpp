@@ -29,7 +29,8 @@ class WrapEntryPointsPass
     : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<StandardOpsDialect, IREE::HAL::HALDialect,
+    registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                    IREE::HAL::HALDialect,
                     // TODO: memref is here because the **tensor** dim op was
                     // moved there for some reason. When that goes away we can
                     // drop this dependency.
@@ -168,8 +169,8 @@ class WrapEntryPointsPass
     SmallVector<NamedAttribute, 4> attrs;
     auto abiAttr = entryFuncOp->getAttr("iree.abi");
     if (abiAttr) {
-      attrs.push_back(std::make_pair(
-          Identifier::get("iree.abi", entryFuncOp.getContext()), abiAttr));
+      attrs.emplace_back(StringAttr::get(entryFuncOp.getContext(), "iree.abi"),
+                         abiAttr);
     }
     if (!attrs.empty()) {
       auto reflectionAttr = DictionaryAttr::get(&getContext(), attrs);

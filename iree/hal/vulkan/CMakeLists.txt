@@ -23,6 +23,8 @@ iree_cc_library(
     "vulkan_driver.h"
   SRCS
     "api.cc"
+    "builtin_executables.cc"
+    "builtin_executables.h"
     "command_queue.h"
     "debug_reporter.cc"
     "debug_reporter.h"
@@ -82,6 +84,7 @@ iree_cc_library(
     iree::base::logging
     iree::base::tracing
     iree::hal
+    iree::hal::vulkan::builtin
     iree::hal::vulkan::util::arena
     iree::hal::vulkan::util::intrusive_list
     iree::hal::vulkan::util::ref_ptr

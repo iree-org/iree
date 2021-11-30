@@ -30,6 +30,7 @@ struct ConvertTensorOpsPass
     : public ConvertTensorOpsBase<ConvertTensorOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, mlir::StandardOpsDialect,
+                    mlir::arith::ArithmeticDialect, mlir::math::MathDialect,
                     tensor::TensorDialect>();
   }
   void runOnOperation() override {

@@ -20,11 +20,11 @@ iree_cc_library(
     "ConvertStandardToVMTest.cpp"
   DEPS
     MLIRIR
+    MLIRMath
     MLIRPass
     MLIRStandard
     MLIRTransformUtils
     MLIRTransforms
-    iree::base
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR

@@ -109,7 +109,7 @@ class ConvertHALInterfaceWorkgroupIDOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupIDOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupIDOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -132,7 +132,7 @@ class ConvertHALInterfaceWorkgroupSizeOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupSizeOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupSizeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -155,7 +155,7 @@ class ConvertHALInterfaceWorkgroupCountOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupCountOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupCountOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -177,7 +177,7 @@ class ConvertHALInterfaceLoadConstantOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceLoadConstantOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceLoadConstantOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
     auto constantsArg =
@@ -188,11 +188,12 @@ class ConvertHALInterfaceLoadConstantOp
 
     auto resultType = getTypeConverter()->convertType(op.result().getType());
 
-    auto constantOrdinal = rewriter.createOrFold<ConstantIndexOp>(
+    auto constantOrdinal = rewriter.createOrFold<arith::ConstantIndexOp>(
         op.getLoc(), op.offset().getZExtValue());
     auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
         op.getLoc(), constantType, constantsArg, ValueRange{constantOrdinal});
-    rewriter.replaceOpWithNewOp<IndexCastOp>(op, loadedValue, resultType);
+    rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, loadedValue,
+                                                    resultType);
     return success();
   }
 };
@@ -204,15 +205,8 @@ class ConvertHALInterfaceBindingSubspanOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    // NOTE: we expect FoldSubViewOps to have run and zeroed out the offset.
-    APInt byteOffset;
-    if (!matchPattern(op.byte_offset(), m_ConstantInt(&byteOffset))) {
-      return op.emitOpError()
-             << "FoldSubViewOps must have ran prior to conversion";
-    }
-
     // Find the vmvx.interface argument to the function.
     auto bindingsArg =
         op->getParentOfType<mlir::FuncOp>().getArgument(kEntryArgBindings);
@@ -230,16 +224,42 @@ class ConvertHALInterfaceBindingSubspanOp
 
     auto bindingType =
         bindingsArg.getType().cast<IREE::Util::ListType>().getElementType();
-    auto getOp = rewriter.create<IREE::Util::ListGetOp>(
-        op.getLoc(), bindingType, bindingsArg,
-        rewriter.createOrFold<ConstantIndexOp>(
-            op.getLoc(), interfaceBindingOp.binding().getZExtValue()));
+    auto memrefValue =
+        rewriter
+            .create<IREE::Util::ListGetOp>(
+                op.getLoc(), bindingType, bindingsArg,
+                rewriter.createOrFold<arith::ConstantIndexOp>(
+                    op.getLoc(), interfaceBindingOp.binding().getZExtValue()))
+            .result();
+    if (!matchPattern(op.byte_offset(), m_Zero())) {
+      auto memrefType = op.result().getType().cast<MemRefType>();
+      auto byteLength = op.byte_length();
+      if (!byteLength) {
+        Value elementCount;
+        if (memrefType.isDynamicDim(0)) {
+          elementCount = op.dynamic_dims().front();
+        } else {
+          elementCount = rewriter.createOrFold<arith::ConstantIndexOp>(
+              op.getLoc(), memrefType.getDimSize(0));
+        }
+        byteLength = rewriter.createOrFold<arith::MulIOp>(
+            op.getLoc(),
+            rewriter.createOrFold<arith::ConstantIndexOp>(
+                op.getLoc(), memrefType.getElementTypeBitWidth()),
+            elementCount);
+      }
+      memrefValue = rewriter.createOrFold<memref::SubViewOp>(
+          op.getLoc(), bindingType.cast<MemRefType>(), memrefValue,
+          ArrayRef<OpFoldResult>{op.byte_offset()},
+          ArrayRef<OpFoldResult>{byteLength},
+          ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)});
+    }
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         op,
         getTypeConverter()
             ->convertType(op.result().getType())
             .cast<MemRefType>(),
-        getOp.result());
+        memrefValue);
     return success();
   }
 };
@@ -251,7 +271,7 @@ class RemoveHALInterfaceOpPattern
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return success();

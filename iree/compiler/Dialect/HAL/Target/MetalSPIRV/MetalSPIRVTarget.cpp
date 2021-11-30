@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/SPIRVToMSL.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -44,7 +45,8 @@ class MetalSPIRVTargetBackend : public TargetBackend {
   std::string name() const override { return "metal"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<spirv::SPIRVDialect, gpu::GPUDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
+                    gpu::GPUDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(

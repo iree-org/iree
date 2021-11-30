@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/IREE/IREEDialect.h"
-#include "iree-dialects/Dialect/IREE/IREEOps.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -26,8 +26,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace IREEPublic = mlir::iree;
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -43,9 +41,9 @@ constexpr const char *kRetainedAttributes[] = {
 struct IREEImportPublicPass
     : public IREEImportPublicBase<IREEImportPublicPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::iree::IREEDialect, IREE::Flow::FlowDialect,
+    registry.insert<IREE::Input::IREEInputDialect, IREE::Flow::FlowDialect,
                     IREE::HAL::HALDialect, IREE::Util::UtilDialect,
-                    mlir::StandardOpsDialect>();
+                    mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
   }
   void runOnOperation() override;
 };
@@ -86,13 +84,12 @@ class OneToOneConverionPattern : public ConversionPattern {
 };
 
 class BufferViewToTensorPattern
-    : public OpConversionPattern<IREEPublic::BufferViewToTensorOp> {
+    : public OpConversionPattern<IREE::Input::BufferViewToTensorOp> {
   using OpConversionPattern<
-      IREEPublic::BufferViewToTensorOp>::OpConversionPattern;
+      IREE::Input::BufferViewToTensorOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREEPublic::BufferViewToTensorOp srcOp, ArrayRef<Value> operands,
+      IREE::Input::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREEPublic::BufferViewToTensorOpAdaptor adaptor(operands);
     Type resultType = typeConverter->convertType(srcOp.target().getType());
     if (!resultType) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorCastOp>(
@@ -102,13 +99,12 @@ class BufferViewToTensorPattern
 };
 
 class TensorToBufferViewPattern
-    : public OpConversionPattern<IREEPublic::TensorToBufferViewOp> {
+    : public OpConversionPattern<IREE::Input::TensorToBufferViewOp> {
   using OpConversionPattern<
-      IREEPublic::TensorToBufferViewOp>::OpConversionPattern;
+      IREE::Input::TensorToBufferViewOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREEPublic::TensorToBufferViewOp srcOp, ArrayRef<Value> operands,
+      IREE::Input::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREEPublic::TensorToBufferViewOpAdaptor adaptor(operands);
     Type resultType = typeConverter->convertType(srcOp.target().getType());
     if (!resultType) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorCastOp>(
@@ -120,7 +116,7 @@ class TensorToBufferViewPattern
 class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      FuncOp srcOp, ArrayRef<Value> operands,
+      FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getType();
     TypeConverter::SignatureConversion signatureConversion(
@@ -175,10 +171,10 @@ class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
   }
 };
 
-class GlobalOpPattern : public OpConversionPattern<IREEPublic::GlobalOp> {
+class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      IREEPublic::GlobalOp srcOp, ArrayRef<Value> operands,
+      IREE::Input::GlobalOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Type newType = typeConverter->convertType(srcOp.type());
     if (!newType) return failure();
@@ -235,20 +231,20 @@ class GenericTypeConvert : public ConversionPattern {
 
 IREETypeConverter::IREETypeConverter() {
   addConversion([](Type t) { return t; });
-  addConversion([=](IREEPublic::BufferViewType t) {
+  addConversion([=](IREE::Input::BufferViewType t) {
     return IREE::HAL::BufferViewType::get(t.getContext());
   });
-  addConversion([=](IREEPublic::ListType t) -> IREE::Util::ListType {
+  addConversion([=](IREE::Input::ListType t) -> IREE::Util::ListType {
     auto subType = convertType(t.getElementType());
     if (!subType) return nullptr;
     return IREE::Util::ListType::get(subType);
   });
-  addConversion([=](IREEPublic::PtrType t) -> IREE::Util::PtrType {
+  addConversion([=](IREE::Input::PtrType t) -> IREE::Util::PtrType {
     auto subType = convertType(t.getTargetType());
     if (!subType) return nullptr;
     return IREE::Util::PtrType::get(subType);
   });
-  addConversion([](IREEPublic::VariantType t) {
+  addConversion([](IREE::Input::VariantType t) {
     return IREE::Util::VariantType::get(t.getContext());
   });
 }
@@ -260,11 +256,20 @@ void IREEImportPublicPass::runOnOperation() {
   target.addLegalDialect<IREE::Flow::FlowDialect>();
   target.addLegalDialect<IREE::HAL::HALDialect>();
   target.addLegalDialect<IREE::Util::UtilDialect>();
-  target.addIllegalDialect<IREEPublic::IREEDialect>();
+  target.addIllegalDialect<IREE::Input::IREEInputDialect>();
 
-  auto ireeDialect = context.getOrLoadDialect<IREEPublic::IREEDialect>();
+  auto ireeDialect = context.getOrLoadDialect<IREE::Input::IREEInputDialect>();
   auto isIllegalType = [&](Type t) {
     return t.getDialect().getTypeID() == ireeDialect->getTypeID();
+  };
+  auto isLegallyTypedOp = [&](Operation *op) -> bool {
+    for (Type type : op->getResultTypes()) {
+      if (isIllegalType(type)) return false;
+    }
+    for (Type type : op->getOperandTypes()) {
+      if (isIllegalType(type)) return false;
+    }
+    return true;
   };
 
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
@@ -274,18 +279,14 @@ void IREEImportPublicPass::runOnOperation() {
     for (Type type : funcOp.getType().getResults()) {
       if (isIllegalType(type)) return false;
     }
-    return true;
-  });
-
-  target.markUnknownOpDynamicallyLegal([&](Operation *op) {
-    for (Type type : op->getResultTypes()) {
-      if (isIllegalType(type)) return false;
-    }
-    for (Type type : op->getOperandTypes()) {
-      if (isIllegalType(type)) return false;
+    for (Block &block : funcOp.body()) {
+      for (Type type : block.getArgumentTypes()) {
+        if (isIllegalType(type)) return false;
+      }
     }
     return true;
   });
+  target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
   IREETypeConverter typeConverter;
   PatternBenefit specific_benefit = 100;
@@ -303,27 +304,27 @@ void IREEImportPublicPass::runOnOperation() {
       typeConverter, SrcOpTy::getOperationName(), \
       TargetOpTy::getOperationName(), &getContext(), specific_benefit)
 
-  ONETOONE(IREEPublic::BufferViewRankOp, IREE::HAL::BufferViewRankOp);
-  ONETOONE(IREEPublic::BufferViewDimOp, IREE::HAL::BufferViewDimOp);
-  ONETOONE(IREEPublic::ListCreateOp, IREE::Util::ListCreateOp);
-  ONETOONE(IREEPublic::ListSizeOp, IREE::Util::ListSizeOp);
-  ONETOONE(IREEPublic::ListResizeOp, IREE::Util::ListResizeOp);
-  ONETOONE(IREEPublic::ListGetOp, IREE::Util::ListGetOp);
-  ONETOONE(IREEPublic::ListSetOp, IREE::Util::ListSetOp);
-  ONETOONE(IREEPublic::NullOp, IREE::Util::NullOp);
-  ONETOONE(IREEPublic::TensorCloneOp, IREE::Flow::TensorCloneOp);
-  ONETOONE(IREEPublic::TensorLoadOp, IREE::Flow::TensorLoadOp);
-  ONETOONE(IREEPublic::TensorReshapeOp, IREE::Flow::TensorReshapeOp);
-  ONETOONE(IREEPublic::TensorSliceOp, IREE::Flow::TensorSliceOp);
-  ONETOONE(IREEPublic::TensorSplatOp, IREE::Flow::TensorSplatOp);
-  ONETOONE(IREEPublic::TensorStoreOp, IREE::Flow::TensorStoreOp);
-  ONETOONE(IREEPublic::TensorUpdateOp, IREE::Flow::TensorUpdateOp);
-  ONETOONE(IREEPublic::TensorTraceOp, IREE::Flow::TensorTraceOp);
-  ONETOONE(IREEPublic::GlobalAddressOp, IREE::Util::GlobalAddressOp);
-  ONETOONE(IREEPublic::GlobalLoadOp, IREE::Util::GlobalLoadOp);
-  ONETOONE(IREEPublic::GlobalLoadIndirectOp, IREE::Util::GlobalLoadIndirectOp);
-  ONETOONE(IREEPublic::GlobalStoreOp, IREE::Util::GlobalStoreOp);
-  ONETOONE(IREEPublic::GlobalStoreIndirectOp,
+  ONETOONE(IREE::Input::BufferViewRankOp, IREE::HAL::BufferViewRankOp);
+  ONETOONE(IREE::Input::BufferViewDimOp, IREE::HAL::BufferViewDimOp);
+  ONETOONE(IREE::Input::ListCreateOp, IREE::Util::ListCreateOp);
+  ONETOONE(IREE::Input::ListSizeOp, IREE::Util::ListSizeOp);
+  ONETOONE(IREE::Input::ListResizeOp, IREE::Util::ListResizeOp);
+  ONETOONE(IREE::Input::ListGetOp, IREE::Util::ListGetOp);
+  ONETOONE(IREE::Input::ListSetOp, IREE::Util::ListSetOp);
+  ONETOONE(IREE::Input::NullOp, IREE::Util::NullOp);
+  ONETOONE(IREE::Input::TensorCloneOp, IREE::Flow::TensorCloneOp);
+  ONETOONE(IREE::Input::TensorLoadOp, IREE::Flow::TensorLoadOp);
+  ONETOONE(IREE::Input::TensorReshapeOp, IREE::Flow::TensorReshapeOp);
+  ONETOONE(IREE::Input::TensorSliceOp, IREE::Flow::TensorSliceOp);
+  ONETOONE(IREE::Input::TensorSplatOp, IREE::Flow::TensorSplatOp);
+  ONETOONE(IREE::Input::TensorStoreOp, IREE::Flow::TensorStoreOp);
+  ONETOONE(IREE::Input::TensorUpdateOp, IREE::Flow::TensorUpdateOp);
+  ONETOONE(IREE::Input::TensorTraceOp, IREE::Flow::TensorTraceOp);
+  ONETOONE(IREE::Input::GlobalAddressOp, IREE::Util::GlobalAddressOp);
+  ONETOONE(IREE::Input::GlobalLoadOp, IREE::Util::GlobalLoadOp);
+  ONETOONE(IREE::Input::GlobalLoadIndirectOp, IREE::Util::GlobalLoadIndirectOp);
+  ONETOONE(IREE::Input::GlobalStoreOp, IREE::Util::GlobalStoreOp);
+  ONETOONE(IREE::Input::GlobalStoreIndirectOp,
            IREE::Util::GlobalStoreIndirectOp);
 
   if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))

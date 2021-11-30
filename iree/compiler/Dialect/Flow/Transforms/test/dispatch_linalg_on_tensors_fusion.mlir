@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -canonicalize -cse %s | IreeFileCheck %s
 
 func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>, %offset: tensor<32xf32>) -> tensor<1x112x112x32xf32> {
-  %cst = constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
   %2 = linalg.conv_2d_nhwc_hwcf
@@ -18,7 +18,7 @@ func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<
          ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>) {
          ^bb0(%a: f32, %b: f32, %c: f32):
-            %sub = subf %a, %b : f32
+            %sub = arith.subf %a, %b : f32
             linalg.yield %sub : f32
          } -> tensor<1x112x112x32xf32>
   return %3 : tensor<1x112x112x32xf32>
@@ -47,7 +47,7 @@ func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<
 
 func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>, %offset: tensor<32xf32>)
   -> (tensor<1x112x112x32xf32>, tensor<1x112x112x32xf32>) {
-  %cst = constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
   %2 = linalg.conv_2d_nhwc_hwcf
@@ -64,7 +64,7 @@ func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %fil
          ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>) {
          ^bb0(%a: f32, %b: f32, %c: f32):
-            %sub = subf %a, %b : f32
+            %sub = arith.subf %a, %b : f32
             linalg.yield %sub : f32
          } -> tensor<1x112x112x32xf32>
   return %3, %2 : tensor<1x112x112x32xf32>, tensor<1x112x112x32xf32>
@@ -83,7 +83,7 @@ func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %fil
 // -----
 
 func @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>, %offset: tensor<32xf32>) -> tensor<1x112x112x32xf32> {
-  %cst = constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
   %2 = linalg.conv_2d_nhwc_hwcf
@@ -100,7 +100,7 @@ func @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x225x16xf32>, %
          ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>) {
          ^bb0(%a: f32, %b: f32, %c: f32):
-            %sub = subf %a, %b : f32
+            %sub = arith.subf %a, %b : f32
             linalg.yield %sub : f32
          } -> tensor<1x112x112x32xf32>
   return %3 : tensor<1x112x112x32xf32>

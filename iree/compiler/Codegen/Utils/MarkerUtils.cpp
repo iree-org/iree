@@ -21,8 +21,6 @@ const StringLiteral VectorTransforms::kVectorTransformMarker =
 
 StringRef getFusedMarker() { return "fused_numprocs_ge_numiters"; }
 
-StringRef getWorkgroupMarker() { return "workgroup"; }
-
 StringRef getWorkgroupKTiledMarker() { return "workgroup_k_tiled"; }
 
 StringRef getWorkgroupL1TileMarker() { return "workgroup_l1_tile"; }
@@ -41,11 +39,7 @@ StringRef getCopyToWorkgroupMemoryMarker() {
   return "copy_to_workgroup_memory";
 }
 
-// This marker is needed because we tile a convolution op multiple times: 1)
-// workgroups, 2) invocations, and 3) tiling along filter's height/width and
-// input channel to generate loops for a single GPU invocation. This marker
-// is for the 3) step.
-StringRef getConvFilterTileMarker() { return "tile_conv_filter"; }
+StringRef getTileReductionMarker() { return "tile_reduction"; }
 
 StringRef getVectorizeMarker() { return "vectorize"; }
 

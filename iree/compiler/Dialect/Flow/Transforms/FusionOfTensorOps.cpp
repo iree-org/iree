@@ -55,10 +55,10 @@ struct FusionOfTensorOpsPass
           Operation *producer = producerResult.getOwner();
           Operation *consumer = consumerOperand.getOwner();
 
-          // TODO(GH-5611): Enable fusion with reduction consumer for all
-          // targets. Currently vectorization doesn't handle generic ops with
-          // reduction iterators we will disable for now to allow vectorizing
-          // producer pointwise ops to avoid performance regressions on CPU.
+          // TODO(#5611): Enable fusion with reduction consumer for all targets.
+          // Currently vectorization doesn't handle generic ops with reduction
+          // iterators we will disable for now to allow vectorizing producer
+          // pointwise ops to avoid performance regressions on CPU.
           if (!clEnableFusionWithReductionOps) {
             if (auto genericOp = dyn_cast<linalg::GenericOp>(consumer)) {
               if (genericOp.getNumReductionLoops()) return false;
@@ -99,7 +99,7 @@ struct FusionOfTensorOpsPass
           // simplistic heuristic to avoid duplicating ops that may be
           // expensive.
           // TODO: Add a cost model to allow ops to be duplicated.
-          if (!isBroadcast && !isa<ConstantOp>(producer) &&
+          if (!isBroadcast && !isa<arith::ConstantOp>(producer) &&
               !llvm::hasSingleElement(producerResult.getUsers()))
             return false;
           return llvm::all_of(producerResult.getUsers(), [](Operation *user) {

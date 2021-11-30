@@ -95,6 +95,7 @@
 #include "iree/base/allocator.h"       // IWYU pragma: export
 #include "iree/base/assert.h"          // IWYU pragma: export
 #include "iree/base/attributes.h"      // IWYU pragma: export
+#include "iree/base/bitfield.h"        // IWYU pragma: export
 #include "iree/base/config.h"          // IWYU pragma: export
 #include "iree/base/status.h"          // IWYU pragma: export
 #include "iree/base/string_builder.h"  // IWYU pragma: export

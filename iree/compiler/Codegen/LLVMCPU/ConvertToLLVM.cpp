@@ -9,13 +9,13 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -75,6 +75,8 @@ class HALDispatchABI {
     binding_count = 4,
     binding_ptrs = 5,
     binding_lengths = 6,
+    import_thunk = 7,
+    imports = 8,
   };
 
   // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
@@ -87,6 +89,8 @@ class HALDispatchABI {
     auto indexType = typeConverter->convertType(IndexType::get(context));
     auto int8Type = IntegerType::get(context, 8);
     auto uint32Type = IntegerType::get(context, 32);
+    auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
+    auto uint32PtrType = LLVM::LLVMPointerType::get(uint32Type);
     auto vec3Type = getVec3Type(context);
     SmallVector<Type, 4> fieldTypes;
 
@@ -98,17 +102,23 @@ class HALDispatchABI {
     // size_t push_constant_count;
     // const uint32_t * push_constants;
     fieldTypes.push_back(indexType);
-    fieldTypes.push_back(LLVM::LLVMPointerType::get(uint32Type));
+    fieldTypes.push_back(uint32PtrType);
 
     // size_t binding_count;
     // void *const * binding_ptrs;
     // const size_t * binding_lengths;
     fieldTypes.push_back(indexType);
-    fieldTypes.push_back(
-        LLVM::LLVMPointerType::get(LLVM::LLVMPointerType::get(int8Type)));
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(int8PtrType));
     fieldTypes.push_back(LLVM::LLVMPointerType::get(indexType));
 
-    // TODO(benvanik): import_thunk/import and a callImport() helper function.
+    // iree_hal_executable_import_thunk_v0_t import_thunk;
+    // const iree_hal_executable_import_v0_t* imports;
+    auto importType = LLVM::LLVMFunctionType::get(uint32Type, int8PtrType);
+    auto importPtrType = LLVM::LLVMPointerType::get(importType);
+    auto importThunkType =
+        LLVM::LLVMFunctionType::get(uint32Type, {importPtrType, int8PtrType});
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(importThunkType));
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(importPtrType));
 
     LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
     assert(succeeded(bodySet) &&
@@ -141,6 +151,8 @@ class HALDispatchABI {
         typeConverter(typeConverter),
         dispatchStateType(
             getDispatchStateType(funcOp.getContext(), typeConverter)) {}
+
+  LLVM::LLVMFuncOp getFuncOp() { return funcOp; }
 
   // Loads the workgroup_id[dim] value (XYZ) and casts it to |resultType|.
   Value loadWorkgroupID(Location loc, int32_t dim, Type resultType,
@@ -298,6 +310,48 @@ class HALDispatchABI {
     }
   }
 
+  // Loads the import function pointer of the import |ordinal|.
+  // Equivalent to:
+  //   iree_hal_executable_import_v0_t func_ptr = state->imports[ordinal];
+  Value loadImportFuncPtr(Location loc, int64_t ordinal, OpBuilder &builder) {
+    auto importsPtrValue = loadFieldValue(loc, Field::imports, builder);
+    auto ordinalValue = getIndexValue(loc, ordinal, builder);
+    auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
+        loc, importsPtrValue.getType(), importsPtrValue, ordinalValue);
+    return builder.createOrFold<LLVM::LoadOp>(loc, elementPtrValue);
+  }
+
+  // Returns an i1 indicating whether the weak import with |ordinal| is defined.
+  // Equivalent to:
+  //   state->imports[ordinal] != NULL
+  Value isImportFuncAvailable(Location loc, int64_t ordinal,
+                              OpBuilder &builder) {
+    auto importPtrValue = loadImportFuncPtr(loc, ordinal, builder);
+    auto nullPtrValue =
+        builder.create<LLVM::NullOp>(loc, importPtrValue.getType()).getResult();
+    return builder.create<LLVM::ICmpOp>(loc, builder.getI1Type(),
+                                        LLVM::ICmpPredicate::ne, importPtrValue,
+                                        nullPtrValue);
+  }
+
+  // Emits a call to the import with the given |importOrdinal|.
+  // The provided |params| struct containing the function-specific arguments
+  // is passed without modification.
+  // Returns 0 on success and non-zero otherwise.
+  Value callImport(Location loc, unsigned importOrdinal, Value params,
+                   OpBuilder &builder) {
+    auto thunkPtrValue = loadFieldValue(loc, Field::import_thunk, builder);
+    auto importPtrValue = loadImportFuncPtr(loc, importOrdinal, builder);
+    auto callOp =
+        builder.create<LLVM::CallOp>(loc, TypeRange{builder.getI32Type()},
+                                     ValueRange{
+                                         /*thunk_func_ptr=*/thunkPtrValue,
+                                         /*import_func_ptr=*/importPtrValue,
+                                         /*import_params=*/params,
+                                     });
+    return callOp.getResult(0);
+  }
+
  private:
   Value loadFieldValue(Location loc, Field field, OpBuilder &builder) {
     auto statePtrValue = funcOp.getArgument(0);
@@ -379,8 +433,8 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
     // MLIR implicitly.
     SmallVector<NamedAttribute, 4> funcAttrs;
     for (auto attr : stdFuncOp->getAttrs()) {
-      if (attr.first == SymbolTable::getSymbolAttrName() ||
-          attr.first == mlir::function_like_impl::getTypeAttrName()) {
+      if (attr.getName() == SymbolTable::getSymbolAttrName() ||
+          attr.getName() == mlir::function_like_impl::getTypeAttrName()) {
         continue;
       }
       funcAttrs.push_back(attr);
@@ -405,8 +459,8 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
     for (auto returnOp :
          llvm::make_early_inc_range(llvmFuncOp.getOps<mlir::ReturnOp>())) {
       rewriter.setInsertionPoint(returnOp);
-      auto returnValue =
-          rewriter.createOrFold<mlir::ConstantIntOp>(returnOp.getLoc(), 0, 32);
+      auto returnValue = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
+          returnOp.getLoc(), 0, 32);
       rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, returnValue);
     }
 
@@ -639,7 +693,7 @@ void ConvertToLLVMPass::runOnOperation() {
   {
     OwningRewritePatternList vectorToLoopsPatterns(&getContext());
     populateVectorToSCFConversionPatterns(
-        vectorToLoopsPatterns, VectorTransferToSCFOptions().setUnroll(true));
+        vectorToLoopsPatterns, VectorTransferToSCFOptions().enableFullUnroll());
     (void)applyPatternsAndFoldGreedily(getOperation(),
                                        std::move(vectorToLoopsPatterns));
   }
@@ -676,6 +730,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateMathToLLVMConversionPatterns(converter, patterns);
   populateMemRefToLLVMConversionPatterns(converter, patterns);
   populateStdToLLVMConversionPatterns(converter, patterns);
+  arith::populateArithmeticToLLVMConversionPatterns(converter, patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
   populateVectorToLLVMConversionPatterns(converter, patterns);
@@ -699,7 +754,7 @@ void ConvertToLLVMPass::runOnOperation() {
   // rest of the IR.
   target.addLegalOp<ModuleOp, IREE::HAL::InterfaceOp,
                     IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
-  target.addIllegalDialect<ShapeDialect, StandardOpsDialect,
+  target.addIllegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();
   target.addIllegalOp<UnrealizedConversionCastOp>();
@@ -709,7 +764,8 @@ void ConvertToLLVMPass::runOnOperation() {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
-  target.addDynamicallyLegalDialect<ShapeDialect, StandardOpsDialect,
+  target.addDynamicallyLegalDialect<StandardOpsDialect, mlir::math::MathDialect,
+                                    mlir::arith::ArithmeticDialect,
                                     IREE::Util::UtilDialect,
                                     IREE::HAL::HALDialect, math::MathDialect>(
       [&](Operation *op) {

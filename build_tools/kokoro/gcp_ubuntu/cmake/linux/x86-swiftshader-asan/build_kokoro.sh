@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build and test the project within the gcr.io/iree-oss/cmake-python-swiftshader
+# Build and test the project within the gcr.io/iree-oss/swiftshader
 # image using Kokoro.
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
@@ -24,8 +24,8 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 docker_setup
 
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-python-swiftshader@sha256:e1f3fb0ba79f12d3dd620a84a805633ed3cb87b482758d2160b43ecf3eb9c1a9 \
-  build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-swiftshader/build.sh
+  gcr.io/iree-oss/swiftshader@sha256:715bdde46dbf454c8b20b9f193ff5ca4b02c1e33a1bfbe83d60921aa21d64664 \
+  build_tools/kokoro/gcp_ubuntu/cmake/linux/x86-swiftshader-asan/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
 # build which takes forever and is totally useless.

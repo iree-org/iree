@@ -1,25 +1,25 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | IreeFileCheck %s
 
-#config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @fuse_and_vectorize_fill_matmul  {
   hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
     hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
+      translation.info = #translation
     }
     builtin.module {
       func @fuse_and_vectorize_fill_matmul() {
-        %c0 = constant 0 : index
-        %cst = constant 0.000000e+00 : f32
-        %c4096 = constant 4096 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c4096 = arith.constant 4096 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4096x4096xf32>
@@ -44,17 +44,17 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
             %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg0)[%workgroup_size_y]
             %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %16 = linalg.fill(%cst, %15) {lowering.config = #config} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %17 = linalg.matmul {lowering.config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>
           }
         }
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -70,27 +70,27 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
 
 // -----
 
-#config = {tileSizes = [[8, 64, 4], [], [8, 4, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @fuse_and_vectorize_matmul_add  {
   hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
     hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [64, 8]}
+      translation.info = #translation
     }
     builtin.module {
       func @fuse_and_vectorize_matmul_add() {
-        %c0 = constant 0 : index
-        %cst = constant 0.000000e+00 : f32
-        %c1024 = constant 1024 : index
-        %c256 = constant 256 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c1024 = arith.constant 1024 : index
+        %c256 = arith.constant 256 : index
         %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x256xf32>
         %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x512xf32>
         %2 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x256xf32>
@@ -120,11 +120,11 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
             %18 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg0)[%workgroup_size_y]
             %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 256, s0)>(%arg1)[%workgroup_size_x]
             %20 = linalg.init_tensor [%18, %19] : tensor<?x?xf32>
-            %21 = linalg.fill(%cst, %20) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %22 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config} ins(%15, %17 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%21 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%13 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = #config} {
+            %21 = linalg.fill(%cst, %20) {lowering.config = #config} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %22 = linalg.matmul {lowering.config = #config} ins(%15, %17 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%21 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%13 : tensor<?x?xf32>) attrs =  {lowering.config = #config} {
             ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
-              %24 = addf %arg2, %arg3 : f32
+              %24 = arith.addf %arg2, %arg3 : f32
               linalg.yield %24 : f32
             } -> tensor<?x?xf32>
             flow.dispatch.tensor.store %23, %3, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x256xf32>
@@ -133,10 +133,10 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_ro_external, set=0, binding=2, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b3_xw_external, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @s0b2_ro_external, set=0, binding=2, type="StorageBuffer"
+        hal.interface.binding @s0b3_xw_external, set=0, binding=3, type="StorageBuffer"
       }
     }
   }

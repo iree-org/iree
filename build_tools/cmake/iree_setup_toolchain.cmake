@@ -17,8 +17,21 @@ if(IREE_ENABLE_LLD)
   set(IREE_USE_LINKER "lld")
 endif()
 
-if(IREE_USE_LINKER)
+if(IREE_USE_LINKER AND NOT APPLE)
   set(IREE_LINKER_FLAG "-fuse-ld=${IREE_USE_LINKER}")
+
+  # Depending on how the C compiler is invoked, it may trigger an unused
+  # argument warning about -fuse-ld, which can foul up compiler flag detection,
+  # causing false negatives. We lack a finer grained way to suppress such a
+  # thing, and this is deemed least bad.
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    iree_append("-Wno-unused-command-line-argument"
+      CMAKE_REQUIRED_FLAGS
+      CMAKE_EXE_LINKER_FLAGS
+      CMAKE_MODULE_LINKER_FLAGS
+      CMAKE_SHARED_LINKER_FLAGS
+    )
+  endif()
 
   iree_append("${IREE_LINKER_FLAG}"
     CMAKE_REQUIRED_FLAGS
@@ -26,7 +39,6 @@ if(IREE_USE_LINKER)
     CMAKE_MODULE_LINKER_FLAGS
     CMAKE_SHARED_LINKER_FLAGS
   )
-
   include(CheckCXXSourceCompiles)
   include(CheckCSourceCompiles)
   set(MINIMAL_SRC "int main() { return 0; }")
@@ -41,4 +53,6 @@ if(IREE_USE_LINKER)
     message(FATAL_ERROR "Compiler '${CMAKE_C_COMPILER}' does not support '${IREE_LINKER_FLAG}'")
   endif()
 
+elseif(IREE_USE_LINKER)
+    message(STATUS "On Apple OSX use system linker")
 endif()

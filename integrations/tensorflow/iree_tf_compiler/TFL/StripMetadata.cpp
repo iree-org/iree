@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -11,28 +12,22 @@
 namespace mlir {
 namespace iree_integrations {
 namespace TFL {
+namespace {
 
 static bool isTFLAttr(NamedAttribute &namedAttr) {
   // NOTE: tflite mixes tf and tfl, for some reason.
-  auto name = namedAttr.first.strref();
+  auto name = namedAttr.getName().strref();
   if (name.startswith("tf.") || name.startswith("tf_") ||
       name.startswith("tfl.") || name.startswith("tfl_")) {
     return true;
   }
-  StringRef attrNamespace = namedAttr.second.getDialect().getNamespace();
+  StringRef attrNamespace = namedAttr.getValue().getDialect().getNamespace();
   return attrNamespace == "tf" || attrNamespace == "tfl";
 }
 
 class StripModuleMetadataPass
-    : public PassWrapper<StripModuleMetadataPass, OperationPass<ModuleOp>> {
+    : public StripModuleMetadataBase<StripModuleMetadataPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-tflite-strip-module-metadata";
-  }
-
-  StringRef getDescription() const override {
-    return "Remove unneeded TFLite attributes from module ops";
-  }
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
@@ -40,21 +35,14 @@ class StripModuleMetadataPass
         moduleOp->getAttrs(),
         [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
-      moduleOp->removeAttr(namedAttr.first);
+      moduleOp->removeAttr(namedAttr.getName());
     }
   }
 };
 
 class StripFunctionMetadataPass
-    : public PassWrapper<StripFunctionMetadataPass, OperationPass<FuncOp>> {
+    : public StripFunctionMetadataBase<StripFunctionMetadataPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-tflite-strip-function-metadata";
-  }
-
-  StringRef getDescription() const override {
-    return "Remove unneeded TFLite attributes from func ops";
-  }
 
   void runOnOperation() override {
     auto funcOp = getOperation();
@@ -62,7 +50,7 @@ class StripFunctionMetadataPass
         funcOp->getAttrs(),
         [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
     for (auto namedAttr : stripAttrs) {
-      funcOp->removeAttr(namedAttr.first);
+      funcOp->removeAttr(namedAttr.getName());
     }
 
     for (int i = 0; i < funcOp.getNumArguments(); ++i) {
@@ -70,7 +58,7 @@ class StripFunctionMetadataPass
           funcOp.getArgAttrs(i),
           [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
-        funcOp.removeArgAttr(i, namedAttr.first);
+        funcOp.removeArgAttr(i, namedAttr.getName());
       }
     }
 
@@ -79,11 +67,13 @@ class StripFunctionMetadataPass
           funcOp.getResultAttrs(i),
           [](NamedAttribute namedAttr) { return isTFLAttr(namedAttr); }));
       for (auto namedAttr : stripAttrs) {
-        funcOp.removeResultAttr(i, namedAttr.first);
+        funcOp.removeResultAttr(i, namedAttr.getName());
       }
     }
   }
 };
+
+}  // anonymous namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass() {
   return std::make_unique<StripModuleMetadataPass>();
@@ -92,9 +82,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass() {
 std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass() {
   return std::make_unique<StripFunctionMetadataPass>();
 }
-
-static PassRegistration<StripModuleMetadataPass> modulePass;
-static PassRegistration<StripFunctionMetadataPass> funcPass;
 
 }  // namespace TFL
 }  // namespace iree_integrations

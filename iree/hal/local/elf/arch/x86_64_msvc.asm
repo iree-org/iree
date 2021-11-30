@@ -185,5 +185,18 @@ iree_elf_call_i_ppp PROC FRAME
   ret
 iree_elf_call_i_ppp ENDP
 
+; int iree_elf_thunk_i_p(const void* symbol_ptr, void* a0)
+iree_elf_thunk_i_p PROC FRAME
+  _sysv_interop_prolog
+
+  ; RDI = symbol_ptr
+  ; RSI = a0
+  mov rcx, rsi
+  call rdi
+
+  _sysv_interop_epilog
+  ret
+iree_elf_thunk_i_p ENDP
+
 _TEXT ENDS
 END

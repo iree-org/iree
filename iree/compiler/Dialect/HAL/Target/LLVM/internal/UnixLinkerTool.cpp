@@ -22,9 +22,9 @@ class UnixLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
-  std::string getToolPath() const override {
+  std::string getSystemToolPath() const override {
     // First check for setting the linker explicitly.
-    auto toolPath = LinkerTool::getToolPath();
+    auto toolPath = LinkerTool::getSystemToolPath();
     if (!toolPath.empty()) return toolPath;
 
     // No explicit linker specified, search the environment for common tools.
@@ -50,7 +50,7 @@ class UnixLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
-        getToolPath(),
+        getSystemToolPath(),
         "-o " + artifacts.libraryFile.path,
     };
 
@@ -62,6 +62,9 @@ class UnixLinkerTool : public LinkerTool {
       // Produce a Mach-O dylib file.
       flags.push_back("-dylib");
       flags.push_back("-flat_namespace");
+      flags.push_back(
+          "-L /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib "
+          "-lSystem");
 
       // HACK: we insert libm calls. This is *not good*.
       // Until the MLIR LLVM lowering paths no longer introduce these,

@@ -23,6 +23,8 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
+
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
 //
@@ -34,7 +36,8 @@ namespace Flow {
 //     - Directly passing supported flow plus core ops
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager);
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    const TransformOptions &transformOptions);
 
 void registerFlowTransformPassPipeline();
 
@@ -81,10 +84,6 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
 // Strips the signed/unsigned portion off of tensors.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createStripSignednessPass();
 
-// Expands dynamic !shapex.ranked_shape dimensions in variables.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createExpandGlobalDynamicDimsPass();
-
 /// Verifies that the input to the Flow transformation pipeline is legal.
 /// This includes checking for operations from dialects that are expected
 /// to be legalized before this pass.
@@ -122,31 +121,12 @@ createPadLinalgOpsToIntegerMultiplePass(int paddingSize = 4);
 //===----------------------------------------------------------------------===//
 
 // Outlines large tensor constants into util.globals at the module level.
-//
-// TODO(#5493): implement the support for inlining constants into the command
-// buffer and raise this value to one that is measured to be good.
-static constexpr size_t kMinLargeConstantSize = 1;
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineLargeConstantsPass(
-    size_t minLargeConstantSize = kMinLargeConstantSize);
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOutlineLargeConstantsPass();
 
 // Deduplicates equivalent executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDeduplicateExecutablesPass();
-
-//===----------------------------------------------------------------------===//
-// Stream Formation and Folding
-//===----------------------------------------------------------------------===//
-
-// Identifies dispatches that can be grouped into streams within functions.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createFormStreamsPass();
-
-// Reorders blocks to hoist ops that cannot be put into streams.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createHoistUnstreamableOpsPass();
-
-// TODO(benvanik): cross-function stream flows.
-
-// Inserts clones of constant values where they may be required.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createInsertConstantClonesPass();
 
 //===----------------------------------------------------------------------===//
 // Module Analysis and Finalization

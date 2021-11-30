@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/local/executable_library.h"
@@ -134,6 +135,21 @@ static void iree_hal_inline_command_buffer_destroy(
   iree_allocator_free(host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+bool iree_hal_inline_command_buffer_isa(
+    iree_hal_command_buffer_t* command_buffer) {
+  return iree_hal_command_buffer_dyn_cast(
+      command_buffer, &iree_hal_inline_command_buffer_vtable);
+}
+
+static void* iree_hal_inline_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
+  if (vtable == &iree_hal_inline_command_buffer_vtable) {
+    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
+    return command_buffer;
+  }
+  return NULL;
 }
 
 static iree_hal_command_buffer_mode_t iree_hal_inline_command_buffer_mode(
@@ -336,12 +352,6 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
                             "set %u out of bounds", set);
   }
 
-  iree_hal_local_executable_layout_t* local_executable_layout =
-      iree_hal_local_executable_layout_cast(executable_layout);
-  iree_hal_local_descriptor_set_layout_t* local_set_layout =
-      iree_hal_local_descriptor_set_layout_cast(
-          local_executable_layout->set_layouts[set]);
-
   iree_host_size_t binding_base =
       set * IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
@@ -355,8 +365,8 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
     iree_hal_buffer_mapping_t buffer_mapping;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        bindings[i].buffer, local_set_layout->bindings[binding_ordinal].access,
-        bindings[i].offset, bindings[i].length, &buffer_mapping));
+        bindings[i].buffer, IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset,
+        bindings[i].length, &buffer_mapping));
     command_buffer->state.full_bindings[binding_ordinal] =
         buffer_mapping.contents.data;
     command_buffer->state.full_binding_lengths[binding_ordinal] =
@@ -463,8 +473,13 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
                                                (void**)&local_memory.data));
   }
 
+  // Since we are running on a borrowed thread, we know nothing about the
+  // floating point state. Reset it.
+  iree_fpu_state_t fpu_state =
+      iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
   iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
       local_executable, entry_point, dispatch_state, local_memory);
+  iree_fpu_state_pop(fpu_state);
 
   if (local_memory.data) {
     iree_allocator_free(command_buffer->host_allocator, local_memory.data);
@@ -496,6 +511,7 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_inline_command_buffer_vtable = {
         .destroy = iree_hal_inline_command_buffer_destroy,
+        .dyn_cast = iree_hal_inline_command_buffer_dyn_cast,
         .mode = iree_hal_inline_command_buffer_mode,
         .allowed_categories = iree_hal_inline_command_buffer_allowed_categories,
         .begin = iree_hal_inline_command_buffer_begin,

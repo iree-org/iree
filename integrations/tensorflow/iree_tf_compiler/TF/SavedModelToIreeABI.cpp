@@ -174,12 +174,10 @@ struct StructureLevel {
         json::Array typeRecord;
         typeRecord.push_back(
             json::Value(type == LevelType::List ? "slist" : "stuple"));
-        int lastIndex = 0;
         for (auto &child : children) {
           for (int j = children.size(); j < child.ikey; ++j) {
             typeRecord.push_back(json::Value(nullptr));
           }
-          lastIndex = child.valueIndex;
           typeRecord.push_back(child.createReflectionType());
         }
         return json::Value(std::move(typeRecord));
@@ -259,15 +257,15 @@ struct StructureLevel {
     }
     // Recurse into sequence (index can be sparse on child ikey).
     if (type == LevelType::List || type == LevelType::Tuple) {
-      Value listSizeValue =
-          builder.create<ConstantOp>(loc, builder.getIndexType(),
-                                     builder.getIndexAttr(getNeededListSize()));
+      Value listSizeValue = builder.create<arith::ConstantOp>(
+          loc, builder.getIndexType(),
+          builder.getIndexAttr(getNeededListSize()));
       Value listValue = builder.create<IREE::Util::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
       builder.create<IREE::Util::ListResizeOp>(loc, listValue, listSizeValue);
       for (StructureLevel &child : children) {
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
-        Value indexValue = builder.create<ConstantOp>(
+        Value indexValue = builder.create<arith::ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(child.ikey));
         builder.create<IREE::Util::ListSetOp>(loc, listValue, indexValue,
                                               childValue);
@@ -277,16 +275,16 @@ struct StructureLevel {
 
     // Recurse into dict (modeled as a dense tuple of children).
     if (type == LevelType::Dict) {
-      Value listSizeValue =
-          builder.create<ConstantOp>(loc, builder.getIndexType(),
-                                     builder.getIndexAttr(getNeededListSize()));
+      Value listSizeValue = builder.create<arith::ConstantOp>(
+          loc, builder.getIndexType(),
+          builder.getIndexAttr(getNeededListSize()));
       Value listValue = builder.create<IREE::Util::ListCreateOp>(
           loc, getIrType(builder), listSizeValue);
       builder.create<IREE::Util::ListResizeOp>(loc, listValue, listSizeValue);
       for (auto it : llvm::enumerate(children)) {
         StructureLevel &child = it.value();
         Value childValue = child.emitCreateReturns(loc, builder, callReturns);
-        Value indexValue = builder.create<ConstantOp>(
+        Value indexValue = builder.create<arith::ConstantOp>(
             loc, builder.getIndexType(), builder.getIndexAttr(it.index()));
         builder.create<IREE::Util::ListSetOp>(loc, listValue, indexValue,
                                               childValue);
@@ -300,8 +298,8 @@ struct StructureLevel {
   // given index.
   Value emitGetFromList(Location loc, OpBuilder &builder, Value parentList,
                         int index) {
-    Value indexValue = builder.create<ConstantOp>(loc, builder.getIndexType(),
-                                                  builder.getIndexAttr(index));
+    Value indexValue = builder.create<arith::ConstantOp>(
+        loc, builder.getIndexType(), builder.getIndexAttr(index));
     Value itemValue = builder.create<IREE::Util::ListGetOp>(
         loc, getIrType(builder), parentList, indexValue);
     // TODO: Null check, etc. How does that work if returning a tensor? Need

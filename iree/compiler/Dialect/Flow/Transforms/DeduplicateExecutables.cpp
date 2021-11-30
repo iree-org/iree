@@ -48,12 +48,12 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
 //
 // Example:
 //   func @lhs(%arg0 : index) -> index {
-//     %c1 = constant 1 : index
+//     %c1 = arith.constant 1 : index
 //     %0 = add %arg0, %c1 : index
 //     return %0 : index
 //   }
 //   func @rhs(%arg0 : index) -> index {
-//     %c1 = constant 1 : index
+//     %c1 = arith.constant 1 : index
 //     %0 = add %arg0, %c1 : index
 //     return %0 : index
 //   }
@@ -132,8 +132,8 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   if (!compare_ranges(
           lhs.getAttrs(), rhs.getAttrs(),
           [&](const NamedAttribute &lhs, const NamedAttribute &rhs) {
-            if (lhs.first == "function_ref" ||
-                lhs.first == SymbolTable::getSymbolAttrName()) {
+            if (lhs.getName() == "function_ref" ||
+                lhs.getName() == SymbolTable::getSymbolAttrName()) {
               return true;
             }
             return lhs == rhs;

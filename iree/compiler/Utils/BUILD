@@ -15,13 +15,16 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
+        "ConversionUtils.cpp",
         "FlatbufferUtils.cpp",
         "GraphUtils.cpp",
         "TracingUtils.cpp",
     ],
     hdrs = [
+        "ConversionUtils.h",
         "FlatbufferUtils.h",
         "GraphUtils.h",
+        "IndexSet.h",
         "PatternUtils.h",
         "TracingUtils.h",
     ],
@@ -32,6 +35,7 @@ cc_library(
         "//iree/base/internal/flatcc:parsing",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",

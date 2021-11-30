@@ -14,16 +14,20 @@ iree_cc_library(
   NAME
     Utils
   HDRS
+    "ConversionUtils.h"
     "FlatbufferUtils.h"
     "GraphUtils.h"
+    "IndexSet.h"
     "PatternUtils.h"
     "TracingUtils.h"
   SRCS
+    "ConversionUtils.cpp"
     "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
     "TracingUtils.cpp"
   DEPS
     LLVMSupport
+    MLIRArithmetic
     MLIRIR
     MLIRPass
     MLIRStandard

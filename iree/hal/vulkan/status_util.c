@@ -37,17 +37,19 @@ iree_status_t iree_hal_vulkan_result_to_status(VkResult result,
     // Error codes.
     case VK_ERROR_OUT_OF_HOST_MEMORY:
       // A host memory allocation has failed.
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "VK_ERROR_OUT_OF_HOST_MEMORY");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_RESOURCE_EXHAUSTED,
+                                            "VK_ERROR_OUT_OF_HOST_MEMORY");
     case VK_ERROR_OUT_OF_DEVICE_MEMORY:
       // A device memory allocation has failed.
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "VK_ERROR_OUT_OF_DEVICE_MEMORY");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_RESOURCE_EXHAUSTED,
+                                            "VK_ERROR_OUT_OF_DEVICE_MEMORY");
     case VK_ERROR_INITIALIZATION_FAILED:
       // Initialization of an object could not be completed for
       // implementation-specific reasons.
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "VK_ERROR_INITIALIZATION_FAILED");
+      return iree_make_status_with_location(file, line, IREE_STATUS_UNAVAILABLE,
+                                            "VK_ERROR_INITIALIZATION_FAILED");
     case VK_ERROR_DEVICE_LOST:
       // The logical or physical device has been lost.
       //
@@ -116,87 +118,101 @@ iree_status_t iree_hal_vulkan_result_to_status(VkResult result,
       // command buffer is in the pending state, or whether resources are
       // considered in-use by the device, a return value of
       // VK_ERROR_DEVICE_LOST is equivalent to VK_SUCCESS.
-      return iree_make_status(IREE_STATUS_INTERNAL, "VK_ERROR_DEVICE_LOST");
+      return iree_make_status_with_location(file, line, IREE_STATUS_INTERNAL,
+                                            "VK_ERROR_DEVICE_LOST");
     case VK_ERROR_MEMORY_MAP_FAILED:
       // Mapping of a memory object has failed.
-      return iree_make_status(IREE_STATUS_INTERNAL,
-                              "VK_ERROR_MEMORY_MAP_FAILED");
+      return iree_make_status_with_location(file, line, IREE_STATUS_INTERNAL,
+                                            "VK_ERROR_MEMORY_MAP_FAILED");
     case VK_ERROR_LAYER_NOT_PRESENT:
       // A requested layer is not present or could not be loaded.
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "VK_ERROR_LAYER_NOT_PRESENT");
+      return iree_make_status_with_location(
+          file, line, IREE_STATUS_UNIMPLEMENTED, "VK_ERROR_LAYER_NOT_PRESENT");
     case VK_ERROR_EXTENSION_NOT_PRESENT:
       // A requested extension is not supported.
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "VK_ERROR_EXTENSION_NOT_PRESENT");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_UNIMPLEMENTED,
+                                            "VK_ERROR_EXTENSION_NOT_PRESENT");
     case VK_ERROR_FEATURE_NOT_PRESENT:
       // A requested feature is not supported.
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "VK_ERROR_FEATURE_NOT_PRESENT");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_UNIMPLEMENTED,
+                                            "VK_ERROR_FEATURE_NOT_PRESENT");
     case VK_ERROR_INCOMPATIBLE_DRIVER:
       // The requested version of Vulkan is not supported by the driver or is
       // otherwise incompatible for implementation-specific reasons.
-      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                              "VK_ERROR_INCOMPATIBLE_DRIVER");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_FAILED_PRECONDITION,
+                                            "VK_ERROR_INCOMPATIBLE_DRIVER");
     case VK_ERROR_TOO_MANY_OBJECTS:
       // Too many objects of the type have already been created.
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "VK_ERROR_TOO_MANY_OBJECTS");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_RESOURCE_EXHAUSTED,
+                                            "VK_ERROR_TOO_MANY_OBJECTS");
     case VK_ERROR_FORMAT_NOT_SUPPORTED:
       // A requested format is not supported on this device.
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "VK_ERROR_FORMAT_NOT_SUPPORTED");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_UNIMPLEMENTED,
+                                            "VK_ERROR_FORMAT_NOT_SUPPORTED");
     case VK_ERROR_FRAGMENTED_POOL:
       // A pool allocation has failed due to fragmentation of the pool’s
       // memory. This must only be returned if no attempt to allocate host
       // or device memory was made to accommodate the new allocation.
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "VK_ERROR_FRAGMENTED_POOL");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_RESOURCE_EXHAUSTED,
+                                            "VK_ERROR_FRAGMENTED_POOL");
     case VK_ERROR_OUT_OF_POOL_MEMORY:
       // A pool memory allocation has failed. This must only be returned if no
       // attempt to allocate host or device memory was made to accommodate the
       // new allocation. If the failure was definitely due to fragmentation of
       // the pool, VK_ERROR_FRAGMENTED_POOL should be returned instead.
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "VK_ERROR_OUT_OF_POOL_MEMORY");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_RESOURCE_EXHAUSTED,
+                                            "VK_ERROR_OUT_OF_POOL_MEMORY");
     case VK_ERROR_INVALID_EXTERNAL_HANDLE:
       // An external handle is not a valid handle of the specified type.
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "VK_ERROR_INVALID_EXTERNAL_HANDLE");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_INVALID_ARGUMENT,
+                                            "VK_ERROR_INVALID_EXTERNAL_HANDLE");
     case VK_ERROR_SURFACE_LOST_KHR:
       // A surface is no longer available.
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "VK_ERROR_SURFACE_LOST_KHR");
+      return iree_make_status_with_location(file, line, IREE_STATUS_UNAVAILABLE,
+                                            "VK_ERROR_SURFACE_LOST_KHR");
     case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
       // The requested window is already in use by Vulkan or another API in a
       // manner which prevents it from being used again.
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR");
+      return iree_make_status_with_location(
+          file, line, IREE_STATUS_INVALID_ARGUMENT,
+          "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR");
     case VK_ERROR_OUT_OF_DATE_KHR:
       // A surface has changed in such a way that it is no longer compatible
       // with the swapchain, and further presentation requests using the
       // swapchain will fail. Applications must query the new surface properties
       // and recreate their swapchain if they wish to continue presenting to the
       // surface.
-      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                              "VK_ERROR_OUT_OF_DATE_KHR");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_FAILED_PRECONDITION,
+                                            "VK_ERROR_OUT_OF_DATE_KHR");
     case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
       // The display used by a swapchain does not use the same presentable image
       // layout, or is incompatible in a way that prevents sharing an image.
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR");
+      return iree_make_status_with_location(
+          file, line, IREE_STATUS_INVALID_ARGUMENT,
+          "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR");
     case VK_ERROR_VALIDATION_FAILED_EXT:
       // Validation layer testing failed. It is not expected that an
       // application would see this this error code during normal use of the
       // validation layers.
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "VK_ERROR_VALIDATION_FAILED_EXT");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_INVALID_ARGUMENT,
+                                            "VK_ERROR_VALIDATION_FAILED_EXT");
     case VK_ERROR_INVALID_SHADER_NV:
       // One or more shaders failed to compile or link. More details are
       // reported back to the application when the validation layer is enabled
       // using the extension VK_EXT_debug_report.
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "VK_ERROR_INVALID_SHADER_NV");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_INVALID_ARGUMENT,
+                                            "VK_ERROR_INVALID_SHADER_NV");
     case VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT:
       // When creating an image with
       // VkImageDrmFormatModifierExplicitCreateInfoEXT, it is the application’s
@@ -208,33 +224,37 @@ iree_status_t iree_hal_vulkan_result_to_status(VkResult result,
       // outside the scope of Vulkan, and therefore not described by Valid Usage
       // requirements). If this validation fails, then vkCreateImage returns
       // VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT.
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
+      return iree_make_status_with_location(
+          file, line, IREE_STATUS_INVALID_ARGUMENT,
           "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT");
     case VK_ERROR_FRAGMENTATION_EXT:
       // A descriptor pool creation has failed due to fragmentation.
-      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                              "VK_ERROR_FRAGMENTATION_EXT");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_RESOURCE_EXHAUSTED,
+                                            "VK_ERROR_FRAGMENTATION_EXT");
     case VK_ERROR_NOT_PERMITTED_EXT:
       // When creating a queue, the caller does not have sufficient privileges
       // to request to acquire a priority above the default priority
       // (VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT).
-      return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
-                              "VK_ERROR_NOT_PERMITTED_EXT");
+      return iree_make_status_with_location(file, line,
+                                            IREE_STATUS_PERMISSION_DENIED,
+                                            "VK_ERROR_NOT_PERMITTED_EXT");
     case VK_ERROR_INVALID_DEVICE_ADDRESS_EXT:
       // A buffer creation failed because the requested address is not
       // available.
-      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "VK_ERROR_INVALID_DEVICE_ADDRESS_EXT");
+      return iree_make_status_with_location(
+          file, line, IREE_STATUS_OUT_OF_RANGE,
+          "VK_ERROR_INVALID_DEVICE_ADDRESS_EXT");
     case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
       // An operation on a swapchain created with
       // VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT failed as it did
       // not have exlusive full-screen access. This may occur due to
       // implementation-dependent reasons, outside of the application’s control.
-      return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                              "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT");
+      return iree_make_status_with_location(
+          file, line, IREE_STATUS_UNAVAILABLE,
+          "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT");
     default:
-      return iree_make_status(IREE_STATUS_UNKNOWN, "VkResult=%u",
-                              (uint32_t)result);
+      return iree_make_status_with_location(file, line, IREE_STATUS_UNKNOWN,
+                                            "VkResult=%u", (uint32_t)result);
   }
 }

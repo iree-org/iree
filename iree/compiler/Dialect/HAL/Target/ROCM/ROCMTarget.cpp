@@ -8,6 +8,7 @@
 
 #include <mutex>
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -15,7 +16,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/TargetRegistry.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -77,13 +78,13 @@ class ROCMTargetBackend final : public TargetBackend {
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerROCDLDialectTranslation(registry);
+    registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
       MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
-    ;
     configItems.emplace_back(b.getIdentifier("executable_targets"),
                              getExecutableTargets(context));
 
@@ -200,7 +201,7 @@ class ROCMTargetBackend final : public TargetBackend {
 
     iree_ROCMBlockSizeDef_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
-    for (auto shader : entryPointNames) {
+    for (int i = 0, e = entryPointNames.size(); i < e; ++i) {
       iree_ROCMBlockSizeDef_vec_push_create(builder, (*blockSizes)[0],
                                             (*blockSizes)[1], (*blockSizes)[2]);
       ++blockSizes;

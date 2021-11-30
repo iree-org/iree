@@ -14,7 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "shape_constants.mlir"
+    "global_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

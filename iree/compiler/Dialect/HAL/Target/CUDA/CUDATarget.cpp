@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/CUDA/CUDATarget.h"
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
@@ -17,7 +18,7 @@
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/Support/TargetRegistry.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
@@ -39,6 +40,10 @@ static llvm::cl::opt<bool> clDisableLoopNounrollWa(
     llvm::cl::desc(
         "Disable the workaround for bug in ptxas for CUDA version before 11.4"),
     llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clTargetChip(
+    "iree-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip"),
+    llvm::cl::init("sm_35"));
 
 namespace mlir {
 namespace iree_compiler {
@@ -150,7 +155,7 @@ class CUDATargetBackend final : public TargetBackend {
   std::string name() const override { return "cuda"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect>();
+    registry.insert<gpu::GPUDialect, IREE::Codegen::IREECodegenDialect>();
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);
   }
@@ -160,7 +165,7 @@ class CUDATargetBackend final : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getIdentifier("executable_targets"),
+    configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
 
     auto configAttr = b.getDictionaryAttr(configItems);
@@ -244,7 +249,7 @@ class CUDATargetBackend final : public TargetBackend {
     std::unique_ptr<llvm::TargetMachine> targetMachine;
     {
       llvm::Triple triple("nvptx64-nvidia-cuda");
-      std::string targetChip = "sm_35";
+      std::string targetChip = clTargetChip;
       std::string features = "+ptx60";
       std::string error;
       const llvm::Target *target =
@@ -316,6 +321,12 @@ class CUDATargetBackend final : public TargetBackend {
       MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
+    // Add some configurations to the `hal.executable.target` attribute.
+    auto addConfig = [&](StringRef name, Attribute value) {
+      configItems.emplace_back(StringAttr::get(context, name), value);
+    };
+    // Set target arch
+    addConfig("target_arch", StringAttr::get(context, clTargetChip));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(

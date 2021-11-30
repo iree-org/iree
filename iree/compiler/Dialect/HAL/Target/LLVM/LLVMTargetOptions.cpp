@@ -11,9 +11,9 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/MC/SubtargetFeature.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Host.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetOptions.h"
 
 namespace mlir {
@@ -51,6 +51,11 @@ LLVMTargetOptions getDefaultLLVMTargetOptions() {
     // TODO(benvanik): add an option for this.
     targetOptions.optLevel = llvm::OptimizationLevel::O3;
     targetOptions.options.FloatABIType = llvm::FloatABI::Hard;
+
+    // Force `-ffunction-sections` so we can strip unused code.
+    targetOptions.options.FunctionSections = true;
+    targetOptions.options.DataSections = true;
+    targetOptions.options.UniqueSectionNames = true;
   });
   return targetOptions;
 }
@@ -132,16 +137,17 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   targetOptions.debugSymbols = clDebugSymbols;
 
   static llvm::cl::opt<std::string> clLinkerPath(
-      "iree-llvm-linker-path",
-      llvm::cl::desc("Tool used to link shared libraries produced by IREE."),
+      "iree-llvm-system-linker-path",
+      llvm::cl::desc("Tool used to link system shared libraries produced by "
+                     "IREE (for -iree-llvm-link-embedded=false)."),
       llvm::cl::init(""));
   targetOptions.linkerPath = clLinkerPath;
 
   static llvm::cl::opt<std::string> clEmbeddedLinkerPath(
       "iree-llvm-embedded-linker-path",
       llvm::cl::desc("Tool used to link embedded ELFs produced by IREE (for "
-                     "-iree-llvm-link-embedded)."),
-      llvm::cl::init("ld.lld"));
+                     "-iree-llvm-link-embedded=true)."),
+      llvm::cl::init(""));
   targetOptions.embeddedLinkerPath = clEmbeddedLinkerPath;
 
   static llvm::cl::opt<bool> clLinkEmbedded(

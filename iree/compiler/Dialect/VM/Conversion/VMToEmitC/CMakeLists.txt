@@ -14,6 +14,7 @@ if(${IREE_ENABLE_EMITC})
       "ConvertVMToEmitC.h"
       "DropExcludedExports.h"
       "EmitCTypeConverter.h"
+      "VMAnalysis.h"
     SRCS
       "ConvertVMToEmitC.cpp"
       "DropExcludedExports.cpp"

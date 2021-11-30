@@ -12,12 +12,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Host.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
 
@@ -88,20 +88,16 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
       passBuilder.registerOptimizerLastEPCallback(
           [](llvm::ModulePassManager &modulePassManager,
              llvm::OptimizationLevel Level) {
-            bool compileKernel = false;
-            bool recover = false;
-            bool useAfterScope = true;
+            llvm::AddressSanitizerOptions Opts;
             bool moduleUseAfterScope = false;
             bool useOdrIndicator = false;
             modulePassManager.addPass(
                 llvm::RequireAnalysisPass<llvm::ASanGlobalsMetadataAnalysis,
                                           llvm::Module>());
             modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(
-                compileKernel, recover, moduleUseAfterScope, useOdrIndicator));
-            modulePassManager.addPass(
-                createModuleToFunctionPassAdaptor(llvm::AddressSanitizerPass(
-                    {compileKernel, recover, useAfterScope,
-                     llvm::AsanDetectStackUseAfterReturnMode::Runtime})));
+                Opts, moduleUseAfterScope, useOdrIndicator));
+            modulePassManager.addPass(createModuleToFunctionPassAdaptor(
+                llvm::AddressSanitizerPass(Opts)));
           });
     } break;
   }
@@ -119,17 +115,18 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
 }
 
 LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
-                                   llvm::Module *module, std::string *objData) {
+                                   llvm::Module *module,
+                                   llvm::CodeGenFileType fileType,
+                                   std::string *objData) {
   llvm::SmallVector<char, 0> stream_buffer;
   {
+    llvm::raw_svector_ostream ostream(stream_buffer);
     // TODO(ataei): Use non legacy pass mamanger for this.
     llvm::legacy::PassManager passManager;
     passManager.add(
         new llvm::TargetLibraryInfoWrapperPass(machine->getTargetTriple()));
-    llvm::raw_svector_ostream ostream(stream_buffer);
     if (machine->addPassesToEmitFile(passManager, ostream,
-                                     /*DwoOut=*/nullptr,
-                                     llvm::CGFT_ObjectFile)) {
+                                     /*DwoOut=*/nullptr, fileType)) {
       return failure();
     }
     passManager.run(*module);

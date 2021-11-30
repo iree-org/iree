@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -40,8 +39,8 @@ void buildMHLOImportPassPipeline(OpPassManager &pm) {
   pm.addPass(createFlattenTuplesInCFGPass());
   pm.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
-  // Mostly delicate to the IREE side MHLO legalization pipeline, now that
-  // we have handled the weird that comes from legacy HLO clients.
+  // Mostly delegate to the IREE side MHLO legalization pipeline, now that we
+  // have handled the weird that comes from legacy HLO clients.
   mlir::iree_compiler::buildMHLOInputConversionPassPipeline(pm);
 
   // Import pipelines should end with canonicalization because they may have

@@ -16,8 +16,8 @@ func @interface_workgroup_info() {
 // CHECK-LABEL: @interface_io_subspan
 //  CHECK-SAME: (%[[DIM0:.+]]: index, %[[DIM2:.+]]: index)
 func @interface_io_subspan(%dim0: index, %dim2: index) {
-  %c8 = constant 8 : index
-  %c16 = constant 16 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
 
   // CHECK: = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?x4x?x16xi8>{%[[DIM0]], %[[DIM2]]}
   %0 = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?x4x?x16xi8>{%dim0, %dim2}
@@ -31,7 +31,7 @@ func @interface_io_subspan(%dim0: index, %dim2: index) {
 // -----
 
 func @interface_io_subspan_wrong_dynamic_dim(%dim: index) {
-  %c8 = constant 8 : index
+  %c8 = arith.constant 8 : index
 
   // expected-error @+1{{result type 'memref<?x4x?x16xi8>' has 2 dynamic dimensions but 1 associated dimension SSA values}}
   %0 = hal.interface.binding.subspan @interface::@s0b0[%c8] : memref<?x4x?x16xi8>{%dim}

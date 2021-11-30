@@ -54,8 +54,8 @@ func @loaded() {
 util.global private mutable @v_stored : tensor<4xi32>
 // CHECK-LABEL: @stored
 func @stored() {
-  // CHECK-NEXT: %[[VAL:.+]] = constant
-  %cst = constant dense<5> : tensor<4xi32>
+  // CHECK-NEXT: %[[VAL:.+]] = arith.constant
+  %cst = arith.constant dense<5> : tensor<4xi32>
   // CHECK-NEXT: util.global.store %[[VAL]], @v_stored : tensor<4xi32>
   util.global.store %cst, @v_stored : tensor<4xi32>
   return

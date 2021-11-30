@@ -46,8 +46,12 @@ inline void registerMlirPasses() {
   registerAffineScalarReplacementPass();
   registerParallelLoopCollapsingPass();
   registerPrintOpStatsPass();
+  registerViewOpGraphPass();
   registerStripDebugInfoPass();
   registerSymbolDCEPass();
+
+  // Generic conversions
+  registerReconcileUnrealizedCastsPass();
 
   // Affine
   registerAffinePasses();
@@ -79,7 +83,8 @@ inline void registerMlirPasses() {
   registerConvertLinalgToSPIRVPass();
 
   // TOSA.
-  registerTosaToLinalgOnTensorsPass();
+  registerTosaToLinalgPass();
+  registerTosaToStandardPass();
 }
 
 }  // namespace mlir

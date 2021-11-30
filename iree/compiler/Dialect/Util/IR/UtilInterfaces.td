@@ -150,7 +150,23 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*methodName=*/"getTiedOperandsIndexAndLength", (ins),
       /*args=*/[{}],
       /*defaultImplementation=*/[{
-        return {0, $_op.getNumOperands()};
+        return {0, $_op->getNumOperands()};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the set of results that may be tied to operands as an
+        (index, length) pair ala getODSResultIndexAndLength.
+
+        By default assumes all results may be tied. If an op treats some
+        results as special then the op can override this and specify only the
+        ones it will tie.
+      }],
+      /*retTy=*/"std::pair<unsigned, unsigned>",
+      /*methodName=*/"getTiedResultsIndexAndLength", (ins),
+      /*args=*/[{}],
+      /*defaultImplementation=*/[{
+        return {0, $_op->getNumResults()};
       }]
     >,
     InterfaceMethod<
@@ -249,6 +265,18 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         return IREE::Util::detail::isOperandTied($_op, operandIndex);
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a list of result values that are tied to the given operand.
+      }],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"getOperandTiedResults",
+      /*args=*/(ins "unsigned":$operandIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return IREE::Util::detail::getOperandTiedResults($_op, operandIndex);
+      }]
+    >,
   ];
 
   let extraClassDeclaration = [{
@@ -261,11 +289,96 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
     // from the given value by traversing tied ops. Note that the returned
     // value may be a block argument and have no defining op.
     static Value findTiedBaseValue(Value derivedValue);
+
+    // Returns true if any of |value|'s uses have tied it to a result.
+    static bool hasAnyTiedUses(Value value);
   }];
 
   let verify = [{
     return IREE::Util::detail::verifyTiedOp($_op);
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::ShapeAware* interfaces
+//===----------------------------------------------------------------------===//
+
+def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    An operation that is able to provide dynamic shape dimensions for all
+    shaped operands and results.
+
+    This is a more fine-grained version of ReifyRankedShapedTypeOpInterface that
+    allows for querying of individual operand and result dimensions without
+    unconditionally inserting IR. The dynamic dimension queries allow us to find
+    the dynamic shape dimension SSA values in the IR in read-only mode (such as
+    during analysis), and having the queries specific to a particular operand
+    and result allows us to walk through ops along use-def edges. When combined
+    with tied operands the split queries allow for operands and results to have
+    differing dimensions (such as after reshaping/casting).
+
+    `getOperandDynamicDims` and `getResultDynamicDims` are the load-bearing
+    methods and if there was an equivalent set in an upstream dialect we could
+    switch to using that instead as the rest are just utilities built around
+    them.
+
+    `tensor.dim` and `memref.dim` will both resolve shape dimensions through
+    this interface when the dimension index is constant.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      [{Returns dynamic dimensions for the given shaped operand index.}],
+      "ValueRange", "getOperandDynamicDims", (ins "unsigned":$idx)
+    >,
+    InterfaceMethod<
+      [{Returns dynamic dimensions for the given shaped result index.}],
+      "ValueRange", "getResultDynamicDims", (ins "unsigned":$idx)
+    >,
+    InterfaceMethod<
+      [{Returns dynamic dimensions for the given shaped result value.}],
+      "ValueRange", "getResultDynamicDimsFromValue", (ins "Value":$value),
+      /*defaultImplementation=*/[{
+        for (unsigned i = 0; i < $_self->getNumResults(); ++i) {
+          if ($_self->getResult(i) == value) {
+            return $_self.getResultDynamicDims(i);
+          }
+        }
+        return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{Returns a full shape for the given shaped operand index.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildOperandShape",
+      /*args=*/(ins "unsigned":$idx, "OpBuilder &":$builder),
+      /*defaultImplementation=*/[{
+        return IREE::Util::buildOperandShape($_self, idx, builder);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{Returns a full shape for the given shaped result index.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildResultShape",
+      /*args=*/(ins "unsigned":$idx, "OpBuilder &":$builder),
+      /*defaultImplementation=*/[{
+        return IREE::Util::buildResultShape($_self, idx, builder);
+      }]
+    >,
+    StaticInterfaceMethod<
+      /*desc=*/[{Builds a full shape for the given shaped result value.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildResultValueShape",
+      /*args=*/(ins "Value":$result, "OpBuilder &":$builder),
+      /*methodBody=*/[{
+        auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(result.getDefiningOp());
+        return shapeAwareOp.buildResultShape(
+            result.cast<mlir::OpResult>().getResultNumber(), builder);
+      }]
+    >,
+  ];
 }
 
 //===----------------------------------------------------------------------===//
@@ -276,8 +389,7 @@ def Util_InferTypeSize : TypeInterface<"InferTypeSizeInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
-    Allows types to be queried for their size by inserting the required logic
-    when required.
+    Allows types to be queried for their size by inserting the required logic.
   }];
 
   let methods = [
@@ -298,12 +410,18 @@ def Util_SizeAwareType : TypeInterface<"SizeAwareTypeInterface"> {
     associated with it in the IR. See `SizeAwareOp` for more information.
   }];
 
-  let methods = [
-    InterfaceMethod<
-      [{Returns a size for the given sized value.}],
-      "Value", "getSize", (ins "Value":$value)
-    >,
-  ];
+  let extraClassDeclaration = [{
+    // Walks the SSA use-def chain to find the size of the type.
+    // Returns nullptr if the size cannot be found or if it is defined after
+    // {|block|, |insertionPoint|}.
+    static Value findSizeValue(Value resourceValue, Block *block,
+                               Block::iterator insertionPoint);
+
+    // Returns an SSA value representing the byte size of |value| or nullptr
+    // if not a sized value.
+    static Value queryValueSize(Location loc, Value resourceValue,
+                                OpBuilder &builder);
+  }];
 }
 
 def Util_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
@@ -334,6 +452,20 @@ def Util_SizeAwareOp : OpInterface<"SizeAwareOpInterface"> {
       }]
     >,
   ];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::ReferenceTypeInterface
+//===----------------------------------------------------------------------===//
+
+def Util_ReferenceType : TypeInterface<"ReferenceTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used to mark types as passed by-reference. These types may have
+    aliases/ties or be convertable into forms that do. This is in contrast to
+    the default of immutable by-value types.
+  }];
 }
 
 //===----------------------------------------------------------------------===//

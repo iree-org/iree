@@ -137,7 +137,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     // conversions can do their job. If we want to remove the dependency
     // from standard ops in the future we could instead go directly to
     // one of the vm constant ops.
-    auto constValue = rewriter.createOrFold<mlir::ConstantOp>(
+    auto constValue = rewriter.createOrFold<mlir::arith::ConstantOp>(
         loc, inputType,
         IntegerAttr::get(inputType,
                          APInt(32, static_cast<int32_t>(intAttr.getInt()))));
@@ -146,7 +146,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     SmallVector<Value, 4> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
-      elementValues.push_back(rewriter.createOrFold<mlir::ConstantOp>(
+      elementValues.push_back(rewriter.createOrFold<mlir::arith::ConstantOp>(
           loc, elementsAttr.getType().getElementType(), intAttr));
     }
     return elementValues;

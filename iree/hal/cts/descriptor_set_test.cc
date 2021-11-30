@@ -27,10 +27,8 @@ class DescriptorSetTest : public CtsTestBase {};
 TEST_P(DescriptorSetTest, DISABLED_CreateWithTwoBindings) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
-      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_READ},
-      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE},
+      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
   };
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
       device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,

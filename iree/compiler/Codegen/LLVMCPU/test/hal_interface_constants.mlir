@@ -12,7 +12,7 @@ func @constant_values() {
   // CHECK: %[[V64:.+]] = llvm.zext %[[V32]] : i32 to i64
   %v1 = hal.interface.load.constant offset = 1 : index
   // CHECK-NOT: unrealized_conversion_cast
-  %v2 = index_cast %v1 : index to i64
+  %v2 = arith.index_cast %v1 : index to i64
   // CHECK: llvm.call @sink
   llvm.call @sink(%v2) : (i64) -> ()
   return

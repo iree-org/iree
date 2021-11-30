@@ -66,6 +66,7 @@ iree_e2e_cartesian_product_test_suite(
     ",,MaxPool2D,,,,iree_vulkan"
     ",,Conv3D,,,,iree_vulkan"
     ",,Conv3DTranspose,,,,iree_vulkan"
+    ",,UpSampling3D,,,,iree_vulkan"
 )
 
 iree_e2e_cartesian_product_test_suite(

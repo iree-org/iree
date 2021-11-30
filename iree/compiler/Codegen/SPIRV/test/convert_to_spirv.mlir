@@ -2,8 +2,8 @@
 
 hal.executable private @push_constant  {
   hal.interface private @io attributes {push_constants = 5 : index} {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
@@ -26,8 +26,8 @@ hal.executable private @push_constant  {
       }
 
       hal.interface private @io attributes {push_constants = 5 : index} {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -37,9 +37,9 @@ hal.executable private @push_constant  {
 
 hal.executable private @resource_bindings_in_same_func  {
   hal.interface private @io attributes {push_constants = 5 : index} {
-    hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+    hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+    hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer"
+    hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
@@ -55,7 +55,7 @@ hal.executable private @resource_bindings_in_same_func  {
       // CHECK: spv.GlobalVariable @[[RET0:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spv.func @resource_bindings_in_same_entry_func()
       func @resource_bindings_in_same_entry_func() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
 
         // Same type
         // CHECK: spv.mlir.addressof @[[ARG0]]
@@ -84,9 +84,9 @@ hal.executable private @resource_bindings_in_same_func  {
       }
 
       hal.interface private @io attributes {push_constants = 5 : index} {
-        hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+        hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+        hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer"
+        hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
       }
     }
   }
@@ -96,8 +96,8 @@ hal.executable private @resource_bindings_in_same_func  {
 
 hal.executable private @resource_bindings_in_multi_entry_func  {
   hal.interface private @io attributes {push_constants = 5 : index} {
-    hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+    hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+    hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
@@ -120,7 +120,7 @@ hal.executable private @resource_bindings_in_multi_entry_func  {
       func @resource_bindings_in_entry_func1() {
         // CHECK: spv.mlir.addressof @[[FUNC1_ARG]]
         // CHECK: spv.mlir.addressof @[[FUNC1_RET]]
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32>
         %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4xvector<4xf32>>
 
@@ -134,7 +134,7 @@ hal.executable private @resource_bindings_in_multi_entry_func  {
       func @resource_bindings_in_entry_func2() {
         // CHECK: spv.mlir.addressof @[[FUNC2_ARG]]
         // CHECK: spv.mlir.addressof @[[FUNC2_RET]]
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4x4xf32> // Same type as previous function
         %1 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4x4xf32> // Different type as previous function
 
@@ -145,8 +145,8 @@ hal.executable private @resource_bindings_in_multi_entry_func  {
       }
 
       hal.interface private @io attributes {push_constants = 5 : index} {
-        hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+        hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+        hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
       }
     }
   }
@@ -156,9 +156,9 @@ hal.executable private @resource_bindings_in_multi_entry_func  {
 
 hal.executable private @interface_binding  {
   hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
@@ -168,7 +168,7 @@ hal.executable private @interface_binding  {
     }
     builtin.module {
       func @interface_binding() {
-        %c0 = constant 0 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<8x5xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<5xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<8x5xf32>
@@ -180,9 +180,9 @@ hal.executable private @interface_binding  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -203,9 +203,9 @@ hal.executable private @interface_binding  {
 
 hal.executable private @interface_wg_id  {
   hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
@@ -220,9 +220,9 @@ hal.executable private @interface_wg_id  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -242,9 +242,9 @@ hal.executable private @interface_wg_id  {
 
 hal.executable private @interface_wg_count  {
   hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
@@ -259,9 +259,9 @@ hal.executable private @interface_wg_count  {
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

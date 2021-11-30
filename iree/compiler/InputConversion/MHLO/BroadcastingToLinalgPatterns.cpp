@@ -66,7 +66,7 @@ class Extent {
 
   Value convertToValue(OpBuilder &builder, Location loc) {
     if (!isStatic()) return getValue();
-    return builder.create<ConstantIndexOp>(loc, getStatic());
+    return builder.create<arith::ConstantIndexOp>(loc, getStatic());
   }
 
  private:
@@ -192,8 +192,8 @@ Optional<Extent> computeBinaryResultExtent(OpBuilder &builder, Location loc,
   Value lhsExtentValue = lhsDim.convertToValue(builder, loc);
   Value rhsExtentValue = rhsDim.convertToValue(builder, loc);
 
-  Value isEqual = builder.create<CmpIOp>(loc, CmpIPredicate::eq, lhsExtentValue,
-                                         rhsExtentValue);
+  Value isEqual = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                lhsExtentValue, rhsExtentValue);
   builder.create<AssertOp>(
       loc, isEqual,
       builder.getStringAttr("mismatched dynamic broadcast extents"));
@@ -269,8 +269,8 @@ Optional<Extent> computeTernaryResultExtent(OpBuilder &builder, Location loc,
     // Dynamic check.
     Value cmpLhsValue = cmpLhs.convertToValue(builder, loc);
     Value cmpRhsValue = cmpRhs.convertToValue(builder, loc);
-    Value isEqual = builder.create<CmpIOp>(loc, CmpIPredicate::eq, cmpLhsValue,
-                                           cmpRhsValue);
+    Value isEqual = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                                  cmpLhsValue, cmpRhsValue);
     builder.create<AssertOp>(
         loc, isEqual,
         builder.getStringAttr("mismatched dynamic broadcast extents"));
@@ -310,7 +310,7 @@ struct ConvertConstantLikeOp
     : public OpConversionPattern<chlo::ConstantLikeOp> {
   using OpConversionPattern<chlo::ConstantLikeOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      chlo::ConstantLikeOp op, ArrayRef<Value> operands,
+      chlo::ConstantLikeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto resultTy = op.getType().cast<RankedTensorType>();
     if (!resultTy.hasRank())
@@ -322,14 +322,12 @@ struct ConvertConstantLikeOp
       return success();
     }
 
-    chlo::ConstantLikeOpAdaptor transformed(operands);
     Location loc = op.getLoc();
 
     int resultRank = resultTy.getRank();
     SmallVector<Extent> resultExtents;
     resultExtents.reserve(resultRank);
-    appendExtents(rewriter, loc, resultExtents, transformed.operand(),
-                  resultTy);
+    appendExtents(rewriter, loc, resultExtents, adaptor.operand(), resultTy);
 
     auto resultTy0D = RankedTensorType::get({}, resultTy.getElementType());
     Value scalarConst = rewriter.create<mhlo::ConstOp>(
@@ -596,15 +594,14 @@ struct ConvertSelectOp : public OpConversionPattern<chlo::BroadcastSelectOp> {
   using OpConversionPattern<chlo::BroadcastSelectOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      chlo::BroadcastSelectOp op, ArrayRef<Value> operands,
+      chlo::BroadcastSelectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    chlo::BroadcastSelectOp::Adaptor transformed(operands);
     Location loc = op.getLoc();
 
     // Only support ranked operands.
-    Value pred = transformed.pred();
-    Value thenValue = transformed.on_true();
-    Value elseValue = transformed.on_false();
+    Value pred = adaptor.pred();
+    Value thenValue = adaptor.on_true();
+    Value elseValue = adaptor.on_false();
     auto predType = pred.getType().dyn_cast<RankedTensorType>();
     auto thenType = thenValue.getType().dyn_cast<RankedTensorType>();
     auto elseType = elseValue.getType().dyn_cast<RankedTensorType>();
@@ -713,12 +710,11 @@ struct ConvertDynamicReshapeOp
   using OpConversionPattern<mhlo::DynamicReshapeOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mhlo::DynamicReshapeOp op, ArrayRef<Value> rawOperands,
+      mhlo::DynamicReshapeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    mhlo::DynamicReshapeOpAdaptor operands(rawOperands);
-    Value input = operands.operand();
-    Value outputShape = operands.output_shape();
+    Value input = adaptor.operand();
+    Value outputShape = adaptor.output_shape();
     auto outputShapeType = outputShape.getType().dyn_cast<RankedTensorType>();
     auto resultType = typeConverter->convertType(op.getType())
                           .dyn_cast_or_null<RankedTensorType>();
@@ -730,7 +726,7 @@ struct ConvertDynamicReshapeOp
            "mismatched rank");
     for (int i = 0, e = resultType.getRank(); i < e; ++i) {
       if (resultType.isDynamicDim(i)) {
-        Value index = rewriter.create<ConstantIndexOp>(loc, i);
+        Value index = rewriter.create<arith::ConstantIndexOp>(loc, i);
         targetDims.push_back(
             rewriter.create<tensor::ExtractOp>(loc, outputShape, index));
       }

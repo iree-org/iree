@@ -15,6 +15,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+#define IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT 64
+
 // Creates the kernel arguments.
 iree_status_t iree_hal_cuda_executable_layout_create(
     iree_hal_cuda_context_wrapper_t* context, iree_host_size_t set_layout_count,
@@ -28,6 +30,10 @@ iree_host_size_t iree_hal_cuda_base_binding_index(
 
 // Return the base index for push constant data.
 iree_host_size_t iree_hal_cuda_push_constant_index(
+    iree_hal_executable_layout_t* base_executable_layout);
+
+// Return the number of constants in the executable layout.
+iree_host_size_t iree_hal_cuda_executable_layout_num_constants(
     iree_hal_executable_layout_t* base_executable_layout);
 
 #ifdef __cplusplus

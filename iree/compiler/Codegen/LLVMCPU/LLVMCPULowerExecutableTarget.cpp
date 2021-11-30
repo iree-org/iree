@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -30,8 +30,9 @@ class LLVMCPULowerExecutableTargetPass
           LLVMCPULowerExecutableTargetPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect, linalg::LinalgDialect,
-                    LLVM::LLVMDialect, vector::VectorDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect,
+                    linalg::LinalgDialect, LLVM::LLVMDialect,
+                    vector::VectorDialect>();
   }
 
   LLVMCPULowerExecutableTargetPass(bool vectorize = true)
@@ -91,6 +92,21 @@ static StringRef sanitizePipelineString(StringRef input) {
   return input;
 }
 
+/// Verify that valid configuration is set for all ops within the compiled
+/// module.
+template <typename F>
+static LogicalResult verifyLoweringConfiguration(
+    ModuleOp module, IREE::Codegen::TranslationInfoAttr translationInfo,
+    F verificationFn) {
+  auto walkResult = module.walk([&](Operation *op) -> WalkResult {
+    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
+    if (!loweringConfig) return WalkResult::advance();
+    return verificationFn(op, loweringConfig, translationInfo,
+                          ArrayRef<int64_t>{});
+  });
+  return failure(walkResult.wasInterrupted());
+}
+
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
@@ -117,51 +133,66 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     }
 
     // There might be multiple entry points in the module. Currently, all of
-    // them need to have the same pipeline.
+    // them need to have the same translation info.
     // TODO(ravishankarm): This is strange that this is not enforced
-    // structurally, but something to address later on. For now this restriction
+    // structurally, but something to address later on. The main issue is how
+    // to invoke separate dynamic pass pipelines on  entry point functions, when
+    // the passes might have module level changes. For now this restriction
     // is fine.
     llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
         getAllEntryPoints(moduleOp);
-    Optional<IREE::HAL::DispatchLoweringPassPipeline> passPipeline;
+    Optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
     for (auto &it : entryPoints) {
       auto entryPointOp = it.second;
-      if (IREE::HAL::TranslationInfo translationInfo =
+      if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
               getTranslationInfo(entryPointOp)) {
-        Optional<IREE::HAL::DispatchLoweringPassPipeline> currPipeline =
-            getLoweringPassPipeline(translationInfo);
-        if (!currPipeline) continue;
-        if (passPipeline) {
-          if (currPipeline.getValue() != passPipeline.getValue()) {
-            moduleOp.emitError(
-                "unhandled compilation of entry point function with different "
-                "pass pipelines within a module");
-            return signalPassFailure();
+        if (translationInfo) {
+          if (currTranslationInfo != translationInfo.getValue()) {
+            moduleOp.emitOpError(
+                "unhandled compilation of entry point functions with different "
+                "translation info");
           }
-          continue;
+        } else {
+          translationInfo = currTranslationInfo;
         }
-        passPipeline = currPipeline;
       }
     }
 
-    executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
-    executableLoweringPipeline.addPass(createCanonicalizerPass());
-    if (!testLoweringConfiguration && passPipeline.hasValue()) {
-      OpPassManager &nestedModulePM =
-          executableLoweringPipeline.nest<ModuleOp>();
-      switch (passPipeline.getValue()) {
-        case IREE::HAL::DispatchLoweringPassPipeline::CPUDefault:
-        case IREE::HAL::DispatchLoweringPassPipeline::None:
-          addCPUDefaultPassPipeline(nestedModulePM);
+    // Verify the configuration.
+    if (translationInfo.hasValue()) {
+      LogicalResult verificationStatus = success();
+      switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
+          verificationStatus = verifyLoweringConfiguration(
+              moduleOp, translationInfo.getValue(),
+              verifyTensorToVectorsPassPipelineConfig);
           break;
-        case IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization:
-          addCPUVectorizationPassPipeline(nestedModulePM, lowerToVectors);
-          break;
-        case IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors:
-          addTensorToVectorsPassPipeline(nestedModulePM, lowerToVectors);
-          break;
-        default:
-          llvm_unreachable("Unsupported pipeline on CPU target.");
+        default:;
+      }
+      if (failed(verificationStatus)) {
+        return signalPassFailure();
+      }
+
+      executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
+      executableLoweringPipeline.addPass(createCanonicalizerPass());
+      if (!testLoweringConfiguration) {
+        OpPassManager &nestedModulePM =
+            executableLoweringPipeline.nest<ModuleOp>();
+        switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
+          case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
+          case IREE::Codegen::DispatchLoweringPassPipeline::None:
+            addCPUDefaultPassPipeline(nestedModulePM);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
+            addTensorToVectorsPassPipeline(nestedModulePM, lowerToVectors);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUTileFuseAndVectorize:
+            addTileFuseAndVectorizePassPipeline(nestedModulePM);
+            break;
+          default:
+            llvm_unreachable("Unsupported pipeline on CPU target.");
+        }
       }
     }
   }

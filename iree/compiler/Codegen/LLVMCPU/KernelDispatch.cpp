@@ -6,14 +6,14 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -41,31 +41,6 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     llvm::cl::desc("number of threads that are used at runtime"),
     llvm::cl::init(8));
 
-static llvm::cl::opt<int> matmulWorkgroupTileSize(
-    "iree-codegen-llvm-matmul-workgroup-size",
-    llvm::cl::desc(
-        "linalg.matmul tile size for workgroups spliting of M, N dimension"),
-    llvm::cl::init(64));
-static llvm::cl::opt<int> matmulL1TileSize(
-    "iree-codegen-llvm-matmul-l1-size",
-    llvm::cl::desc(
-        "linalg.matmul tile size for L1 spliting of M, N, K dimension"),
-    llvm::cl::init(32));
-static llvm::cl::opt<int> matmulVectorSize(
-    "iree-codegen-llvm-matmul-vector-size",
-    llvm::cl::desc("linalg.matmul vector tile size"), llvm::cl::init(4));
-
-static llvm::cl::opt<int> batchMatmulWorkgroupTileSize(
-    "iree-codegen-llvm-batch-matmul-workgroup-size",
-    llvm::cl::desc("linalg.batch_matmul tile size for workgroups spliting of "
-                   "M, N dimension"),
-    llvm::cl::init(32));
-static llvm::cl::opt<int> batchMatmulL1TileSize(
-    "iree-codegen-llvm-batch-matmul-l1-size",
-    llvm::cl::desc("linalg.batch_matmul tile size for L1 spliting of M, N, K "
-                   "dimensions"),
-    llvm::cl::init(16));
-
 static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
     "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
     llvm::cl::desc("linalg.mmt4d workgroup tile size"), llvm::cl::ZeroOrMore,
@@ -86,6 +61,39 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
     llvm::cl::desc(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
+
+using IREE::Codegen::DispatchLoweringPassPipeline;
+
+static Optional<llvm::Triple> getTargetTriple(FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+  if (!targetAttr) return llvm::None;
+  auto config = targetAttr.getConfiguration();
+  if (!config) return llvm::None;
+  auto triple = config.getAs<StringAttr>("target_triple");
+  if (!triple) return llvm::None;
+  return llvm::Triple(triple.getValue().str());
+}
+
+static DispatchLoweringPassPipeline getDispatchLoweringPassPipeline(
+    FuncOp entryPointFn, Operation *op) {
+  return TypeSwitch<Operation *, DispatchLoweringPassPipeline>(op)
+      .Case<linalg::ContractionOpInterface>([&](auto op) {
+        Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
+        if (triple && triple.getValue().isX86()) {
+          return DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
+        } else {
+          return DispatchLoweringPassPipeline::CPUTensorToVectors;
+        }
+      })
+      .Case<linalg::Mmt4DOp>([&](auto op) {
+        return DispatchLoweringPassPipeline::CPUTensorToVectors;
+      })
+      .Default([&](Operation *op) {
+        return DispatchLoweringPassPipeline::CPUDefault;
+      });
+}
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
@@ -132,7 +140,7 @@ static unsigned getReferenceTypeLengthInBytes(FuncOp entryPointFn) {
 }
 
 static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
-    ArrayRef<TiledLoopInfo> tiledLoops,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
     ArrayRef<int64_t> nativeVectorSizeInElements) {
   if (tiledLoops.empty()) {
     return {};
@@ -140,7 +148,7 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
   assert(tiledLoops.size() == nativeVectorSizeInElements.size());
   unsigned maxDim = 0;
   for (auto tiledLoop : tiledLoops) {
-    maxDim = std::max<unsigned>(tiledLoop.distributionDim, maxDim);
+    maxDim = std::max<unsigned>(tiledLoop.processorDistributionDim, maxDim);
   }
   SmallVector<int64_t> workloadPerWorkgroup(maxDim + 1, 1);
   SmallVector<int64_t> numWorkgroupsPerDim(maxDim + 1, 1);
@@ -151,9 +159,9 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
   auto ceilFn = [](int64_t a, int64_t b) { return (a + b - 1) / b; };
 
   for (auto tiledLoop : enumerate(tiledLoops)) {
-    Optional<int64_t> lb = getStaticValue(tiledLoop.value().lb);
-    Optional<int64_t> ub = getStaticValue(tiledLoop.value().ub);
-    unsigned dim = tiledLoop.value().distributionDim;
+    Optional<int64_t> lb = getStaticValue(tiledLoop.value().untiledLowerBound);
+    Optional<int64_t> ub = getStaticValue(tiledLoop.value().untiledUpperBound);
+    unsigned dim = tiledLoop.value().processorDistributionDim;
     if (!lb || !ub) {
       workloadPerWorkgroup[dim] = defaultWorkgroupTileSize;
       workload[dim] = ShapedType::kDynamicSize;
@@ -211,7 +219,7 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
 /// Sets the default launch configuration to use for a tiled + distributed
 /// dispatch region based on the `tiledLoops` found.
 static LogicalResult setDefaultLaunchConfig(
-    FuncOp entryPointFn, ArrayRef<TiledLoopInfo> tiledLoops) {
+    FuncOp entryPointFn, ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   unsigned typeWidthInBytes = getReferenceTypeLengthInBytes(entryPointFn);
   SmallVector<int64_t> nativeVectorSizeInElements(tiledLoops.size(), 1);
   if (!tiledLoops.empty()) {
@@ -226,17 +234,17 @@ static LogicalResult setDefaultLaunchConfig(
   SmallVector<int64_t> workloadPerWorkgroup =
       getDefaultWorkloadPerWorkgroup(tiledLoops, nativeVectorSizeInElements);
 
-  setTranslationInfo(
-      entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUDefault,
-      /*workgroupSize =*/ArrayRef<int64_t>{}, workloadPerWorkgroup);
+  setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
+                     workloadPerWorkgroup,
+                     /*workgroupSize =*/ArrayRef<int64_t>{});
   return success();
 }
 
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
-static LogicalResult setRootConfig(FuncOp entryPointFn,
-                                   linalg::ContractionOpInterface contractionOp,
-                                   ArrayRef<TiledLoopInfo> tiledLoops) {
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(contractionOp)) return success();
 
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
@@ -249,7 +257,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     }
   } else if (tiledLoops.size() != 2) {
     return contractionOp.emitOpError(
-        "expected op tbe distributed along 2 dimensions");
+        "expected op to be distributed along 2 dimensions");
   }
 
   Type elementType = lhsShapedType.getElementType();
@@ -260,7 +268,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
           getNativeVectorSizeInBytes(entryPointFn)) {
     vectorSize = nativeVectorSizeVal.getValue() / byteWidth;
   } else {
-    vectorSize = matmulVectorSize;
+    vectorSize = clNativeVectorSizeInBytes;
   }
   SmallVector<int64_t> vectorSizeVals(tiledLoops.size(), 1);
   vectorSizeVals.back() = vectorSize;
@@ -288,19 +296,29 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
     return maxSize;
   };
   for (unsigned i = tiledLoops.size() - 2; i < tiledLoops.size(); ++i) {
-    if (!tiledLoops[i].lb.is<Attribute>() ||
-        !tiledLoops[i].ub.is<Attribute>()) {
+    if (!tiledLoops[i].untiledLowerBound.is<Attribute>() ||
+        !tiledLoops[i].untiledUpperBound.is<Attribute>()) {
       continue;
     }
-    int64_t lb = tiledLoops[i].lb.get<Attribute>().cast<IntegerAttr>().getInt();
-    int64_t ub = tiledLoops[i].ub.get<Attribute>().cast<IntegerAttr>().getInt();
-    workloadPerWorkgroup[tiledLoops.size() - 1 - i] =
-        getTileSize(lb, ub, workloadPerWorkgroup[tiledLoops.size() - 1 - i],
-                    vectorSizeVals[i]);
+    auto lb =
+        tiledLoops[i].untiledLowerBound.get<Attribute>().cast<IntegerAttr>();
+    auto ub =
+        tiledLoops[i].untiledUpperBound.get<Attribute>().cast<IntegerAttr>();
+    workloadPerWorkgroup[tiledLoops.size() - 1 - i] = getTileSize(
+        lb.getInt(), ub.getInt(),
+        workloadPerWorkgroup[tiledLoops.size() - 1 - i], vectorSizeVals[i]);
+  }
+  if (isBatchMatmul) {
+    workloadPerWorkgroup.push_back(1);
   }
   setTranslationInfo(
-      entryPointFn, IREE::HAL::DispatchLoweringPassPipeline::CPUTensorToVectors,
-      /*workgroupSize =*/ArrayRef<int64_t>{}, workloadPerWorkgroup);
+      entryPointFn,
+      getDispatchLoweringPassPipeline(entryPointFn, contractionOp),
+      workloadPerWorkgroup,
+      /*workgroupSize =*/ArrayRef<int64_t>{});
+
+  Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
+  int64_t matmulL1TileSize = (triple && triple.getValue().isX86()) ? 16 : 32;
 
   SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;
   if (isBatchMatmul) {
@@ -321,16 +339,17 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
                             // level tiling.
   tileSizes.emplace_back(std::move(l1TileSizes));
   tileSizes.emplace_back(std::move(vectorTileSizes));
-  IREE::HAL::LoweringConfig config =
-      buildConfigAttr(tileSizes, vectorSizeVals, entryPointFn.getContext());
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes, vectorSizeVals);
   setLoweringConfig(contractionOp, config);
   return success();
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root
 /// op
-static LogicalResult setRootConfig(FuncOp entryPointFn, linalg::Mmt4DOp mmt4dOp,
-                                   ArrayRef<TiledLoopInfo> tiledLoops) {
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, linalg::Mmt4DOp mmt4dOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   // TODO(ataei): These are hand tuned for some performance benchmarks for
   // now, we want to adapt the same strategy as matmul that dynamically sets
   // tile size.
@@ -368,24 +387,24 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, linalg::Mmt4DOp mmt4dOp,
     return {1, 1, 1, M0, N0, K0};
   };
 
-  SmallVector<int64_t, 4> nativeVectorSize = getVectorSizes();
+  SmallVector<int64_t> nativeVectorSize = getVectorSizes();
 
   TileSizesListType tileSizes = {getWorkgroupTileSizes(), getL1TileSizes(),
                                  nativeVectorSize};
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
-      IREE::HAL::DispatchLoweringPassPipeline::CPUVectorization);
+      getDispatchLoweringPassPipeline(entryPointFn, mmt4dOp));
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
 /// root op.
-static LogicalResult setRootConfig(FuncOp entryPointFn, linalg_ext::FftOp fftOp,
-                                   ArrayRef<TiledLoopInfo> tiledLoops) {
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto partitionedLoops = getPartitionedLoops(fftOp);
   unsigned maxDepth = partitionedLoops.back() + 1;
-  SmallVector<int64_t, 4> workgroupTileSizes(maxDepth,
-                                             defaultWorkgroupTileSize);
+  SmallVector<int64_t> workgroupTileSizes(maxDepth, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
   for (auto dim : llvm::seq<int64_t>(0, workgroupTileSizes.size())) {
@@ -398,7 +417,7 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, linalg_ext::FftOp fftOp,
   if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
     APInt value;
     if (matchPattern(fftOp.getStage(), m_ConstantInt(&value))) {
-      workgroupTileSizes[rank - 1] = 1 << value.getSExtValue();
+      workgroupTileSizes[rank - 1] = 1ll << value.getSExtValue();
       workgroupTileSizes[rank - 1] =
           std::max(workgroupTileSizes[rank - 1],
                    static_cast<int64_t>(defaultWorkgroupTileSize));
@@ -412,22 +431,20 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, linalg_ext::FftOp fftOp,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, fftOp, tileSizes,
       /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      IREE::HAL::DispatchLoweringPassPipeline::CPUDefault);
+      getDispatchLoweringPassPipeline(entryPointFn, fftOp));
 }
 
 /// Finds the root operation in the given list of linalg operations and sets
 /// its configuration. Returns error for multiple root operations.
-static LogicalResult setRootConfig(FuncOp entryPointFn,
-                                   ArrayRef<Operation *> computeOps,
-                                   ArrayRef<TiledLoopInfo> tiledLoops) {
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   Operation *rootOp = nullptr;
   for (auto computeOp : computeOps) {
-    if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
-
     auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
       return TypeSwitch<Operation *, LogicalResult>(op)
           .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
-                linalg_ext::FftOp>([&](auto op) {
+                IREE::LinalgExt::FftOp>([&](auto op) {
             return setRootConfig(entryPointFn, op, tiledLoops);
           })
           .Default([&](Operation *op) { return success(); });
@@ -449,16 +466,11 @@ static LogicalResult setRootConfig(FuncOp entryPointFn,
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult setTranslationInfoAndRootConfig(
     FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
-    ArrayRef<TiledLoopInfo> tiledLoops) {
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   // First check if the operations have a preset pipeline.
   for (auto computeOp : computeOps) {
-    if (!hasMarker(computeOp, getWorkgroupMarker())) continue;
-
-    if (auto config = getLoweringConfig(computeOp)) {
-      // Check if the op has a preset pipeline.
-      auto passPipeline = getLoweringPassPipeline(config);
-      if (!passPipeline) continue;
-
+    if (IREE::Codegen::CompilationInfoAttr compilationInfo =
+            getCompilationInfo(computeOp)) {
       // If the function already has a translation, error out.
       if (auto translationInfo = getTranslationInfo(entryPointFn)) {
         return computeOp->emitOpError(
@@ -466,17 +478,12 @@ static LogicalResult setTranslationInfoAndRootConfig(
             "info");
       }
 
-      SmallVector<int64_t, 4> workgroupSize;
-      if (auto workgroupSizeAttr = config.workgroupSize()) {
-        workgroupSize = llvm::to_vector<4>(
-            llvm::map_range(workgroupSizeAttr, [](Attribute intAttr) {
-              return intAttr.cast<IntegerAttr>().getInt();
-            }));
-      }
-      if (failed(setOpConfigAndEntryPointFnTranslation(
-              entryPointFn, computeOp, config, *passPipeline, workgroupSize))) {
-        return failure();
-      }
+      SmallVector<int64_t> workgroupSize =
+          compilationInfo.getWorkgroupSizeVals();
+      setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
+                         workgroupSize);
+      setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
+      eraseCompilationInfo(computeOp);
     }
   }
 
@@ -500,7 +507,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;
     SmallVector<Operation *> computeOps;
-    SmallVector<TiledLoopInfo> tiledLoops;
+    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
 
     // If there are no linalg ops, not using Linalg based lowering.
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {

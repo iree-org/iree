@@ -1,21 +1,20 @@
-// Copyright 2019 The IREE Authors
+// Copyright 2021 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
-#include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
-#include "iree/compiler/Dialect/HAL/Conversion/HALToHAL/ConvertHALToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
+#include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/ConvertStreamToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/Conversion/UtilToHAL/ConvertUtilToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -41,15 +40,17 @@ class ConvertToHALPass
     : public PassWrapper<ConvertToHALPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<IREE::HAL::HALDialect>();
+    registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
-    registry.insert<HALDialect>();
-    registry.insert<StandardOpsDialect>();
   }
 
-  StringRef getArgument() const override { return "iree-convert-to-hal"; }
+  StringRef getArgument() const override { return "iree-hal-conversion"; }
 
   StringRef getDescription() const override {
-    return "Convert input flow/std/etc dialects to the IREE HAL dialect.";
+    return "Convert input stream/std/etc dialects to the IREE HAL dialect.";
   }
 
   void runOnOperation() override {
@@ -73,22 +74,12 @@ class ConvertToHALPass
 
     populateUtilToHALPatterns(context, conversionTarget, typeConverter,
                               patterns);
-
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);
-    conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
-        [&](IREE::Util::GlobalOp op) {
-          return typeConverter.isLegal(op.type());
-        });
-
-    setupStandardToHALLegality(context, conversionTarget, typeConverter);
-    populateStandardToHALPatterns(context, patterns, typeConverter);
-
-    setupFlowToHALLegality(context, conversionTarget, typeConverter);
-    populateFlowToHALPatterns(context, patterns, typeConverter);
-
-    setupHALToHALLegality(context, conversionTarget, typeConverter);
-    populateHALToHALPatterns(context, patterns, typeConverter);
+    populateStandardToHALPatterns(context, conversionTarget, typeConverter,
+                                  patterns);
+    populateStreamToHALPatterns(context, conversionTarget, typeConverter,
+                                patterns);
 
     // Gather all HAL dialect conversion patterns from custom dialects.
     // These will perform the tensor->buffer mapping for their ops.
@@ -98,8 +89,7 @@ class ConvertToHALPass
     }
 
     // NOTE: we allow ops that we don't know about to allow custom dialects
-    // that don't need anything HAL-specific to pass through. This is handled by
-    // the fallback type legality support of the
+    // that don't need anything HAL-specific to pass through.
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(patterns)))) {
       return signalPassFailure();

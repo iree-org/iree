@@ -1,4 +1,4 @@
-// Copyright 2020 The IREE Authors
+// Copyright 2021 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -14,12 +14,10 @@
 namespace mlir {
 namespace iree_compiler {
 
-// TODO(gcmn): Use conversion interfaces. Requires breaking circular dependency
-// between HAL and IREE dialects.
-
 // Appends all patterns for lowering IREE ops to HAL buffer ops and sets their
 // legality.
-void populateUtilToHALPatterns(MLIRContext *context, ConversionTarget &target,
+void populateUtilToHALPatterns(MLIRContext *context,
+                               ConversionTarget &conversionTarget,
                                TypeConverter &typeConverter,
                                OwningRewritePatternList &patterns);
 

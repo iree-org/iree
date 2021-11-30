@@ -79,7 +79,7 @@ struct PadTensorOpConversion : public OpRewritePattern<linalg::PadTensorOp> {
       expr = addValueOrAttr(expr, highPad[dim]);
       Value v = linalg::applyMapToValues(
           rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
-      if (auto cst = v.getDefiningOp<ConstantOp>()) {
+      if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
         outputShape.push_back(cst.value());
       } else {
         outputShape.push_back(v);
@@ -100,7 +100,8 @@ struct PadTensorToSubTensorInsertPass
     : public PadTensorToSubTensorInsertBase<PadTensorToSubTensorInsertPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
-                    StandardOpsDialect>();
+                    StandardOpsDialect, mlir::math::MathDialect,
+                    mlir::arith::ArithmeticDialect>();
   }
 
   void runOnOperation() override {

@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -23,14 +23,13 @@ class BufferLoadOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::BufferLoadOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::BufferLoadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::BufferLoadOp::Adaptor adaptor(operands);
     auto importType = importOp.getType();
-    auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
+    auto sizeConst = rewriter.createOrFold<mlir::arith::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
-            IREE::HAL::getRoundedElementByteWidth(op.getResult().getType())));
+            IREE::Util::getRoundedElementByteWidth(op.getResult().getType())));
     auto callOp = rewriter.create<IREE::VM::CallOp>(
         op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.source_buffer(), adaptor.source_offset(),
@@ -44,7 +43,8 @@ class BufferLoadOpConversion
     if (newResultType == callResult.getType()) {
       rewriter.replaceOp(op, {callResult});
     } else {
-      rewriter.replaceOpWithNewOp<BitcastOp>(op, newResultType, callResult);
+      rewriter.replaceOpWithNewOp<arith::BitcastOp>(op, newResultType,
+                                                    callResult);
     }
 
     return success();
@@ -65,14 +65,13 @@ class BufferStoreOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::BufferStoreOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::BufferStoreOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    IREE::HAL::BufferStoreOp::Adaptor adaptor(operands);
     auto importType = importOp.getType();
-    auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
+    auto sizeConst = rewriter.createOrFold<mlir::arith::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
-            IREE::HAL::getRoundedElementByteWidth(op.value().getType())));
+            IREE::Util::getRoundedElementByteWidth(op.value().getType())));
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, SymbolRefAttr::get(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.value(), adaptor.target_buffer(),
@@ -89,10 +88,14 @@ void populateHALBufferToVMPatterns(MLIRContext *context,
                                    SymbolTable &importSymbols,
                                    TypeConverter &typeConverter,
                                    OwningRewritePatternList &patterns) {
+  patterns.insert<VMImportOpConversion<IREE::HAL::BufferAssertOp>>(
+      context, importSymbols, typeConverter, "hal.buffer.assert");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferAllocatorOp>>(
       context, importSymbols, typeConverter, "hal.buffer.allocator");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferSubspanOp>>(
       context, importSymbols, typeConverter, "hal.buffer.subspan");
+  patterns.insert<VMImportOpConversion<IREE::HAL::BufferLengthOp>>(
+      context, importSymbols, typeConverter, "hal.buffer.length");
   patterns.insert<BufferLoadOpConversion>(context, importSymbols, typeConverter,
                                           "hal.buffer.load");
   patterns.insert<BufferStoreOpConversion>(context, importSymbols,

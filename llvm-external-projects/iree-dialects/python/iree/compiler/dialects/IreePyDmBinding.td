@@ -8,6 +8,6 @@
 #define PYTHON_BINDINGS_IREE_PYDM_OPS
 
 include "mlir/Bindings/Python/Attributes.td"
-include "iree-dialects/Dialect/IREEPyDM/IR/Ops.td"
+include "iree-dialects/Dialect/PyDM/IR/PyDMOps.td"
 
 #endif // PYTHON_BINDINGS_IREE_PYDM_OPS

@@ -31,7 +31,7 @@ namespace HAL {
 //===----------------------------------------------------------------------===//
 
 template <typename AttrType>
-static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
+static LogicalResult parseEnumAttr(AsmParser &parser, StringRef attrName,
                                    AttrType &attr) {
   Attribute genericAttr;
   auto loc = parser.getCurrentLocation();
@@ -56,7 +56,7 @@ static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
 }
 
 template <typename AttrType>
-static LogicalResult parseOptionalEnumAttr(DialectAsmParser &parser,
+static LogicalResult parseOptionalEnumAttr(AsmParser &parser,
                                            StringRef attrName, AttrType &attr) {
   if (succeeded(parser.parseOptionalQuestion())) {
     // Special case `?` to indicate any/none/undefined/etc.
@@ -66,8 +66,7 @@ static LogicalResult parseOptionalEnumAttr(DialectAsmParser &parser,
   return parseEnumAttr<AttrType>(parser, attrName, attr);
 }
 
-static LogicalResult parseMemoryType(DialectAsmParser &parser,
-                                     Attribute &attr) {
+static LogicalResult parseMemoryType(AsmParser &parser, Attribute &attr) {
   if (succeeded(parser.parseOptionalQuestion())) {
     attr = parser.getBuilder().getI32IntegerAttr(0);
     return success();
@@ -124,7 +123,7 @@ static LogicalResult parseMemoryType(DialectAsmParser &parser,
   return success();
 }
 
-static void printMemoryType(DialectAsmPrinter &printer,
+static void printMemoryType(AsmPrinter &printer,
                             MemoryTypeBitfield memoryType) {
   if (memoryType == MemoryTypeBitfield::None) {
     printer << '?';
@@ -148,75 +147,6 @@ static void printMemoryType(DialectAsmPrinter &printer,
     printer << 'D';
   } else if (allEnumBitsSet(memoryType, MemoryTypeBitfield::DeviceVisible)) {
     printer << 'd';
-  }
-}
-
-static LogicalResult parseMemoryAccess(DialectAsmParser &parser,
-                                       Attribute &attr) {
-  if (succeeded(parser.parseOptionalQuestion())) {
-    attr = parser.getBuilder().getI32IntegerAttr(0);
-    return success();
-  }
-
-  std::string fullString;
-  if (succeeded(parser.parseOptionalString(&fullString))) {
-    auto symbolized = symbolizeEnum<MemoryAccessBitfield>(fullString);
-    if (!symbolized.hasValue()) {
-      return parser.emitError(parser.getCurrentLocation())
-             << "failed to parse memory access enum value";
-    }
-    attr = parser.getBuilder().getI32IntegerAttr(
-        static_cast<int32_t>(symbolized.getValue()));
-    return success();
-  }
-
-  StringRef shortString;
-  if (failed(parser.parseKeyword(&shortString))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "failed to find memory access short string";
-  }
-  MemoryAccessBitfield memoryAccess = MemoryAccessBitfield::None;
-  for (char c : shortString) {
-    switch (c) {
-      case 'R':
-        memoryAccess = memoryAccess | MemoryAccessBitfield::Read;
-        break;
-      case 'W':
-        memoryAccess = memoryAccess | MemoryAccessBitfield::Write;
-        break;
-      case 'D':
-        memoryAccess = memoryAccess | MemoryAccessBitfield::Discard;
-        break;
-      case 'A':
-        memoryAccess = memoryAccess | MemoryAccessBitfield::MayAlias;
-        break;
-      default:
-        return parser.emitError(parser.getCurrentLocation())
-               << "unknown memory access short-form char: " << c;
-    }
-  }
-  attr =
-      parser.getBuilder().getI32IntegerAttr(static_cast<int32_t>(memoryAccess));
-  return success();
-}
-
-static void printMemoryAccess(DialectAsmPrinter &printer,
-                              MemoryAccessBitfield memoryAccess) {
-  if (memoryAccess == MemoryAccessBitfield::None) {
-    printer << '?';
-    return;
-  }
-  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Read)) {
-    printer << 'R';
-  }
-  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Discard)) {
-    printer << 'D';
-  }
-  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::Write)) {
-    printer << 'W';
-  }
-  if (allEnumBitsSet(memoryAccess, MemoryAccessBitfield::MayAlias)) {
-    printer << 'A';
   }
 }
 
@@ -268,8 +198,7 @@ static LogicalResult parseBufferUsage(DialectAsmParser &parser,
   return success();
 }
 
-static void printBufferUsage(DialectAsmPrinter &printer,
-                             BufferUsageBitfield usage) {
+static void printBufferUsage(AsmPrinter &printer, BufferUsageBitfield usage) {
   if (usage == BufferUsageBitfield::None) {
     printer << '?';
     return;
@@ -326,85 +255,11 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
   return llvm::None;
 }
 
-IntegerAttr getElementTypeAttr(Type type) {
-  auto elementType = getElementTypeValue(type);
-  if (!elementType) return {};
-  return IntegerAttr::get(IntegerType::get(type.getContext(), 32),
-                          elementType.getValue());
-}
-
-size_t getElementBitCount(IntegerAttr elementType) {
-  return static_cast<size_t>((elementType.getValue().getZExtValue()) & 0xFF);
-}
-
-Value getElementBitCount(Location loc, Value elementType, OpBuilder &builder) {
-  return builder.createOrFold<AndOp>(
-      loc,
-      builder.createOrFold<IndexCastOp>(loc, builder.getIndexType(),
-                                        elementType),
-      builder.createOrFold<ConstantIndexOp>(loc, 0xFF));
-}
-
-size_t getElementByteCount(IntegerAttr elementType) {
-  return (getElementBitCount(elementType) + 8 - 1) / 8;
-}
-
-Value getElementByteCount(Location loc, Value elementType, OpBuilder &builder) {
-  auto c1 = builder.createOrFold<ConstantIndexOp>(loc, 1);
-  auto c8 = builder.createOrFold<ConstantIndexOp>(loc, 8);
-  auto bitCount = getElementBitCount(loc, elementType, builder);
-  return builder.createOrFold<UnsignedDivIOp>(
-      loc,
-      builder.createOrFold<SubIOp>(
-          loc, builder.createOrFold<AddIOp>(loc, bitCount, c8), c1),
-      c8);
-}
-
 llvm::Optional<int32_t> getEncodingTypeValue(Attribute attr) {
   // TODO(#6762): encoding attribute handling/mapping to enums.
   assert(!attr && "encoding types other than default not yet supported");
   // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
   return 1;
-}
-
-IntegerAttr getEncodingTypeAttr(Attribute attr, MLIRContext *context) {
-  auto encodingType = getEncodingTypeValue(attr);
-  if (!encodingType) return {};
-  return IntegerAttr::get(IntegerType::get(context, 32),
-                          encodingType.getValue());
-}
-
-//===----------------------------------------------------------------------===//
-// Size-aware type utils
-//===----------------------------------------------------------------------===//
-
-// Returns the SSA value containing the size of the given |value|.
-static Value lookupValueSize(Value value) {
-  assert(value.getType().isa<IREE::Util::SizeAwareTypeInterface>());
-
-  auto definingOp = value.getDefiningOp();
-  if (!definingOp) {
-    return {};  // Not yet implemented.
-  }
-
-  // Skip do-not-optimize ops.
-  if (auto dnoOp = dyn_cast<IREE::Util::DoNotOptimizeOp>(definingOp)) {
-    return lookupValueSize(dnoOp.getOperand(0));
-  }
-
-  // Query size from the size-aware op that defined the value, as it knows how
-  // to get/build the right value.
-  unsigned resultIndex = -1;
-  for (unsigned i = 0; i < definingOp->getNumResults(); ++i) {
-    if (definingOp->getResult(i) == value) {
-      resultIndex = i;
-      break;
-    }
-  }
-  assert(resultIndex != -1 && "result not in results");
-  auto sizeAwareOp = dyn_cast<IREE::Util::SizeAwareOpInterface>(definingOp);
-  if (!sizeAwareOp) return {};
-  return sizeAwareOp.getResultSize(resultIndex);
 }
 
 //===----------------------------------------------------------------------===//
@@ -462,23 +317,23 @@ BufferConstraintsAdaptor::BufferConstraintsAdaptor(Location loc,
 }
 
 Value BufferConstraintsAdaptor::getMaxAllocationSize(OpBuilder &builder) {
-  return builder.createOrFold<mlir::ConstantOp>(
+  return builder.createOrFold<mlir::arith::ConstantOp>(
       loc_, bufferConstraints_.max_allocation_sizeAttr());
 }
 
 Value BufferConstraintsAdaptor::getMinBufferOffsetAlignment(
     OpBuilder &builder) {
-  return builder.createOrFold<mlir::ConstantOp>(
+  return builder.createOrFold<mlir::arith::ConstantOp>(
       loc_, bufferConstraints_.min_buffer_offset_alignmentAttr());
 }
 
 Value BufferConstraintsAdaptor::getMaxBufferRange(OpBuilder &builder) {
-  return builder.createOrFold<mlir::ConstantOp>(
+  return builder.createOrFold<mlir::arith::ConstantOp>(
       loc_, bufferConstraints_.max_buffer_rangeAttr());
 }
 
 Value BufferConstraintsAdaptor::getMinBufferRangeAlignment(OpBuilder &builder) {
-  return builder.createOrFold<mlir::ConstantOp>(
+  return builder.createOrFold<mlir::arith::ConstantOp>(
       loc_, bufferConstraints_.min_buffer_range_alignmentAttr());
 }
 
@@ -487,7 +342,7 @@ Value BufferConstraintsAdaptor::getMinBufferRangeAlignment(OpBuilder &builder) {
 //===----------------------------------------------------------------------===//
 
 // static
-Attribute BufferConstraintsAttr::parse(DialectAsmParser &p) {
+Attribute BufferConstraintsAttr::parse(AsmParser &p) {
   auto b = p.getBuilder();
   if (failed(p.parseLess())) return {};
 
@@ -518,9 +373,9 @@ Attribute BufferConstraintsAttr::parse(DialectAsmParser &p) {
       minBufferRangeAlignmentAttr);
 }
 
-void BufferConstraintsAttr::print(DialectAsmPrinter &p) const {
+void BufferConstraintsAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   os << "max_allocation_size = " << max_allocation_size() << ", ";
   os << "min_buffer_offset_alignment = " << min_buffer_offset_alignment()
      << ", ";
@@ -530,27 +385,24 @@ void BufferConstraintsAttr::print(DialectAsmPrinter &p) const {
 }
 
 // static
-Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
+Attribute DescriptorSetLayoutBindingAttr::parse(AsmParser &p) {
   auto b = p.getBuilder();
   IntegerAttr bindingAttr;
   DescriptorTypeAttr typeAttr;
-  MemoryAccessBitfieldAttr accessAttr;
   if (failed(p.parseLess()) ||
       failed(p.parseAttribute(bindingAttr, b.getIntegerType(32))) ||
       failed(p.parseComma()) || failed(parseEnumAttr(p, "type", typeAttr)) ||
-      failed(p.parseComma()) || failed(parseMemoryAccess(p, accessAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }
-  return get(bindingAttr, typeAttr, accessAttr);
+  return get(bindingAttr, typeAttr);
 }
 
-void DescriptorSetLayoutBindingAttr::print(DialectAsmPrinter &p) const {
+void DescriptorSetLayoutBindingAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getKindName() << "<";
+  os << "<";
   os << binding() << ", ";
-  os << "\"" << stringifyDescriptorType(type()) << "\", ";
-  printMemoryAccess(p, access());
+  os << "\"" << stringifyDescriptorType(type()) << "\"";
   os << ">";
 }
 
@@ -567,7 +419,7 @@ DeviceTargetAttr DeviceTargetAttr::get(MLIRContext *context,
 }
 
 // static
-Attribute DeviceTargetAttr::parse(DialectAsmParser &p, Type type) {
+Attribute DeviceTargetAttr::parse(AsmParser &p, Type type) {
   StringAttr deviceIDAttr;
   DictionaryAttr configAttr;
   // `<"device-id"`
@@ -586,9 +438,9 @@ Attribute DeviceTargetAttr::parse(DialectAsmParser &p, Type type) {
   return get(p.getContext(), deviceIDAttr, configAttr);
 }
 
-void DeviceTargetAttr::print(DialectAsmPrinter &p) const {
+void DeviceTargetAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getDeviceID());
   auto configAttr = getConfiguration();
   if (configAttr && !configAttr.empty()) {
@@ -709,7 +561,7 @@ ExecutableTargetAttr ExecutableTargetAttr::get(MLIRContext *context,
 }
 
 // static
-Attribute ExecutableTargetAttr::parse(DialectAsmParser &p, Type type) {
+Attribute ExecutableTargetAttr::parse(AsmParser &p, Type type) {
   StringAttr backendAttr;
   StringAttr formatAttr;
   DictionaryAttr configurationAttr;
@@ -730,9 +582,9 @@ Attribute ExecutableTargetAttr::parse(DialectAsmParser &p, Type type) {
   return get(p.getContext(), backendAttr, formatAttr, configurationAttr);
 }
 
-void ExecutableTargetAttr::print(DialectAsmPrinter &p) const {
+void ExecutableTargetAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getBackend());
   os << ", ";
   p.printAttribute(getFormat());
@@ -761,10 +613,11 @@ Attribute ExecutableTargetAttr::getMatchExpression() {
 Value MatchAlwaysAttr::buildConditionExpression(Location loc, Value value,
                                                 OpBuilder builder) const {
   // #hal.match.always -> true
-  return builder.createOrFold<ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
+  return builder.createOrFold<arith::ConstantIntOp>(loc, /*value=*/1,
+                                                    /*width=*/1);
 }
 
-static ArrayAttr parseMultiMatchAttrArray(DialectAsmParser &p) {
+static ArrayAttr parseMultiMatchAttrArray(AsmParser &p) {
   auto b = p.getBuilder();
   SmallVector<Attribute, 4> conditionAttrs;
   if (failed(p.parseLess()) || failed(p.parseLSquare())) {
@@ -783,8 +636,7 @@ static ArrayAttr parseMultiMatchAttrArray(DialectAsmParser &p) {
   return b.getArrayAttr(conditionAttrs);
 }
 
-static void printMultiMatchAttrList(ArrayAttr conditionAttrs,
-                                    DialectAsmPrinter &p) {
+static void printMultiMatchAttrList(ArrayAttr conditionAttrs, AsmPrinter &p) {
   auto &os = p.getStream();
   os << "<[";
   interleaveComma(conditionAttrs, os,
@@ -793,12 +645,11 @@ static void printMultiMatchAttrList(ArrayAttr conditionAttrs,
 }
 
 // static
-Attribute MatchAnyAttr::parse(DialectAsmParser &p, Type type) {
+Attribute MatchAnyAttr::parse(AsmParser &p, Type type) {
   return get(p.getContext(), parseMultiMatchAttrArray(p));
 }
 
-void MatchAnyAttr::print(DialectAsmPrinter &p) const {
-  p << getMnemonic();
+void MatchAnyAttr::print(AsmPrinter &p) const {
   printMultiMatchAttrList(getConditions(), p);
 }
 
@@ -807,7 +658,7 @@ Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
   // #hal.match.any<[a, b, c]> -> or(or(a, b), c)
   if (getConditions().empty()) {
     // Empty returns false (no conditions match).
-    return builder.create<ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
+    return builder.create<arith::ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
   }
   auto conditionValues =
       llvm::map_range(getConditions(), [&](MatchAttrInterface attr) {
@@ -815,20 +666,19 @@ Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
       });
   Value resultValue;
   for (auto conditionValue : conditionValues) {
-    resultValue = resultValue ? builder.createOrFold<OrOp>(loc, resultValue,
-                                                           conditionValue)
+    resultValue = resultValue ? builder.createOrFold<arith::OrIOp>(
+                                    loc, resultValue, conditionValue)
                               : conditionValue;
   }
   return resultValue;
 }
 
 // static
-Attribute MatchAllAttr::parse(DialectAsmParser &p, Type type) {
+Attribute MatchAllAttr::parse(AsmParser &p, Type type) {
   return get(p.getContext(), parseMultiMatchAttrArray(p));
 }
 
-void MatchAllAttr::print(DialectAsmPrinter &p) const {
-  p << getMnemonic();
+void MatchAllAttr::print(AsmPrinter &p) const {
   printMultiMatchAttrList(getConditions(), p);
 }
 
@@ -837,7 +687,7 @@ Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
   // #hal.match.all<[a, b, c]> -> and(and(a, b), c)
   if (getConditions().empty()) {
     // Empty returns true (all 0 conditions match).
-    return builder.create<ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
+    return builder.create<arith::ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
   }
   auto conditionValues =
       llvm::map_range(getConditions(), [&](MatchAttrInterface attr) {
@@ -845,15 +695,15 @@ Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
       });
   Value resultValue;
   for (auto conditionValue : conditionValues) {
-    resultValue = resultValue ? builder.createOrFold<AndOp>(loc, resultValue,
-                                                            conditionValue)
+    resultValue = resultValue ? builder.createOrFold<arith::AndIOp>(
+                                    loc, resultValue, conditionValue)
                               : conditionValue;
   }
   return resultValue;
 }
 
 // static
-Attribute DeviceMatchIDAttr::parse(DialectAsmParser &p, Type type) {
+Attribute DeviceMatchIDAttr::parse(AsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
@@ -862,9 +712,9 @@ Attribute DeviceMatchIDAttr::parse(DialectAsmParser &p, Type type) {
   return get(p.getContext(), patternAttr);
 }
 
-void DeviceMatchIDAttr::print(DialectAsmPrinter &p) const {
+void DeviceMatchIDAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getPattern());
   os << ">";
 }
@@ -880,7 +730,7 @@ Value DeviceMatchIDAttr::buildConditionExpression(Location loc, Value device,
 }
 
 // static
-Attribute DeviceMatchFeatureAttr::parse(DialectAsmParser &p, Type type) {
+Attribute DeviceMatchFeatureAttr::parse(AsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
@@ -889,9 +739,9 @@ Attribute DeviceMatchFeatureAttr::parse(DialectAsmParser &p, Type type) {
   return get(p.getContext(), patternAttr);
 }
 
-void DeviceMatchFeatureAttr::print(DialectAsmPrinter &p) const {
+void DeviceMatchFeatureAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getPattern());
   os << ">";
 }
@@ -908,7 +758,7 @@ Value DeviceMatchFeatureAttr::buildConditionExpression(
 }
 
 // static
-Attribute DeviceMatchArchitectureAttr::parse(DialectAsmParser &p, Type type) {
+Attribute DeviceMatchArchitectureAttr::parse(AsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
@@ -917,9 +767,9 @@ Attribute DeviceMatchArchitectureAttr::parse(DialectAsmParser &p, Type type) {
   return get(p.getContext(), patternAttr);
 }
 
-void DeviceMatchArchitectureAttr::print(DialectAsmPrinter &p) const {
+void DeviceMatchArchitectureAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getPattern());
   os << ">";
 }
@@ -936,8 +786,7 @@ Value DeviceMatchArchitectureAttr::buildConditionExpression(
 }
 
 // static
-Attribute DeviceMatchExecutableFormatAttr::parse(DialectAsmParser &p,
-                                                 Type type) {
+Attribute DeviceMatchExecutableFormatAttr::parse(AsmParser &p, Type type) {
   StringAttr patternAttr;
   if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
       failed(p.parseGreater())) {
@@ -946,9 +795,9 @@ Attribute DeviceMatchExecutableFormatAttr::parse(DialectAsmParser &p,
   return get(p.getContext(), patternAttr);
 }
 
-void DeviceMatchExecutableFormatAttr::print(DialectAsmPrinter &p) const {
+void DeviceMatchExecutableFormatAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "<";
+  os << "<";
   p.printAttribute(getPattern());
   os << ">";
 }
@@ -965,102 +814,6 @@ Value DeviceMatchExecutableFormatAttr::buildConditionExpression(
 }
 
 //===----------------------------------------------------------------------===//
-// Experimental interface plumbing
-//===----------------------------------------------------------------------===//
-
-// static
-Attribute ExConstantStorageAttr::parse(DialectAsmParser &p) {
-  StringAttr bindingAttr;
-  StringAttr storageAttr;
-  IntegerAttr offsetAttr;
-  IntegerAttr lengthAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(storageAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(offsetAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(lengthAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(bindingAttr, storageAttr, offsetAttr, lengthAttr);
-}
-
-void ExConstantStorageAttr::print(DialectAsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << getKindName() << "<";
-  p.printAttribute(bindingAttr());
-  os << ", ";
-  p.printAttribute(storageAttr());
-  os << ", ";
-  p.printAttribute(offsetAttr());
-  os << ", ";
-  p.printAttribute(lengthAttr());
-  os << ">";
-}
-
-// static
-Attribute ExPushConstantAttr::parse(DialectAsmParser &p) {
-  IntegerAttr ordinalAttr;
-  IntegerAttr operandAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(ordinalAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(operandAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(ordinalAttr, operandAttr);
-}
-
-void ExPushConstantAttr::print(DialectAsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << getKindName() << "<";
-  p.printAttribute(ordinalAttr());
-  os << ", ";
-  p.printAttribute(operandAttr());
-  os << ">";
-}
-
-// static
-Attribute ExOperandBufferAttr::parse(DialectAsmParser &p) {
-  StringAttr bindingAttr;
-  IntegerAttr operandAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(operandAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(bindingAttr, operandAttr);
-}
-
-void ExOperandBufferAttr::print(DialectAsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << getKindName() << "<";
-  p.printAttribute(bindingAttr());
-  os << ", ";
-  p.printAttribute(operandAttr());
-  os << ">";
-}
-
-// static
-Attribute ExResultBufferAttr::parse(DialectAsmParser &p) {
-  StringAttr bindingAttr;
-  IntegerAttr resultAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(bindingAttr)) ||
-      failed(p.parseComma()) || failed(p.parseAttribute(resultAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(bindingAttr, resultAttr);
-}
-
-void ExResultBufferAttr::print(DialectAsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << getKindName() << "<";
-  p.printAttribute(bindingAttr());
-  os << ", ";
-  p.printAttribute(resultAttr());
-  os << ">";
-}
-
-//===----------------------------------------------------------------------===//
 // Dialect registration
 //===----------------------------------------------------------------------===//
 
@@ -1069,10 +822,7 @@ void ExResultBufferAttr::print(DialectAsmPrinter &p) const {
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
-  addAttributes<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
-                // Experimental:
-                ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
-                ExResultBufferAttr>();
+  addAttributes<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr>();
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
@@ -1102,14 +852,6 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
     return BufferConstraintsAttr::parse(parser);
   } else if (mnemonic == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
-  } else if (mnemonic == ExConstantStorageAttr::getKindName()) {
-    return ExConstantStorageAttr::parse(parser);
-  } else if (mnemonic == ExPushConstantAttr::getKindName()) {
-    return ExPushConstantAttr::parse(parser);
-  } else if (mnemonic == ExOperandBufferAttr::getKindName()) {
-    return ExOperandBufferAttr::parse(parser);
-  } else if (mnemonic == ExResultBufferAttr::getKindName()) {
-    return ExResultBufferAttr::parse(parser);
   }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
@@ -1118,10 +860,11 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr,
-            // Experimental:
-            ExConstantStorageAttr, ExPushConstantAttr, ExOperandBufferAttr,
-            ExResultBufferAttr>([&](auto typedAttr) { typedAttr.print(p); })
+      .Case<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr>(
+          [&](auto typedAttr) {
+            p << typedAttr.getKindName();
+            typedAttr.print(p);
+          })
       .Default([&](Attribute) {
         if (failed(generatedAttributePrinter(attr, p))) {
           llvm_unreachable("unhandled HAL attribute kind");

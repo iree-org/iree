@@ -53,6 +53,8 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRComplex
@@ -62,6 +64,7 @@ iree_cc_library(
     MLIRMath
     MLIRMemRef
     MLIRPass
+    MLIRReconcileUnrealizedCasts
     MLIRSCFToStandard
     MLIRShape
     MLIRShapeOpsTransforms
@@ -72,8 +75,6 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::InputConversion::Common
     tensorflow::mlir_hlo

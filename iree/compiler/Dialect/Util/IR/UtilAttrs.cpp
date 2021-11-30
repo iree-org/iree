@@ -279,7 +279,7 @@ static LogicalResult serializeGenericElementData(
 // Buffer attributes
 //===----------------------------------------------------------------------===//
 
-Attribute ByteRangeAttr::parse(DialectAsmParser &p, Type type) {
+Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess())) return {};
 
   // TODO(benvanik): support the range syntax; the dialect asm parser fights
@@ -329,9 +329,8 @@ Attribute ByteRangeAttr::parse(DialectAsmParser &p, Type type) {
   return get(p.getContext(), offset, length);
 }
 
-void ByteRangeAttr::print(DialectAsmPrinter &p) const {
+void ByteRangeAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic();
   os << "<";
   os << getOffset();
   os << ", ";
@@ -376,7 +375,7 @@ LogicalResult CompositeAttr::verify(
   return success();
 }
 
-Attribute CompositeAttr::parse(DialectAsmParser &parser, Type type) {
+Attribute CompositeAttr::parse(AsmParser &parser, Type type) {
   SmallVector<int64_t> dims;
   if (failed(parser.parseLess()) ||
       failed(parser.parseDimensionList(dims, /*allowDynamic=*/false)) ||
@@ -419,9 +418,8 @@ Attribute CompositeAttr::parse(DialectAsmParser &parser, Type type) {
              ArrayAttr::get(parser.getContext(), valueAttrs));
 }
 
-void CompositeAttr::print(DialectAsmPrinter &p) const {
+void CompositeAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic();
   os << "<" << getTotalLength() << "xi8, [";
   if (getTotalLength() > 0) {
     os << "\n";
@@ -496,7 +494,7 @@ struct SerializableDenseElementsAttrModel
     auto elementsAttr = baseAttr.cast<DenseElementsAttr>();
     if (elementsAttr.isSplat()) {
       // Fast-path for splat (no need to convert the value a bunch).
-      return serializeSplatValue(elementsAttr.getSplatValue(),
+      return serializeSplatValue(elementsAttr.getSplatValue<Attribute>(),
                                  elementsAttr.getNumElements(), endian, os);
     }
 

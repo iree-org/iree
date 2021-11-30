@@ -93,7 +93,7 @@ class ImportContext:
     del self._ip_stack[-1]
 
   @property
-  def ip(self):
+  def ip(self) -> ir.InsertionPoint:
     assert self._ip_stack, "InsertionPoint requested but stack is empty"
     return self._ip_stack[-1]
 

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -18,6 +17,8 @@ void populateHALBufferViewToVMPatterns(MLIRContext *context,
                                        OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewCreateOp>>(
       context, importSymbols, typeConverter, "hal.buffer_view.create");
+  patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewAssertOp>>(
+      context, importSymbols, typeConverter, "hal.buffer_view.assert");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewBufferOp>>(
       context, importSymbols, typeConverter, "hal.buffer_view.buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewByteLengthOp>>(

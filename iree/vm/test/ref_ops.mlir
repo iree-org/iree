@@ -11,7 +11,12 @@ vm.module @ref_ops {
     vm.return
   }
 
-  vm.export @test_ref_eq
+  // TODO(simon-camp): In the C target we run the DropCompilerHintsPass after
+  // ordinal allocation and vm to EmitC conversion to prevent constant folding
+  // of the tests during the lattter. This means we would need to add a pattern
+  // that inserts calls to `iree_vm_ref_retain` for operand/result pairs of the
+  // do_not_optimize op.
+  vm.export @test_ref_eq attributes {emitc.exclude}
   vm.func @test_ref_eq() {
     %ref_1 = vm.const.ref.rodata @buffer_i8 : !vm.buffer
     %ref_1_dno = util.do_not_optimize(%ref_1) : !vm.buffer

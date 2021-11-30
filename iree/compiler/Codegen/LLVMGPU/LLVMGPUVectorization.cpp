@@ -17,6 +17,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
+#define DEBUG_TYPE "iree-llvmgpu-vectorization"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -31,6 +33,8 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), patterns.getContext())));
+  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+  vector::populateVectorReductionToContractPatterns(patterns);
 }
 
 static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
@@ -98,6 +102,11 @@ struct LLVMGPUVectorizationPass
       populateVectorUnrollPatterns(vectorUnrollPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(vectorUnrollPatterns));
+      DEBUG_WITH_TYPE(DEBUG_TYPE, {
+        llvm::dbgs() << "\n--- After Step 1: Vectorization ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
     {
       // Step 2. Lower transfer op to canonical form.
@@ -108,23 +117,31 @@ struct LLVMGPUVectorizationPass
           lowerTransferOpPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(lowerTransferOpPatterns));
+      DEBUG_WITH_TYPE(DEBUG_TYPE, {
+        llvm::dbgs()
+            << "\n--- After Step 2: Lower transfer op to canonical form. ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
     {
-      // Step 2. Unroll the vetors to native size and canonicalize.
-      RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(vectorUnrollPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
-
+      // Step 3. Canonicalize.
       RewritePatternSet canonicalizationPatterns(funcOp.getContext());
+      vector::ExtractStridedSliceOp::getCanonicalizationPatterns(
+          canonicalizationPatterns, canonicalizationPatterns.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
           canonicalizationPatterns);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(canonicalizationPatterns));
+      DEBUG_WITH_TYPE(DEBUG_TYPE, {
+        llvm::dbgs() << "\n--- After Step 3: Canonicalize. ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
     {
-      // Step 3. Lower contract op to outer product.
+      // Step 4. Lower contract op to outer product.
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
@@ -134,9 +151,16 @@ struct LLVMGPUVectorizationPass
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMultiReductionLoweringPatterns(
-          contractLoweringPatterns);
+          contractLoweringPatterns,
+          vector::VectorMultiReductionLowering::InnerParallel);
       (void)applyPatternsAndFoldGreedily(funcOp,
                                          std::move(contractLoweringPatterns));
+      DEBUG_WITH_TYPE(DEBUG_TYPE, {
+        llvm::dbgs()
+            << "\n--- After Step 4: Lower contract op to outer product. ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
   }
 };

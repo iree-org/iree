@@ -25,20 +25,24 @@ iree_cc_library(
     "NVIDIAConfig.cpp"
     "Passes.cpp"
     "SPIRVCopyToWorkgroupMemory.cpp"
-    "SPIRVDistributeToGlobalID.cpp"
-    "SPIRVFoldGPUProcessorIDUses.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
-    "SPIRVRemoveOneTripTiledLoops.cpp"
     "SPIRVTileAndDistribute.cpp"
-    "SPIRVVectorToCooperativeMatrix.cpp"
+    "SPIRVTileAndVectorizeToCooperativeOps.cpp"
+    "SPIRVVectorToCooperativeOps.cpp"
     "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
   DEPS
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
     MLIRAnalysis
+    MLIRArithmetic
+    MLIRArithmeticToSPIRV
+    MLIRArithmeticTransforms
+    MLIRBufferization
     MLIRGPUOps
     MLIRGPUToSPIRV
     MLIRGPUTransforms
@@ -68,16 +72,13 @@ iree_cc_library(
     MLIRVectorInterfaces
     MLIRVectorToSPIRV
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::LinalgExt::Transforms
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Util::IR
     tensorflow::mlir_hlo
   PUBLIC

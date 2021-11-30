@@ -31,10 +31,10 @@ module @do_not_optimize_module {
 // CHECK: "exported_functions":
 // CHECK: "local_name": "add"
 func @add() -> i32 {
-  %c1 = constant 1 : i32
+  %c1 = arith.constant 1 : i32
   %unf_c1 = util.do_not_optimize(%c1) : i32
   %unf_c2 = util.unfoldable_constant 2 : i32
-  %result = addi %unf_c1, %unf_c2 : i32
+  %result = arith.addi %unf_c1, %unf_c2 : i32
   return %result : i32
 }
 }

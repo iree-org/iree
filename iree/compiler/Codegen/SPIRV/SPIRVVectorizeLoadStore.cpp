@@ -119,8 +119,8 @@ class MemRefUsageAnalysis {
  public:
   explicit MemRefUsageAnalysis(mlir::Operation *);
 
-  // Returns true if the memref should be converted to a vector of memref.
-  bool vectorizeMemRef(Value value) const {
+  // Returns true if the memref should be converted to a memref of vectors.
+  bool shouldVectorizeMemRef(Value value) const {
     return valueToVectorBitsMap.count(value);
   }
 
@@ -130,12 +130,17 @@ class MemRefUsageAnalysis {
   }
   // Returns true if the transfer operation needs to be updated during memref
   // vectorization.
-  bool transferConvert(Operation *op) const { return transferOps.count(op); }
+  bool shouldConvertTransfer(Operation *op) const {
+    return transferOps.count(op);
+  }
 
  private:
   void analyzeMemRefValue(Value value);
 
+  // The mapping from a MemRef value to the number of bits of the vector this
+  // MemRef value should be vectorized into.
   llvm::DenseMap<Value, unsigned> valueToVectorBitsMap;
+  // A list of transfer ops that should be adjusted for memref vectorization.
   llvm::DenseSet<Operation *> transferOps;
 };
 
@@ -174,30 +179,29 @@ class MemRefConversionPattern : public OpConversionPattern<OpTy> {
   const MemRefUsageAnalysis &memrefUsageAnalysis;
 };
 
-class ProcessFuncArg final : public MemRefConversionPattern<FuncOp> {
+class ProcessFunctionArgument final : public MemRefConversionPattern<FuncOp> {
  public:
-  using MemRefConversionPattern<FuncOp>::MemRefConversionPattern;
+  using MemRefConversionPattern::MemRefConversionPattern;
+
   LogicalResult matchAndRewrite(
-      FuncOp funcOp, ArrayRef<Value> operands,
+      FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override;
 };
 
 class ProcessTransferRead final
     : public MemRefConversionPattern<vector::TransferReadOp> {
  public:
-  using MemRefConversionPattern<
-      vector::TransferReadOp>::MemRefConversionPattern;
+  using MemRefConversionPattern::MemRefConversionPattern;
+
   LogicalResult matchAndRewrite(
-      vector::TransferReadOp read, ArrayRef<Value> operands,
+      vector::TransferReadOp read, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!memrefUsageAnalysis.transferConvert(read)) {
+    if (!memrefUsageAnalysis.shouldConvertTransfer(read)) {
       return rewriter.notifyMatchFailure(
           read, "cannot be vectorized per memref usage analysis");
     }
 
     Location loc = read.getLoc();
-    vector::TransferReadOp::Adaptor adaptor(operands,
-                                            read->getAttrDictionary());
 
     auto scalarMemrefType = read.source().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
@@ -213,10 +217,10 @@ class ProcessTransferRead final
       return failure();
 
     unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
-    SmallVector<Value, 4> indices(adaptor.indices().begin(),
-                                  adaptor.indices().end());
-    indices.back() = rewriter.create<SignedDivIOp>(
-        loc, indices.back(), rewriter.create<ConstantIndexOp>(loc, ratio));
+    auto indices = llvm::to_vector<4>(adaptor.indices());
+    indices.back() = rewriter.create<arith::DivSIOp>(
+        loc, indices.back(),
+        rewriter.create<arith::ConstantIndexOp>(loc, ratio));
 
     // If the transfer_read can be replaced by a load after vectorization use
     // LoadOp and cast back to the original type.
@@ -242,19 +246,17 @@ class ProcessTransferRead final
 class ProcessTransferWrite final
     : public MemRefConversionPattern<vector::TransferWriteOp> {
  public:
-  using MemRefConversionPattern<
-      vector::TransferWriteOp>::MemRefConversionPattern;
+  using MemRefConversionPattern::MemRefConversionPattern;
+
   LogicalResult matchAndRewrite(
-      vector::TransferWriteOp write, ArrayRef<Value> operands,
+      vector::TransferWriteOp write, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!memrefUsageAnalysis.transferConvert(write)) {
+    if (!memrefUsageAnalysis.shouldConvertTransfer(write)) {
       return rewriter.notifyMatchFailure(
           write, "cannot be vectorized per memref usage analysis");
     }
 
     Location loc = write.getLoc();
-    vector::TransferWriteOp::Adaptor adaptor(operands,
-                                             write->getAttrDictionary());
 
     auto scalarMemrefType = write.source().getType().dyn_cast<MemRefType>();
     auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
@@ -271,8 +273,9 @@ class ProcessTransferWrite final
 
     unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
     SmallVector<Value, 4> indices(adaptor.indices());
-    indices.back() = rewriter.create<SignedDivIOp>(
-        loc, indices.back(), rewriter.create<ConstantIndexOp>(loc, ratio));
+    indices.back() = rewriter.create<arith::DivSIOp>(
+        loc, indices.back(),
+        rewriter.create<arith::ConstantIndexOp>(loc, ratio));
 
     // If the transfer_write can be replaced by a store after vectorization cast
     // the original value and use StoreOp.
@@ -304,34 +307,38 @@ class ProcessTransferWrite final
 template <typename OpTy>
 Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
     ConversionPatternRewriter &rewriter, Value memRefValue) const {
-  unsigned vecSizeInBits =
-      memrefUsageAnalysis.getMemRefVectorSizeInBits(memRefValue);
   MemRefType type = memRefValue.getType().cast<MemRefType>();
-  unsigned elemSize = type.getElementTypeBitWidth();
-  unsigned numElements = vecSizeInBits / elemSize;
-  Type elemType = type.getElementType();
+  unsigned vectorNumBits =
+      memrefUsageAnalysis.getMemRefVectorSizeInBits(memRefValue);
+
+  Type scalarType = type.getElementType();
+  unsigned scalarNumBits = type.getElementTypeBitWidth();
+  unsigned vectorNumElements = vectorNumBits / scalarNumBits;
   // If the vector we need to generate is bigger than the the max vector size
   // allowed for loads use a larger element type.
-  if (numElements > kMaxVectorNumElements) {
-    elemType = elemType.isa<IntegerType>() ? rewriter.getI32Type().cast<Type>()
-                                           : rewriter.getF32Type().cast<Type>();
-    elemSize = elemType.getIntOrFloatBitWidth();
-    numElements = vecSizeInBits / elemSize;
+  if (vectorNumElements > kMaxVectorNumElements) {
+    scalarType = scalarType.isa<IntegerType>()
+                     ? rewriter.getI32Type().cast<Type>()
+                     : rewriter.getF32Type().cast<Type>();
+    scalarNumBits = scalarType.getIntOrFloatBitWidth();
+    vectorNumElements = vectorNumBits / scalarNumBits;
   }
-  Type vecType = VectorType::get(numElements, elemType);
-  SmallVector<int64_t, 2> newShape(type.getShape().begin(),
-                                   type.getShape().end());
-  unsigned ratio = vecSizeInBits / type.getElementTypeBitWidth();
+
+  Type vectorType = VectorType::get(vectorNumElements, scalarType);
+  auto newShape = llvm::to_vector<2>(type.getShape());
+  unsigned ratio = vectorNumBits / type.getElementTypeBitWidth();
   if (newShape.back() % ratio != 0) return {};
   newShape.back() = newShape.back() / ratio;
-  return MemRefType::get(newShape, vecType, {}, type.getMemorySpaceAsInt());
+
+  return MemRefType::get(newShape, vectorType, {}, type.getMemorySpaceAsInt());
 }
 
 class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
  public:
-  using MemRefConversionPattern<memref::AllocOp>::MemRefConversionPattern;
+  using MemRefConversionPattern::MemRefConversionPattern;
+
   LogicalResult matchAndRewrite(
-      memref::AllocOp alloc, ArrayRef<Value> operands,
+      memref::AllocOp alloc, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = getVectorizedMemRefType(rewriter, alloc.getResult());
     if (!memrefType) return failure();
@@ -344,11 +351,10 @@ class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
 class ProcessInterfaceBinding final
     : public MemRefConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
  public:
-  using MemRefConversionPattern<
-      IREE::HAL::InterfaceBindingSubspanOp>::MemRefConversionPattern;
+  using MemRefConversionPattern::MemRefConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp bindingOp, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceBindingSubspanOp bindingOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto memrefType = bindingOp.getType().dyn_cast<MemRefType>();
     if (!memrefType) return failure();
@@ -357,14 +363,29 @@ class ProcessInterfaceBinding final
     assert(memrefType.getRank() > 0 &&
            !ShapedType::isDynamic(memrefType.getShape().back()));
 
-    auto vecMemRef = getVectorizedMemRefType(rewriter, bindingOp.getResult());
+    auto vecMemRef = getVectorizedMemRefType(rewriter, bindingOp.result());
     if (!vecMemRef) {
       return rewriter.notifyMatchFailure(bindingOp,
                                          "cannot get vectorized memref type");
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         bindingOp, *vecMemRef, bindingOp.binding(), bindingOp.byte_offset(),
-        bindingOp.byte_length(), bindingOp.dynamic_dims());
+        bindingOp.byte_length(), bindingOp.dynamic_dims(),
+        bindingOp.alignmentAttr());
+    return success();
+  }
+};
+
+template <typename OpT>
+class PassThroughConversion : public OpConversionPattern<OpT> {
+ public:
+  using OpConversionPattern<OpT>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      OpT op, typename OpT::Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.updateRootInPlace(op,
+                               [&] { op->setOperands(adaptor.getOperands()); });
     return success();
   }
 };
@@ -377,6 +398,7 @@ class ProcessInterfaceBinding final
 struct ScalarizeVectorTransferRead final
     : public OpRewritePattern<vector::TransferReadOp> {
   using OpRewritePattern::OpRewritePattern;
+
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 PatternRewriter &rewriter) const override {
     VectorType vectorType = readOp.getType();
@@ -386,13 +408,13 @@ struct ScalarizeVectorTransferRead final
       return failure();
 
     Location loc = readOp.getLoc();
-    Value newVector = rewriter.create<ConstantOp>(
+    Value newVector = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      SmallVector<Value, 4> indices(readOp.indices().begin(),
-                                    readOp.indices().end());
-      indices.back() = rewriter.createOrFold<AddIOp>(
-          loc, indices.back(), rewriter.createOrFold<ConstantIndexOp>(loc, i));
+      auto indices = llvm::to_vector<4>(readOp.indices());
+      indices.back() = rewriter.createOrFold<arith::AddIOp>(
+          loc, indices.back(),
+          rewriter.createOrFold<arith::ConstantIndexOp>(loc, i));
       Value scalar = rewriter.create<memref::LoadOp>(loc, scalarType,
                                                      readOp.source(), indices);
       newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
@@ -405,6 +427,7 @@ struct ScalarizeVectorTransferRead final
 struct ScalarizeVectorTransferWrite final
     : public OpRewritePattern<vector::TransferWriteOp> {
   using OpRewritePattern::OpRewritePattern;
+
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 PatternRewriter &rewriter) const override {
     VectorType vectorType = writeOp.getVectorType();
@@ -415,10 +438,10 @@ struct ScalarizeVectorTransferWrite final
     Location loc = writeOp.getLoc();
 
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      SmallVector<Value, 4> indices(writeOp.indices().begin(),
-                                    writeOp.indices().end());
-      indices.back() = rewriter.createOrFold<AddIOp>(
-          loc, indices.back(), rewriter.createOrFold<ConstantIndexOp>(loc, i));
+      auto indices = llvm::to_vector<4>(writeOp.indices());
+      indices.back() = rewriter.createOrFold<arith::AddIOp>(
+          loc, indices.back(),
+          rewriter.createOrFold<arith::ConstantIndexOp>(loc, i));
       Value scalar =
           rewriter.create<vector::ExtractOp>(loc, writeOp.vector(), i);
       rewriter.create<memref::StoreOp>(loc, scalar, writeOp.source(), indices);
@@ -441,14 +464,13 @@ class SPIRVVectorizeLoadStorePass final
 };
 }  // namespace
 
-LogicalResult ProcessFuncArg::matchAndRewrite(
-    FuncOp funcOp, ArrayRef<Value> operands,
+LogicalResult ProcessFunctionArgument::matchAndRewrite(
+    FuncOp funcOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
   TypeConverter::SignatureConversion signatureConverter(
       funcOp.getType().getNumInputs());
-  TypeConverter typeConverter;
   for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
-    if (memrefUsageAnalysis.vectorizeMemRef(arg.value())) {
+    if (memrefUsageAnalysis.shouldVectorizeMemRef(arg.value())) {
       if (auto memrefType = getVectorizedMemRefType(rewriter, arg.value())) {
         signatureConverter.addInputs(arg.index(), *memrefType);
         continue;
@@ -457,9 +479,7 @@ LogicalResult ProcessFuncArg::matchAndRewrite(
     signatureConverter.addInputs(arg.index(), arg.value().getType());
   }
   // Creates a new function with the update signature.
-  if (failed(rewriter.convertRegionTypes(&funcOp.getBody(), typeConverter,
-                                         &signatureConverter)))
-    return failure();
+  rewriter.applySignatureConversion(&funcOp.getBody(), signatureConverter);
 
   // Creates a new function with the update signature.
   rewriter.updateRootInPlace(funcOp, [&] {
@@ -479,26 +499,29 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
 
   RewritePatternSet conversionPatterns(context);
   conversionPatterns
-      .add<ProcessFuncArg, ProcessTransferRead, ProcessTransferWrite,
+      .add<ProcessFunctionArgument, ProcessTransferRead, ProcessTransferWrite,
            ProcessAlloc, ProcessInterfaceBinding>(context,
                                                   *memrefUsageAnalysis);
+  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>>(context);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
     return llvm::all_of(op.getArguments(), [&](Value arg) {
-      return !memrefUsageAnalysis->vectorizeMemRef(arg);
+      return !memrefUsageAnalysis->shouldVectorizeMemRef(arg);
     });
   });
   target.addDynamicallyLegalOp<memref::AllocOp>([&](memref::AllocOp alloc) {
-    return !memrefUsageAnalysis->vectorizeMemRef(alloc);
+    return !memrefUsageAnalysis->shouldVectorizeMemRef(alloc);
   });
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&](IREE::HAL::InterfaceBindingSubspanOp bindingOp) {
-        return !memrefUsageAnalysis->vectorizeMemRef(bindingOp);
+        return !memrefUsageAnalysis->shouldVectorizeMemRef(bindingOp);
       });
   target.markUnknownOpDynamicallyLegal([&](Operation *op) {
     if (isa<vector::TransferWriteOp, vector::TransferReadOp>(op))
-      return !memrefUsageAnalysis->transferConvert(op);
+      return !memrefUsageAnalysis->shouldConvertTransfer(op);
+    if (auto dealloc = dyn_cast<memref::DeallocOp>(op))
+      return !memrefUsageAnalysis->shouldVectorizeMemRef(dealloc.memref());
     return true;
   });
   if (failed(applyPartialConversion(module, target,

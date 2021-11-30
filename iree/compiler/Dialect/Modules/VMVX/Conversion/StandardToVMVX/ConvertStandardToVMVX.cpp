@@ -9,9 +9,6 @@
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXOps.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXTypes.h"
-#include "iree/compiler/Dialect/Shape/IR/Builders.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -37,9 +34,9 @@ template <typename OpTy>
 struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      OpTy op, ArrayRef<Value> operands,
+      OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, operands);
+    rewriter.replaceOp(op, adaptor.getOperands());
     return success();
   }
 };
@@ -50,11 +47,12 @@ struct RemoveIdentityConversionCast final
     : public OpConversionPattern<UnrealizedConversionCastOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      UnrealizedConversionCastOp op, ArrayRef<Value> operands,
+      UnrealizedConversionCastOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (op->getNumOperands() == 1 && op->getNumResults() == 1 &&
-        operands.front().getType() == op->getResultTypes().front()) {
-      rewriter.replaceOp(op, operands);
+        adaptor.getOperands().front().getType() ==
+            op->getResultTypes().front()) {
+      rewriter.replaceOp(op, adaptor.getOperands());
       return success();
     }
 

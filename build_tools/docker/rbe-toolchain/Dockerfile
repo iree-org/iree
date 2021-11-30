@@ -18,7 +18,13 @@
 FROM ubuntu@sha256:3355b6e4ba1b12071ba5fe9742042a2f10b257c908fbdfac81912a16eb463879 AS install-swiftshader
 WORKDIR /install-swiftshader
 
-RUN apt-get update && apt-get install -y wget
+RUN apt-get update && apt-get install -y \
+  clang \
+  git \
+  ninja-build \
+  python3 \
+  zlib1g-dev \
+  wget
 
 ARG CMAKE_VERSION=3.13.5
 # Install CMake v3.13, which is ahead of apt-get's version (3.10.2).
@@ -27,14 +33,7 @@ RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/
   && "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/ \
   && rm "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh"
 
-RUN apt-get update && apt-get install -y \
-  clang \
-  git \
-  ninja-build \
-  python3 \
-  zlib1g-dev
-
-ARG SWIFTSHADER_COMMIT=755b78dc66b2362621a78b6964a9df3af94e960c
+ARG SWIFTSHADER_COMMIT=84f5eeb6dd9b225f465f93737fa76aad7de355cf
 
 RUN git clone https://github.com/google/swiftshader
 RUN cd swiftshader && git checkout "${SWIFTSHADER_COMMIT?}" && cd ..
@@ -63,7 +62,8 @@ FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:1a8ed713f40267bb51fe
 
 ARG VULKAN_SDK_VERSION=1.2.154.0
 
-COPY --from=gcr.io/iree-oss/vulkan@sha256:5812ee64806a7f3df0739ccf0930c27cabce346901488eceb1ee66c9c0a5ae96 /opt/vulkan-sdk/ /opt/vulkan-sdk/
+COPY --from=gcr.io/iree-oss/base@sha256:b8d9863c6ac913f167c6fab319d7cd883ab099312488709ee30b29976d63eb22 \
+     /opt/vulkan-sdk/ /opt/vulkan-sdk/
 
 ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
 
@@ -80,6 +80,21 @@ COPY --from=install-swiftshader /swiftshader /swiftshader
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
 
-
 ######################## LibXML2 for LLD #######################################
 RUN apt-get update && apt-get install -y libxml2-dev
+
+######################## Python and PyYaml for traces ##########################
+
+# Avoid apt-add-repository, which requires software-properties-common, which is
+# a rabbit hole of python version compatibility issues. See
+# https://mondwan.blogspot.com/2018/05/alternative-for-add-apt-repository-for.html
+RUN echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu xenial main" >> /etc/apt/sources.list \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys BA6932366A755776 \
+  && apt-get update \
+  && apt-get install -y \
+    python3.7 \
+    python3-pip \
+  && rm /usr/bin/python3 \
+  && ln -s /usr/bin/python3.7 /usr/bin/python3 \
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install PyYAML==5.4.1

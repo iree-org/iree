@@ -37,24 +37,6 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_dylib_embedded-llvm-aot_dylib",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "reverse.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-        ],
-    ),
-    compiler_flags = [
-        "-iree-llvm-link-embedded=true",
-    ],
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
-)
-
-iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
     srcs = enforce_glob(
         # keep sorted

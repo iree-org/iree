@@ -10,6 +10,7 @@
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -72,58 +73,6 @@ static InputDialectOptions getInputDialectOptionsFromFlags() {
   return options;
 }
 
-// Performs initial dialect conversion to get the canonical input lowered into
-// the IREE execution/dataflow dialect.
-//
-// This will fail if we cannot support the input yet. The hope is that any
-// error that happens after this point is either backend-specific (like
-// unsupported SPIR-V lowering) or a bug.
-static LogicalResult convertToFlowModule(ModuleOp moduleOp) {
-  PassManager passManager(moduleOp.getContext());
-  mlir::applyPassManagerCLOptions(passManager);
-  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-  passManager.addInstrumentation(std::make_unique<PassTracing>());
-  IREE::Flow::buildFlowTransformPassPipeline(passManager);
-  if (failed(passManager.run(moduleOp))) {
-    return moduleOp.emitError()
-           << "failed to run flow transformation pass pipeline";
-  }
-  return success();
-}
-
-// Runs the flow->HAL transform pipeline to lower a flow module and compile
-// executables for the specified target backends.
-static LogicalResult convertToHALModule(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions) {
-  PassManager passManager(moduleOp.getContext());
-  mlir::applyPassManagerCLOptions(passManager);
-  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-  passManager.addInstrumentation(std::make_unique<PassTracing>());
-  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
-  if (failed(passManager.run(moduleOp))) {
-    return moduleOp.emitError()
-           << "failed to run HAL transformation pass pipeline";
-  }
-  return success();
-}
-
-// Converts the lowered module to a canonical vm.module containing only vm ops.
-// This uses patterns to convert from standard ops and other dialects to their
-// vm ABI form.
-static LogicalResult convertToVMModule(ModuleOp moduleOp,
-                                       IREE::VM::TargetOptions targetOptions) {
-  PassManager passManager(moduleOp.getContext());
-  mlir::applyPassManagerCLOptions(passManager);
-  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-  passManager.addInstrumentation(std::make_unique<PassTracing>());
-  IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
-  if (failed(passManager.run(moduleOp))) {
-    return moduleOp.emitError()
-           << "failed to run VM transformation pass pipeline";
-  }
-  return success();
-}
-
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     IREE::HAL::TargetOptions executableOptions,
@@ -147,7 +96,10 @@ void buildIREEVMTransformPassPipeline(
   }
 
   buildCommonInputConversionPassPipeline(passManager);
-  IREE::Flow::buildFlowTransformPassPipeline(passManager);
+  IREE::Flow::TransformOptions flowOptions;
+  IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
+  IREE::Stream::TransformOptions streamOptions;
+  IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());

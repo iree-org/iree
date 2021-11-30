@@ -1,7 +1,7 @@
 // RUN: iree-opt %s -cse -iree-llvmcpu-tile-and-vectorize -cse -canonicalize -split-input-file | IreeFileCheck %s
 
-#config0 = {tileSizes = [[64, 64]]}
-#config1 = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 32], [4, 4, 4]]}
+#config0 = #iree_codegen.lowering.config<tile_sizes = [[64, 64]], native_vector_size = []>
+#config1 = #iree_codegen.lowering.config<tile_sizes = [[64, 64], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0) -> (64, -d0 + 383)>
 #map2 = affine_map<(d0) -> (64, -d0 + 513)>
@@ -9,10 +9,10 @@
 #map4 = affine_map<(d0) -> (-d0 + 513, 64)>
 module  {
   func @dot_383x383x513_dispatch_0() {
-    %c0 = constant 0 : index
-    %c513 = constant 513 : index
-    %c383 = constant 383 : index
-    %cst = constant 0.000000e+00 : f32
+    %c0 = arith.constant 0 : index
+    %c513 = arith.constant 513 : index
+    %c383 = arith.constant 383 : index
+    %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x383xf32>
     %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x513xf32>
     %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>
@@ -33,17 +33,17 @@ module  {
         %11 = affine.min #map3(%arg0)
         %12 = affine.min #map4(%arg1)
         %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf32>
-        %14 = linalg.fill(%cst, %13) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-        %15 = linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = #config1} ins(%8, %10 : tensor<?x383xf32>, tensor<383x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %14 = linalg.fill(%cst, %13) {lowering.config = #config0} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+        %15 = linalg.matmul {lowering.config = #config1} ins(%8, %10 : tensor<?x383xf32>, tensor<383x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:383x513xf32>
       }
     }
     return
   }
   hal.interface private @io  {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
 }
 //      CHECK: #[[MAP1:.+]] = affine_map<(d0) -> (64, -d0 + 383)>
@@ -51,12 +51,12 @@ module  {
 //      CHECK: #[[MAP5:.+]] = affine_map<(d0, d1) -> (32, -d0 + d1)>
 //      CHECK: #[[MAP6:.+]] = affine_map<(d0) -> (32, -d0 + 383)>
 //      CHECK: @dot_383x383x513_dispatch_0
-//  CHECK-DAG: %[[CST:.+]] = constant 0.000000e+00 : f32
-//  CHECK-DAG: %[[C0:.+]] = constant 0 : index
-//  CHECK-DAG: %[[C4:.+]] = constant 4 : index
-//  CHECK-DAG: %[[C383:.+]] = constant 383 : index
-//  CHECK-DAG: %[[C513:.+]] = constant 513 : index
-//  CHECK-DAG: %[[C32:.+]] = constant 32 : index
+//  CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG: %[[C383:.+]] = arith.constant 383 : index
+//  CHECK-DAG: %[[C513:.+]] = arith.constant 513 : index
+//  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 //      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x383xf32>
 //      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x513xf32>
 //      CHECK: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>

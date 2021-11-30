@@ -24,6 +24,7 @@ iree_lit_test_suite(
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
+    lld
   LABELS
     "hostonly"
     "optonly"
@@ -31,7 +32,7 @@ iree_lit_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_linalg_on_tensors_dylib-llvm-aot_dylib
+    check_dylib-llvm-aot_dylib
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
     "mobilenetv3_fake_weights.mlir"
@@ -45,7 +46,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_linalg_on_tensors_vulkan-spirv_vulkan
+    check_vulkan-spirv_vulkan
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
     "mobilenetv3_fake_weights.mlir"
@@ -59,7 +60,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_linalg_on_tensors_cuda_cuda
+    check_cuda_cuda
   SRCS
     "bert_encoder_unrolled_fake_weights.mlir"
     "mobilenetv3_fake_weights.mlir"

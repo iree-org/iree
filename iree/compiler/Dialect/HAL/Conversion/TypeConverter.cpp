@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 
 namespace mlir {
@@ -31,10 +30,10 @@ HALTypeConverter::HALTypeConverter(
   // Tensors become buffers by default.
   // Shapes and types are carried independently or folded away entirely - all
   // we need at the HAL level is a blob of bytes.
-  addConversion([](TensorType type) -> Optional<Type> {
+  addConversion([=](TensorType type) -> Optional<Type> {
     // HAL only should be concerned with numeric values.
-    if (HALTypeConverter::shouldConvertToBuffer(type)) {
-      return IREE::HAL::BufferType::get(type.getContext());
+    if (HALTypeConverter::shouldConvertToBufferView(type)) {
+      return IREE::HAL::BufferViewType::get(type.getContext());
     }
     return llvm::None;
   });

@@ -22,47 +22,65 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     Common
+  HDRS
+    "BufferizationAnalysis.h"
   SRCS
+    "BufferizationAnalysis.cpp"
     "CleanupBufferAllocViewPass.cpp"
+    "ConvertToDestinationPassingStylePass.cpp"
     "DemoteF32ToF16.cpp"
     "FlattenMemRefSubspanPass.cpp"
+    "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "IREEComprehensiveBufferizePass.cpp"
     "LinalgBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
+    "RemoveTrivialLoops.cpp"
     "SetNumWorkgroupsPass.cpp"
     "VectorizeConv.cpp"
     "VectorizeMMT4d.cpp"
   DEPS
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
+    MLIRAffineBufferizableOpInterfaceImpl
     MLIRAffineUtils
     MLIRAnalysis
+    MLIRArithBufferizableOpInterfaceImpl
+    MLIRArithmetic
+    MLIRBufferizableOpInterface
+    MLIRBufferization
+    MLIRComprehensiveBufferize
     MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR
     MLIRLinalg
+    MLIRLinalgBufferizableOpInterfaceImpl
     MLIRLinalgTransforms
     MLIRMemRef
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
+    MLIRSCFBufferizableOpInterfaceImpl
     MLIRSCFToStandard
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTensorBufferizableOpInterfaceImpl
     MLIRTransforms
     MLIRVector
+    MLIRVectorBufferizableOpInterfaceImpl
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

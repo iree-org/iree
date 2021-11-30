@@ -26,6 +26,22 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Utils
+//===----------------------------------------------------------------------===//
+
+Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes) {
+  assert(values[index].getType().isa<IREE::Util::SizeAwareTypeInterface>() &&
+         "must be a size-aware type to get dims");
+  unsigned sizeIndex = 0;
+  for (unsigned i = 0; i < index; ++i) {
+    if (values[i].getType().isa<IREE::Util::SizeAwareTypeInterface>()) {
+      ++sizeIndex;
+    }
+  }
+  return sizes[sizeIndex];
+}
+
+//===----------------------------------------------------------------------===//
 // custom<SymbolVisibility>($sym_visibility)
 //===----------------------------------------------------------------------===//
 // some.op custom<SymbolVisibility>($sym_visibility) $sym_name
@@ -104,6 +120,41 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<RangeList>($offsets, $lengths)
+//===----------------------------------------------------------------------===//
+// [%offset for %length], [%offset for %length], ...
+
+ParseResult parseRangeList(OpAsmParser &parser,
+                           SmallVectorImpl<OpAsmParser::OperandType> &offsets,
+                           SmallVectorImpl<OpAsmParser::OperandType> &lengths) {
+  do {
+    OpAsmParser::OperandType offset;
+    OpAsmParser::OperandType length;
+    if (failed(parser.parseLSquare()) || failed(parser.parseOperand(offset)) ||
+        failed(parser.parseKeyword("for")) ||
+        failed(parser.parseOperand(length)) || failed(parser.parseRSquare())) {
+      return failure();
+    }
+    offsets.push_back(offset);
+    lengths.push_back(length);
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+void printRangeList(OpAsmPrinter &p, Operation *op, OperandRange offsets,
+                    OperandRange lengths) {
+  llvm::interleaveComma(llvm::zip(offsets, lengths), p, [&](auto it) {
+    auto offset = std::get<0>(it);
+    auto length = std::get<1>(it);
+    p << "[";
+    p.printOperand(offset);
+    p << " for ";
+    p.printOperand(length);
+    p << "]";
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // custom<SizeAwareType>
 //===----------------------------------------------------------------------===//
 // type{%size}
@@ -127,7 +178,7 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
 //===----------------------------------------------------------------------===//
 // custom<SizeAwareTypeList>
 //===----------------------------------------------------------------------===//
-// (type{%size0}, type, type{%size1})
+// type{%size0}, type, type{%size1}
 
 ParseResult parseSizeAwareTypeList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types,
@@ -161,11 +212,32 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
   });
 }
 
+ParseResult parseSizeAwareTypeList(
+    OpAsmParser &parser, SmallVectorImpl<Type> &types0,
+    SmallVectorImpl<Type> &types1,
+    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
+  if (failed(parseSizeAwareTypeList(parser, types0, sizes))) return failure();
+  types1 = types0;
+  return success();
+}
+
+void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
+                            TypeRange types1, OperandRange sizes) {
+  printSizeAwareTypeList(p, op, types0, sizes);
+}
+
 //===----------------------------------------------------------------------===//
 // custom<ShapedTiedResult>
 //===----------------------------------------------------------------------===//
 // type{%dim0, %dim1}
 // %arg0 as type{%dim0}
+
+ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims) {
+  ArrayAttr tiedOperands;
+  return parseShapedTiedResult(parser, resultType, resultDims, tiedOperands);
+}
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
@@ -194,7 +266,8 @@ ParseResult parseShapedTiedResult(
   } else if (auto sizedType =
                  resultType.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
     OpAsmParser::OperandType size;
-    if (failed(parser.parseOperand(size))) {
+    if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
+        failed(parser.parseRBrace())) {
       return failure();
     }
     resultDims.push_back(size);
@@ -204,7 +277,7 @@ ParseResult parseShapedTiedResult(
 }
 
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
-                           ValueRange resultDims, ArrayAttr tiedOperands) {
+                           ValueRange resultDims) {
   auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
   auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(0);
   if (tiedOperandIndex.hasValue()) {
@@ -235,6 +308,11 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
   }
 }
 
+void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
+                           ValueRange resultDims, ArrayAttr tiedOperands) {
+  printShapedTiedResult(p, op, resultType, resultDims);
+}
+
 //===----------------------------------------------------------------------===//
 // custom<ShapedFunctionType>
 //===----------------------------------------------------------------------===//
@@ -261,7 +339,8 @@ static ParseResult parseShapedOperandList(
     } else if (auto sizedType =
                    type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
       OpAsmParser::OperandType size;
-      if (failed(parser.parseOperand(size))) {
+      if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
+          failed(parser.parseRBrace())) {
         return failure();
       }
       dims.push_back(size);
@@ -277,7 +356,8 @@ static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
                                ArrayRef<OpAsmParser::OperandType> operands) {
   int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
-    if (operands[i].name == tiedResult.name) {
+    if (operands[i].name == tiedResult.name &&
+        operands[i].number == tiedResult.number) {
       operandIndex = i;
       break;
     }
@@ -285,7 +365,7 @@ static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
   return operandIndex;
 }
 
-static ParseResult parseShapedResultList(
+ParseResult parseShapedResultList(
     OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
     TypeRange operandTypes, ArrayRef<OpAsmParser::OperandType> operandDims,
     SmallVectorImpl<Type> &resultTypes,
@@ -329,7 +409,8 @@ static ParseResult parseShapedResultList(
     } else if (auto sizedType =
                    type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
       OpAsmParser::OperandType size;
-      if (failed(parser.parseOperand(size))) {
+      if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
+          failed(parser.parseRBrace())) {
         return failure();
       }
       resultDims.push_back(size);
@@ -341,6 +422,52 @@ static ParseResult parseShapedResultList(
     tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
   }
   return success();
+}
+
+void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
+                           TypeRange operandTypes, ValueRange operandDims,
+                           TypeRange resultTypes, ValueRange resultDims,
+                           ArrayAttr tiedOperands) {
+  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
+  for (unsigned i = 0; i < resultTypes.size(); ++i) {
+    auto resultType = resultTypes[i];
+    auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
+    bool printType = true;
+    if (tiedOperandIndex.hasValue()) {
+      auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
+      p.printOperand(tiedOperand);
+      if (tiedOperand.getType() != resultType) {
+        p << " as ";
+      } else {
+        // Type elided as it matches the operand.
+        printType = false;
+      }
+    }
+    if (printType) {
+      p.printType(resultType);
+    }
+    if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        if (resultDims.empty()) {
+          p << "{<<INVALID>>}";
+          return;
+        }
+        p << "{";
+        llvm::interleaveComma(
+            resultDims.take_front(shapedType.getNumDynamicDims()), p,
+            [&](Value value) { p.printOperand(value); });
+        p << "}";
+        resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
+      }
+    } else if (auto sizedType =
+                   resultType.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+      p << "{";
+      p.printOperand(resultDims.front());
+      p << "}";
+      resultDims = resultDims.drop_front(1);
+    }
+    if (i < resultTypes.size() - 1) p << ", ";
+  }
 }
 
 ParseResult parseShapedFunctionType(
@@ -405,46 +532,8 @@ void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
   });
   p << ") -> ";
   if (resultTypes.size() != 1) p << "(";
-  auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
-  for (unsigned i = 0; i < resultTypes.size(); ++i) {
-    auto resultType = resultTypes[i];
-    auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
-    bool printType = true;
-    if (tiedOperandIndex.hasValue()) {
-      auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
-      p.printOperand(tiedOperand);
-      if (tiedOperand.getType() != resultType) {
-        p << " as ";
-      } else {
-        // Type elided as it matches the operand.
-        printType = false;
-      }
-    }
-    if (printType) {
-      p.printType(resultType);
-    }
-    if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
-      if (!shapedType.hasStaticShape()) {
-        if (resultDims.empty()) {
-          p << "{<<INVALID>>}";
-          return;
-        }
-        p << "{";
-        llvm::interleaveComma(
-            resultDims.take_front(shapedType.getNumDynamicDims()), p,
-            [&](Value value) { p.printOperand(value); });
-        p << "}";
-        resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
-      }
-    } else if (auto sizedType =
-                   resultType.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
-      p << "{";
-      p.printOperand(resultDims.front());
-      p << "}";
-      resultDims = resultDims.drop_front(1);
-    }
-    if (i < resultTypes.size() - 1) p << ", ";
-  }
+  printShapedResultList(p, op, operands, operandTypes, operandDims, resultTypes,
+                        resultDims, tiedOperands);
   if (resultTypes.size() != 1) p << ")";
 }
 
@@ -547,26 +636,6 @@ void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
   if (constOp.value().isa<SymbolRefAttr>()) p << " : " << constOp.getType();
 }
 
-namespace {
-
-struct ExpandUnfoldableConstantOp
-    : public OpRewritePattern<UnfoldableConstantOp> {
-  using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(UnfoldableConstantOp op,
-                                PatternRewriter &rewriter) const override {
-    auto stdConst = rewriter.create<ConstantOp>(op.getLoc(), op.value());
-    rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, stdConst.getResult());
-    return success();
-  }
-};
-
-}  // namespace
-
-void UnfoldableConstantOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ExpandUnfoldableConstantOp>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
@@ -621,7 +690,7 @@ Block *InitializerOp::addBlock() {
 static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
   // If one is a shaped type, then they both must be and have compatible
   // shapes.
-  if (globalType.isa<ShapedType>() || accessType.isa<ShapedType>()) {
+  if (globalType.isa<ShapedType>() && accessType.isa<ShapedType>()) {
     return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
   }
 

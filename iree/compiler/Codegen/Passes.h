@@ -9,8 +9,9 @@
 
 #include <memory>
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
@@ -19,8 +20,14 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Registers all conversion passes in this directory.
+/// Registers all conversion passes in this directory.
 void registerCodegenPasses();
+
+/// Verify that the configuration used for compilation is valid.
+LogicalResult verifyLoweringConfiguration(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 
 //------------------------------------------------------------------------------
 // Misc/common conversions
@@ -40,6 +47,11 @@ using WorkgroupMemoryAllocationFn = std::function<Value(
 void addLinalgBufferizePasses(
     OpPassManager &passManager,
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
+void addIREEComprehensiveBufferizePasses(
+    OpPassManager &passManager,
+    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+        allocationFn =
+            linalg::comprehensive_bufferize::defaultAllocationCallbacks());
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -53,6 +65,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
 /// subspan ops to the consumer load/store ops, in preparation for lowering to
 /// backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
+
+/// Creates a pass to to fold `affine.min` ops in tiled and distributed loops.
+std::unique_ptr<OperationPass<FuncOp>>
+createFoldAffineMinInDistributedLoopsPass();
 
 /// After running the upstream TensorConstantBufferize pass, remove tensor_loads
 /// introduced for use only in tensor_extract. These can be folded to use a load
@@ -73,6 +89,18 @@ std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
 /// and default memory space.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
+std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
+    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks> =
+        linalg::comprehensive_bufferize::defaultAllocationCallbacks());
+
+/// Creates a pass to remove single iteration distributed loops.
+std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
+
+/// Converts entry point function within dispatch regions to use
+/// destination-passing style, which is better suited for the upstream
+/// comprehensive bufferization pass.
+std::unique_ptr<OperationPass<FuncOp>>
+createConvertToDestinationPassingStylePass();
 
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
@@ -91,6 +119,11 @@ createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
+
+/// Populates `patterns` with patterns to fold `affine.min` ops in tiled and
+/// distributed loops.
+void populateFoldAffineMinInDistributedLoopsPatterns(
+    RewritePatternSet &patterns);
 
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on
@@ -124,6 +157,9 @@ createLLVMCPUSynchronizeSymbolVisibilityPass();
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
     bool lowerToVectors = true);
 
+/// Multi-level tiling, fusing and vectorization of linalg ops on tensors.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass();
+
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUVectorizationPass(
     bool lowerToVectors = true);
@@ -156,15 +192,18 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
-/// Populates the passes needed to lower to vector operations using linalg based
-/// progressive lowering with vectorization after bufferization.
-void addCPUVectorizationPassPipeline(OpPassManager &passManager,
-                                     bool lowerToVectors = true);
-
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
+LogicalResult verifyTensorToVectorsPassPipelineConfig(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);
+
+/// Populates the passes needed to multi level tile, fuse and vectorize lowering
+/// of linalg ops on tensors to vectors operations.
+void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
@@ -186,6 +225,9 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm);
 /// Lowering calling vectorization patterns.
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
+/// Lowering using tensorcore operations.
+void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm);
+
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level
 /// pass manager.
@@ -203,11 +245,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<FuncOp>>
-createLLVMGPUTileAndDistributeToThreads();
-
-std::unique_ptr<OperationPass<FuncOp>>
-createLLVMGPURemoveSingleIterationLoopPass();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUTileAndDistribute(
+    bool distributeToWarp = false);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -215,6 +254,10 @@ createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass();
+
+/// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
+std::unique_ptr<OperationPass<FuncOp>>
+createLLVMGPUTensorCoreVectorizationPass();
 
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();
@@ -235,14 +278,15 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
 /// distribution to threads without vectorization.
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm);
 
-/// Pass pipeline to lower IREE HAL executables that contain Linalg ops that are
-/// not tiled/distributed. Performs distribution to global invocations.
-void addSPIRVDistributeToGlobalIDPassPipeline(OpPassManager &pm);
-
 /// Pass pipeline to lower IREE HAL executables with workgroup tiled and
 /// distributed Linalg ops to SPIR-V scalar and vector code. Additionally
 /// performs distribution to threads with vectorization.
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
+
+/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
+/// distributed Linalg ops to SPIR-V cooperative matrix code. Additionally
+/// performs distribution to threads with vectorization.
+void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm);
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 ///
@@ -250,9 +294,6 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
-
-/// Pass to distribute Linalg ops with buffer semantics to global invocations.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVDistributeToGlobalIDPass();
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
@@ -263,19 +304,17 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
 
-/// Pass to remove loop generated at flow for tiled and distributed Linalg ops
-/// when the loop is known to have a single trip count.
-/// WARNING: DO NOT USE. This is a legacy pass that is to be deprecated.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVRemoveOneTripTiledLoopPass();
-
-/// Pass to tile and distribute Linalg ops with buffer semantics to subgroups
-/// and invocations.
+/// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
+
+/// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize to
+/// vector ops suitable for lowering to SPIR-V cooperative ops.
+std::unique_ptr<OperationPass<FuncOp>>
+createSPIRVTileAndVectorizeToCooperativeOpsPass();
 
 /// Pass to convert vector read/write/arithmetic operations to the corresponding
 /// cooperative matrix ops when possible.
-std::unique_ptr<OperationPass<FuncOp>>
-createSPIRVVectorToCooperativeMatrixPass();
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToCooperativeOpsPass();
 
 /// Pass to lower linalg.copy for copying data to workgroup memory.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVCopyToWorkgroupMemoryPass();
@@ -300,15 +339,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 /// size.
 /// TODO: Are both of these needed and does this one still work on HLO?
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
-
-//----------------------------------------------------------------------------//
-// SPIRV Codegen specific patterns.
-//----------------------------------------------------------------------------//
-
-/// Populates patterns to fold processor ID uses by using processor counts
-/// information where possible.
-void populateFoldGPUProcessorIDUsesPatterns(MLIRContext *context,
-                                            OwningRewritePatternList &patterns);
 
 //------------------------------------------------------------------------------
 // Test passes

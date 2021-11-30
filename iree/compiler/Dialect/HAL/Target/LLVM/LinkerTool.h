@@ -84,8 +84,9 @@ class LinkerTool {
 
   virtual ~LinkerTool() = default;
 
-  // Returns the path to the linker tool binary.
-  virtual std::string getToolPath() const;
+  // Returns the path to the system linker tool binary, or empty string if none
+  // was discovered.
+  virtual std::string getSystemToolPath() const;
 
   // Configures a module prior to compilation with any additional
   // functions/exports it may need, such as shared object initializer functions.
@@ -102,9 +103,10 @@ class LinkerTool {
 
  protected:
   // Runs the given command line on the shell, logging failures.
-  LogicalResult runLinkCommand(const std::string& commandLine);
+  LogicalResult runLinkCommand(std::string commandLine, StringRef env = "");
 
-  // Returns the path to the first tool in |toolNames| found in the environment.
+  // Returns the path to the first tool in |toolNames| found in the environment,
+  // or empty string if no tool was found.
   std::string findToolInEnvironment(
       SmallVector<std::string, 4> toolNames) const;
 

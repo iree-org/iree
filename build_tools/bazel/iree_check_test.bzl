@@ -22,6 +22,8 @@ def iree_check_test(
         driver,
         compiler_flags = [],
         runner_args = [],
+        opt_tool = "//iree/tools:iree-opt",
+        opt_flags = [],
         tags = [],
         timeout = None,
         **kwargs):
@@ -36,6 +38,10 @@ def iree_check_test(
           flags are passed automatically.
       runner_args: additional runner_args to pass to iree-check-module. The driver and input file
           are passed automatically.
+      opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
+          if opt_flags is specified.
+      opt_flags: If specified, source files are preprocessed with OPT_TOOL with
+          these flags.
       tags: additional tags to apply to the generated test. A tag "driver=DRIVER" is added
           automatically.
       timeout: timeout for the generated tests.
@@ -50,6 +56,8 @@ def iree_check_test(
             "-mlir-print-op-on-diagnostic=false",
             "-iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
+        opt_tool = opt_tool,
+        opt_flags = opt_flags,
         visibility = ["//visibility:private"],
     )
 
@@ -73,6 +81,8 @@ def iree_check_single_backend_test_suite(
         driver,
         compiler_flags = [],
         runner_args = [],
+        opt_tool = "//iree/tools:iree-opt",
+        opt_flags = [],
         tags = [],
         timeout = None,
         **kwargs):
@@ -90,6 +100,10 @@ def iree_check_single_backend_test_suite(
       runner_args: additional runner_args to pass to the underlying iree-check-module tests. The
           driver and input file are passed automatically. To use different runner_args per test,
           create a separate suite or iree_check_test.
+      opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
+          if opt_flags is specified.
+      opt_flags: If specified, source files are preprocessed with OPT_TOOL with
+          these flags.
       tags: tags to apply to the generated tests. Note that as in standard test suites, manual
           is treated specially and will also apply to the test suite itself.
       timeout: timeout for the generated tests.
@@ -105,6 +119,8 @@ def iree_check_single_backend_test_suite(
             driver = driver,
             compiler_flags = compiler_flags,
             runner_args = runner_args,
+            opt_tool = opt_tool,
+            opt_flags = opt_flags,
             tags = tags,
             timeout = timeout,
             **kwargs
@@ -128,6 +144,8 @@ def iree_check_test_suite(
         target_backends_and_drivers = ALL_TARGET_BACKENDS_AND_DRIVERS,
         compiler_flags = [],
         runner_args = [],
+        opt_tool = "//iree/tools:iree-opt",
+        opt_flags = [],
         tags = [],
         **kwargs):
     """Creates a test suite of iree-check-module tests.
@@ -143,6 +161,10 @@ def iree_check_test_suite(
       runner_args: additional runner_args to pass to the underlying iree-check-module tests. The
           driver and input file are passed automatically. To use different runner_args per test,
           create a separate suite or iree_check_test.
+      opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
+          if opt_flags is specified.
+      opt_flags: If specified, source files are preprocessed with OPT_TOOL with
+          these flags.
       tags: tags to apply to the generated tests. Note that as in standard test suites, manual
           is treated specially and will also apply to the test suite itself.
       **kwargs: any additional attributes to pass to the underlying tests and test suite.
@@ -160,6 +182,8 @@ def iree_check_test_suite(
             target_backend = backend,
             compiler_flags = compiler_flags,
             runner_args = runner_args,
+            opt_tool = opt_tool,
+            opt_flags = opt_flags,
             tags = tags,
             **kwargs
         )

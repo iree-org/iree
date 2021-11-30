@@ -39,12 +39,6 @@ iree_flatbuffer_c_library(
 )
 
 iree_flatbuffer_c_library(
-    name = "dylib_executable_def_c_fbs",
-    srcs = ["dylib_executable_def.fbs"],
-    flatcc_args = FLATCC_ARGS,
-)
-
-iree_flatbuffer_c_library(
     name = "metal_executable_def_c_fbs",
     srcs = ["metal_executable_def.fbs"],
     flatcc_args = FLATCC_ARGS,
@@ -60,7 +54,6 @@ iree_build_test(
     name = "schema_build_test",
     targets = [
         ":bytecode_module_def_c_fbs",
-        ":dylib_executable_def_c_fbs",
         ":metal_executable_def_c_fbs",
         ":spirv_executable_def_c_fbs",
     ],

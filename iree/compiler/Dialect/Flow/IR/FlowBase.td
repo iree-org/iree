@@ -9,7 +9,6 @@
 
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
-include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE execution flow dialect
@@ -86,6 +85,10 @@ def FLOW_Tensor : TypeAlias<AnyRankedTensor>;
 def FLOW_ExecutableRefAttr : AliasedSymbolRefAttr;
 def FLOW_GlobalRefAttr : AliasedSymbolRefAttr;
 def FLOW_GlobalPtr : Util_AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
+
+//===----------------------------------------------------------------------===//
+// Dispatch types
+//===----------------------------------------------------------------------===//
 
 def FLOW_TensorAccessCanReadPred : CPred<[{
   $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==

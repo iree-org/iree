@@ -81,11 +81,31 @@ struct LinalgFillToFlowTensorSplat final
       // Don't convert linalg.fill ops that were fused together with other ops.
       return failure();
     }
-
     SmallVector<Value, 4> dynamicDims =
         getDynamicDimValues(rewriter, fillOp.getLoc(), fillOp.output());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(
         fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);
+    return success();
+  }
+};
+
+struct ConvertSplatConstantOp : public OpRewritePattern<mlir::ConstantOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mlir::ConstantOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      return rewriter.notifyMatchFailure(op, "ignoring dispatch ops");
+    }
+    auto splatAttr = op.getValue().dyn_cast<SplatElementsAttr>();
+    if (!splatAttr) {
+      return rewriter.notifyMatchFailure(op, "only looking for splats");
+    }
+    auto tensorType = op.getType().cast<TensorType>();
+    auto elementValue = rewriter.createOrFold<mlir::ConstantOp>(
+        op.getLoc(), tensorType.getElementType(),
+        splatAttr.getSplatValue<Attribute>());
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
+        op, tensorType, elementValue, ValueRange{});
     return success();
   }
 };
@@ -102,7 +122,8 @@ struct ConvertLinalgTensorOpsPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
-                    linalg::LinalgDialect, mlir::StandardOpsDialect>();
+                    linalg::LinalgDialect, mlir::StandardOpsDialect,
+                    mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
@@ -115,7 +136,8 @@ struct ConvertLinalgTensorOpsPass
           LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(
           context);
     } else {
-      patterns.insert<LinalgFillToFlowTensorSplat>(context);
+      patterns.insert<LinalgFillToFlowTensorSplat, ConvertSplatConstantOp>(
+          context);
     }
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

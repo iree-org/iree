@@ -12,6 +12,7 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -32,7 +33,7 @@ class Util_PureOp<string mnemonic, list<OpTrait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def Util_NullOp : Util_PureOp<"null"> {
-  let summary = "a null type value";
+  let summary = [{returns a null type value}];
   let description = [{
     Defines an SSA value that is lowered into dialects supporting
     null/undefined/optional/etc values.
@@ -47,6 +48,31 @@ def Util_NullOp : Util_PureOp<"null"> {
   }];
 }
 
+def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
+  AllTypesMatch<["lhs", "rhs"]>,
+  Commutative,
+]> {
+  let summary = [{compares two values for equality}];
+  let description = [{
+    Compares two operands for equality. This is intended for comparing IREE
+    reference types (like !util.byte_buffer) that cannot be used with std.cmpi.
+  }];
+
+  let arguments = (ins
+    AnyType:$lhs,
+    AnyType:$rhs
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($lhs)
+  }];
+
+  let hasFolder = 1;
+}
+
 def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
   let summary = "constant host-side byte buffer";
   let description = [{
@@ -56,7 +82,8 @@ def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
   }];
 
   let arguments = (ins
-    ElementsAttr:$value
+    AnyAttr:$value,
+    OptionalAttr<I64Attr>:$alignment
   );
   let results = (outs
     ByteBufferType:$result
@@ -68,10 +95,134 @@ def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Range arithmetic
+//===----------------------------------------------------------------------===//
+
+def Util_RangeMinOp : Util_PureOp<"range.min", [
+  SameOperandsAndResultType,
+  SameVariadicOperandSize,
+]> {
+  let summary = [{returns the min of all values}];
+  let description = [{
+    Computes the min of a variadic list of operands. Though it's possible to
+    express this with standard arithmetic this op enables more semantically
+    meaningful folding/optimizations.
+  }];
+
+  let arguments = (ins
+    Variadic<Util_Offset>:$operands
+  );
+  let results = (outs
+    Util_Offset:$result
+  );
+
+  let assemblyFormat = [{
+    $operands attr-dict `:` type($result)
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Util_RangeMaxOp : Util_PureOp<"range.max", [
+  SameOperandsAndResultType,
+  SameVariadicOperandSize,
+]> {
+  let summary = [{returns the max of all values}];
+  let description = [{
+    Computes the max of a variadic list of operands. Though it's possible to
+    express this with standard arithmetic this op enables more semantically
+    meaningful folding/optimizations.
+  }];
+
+  let arguments = (ins
+    Variadic<Util_Offset>:$operands
+  );
+  let results = (outs
+    Util_Offset:$result
+  );
+
+  let assemblyFormat = [{
+    $operands attr-dict `:` type($result)
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+}
+
+def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
+  SameOperandsAndResultType,
+  SameVariadicOperandSize,
+]> {
+  let summary = [{returns the min/max of a union of a set of ranges}];
+  let description = [{
+    Computes min(offsets) and max(offsets + lengths). Though it's possible to
+    express this with standard arithmetic this op enables more semantically
+    meaningful folding/optimizations.
+  }];
+
+  let arguments = (ins
+    Variadic<Util_Offset>:$offsets,
+    Variadic<Util_Offset>:$lengths
+  );
+  let results = (outs
+    Util_Offset:$min,
+    Util_Offset:$max
+  );
+
+  let assemblyFormat = [{
+    custom<RangeList>($offsets, $lengths) attr-dict `:` type($min)
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Address/offset Arithmetic
+//===----------------------------------------------------------------------===//
+
+def Util_AlignOp : Util_PureOp<"align", [
+  SameOperandsAndResultType
+  ]> {
+  let summary = "Aligns up to a power-of-two alignment if required";
+  let description = [{
+     Aligns |value| up to the given power-of-two |alignment| if required.
+  }];
+
+  let arguments = (ins
+    SignlessIntegerLike:$value,
+    SignlessIntegerLike:$alignment
+  );
+
+  let results = (outs
+    SignlessIntegerLike:$result
+  );
+
+  let assemblyFormat = [{
+    $value `,` $alignment attr-dict `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$value,
+      "int64_t":$alignment
+    ),
+    [{
+      build($_builder, $_state, value.getType(), value,
+       $_builder.createOrFold<arith::ConstantIndexOp>($_state.location, alignment));
+    }]>,
+  ];
+
+  let hasFolder = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
-def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize"> {
+def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize", [
+  SameOperandsAndResultType,
+]> {
   let summary = "Prevents compiler optimizations of a value.";
   let description = [{
     Wraps any operands in an unoptimizable identity. This operation is declared
@@ -83,30 +234,11 @@ def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize"> {
   let results = (outs Variadic<AnyType>:$results);
   let verifier = [{ return verify$cppClass(*this); }];
   let builders = [
-    OpBuilder<(ins "ValueRange":$operands,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>
+    OpBuilder<(ins
+      "ValueRange":$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
   ];
-}
-
-// TODO(gcmn): It shouldn't be necessary to have both of these ops. Unify the
-// approach here.
-
-def Util_DynamicShapeConstantOp : Util_Op<"dynamic_shape_constant"> {
-  let summary = "A tensor constant that can have dynamic dimensions";
-  let description = [{
-    Allows specifying a constant where the return value can erase shape
-    information. This operation is declared as having side effects and has no
-    folder, so will not be optimized away by the compiler. The underlying shape
-    information should be hidden from the compiler and resolved at runtime.
-
-    ```mlir
-    %c = util.dynamic_shape_constant tensor<2x2xf32> -> tensor<?x?xf32>
-    %res = "mhlo.abs"(%c) : (tensor<?x?xf32>) -> tensor<?x?xf32>
-    ```
-  }];
-  let arguments = (ins ElementsAttr:$value);
-  let results = (outs AnyTensor:$result);
-  let assemblyFormat = "$value attr-dict `->` type($result)";
 }
 
 def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
@@ -136,7 +268,7 @@ def Util_UnreachableOp : Util_Op<"unreachable", [NoSideEffect, Terminator]> {
 
     ```mlir
     ^bb0:
-      %true = constant true
+      %true = arith.constant true
       cond_br %true, ^bb2, ^bb1
     ^bb1:
       // Indicates that this branch should never be taken.
@@ -336,8 +468,6 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
   }];
 
   let verifier = [{ return verifyGlobalLoadOp(*this); }];
-
-  let hasFolder = 1;
 }
 
 def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {

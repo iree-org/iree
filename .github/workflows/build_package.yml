@@ -42,6 +42,9 @@ jobs:
             build_package: py-runtime-pkg
             experimental: false
           - os: ubuntu-18.04
+            build_package: instrumented-py-runtime-pkg
+            experimental: true
+          - os: ubuntu-18.04
             build_package: py-xla-compiler-tools-pkg
             experimental: false
           - os: ubuntu-18.04
@@ -122,12 +125,26 @@ jobs:
         run: |
           python -m pip install cibuildwheel==1.7.2
 
-      - name: Write version info
+      - name: Write version info (release)
+        if: "!startsWith(matrix.build_package, 'instrumented-')"
         shell: bash
         run: |
           cat << EOF > ./main_checkout/version_info.json
           {
             "package-suffix": "${{ github.event.inputs.package_suffix }}",
+            "package-version": "${{ github.event.inputs.package_version }}",
+            "iree-revision": "$(cd ./main_checkout && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./main_checkout/version_info.json
+
+      - name: Write version info (instrumented)
+        if: "startsWith(matrix.build_package, 'instrumented-')"
+        shell: bash
+        run: |
+          cat << EOF > ./main_checkout/version_info.json
+          {
+            "package-suffix": "-instrumented${{ github.event.inputs.package_suffix }}",
             "package-version": "${{ github.event.inputs.package_version }}",
             "iree-revision": "$(cd ./main_checkout && git rev-parse HEAD)"
           }
@@ -162,6 +179,18 @@ jobs:
         run: |
           package_dir="./iree-install/python_packages/iree_runtime"
           export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg"
+          # TODO: cibuildwheel sanity checks this, but our setup.py is the
+          # *output* of the build :( Make source packages.
+          mkdir -p $package_dir && touch $package_dir/setup.py
+          python -m cibuildwheel --output-dir bindist $package_dir
+
+      - name: Build runtime wheels (instrumented)
+        if: "matrix.build_package == 'instrumented-py-runtime-pkg'"
+        shell: bash
+        run: |
+          package_dir="./iree-install/python_packages/iree_runtime"
+          export CIBW_BEFORE_ALL_LINUX="./main_checkout/build_tools/github_actions/install_tracy_cli_deps_manylinux2014.sh"
+          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py instrumented-py-runtime-pkg"
           # TODO: cibuildwheel sanity checks this, but our setup.py is the
           # *output* of the build :( Make source packages.
           mkdir -p $package_dir && touch $package_dir/setup.py

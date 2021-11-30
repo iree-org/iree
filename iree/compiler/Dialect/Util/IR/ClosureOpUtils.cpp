@@ -87,6 +87,7 @@ void excludeClosureOperandsAndResults(
     }
     remainingResultDims = remainingResultDims.drop_front(numDynamicDims);
   }
+  assert(remainingResultDims.empty());
 }
 
 void eraseRegionResults(Region &region,
@@ -117,7 +118,7 @@ void eraseRegionResults(Region &region,
 // This is also still at a fairly high level (flow dialect): once the closures
 // are expanded out in lower dialects things like CSE have a chance to once
 // again get at the constants and dedupe them if they survive.
-static bool isConstantSmall(ConstantOp constantOp) {
+static bool isConstantSmall(arith::ConstantOp constantOp) {
   // We could tune this/take it as a configuration setting.
   // The current value is chosen based on what is known to be reasonable to
   // inline into command buffers way down in the HAL, which is not great but at
@@ -125,7 +126,7 @@ static bool isConstantSmall(ConstantOp constantOp) {
   // constants or inlining megabytes.
   static constexpr int kMaxInlinedConstantBytes = 256;
 
-  auto constantValueAttr = constantOp.getValue();
+  auto constantValueAttr = constantOp.value();
   auto constantType = constantOp.getType();
   if (constantValueAttr.isa<SplatElementsAttr>()) {
     // Splats are always small and can often have special handling when we
@@ -154,7 +155,7 @@ static bool isConstantSmall(ConstantOp constantOp) {
 // returns true for.
 static bool shouldInlineIntoClosure(Value value) {
   auto definingOp = value.getDefiningOp();
-  if (auto constantOp = dyn_cast<ConstantOp>(definingOp)) {
+  if (auto constantOp = dyn_cast<arith::ConstantOp>(definingOp)) {
     // Constants are perfect!
     return isConstantSmall(constantOp);
   } else if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(definingOp)) {
@@ -248,10 +249,9 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   SmallVector<Value, 4> preservedResults;
   SmallVector<unsigned, 4> elidedResults;
   for (auto result : llvm::enumerate(closureOp.getClosureResults())) {
-    // You can drop a result if the use is empty, and that it is only written to
-    // within the dispatch region.
-    if (result.value().use_empty() &&
-        !closureOp.getResultAccess(result.index()).isRead) {
+    // You can drop a result if the use is empty and not read via a tie.
+    auto access = closureOp.getResultAccess(result.index());
+    if (result.value().use_empty() && !access.isRead) {
       elidedResults.push_back(result.index());
     } else {
       preservedResults.push_back(result.value());
@@ -263,29 +263,46 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
     return failure();
   }
 
-  if (elidedResults.size() == closureOp.getClosureResults().size()) {
+  if (elidedResults.size() == closureOp.getClosureResults().size() &&
+      closureOp.getClosureResults().size() == closureOp->getNumResults()) {
     // The op is completely unused - delete it.
     rewriter.eraseOp(closureOp);
     return success();
   }
 
   // Replace duplicate block arguments.
-  unsigned blockArgIndex = 0;
-  for (auto replacement : blockArgReplacements) {
-    if (!replacement) {
+  for (auto replacement : llvm::enumerate(blockArgReplacements)) {
+    if (!replacement.value()) {
       // No change.
-      blockArgIndex++;
-    } else if (!replacement.getValue()) {
+    } else if (!replacement.value().getValue()) {
       // Dropped.
     } else {
       // Replaced.
-      entryBlock.getArgument(blockArgIndex).replaceAllUsesWith(*replacement);
+      entryBlock.getArgument(replacement.index())
+          .replaceAllUsesWith(*replacement.value());
     }
   }
 
   // Clone the op with the elidable operands and results removed.
   auto newOp = closureOp.cloneReplacementExcludingOperandsAndResults(
       elidedOperands, elidedResults, rewriter);
+
+  // Fixup any non-closure results to point to the new op.
+  SetVector<Value> oldResults(closureOp->getResults().begin(),
+                              closureOp->getResults().end());
+  SetVector<Value> oldClosureResults(closureOp.getClosureResults().begin(),
+                                     closureOp.getClosureResults().end());
+  SetVector<Value> newResults(newOp->getResults().begin(),
+                              newOp->getResults().end());
+  SetVector<Value> newClosureResults(newOp.getClosureResults().begin(),
+                                     newOp.getClosureResults().end());
+  oldResults.set_subtract(oldClosureResults);
+  newResults.set_subtract(newClosureResults);
+  assert(oldResults.size() == newResults.size() &&
+         "expected non-closure results to match");
+  for (auto oldNewResult : llvm::zip(oldResults, newResults)) {
+    std::get<0>(oldNewResult).replaceAllUsesWith(std::get<1>(oldNewResult));
+  }
 
   // Replace original uses of the closure results.
   for (auto oldNewResult :

@@ -1,32 +1,32 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(canonicalize,iree-spirv-remove-one-trip-tiled-loop,iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-codegen-remove-single-iteration-loop,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
 
-#config = {tileSizes = [[0, 4, 4, 16], [], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
 hal.executable private @conv_static_shape_f32  {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_static_shape_f32 attributes {
       interface = @io,
       ordinal = 0 : index,
       workgroup_size = [4: index, 4: index, 1: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
+      translation.info = #translation
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
-      %x = constant 2: index
-      %y = constant 28: index
-      %z = constant 28: index
+      %x = arith.constant 2: index
+      %y = arith.constant 28: index
+      %z = arith.constant 28: index
       hal.return %x, %y, %z: index, index, index
     }
     builtin.module {
       func @conv_static_shape_f32() {
-        %cst = constant 0.000000e+00 : f32
-        %c32 = constant 32 : index
-        %c112 = constant 112 : index
-        %c0 = constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c32 = arith.constant 32 : index
+        %c112 = arith.constant 112 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<1x225x225x16xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x3x16x32xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<1x112x112x32xf32>
@@ -58,17 +58,17 @@ hal.executable private @conv_static_shape_f32  {
               %16 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg0)[%workgroup_size_z]
               %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 112)>(%arg1)[%workgroup_size_y]
               %18 = memref.subview %2[0, %arg0, %arg1, %arg2] [1, %16, %17, %14] [1, 1, 1, 1] : memref<1x112x112x32xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
-              linalg.fill(%cst, %18) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
-              linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : memref<1x?x?x16xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 810000 + s0 + d1 * 3600 + d2 * 16 + d3)>>, memref<3x3x16x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1536 + s0 + d1 * 512 + d2 * 32 + d3)>>) outs(%18 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>)
+              linalg.fill(%cst, %18) {lowering.config = #config} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>
+              linalg.conv_2d_nhwc_hwcf {lowering.config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%13, %15 : memref<1x?x?x16xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 810000 + s0 + d1 * 3600 + d2 * 16 + d3)>>, memref<3x3x16x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1536 + s0 + d1 * 512 + d2 * 32 + d3)>>) outs(%18 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 401408 + s0 + d1 * 3584 + d2 * 32 + d3)>>)
             }
           }
         }
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -99,33 +99,33 @@ hal.executable private @conv_static_shape_f32  {
 
 // -----
 
-#config = {tileSizes = [[0, 2, 2, 32], [], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]}
-
+#config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
 hal.executable private @depthwise_conv_static_shape_f32  {
   hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
       interface = @io,
       ordinal = 0 : index,
-      workgroup_size = [8: index, 2: index, 2: index],
-      translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [16, 4, 4]}
+      workgroup_size = [4: index, 4: index, 4: index],
+      translation.info = #translation
     } {
     ^bb0(%arg0 : index, %arg1 : index, %arg2 : index):
-      %x = constant 6: index
-      %y = constant 14: index
-      %z = constant 14: index
+      %x = arith.constant 6: index
+      %y = arith.constant 14: index
+      %z = arith.constant 14: index
       hal.return %x, %y, %z: index, index, index
     }
     builtin.module {
       func @depthwise_conv_static_shape_f32() {
-        %cst = constant 0.000000e+00 : f32
-        %c96 = constant 96 : index
-        %c56 = constant 56 : index
-        %c0 = constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %c96 = arith.constant 96 : index
+        %c56 = arith.constant 56 : index
+        %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<1x113x113x96xf32>
         %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x3x1x96xf32>
         %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<1x56x56x96xf32>
@@ -159,17 +159,17 @@ hal.executable private @depthwise_conv_static_shape_f32  {
               %18 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 56)>(%arg0)[%workgroup_size_z]
               %19 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 56)>(%arg1)[%workgroup_size_y]
               %20 = memref.subview %2[0, %arg0, %arg1, %arg2] [1, %18, %19, %15] [1, 1, 1, 1] : memref<1x56x56x96xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>
-              linalg.fill(%cst, %20) {__internal_linalg_transform__ = "workgroup", lowering.config = #config} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>
-              linalg.depthwise_conv2D_nhw {__internal_linalg_transform__ = "workgroup", lowering.config = #config, dilations = dense<2> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%16, %17 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1225824 + s0 + d1 * 10848 + d2 * 96 + d3)>>, memref<3x3x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 288 + s0 + d1 * 96 + d2)>>) outs(%20 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>)
+              linalg.fill(%cst, %20) {lowering.config = #config} : f32, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>
+              linalg.depthwise_conv_2d_nhwc_hwc {lowering.config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%16, %17 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1225824 + s0 + d1 * 10848 + d2 * 96 + d3)>>, memref<3x3x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 288 + s0 + d1 * 96 + d2)>>) outs(%20 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 301056 + s0 + d1 * 5376 + d2 * 96 + d3)>>)
             }
           }
         }
         return
       }
       hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -180,19 +180,19 @@ hal.executable private @depthwise_conv_static_shape_f32  {
 // For linalg.fill
 // CHECK: vector.transfer_write
 
-// For linalg.depthwise_conv2D_nhw
+// For linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK: vector.transfer_read
 
 // check tiling loop along filter height/width and input channel
 //      CHECK:    scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:        -> (vector<4xf32>)
+// CHECK-SAME:        -> (vector<1x1x1x4xf32>)
 //      CHECK:      scf.for %{{.+}} = %c0 to %c3 step %c1
-// CHECK-SAME:          -> (vector<4xf32>)
+// CHECK-SAME:          -> (vector<1x1x1x4xf32>)
 
 
 // CHECK: vector.fma
 
 // CHECK-COUNT-2: scf.yield
 
-// For linalg.depthwise_conv2D_nhw
+// For linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK: vector.transfer_write

@@ -18,6 +18,7 @@ iree_lit_test_suite(
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
+    lld
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

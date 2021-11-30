@@ -75,8 +75,8 @@ static SmallVector<Value, 4> getAsValues(
   SmallVector<Value, 4> values;
   for (auto valueOrAttr : valueOrAttrList) {
     if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-      values.push_back(
-          b.create<ConstantIndexOp>(loc, attr.cast<IntegerAttr>().getInt()));
+      values.push_back(b.create<arith::ConstantIndexOp>(
+          loc, attr.cast<IntegerAttr>().getInt()));
     } else {
       values.push_back(valueOrAttr.get<Value>());
     }
@@ -123,7 +123,6 @@ static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
 struct ConvertTensorInsertSlicePattern
     : public OpRewritePattern<tensor::InsertSliceOp> {
   using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
     if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
@@ -160,7 +159,7 @@ struct ConvertTensorInsertSlicePattern
     auto destDynamicDims = getDynamicDimValues(rewriter, loc, dest);
     rewriter.replaceOpWithNewOp<TensorUpdateOp>(
         insertOp, insertOp.getType(), dest, destDynamicDims, offsetVals, source,
-        sourceDynamicDims, nullptr);
+        sourceDynamicDims, rewriter.getIndexArrayAttr({0}));
     return success();
   }
 };
@@ -169,7 +168,6 @@ struct ConvertTensorInsertSlicePattern
 struct ConvertTensorExtractSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     if (sliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
@@ -234,7 +232,6 @@ struct ConvertTensorExtractPattern
 
 struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
   using OpRewritePattern<tensor::CastOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::CastOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
@@ -267,7 +264,8 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
           int64_t dimSize = !inputType.isDynamicDim(position)
                                 ? inputType.getDimSize(position)
                                 : resultType.getDimSize(position);
-          dimSizes[position] = rewriter.create<ConstantIndexOp>(loc, dimSize);
+          dimSizes[position] =
+              rewriter.create<arith::ConstantIndexOp>(loc, dimSize);
         } else {
           // Dynamic dim.
           dimSizes[position] =
@@ -301,7 +299,6 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
 struct ConvertTensorFromElementsPattern
     : public OpRewritePattern<tensor::FromElementsOp> {
   using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: This pattern was mainly added to iron out some kinks specific to
@@ -314,7 +311,7 @@ struct ConvertTensorFromElementsPattern
 
     auto loc = op.getLoc();
     SmallVector<Value> dimSizes(1);
-    dimSizes[0] = rewriter.create<ConstantIndexOp>(loc, 1);
+    dimSizes[0] = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
         op, op.getType(), op.getOperand(0), dimSizes);
     return success();

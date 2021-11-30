@@ -9,6 +9,7 @@ import subprocess
 
 from iree.compiler import ir
 from iree.compiler import passmanager
+from iree.compiler.dialects import arith
 from iree.compiler.dialects import chlo
 from iree.compiler.dialects import mhlo
 from iree.compiler.dialects import iree as iree_dialect

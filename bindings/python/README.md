@@ -34,3 +34,8 @@ For development, just set your `PYTHONPATH` environment variable to the
 
 Tests under `bindings/python/tests` can be run directly once installed.
 Additional tests under `integrations/tensorflow/e2e` will be runnable soon.
+
+## Documentation
+
+API reference pages for IREE's runtime and compiler Python APIs are hosted on
+[readthedocs](https://iree-python-api.readthedocs.io/en/latest/).

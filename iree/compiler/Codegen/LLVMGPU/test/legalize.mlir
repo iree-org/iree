@@ -43,7 +43,7 @@ func @scalarize(
 // CHECK:   memref.store %{{.*}}, %[[A]][%{{.*}}, %{{.*}}] : memref<16x16xf32, 3>
 func @allocation(%arg0: f32) {
   %0 = memref.alloc() : memref<16x16xf32, 3>
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   memref.store %arg0, %0[%c0, %c0] : memref<16x16xf32, 3>
   return
 }

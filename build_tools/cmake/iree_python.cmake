@@ -5,7 +5,29 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 include(CMakeParseArguments)
-include(iree_installed_test)
+
+###############################################################################
+# Package detection
+###############################################################################
+
+# Checks whether the PyYAML package is available. Sets IREE_PYYAML_FOUND to
+# ON if so.
+function(iree_detect_pyyaml)
+  execute_process(
+      COMMAND ${Python3_EXECUTABLE} -c "import yaml"
+      RESULT_VARIABLE EXIT_CODE
+      OUTPUT_QUIET
+      ERROR_QUIET
+  )
+  if(EXIT_CODE)
+    message(STATUS "Looking for PyYAML - not found (some features may not be available: install with 'python -m pip install PyYAML' or equiv for your system)")
+    set(IREE_PYYAML_FOUND OFF PARENT_SCOPE)
+  else()
+    message(STATUS "Looking for PyYAML - found")
+    set(IREE_PYYAML_FOUND ON PARENT_SCOPE)
+  endif()
+endfunction()
+
 
 ###############################################################################
 # Main user rules
@@ -198,7 +220,7 @@ function(iree_pyext_module)
   if(UNIX AND NOT APPLE)  # Apple does not support linker scripts.
     if(ARG_UNIX_LINKER_SCRIPT)
       set_target_properties(${_NAME} PROPERTIES LINK_FLAGS
-        "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/${ARG_UNIX_LINKER_SCRIPT}")
+        "-Wl,--version-script=\"${CMAKE_CURRENT_SOURCE_DIR}/${ARG_UNIX_LINKER_SCRIPT}\"")
     endif()
   endif()
 endfunction()
@@ -262,7 +284,7 @@ endfunction()
 #
 # Parameters:
 # NAME: name of test
-# SRCS: Test source file
+# SRCS: Test source file (single file only, despite name)
 # ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
@@ -295,25 +317,21 @@ function(iree_py_test)
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
 
-  iree_add_installed_test(
-    TEST_NAME "${_NAME_PATH}"
-    LABELS "${_RULE_LABELS}"
-    ENVIRONMENT
-      "PYTHONPATH=${IREE_BINARY_DIR}/compiler-api/python_package:${IREE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
+  add_test(
+    NAME ${_NAME_PATH}
     COMMAND
       "${IREE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
-      "${_SRC_DIR}/${_RULE_SRCS}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
       ${_RULE_ARGS}
-    INSTALLED_COMMAND
-      python
-      "${_PACKAGE_PATH}/${_RULE_SRCS}"
   )
 
-  install(FILES ${_RULE_SRCS}
-    DESTINATION "tests/${_PACKAGE_PATH}"
-    COMPONENT Tests
+  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
+      "PYTHONPATH=${IREE_BINARY_DIR}/compiler-api/python_package:${IREE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}"
+      "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
   )
+  iree_add_test_environment_properties(${_NAME_PATH})
 
   # TODO(marbre): Find out how to add deps to tests.
   #               Similar to _RULE_DATA in iree_lit_test().

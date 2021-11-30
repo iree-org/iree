@@ -35,6 +35,7 @@ class LibraryBuilder {
  public:
   // Builder mode setting.
   enum class Mode : uint32_t {
+    NONE = 0u,
     // Include entry point names and tags.
     // If not specified then the reflection strings will be excluded to reduce
     // binary size.
@@ -96,6 +97,12 @@ class LibraryBuilder {
     this->sanitizerKind = sanitizerKind;
   }
 
+  // Defines a new runtime import function and returns its ordinal.
+  unsigned addImport(StringRef name, bool weak) {
+    imports.push_back({name.str(), weak});
+    return imports.size() - 1;
+  }
+
   // Defines a new entry point on the library implemented by |func|.
   // |name| will be used as the library export and an optional |tag| will be
   // attached.
@@ -126,13 +133,19 @@ class LibraryBuilder {
   Features features = Features::NONE;
   SanitizerKind sanitizerKind = SanitizerKind::NONE;
 
+  struct Import {
+    std::string symbol_name;
+    bool weak = false;
+  };
+  SmallVector<Import> imports;
+
   struct Dispatch {
     std::string name;
     std::string tag;
     DispatchAttrs attrs;
     llvm::Function *func;
   };
-  std::vector<Dispatch> exports;
+  SmallVector<Dispatch> exports;
 };
 
 }  // namespace HAL

@@ -4,14 +4,14 @@
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device
 // CHECK-SAME: %[[ARG:.+]]: i32
 func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
-  // CHECK-DAG: %[[C0:.+]] = constant 0
-  %c0 = constant 0 : i32
-  // CHECK-DAG: %[[C1:.+]] = constant 1
-  %c1 = constant 1 : i32
-  // CHECK-DAG: %[[C2:.+]] = constant 2
-  %c2 = constant 2 : i32
-  // CHECK-DAG: %[[C3:.+]] = constant 3
-  // CHECK-DAG: %[[C4:.+]] = constant 4
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0
+  %c0 = arith.constant 0 : i32
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1
+  %c1 = arith.constant 1 : i32
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2
+  %c2 = arith.constant 2 : i32
+  // CHECK-DAG: %[[C3:.+]] = arith.constant 3
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4
   %0 = hal.device.switch<%device : !hal.device> -> i32
     // CHECK-NEXT: %{{.+}}, %[[IS0:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vulkan-v1.?-*") : i1, i1 = false
     // CHECK-NEXT: cond_br %[[IS0]], ^bb3(%[[C1]] : i32), ^bb1
@@ -21,19 +21,19 @@ func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
     // CHECK-NEXT: ^bb1:
     // CHECK-NEXT:  %{{.+}}, %[[IS1L:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vmvx") : i1, i1 = false
     // CHECK-NEXT:  %{{.+}}, %[[IS1R:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vulkan-*") : i1, i1 = false
-    // CHECK-NEXT:  %[[IS1:.+]] = or %[[IS1L]], %[[IS1R]] : i1
+    // CHECK-NEXT:  %[[IS1:.+]] = arith.ori %[[IS1L]], %[[IS1R]] : i1
     // CHECK-NEXT:  cond_br %[[IS1]], ^bb2, ^bb3(%[[C0]] : i32)
     // CHECK-NEXT: ^bb2:
-    // CHECK-NEXT:  %[[EQZ:.+]] = cmpi eq, %[[ARG]], %[[C2]] : i32
+    // CHECK-NEXT:  %[[EQZ:.+]] = arith.cmpi eq, %[[ARG]], %[[C2]] : i32
     // CHECK-NEXT:  cond_br %[[EQZ]], ^bb3(%[[C3]] : i32), ^bb3(%[[C4]] : i32)
     #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
-      %eqz = cmpi eq, %arg, %c2 : i32
+      %eqz = arith.cmpi eq, %arg, %c2 : i32
       cond_br %eqz, ^bb_true, ^bb_false
     ^bb_true:
-      %c3 = constant 3 : i32
+      %c3 = arith.constant 3 : i32
       hal.return %c3 : i32
     ^bb_false:
-      %c4 = constant 4 : i32
+      %c4 = arith.constant 4 : i32
       hal.return %c4 : i32
     },
     #hal.match.always {
@@ -62,7 +62,7 @@ func @no_results(%device : !hal.device) {
     // CHECK-NEXT: ^bb2:
     // CHECK-NEXT:  %{{.+}}, %[[IS1L:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vmvx") : i1, i1 = false
     // CHECK-NEXT:  %{{.+}}, %[[IS1R:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vulkan-*") : i1, i1 = false
-    // CHECK-NEXT:  %[[IS1:.+]] = or %[[IS1L]], %[[IS1R]] : i1
+    // CHECK-NEXT:  %[[IS1:.+]] = arith.ori %[[IS1L]], %[[IS1R]] : i1
     // CHECK-NEXT:  cond_br %[[IS1]], ^bb3, ^bb4
     // CHECK-NEXT: ^bb3:
     // CHECK-NEXT:  "some.op_b"()

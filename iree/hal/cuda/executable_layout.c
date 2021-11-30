@@ -16,6 +16,7 @@ typedef struct iree_hal_cuda_executable_layout_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
   iree_host_size_t push_constant_base_index;
+  iree_host_size_t push_constant_count;
   iree_host_size_t set_layout_count;
   iree_hal_descriptor_set_layout_t* set_layouts[];
 } iree_hal_cuda_executable_layout_t;
@@ -54,6 +55,14 @@ iree_status_t iree_hal_cuda_executable_layout_create(
   IREE_ASSERT_ARGUMENT(out_executable_layout);
   *out_executable_layout = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (push_constant_count > IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "push constant count %zu over the limit of %d",
+                            push_constant_count,
+                            IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT);
+  }
+
   // Currently the executable layout doesn't do anything.
   // TODO: Handle creating the argument layout at that time hadling both push
   // constant and buffers.
@@ -76,6 +85,7 @@ iree_status_t iree_hal_cuda_executable_layout_create(
           iree_hal_cuda_descriptor_set_layout_binding_count(set_layouts[i]);
     }
     executable_layout->push_constant_base_index = binding_number;
+    executable_layout->push_constant_count = push_constant_count;
     *out_executable_layout = (iree_hal_executable_layout_t*)executable_layout;
   }
   IREE_TRACE_ZONE_END(z0);
@@ -101,6 +111,13 @@ iree_host_size_t iree_hal_cuda_push_constant_index(
   iree_hal_cuda_executable_layout_t* executable_layout =
       iree_hal_cuda_executable_layout_cast(base_executable_layout);
   return executable_layout->push_constant_base_index;
+}
+
+iree_host_size_t iree_hal_cuda_executable_layout_num_constants(
+    iree_hal_executable_layout_t* base_executable_layout) {
+  iree_hal_cuda_executable_layout_t* executable_layout =
+      iree_hal_cuda_executable_layout_cast(base_executable_layout);
+  return executable_layout->push_constant_count;
 }
 
 const iree_hal_executable_layout_vtable_t

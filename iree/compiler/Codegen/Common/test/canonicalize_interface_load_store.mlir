@@ -2,9 +2,9 @@
 
 // CHECK-LABEL: func @fold_reshape()
 func @fold_reshape() {
-  // CHECK: %[[C0:.+]] = constant 0 : index
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   // CHECK: %[[ARG:.+]] = hal.interface.binding.subspan @interface_io::@arg0[%[[C0]]] : !flow.dispatch.tensor<readonly:3x3x96xf32>
   %1 = hal.interface.binding.subspan @interface_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:3x3x1x96xf32>
   %2 = hal.interface.binding.subspan @interface_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x3x96xf32>
@@ -18,8 +18,8 @@ func @fold_reshape() {
 }
 
 hal.interface private @interface_io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer"
 }
 
 
@@ -27,10 +27,10 @@ hal.interface private @interface_io  {
 
 // CHECK-LABEL: func @dont_fold_reshape_with_not_full_load()
 func @dont_fold_reshape_with_not_full_load() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c3 = constant 3 : index
-  %c96 = constant 96 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c96 = arith.constant 96 : index
   %1 = hal.interface.binding.subspan @interface_io::@arg0[%c0] : !flow.dispatch.tensor<readonly:6x3x1x96xf32>
   %2 = hal.interface.binding.subspan @interface_io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:3x3x96xf32>
   %3 = flow.dispatch.tensor.load %1, offsets = [%c3, %c0, %c0, %c0], sizes = [%c3, %c3, %c1, %c96], strides = [%c1, %c1, %c1, %c1] : !flow.dispatch.tensor<readonly:6x3x1x96xf32> -> tensor<3x3x1x96xf32>
@@ -43,16 +43,16 @@ func @dont_fold_reshape_with_not_full_load() {
 }
 
 hal.interface private @interface_io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=0, type="StorageBuffer"
 }
 
 // -----
 
 // CHECK-LABEL: func @dont_fold_dynamic_reshape()
 func @dont_fold_dynamic_reshape() {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %dim0 = hal.interface.load.constant offset = 0 : index
   %dim1 = hal.interface.load.constant offset = 1 : index
   %dim2 = hal.interface.load.constant offset = 2 : index

@@ -4,9 +4,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3 AS final
+FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3
 
-# Environment variables for IREE.
+# Disable apt-key parse waring. If someone knows how to do whatever the "proper"
+# thing is then feel free. The warning complains about parsing apt-key output,
+# which we're not even doing.
+ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
+
+######## Basic stuff ########
+# Default compiler environment variables for IREE.
 ENV CC /usr/bin/clang
 ENV CXX /usr/bin/clang++
 
@@ -16,7 +22,120 @@ RUN apt-get update \
     git \
     # Default compiler and linker.
     clang \
-    lld \
+    lld-9 \
     # IREE transitive dependencies
     libsdl2-dev \
-    libssl-dev
+    libssl-dev \
+    # A much better CMake builder
+     ninja-build \
+    # For building child images. Best practices would tell us to use multi-stage
+    # builds (https://docs.docker.com/develop/develop-images/multistage-build/)
+    # but it turns out that Dockerfile is a thoroughly non-composable awful
+    # format and that doesn't actually work that well. These deps are pretty
+    # small.
+    unzip \
+    wget \
+    gnupg2 \
+    # Someone is welcome to tell me a better way to just install lld-9 as lld
+    # (lld=9 doesn't work)
+    && ln -s lld-9 /usr/bin/lld \
+    && ln -s ld.lld-9 /usr/bin/ld.lld
+
+######## CMake ########
+WORKDIR /install-cmake
+
+# These are separate args because there's no way to strip the patch version off
+# to get the /usr/share path.
+# See https://github.com/moby/moby/issues/41383
+ARG CMAKE_MAJOR_VERSION=3
+ARG CMAKE_MINOR_VERSION=16
+ARG CMAKE_PATCH_VERSION=3
+
+ENV CMAKE_VERSION="${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CMAKE_PATCH_VERSION}"
+
+# Install CMake v3.13, which is ahead of apt-get's version (3.10.2).
+RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
+    && chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
+    && "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/  \
+    && rm -rf /install-cmake
+
+##############
+
+######## Bazel ########
+WORKDIR /install-bazel
+ARG BAZEL_VERSION=3.7.1
+
+# https://docs.bazel.build/versions/master/install-ubuntu.html
+RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
+  && echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
+    | tee /etc/apt/sources.list.d/bazel.list \
+  && apt-get update \
+  && apt-get install -y "bazel=${BAZEL_VERSION?}" \
+  && rm -rf /install-bazel
+
+##############
+
+######## Python ########
+WORKDIR /install-python
+
+RUN apt-get update \
+  && apt-get install -y \
+    python3.7 \
+    python3.7-dev \
+  && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 1 \
+  && apt-get install -y \
+    python3-pip \
+    python3-setuptools \
+    python3-distutils \
+  && python3 -m pip install --upgrade pip \
+  && python3 -m pip install \
+    numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
+    pybind11==2.6.1
+
+ENV PYTHON_BIN /usr/bin/python3
+
+##############
+
+######## Vulkan ########
+WORKDIR /install-vulkan
+ARG VULKAN_SDK_VERSION=1.2.154.0
+
+RUN wget -q \
+  # This file disappeared from the canonical source:
+  # "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION?}/linux/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz"
+  "https://storage.googleapis.com/iree-shared-files/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" \
+  && mkdir -p /opt/vulkan-sdk \
+  && tar -xzf "vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" -C /opt/vulkan-sdk \
+  && rm -rf /install-vulkan
+WORKDIR /
+
+ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
+
+ENV PATH="${VULKAN_SDK}/bin:$PATH"
+
+# Symlink the Vulkan loader to a system library directory. This is needed to
+# allow Vulkan applications to find the Vulkan loader. It also avoids using
+# LD_LIBRARY_PATH, which is not supported well by Docker.
+RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
+  && ln -s "${VULKAN_SDK}/lib/libvulkan.so.1" /usr/lib/x86_64-linux-gnu/
+
+##############
+
+
+######## GCC ########
+WORKDIR /
+
+# Avoid apt-add-repository, which requires software-properties-common, which is
+# a rabbit hole of python version compatibility issues. See
+# https://mondwan.blogspot.com/2018/05/alternative-for-add-apt-repository-for.html
+# We use gcc-9 because it's what manylinux had (at time of authorship) and
+# we don't aim to support older versions. We need a more modern lld to handle
+# --push-state flags
+RUN echo "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu bionic main" >> /etc/apt/sources.list  \
+  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1E9377A2BA9EF27F \
+  && apt-get update \
+  && apt-get install -y gcc-9 g++-9
+
+##############
+
+WORKDIR /

@@ -21,7 +21,7 @@ class DeviceQueryIntCastOpConversion
       : OpConversionPattern(typeConverter, context) {}
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::DeviceQueryOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // We only deal with in-dialect conversions to i32 in this pattern.
     auto targetType = op.value().getType();
@@ -33,7 +33,6 @@ class DeviceQueryIntCastOpConversion
     // ourselves instead of allowing the i32 do the same. We could let it handle
     // things but then we are generating more IR that may prevent other
     // canonicalizations (a select of i1 to i1 is easier to handle).
-    IREE::HAL::DeviceQueryOp::Adaptor adaptor(operands);
     auto queryOp = rewriter.create<IREE::HAL::DeviceQueryOp>(
         op.getLoc(), rewriter.getI1Type(), rewriter.getI32Type(),
         adaptor.device(), op.categoryAttr(), op.keyAttr(), Attribute{});
@@ -43,19 +42,19 @@ class DeviceQueryIntCastOpConversion
     // Truncate or extend based on the target type.
     if (targetType.isIndex()) {
       // i32 -> index cast.
-      value =
-          rewriter.createOrFold<IndexCastOp>(op.getLoc(), targetType, value);
+      value = rewriter.createOrFold<arith::IndexCastOp>(op.getLoc(), targetType,
+                                                        value);
     } else if (targetType.isa<IntegerType>()) {
       // i32 -> {integer} cast.
       if (targetType.getIntOrFloatBitWidth() <
           value.getType().getIntOrFloatBitWidth()) {
         // i32 -> narrowing cast.
-        value =
-            rewriter.createOrFold<TruncateIOp>(op.getLoc(), targetType, value);
+        value = rewriter.createOrFold<arith::TruncIOp>(op.getLoc(), targetType,
+                                                       value);
       } else {
         // i32 -> widening cast.
-        value = rewriter.createOrFold<ZeroExtendIOp>(op.getLoc(), targetType,
-                                                     value);
+        value = rewriter.createOrFold<arith::ExtUIOp>(op.getLoc(), targetType,
+                                                      value);
       }
     }
 
@@ -65,8 +64,8 @@ class DeviceQueryIntCastOpConversion
       // already handled the error case.
       value = rewriter.createOrFold<SelectOp>(
           op.getLoc(), ok, value,
-          rewriter.createOrFold<ConstantOp>(op.getLoc(),
-                                            op.default_valueAttr()));
+          rewriter.createOrFold<arith::ConstantOp>(op.getLoc(),
+                                                   op.default_valueAttr()));
       ok = rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1);
     }
 
@@ -86,10 +85,9 @@ class DeviceQueryI32OpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::DeviceQueryOp op, llvm::ArrayRef<Value> operands,
+      IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!op.value().getType().isInteger(32)) return failure();
-    IREE::HAL::DeviceQueryOp::Adaptor adaptor(operands);
     auto results =
         rewriteToCall(op, adaptor, importOp, *getTypeConverter(), rewriter);
     if (!results.hasValue()) return failure();

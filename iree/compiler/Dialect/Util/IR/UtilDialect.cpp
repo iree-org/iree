@@ -10,8 +10,13 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
@@ -60,6 +65,20 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     // Sure!
     return true;
   }
+
+  void handleTerminator(Operation *op, Block *newDest) const final {
+    auto returnOp = dyn_cast<IREE::Util::InitializerReturnOp>(op);
+    if (!returnOp) return;
+    // util.initialize.return takes no args - just branch to the new block.
+    OpBuilder builder(op);
+    builder.create<mlir::BranchOp>(op->getLoc(), newDest, ValueRange{});
+    op->erase();
+  }
+
+  void handleTerminator(Operation *op,
+                        ArrayRef<Value> valuesToReplace) const final {
+    // util.initialize.return takes no args.
+  }
 };
 
 UtilDialect::UtilDialect(MLIRContext *context)
@@ -71,6 +90,57 @@ UtilDialect::UtilDialect(MLIRContext *context)
   addOperations<
 #include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"
       >();
+}
+
+Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
+                                            Type type, Location loc) {
+  if (arith::ConstantOp::isBuildableWith(value, type)) {
+    return builder.create<arith::ConstantOp>(loc, value, type);
+  }
+  return nullptr;
+}
+
+template <typename DimOp>
+struct FoldDimOp : public OpRewritePattern<DimOp> {
+  using OpRewritePattern<DimOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(DimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto shapeAwareOp =
+        dyn_cast_or_null<ShapeAwareOpInterface>(op.source().getDefiningOp());
+    if (!shapeAwareOp) return failure();
+
+    // We only support static dimension indices today (as in general we only
+    // support ranked shapes). If we find dynamic indices sneaking in we will
+    // need to do something much more complex - or prevent them from sneaking
+    // in.
+    APInt index;
+    if (!matchPattern(op.index(), m_ConstantInt(&index))) {
+      return rewriter.notifyMatchFailure(op,
+                                         "non-constant dim index unsupported");
+    }
+
+    // If it's a static dim then just fold to that.
+    auto type = op.source().getType().template cast<ShapedType>();
+    int64_t staticDim = type.getDimSize(index.getZExtValue());
+    if (staticDim != ShapedType::kDynamicSize) {
+      rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op, staticDim);
+      return success();
+    }
+
+    // Otherwise try to get the dynamic dimension cheaply without the need to
+    // insert new IR.
+    unsigned dynamicIdx = type.getDynamicDimIndex(index.getZExtValue());
+    auto dynamicDims = shapeAwareOp.getResultDynamicDimsFromValue(op.source());
+    rewriter.replaceOp(op, dynamicDims[dynamicIdx]);
+
+    return success();
+  }
+};
+
+void UtilDialect::getCanonicalizationPatterns(
+    RewritePatternSet &results) const {
+  results.insert<FoldDimOp<memref::DimOp>>(getContext());
+  results.insert<FoldDimOp<tensor::DimOp>>(getContext());
 }
 
 }  // namespace Util

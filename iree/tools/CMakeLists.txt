@@ -48,10 +48,6 @@ if(IREE_ENABLE_EMITC)
   set(IREE_EMITC_CONDITIONAL_DEP
     MLIREmitC
   )
-  set(IREE_TRANSLATE_CONDITIONAL_DEPS
-    MLIREmitC
-    emitc::TranslateToCpp
-  )
 endif()
 
 iree_cc_binary(
@@ -172,6 +168,25 @@ iree_cc_binary(
     yaml
 )
 
+iree_cc_binary(
+  NAME
+    iree-e2e-matmul-test
+  SRCS
+    "iree-e2e-matmul-test.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_path
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::hal::drivers
+    iree::modules::hal
+    iree::tools::utils::trace_replay
+    iree::tools::utils::yaml_util
+    iree::vm
+    yaml
+)
+
 if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
@@ -196,22 +211,21 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_dialects.h"
       "init_iree_passes.h"
     DEPS
-      IREEDialectsIREEPyDMDialect
-      IREEDialectsIREEDialect
+      IREEInputDialect
+      IREEPyDMDialect
       MLIRIR
       iree::compiler::Bindings::Native::Transforms
       iree::compiler::Bindings::TFLite::Transforms
+      iree::compiler::Codegen::Dialect::IREECodegenDialect
+      iree::compiler::Codegen::Dialect::ProcessorOpInterfaces
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect
       iree::compiler::Dialect::HAL::Transforms
-      iree::compiler::Dialect::LinalgExt::IR
-      iree::compiler::Dialect::LinalgExt::IR::TiledOpInterface
-      iree::compiler::Dialect::LinalgExt::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms
-      iree::compiler::Dialect::Shape::IR
-      iree::compiler::Dialect::Shape::Transforms
+      iree::compiler::Dialect::Stream::IR
+      iree::compiler::Dialect::Stream::Transforms
       iree::compiler::Dialect::Util::IR
       iree::compiler::Dialect::Util::Transforms
       iree::compiler::Dialect::VM::Analysis
@@ -359,7 +373,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::IREEVM
-      ${IREE_TRANSLATE_CONDITIONAL_DEPS}
+      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 

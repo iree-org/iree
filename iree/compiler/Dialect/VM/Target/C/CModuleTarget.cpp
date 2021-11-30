@@ -6,13 +6,13 @@
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
-#include "emitc/Target/Cpp/CppEmitter.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
+#include "iree/compiler/Dialect/VM/Target/C/CppEmitter.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Pass/PassManager.h"
@@ -70,7 +70,7 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
     output << "iree_alignas(" << alignment << ") static const uint8_t "
            << bufferName << "[] = {";
     llvm::interleaveComma(byteBuffer, output, [&](char value) {
-      output << static_cast<unsigned int>(value);
+      output << static_cast<unsigned int>(static_cast<unsigned char>(value));
     });
     output << "};\n";
   }
@@ -138,6 +138,8 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   auto printStringView = [](StringRef s) -> std::string {
     // We can't use iree_make_string_view because function calls are not allowed
     // for constant expressions in C.
+    // TODO(#7605): Switch to IREE_SVL. We can't use IREE_SVL today because it
+    // uses designated initializers, which cause issues when compiled as C++.
     return ("{\"" + s + "\", " + std::to_string(s.size()) + "}").str();
   };
 
@@ -145,8 +147,6 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   SmallVector<IREE::VM::ExportOp, 4> exportOps(
       moduleOp.getOps<IREE::VM::ExportOp>());
   std::string exportName = moduleName + "_exports_";
-  output << "static const size_t " << exportName
-         << "count_ = " << exportOps.size() << ";\n";
   output << "static const iree_vm_native_export_descriptor_t " << exportName
          << "[] = {\n";
   if (exportOps.empty()) {
@@ -183,17 +183,16 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   SmallVector<IREE::VM::ImportOp, 4> importOps(
       moduleOp.getOps<IREE::VM::ImportOp>());
   std::string importName = moduleName + "_imports_";
-  output << "static const size_t " << importName
-         << "count_ = " << importOps.size() << ";\n";
   output << "static const iree_vm_native_import_descriptor_t " << importName
          << "[] = {\n";
   if (importOps.empty()) {
     // Empty list placeholder.
     output << "    {0},\n";
   } else {
-    // sort import ops
+    // sort import ops by ordinal
     llvm::sort(importOps, [](auto &lhs, auto &rhs) {
-      return lhs.getName().compare(rhs.getName()) < 0;
+      return lhs.ordinal().getValue().getZExtValue() <
+             rhs.ordinal().getValue().getZExtValue();
     });
     for (auto importOp : importOps) {
       output << "{" << printStringView(importOp.getName()) << "},\n";
@@ -204,8 +203,6 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 
   // functions
   std::string functionName = moduleName + "_funcs_";
-  output << "static const size_t " << functionName
-         << "count_ = " << exportOps.size() << ";\n";
   output << "static const iree_vm_native_function_ptr_t " << functionName
          << "[] = {\n";
   if (exportOps.empty()) {
@@ -240,11 +237,11 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   output << "static const iree_vm_native_module_descriptor_t " << descriptorName
          << " = {\n"
          << printStringView(moduleName) << ",\n"
-         << importName << "count_,\n"
+         << importOps.size() << ",\n"
          << importName << ",\n"
-         << exportName << "count_,\n"
+         << exportOps.size() << ",\n"
          << exportName << ",\n"
-         << functionName << "count_,\n"
+         << exportOps.size() << ",\n"
          << functionName << ",\n"
          << "0,\n"
          << "NULL,\n"
@@ -264,20 +261,18 @@ static LogicalResult canonicalizeModule(
 
   // Add all VM canonicalization patterns and mark pseudo-ops illegal.
   auto *context = moduleOp.getContext();
-  for (auto *op : context->getRegisteredOperations()) {
+  for (auto op : context->getRegisteredOperations()) {
     // Non-serializable ops must be removed prior to serialization.
-    if (op->hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
-      op->getCanonicalizationPatterns(patterns, context);
-      target.setOpAction(OperationName(op->name, context),
-                         ConversionTarget::LegalizationAction::Illegal);
+    if (op.hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
+      op.getCanonicalizationPatterns(patterns, context);
+      target.setOpAction(op, ConversionTarget::LegalizationAction::Illegal);
     }
 
     // Debug ops must not be present when stripping.
     // TODO(benvanik): add RemoveDisabledDebugOp pattern.
-    if (op->hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
+    if (op.hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
         targetOptions.stripDebugOps) {
-      target.setOpAction(OperationName(op->name, context),
-                         ConversionTarget::LegalizationAction::Illegal);
+      target.setOpAction(op, ConversionTarget::LegalizationAction::Illegal);
     }
   }
 

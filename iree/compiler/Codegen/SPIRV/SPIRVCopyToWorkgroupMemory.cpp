@@ -57,12 +57,12 @@ linalg::ProcInfo getLinearizedGPUProcessorIdAndCount(
   linearized.procId = procInfo[0].procId;
   linearized.nprocs = procInfo[0].nprocs;
   for (unsigned i = 0; i < kNumGPUDims - 1; ++i) {
-    linearized.procId =
-        rewriter.create<MulIOp>(loc, linearized.procId, procInfo[i + 1].nprocs);
-    linearized.procId =
-        rewriter.create<AddIOp>(loc, linearized.procId, procInfo[i + 1].procId);
-    linearized.nprocs =
-        rewriter.create<MulIOp>(loc, linearized.nprocs, procInfo[i + 1].nprocs);
+    linearized.procId = rewriter.create<arith::MulIOp>(loc, linearized.procId,
+                                                       procInfo[i + 1].nprocs);
+    linearized.procId = rewriter.create<arith::AddIOp>(loc, linearized.procId,
+                                                       procInfo[i + 1].procId);
+    linearized.nprocs = rewriter.create<arith::MulIOp>(loc, linearized.nprocs,
+                                                       procInfo[i + 1].nprocs);
   }
   return linearized;
 }
@@ -91,11 +91,11 @@ LogicalResult distributeCyclicallyToProcessors(
   auto lbs = pLoopOp.lowerBound(), ubs = pLoopOp.upperBound(),
        steps = pLoopOp.step();
   for (unsigned i : llvm::seq<unsigned>(0, procInfo.size())) {
-    Value mappedLb = rewriter.create<AddIOp>(
+    Value mappedLb = rewriter.create<arith::AddIOp>(
         loc, lbs[i],
-        rewriter.create<MulIOp>(loc, steps[i], procInfo[i].procId));
+        rewriter.create<arith::MulIOp>(loc, steps[i], procInfo[i].procId));
     Value mappedStep =
-        rewriter.create<MulIOp>(loc, steps[i], procInfo[i].nprocs);
+        rewriter.create<arith::MulIOp>(loc, steps[i], procInfo[i].nprocs);
     forBounds.push_back({mappedLb, ubs[i], mappedStep});
     permutation.push_back(i);
   }
@@ -162,8 +162,7 @@ LogicalResult distributeCopyOp(linalg::CopyOp copyOp, scf::ParallelOp pLoopOp,
 
 // Applies tiling followed to load/store optimized size then distribute on
 // incovations.
-LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp,
-                                    ArrayRef<Value> operands,
+LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp, ValueRange operands,
                                     ConversionPatternRewriter &rewriter) {
   linalg::LinalgTilingOptions options;
   // Tile to memory access of 128bits as those tend to be optimal on most GPUs.
@@ -187,12 +186,13 @@ LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp,
 struct TileAndDistributeCopyOp : public OpConversionPattern<linalg::CopyOp> {
   using OpConversionPattern<linalg::CopyOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      linalg::CopyOp linalgOp, ArrayRef<Value> operands,
+      linalg::CopyOp linalgOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!hasMarker(linalgOp, getCopyToWorkgroupMemoryMarker())) {
       return failure();
     }
-    if (failed(tileAndDistributeCopy(linalgOp, operands, rewriter))) {
+    if (failed(
+            tileAndDistributeCopy(linalgOp, adaptor.getOperands(), rewriter))) {
       return failure();
     }
 
@@ -222,7 +222,7 @@ struct SerializeAndDistributeCopy : public OpConversionPattern<linalg::CopyOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      linalg::CopyOp copyOp, ArrayRef<Value> operands,
+      linalg::CopyOp copyOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!hasMarker(copyOp, {getCopyToWorkgroupMemoryMarker()}))
       return failure();
