@@ -149,7 +149,7 @@ class FunctionTest(absltest.TestCase):
                 })
         })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
-    with self.assertRaisesRegex(ValueError, "mismatched function call arity:"):
+    with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
       result = invoker(a=1, b=1)
 
   def testMissingPositionalNdarray(self):
@@ -171,7 +171,7 @@ class FunctionTest(absltest.TestCase):
                 })
         })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
-    with self.assertRaisesRegex(ValueError, "mismatched function call arity:"):
+    with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
       result = invoker(a=1, b=1)
 
   def testMissingKeyword(self):
@@ -193,7 +193,7 @@ class FunctionTest(absltest.TestCase):
                 })
         })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
-    with self.assertRaisesRegex(ValueError, "mismatched function call arity:"):
+    with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
       result = invoker(-1, a=1)
 
   def testMissingKeywordNdArray(self):
@@ -215,7 +215,7 @@ class FunctionTest(absltest.TestCase):
                 })
         })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
-    with self.assertRaisesRegex(ValueError, "mismatched function call arity:"):
+    with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
       result = invoker(-1, a=1)
 
   def testExtraKeyword(self):
