@@ -18,6 +18,7 @@ typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
   CUdevice device;
+  bool supports_concurrent_managed_access;
   CUstream stream;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
@@ -36,6 +37,28 @@ iree_status_t iree_hal_cuda_allocator_create(
     iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // To support device-local + host-visible memory we need concurrent managed
+  // access indicating that the host and devices can concurrently access the
+  // device memory. If we don't have this feature then we fall back to forcing
+  // all device-local + host-visible memory into host-local + device-visible
+  // page-locked memory. The compiler tries to avoid this for high-traffic
+  // buffers except for readback staging buffers.
+  int supports_concurrent_managed_access = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, CU_RESULT_TO_STATUS(
+              context->syms,
+              cuDeviceGetAttribute(
+                  &supports_concurrent_managed_access,
+                  CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS, device),
+              "cuDeviceGetAttribute"));
+
+  IREE_TRACE_ZONE_APPEND_TEXT(
+      z0, supports_concurrent_managed_access
+              ? "has CONCURRENT_MANAGED_ACCESS"
+              : "no CONCURRENT_MANAGED_ACCESS (expect slow accesses on "
+                "device-local + host-visible memory)");
+
   iree_hal_cuda_allocator_t* allocator = NULL;
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, sizeof(*allocator), (void**)&allocator);
@@ -45,6 +68,8 @@ iree_status_t iree_hal_cuda_allocator_create(
     allocator->context = context;
     allocator->device = device;
     allocator->stream = stream;
+    allocator->supports_concurrent_managed_access =
+        supports_concurrent_managed_access != 0;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -121,6 +146,21 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   // application is unlikely to do anything when requesting a 0-byte buffer; but
   // it can happen in real world use cases. So we should at least not crash.
   if (allocation_size == 0) allocation_size = 4;
+
+  // If concurrent managed access is not supported then make device-local +
+  // host-visible allocations fall back to host-local + device-visible
+  // page-locked memory. This will be significantly slower for the device to
+  // access but the compiler only uses this type for readback staging buffers
+  // and it's better to function than function fast.
+  if (!allocator->supports_concurrent_managed_access &&
+      iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    memory_type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                     IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
+    memory_type |=
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  }
+
   iree_status_t status;
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
