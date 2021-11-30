@@ -13,6 +13,7 @@
 #define IREE_TOOLS_INIT_MLIR_DIALECTS_H_
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -38,6 +39,7 @@ namespace mlir {
 inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format off
   registry.insert<AffineDialect,
+                  bufferization::BufferizationDialect,
                   gpu::GPUDialect,
                   LLVM::LLVMDialect,
                   linalg::LinalgDialect,

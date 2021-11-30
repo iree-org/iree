@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -233,7 +234,8 @@ void populateMemRefToVMPatterns(MLIRContext *context,
     return llvm::None;
   });
 
-  patterns.insert<FoldAsNoOp<memref::BufferCastOp>>(typeConverter, context);
+  patterns.insert<FoldAsNoOp<bufferization::ToMemrefOp>>(typeConverter,
+                                                         context);
   patterns.insert<ConvertMemRefGlobalOp, ConvertMemRefGetGlobalOp,
                   ConvertMemRefLoadOp, ConvertMemRefStoreOp>(typeConverter,
                                                              context);

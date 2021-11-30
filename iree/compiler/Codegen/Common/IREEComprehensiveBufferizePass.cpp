@@ -29,9 +29,13 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/AffineInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ArithInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/SCFInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/TensorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -203,11 +207,10 @@ using mlir::linalg::comprehensive_bufferize::linalg_ext::
 ///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
 struct StoreTensorOpAnchoredInitTensorEliminationStep
     : public InitTensorEliminationStep {
-  LogicalResult run(FuncOp funcOp, BufferizationAliasInfo &aliasInfo,
-                    DominanceInfo &domInfo,
+  LogicalResult run(FuncOp funcOp, BufferizationState &state,
                     SmallVector<Operation *> &newOps) override {
     return eliminateInitTensors(
-        funcOp, aliasInfo, domInfo,
+        funcOp, state,
         /*anchorMatchFunc=*/
         [&](OpOperand &operand) {
           return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
@@ -249,9 +252,13 @@ class IREEComprehensiveBufferizePass
 
     // TODO: Find a better place to register external models.
     // Registers operations of other dialects.
-    linalg::comprehensive_bufferize::
+    linalg::comprehensive_bufferize::affine_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::arith_ext::
         registerBufferizableOpInterfaceExternalModels(registry);
     linalg::comprehensive_bufferize::linalg_ext::
+        registerBufferizableOpInterfaceExternalModels(registry);
+    linalg::comprehensive_bufferize::scf_ext::
         registerBufferizableOpInterfaceExternalModels(registry);
     linalg::comprehensive_bufferize::tensor_ext::
         registerBufferizableOpInterfaceExternalModels(registry);
@@ -281,10 +288,10 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 
   linalg::comprehensive_bufferize::BufferizationOptions options;
   options.testAnalysisOnly = false;
-
   // Enable InitTensorOp elimination.
   options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
-
+  options.addPostAnalysisStep<linalg::comprehensive_bufferize::tensor_ext::
+                                  InplaceInsertSliceOpAnalysis>();
   // TODO: Use allocationFn.
 
   if (failed(runComprehensiveBufferize(moduleOp, options))) signalPassFailure();

@@ -1056,7 +1056,7 @@ func @constant() {
 }
 // CHECK-LABEL: func @constant()
 //       CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<2x2x3xi32>
-//       CHECK:   %[[MEMREF:.+]] = memref.buffer_cast %[[CST]] : memref<2x2x3xi32>
+//       CHECK:   %[[MEMREF:.+]] = bufferization.to_memref %[[CST]] : memref<2x2x3xi32>
 //       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan @io::@ret0
 //       CHECK:   linalg.copy(%[[MEMREF]], %[[RESULT]])
 
@@ -1102,7 +1102,7 @@ hal.interface private @io  {
 }
 // CHECK-LABEL: func @rhs_non_splat_constant
 //   CHECK-DAG:   %[[CONSTANT:.+]] = arith.constant {{.+}} : tensor<3x5xf32>
-//   CHECK-DAG:   %[[RHS:.+]] = memref.buffer_cast %[[CONSTANT]]
+//   CHECK-DAG:   %[[RHS:.+]] = bufferization.to_memref %[[CONSTANT]]
 //   CHECK-DAG:   %[[LHS_INPUT:.+]] = hal.interface.binding.subspan @io::@arg0[%{{.+}}] : memref<1x5x3x1xf32>
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @io::@ret0[%{{.+}}] : memref<5x5xf32>
 //       CHECK:   %[[LHS:.+]] = memref.collapse_shape %[[LHS_INPUT]]
@@ -1450,8 +1450,8 @@ hal.interface private @interface_io  {
 
 //       CHECK-DAG: %[[CST1:.+]] = arith.constant dense<-2147483648> : tensor<i32>
 //       CHECK-DAG: %[[CST5:.+]] = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
-//       CHECK: %[[CAST1:.+]] = memref.buffer_cast %[[CST1]] : memref<i32>
-//       CHECK: %[[CAST5:.+]] = memref.buffer_cast %[[CST5]] : memref<5xi32>
+//       CHECK: %[[CAST1:.+]] = bufferization.to_memref %[[CST1]] : memref<i32>
+//       CHECK: %[[CAST5:.+]] = bufferization.to_memref %[[CST5]] : memref<5xi32>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan @io::@ro0[%c0] : memref<5xf32>
 //       CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan @io::@wo1[%c0] : memref<i32>
 //       CHECK: linalg.copy(%[[CAST1]], %[[OUTPUT]])

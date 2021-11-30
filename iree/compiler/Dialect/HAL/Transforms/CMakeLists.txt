@@ -33,6 +33,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineToStandard
+    MLIRBufferization
     MLIRIR
     MLIRPass
     MLIRStandard
