@@ -260,8 +260,10 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     // TODO(hanchung): Set different vector sizes for different operations. Also
     // it seems that `{16, 16, 16}` is not a good config. We should tune it.
     vector::populateVectorUnrollPatterns(
-        vectorUnrollPatterns, vector::UnrollVectorOptions().setNativeShape(
-                                  config.getNativeVectorSizeVals()));
+        vectorUnrollPatterns,
+        vector::UnrollVectorOptions().setNativeShape(config.getTileSizeVals(
+            static_cast<unsigned>(TilingLevel::VectorTiles))));
+
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(vectorUnrollPatterns)))) {
       return signalPassFailure();

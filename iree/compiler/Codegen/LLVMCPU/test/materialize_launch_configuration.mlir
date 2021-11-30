@@ -1351,4 +1351,6 @@ hal.executable private @matmul_x86  {
     }
   }
 }
-//  CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering.config<tile_sizes = [{{\[}}], [8, 32, 32], [1, 16, 16]], native_vector_size = [1, 16, 16]>
+//  CHECK:       linalg.matmul {lowering.config = #[[CONFIG]]}
