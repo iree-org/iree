@@ -23,6 +23,15 @@ steps:
     agents:
       - "queue=build"
 
+  - label: ":pinching_hand: Build the size-optimized runtime only"
+    commands:
+      - "./scripts/git/submodule_versions.py init"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:b8d9863c6ac913f167c6fab319d7cd883ab099312488709ee30b29976d63eb22 ./build_tools/cmake/build_runtime_small.sh"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"
+
   - label: ":gnu: Build with GCC"
     key: "build-gcc"
     commands:
