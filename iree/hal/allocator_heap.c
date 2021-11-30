@@ -84,9 +84,9 @@ static iree_allocator_t iree_hal_heap_allocator_host_allocator(
 static void iree_hal_heap_allocator_query_statistics(
     iree_hal_allocator_t* base_allocator,
     iree_hal_allocator_statistics_t* out_statistics) {
-  iree_hal_heap_allocator_t* allocator =
-      iree_hal_heap_allocator_cast(base_allocator);
   IREE_STATISTICS({
+    iree_hal_heap_allocator_t* allocator =
+        iree_hal_heap_allocator_cast(base_allocator);
     iree_slim_mutex_lock(&allocator->statistics.mutex);
     memcpy(out_statistics, &allocator->statistics.base,
            sizeof(*out_statistics));
