@@ -11,6 +11,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/dynamic_symbols.h"
+#include "iree/hal/cuda/executable_layout.h"
 #include "iree/hal/cuda/status_util.h"
 
 // flatcc schemas:
@@ -28,6 +29,7 @@ typedef struct iree_hal_cuda_native_executable_function_t {
 typedef struct iree_hal_cuda_native_executable_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
+  iree_hal_executable_layout_t** executable_layouts;
   iree_host_size_t entry_count;
   CUmodule module;
   iree_hal_cuda_native_executable_function_t entry_functions[];
@@ -68,9 +70,13 @@ iree_status_t iree_hal_cuda_native_executable_create(
   iree_host_size_t entry_count = flatbuffers_string_vec_len(entry_points_vec);
   iree_host_size_t total_size =
       sizeof(*executable) +
-      entry_count * sizeof(iree_hal_cuda_native_executable_function_t);
+      entry_count * sizeof(iree_hal_cuda_native_executable_function_t) +
+      entry_count * sizeof(iree_hal_executable_layout_t*);
   iree_status_t status = iree_allocator_malloc(context->host_allocator,
                                                total_size, (void**)&executable);
+  executable->executable_layouts =
+      (void*)((char*)executable + sizeof(*executable) +
+              entry_count * sizeof(iree_hal_cuda_native_executable_function_t));
   CUmodule module = NULL;
   CUDA_RETURN_IF_ERROR(context->syms,
                        cuModuleLoadDataEx(&module, ptx_image, 0, NULL, NULL),
@@ -86,6 +92,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
     executable->entry_functions[i].block_size_x = block_sizes_vec[i].x;
     executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
     executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
+    executable->executable_layouts[i] = executable_spec->executable_layouts[i];
   }
 
   iree_hal_resource_initialize(&iree_hal_cuda_native_executable_vtable,
@@ -113,6 +120,13 @@ iree_status_t iree_hal_cuda_native_executable_block_size(
   *y = executable->entry_functions[entry_point].block_size_y;
   *z = executable->entry_functions[entry_point].block_size_z;
   return iree_ok_status();
+}
+
+iree_hal_executable_layout_t* iree_hal_cuda_executable_get_layout(
+    iree_hal_executable_t* base_executable, int32_t entry_point) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  return executable->executable_layouts[entry_point];
 }
 
 static void iree_hal_cuda_native_executable_destroy(
