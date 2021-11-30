@@ -17,8 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "dispatch_ops.mlir",
-            "tensor_ops.mlir",
+            "abi_ops.mlir",
         ],
         include = ["*.mlir"],
     ),
