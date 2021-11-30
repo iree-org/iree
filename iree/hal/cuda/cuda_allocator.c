@@ -45,33 +45,32 @@ iree_status_t iree_hal_cuda_allocator_create(
   // page-locked memory. The compiler tries to avoid this for high-traffic
   // buffers except for readback staging buffers.
   int supports_concurrent_managed_access = 0;
-  iree_status_t status = CU_RESULT_TO_STATUS(
-      context->syms,
-      cuDeviceGetAttribute(&supports_concurrent_managed_access,
-                           CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS,
-                           device),
-      "cuDeviceGetAttribute");
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, CU_RESULT_TO_STATUS(
+              context->syms,
+              cuDeviceGetAttribute(
+                  &supports_concurrent_managed_access,
+                  CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS, device),
+              "cuDeviceGetAttribute"));
 
+  IREE_TRACE_ZONE_APPEND_TEXT(
+      z0, supports_concurrent_managed_access
+              ? "has CONCURRENT_MANAGED_ACCESS"
+              : "no CONCURRENT_MANAGED_ACCESS (expect slow accesses on "
+                "device-local + host-visible memory)");
+
+  iree_hal_cuda_allocator_t* allocator = NULL;
+  iree_status_t status = iree_allocator_malloc(
+      context->host_allocator, sizeof(*allocator), (void**)&allocator);
   if (iree_status_is_ok(status)) {
-    IREE_TRACE_ZONE_APPEND_TEXT(
-        z0, supports_concurrent_managed_access
-                ? "has CONCURRENT_MANAGED_ACCESS"
-                : "no CONCURRENT_MANAGED_ACCESS (expect slow accesses on "
-                  "device-local + host-visible memory)");
-
-    iree_hal_cuda_allocator_t* allocator = NULL;
-    status = iree_allocator_malloc(context->host_allocator, sizeof(*allocator),
-                                   (void**)&allocator);
-    if (iree_status_is_ok(status)) {
-      iree_hal_resource_initialize(&iree_hal_cuda_allocator_vtable,
-                                   &allocator->resource);
-      allocator->context = context;
-      allocator->device = device;
-      allocator->stream = stream;
-      allocator->supports_concurrent_managed_access =
-          supports_concurrent_managed_access != 0;
-      *out_allocator = (iree_hal_allocator_t*)allocator;
-    }
+    iree_hal_resource_initialize(&iree_hal_cuda_allocator_vtable,
+                                 &allocator->resource);
+    allocator->context = context;
+    allocator->device = device;
+    allocator->stream = stream;
+    allocator->supports_concurrent_managed_access =
+        supports_concurrent_managed_access != 0;
+    *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
   IREE_TRACE_ZONE_END(z0);
