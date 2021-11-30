@@ -12,7 +12,7 @@ import logging
 
 import numpy as np
 
-from f.binding import HalDevice, HalElementType, VmContext, VmFunction, VmVariantList
+from .binding import HalDevice, HalElementType, VmContext, VmFunction, VmVariantList
 from . import tracing
 
 __all__ = [
@@ -502,8 +502,10 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
     len_py_list = sum([1 for x in py_list if x is not MissingArgument])
     if len(py_list) != len_py_list:
       _raise_argument_error(
-          inv, f"mismatched call arity: expected {len(descs)} arguments but got "
-          f"{len(py_list)}. Expected signature=\n{descs}\nfor input=\n{py_list}")
+          inv,
+          f"mismatched call arity: expected {len(descs)} arguments but got "
+          f"{len(py_list)}. Expected signature=\n{descs}\nfor input=\n{py_list}"
+      )
 
   for py_value, desc in zip(py_list, descs):
     inv.current_arg = py_value
