@@ -183,8 +183,7 @@
 // Example:
 //   int some_info IREE_ATTRIBUTE_UNUSED = compute_debug_info();
 //   assert(some_info > 0);  // stripped in NDEBUG
-#if IREE_HAVE_ATTRIBUTE(maybe_unused) || \
-    (defined(__GNUC__) && !defined(__clang__))
+#if IREE_HAVE_ATTRIBUTE(maybe_unused) && defined(__clang__)
 #define IREE_ATTRIBUTE_UNUSED __attribute__((maybe_unused))
 #elif IREE_HAVE_ATTRIBUTE(unused) || (defined(__GNUC__) && !defined(__clang__))
 #define IREE_ATTRIBUTE_UNUSED __attribute__((unused))
