@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "broadcasting.mlir"
     "convert_complex_to_real.mlir"
     "convert_mhlo_to_linalg_ext.mlir"
+    "convert_structural_types.mlir"
     "dynamic_shape.mlir"
     "fft.mlir"
     "legalize_input_types.mlir"
