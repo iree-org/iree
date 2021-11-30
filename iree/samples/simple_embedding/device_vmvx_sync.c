@@ -36,7 +36,7 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   iree_hal_allocator_t* device_allocator = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_allocator_create_heap(identifier, host_allocator,
-                                            &device_allocator);
+                                            host_allocator, &device_allocator);
   }
 
   if (iree_status_is_ok(status)) {

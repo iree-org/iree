@@ -41,7 +41,7 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   iree_string_view_t identifier = iree_make_cstring_view("dylib");
   iree_hal_allocator_t* device_allocator = NULL;
   iree_status_t status = iree_hal_allocator_create_heap(
-      identifier, host_allocator, &device_allocator);
+      identifier, host_allocator, host_allocator, &device_allocator);
 
   // Create the synchronous device and release the loader afterwards.
   if (iree_status_is_ok(status)) {

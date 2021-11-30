@@ -263,7 +263,8 @@ static iree_status_t iree_hal_executable_library_run(
   // memory accessed by the invocation will come from here.
   iree_hal_allocator_t* heap_allocator = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_create_heap(
-      iree_make_cstring_view("benchmark"), host_allocator, &heap_allocator));
+      iree_make_cstring_view("benchmark"), host_allocator, host_allocator,
+      &heap_allocator));
   iree_hal_buffer_view_t* buffer_views[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
   void* binding_ptrs[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
   size_t binding_lengths[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
