@@ -93,7 +93,7 @@ cc_library(
         "@mlir-hlo//:legalize_einsum_to_dot_general",
         "@mlir-hlo//:legalize_gather_to_torch_index_select",
         "@mlir-hlo//:legalize_to_linalg",
-        "@mlir-hlo//:map_lmhlo_to_scalar_op",
+        "@mlir-hlo//:map_mhlo_to_scalar_op",
         "@mlir-hlo//:materialize_broadcasts",
         "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns",
         "@mlir-hlo//:unfuse_batch_norm",
