@@ -79,7 +79,8 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
   iree_hal_allocator_t* device_allocator = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_allocator_create_heap(iree_make_cstring_view("cpu"),
-                                            host_allocator, &device_allocator);
+                                            host_allocator, host_allocator,
+                                            &device_allocator);
   }
 
   if (iree_status_is_ok(status)) {
