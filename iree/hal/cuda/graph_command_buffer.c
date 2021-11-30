@@ -18,7 +18,6 @@
 #include "iree/hal/cuda/native_executable.h"
 #include "iree/hal/cuda/status_util.h"
 
-#define IREE_HAL_CUDA_MAX_PUSH_CONSTANT 64
 #define IREE_HAL_CUDA_MAX_BINDING_COUNT 64
 // Kernel arguments contains binding and push constants.
 #define IREE_HAL_CUDA_MAX_KERNEL_ARG 128
@@ -37,7 +36,7 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
   // Keep track of the last node added to the command buffer as we are currently
   // serializing all the nodes (each node depends on the previous one).
   CUgraphNode last_node;
-  int32_t push_constant[IREE_HAL_CUDA_MAX_PUSH_CONSTANT];
+  int32_t push_constant[IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT];
   // Keep track of the current set of kernel arguments.
   void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;

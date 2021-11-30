@@ -93,6 +93,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
     executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
     executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
     executable->executable_layouts[i] = executable_spec->executable_layouts[i];
+    iree_hal_executable_layout_retain(executable_spec->executable_layouts[i]);
   }
 
   iree_hal_resource_initialize(&iree_hal_cuda_native_executable_vtable,
@@ -136,6 +137,9 @@ static void iree_hal_cuda_native_executable_destroy(
   iree_allocator_t host_allocator = executable->context->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  for (iree_host_size_t i = 0; i < executable->entry_count; ++i) {
+    iree_hal_executable_layout_release(executable->executable_layouts[i]);
+  }
   iree_allocator_free(host_allocator, executable);
 
   IREE_TRACE_ZONE_END(z0);
