@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "llvm/ADT/StringSet.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -44,6 +45,7 @@ class TranslateTargetExecutableVariantsPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
+    registry.insert<bufferization::BufferizationDialect>();
     auto targetBackend = getTargetBackend(target);
     if (targetBackend) {
       targetBackend->getDependentDialects(registry);
@@ -102,6 +104,7 @@ class TranslateExecutablesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
+    registry.insert<bufferization::BufferizationDialect>();
     auto targetBackends = getTargetBackends(getRegisteredTargetBackends());
     for (auto &targetBackend : targetBackends) {
       targetBackend->getDependentDialects(registry);

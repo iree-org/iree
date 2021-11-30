@@ -45,10 +45,13 @@ iree_cc_library(
     IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
+    MLIRAffineBufferizableOpInterfaceImpl
     MLIRAffineUtils
     MLIRAnalysis
+    MLIRArithBufferizableOpInterfaceImpl
     MLIRArithmetic
     MLIRBufferizableOpInterface
+    MLIRBufferization
     MLIRComprehensiveBufferize
     MLIRGPUOps
     MLIRIR
@@ -61,6 +64,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
+    MLIRSCFBufferizableOpInterfaceImpl
     MLIRSCFToStandard
     MLIRSideEffectInterfaces
     MLIRStandard

@@ -591,8 +591,8 @@ hal.executable private @static_3d_fft_stage3  {
         %c32 = arith.constant 32 : index
         %cst = arith.constant dense<[1.000000e+00, 0.707106769, 6.12323426E-17, -0.707106769]> : tensor<4xf32>
         %cst_0 = arith.constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
-        %0 = memref.buffer_cast %cst_0 : memref<4xf32>
-        %1 = memref.buffer_cast %cst : memref<4xf32>
+        %0 = bufferization.to_memref %cst_0 : memref<4xf32>
+        %1 = bufferization.to_memref %cst : memref<4xf32>
         %2 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : memref<64x128x32xf32>
         %3 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : memref<64x128x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index

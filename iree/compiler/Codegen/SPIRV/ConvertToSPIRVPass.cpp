@@ -34,6 +34,7 @@
 #include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -391,7 +392,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// - unrealized_conversion_cast with the same source and target type.
   patterns.insert<
       FoldAsNoOp<memref::CollapseShapeOp>, FoldAsNoOp<memref::ExpandShapeOp>,
-      FoldAsNoOp<memref::BufferCastOp>, RemoveIdentityConversionCast>(
+      FoldAsNoOp<bufferization::ToMemrefOp>, RemoveIdentityConversionCast>(
       typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =

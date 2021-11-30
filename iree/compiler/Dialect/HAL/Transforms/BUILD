@@ -49,6 +49,7 @@ cc_library(
         "//iree/compiler/Dialect/Util/Transforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineToStandard",
+        "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
