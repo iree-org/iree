@@ -414,7 +414,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_assert,  //
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
   iree_vm_buffer_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &message));
-  iree_string_view_t message_str = iree_vm_buffer_as_string(message);
+  iree_string_view_t message_str IREE_ATTRIBUTE_UNUSED =
+      iree_vm_buffer_as_string(message);
   iree_hal_allocator_t* allocator = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r2, &allocator));
   iree_vm_size_t minimum_length = (iree_vm_size_t)args->i3;
@@ -621,7 +622,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
   iree_vm_buffer_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &message));
-  iree_string_view_t message_str = iree_vm_buffer_as_string(message);
+  iree_string_view_t message_str IREE_ATTRIBUTE_UNUSED =
+      iree_vm_buffer_as_string(message);
   iree_hal_element_type_t expected_element_type =
       (iree_hal_element_type_t)args->i2;
   iree_hal_encoding_type_t expected_encoding_type =

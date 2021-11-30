@@ -304,14 +304,20 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_begin_call(
   iree_status_t status = function_ptr->shim(stack, call, function_ptr->target,
                                             module, module_state, out_result);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    iree_string_view_t module_name = iree_vm_native_module_name(module);
-    iree_string_view_t function_name = iree_string_view_empty();
+#if IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS
+    iree_string_view_t module_name IREE_ATTRIBUTE_UNUSED =
+        iree_vm_native_module_name(module);
+    iree_string_view_t function_name IREE_ATTRIBUTE_UNUSED =
+        iree_string_view_empty();
     iree_status_ignore(iree_vm_native_module_get_export_function(
         module, call->function.ordinal, NULL, &function_name, NULL));
     return iree_status_annotate_f(status,
                                   "while invoking native function %.*s.%.*s",
                                   (int)module_name.size, module_name.data,
                                   (int)function_name.size, function_name.data);
+#else
+    return status;
+#endif  // IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS
   }
 
   return iree_vm_stack_function_leave(stack);

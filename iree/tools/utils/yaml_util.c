@@ -99,7 +99,7 @@ size_t iree_yaml_base64_calculate_size(iree_string_view_t source) {
   size_t decoded_length = 0;
   size_t i = 0;
   while (i < source.size) {
-    uint8_t c = iree_yaml_base64_decode_table[source.data[i++]];
+    uint8_t c = iree_yaml_base64_decode_table[(uint8_t)source.data[i++]];
     if (c == IREE_YAML_BASE64_WHITESPACE) {
       // Skip whitespace.
       continue;
@@ -138,7 +138,7 @@ iree_status_t iree_yaml_base64_decode(iree_string_view_t source,
   size_t i = 0;
   uint8_t* p = target.data;
   while (i < source.size) {
-    uint8_t c = iree_yaml_base64_decode_table[source.data[i++]];
+    uint8_t c = iree_yaml_base64_decode_table[(uint8_t)source.data[i++]];
     if (c == IREE_YAML_BASE64_WHITESPACE) {
       // Skip whitespace.
       continue;
