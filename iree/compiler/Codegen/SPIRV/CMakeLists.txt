@@ -42,7 +42,7 @@ iree_cc_library(
     MLIRArithmetic
     MLIRArithmeticToSPIRV
     MLIRArithmeticTransforms
-    MLIRBufferizationDialect
+    MLIRBufferization
     MLIRGPUOps
     MLIRGPUToSPIRV
     MLIRGPUTransforms
