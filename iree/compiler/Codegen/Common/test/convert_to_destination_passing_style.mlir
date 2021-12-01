@@ -217,9 +217,9 @@ hal.interface private @io  {
 //      CHECK: func @reshape_fused_source()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //      CHECK:   %[[RESHAPE:.+]] = linalg.tensor_expand_shape %[[SOURCE]]
-//      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[RESHAPE]]
 // CHECK-SAME:       outs(%[[TARGET]]
@@ -259,10 +259,10 @@ hal.interface private @io  {
 //      CHECK: func @reshape_fused_source_and_copyout()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//  CHECK-DAG:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //  CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@ret1
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //      CHECK:   %[[RESHAPE:.+]] = linalg.tensor_expand_shape %[[SOURCE]]
-//      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[RESHAPE]]
 // CHECK-SAME:       outs(%[[TARGET]]
@@ -302,7 +302,7 @@ hal.interface private @io  {
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
 //  CHECK-DAG:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //  CHECK-DAG:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
-//      CHECK:   %[[RESHAPE_EXPAND:.+]] = linalg.tensor_expand_shape %[[TARGET]] {{\[}}[0, 1]{{\]}}
+//  CHECK-DAG:   %[[RESHAPE_EXPAND:.+]] = linalg.tensor_expand_shape %[[TARGET]] {{\[}}[0, 1]{{\]}}
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[SOURCE]]
 // CHECK-SAME:       outs(%[[RESHAPE_EXPAND]]

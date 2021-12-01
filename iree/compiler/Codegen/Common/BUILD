@@ -56,6 +56,7 @@ cc_library(
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common:FoldTensorExtractOpIncGen",
         "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
         "//iree/compiler/Codegen/Transforms",
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/Flow/IR",
