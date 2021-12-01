@@ -86,9 +86,7 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
 }
 
 void buildXLACleanupPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(mhlo::createControlFlowToScfPass());
   passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
-  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
   passManager.addPass(createFlattenTuplesInCFGPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 }
