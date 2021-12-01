@@ -534,7 +534,10 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
         .add<ScalarizeVectorTransferRead, ScalarizeVectorTransferWrite>(
             context);
 
-    (void)applyPatternsAndFoldGreedily(func, std::move(rewritingPatterns));
+    if (failed(
+            applyPatternsAndFoldGreedily(func, std::move(rewritingPatterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 

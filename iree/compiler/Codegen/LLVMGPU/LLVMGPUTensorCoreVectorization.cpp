@@ -125,8 +125,10 @@ struct LLVMGPUTensorCoreVectorizationPass
       // Step 1. Vectorize
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorizationPatterns)))) {
+        return signalPassFailure();
+      }
 
       // Fold consumer add ops into the contraction op itself.
       RewritePatternSet canonicalizationPatterns(context);
@@ -134,13 +136,17 @@ struct LLVMGPUTensorCoreVectorizationPass
           canonicalizationPatterns, context);
       canonicalizationPatterns.insert<CombineTransferReadOpBroadcast>(
           funcOp.getContext());
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
 
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorUnrollPatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };

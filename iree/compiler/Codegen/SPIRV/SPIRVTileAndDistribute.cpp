@@ -185,8 +185,11 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   {  // Tile and distribute to invocations.
     RewritePatternSet invocationTilingPatterns(&getContext());
     populateTilingToInvocationPatterns(context, invocationTilingPatterns);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(invocationTilingPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(invocationTilingPatterns)))) {
+      funcOp.emitOpError() << "failure in tiling";
+      return signalPassFailure();
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tiling to invocations ---\n";
@@ -201,8 +204,14 @@ void SPIRVTileAndDistributePass::runOnOperation() {
 
     populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
 
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(canonicalizationPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(canonicalizationPatterns)))) {
+      // TODO(#4759): Terrifyingly, this fails. Errors here were ignored for a
+      // long time and now tests for this pass actually fail if we propagate the
+      // failure correctly. Fix this.
+      // funcOp.emitOpError() << "failure canonicalizing after tiling";
+      // return signalPassFailure();
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tiling canonicalization ---\n";
@@ -216,14 +225,20 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     auto marker = getLinalgMatchAndReplaceMarker(getTileReductionMarker(),
                                                  getVectorizeMarker(), context);
     populateTilingReductionPatterns(context, reductionTilingPatterns, marker);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(reductionTilingPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(reductionTilingPatterns)))) {
+      funcOp.emitOpError() << "failing in tile reduction";
+      return signalPassFailure();
+    }
 
     RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     scf::populateSCFForLoopCanonicalizationPatterns(canonicalizationPatterns);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(canonicalizationPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(canonicalizationPatterns)))) {
+      funcOp.emitOpError() << "failing canonicalizing after tile reduction";
+      return signalPassFailure();
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tiling reduction dimensions  ---\n";

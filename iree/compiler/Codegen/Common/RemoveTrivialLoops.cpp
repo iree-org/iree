@@ -121,9 +121,9 @@ static SmallVector<int64_t> getNumWorkgroup(
   return numWorkgroups;
 }
 
-static void removeOneTripTiledLoops(FuncOp funcOp,
-                                    ArrayRef<int64_t> workgroupSize,
-                                    ArrayRef<int64_t> numWorkgroups) {
+static LogicalResult removeOneTripTiledLoops(FuncOp funcOp,
+                                             ArrayRef<int64_t> workgroupSize,
+                                             ArrayRef<int64_t> numWorkgroups) {
   auto getWorkgroupRangeFn = [numWorkgroups, workgroupSize](
                                  Value processorValue,
                                  SmallVectorImpl<Value> &dims,
@@ -133,7 +133,7 @@ static void removeOneTripTiledLoops(FuncOp funcOp,
   };
   OwningRewritePatternList patterns(funcOp.getContext());
   populateRemoveSingleIterationLoopPattern(patterns, getWorkgroupRangeFn);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  return applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
 namespace {
@@ -148,7 +148,9 @@ class RemoveSingleIterationLoopPass final
     SmallVector<int64_t> workgroupSize = getWorkgroupSize(entryPointOp);
     SmallVector<int64_t> numWorkgroups = getNumWorkgroup(funcOp, entryPointOp);
 
-    removeOneTripTiledLoops(funcOp, workgroupSize, numWorkgroups);
+    if (failed(removeOneTripTiledLoops(funcOp, workgroupSize, numWorkgroups))) {
+      return signalPassFailure();
+    }
   }
 };
 }  // namespace

@@ -69,12 +69,16 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       vector::populateVectorShapeCastLoweringPatterns(patterns);
       vector::populateVectorTransposeLoweringPatterns(patterns);
       vector::populateVectorTransferLoweringPatterns(patterns);
-      (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
+      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
     {
       OwningRewritePatternList patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
+      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
     {
       OwningRewritePatternList llvmPatterns(&getContext());

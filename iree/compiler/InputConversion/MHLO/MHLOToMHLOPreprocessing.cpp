@@ -877,7 +877,10 @@ struct MHLOToMHLOPreprocessingPass
       patterns.insert<ReorderConvOpKernelDimensions>(context);
       patterns.insert<ReorderConvOpOutputDimensions>(context);
     }
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

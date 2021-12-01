@@ -617,7 +617,10 @@ struct FlattenMemRefSubspanPass
     foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
                      FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(&context);
 
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(foldPatterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(foldPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

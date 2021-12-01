@@ -1109,7 +1109,9 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
     // update subtensor_insert ops will be turned into flow dispatch output
     // store ops.
     tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return failure();
+    }
   }
 
   // After outlining in dispatch region we can rewrite the dispatch ops with

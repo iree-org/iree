@@ -688,21 +688,29 @@ void ConvertToLLVMPass::runOnOperation() {
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
     vector::populateVectorTransposeLoweringPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
   {
     OwningRewritePatternList vectorToLoopsPatterns(&getContext());
     populateVectorToSCFConversionPatterns(
         vectorToLoopsPatterns, VectorTransferToSCFOptions().enableFullUnroll());
-    (void)applyPatternsAndFoldGreedily(getOperation(),
-                                       std::move(vectorToLoopsPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            getOperation(), std::move(vectorToLoopsPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   // math dialect elementry functions -> polynomial form.
   {
     OwningRewritePatternList mathPatterns(&getContext());
     populateMathPolynomialApproximationPatterns(mathPatterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(mathPatterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(mathPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   const auto &dataLayoutAnalysis = getAnalysis<DataLayoutAnalysis>();
@@ -790,7 +798,10 @@ void ConvertToLLVMPass::runOnOperation() {
     llvm::Triple triple(targetTripleStr);
     if (triple.isWasm()) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
-      (void)applyPatternsAndFoldGreedily(module, std::move(postPatterns));
+      if (failed(
+              applyPatternsAndFoldGreedily(module, std::move(postPatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 }

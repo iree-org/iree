@@ -150,7 +150,10 @@ void SetNumWorkgroupsPass::runOnOperation() {
   populateAffineMinSCFCanonicalizationPattern(canonicalization);
   IREE::Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,
                                                            context);
-  (void)applyPatternsAndFoldGreedily(module, std::move(canonicalization));
+  if (failed(
+          applyPatternsAndFoldGreedily(module, std::move(canonicalization)))) {
+    return signalPassFailure();
+  }
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>

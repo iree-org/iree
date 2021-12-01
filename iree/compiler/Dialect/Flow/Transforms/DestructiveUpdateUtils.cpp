@@ -368,9 +368,8 @@ LogicalResult rewriteLinalgDestructiveUpdates(
   // affineminscf and others as needed.
   OwningRewritePatternList canonicalizationPatterns(context);
   scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  (void)applyPatternsAndFoldGreedily(dispatchOp,
-                                     std::move(canonicalizationPatterns));
-  return success();
+  return applyPatternsAndFoldGreedily(dispatchOp,
+                                      std::move(canonicalizationPatterns));
 }
 
 }  // namespace Flow

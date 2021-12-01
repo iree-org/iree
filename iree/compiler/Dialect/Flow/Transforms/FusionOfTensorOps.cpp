@@ -127,8 +127,10 @@ struct FusionOfTensorOpsPass
             .setControlFoldingReshapes(foldReshapeBetweenLinalgFn)
             .setControlElementwiseOpsFusionFn(controlFn));
 
-    (void)applyPatternsAndFoldGreedily(op->getRegions(),
-                                       std::move(fusionPatterns));
+    if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
+                                            std::move(fusionPatterns)))) {
+      return signalPassFailure();
+    }
 
     OwningRewritePatternList reshapeCanonicalizations(&getContext());
     linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
@@ -137,8 +139,10 @@ struct FusionOfTensorOpsPass
         reshapeCanonicalizations, context);
     linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
         reshapeCanonicalizations, context);
-    (void)applyPatternsAndFoldGreedily(op->getRegions(),
-                                       std::move(reshapeCanonicalizations));
+    if (failed(applyPatternsAndFoldGreedily(
+            op->getRegions(), std::move(reshapeCanonicalizations)))) {
+      return signalPassFailure();
+    }
 
     // Push the remaining reshapes down the graphs.
     OwningRewritePatternList pushReshapePatterns(&getContext());
@@ -147,8 +151,10 @@ struct FusionOfTensorOpsPass
         pushReshapePatterns, context);
     linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
         pushReshapePatterns, context);
-    (void)applyPatternsAndFoldGreedily(op->getRegions(),
-                                       std::move(pushReshapePatterns));
+    if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
+                                            std::move(pushReshapePatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 
