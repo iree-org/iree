@@ -205,7 +205,6 @@ func @nonvectorizable_matmul_and_vectorizable_generic() {
   return
 }
 
-
 // CHECK: func @nonvectorizable_matmul_and_vectorizable_generic
 // Verify that both matmul and generic ops are not vectorized.
 // CHECK:   linalg.matmul
