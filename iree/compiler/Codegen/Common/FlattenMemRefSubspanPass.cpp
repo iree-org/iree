@@ -544,6 +544,19 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
   }
 };
 
+/// Erase alignment hints.
+struct RemoveAssumeAlignOp
+    : public OpRewritePattern<memref::AssumeAlignmentOp> {
+ public:
+  using OpRewritePattern<memref::AssumeAlignmentOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -562,6 +575,12 @@ struct FlattenMemRefSubspanPass
     // ops. This requires setting up conversion targets with type converter.
 
     MLIRContext &context = getContext();
+
+    // This pass currently doesn't support alignment hints so remove them first.
+    OwningRewritePatternList patterns(&context);
+    patterns.add<RemoveAssumeAlignOp>(&context);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+
     FlattenMemRefTypeConverter typeConverter;
     RewritePatternSet flattenPatterns(&context);
     flattenPatterns

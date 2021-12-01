@@ -40,7 +40,7 @@ static bool getUsesIfAllTransferOp(Value value,
                                    SmallVectorImpl<Operation *> &uses) {
   assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : value.getUsers()) {
-    if (isa<memref::DeallocOp>(userOp)) continue;
+    if (isa<memref::DeallocOp, memref::AssumeAlignmentOp>(userOp)) continue;
     // Only vectorize memref used by vector transfer ops.
     if (!isa<vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
       uses.clear();
@@ -502,7 +502,9 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       .add<ProcessFunctionArgument, ProcessTransferRead, ProcessTransferWrite,
            ProcessAlloc, ProcessInterfaceBinding>(context,
                                                   *memrefUsageAnalysis);
-  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>>(context);
+  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>,
+                         PassThroughConversion<memref::AssumeAlignmentOp>>(
+      context);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
@@ -522,6 +524,8 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       return !memrefUsageAnalysis->shouldConvertTransfer(op);
     if (auto dealloc = dyn_cast<memref::DeallocOp>(op))
       return !memrefUsageAnalysis->shouldVectorizeMemRef(dealloc.memref());
+    if (auto assumeOp = dyn_cast<memref::AssumeAlignmentOp>(op))
+      return !memrefUsageAnalysis->shouldVectorizeMemRef(assumeOp.memref());
     return true;
   });
   if (failed(applyPartialConversion(module, target,
