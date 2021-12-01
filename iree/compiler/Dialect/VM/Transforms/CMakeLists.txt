@@ -36,7 +36,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion

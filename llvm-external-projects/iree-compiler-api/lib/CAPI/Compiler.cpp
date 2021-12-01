@@ -8,6 +8,8 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 #include "iree/tools/init_targets.h"
 #include "mlir/CAPI/IR.h"
@@ -66,6 +68,25 @@ void ireeCompilerOptionsSetInputDialectMHLO(IreeCompilerOptions options) {
 
 void ireeCompilerOptionsSetInputDialectTOSA(IreeCompilerOptions options) {
   unwrap(options)->inputDialectOptions.type = InputDialectOptions::Type::tosa;
+}
+
+void ireeCompilerOptionsSetInputDialectXLA(IreeCompilerOptions options) {
+  unwrap(options)->inputDialectOptions.type = InputDialectOptions::Type::xla;
+}
+
+void ireeCompilerBuildXLACleanupPassPipeline(MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  MHLO::buildXLACleanupPassPipeline(*passManagerCpp);
+}
+
+void ireeCompilerBuildMHLOImportPassPipeline(MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  MHLO::buildMHLOInputConversionPassPipeline(*passManagerCpp);
+}
+
+void ireeCompilerBuildTOSAImportPassPipeline(MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  buildTOSAInputConversionPassPipeline(*passManagerCpp);
 }
 
 void ireeCompilerBuildIREEVMPassPipeline(IreeCompilerOptions options,

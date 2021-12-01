@@ -211,8 +211,10 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     RewritePatternSet canonicalizationPatterns(context);
     vector::ContractionOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                        context);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(canonicalizationPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(canonicalizationPatterns)))) {
+      return signalPassFailure();
+    }
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs()

@@ -474,7 +474,8 @@ static iree_status_t iree_elf_module_verify_no_imports(
   for (iree_host_size_t i = 1; i < module->dynsym_count; ++i) {
     const iree_elf_sym_t* sym = &module->dynsym[i];
     if (sym->st_shndx == IREE_ELF_SHN_UNDEF) {
-      const char* symname = sym->st_name ? module->dynstr + sym->st_name : NULL;
+      const char* symname IREE_ATTRIBUTE_UNUSED =
+          sym->st_name ? module->dynstr + sym->st_name : NULL;
       return iree_make_status(IREE_STATUS_UNAVAILABLE,
                               "ELF imports one or more symbols (trying "
                               "'%s'); imports are not supported in the "

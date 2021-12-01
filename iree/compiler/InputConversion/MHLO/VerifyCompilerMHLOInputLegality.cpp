@@ -15,6 +15,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 struct VerifyCompilerMHLOInputLegalityPass
     : public VerifyCompilerMHLOInputLegalityBase<
@@ -69,5 +70,6 @@ createVerifyCompilerMHLOInputLegality() {
   return std::make_unique<VerifyCompilerMHLOInputLegalityPass>();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir

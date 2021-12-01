@@ -8,9 +8,6 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/Builders.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -34,66 +31,6 @@ static Value buildResultSizeOf(Location loc, Value tensorValue,
       loc, rewriter.getIndexType(), TypeAttr::get(tensorValue.getType()),
       dynamicDims, /*affinity=*/nullptr);
 }
-
-// hal.tensor.cast is inserted by frontends to ensure that ABI types are HAL
-// buffer views. We need to map those to the stream import/export equivalents as
-// the cast has special meaning when we are dealing with asynchronous values.
-//
-// %1 = hal.tensor.cast %0 : !hal.buffer_view -> tensor<4xf32>
-// ->
-// %1 = stream.tensor.import %0 : !hal.buffer_view ->
-//                                tensor<4xf32> in !stream.resource<*>
-struct ConvertHALTensorCastOp
-    : public OpConversionPattern<IREE::HAL::TensorCastOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::TensorCastOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto sourceType = op.source().getType();
-    auto targetType = op.target().getType();
-    if (sourceType.isa<IREE::HAL::BufferType>() ||
-        sourceType.isa<IREE::HAL::BufferViewType>()) {
-      // Import (buffer view to stream resource).
-      auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
-          IREE::Stream::Lifetime::External);
-      auto resultSize = buildResultSizeOf(op.getLoc(), op.target(),
-                                          adaptor.target_dims(), rewriter);
-      auto newOp = rewriter.create<IREE::Stream::TensorImportOp>(
-          op.getLoc(), resultType, adaptor.source(), TypeAttr::get(targetType),
-          adaptor.target_dims(), resultSize,
-          /*affinity=*/nullptr);
-
-      auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-      rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
-          op, unknownType, newOp.result(), resultSize, resultSize,
-          /*source_affinity=*/nullptr,
-          /*result_affinity=*/nullptr);
-    } else if (targetType.isa<IREE::HAL::BufferType>() ||
-               targetType.isa<IREE::HAL::BufferViewType>()) {
-      auto source =
-          consumeTensorOperand(op.getLoc(), adaptor.source(), rewriter);
-      auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
-          IREE::Stream::Lifetime::External);
-      auto exportSource = adaptor.source();
-      if (source.resource.getType() != externalType) {
-        exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
-            op.getLoc(), externalType, source.resource, source.resourceSize,
-            source.resourceSize,
-            /*source_affinity=*/nullptr,
-            /*result_affinity=*/nullptr);
-      }
-
-      // Export (stream resource to buffer view).
-      rewriter.replaceOpWithNewOp<IREE::Stream::TensorExportOp>(
-          op, targetType, exportSource, TypeAttr::get(op.source().getType()),
-          adaptor.source_dims(), source.resourceSize,
-          /*affinity=*/nullptr);
-    } else {
-      return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
-    }
-    return success();
-  }
-};
 
 // Reshapes become clones here to preserve shape information (which may become
 // actual transfers depending on source/target shape) - they'll be elided if not
@@ -277,7 +214,7 @@ struct ConvertTensorTraceOp
             /*source_affinity=*/nullptr,
             /*result_affinity=*/nullptr);
       }
-      auto dynamicDims = Shape::buildOrFindDynamicDimsForValue(
+      auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           op.getLoc(), tensorOperand, rewriter);
       exportedTensors.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
           op.getLoc(), tensorOperand.getType(), exportSource,
@@ -332,7 +269,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
         resultSizes.push_back(operandSizes[operandIndex]);
         resultTypes.push_back(dispatchOperands[operandIndex].getType());
       } else {
-        auto resultDynamicDims = Shape::buildOrFindDynamicDimsForValue(
+        auto resultDynamicDims = IREE::Util::buildDynamicDimsForValue(
             op.getLoc(), result.value(), rewriter);
         resultSizes.push_back(buildResultSizeOf(op.getLoc(), result.value(),
                                                 resultDynamicDims, rewriter));
@@ -434,10 +371,6 @@ struct ConvertExecutableOp
 void populateFlowToStreamConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     OwningRewritePatternList &patterns) {
-  typeConverter.addConversion(
-      [](IREE::HAL::BufferViewType type) { return type; });
-  patterns.insert<ConvertHALTensorCastOp>(typeConverter, context);
-
   patterns
       .insert<ConvertTensorReshapeOp, ConvertTensorSplatOp,
               ConvertTensorCloneOp, ConvertTensorSliceOp, ConvertTensorUpdateOp,
@@ -458,12 +391,6 @@ void populateFlowToStreamConversionPatterns(
   conversionTarget.addIllegalDialect<IREE::Flow::FlowDialect>();
   conversionTarget.addLegalOp<IREE::Stream::ExecutableOp>();
   conversionTarget.markOpRecursivelyLegal<IREE::Stream::ExecutableOp>();
-
-  conversionTarget.addDynamicallyLegalOp<IREE::HAL::TensorCastOp>(
-      [&](IREE::HAL::TensorCastOp op) {
-        return typeConverter.isLegal(op.source().getType()) &&
-               typeConverter.isLegal(op.target().getType());
-      });
 
   populateFlowToStreamConversionPatterns(context, typeConverter, patterns);
 }

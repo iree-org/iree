@@ -103,7 +103,10 @@ class PromoteI1ToI8Pass : public PromoteI1ToI8Base<PromoteI1ToI8Pass> {
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<ConvertBoolConstantPattern>(&getContext());
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

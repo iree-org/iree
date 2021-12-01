@@ -13,51 +13,67 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:IREEInputDialect": [
-        "IREEInputDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtDialect": [
-        "IREELinalgExtDialect"
-    ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
-        "IREELinalgExtPasses"
-    ],
+    "//llvm-external-projects/iree-dialects:IREEInputDialect":
+        ["IREEInputDialect"],
+    "//llvm-external-projects/iree-dialects:IREELinalgExtDialect":
+        ["IREELinalgExtDialect"],
+    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms":
+        ["IREELinalgExtPasses"],
     "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
         "IREEPyDMDialect"
     ],
-    "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
-        "IREEPyDMPasses"
-    ],
+    "//llvm-external-projects/iree-dialects:IREEPyDMTransforms":
+        ["IREEPyDMPasses"],
 
     # LLVM
     "@llvm-project//llvm:IPO": ["LLVMipo"],
     "@llvm-project//lld": ["lld"],
     # MLIR
-    "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
-    "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
+    "@llvm-project//mlir:AllPassesAndDialects": [
+        "MLIRAllDialects"
+    ],
+    "@llvm-project//mlir:AffineToStandardTransforms": [
+        "MLIRAffineToStandard"
+    ],
     "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToStandard"],
     "@llvm-project//mlir:ComplexDialect": ["MLIRComplex"],
     "@llvm-project//mlir:DialectUtils": [""],
-    "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
+    "@llvm-project//mlir:ExecutionEngineUtils": [
+        "MLIRExecutionEngine"
+    ],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
     "@llvm-project//mlir:LinalgInterfaces": ["MLIRLinalg"],
     "@llvm-project//mlir:LinalgOps": ["MLIRLinalg"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
-    "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
+    "@llvm-project//mlir:LLVMTransforms": [
+        "MLIRStandardToLLVM"
+    ],
     "@llvm-project//mlir:MathDialect": ["MLIRMath"],
-    "@llvm-project//mlir:ArithmeticDialect": ["MLIRArithmetic"],
-    "@llvm-project//mlir:BufferizationDialect": ["MLIRBufferization"],
+    "@llvm-project//mlir:ArithmeticDialect": [
+        "MLIRArithmetic"
+    ],
+    "@llvm-project//mlir:BufferizationDialect": [
+        "MLIRBufferization"
+    ],
     "@llvm-project//mlir:MemRefDialect": ["MLIRMemRef"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
     "@llvm-project//mlir:StandardOps": ["MLIRStandard"],
-    "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
-    "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
+    "@llvm-project//mlir:ShapeTransforms": [
+        "MLIRShapeOpsTransforms"
+    ],
+    "@llvm-project//mlir:SideEffects": [
+        "MLIRSideEffectInterfaces"
+    ],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:TosaDialect": ["MLIRTosa"],
-    "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
-    "@llvm-project//mlir:mlir_c_runner_utils": ["MLIRExecutionEngine"],
+    "@llvm-project//mlir:ToLLVMIRTranslation": [
+        "MLIRTargetLLVMIRExport"
+    ],
+    "@llvm-project//mlir:mlir_c_runner_utils": [
+        "MLIRExecutionEngine"
+    ],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
@@ -65,6 +81,70 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
     "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
+    # MHLO.
+    # TODO: Rework this upstream so that Bazel and CMake rules match up
+    # better.
+    # All of these have to depend on tensorflow::external_mhlo_includes to
+    # ensure that include directories are inherited.
+    "@mlir-hlo//:chlo_legalize_to_hlo": [
+        "tensorflow::external_mhlo_includes",
+        "ChloPasses",
+    ],
+    "@mlir-hlo//:hlo": [
+        "tensorflow::external_mhlo_includes",
+        "ChloDialect",
+        "MhloDialect",
+        "MLIRMhloUtils",
+    ],
+    "@mlir-hlo//:legalize_control_flow": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToStandard",
+    ],
+    "@mlir-hlo//:legalize_einsum_to_dot_general":
+        [
+            "tensorflow::external_mhlo_includes",
+            "MhloPasses",
+        ],
+    "@mlir-hlo//:legalize_gather_to_torch_index_select":
+        [
+            "tensorflow::external_mhlo_includes",
+            "MhloPasses",
+        ],
+    "@mlir-hlo//:legalize_to_linalg": [
+        "tensorflow::external_mhlo_includes",
+        "MhloLhloToLinalg",
+    ],
+    "@mlir-hlo//:legalize_to_standard": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToStandard",
+    ],
+    "@mlir-hlo//:map_lmhlo_to_scalar_op": [
+        "tensorflow::external_mhlo_includes",
+        "LmhloDialect",  # Unfortunate.
+        "MhloDialect",
+    ],
+    "@mlir-hlo//:map_mhlo_to_scalar_op": [
+        "tensorflow::external_mhlo_includes",
+        "MhloDialect",
+    ],
+    "@mlir-hlo//:materialize_broadcasts": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
+    "@mlir-hlo//:mhlo_control_flow_to_scf": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToStandard",
+    ],
+    "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns":
+        [
+            "tensorflow::external_mhlo_includes",
+            "MhloPasses",
+        ],
+    "@mlir-hlo//:unfuse_batch_norm": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
+
     # Vulkan
     "@vulkan_headers": ["Vulkan::Headers"],
     # Cuda
@@ -80,7 +160,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
     "@cpuinfo": ["cpuinfo"],
-    "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
+    "@vulkan_memory_allocator//:impl_header_only":
+        ["vulkan_memory_allocator"],
 }
 
 
@@ -131,8 +212,5 @@ def convert_target(target):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
-  if target.startswith("@mlir-hlo//"):
-    # All Bazel targets map to a single CMake target.
-    return ["tensorflow::mlir_hlo"]
 
   raise KeyError(f"No conversion found for target '{target}'")

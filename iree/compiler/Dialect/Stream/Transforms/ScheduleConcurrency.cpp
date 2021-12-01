@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -241,25 +242,15 @@ class ScheduleConcurrencyPass
         deadOps.insert(oldResult.getDefiningOp());
       }
       partitionBuilder.finish();
-
-      // Extremely shady reordering of ops we know (should) be safe to move
-      // after the partition - otherwise, we shouldn't have moved the source
-      // ops into the partition.
-      auto concurrentOp = partitionBuilder.concurrentOp;
-      for (auto user : concurrentOp->getUsers()) {
-        if (user->getBlock() == concurrentOp->getBlock() &&
-            user->isBeforeInBlock(partitionBuilder.concurrentOp)) {
-          LLVM_DEBUG({
-            llvm::dbgs() << "Shady move of op to after partition: ";
-            user->dump();
-          });
-          user->moveAfter(concurrentOp);
-        }
-      }
     }
     for (auto *deadOp : llvm::reverse(deadOps)) {
       deadOp->erase();
     }
+
+    // Sort the ops in the execution region as they may have gotten out of order
+    // during partitioning. This is safe because we are still unaliased and SSA
+    // values imply ordering.
+    sortBlockTopologically(block);
 
     LLVM_DEBUG({
       llvm::dbgs() << "\nWaves constructed:\n";

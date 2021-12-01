@@ -37,24 +37,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    ProcessorOpInterfaces
-  HDRS
-    "ProcessorOpInterfaces.h"
-  TEXTUAL_HDRS
-    "ProcessorOpInterfaces.cpp.inc"
-    "ProcessorOpInterfaces.h.inc"
-  SRCS
-    "ProcessorOpInterfaces.cpp"
-  DEPS
-    ::ProcessorOpInterfaceGen
-    MLIRGPUOps
-    MLIRIR
-    iree::compiler::Dialect::HAL::IR
-  PUBLIC
-)
-
 iree_tablegen_library(
   NAME
     IREECodegenDialectGen
@@ -75,16 +57,6 @@ iree_tablegen_library(
     -gen-attrdef-defs LoweringConfig.cpp.inc
     -gen-enum-decls LoweringConfigEnums.h.inc
     -gen-enum-defs LoweringConfigEnums.cpp.inc
-)
-
-iree_tablegen_library(
-  NAME
-    ProcessorOpInterfaceGen
-  TD_FILE
-    "ProcessorOpInterfaces.td"
-  OUTS
-    -gen-op-interface-decls ProcessorOpInterfaces.h.inc
-    -gen-op-interface-defs ProcessorOpInterfaces.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

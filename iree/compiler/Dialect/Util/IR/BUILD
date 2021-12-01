@@ -74,11 +74,13 @@ cc_library(
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )
@@ -151,11 +153,11 @@ gentbl_cc_library(
 )
 
 iree_tablegen_doc(
-    name = "UtilUtilDialectDocGen",
+    name = "UtilDialectDocGen",
     tbl_outs = [
         (
             ["-gen-dialect-doc"],
-            "UtilUtilDialect.md",
+            "UtilDialect.md",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",

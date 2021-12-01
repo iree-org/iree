@@ -19,7 +19,8 @@
 // A function to create the HAL device from the different backend targets.
 // The HAL device is returned based on the implementation, and it must be
 // released by the caller.
-extern iree_status_t create_sample_device(iree_hal_device_t** device);
+extern iree_status_t create_sample_device(iree_allocator_t host_allocator,
+                                          iree_hal_device_t** out_device);
 
 // A function to load the vm bytecode module from the different backend targets.
 // The bytecode module is generated for the specific backend and platform.
@@ -34,7 +35,8 @@ iree_status_t Run() {
       iree_vm_instance_create(iree_allocator_system(), &instance));
 
   iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(create_sample_device(&device), "create device");
+  IREE_RETURN_IF_ERROR(create_sample_device(iree_allocator_system(), &device),
+                       "create device");
   iree_vm_module_t* hal_module = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_module_create(device, iree_allocator_system(), &hal_module));

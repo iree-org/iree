@@ -50,8 +50,7 @@ void addLinalgBufferizePasses(
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-        allocationFn =
-            linalg::comprehensive_bufferize::defaultAllocationCallbacks());
+        allocationFn = nullptr);
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -91,7 +90,7 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks> =
-        linalg::comprehensive_bufferize::defaultAllocationCallbacks());
+        nullptr);
 
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();

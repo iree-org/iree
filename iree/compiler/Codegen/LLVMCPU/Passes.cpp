@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -22,6 +21,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===---------------------------------------------------------------------===//
+// Default allocation functions for CPU backend
+//===---------------------------------------------------------------------===//
+
+// Default allocation function to use with IREEs bufferization.
 static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
                                    ArrayRef<int64_t> staticShape,
                                    Type elementType,
@@ -29,6 +33,29 @@ static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
   MemRefType allocType = MemRefType::get(staticShape, elementType);
   return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes);
 }
+
+// Allocation callbacks to use with upstream comprehensive bufferization
+static Optional<Value> cpuComprehensiveBufferizeAllocationFn(
+    OpBuilder &builder, Location loc, MemRefType memRefType,
+    ArrayRef<Value> dynamicSizes) {
+  return builder.create<memref::AllocaOp>(loc, memRefType, dynamicSizes)
+      .getResult();
+}
+
+static void cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
+                                                    Location loc,
+                                                    Value allocation) {
+  return;
+}
+
+static void cpuComprehensiveBufferizeCopyFn(OpBuilder &builder, Location loc,
+                                            Value from, Value to) {
+  builder.create<linalg::CopyOp>(loc, from, to);
+}
+
+//===---------------------------------------------------------------------===//
+// Codegen configuration verifications.
+//===---------------------------------------------------------------------===//
 
 LogicalResult verifyTensorToVectorsPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
@@ -149,6 +176,17 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // Use stack allocation on CPU side.
+
+  // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
+  // soon.
+  //
+  // auto callbacks =
+  //    std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
+  //        cpuComprehensiveBufferizeAllocationFn,
+  //        cpuComprehensiveBufferizeDeallocationFn,
+  //        cpuComprehensiveBufferizeCopyFn);
+  // addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
+
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -170,8 +208,6 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // Linalg -> SCF
   passManager.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
-  passManager.addNestedPass<FuncOp>(
-      Shape::createFoldDimOverShapeCarryingOpPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 

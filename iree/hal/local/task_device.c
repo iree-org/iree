@@ -80,10 +80,12 @@ static iree_status_t iree_hal_task_device_check_params(
 iree_status_t iree_hal_task_device_create(
     iree_string_view_t identifier, const iree_hal_task_device_params_t* params,
     iree_task_executor_t* executor, iree_host_size_t loader_count,
-    iree_hal_executable_loader_t** loaders, iree_allocator_t host_allocator,
+    iree_hal_executable_loader_t** loaders,
+    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(!loader_count || loaders);
+  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -105,6 +107,9 @@ iree_status_t iree_hal_task_device_create(
     iree_string_view_append_to_buffer(identifier, &device->identifier,
                                       (char*)device + struct_size);
     device->host_allocator = host_allocator;
+    device->device_allocator = device_allocator;
+    iree_hal_allocator_retain(device_allocator);
+
     iree_arena_block_pool_initialize(4096, host_allocator,
                                      &device->small_block_pool);
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
@@ -131,11 +136,6 @@ iree_status_t iree_hal_task_device_create(
                                      &device->small_block_pool,
                                      &device->queues[i]);
     }
-  }
-
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_create_heap(identifier, host_allocator,
-                                            &device->device_allocator);
   }
 
   if (iree_status_is_ok(status)) {

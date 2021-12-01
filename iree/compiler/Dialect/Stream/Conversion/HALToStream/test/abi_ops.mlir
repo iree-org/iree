@@ -13,7 +13,7 @@ func @importBufferView(%view: !hal.buffer_view) -> tensor<?x?x4xf32> {
   // CHECK-SAME:     tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} in !stream.resource<external>{%[[SIZE]]}
   // CHECK-NEXT: %[[RESULT:.+]] = stream.async.transfer %[[RESOURCE]] :
   // CHECK-SAME:     !stream.resource<external>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
-  %0 = hal.tensor.cast %view : !hal.buffer_view -> tensor<?x?x4xf32>{%dim0, %dim1}
+  %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<?x?x4xf32>{%dim0, %dim1}
   // CHECK: return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
   return %0 : tensor<?x?x4xf32>
 }
@@ -28,7 +28,7 @@ func @exportBufferView(%tensor: tensor<?x?x4xf32>, %dim0: index, %dim1: index) -
   // CHECK-NEXT: %[[RESULT:.+]] = stream.tensor.export %[[VIEW]] :
   // CHECK-SAME:     tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} in !stream.resource<external>{%[[SIZE]]}
   // CHECK-SAME:     -> !hal.buffer_view
-  %0 = hal.tensor.cast %tensor : tensor<?x?x4xf32>{%dim0, %dim1} -> !hal.buffer_view
+  %0 = hal.tensor.export %tensor : tensor<?x?x4xf32>{%dim0, %dim1} -> !hal.buffer_view
   // CHECK: return %[[RESULT]]
   return %0 : !hal.buffer_view
 }

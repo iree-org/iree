@@ -40,7 +40,6 @@ cc_library(
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/Util/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
@@ -75,7 +74,5 @@ cc_library(
         "@llvm-project//mlir:VectorToGPU",
         "@llvm-project//mlir:VectorToLLVM",
         "@llvm-project//mlir:VectorToSCF",
-        "@mlir-hlo//:hlo",
-        "@mlir-hlo//:legalize_to_linalg",
     ],
 )

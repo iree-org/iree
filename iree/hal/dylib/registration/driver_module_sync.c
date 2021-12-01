@@ -37,7 +37,7 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
-    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
+    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
   if (driver_id != IREE_HAL_DYLIB_SYNC_DRIVER_ID) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
@@ -53,15 +53,24 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
   iree_hal_executable_loader_t* loaders[1] = {NULL};
   if (iree_status_is_ok(status)) {
     status = iree_hal_embedded_library_loader_create(
-        iree_hal_executable_import_provider_null(), allocator, &loaders[0]);
+        iree_hal_executable_import_provider_null(), host_allocator,
+        &loaders[0]);
+  }
+
+  iree_hal_allocator_t* device_allocator = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_create_heap(iree_make_cstring_view("cpu"),
+                                            host_allocator, host_allocator,
+                                            &device_allocator);
   }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_driver_create(
         iree_make_cstring_view("cpu"), &default_params, IREE_ARRAYSIZE(loaders),
-        loaders, allocator, out_driver);
+        loaders, device_allocator, host_allocator, out_driver);
   }
 
+  iree_hal_allocator_release(device_allocator);
   iree_hal_executable_loader_release(loaders[0]);
   return status;
 }

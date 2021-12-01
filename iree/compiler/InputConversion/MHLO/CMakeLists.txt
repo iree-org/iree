@@ -45,6 +45,7 @@ iree_cc_library(
     "ConvertMHLOToFlow.cpp"
     "ConvertMHLOToFlow.h"
     "ConvertMHLOToLinalgExt.cpp"
+    "FlattenTuplesInCFG.cpp"
     "LegalizeInputTypes.cpp"
     "MHLOToLinalgOnTensors.cpp"
     "MHLOToMHLOPreprocessing.cpp"
@@ -53,9 +54,12 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    ChloDialect
+    ChloPasses
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
+    LmhloDialect
     MLIRAffine
     MLIRComplex
     MLIRIR
@@ -63,9 +67,11 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMath
     MLIRMemRef
+    MLIRMhloUtils
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCFToStandard
+    MLIRSCFTransforms
     MLIRShape
     MLIRShapeOpsTransforms
     MLIRShapeToStandard
@@ -73,12 +79,15 @@ iree_cc_library(
     MLIRSupport
     MLIRTensor
     MLIRTransforms
+    MhloDialect
+    MhloLhloToLinalg
+    MhloPasses
+    MhloToStandard
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::InputConversion::Common
-    tensorflow::mlir_hlo
+    tensorflow::external_mhlo_includes
   PUBLIC
 )
 

@@ -29,9 +29,6 @@ void registerMHLOImportPassPipeline();
 // of MHLO and is suitable for such programs.
 std::unique_ptr<OperationPass<FuncOp>> createEmitDefaultIREEABIPass();
 
-// Flattens tuple values in function signatures and blocks.
-std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
-
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
@@ -40,7 +37,6 @@ inline void registerAllPasses() {
   registerMHLOImportPassPipeline();
 
   createEmitDefaultIREEABIPass();
-  createFlattenTuplesInCFGPass();
 }
 
 }  // namespace MHLO

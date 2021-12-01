@@ -76,12 +76,12 @@ iree_cc_library(
     MLIRVectorBufferizableOpInterfaceImpl
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

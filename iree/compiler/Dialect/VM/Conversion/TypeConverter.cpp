@@ -6,8 +6,6 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/Support/Debug.h"
@@ -111,28 +109,6 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
   addConversion([](VectorType vectorType) -> Optional<Type> {
     return IREE::VM::RefType::get(
         IREE::VM::BufferType::get(vectorType.getContext()));
-  });
-
-  // Convert ranked shape types (expanding all dims).
-  addConversion([this](Shape::RankedShapeType rankedShape,
-                       SmallVectorImpl<Type> &results) {
-    auto indexType =
-        IntegerType::get(rankedShape.getContext(), targetOptions_.indexBits);
-    for (int i = 0; i < rankedShape.getRank(); ++i) {
-      if (rankedShape.isDimDynamic(i)) {
-        results.push_back(indexType);
-      }
-    }
-    return success();
-  });
-
-  // TODO(b/145876978): materialize conversion for other types
-  addArgumentMaterialization([](OpBuilder &builder,
-                                Shape::RankedShapeType resultType,
-                                ValueRange inputs, Location loc) -> Value {
-    LLVM_DEBUG(llvm::dbgs()
-               << "MATERIALIZE CONVERSION: " << resultType << "\n");
-    return builder.create<Shape::MakeRankedShapeOp>(loc, resultType, inputs);
   });
 
   addSourceMaterialization([](OpBuilder &builder, IndexType type,

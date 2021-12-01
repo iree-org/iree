@@ -15,18 +15,9 @@ external_cc_library(
   PACKAGE
     tensorflow
   NAME
-    mlir_hlo
+    external_mhlo_includes
   ROOT
     ${TF_MLIR_HLO_SOURCE_DIR}
-  DEPS
-    MhloDialect
-    MhloInferShapeEqualityOpInterface
-    LmhloDialect
-    ChloPasses
-    MhloToStandard
-    MhloPasses
-    MhloLhloToLinalg
-    MLIRMhloUtils
   INCLUDES
     "${TF_MLIR_HLO_SOURCE_DIR}/"
     "${TF_MLIR_HLO_SOURCE_DIR}/include/"

@@ -26,13 +26,17 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
+class ShapeAwareOpInterface;
 class TiedOpInterface;
+
+//===----------------------------------------------------------------------===//
+// Common types
+//===----------------------------------------------------------------------===//
 
 namespace detail {
 
 struct ListTypeStorage;
 struct PtrTypeStorage;
-struct RankedShapeTypeStorage;
 
 }  // namespace detail
 
@@ -149,6 +153,10 @@ class MutableByteBufferType
   using Base::Base;
 };
 
+//===----------------------------------------------------------------------===//
+// Tied operand interface utilities
+//===----------------------------------------------------------------------===//
+
 namespace detail {
 
 llvm::Optional<unsigned> getTiedResultOperandIndex(Operation *op,
@@ -169,6 +177,10 @@ void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedResultIndices,
     SmallVector<int64_t, 4> &tiedOperandIndices);
 
+//===----------------------------------------------------------------------===//
+// Shape-aware interface utilities
+//===----------------------------------------------------------------------===//
+
 // Walks the SSA use-def chain upwards to find the dynamic dimensions of the
 // value. Returns None if the shape cannot be found.
 Optional<ValueRange> findDynamicDims(Value shapedValue);
@@ -182,6 +194,24 @@ Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
 // Returns the dynamic dimensions for the value at |idx|.
 ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
                                    ValueRange dynamicDims);
+
+// Returns dimension values for each dynamic dimension of the given |value|.
+// |value| must be a ShapedType. The returned value range will be empty if the
+// shape is fully static.
+SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
+                                            OpBuilder &builder);
+
+// Builds a ranked shape with all dimension values for the given operand.
+SmallVector<Value> buildOperandShape(ShapeAwareOpInterface op,
+                                     unsigned operandIdx, OpBuilder &builder);
+
+// Builds a ranked shape with all dimension values for the given result.
+SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
+                                    unsigned resultIdx, OpBuilder &builder);
+
+//===----------------------------------------------------------------------===//
+// Alignment and byte offset/length manipulation
+//===----------------------------------------------------------------------===//
 
 // Aligns |value| to |alignment|, rounding up if needed.
 static inline uint64_t align(uint64_t value, uint64_t alignment) {

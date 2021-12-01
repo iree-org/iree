@@ -88,20 +88,26 @@ struct LLVMGPUVectorizationPass
       // Step 1. Vectorize
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorizationPatterns)))) {
+        return signalPassFailure();
+      }
 
       // Fold consumer add ops into the contraction op itself.
       RewritePatternSet canonicalizationPatterns(context);
       vector::ContractionOp::getCanonicalizationPatterns(
           canonicalizationPatterns, context);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
 
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorUnrollPatterns)))) {
+        return signalPassFailure();
+      }
       DEBUG_WITH_TYPE(DEBUG_TYPE, {
         llvm::dbgs() << "\n--- After Step 1: Vectorization ---\n";
         funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
@@ -115,8 +121,10 @@ struct LLVMGPUVectorizationPass
           lowerTransferOpPatterns);
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           lowerTransferOpPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(lowerTransferOpPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(lowerTransferOpPatterns)))) {
+        return signalPassFailure();
+      }
       DEBUG_WITH_TYPE(DEBUG_TYPE, {
         llvm::dbgs()
             << "\n--- After Step 2: Lower transfer op to canonical form. ---\n";
@@ -132,8 +140,10 @@ struct LLVMGPUVectorizationPass
           canonicalizationPatterns, canonicalizationPatterns.getContext());
       vector::populateVectorToVectorCanonicalizationPatterns(
           canonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
       DEBUG_WITH_TYPE(DEBUG_TYPE, {
         llvm::dbgs() << "\n--- After Step 3: Canonicalize. ---\n";
         funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
@@ -153,8 +163,10 @@ struct LLVMGPUVectorizationPass
       vector::populateVectorMultiReductionLoweringPatterns(
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerParallel);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(contractLoweringPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(contractLoweringPatterns)))) {
+        return signalPassFailure();
+      }
       DEBUG_WITH_TYPE(DEBUG_TYPE, {
         llvm::dbgs()
             << "\n--- After Step 4: Lower contract op to outer product. ---\n";

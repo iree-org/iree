@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 
-#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -1821,17 +1820,6 @@ static LogicalResult verifyOp(BindingSubspanOp op) {
   }
 
   return success();
-}
-
-Value BindingSubspanOp::buildOperandRankedShape(unsigned idx,
-                                                OpBuilder &builder) {
-  return {};
-}
-
-Value BindingSubspanOp::buildResultRankedShape(unsigned idx,
-                                               OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), dynamic_dims(),
-                                         builder);
 }
 
 //===----------------------------------------------------------------------===//

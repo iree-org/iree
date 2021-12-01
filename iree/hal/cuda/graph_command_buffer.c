@@ -18,6 +18,10 @@
 #include "iree/hal/cuda/native_executable.h"
 #include "iree/hal/cuda/status_util.h"
 
+#define IREE_HAL_CUDA_MAX_BINDING_COUNT 64
+// Kernel arguments contains binding and push constants.
+#define IREE_HAL_CUDA_MAX_KERNEL_ARG 128
+
 // Command buffer implementation that directly maps to cuda graph.
 // This records the commands on the calling thread without additional threading
 // indirection.
@@ -32,13 +36,10 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
   // Keep track of the last node added to the command buffer as we are currently
   // serializing all the nodes (each node depends on the previous one).
   CUgraphNode last_node;
+  int32_t push_constant[IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT];
   // Keep track of the current set of kernel arguments.
   void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;
-
-#define IREE_HAL_CUDA_MAX_BINDING_COUNT 64
-// Kernel arguments contains binding and push constants.
-#define IREE_HAL_CUDA_MAX_KERNEL_ARG 128
 
 extern const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable;
@@ -349,11 +350,9 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_constants(
     const void* values, iree_host_size_t values_length) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  iree_host_size_t constant_base_index =
-      iree_hal_cuda_push_constant_index(executable_layout) +
-      offset / sizeof(int32_t);
+  iree_host_size_t constant_base_index = offset / sizeof(int32_t);
   for (iree_host_size_t i = 0; i < values_length / sizeof(int32_t); i++) {
-    *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
+    command_buffer->push_constant[i + constant_base_index] =
         ((uint32_t*)values)[i];
   }
   return iree_ok_status();
@@ -425,7 +424,17 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-
+  iree_hal_executable_layout_t* layout =
+      iree_hal_cuda_executable_get_layout(executable, entry_point);
+  iree_host_size_t num_constants =
+      iree_hal_cuda_executable_layout_num_constants(layout);
+  iree_host_size_t constant_base_index =
+      iree_hal_cuda_push_constant_index(layout);
+  // Patch the push constants in the kernel arguments.
+  for (iree_host_size_t i = 0; i < num_constants; i++) {
+    *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
+        command_buffer->push_constant[i];
+  }
   int32_t block_size_x, block_size_y, block_size_z;
   IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
       executable, entry_point, &block_size_x, &block_size_y, &block_size_z));

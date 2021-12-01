@@ -29,7 +29,6 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Modules::VMVX::IR
     iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

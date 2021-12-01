@@ -10,7 +10,6 @@
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -33,7 +32,6 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
   ]>,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
@@ -324,7 +322,7 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
   ];
 
   let extraClassDeclaration = [{
-    /// Return the expected rank of each of the`static_offsets`, `static_sizes`
+    /// Return the expected rank of each of the `static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned sourceRank = source().getType().cast<DispatchTensorType>().asTensorType().getRank();
@@ -398,7 +396,7 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
   ];
 
   let extraClassDeclaration = [{
-    /// Return the expected rank of each of the`static_offsets`, `static_sizes`
+    /// Return the expected rank of each of the `static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned resultRank = target().getType().cast<DispatchTensorType>().asTensorType().getRank();
@@ -530,7 +528,6 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
   ]>,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{a dispatch of workgroups across an n-dimension grid}];
@@ -638,7 +635,6 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
       "getTiedResultOperandIndex",
       "getTiedResultOperandIndices",
   ]>,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{reshapes a tensor}];
@@ -669,7 +665,7 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
       build($_builder, $_state,
           result_type,
           source,
-          Shape::buildOrFindDynamicDimsForValue($_state.location, source, $_builder),
+          IREE::Util::buildDynamicDimsForValue($_state.location, source, $_builder),
           target_dims);
     }]>,
   ];
@@ -691,7 +687,6 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
                   "source", "result",
                   "$_self.cast<ShapedType>().getElementType()">,
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{loads a value from a tensor element}];
@@ -721,7 +716,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
       build($_builder, $_state,
           result_type,
           source,
-          Shape::buildOrFindDynamicDimsForValue($_state.location, source, $_builder),
+          IREE::Util::buildDynamicDimsForValue($_state.location, source, $_builder),
           indices);
     }]>,
   ];
@@ -742,7 +737,6 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
                   "target", "value",
                   "$_self.cast<ShapedType>().getElementType()">,
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{stores a value into a tensor element}];
@@ -774,7 +768,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
           target.getType(),
           value,
           target,
-          Shape::buildOrFindDynamicDimsForValue($_state.location, target, $_builder),
+          IREE::Util::buildDynamicDimsForValue($_state.location, target, $_builder),
           indices);
     }]>,
   ];
@@ -792,7 +786,6 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   TypesMatchWith<"value type matches element type of result",
                   "result", "value",
                   "$_self.cast<ShapedType>().getElementType()">,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{splats a value into a shaped tensor}];
@@ -827,7 +820,6 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
 def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   FLOW_StreamableOp,
   AllTypesMatch<["operand", "result"]>,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{performs a full tensor clone operation}];
@@ -854,7 +846,7 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
       build($_builder, $_state,
           operand.getType(),
           operand,
-          Shape::buildOrFindDynamicDimsForValue($_state.location, operand, $_builder));
+          IREE::Util::buildDynamicDimsForValue($_state.location, operand, $_builder));
     }]>,
   ];
 
@@ -875,7 +867,6 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
   AllRanksMatch<["source", "result"]>,
   AllElementTypesMatch<["source", "result"]>,
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{slices out a subregion of a tensor}];
@@ -924,7 +915,6 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
       "getTiedResultOperandIndex",
       "getTiedResultOperandIndices",
   ]>,
-  DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{updates a tensor with the contents of another tensor}];

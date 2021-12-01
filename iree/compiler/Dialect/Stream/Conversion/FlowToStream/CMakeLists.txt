@@ -22,8 +22,6 @@ iree_cc_library(
     MLIRStandard
     MLIRTensor
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::IR
   PUBLIC

@@ -363,7 +363,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
     iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_device_size_t* out_allocation_size) {
-  IREE_ASSERT_ARGUMENT(shape);
+  IREE_ASSERT_ARGUMENT(!shape_rank || shape);
   IREE_ASSERT_ARGUMENT(out_allocation_size);
   *out_allocation_size = 0;
 

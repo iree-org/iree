@@ -24,7 +24,7 @@ class HALTypeConverter : public TypeConverter {
   // TODO(benvanik): signature conversion for output buffers.
 
   // Returns true if the given |type| maps to !hal.buffer_view by default.
-  // hal.tensor.cast can be used by frontends to map to other types.
+  // hal.tensor.import/export can be used by frontends to map to other types.
   static bool shouldConvertToBufferView(Type type) {
     if (auto tensorType = type.template dyn_cast<TensorType>()) {
       return tensorType.getElementType().isIntOrFloat();

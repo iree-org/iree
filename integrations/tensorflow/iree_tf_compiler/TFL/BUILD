@@ -48,8 +48,6 @@ cc_library(
     deps = [
         ":PassesIncGen",
         "@iree//iree/compiler/Dialect/Flow/IR",
-        "@iree//iree/compiler/Dialect/Shape/IR",
-        "@iree//iree/compiler/Dialect/Shape/Transforms",
         "@iree//iree/compiler/Dialect/Util/IR",
         "@iree//iree/compiler/Utils",
         "@llvm-project//llvm:Support",

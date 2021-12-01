@@ -92,7 +92,10 @@ struct LLVMGPUPipeliningPass
     options.getScheduleFn = getPipelineStages;
     RewritePatternSet pipeliningPatterns(context);
     scf::populateSCFLoopPipeliningPatterns(pipeliningPatterns, options);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(pipeliningPatterns));
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(pipeliningPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 }  // namespace

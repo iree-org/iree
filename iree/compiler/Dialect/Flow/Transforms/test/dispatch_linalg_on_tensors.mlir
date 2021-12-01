@@ -855,7 +855,7 @@ func @dynamic_dot() -> !hal.buffer_view attributes {iree.abi.stub} {
   %6 = linalg.matmul ins(%0, %1 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%5 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %7 = tensor.dim %6, %c0 : tensor<?x?xf32>
   %8 = tensor.dim %6, %c1 : tensor<?x?xf32>
-  %9 = hal.tensor.cast %6 : tensor<?x?xf32>{%7, %8} -> !hal.buffer_view
+  %9 = hal.tensor.export %6 : tensor<?x?xf32>{%7, %8} -> !hal.buffer_view
   return %9 : !hal.buffer_view
 }
 // CHECK-LABEL: func @dynamic_dot()

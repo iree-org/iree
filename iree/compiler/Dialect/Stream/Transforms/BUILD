@@ -44,11 +44,10 @@ cc_library(
     deps = [
         ":PassesIncGen",
         "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/Stream/Analysis",
         "//iree/compiler/Dialect/Stream/Conversion",
         "//iree/compiler/Dialect/Stream/Conversion/FlowToStream",
+        "//iree/compiler/Dialect/Stream/Conversion/HALToStream",
         "//iree/compiler/Dialect/Stream/Conversion/StandardToStream",
         "//iree/compiler/Dialect/Stream/Conversion/UtilToStream",
         "//iree/compiler/Dialect/Stream/IR",

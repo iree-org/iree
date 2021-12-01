@@ -25,7 +25,6 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/Shape/IR:td_files",
         "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
@@ -64,7 +63,6 @@ cc_library(
         ":FlowInterfacesGen",
         ":FlowOpsGen",
         ":FlowTypesGen",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",

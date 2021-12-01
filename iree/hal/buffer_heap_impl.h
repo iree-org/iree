@@ -26,14 +26,17 @@ typedef struct iree_hal_heap_allocator_statistics_t {
   iree_hal_allocator_statistics_t base;
 } iree_hal_heap_allocator_statistics_t;
 
-// Allocates a new heap buffer from the specified |host_allocator|.
-// |out_buffer| must be released by the caller.
+// Allocates a new heap buffer from the specified |data_allocator|.
+// |host_allocator| is used for the iree_hal_buffer_t metadata. If both
+// |data_allocator| and |host_allocator| are the same the buffer will be created
+// as a flat slab. |out_buffer| must be released by the caller.
 iree_status_t iree_hal_heap_buffer_create(
     iree_hal_allocator_t* allocator,
     iree_hal_heap_allocator_statistics_t* statistics,
     iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+    iree_allocator_t data_allocator, iree_allocator_t host_allocator,
+    iree_hal_buffer_t** out_buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

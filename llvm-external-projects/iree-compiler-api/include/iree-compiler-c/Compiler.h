@@ -41,12 +41,34 @@ MLIR_CAPI_EXPORTED void ireeCompilerOptionsSetInputDialectMHLO(
     IreeCompilerOptions options);
 MLIR_CAPI_EXPORTED void ireeCompilerOptionsSetInputDialectTOSA(
     IreeCompilerOptions options);
+MLIR_CAPI_EXPORTED void ireeCompilerOptionsSetInputDialectXLA(
+    IreeCompilerOptions options);
 MLIR_CAPI_EXPORTED void ireeCompilerOptionsAddTargetBackend(
     IreeCompilerOptions options, const char *targetBackend);
 
 //===----------------------------------------------------------------------===//
 // Compiler stages.
 //===----------------------------------------------------------------------===//
+
+// Builds a pass pipeline to cleanup MHLO dialect input derived from XLA.
+// A pass pipeline of this plus ireeCompilerBuildMHLOImportPassPipeline is
+// equivalent to ireeCompilerOptionsSetInputDialectXLA as a one-shot.
+MLIR_CAPI_EXPORTED void ireeCompilerBuildXLACleanupPassPipeline(
+    MlirOpPassManager passManager);
+
+// Builds a pass pipeline to lower IREE-compatible MHLO functions and ops to
+// be a legal input to IREE. This performs the standalone work that
+// ireeCompilerOptionsSetInputDialectMHLO will do as a one-shot. Notably, this
+// requires that XLA control flow has been legalized to SCF or CFG and that
+// no tuples are in the input program.
+MLIR_CAPI_EXPORTED void ireeCompilerBuildMHLOImportPassPipeline(
+    MlirOpPassManager passManager);
+
+// Builds a pass pipeline to lower IREE-compatible TOSA function and ops to
+// be a legal input to IREE. This performs that standalone work that
+// ireeCompilerOptionsSetInputDialectTOSA will do as a one-shot.
+MLIR_CAPI_EXPORTED void ireeCompilerBuildTOSAImportPassPipeline(
+    MlirOpPassManager passManager);
 
 // Builds a pass manager for transforming from an input module op to the IREE VM
 // dialect. This represents the primary compilation stage with serialization to

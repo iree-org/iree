@@ -1100,6 +1100,62 @@ struct TimepointImmediateOpPattern
   }
 };
 
+struct TimepointImportOpPattern
+    : public StreamConversionPattern<IREE::Stream::TimepointImportOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::TimepointImportOp importOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    // Only handle imports from HAL semaphores.
+    auto operands = adaptor.operands();
+    if (operands.size() != 2 ||
+        !operands[0].getType().isa<IREE::HAL::SemaphoreType>() ||
+        !operands[1].getType().isIntOrIndex()) {
+      return rewriter.notifyMatchFailure(importOp,
+                                         "only imports from HAL semaphore + "
+                                         "sequence value tuples are supported");
+    }
+
+    // TODO(benvanik): model timepoints as semaphores.
+    // For now we just block on the semaphore.
+    auto awaitOp = rewriter.create<IREE::HAL::SemaphoreAwaitOp>(
+        importOp.getLoc(), rewriter.getI32Type(), operands[0], operands[1]);
+    rewriter.create<IREE::Util::StatusCheckOkOp>(
+        importOp.getLoc(), awaitOp.status(),
+        "failed to wait on imported semaphore");
+    rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(importOp, 0);
+    return success();
+  }
+};
+
+struct TimepointExportOpPattern
+    : public StreamConversionPattern<IREE::Stream::TimepointExportOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::TimepointExportOp exportOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    // Only handle exports into HAL semaphores.
+    if (exportOp.getNumResults() != 2 ||
+        !exportOp.getResult(0).getType().isa<IREE::HAL::SemaphoreType>() ||
+        !exportOp.getResult(1).getType().isIntOrIndex()) {
+      return rewriter.notifyMatchFailure(exportOp,
+                                         "only exports to HAL semaphore + "
+                                         "sequence value tuples are supported");
+    }
+
+    auto loc = exportOp.getLoc();
+    auto device = lookupDeviceFor(exportOp, rewriter);
+
+    // TODO(benvanik): model timepoints as semaphores.
+    // For now we just create a signaled semaphore.
+    auto exportValue = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto exportSemaphore = rewriter.create<IREE::HAL::SemaphoreCreateOp>(
+        loc, rewriter.getType<IREE::HAL::SemaphoreType>(), device, exportValue);
+    rewriter.replaceOp(exportOp, {exportSemaphore, exportValue});
+    return success();
+  }
+};
+
 struct TimepointJoinOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointJoinOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -1197,7 +1253,8 @@ void populateStreamToHALPatterns(MLIRContext *context,
               CmdFillOpPattern, CmdCopyOpPattern, CmdDispatchOpPattern,
               CmdExecuteOpPattern, CmdSerialOpPattern, CmdConcurrentOpPattern>(
           mapping, typeConverter, context);
-  patterns.insert<TimepointImmediateOpPattern, TimepointJoinOpPattern,
+  patterns.insert<TimepointImmediateOpPattern, TimepointImportOpPattern,
+                  TimepointExportOpPattern, TimepointJoinOpPattern,
                   TimepointAwaitOpPattern>(mapping, typeConverter, context);
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }

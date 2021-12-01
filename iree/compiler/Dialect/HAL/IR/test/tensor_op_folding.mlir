@@ -1,41 +1,39 @@
 // RUN: iree-opt -split-input-file -canonicalize -cse %s | iree-opt -split-input-file | IreeFileCheck %s
 
-// CHECK-LABEL: @tensorCastMatchingTypeFolds
-func @tensorCastMatchingTypeFolds(%arg0: !hal.buffer_view) -> !hal.buffer_view {
-  // CHECK-NOT: hal.tensor.cast
+// CHECK-LABEL: @foldTensorImportExport
+func @foldTensorImportExport(%arg0: !hal.buffer_view) -> !hal.buffer_view {
+  // CHECK-NOT: hal.tensor.import
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<5xi32>
+  // CHECK-NOT: hal.tensor.export
+  %1 = hal.tensor.export %0 : tensor<5xi32> -> !hal.buffer_view
   // CHECK: return %arg0 : !hal.buffer_view
-  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> !hal.buffer_view
-  return %0 : !hal.buffer_view
-}
-
-// -----
-
-// CHECK-LABEL: @tensorCastPassthroughFolds
-func @tensorCastPassthroughFolds(%arg0: !hal.buffer_view) -> !hal.buffer_view {
-  // CHECK-NOT: hal.tensor.cast
-  // CHECK: return %arg0 : !hal.buffer_view
-  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<5xi32>
-  %1 = hal.tensor.cast %0 : tensor<5xi32> -> !hal.buffer_view
   return %1 : !hal.buffer_view
 }
 
 // -----
 
-// CHECK-LABEL: @tensorCastThroughDifferentTypesFolds
-func @tensorCastThroughDifferentTypesFolds(%arg0: !hal.buffer_view) -> !hal.buffer {
-  // CHECK: %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> !hal.buffer
-  // CHECK: return %0 : !hal.buffer
-  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<5xi32>
-  %1 = hal.tensor.cast %0 : tensor<5xi32> -> !hal.buffer
+// TODO(benvanik): add a canonicalizer to take buffer_view -> buffer and turn
+// it into a hal.buffer_view.buffer op and buffer -> buffer_view into a
+// hal.buffer_view.create.
+// For now we just don't fold.
+
+// CHECK-LABEL: @foldTensorImportExportTypeMismatch
+func @foldTensorImportExportTypeMismatch(%arg0: !hal.buffer_view) -> !hal.buffer {
+  // CHECK: hal.tensor.import
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<5xi32>
+  // CHECK: hal.tensor.export
+  %1 = hal.tensor.export %0 : tensor<5xi32> -> !hal.buffer
   return %1 : !hal.buffer
 }
 
 // -----
 
-// CHECK-LABEL: @tensorCastFoldingPreservesDims
-func @tensorCastFoldingPreservesDims(%arg0: !hal.buffer_view, %arg1 : index) -> tensor<?x3xi32> {
-  // CHECK: hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?x3xi32>{%arg1}
-  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> !hal.buffer
-  %1 = hal.tensor.cast %0 : !hal.buffer -> tensor<?x3xi32>{%arg1}
-  return %1 : tensor<?x3xi32>
+// CHECK-LABEL: @foldTensorExportImport
+func @foldTensorExportImport(%arg0: tensor<5xi32>) -> tensor<5xi32> {
+  // CHECK-NOT: hal.tensor.export
+  %0 = hal.tensor.export %arg0 : tensor<5xi32> -> !hal.buffer_view
+  // CHECK-NOT: hal.tensor.import
+  %1 = hal.tensor.import %0 : !hal.buffer_view -> tensor<5xi32>
+  // CHECK: return %arg0 : tensor<5xi32>
+  return %1 : tensor<5xi32>
 }

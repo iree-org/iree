@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
@@ -1974,6 +1973,24 @@ void CmdConcurrentOp::getCanonicalizationPatterns(
 
 OpFoldResult TimepointImmediateOp::fold(ArrayRef<Attribute> operands) {
   return IREE::Stream::TimepointAttr::get(getContext(), getResult().getType());
+}
+
+//===----------------------------------------------------------------------===//
+// stream.timepoint.export
+//===----------------------------------------------------------------------===//
+
+LogicalResult TimepointExportOp::fold(ArrayRef<Attribute> operands,
+                                      SmallVectorImpl<OpFoldResult> &results) {
+  // If the source timepoint comes from an import op we can fold - but only if
+  // the types match.
+  if (auto importOp = dyn_cast_or_null<TimepointImportOp>(
+          await_timepoint().getDefiningOp())) {
+    if (llvm::equal(importOp.getOperandTypes(), getResultTypes())) {
+      llvm::append_range(results, importOp.operands());
+      return success();
+    }
+  }
+  return failure();
 }
 
 //===----------------------------------------------------------------------===//

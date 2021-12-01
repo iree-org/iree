@@ -44,7 +44,7 @@ static iree_status_t iree_hal_dylib_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_dylib_driver_factory_try_create(
-    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
+    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
   if (driver_id != IREE_HAL_DYLIB_DRIVER_ID) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
@@ -62,26 +62,34 @@ static iree_status_t iree_hal_dylib_driver_factory_try_create(
   iree_host_size_t loader_count = 0;
   if (iree_status_is_ok(status)) {
     status = iree_hal_embedded_library_loader_create(
-        iree_hal_executable_import_provider_null(), allocator,
+        iree_hal_executable_import_provider_null(), host_allocator,
         &loaders[loader_count++]);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_system_library_loader_create(
-        iree_hal_executable_import_provider_null(), allocator,
+        iree_hal_executable_import_provider_null(), host_allocator,
         &loaders[loader_count++]);
   }
 
   iree_task_executor_t* executor = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_task_executor_create_from_flags(allocator, &executor);
+    status = iree_task_executor_create_from_flags(host_allocator, &executor);
+  }
+
+  iree_hal_allocator_t* device_allocator = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_create_heap(iree_make_cstring_view("cpu"),
+                                            host_allocator, host_allocator,
+                                            &device_allocator);
   }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
         iree_make_cstring_view("cpu"), &default_params, executor, loader_count,
-        loaders, allocator, out_driver);
+        loaders, device_allocator, host_allocator, out_driver);
   }
 
+  iree_hal_allocator_release(device_allocator);
   iree_task_executor_release(executor);
   for (iree_host_size_t i = 0; i < loader_count; ++i) {
     iree_hal_executable_loader_release(loaders[i]);

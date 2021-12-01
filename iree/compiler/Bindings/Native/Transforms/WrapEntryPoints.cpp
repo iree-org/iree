@@ -136,7 +136,7 @@ class WrapEntryPointsPass
     for (auto arg : llvm::enumerate(entryBlock->getArguments())) {
       auto oldType = entryFuncType.getInput(arg.index());
       if (oldType.isa<TensorType>()) {
-        arguments.push_back(entryBuilder.create<IREE::HAL::TensorCastOp>(
+        arguments.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
             entryFuncOp.getLoc(), oldType, arg.value()));
       } else {
         arguments.push_back(arg.value());
@@ -153,7 +153,7 @@ class WrapEntryPointsPass
       auto oldType = entryFuncType.getResult(result.index());
       auto newType = wrapperFuncType.getResult(result.index());
       if (oldType.isa<TensorType>()) {
-        results.push_back(entryBuilder.createOrFold<IREE::HAL::TensorCastOp>(
+        results.push_back(entryBuilder.createOrFold<IREE::HAL::TensorExportOp>(
             entryFuncOp.getLoc(), newType, result.value()));
       } else {
         results.push_back(result.value());

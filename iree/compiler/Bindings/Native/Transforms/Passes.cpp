@@ -30,7 +30,7 @@ void buildTransformPassPipeline(OpPassManager &passManager) {
 
 void registerTransformPassPipeline() {
   PassPipelineRegistration<> transformPassPipeline(
-      "iree-abi-transform-pipeline",
+      "iree-abi-transformation-pipeline",
       "Runs the IREE native ABI bindings support pipeline",
       [](OpPassManager &passManager) {
         buildTransformPassPipeline(passManager);

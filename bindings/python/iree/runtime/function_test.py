@@ -128,7 +128,7 @@ class FunctionTest(absltest.TestCase):
         })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
     result = invoker()
-    self.assertEqual((3, [{'bar': 100, 'foo': 200}, 6]), result)
+    self.assertEqual((3, [{"bar": 100, "foo": 200}, 6]), result)
 
   def testMissingPositional(self):
 
@@ -149,9 +149,30 @@ class FunctionTest(absltest.TestCase):
                 })
         })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
-    with self.assertRaisesRegexp(ValueError,
-                                 "a required argument was not specified"):
-      result = invoker(a=1, b=2)
+    with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
+      result = invoker(a=1, b=1)
+
+  def testMissingPositionalNdarray(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(
+        reflection={
+            "iree.abi":
+                json.dumps({
+                    "a": [
+                        ["ndarray", "i32", 1, 1],
+                        ["named", "a", ["ndarray", "i32", 1, 1]],
+                        ["named", "b", ["ndarray", "i32", 1, 1]],
+                    ],
+                    "r": ["i32",],
+                })
+        })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
+      result = invoker(a=1, b=1)
 
   def testMissingKeyword(self):
 
@@ -172,8 +193,29 @@ class FunctionTest(absltest.TestCase):
                 })
         })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
-    with self.assertRaisesRegexp(ValueError,
-                                 "a required argument was not specified"):
+    with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
+      result = invoker(-1, a=1)
+
+  def testMissingKeywordNdArray(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(
+        reflection={
+            "iree.abi":
+                json.dumps({
+                    "a": [
+                        ["ndarray", "i32", 1, 1],
+                        ["named", "a", ["ndarray", "i32", 1, 1]],
+                        ["named", "b", ["ndarray", "i32", 1, 1]],
+                    ],
+                    "r": ["i32",],
+                })
+        })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
       result = invoker(-1, a=1)
 
   def testExtraKeyword(self):
@@ -195,7 +237,7 @@ class FunctionTest(absltest.TestCase):
                 })
         })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
-    with self.assertRaisesRegexp(ValueError, "specified kwarg 'c' is unknown"):
+    with self.assertRaisesRegex(ValueError, "specified kwarg 'c' is unknown"):
       result = invoker(-1, a=1, b=2, c=3)
 
   # TODO: Fill out all return types.

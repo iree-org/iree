@@ -46,7 +46,6 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
       session, iree_make_cstring_view("module.set_value"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
-  static const iree_hal_dim_t arg0_shape[1] = {1};
   int arg0_data[1] = {new_value};
 
   // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
@@ -54,8 +53,8 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_clone_heap_buffer(
-        iree_runtime_session_device_allocator(session), arg0_shape,
-        IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+        iree_runtime_session_device_allocator(session), /*shape=*/NULL,
+        /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,
@@ -79,7 +78,6 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
       session, iree_make_cstring_view("module.add_to_value"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
-  static const iree_hal_dim_t arg0_shape[1] = {1};
   int arg0_data[1] = {x};
 
   // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
@@ -87,8 +85,8 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_clone_heap_buffer(
-        iree_runtime_session_device_allocator(session), arg0_shape,
-        IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+        iree_runtime_session_device_allocator(session), /*shape=*/NULL,
+        /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,
