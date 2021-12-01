@@ -142,7 +142,6 @@ static Value getTiedResultForOperand(OpOperand &operand,
       return result;
     }
   }
-  // Check for loop yield values.
   if (auto yieldOp = dyn_cast<scf::YieldOp>(operand.getOwner())) {
     Operation *parentOp = yieldOp->getParentOp();
     if (isa<scf::ForOp, scf::IfOp>(parentOp)) {

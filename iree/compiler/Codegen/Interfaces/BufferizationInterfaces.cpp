@@ -107,7 +107,7 @@ struct DispatchTensorLoadOpInterface
   }
 };
 
-/// Return true if the value of a `storeOp` bufferizes to an equivalent
+/// Returns true if the value of a `storeOp` bufferizes to an equivalent
 /// DispatchTensorLoadOp result that bufferizes inplace.
 static bool isValueEquivalentToAnInplaceTensorLoadOp(
     const BufferizationAliasInfo &aliasInfo,
