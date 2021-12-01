@@ -30,6 +30,7 @@ alias(
         "legalize_to_standard",
         "lhlo",
         "map_lmhlo_to_scalar_op",
+        "map_mhlo_to_scalar_op",
         "materialize_broadcasts",
         "mhlo_control_flow_to_scf",
         "mhlo_to_mhlo_lowering_patterns",
