@@ -2426,6 +2426,65 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
   let hasFolder = 1;
 }
 
+
+def Stream_TimepointImportOp : Stream_PureOp<"timepoint.import", [
+  Stream_AffinityOp,
+]> {
+  let summary = [{imports a timepoint from an external dialect type}];
+  let description = [{
+    Defines a conversion from an external dialect type such as `hal.semaphore`
+    that is resolved during lowering into the stream dialect. This can be used
+    to interoperate between levels of the stack that require specifying stream
+    types and those that prior to lowering do not handle them.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$operands,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $operands `:` `(` type($operands) `)`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+}
+
+def Stream_TimepointExportOp : Stream_PureOp<"timepoint.export", [
+  Stream_AffinityOp,
+]> {
+  let summary = [{exports a timepoint to an external dialect type}];
+  let description = [{
+    Defines a conversion to an external dialect type such as `hal.semaphore`
+    that is resolved during lowering into the stream dialect. This can be used
+    to interoperate between levels of the stack that require specifying stream
+    types and those that prior to lowering do not handle them.
+  }];
+
+  let arguments = (ins
+    Stream_Timepoint:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $await_timepoint
+    `=` `` `>`
+    `(` type($results) `)`
+    attr-dict-with-keyword
+  }];
+
+  let hasFolder = 1;
+}
+
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
   Stream_TimelineOp,
 ]> {

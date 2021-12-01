@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Stream/Conversion/FlowToStream/ConvertFlowToStream.h"
+#include "iree/compiler/Dialect/Stream/Conversion/HALToStream/ConvertHALToStream.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/Conversion/StandardToStream/ConvertStandardToStream.h"
 #include "iree/compiler/Dialect/Stream/Conversion/UtilToStream/ConvertUtilToStream.h"
@@ -241,6 +242,8 @@ class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
                                                typeConverter, patterns);
     populateFlowToStreamConversionPatterns(context, conversionTarget,
                                            typeConverter, patterns);
+    populateHALToStreamConversionPatterns(context, conversionTarget,
+                                          typeConverter, patterns);
 
     conversionTarget.markUnknownOpDynamicallyLegal(
         [&](Operation *op) -> bool { return !doesOperationNeedWrapping(op); });

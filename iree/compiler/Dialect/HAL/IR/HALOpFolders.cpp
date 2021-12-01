@@ -25,23 +25,24 @@ namespace IREE {
 namespace HAL {
 
 //===----------------------------------------------------------------------===//
-// hal.tensor.cast
+// hal.tensor.import/export
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorCastOp::fold(ArrayRef<Attribute> operands) {
-  if (source().getType() == target().getType()) {
-    return source();
+OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
+  if (auto exportOp = source().getDefiningOp<TensorExportOp>()) {
+    if (exportOp.source().getType() == target().getType()) {
+      return exportOp.source();
+    }
   }
+  return {};
+}
 
-  // Cast of a cast can use the defining op's source.
-  // This can apply recursively and may bottom out at source == target type.
-  if (auto castOp = source().getDefiningOp<TensorCastOp>()) {
-    auto mutableSource = sourceMutable();
-    mutableSource.clear();
-    mutableSource.append(castOp.source());
-    return getResult();
+OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
+  if (auto importOp = source().getDefiningOp<TensorImportOp>()) {
+    if (importOp.source().getType() == target().getType()) {
+      return importOp.source();
+    }
   }
-
   return {};
 }
 

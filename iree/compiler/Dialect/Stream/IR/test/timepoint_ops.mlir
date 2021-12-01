@@ -9,6 +9,24 @@ func @timepointImmediate() -> !stream.timepoint {
 
 // -----
 
+// CHECK-LABEL: @timepointImport
+func @timepointImport(%arg0: !hal.semaphore, %arg1: index) -> !stream.timepoint {
+  // CHECK: = stream.timepoint.import %arg0, %arg1 : (!hal.semaphore, index) => !stream.timepoint
+  %0 = stream.timepoint.import %arg0, %arg1 : (!hal.semaphore, index) => !stream.timepoint
+  return %0 : !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @timepointExport
+func @timepointExport(%arg0: !stream.timepoint) -> (!hal.semaphore, index) {
+  // CHECK: = stream.timepoint.export %arg0 => (!hal.semaphore, index)
+  %0:2 = stream.timepoint.export %arg0 => (!hal.semaphore, index)
+  return %0#0, %0#1 : !hal.semaphore, index
+}
+
+// -----
+
 // CHECK-LABEL: @timepointJoin
 func @timepointJoin(%arg0: !stream.timepoint, %arg1: !stream.timepoint) -> !stream.timepoint {
   // CHECK: = stream.timepoint.join max(%arg0, %arg1) => !stream.timepoint

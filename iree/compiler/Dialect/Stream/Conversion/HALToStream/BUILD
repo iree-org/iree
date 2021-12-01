@@ -11,19 +11,18 @@ package(
 )
 
 cc_library(
-    name = "FlowToStream",
+    name = "HALToStream",
     srcs = [
-        "ConvertFlowToStream.cpp",
+        "ConvertHALToStream.cpp",
     ],
     hdrs = [
-        "ConvertFlowToStream.h",
+        "ConvertHALToStream.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/Stream/Conversion",
         "//iree/compiler/Dialect/Stream/IR",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:TensorDialect",
     ],
 )

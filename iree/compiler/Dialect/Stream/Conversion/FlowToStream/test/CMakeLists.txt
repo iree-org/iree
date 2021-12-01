@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "cast_ops.mlir"
     "dispatch_ops.mlir"
     "tensor_ops.mlir"
   DATA

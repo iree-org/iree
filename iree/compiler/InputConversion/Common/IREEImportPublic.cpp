@@ -92,7 +92,7 @@ class BufferViewToTensorPattern
       ConversionPatternRewriter &rewriter) const override {
     Type resultType = typeConverter->convertType(srcOp.target().getType());
     if (!resultType) return failure();
-    rewriter.replaceOpWithNewOp<IREE::HAL::TensorCastOp>(
+    rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
         srcOp, resultType, adaptor.source(), adaptor.target_dims());
     return success();
   }
@@ -107,7 +107,7 @@ class TensorToBufferViewPattern
       ConversionPatternRewriter &rewriter) const override {
     Type resultType = typeConverter->convertType(srcOp.target().getType());
     if (!resultType) return failure();
-    rewriter.replaceOpWithNewOp<IREE::HAL::TensorCastOp>(
+    rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
         srcOp, resultType, adaptor.source(), adaptor.source_dims());
     return success();
   }
