@@ -16,7 +16,7 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/map_lmhlo_to_scalar_op.h"
+#include "mlir-hlo/Dialect/mhlo/transforms/map_mhlo_to_scalar_op.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -133,7 +133,7 @@ struct LinalgExtRegionHLOOpConversion : public OpConversionPattern<OpTy> {
     SmallVector<Value> scalarArgs;
     Type newRetType = getElementTypeOrSelf(
         this->typeConverter->convertType(origRetType.getElementType()));
-    Value result = lmhlo::HloOpToStdScalarOp::map<OpTy>(
+    Value result = mhlo::MhloOpToStdScalarOp::map<OpTy>(
         op, newRetType, adaptor.getOperands(), &rewriter);
     rewriter.replaceOp(op, result);
     return success();

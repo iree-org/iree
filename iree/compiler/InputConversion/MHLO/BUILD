@@ -97,6 +97,7 @@ cc_library(
         "@mlir-hlo//:legalize_to_linalg",
         "@mlir-hlo//:legalize_to_standard",
         "@mlir-hlo//:map_lmhlo_to_scalar_op",
+        "@mlir-hlo//:map_mhlo_to_scalar_op",
         "@mlir-hlo//:materialize_broadcasts",
         "@mlir-hlo//:mhlo_control_flow_to_scf",
         "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns",
