@@ -110,15 +110,15 @@ class FunctionInvoker:
       args = list(args)
       len_delta = self._max_named_arg_index - len(args) + 1
       if len_delta > 0:
-        args.extend([NotImplemented] * len_delta)
+        # Fill in MissingArgument placeholders before arranging kwarg input.
+        # Any remaining placeholders will fail arity checks later on.
+        args.extend([MissingArgument] * len_delta)
+
       for kwarg_key, kwarg_value in kwargs.items():
         try:
           kwarg_index = self._named_arg_indices[kwarg_key]
         except KeyError:
           raise ArgumentError(f"specified kwarg '{kwarg_key}' is unknown")
-        len_delta = kwarg_index - len(args) + 1
-        if len_delta <= 0:
-          args.extend([NotImplemented] * len_delta)
         args[kwarg_index] = kwarg_value
 
     arg_list = VmVariantList(len(args))
@@ -200,10 +200,6 @@ class FunctionInvoker:
 #   target_list: VmVariantList to append to
 #   python_value: The python value of the given type
 #   desc: The ABI descriptor list (or None if in dynamic mode).
-
-
-def _missing_argument(inv: Invocation, t: VmVariantList, x, desc):
-  _raise_argument_error(inv, f"a required argument was not specified")
 
 
 def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
@@ -307,8 +303,16 @@ def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   return _ndarray_to_vm(inv, t, np.asarray(x), desc)
 
 
+class _MissingArgument:
+  """Placeholder for missing kwargs in the function input."""
+
+  def __repr__(self):
+    return "<mising argument>"
+
+
+MissingArgument = _MissingArgument()
+
 PYTHON_TO_VM_CONVERTERS = {
-    NotImplemented.__class__: _missing_argument,
     bool: _bool_to_vm,
     int: _int_to_vm,
     float: _float_to_vm,
@@ -494,10 +498,14 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
   # For dynamic mode, just assume we have the right arity.
   if descs is None:
     descs = [None] * len(py_list)
-  elif len(py_list) != len(descs):
-    _raise_argument_error(
-        inv, f"mismatched call arity: expected {len(descs)} arguments but got "
-        f"{len(py_list)}. Expected signature=\n{descs}\nfor input=\n{py_list}")
+  else:
+    len_py_list = sum([1 for x in py_list if x is not MissingArgument])
+    if len(py_list) != len_py_list:
+      _raise_argument_error(
+          inv,
+          f"mismatched call arity: expected {len(descs)} arguments but got "
+          f"{len_py_list}. Expected signature=\n{descs}\nfor input=\n{py_list}")
+
   for py_value, desc in zip(py_list, descs):
     inv.current_arg = py_value
     inv.current_desc = desc
