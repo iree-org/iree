@@ -28,7 +28,7 @@ struct ConvertTensorImportOp
       IREE::HAL::TensorImportOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.source().getType();
-    auto targetType = op.target().getType();
+    auto targetType = op.target_encoding();
     if (!sourceType.isa<IREE::HAL::BufferType>() &&
         !sourceType.isa<IREE::HAL::BufferViewType>()) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
@@ -65,7 +65,7 @@ struct ConvertTensorExportOp
   LogicalResult matchAndRewrite(
       IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto sourceType = op.source().getType();
+    auto sourceType = op.source_encoding();
     auto targetType = op.target().getType();
     if (!targetType.isa<IREE::HAL::BufferType>() &&
         !targetType.isa<IREE::HAL::BufferViewType>()) {

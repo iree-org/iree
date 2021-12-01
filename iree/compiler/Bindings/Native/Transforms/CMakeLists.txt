@@ -21,7 +21,6 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRMemRef
     MLIRPass
     MLIRShape
     MLIRShapeOpsTransforms

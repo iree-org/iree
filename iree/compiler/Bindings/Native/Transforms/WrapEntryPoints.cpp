@@ -7,8 +7,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/SymbolTable.h"
@@ -30,11 +30,7 @@ class WrapEntryPointsPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect,
-                    IREE::HAL::HALDialect,
-                    // TODO: memref is here because the **tensor** dim op was
-                    // moved there for some reason. When that goes away we can
-                    // drop this dependency.
-                    memref::MemRefDialect>();
+                    mlir::tensor::TensorDialect, IREE::HAL::HALDialect>();
   }
 
   StringRef getArgument() const override {

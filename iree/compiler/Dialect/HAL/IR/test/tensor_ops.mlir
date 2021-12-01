@@ -11,8 +11,8 @@ func @tensorImportStatic(%arg0: !hal.buffer_view) -> tensor<5xi32> {
 
 // CHECK-LABEL: @tensorImportDynamic
 func @tensorImportDynamic(%arg0: !hal.buffer_view, %arg1 : index) -> tensor<?x3xi32> {
-  // CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x3xi32>{%arg1}
-  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x3xi32>{%arg1}
+  // CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x3xf32> as tensor<?x3xi32>{%arg1}
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x3xf32> as tensor<?x3xi32>{%arg1}
   return %0 : tensor<?x3xi32>
 }
 
@@ -20,7 +20,7 @@ func @tensorImportDynamic(%arg0: !hal.buffer_view, %arg1 : index) -> tensor<?x3x
 
 // CHECK-LABEL: @tensorExportDynamic
 func @tensorExportDynamic(%arg0: tensor<?x3xi32>, %arg1 : index) -> !hal.buffer_view {
-  // CHECK: hal.tensor.export %arg0 : tensor<?x3xi32>{%arg1} -> !hal.buffer_view
-  %0 = hal.tensor.export %arg0 : tensor<?x3xi32>{%arg1} -> !hal.buffer_view
+  // CHECK: hal.tensor.export %arg0 : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
+  %0 = hal.tensor.export %arg0 : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
   return %0 : !hal.buffer_view
 }
