@@ -105,6 +105,10 @@ EXPLICIT_TARGET_MAPPING = {
         "LmhloDialect",  # Unfortunate.
         "MhloDialect",
     ],
+    "@mlir-hlo//:map_mhlo_to_scalar_op": [
+        "tensorflow::external_mhlo_includes",
+        "MhloDialect",
+    ],
     "@mlir-hlo//:materialize_broadcasts": [
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
