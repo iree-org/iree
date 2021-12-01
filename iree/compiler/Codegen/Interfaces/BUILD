@@ -55,8 +55,15 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
+        "@llvm-project//mlir:AffineBufferizableOpInterfaceImpl",
+        "@llvm-project//mlir:ArithBufferizableOpInterfaceImpl",
+        "@llvm-project//mlir:BufferizableOpInterface",
+        "@llvm-project//mlir:ComprehensiveBufferize",
         "@llvm-project//mlir:LinalgBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:SCFBufferizableOpInterfaceImpl",
+        "@llvm-project//mlir:TensorBufferizableOpInterfaceImpl",
+        "@llvm-project//mlir:VectorBufferizableOpInterfaceImpl",
     ],
 )
 

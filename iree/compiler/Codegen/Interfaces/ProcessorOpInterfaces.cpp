@@ -6,8 +6,6 @@
 
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 
-#include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
-#include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 
