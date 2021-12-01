@@ -108,15 +108,19 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       populateVectorizationPatterns(context, vectorizationPatterns);
       populateLinalgToVectorVectorizeConvPatterns(context,
                                                   vectorizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorizationPatterns)))) {
+        return signalPassFailure();
+      }
 
       // Fold consumer add ops into the contraction op itself.
       RewritePatternSet canonicalizationPatterns(context);
       vector::ContractionOp::getCanonicalizationPatterns(
           canonicalizationPatterns, context);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -128,8 +132,10 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     {
       RewritePatternSet vectorUnrollPatterns(funcOp.getContext());
       populateVectorUnrollPatterns(funcOp.getContext(), vectorUnrollPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorUnrollPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -152,8 +158,10 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
           canonicalizationPatterns, context);
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           canonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -169,8 +177,10 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
           contractLoweringPatterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(contractLoweringPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(contractLoweringPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({

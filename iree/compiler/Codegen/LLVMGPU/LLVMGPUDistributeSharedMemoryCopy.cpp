@@ -232,8 +232,10 @@ class LLVMGPUDistributeSharedMemoryCopyPass
       // Step 1. Vectorize the shared memory copy.
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorizationPatterns)))) {
+        return signalPassFailure();
+      }
 
       // Step 2. Unroll transfer_read/transfer_write to a vector with the number
       // of element equal to `targetVectorSize * targetVectorSize`. The.
@@ -241,15 +243,20 @@ class LLVMGPUDistributeSharedMemoryCopyPass
       // size.
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns, flatWorkgroupSize);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorUnrollPatterns)))) {
+        return signalPassFailure();
+      }
       // Step 3. Distribute the transfer ops onto the flat ids.
       Value flatId = createFlatId(funcOp, workgroupSize);
       distributeTransferRead(funcOp, flatId, flatWorkgroupSize);
       // Propagate vector distribution to the chain of ops.
       RewritePatternSet distributePatterns(context);
       vector::populatePropagateVectorDistributionPatterns(distributePatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(distributePatterns));
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                              std::move(distributePatterns)))) {
+        return signalPassFailure();
+      }
     } else {
       // Fall back to basic tiling for cases where workgroup memory size is not
       // well aligned on the number of threads.
@@ -258,15 +265,19 @@ class LLVMGPUDistributeSharedMemoryCopyPass
       OwningRewritePatternList threadLevelTilingPatterns(context);
       populateTilingCopyToWorkgroupMemPatterns(threadLevelTilingPatterns,
                                                workgroupSize);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(threadLevelTilingPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(threadLevelTilingPatterns)))) {
+        return signalPassFailure();
+      }
       // Apply canonicalization patterns.
       RewritePatternSet threadTilingCanonicalizationPatterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       populateAffineMinSCFCanonicalizationPattern(
           threadTilingCanonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(
-          funcOp, std::move(threadTilingCanonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(threadTilingCanonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };

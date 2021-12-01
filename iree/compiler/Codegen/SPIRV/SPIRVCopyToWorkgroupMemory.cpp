@@ -290,7 +290,10 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   populateAffineMinCanonicalizationPattern(canonicalizePatterns);
   scf::populateSCFForLoopCanonicalizationPatterns(canonicalizePatterns);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizePatterns));
+  if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                          std::move(canonicalizePatterns)))) {
+    return signalPassFailure();
+  }
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
   OwningRewritePatternList vectorizationPatterns(&getContext());
@@ -298,7 +301,10 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
       vectorizationPatterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), context), {}));
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+  if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                          std::move(vectorizationPatterns)))) {
+    return signalPassFailure();
+  }
 }
 
 void SPIRVCopyToWorkgroupMemoryPass::runOnOperation() {

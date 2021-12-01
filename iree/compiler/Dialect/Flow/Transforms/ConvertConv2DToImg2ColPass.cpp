@@ -350,7 +350,10 @@ struct ConvertConv2DToImg2ColPass
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<Conv2DImg2ColMatmulConversion,
                     DepthwiseConv2DNHWCHWCImg2ColMatmulConversion>(context);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

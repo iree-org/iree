@@ -226,7 +226,9 @@ struct ForOpCanonicalizationPass
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<CanonicalizeForOpInductionVarShape,
                     PackForOpInductionVarVector>(fn.getContext());
-    (void)applyPatternsAndFoldGreedily(fn, std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(fn, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

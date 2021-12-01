@@ -139,7 +139,10 @@ class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(context);
     patterns.insert<PadMatmulOp>(context, paddingSize);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 
  private:

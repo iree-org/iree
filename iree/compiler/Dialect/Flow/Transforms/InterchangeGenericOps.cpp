@@ -62,7 +62,10 @@ struct InterchangeGenericOpsPass
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
     patterns.add<GenericOpInterchangePattern>(&getContext());
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

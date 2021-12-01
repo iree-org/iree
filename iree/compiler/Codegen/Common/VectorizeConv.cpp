@@ -367,7 +367,10 @@ struct LinalgToVectorVectorizeConvPass
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<VectorizeLinalgConv, VectorizeLinalgDepthwiseConv>(context);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 
