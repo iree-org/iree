@@ -40,6 +40,7 @@ done
 
 echo "CPU info (after changing governor):"
 echo 'cpu\tgovernor\tcur\tmin\tmax'
+echo "------------------------------------------------"
 for i in `cat /sys/devices/system/cpu/present | tr '-' ' ' | xargs seq`; do \
     echo "cpu${i}" | paste \
       - \
