@@ -43,6 +43,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 //===----------------------------------------------------------------------===//
 // mhlo.concatenate conversion patterns.
@@ -198,26 +199,6 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 
     // Pack the results back to mhlo::ComplexOp.
     rewriter.replaceOpWithNewOp<mhlo::ComplexOp>(op, op.getType(), real, imag);
-    return success();
-  }
-};
-
-/// Convert mhlo.constant op into std.const.
-struct ConstOpConversion : public OpConversionPattern<mhlo::ConstOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      mhlo::ConstOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto valueAttr = op.value();
-    Type oldElType = valueAttr.getType().getElementType();
-    Type newElType = this->typeConverter->convertType(oldElType);
-    ElementsAttr newValueAttr = valueAttr;
-    if (newElType != oldElType) {
-      // Values don't change, just their reported type.
-      newValueAttr = valueAttr.cast<DenseIntOrFPElementsAttr>().mapValues(
-          newElType, [](const APInt &oldEl) { return oldEl; });
-    }
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, newValueAttr);
     return success();
   }
 };
@@ -388,7 +369,7 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
-  patterns.insert<ConstOpConversion, ConcatenateOpConversion, FftOpConversion>(
+  patterns.insert<ConcatenateOpConversion, FftOpConversion>(
       typeConverter, context, PatternBenefit(1000));
 }
 
@@ -396,5 +377,6 @@ std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass() {
   return std::make_unique<ConvertMHLOToLinalgOnTensorsPass>();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -14,7 +14,6 @@ cc_library(
     name = "MHLO",
     srcs = [
         "EmitDefaultIREEABI.cpp",
-        "FlattenTuplesInCFG.cpp",
         "Passes.cpp",
     ],
     hdrs = [

@@ -21,6 +21,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 namespace {
 
@@ -740,10 +741,11 @@ struct ConvertDynamicReshapeOp
 
 }  // namespace
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir
 
-void mlir::iree_compiler::populateMHLOBroadcastingToLinalgPatterns(
+void mlir::iree_compiler::MHLO::populateMHLOBroadcastingToLinalgPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     OwningRewritePatternList &patterns) {
 #define POPULATE_SIMPLE_BCAST(ChloOp, HloOp)                          \

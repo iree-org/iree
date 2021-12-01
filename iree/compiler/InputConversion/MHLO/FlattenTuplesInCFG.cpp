@@ -4,7 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree_tf_compiler/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/MHLO/PassDetail.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
@@ -18,7 +19,7 @@
 #include "mlir/Transforms/Utils.h"
 
 namespace mlir {
-namespace iree_integrations {
+namespace iree_compiler {
 namespace MHLO {
 
 namespace {
@@ -274,17 +275,8 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
 }
 
 class FlattenTuplesInCFGPass
-    : public PassWrapper<FlattenTuplesInCFGPass, OperationPass<ModuleOp>> {
+    : public FlattenTuplesInCFGBase<FlattenTuplesInCFGPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-mhlo-flatten-tuples-in-cfg";
-  }
-
-  StringRef getDescription() const override {
-    return "Convert functions to remove tuples from method signatures and "
-           "blocks";
-  }
-
   void runOnOperation() override {
     auto module = getOperation();
     Builder builder(module.getContext());
@@ -332,5 +324,5 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass() {
 static PassRegistration<FlattenTuplesInCFGPass> pass;
 
 }  // namespace MHLO
-}  // namespace iree_integrations
+}  // namespace iree_compiler
 }  // namespace mlir

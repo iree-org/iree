@@ -7,8 +7,11 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
+#include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -17,6 +20,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 void registerMHLOConversionPassPipeline() {
   PassPipelineRegistration<> mhlo(
@@ -25,6 +29,11 @@ void registerMHLOConversionPassPipeline() {
       [](OpPassManager &passManager) {
         buildMHLOInputConversionPassPipeline(passManager);
       });
+  PassPipelineRegistration<> xla("iree-mhlo-xla-cleanup-pipeline",
+                                 "Runs the post-XLA import cleanup pipeline",
+                                 [](OpPassManager &passManager) {
+                                   buildXLACleanupPassPipeline(passManager);
+                                 });
 }
 
 // Prepare HLO for use as an input to the Flow dialect.
@@ -53,7 +62,7 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // TODO(nicolasvasilache): createLegalizeInputTypesPass is old and does not
   // handle region conversion properly (parent cloned before children). Revisit
   // when using ops with regions such as scf.for and linalg.generic.
-  passManager.addPass(mlir::iree_compiler::createLegalizeInputTypesPass());
+  passManager.addPass(createLegalizeInputTypesPass());
 
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
   // this context, some operations could be folded away.
@@ -61,10 +70,8 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
 
   // Convert to Linalg. After this point, MHLO will be eliminated.
-  passManager.addNestedPass<FuncOp>(
-      mlir::iree_compiler::createConvertMHLOToLinalgExtPass());
-  passManager.addNestedPass<FuncOp>(
-      mlir::iree_compiler::createMHLOToLinalgOnTensorsPass());
+  passManager.addNestedPass<FuncOp>(createConvertMHLOToLinalgExtPass());
+  passManager.addNestedPass<FuncOp>(createMHLOToLinalgOnTensorsPass());
   // Ensure conversion completed.
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
@@ -76,6 +83,14 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // Entry dialect cleanup
   //----------------------------------------------------------------------------
   passManager.addPass(createVerifyCompilerMHLOInputLegality());
+}
+
+void buildXLACleanupPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<FuncOp>(mhlo::createControlFlowToScfPass());
+  passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
+  passManager.addNestedPass<FuncOp>(mlir::createLowerToCFGPass());
+  passManager.addPass(createFlattenTuplesInCFGPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 }
 
 namespace {
@@ -91,5 +106,6 @@ void registerMHLOConversionPasses() {
   registerMHLOConversionPassPipeline();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir

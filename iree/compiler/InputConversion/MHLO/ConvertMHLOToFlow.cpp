@@ -19,6 +19,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 namespace {
 
@@ -43,5 +44,6 @@ void populateMHLOToFlowPatterns(MLIRContext *context,
   patterns.insert<ConstOpLowering>(context);
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir

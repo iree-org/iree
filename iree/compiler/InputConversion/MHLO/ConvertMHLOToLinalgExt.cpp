@@ -29,6 +29,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 namespace {
 
@@ -571,5 +572,6 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertMHLOToLinalgExtPass() {
   return std::make_unique<ConvertMHLOToLinalgExtPass>();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir

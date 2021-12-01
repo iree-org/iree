@@ -41,7 +41,7 @@ inline void registerAllIreePasses() {
   IREE::TFLite::registerTransformPassPipeline();
 
   registerCommonInputConversionPasses();
-  registerMHLOConversionPasses();
+  MHLO::registerMHLOConversionPasses();
   registerTOSAConversionPasses();
 
   IREE::Flow::registerFlowPasses();

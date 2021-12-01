@@ -26,6 +26,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 static Attribute convertAttribute(Location loc, Attribute value,
                                   FlowTypeConverter &typeConverter) {
@@ -253,5 +254,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass() {
   return std::make_unique<LegalizeInputTypesPass>();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir

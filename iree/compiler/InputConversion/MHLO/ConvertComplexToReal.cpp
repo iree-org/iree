@@ -14,6 +14,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 namespace {
 
@@ -428,5 +429,6 @@ createTestMHLOConvertComplexToRealPass() {
   return std::make_unique<TestMHLOConvertComplexToRealPass>();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir
