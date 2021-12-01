@@ -1976,6 +1976,24 @@ OpFoldResult TimepointImmediateOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.timepoint.export
+//===----------------------------------------------------------------------===//
+
+LogicalResult TimepointExportOp::fold(ArrayRef<Attribute> operands,
+                                      SmallVectorImpl<OpFoldResult> &results) {
+  // If the source timepoint comes from an import op we can fold - but only if
+  // the types match.
+  if (auto importOp = dyn_cast_or_null<TimepointImportOp>(
+          await_timepoint().getDefiningOp())) {
+    if (llvm::equal(importOp.getOperandTypes(), getResultTypes())) {
+      llvm::append_range(results, importOp.operands());
+      return success();
+    }
+  }
+  return failure();
+}
+
+//===----------------------------------------------------------------------===//
 // stream.timepoint.join
 //===----------------------------------------------------------------------===//
 

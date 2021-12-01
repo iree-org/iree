@@ -2122,8 +2122,6 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
   }];
 }
 
-// TODO(benvanik): rework this to make it a terminator with branch targets
-// for ^success and ^fail(status).
 def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [YieldPoint]> {
   let summary = [{asynchronous semaphore wait operation}];
   let description = [{
