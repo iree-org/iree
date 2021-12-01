@@ -210,8 +210,8 @@ struct StructureLevel {
       assert(!callArgs[valueIndex] && "duplicate argument bindings");
       auto value = thisValue;
       if (value.getType().isa<IREE::HAL::BufferViewType>()) {
-        value = builder.createOrFold<IREE::HAL::TensorCastOp>(loc, valueType,
-                                                              thisValue);
+        value = builder.createOrFold<IREE::HAL::TensorImportOp>(loc, valueType,
+                                                                thisValue);
       }
       callArgs[valueIndex] = value;
       return;
@@ -250,7 +250,7 @@ struct StructureLevel {
              "mismatched number of call returns");
       Value value = callReturns[valueIndex];
       if (valueType.isa<TensorType>()) {
-        value = builder.createOrFold<IREE::HAL::TensorCastOp>(
+        value = builder.createOrFold<IREE::HAL::TensorExportOp>(
             loc, getIrType(builder), value);
       }
       return value;
@@ -305,8 +305,8 @@ struct StructureLevel {
     // TODO: Null check, etc. How does that work if returning a tensor? Need
     // to box somehow?
     if (itemValue.getType().isa<IREE::HAL::BufferViewType>()) {
-      itemValue = builder.createOrFold<IREE::HAL::TensorCastOp>(loc, valueType,
-                                                                itemValue);
+      itemValue = builder.createOrFold<IREE::HAL::TensorImportOp>(
+          loc, valueType, itemValue);
     }
     return itemValue;
   }

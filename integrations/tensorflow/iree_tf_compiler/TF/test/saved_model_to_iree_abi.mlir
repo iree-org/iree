@@ -4,11 +4,11 @@
 // Should just be a pass through.
 // CHECK: func @binary_func
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22stuple\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]],\22v\22:1}"
-// CHECK: %[[ARG0_TENSOR:.*]] = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<16xf32>
-// CHECK: %[[ARG1_TENSOR:.*]] = hal.tensor.cast %arg1 : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[ARG0_TENSOR:.*]] = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[ARG1_TENSOR:.*]] = hal.tensor.import %arg1 : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[R:.*]]:2 = call @__inference_binary_func_70(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
-// CHECK: %[[R0_BV:.*]] = hal.tensor.cast %[[R]]#0 : tensor<16xf32> -> !hal.buffer_view
-// CHECK: %[[R1_BV:.*]] = hal.tensor.cast %[[R]]#1 : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R0_BV:.*]] = hal.tensor.export %[[R]]#0 : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R1_BV:.*]] = hal.tensor.export %[[R]]#1 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: return %[[R0_BV]], %[[R1_BV]] : !hal.buffer_view, !hal.buffer_view
 // CHECK: func private @__inference_binary_func_70
 // CHECK-NOT: tf_saved_model
@@ -24,9 +24,9 @@ builtin.module @binary_func attributes {tf.versions = {bad_consumers = [], min_c
 // CHECK-LABEL: module @unary_func
 // CHECK: func @unary_func
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22ndarray\22,\22f32\22,1,16]],\22v\22:1}"
-// CHECK: %[[ARG0_TENSOR:.*]] = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[ARG0_TENSOR:.*]] = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[R:.*]] = call @__inference_unary_func_240(%[[ARG0_TENSOR]])
-// CHECK: %[[R0_BV:.*]] = hal.tensor.cast %[[R]] : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R0_BV:.*]] = hal.tensor.export %[[R]] : tensor<16xf32> -> !hal.buffer_view
 // CHECK: return %[[R0_BV]] : !hal.buffer_view
 // CHECK: func private @__inference_unary_func_240
   // CHECK-NOT: tf_saved_model
@@ -41,11 +41,11 @@ builtin.module @unary_func attributes {tf.versions = {bad_consumers = [], min_co
 // CHECK-LABEL: module @return_list
 // CHECK: func @return_list
 // CHECK-SAME{LITERAL}: iree.abi = "{\22a\22:[[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]],\22r\22:[[\22stuple\22,[\22ndarray\22,\22f32\22,1,16],[\22ndarray\22,\22f32\22,1,16]]],\22v\22:1}"
-// CHECK: %[[ARG0_TENSOR:.*]] = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<16xf32>
-// CHECK: %[[ARG1_TENSOR:.*]] = hal.tensor.cast %arg1 : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[ARG0_TENSOR:.*]] = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[ARG1_TENSOR:.*]] = hal.tensor.import %arg1 : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[R:.+]]:2 = call @__inference_return_list_260(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
-// CHECK: %[[R0_BV:.*]] = hal.tensor.cast %[[R]]#0 : tensor<16xf32> -> !hal.buffer_view
-// CHECK: %[[R1_BV:.*]] = hal.tensor.cast %[[R]]#1 : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R0_BV:.*]] = hal.tensor.export %[[R]]#0 : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R1_BV:.*]] = hal.tensor.export %[[R]]#1 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: return %[[R0_BV]], %[[R1_BV]] : !hal.buffer_view, !hal.buffer_view
 // CHECK: func private @__inference_return_list_260
 // CHECK-NOT: tf_saved_model
@@ -65,36 +65,36 @@ builtin.module @return_list attributes {tf.versions = {bad_consumers = [], min_c
 // CHECK: %[[L0:.+]] = util.list.get %arg0[%[[c0]]] : !util.list<?> -> !util.list<?>
 // CHECK: %[[c0_0:.+]] = arith.constant 0 : index
 // CHECK: %[[L1:.+]] = util.list.get %[[L0]][%[[c0_0]]] : !util.list<?> -> !hal.buffer_view
-// CHECK: %[[L1_TENSOR:.+]] = hal.tensor.cast %[[L1]] : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[L1_TENSOR:.+]] = hal.tensor.import %[[L1]] : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[c1:.+]] = arith.constant 1 : index
 // CHECK: %[[L2:.+]] = util.list.get %[[L0]][%[[c1]]] : !util.list<?> -> !hal.buffer_view
-// CHECK: %[[L2_TENSOR:.+]] = hal.tensor.cast %[[L2]] : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[L2_TENSOR:.+]] = hal.tensor.import %[[L2]] : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[c1_1:.+]] = arith.constant 1 : index
 // CHECK: %[[L3:.+]] = util.list.get %arg0[%[[c1_1]]] : !util.list<?> -> !util.list<?>
 // CHECK: %[[c0_2:.+]] = arith.constant 0 : index
 // CHECK: %[[L4:.+]] = util.list.get %[[L3]][%[[c0_2]]] : !util.list<?> -> !hal.buffer_view
-// CHECK: %[[L4_TENSOR:.+]] = hal.tensor.cast %[[L4]] : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[L4_TENSOR:.+]] = hal.tensor.import %[[L4]] : !hal.buffer_view -> tensor<16xf32>
 // CHECK: %[[c1_3:.+]] = arith.constant 1 : index
 // CHECK: %[[L5:.+]] = util.list.get %[[L3]][%[[c1_3]]] : !util.list<?> -> !hal.buffer_view
-// CHECK: %[[L5_TENSOR:.+]] = hal.tensor.cast %[[L5]] : !hal.buffer_view -> tensor<16xf32>
-// CHECK: %[[ARG1_TENSOR:.+]] = hal.tensor.cast %arg1 : !hal.buffer_view -> tensor<f32>
+// CHECK: %[[L5_TENSOR:.+]] = hal.tensor.import %[[L5]] : !hal.buffer_view -> tensor<16xf32>
+// CHECK: %[[ARG1_TENSOR:.+]] = hal.tensor.import %arg1 : !hal.buffer_view -> tensor<f32>
 // CHECK: %[[RESULT:.+]]:4 = call @__inference_dict_nest_190(%[[L1_TENSOR]], %[[L2_TENSOR]], %[[L4_TENSOR]], %[[L5_TENSOR]], %[[ARG1_TENSOR]]) : (tensor<16xf32>, tensor<16xf32>, tensor<16xf32>, tensor<16xf32>, tensor<f32>) -> (tensor<16xf32>, tensor<16xf32>, tensor<16xf32>, tensor<16xf32>)
 // CHECK: %[[c2:.+]] = arith.constant 2 : index
 // CHECK: %[[R7:.+]] = util.list.create %[[c2]] : !util.list<?>
 // CHECK: util.list.resize %[[R7]], %[[c2]]
-// CHECK: %[[R0_BV:.+]] = hal.tensor.cast %[[RESULT]]#0 : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R0_BV:.+]] = hal.tensor.export %[[RESULT]]#0 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: %[[c0_4:.+]] = arith.constant 0 : index
 // CHECK: util.list.set %[[R7]][%[[c0_4]]], %[[R0_BV]] : !hal.buffer_view -> !util.list<?>
-// CHECK: %[[R1_BV:.+]] = hal.tensor.cast %[[RESULT]]#1 : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R1_BV:.+]] = hal.tensor.export %[[RESULT]]#1 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: %[[c1_5:.+]] = arith.constant 1 : index
 // CHECK: util.list.set %[[R7]][%[[c1_5]]], %[[R1_BV]] : !hal.buffer_view -> !util.list<?>
 // CHECK: %[[c2_8:.+]] = arith.constant 2 : index
 // CHECK: %[[R9:.+]] = util.list.create %[[c2_8]] : !util.list<?>
 // CHECK: util.list.resize %[[R9]], %[[c2_8]]
-// CHECK: %[[R2_BV:.+]] = hal.tensor.cast %[[RESULT]]#2 : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R2_BV:.+]] = hal.tensor.export %[[RESULT]]#2 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: %[[c0_9:.+]] = arith.constant 0 : index
 // CHECK: util.list.set %[[R9]][%[[c0_9]]], %[[R2_BV]] : !hal.buffer_view -> !util.list<?>
-// CHECK: %[[R3_BV:.+]] = hal.tensor.cast %[[RESULT]]#3 : tensor<16xf32> -> !hal.buffer_view
+// CHECK: %[[R3_BV:.+]] = hal.tensor.export %[[RESULT]]#3 : tensor<16xf32> -> !hal.buffer_view
 // CHECK: %[[c1_10:.+]] = arith.constant 1 : index
 // CHECK: util.list.set %[[R9]][%[[c1_10]]], %[[R3_BV]] : !hal.buffer_view -> !util.list<?>
 // return %[[R7]], %[[R8]] : !util.list<?>, !util.list<?>

@@ -39,17 +39,17 @@ builtin.func @null_op() -> !iree_input.variant {
 
 // -----
 // CHECK-LABEL: func @tensor_to_buffer_view
-// CHECK: hal.tensor.cast %arg0 : tensor<?x?x3xf32>{%arg1, %arg2} -> !hal.buffer_view
+// CHECK: hal.tensor.export %arg0 : tensor<?x?x3xf32>{%arg1, %arg2} -> !hal.buffer_view
 builtin.func @tensor_to_buffer_view(%arg0 : tensor<?x?x3xf32>, %arg1 : index, %arg2 : index) -> !iree_input.buffer_view {
-  %0 = iree_input.cast.tensor_to_buffer_view %arg0 : tensor<?x?x3xf32> {%arg1, %arg2} -> !iree_input.buffer_view
+  %0 = iree_input.cast.tensor_to_buffer_view %arg0 : tensor<?x?x3xf32>{%arg1, %arg2} -> !iree_input.buffer_view
   return %0 : !iree_input.buffer_view
 }
 
 // -----
 // CHECK-LABEL: func @buffer_view_to_tensor
-// CHECK: hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?x?x3xf32>{%arg1, %arg2}
+// CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x?x3xf32>{%arg1, %arg2}
 builtin.func @buffer_view_to_tensor(%arg0 : !iree_input.buffer_view, %arg1 : index, %arg2 : index) -> tensor<?x?x3xf32> {
-  %0 = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<?x?x3xf32> {%arg1, %arg2}
+  %0 = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<?x?x3xf32>{%arg1, %arg2}
   return %0 : tensor<?x?x3xf32>
 }
 

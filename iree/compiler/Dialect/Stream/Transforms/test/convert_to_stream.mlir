@@ -29,7 +29,7 @@ func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.a
   // CHECK: %[[ARG0_SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]} : index
   // CHECK: %[[ARG0_IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[ARG0_SIZE]]}
   // CHECK: %[[ARG0_T:.+]] = stream.async.transfer %[[ARG0_IMPORT]] : !stream.resource<external>{%[[ARG0_SIZE]]} -> !stream.resource<*>{%[[ARG0_SIZE]]}
-  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%dim0}
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%dim0}
 
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -39,7 +39,7 @@ func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.a
 
   // CHECK: %[[RET0_T:.+]] = stream.async.transfer %[[RET0]] : !stream.resource<*>{%[[RET0_SIZE]]} -> !stream.resource<external>{%[[RET0_SIZE]]}
   // CHECK: %[[RET0_EXPORT:.+]] = stream.tensor.export %[[RET0_T]] : tensor<?xf32>{%[[DIM0]]} in !stream.resource<external>{%[[RET0_SIZE]]} -> !hal.buffer_view
-  %2 = hal.tensor.cast %1 : tensor<?xf32>{%dim0} -> !hal.buffer_view
+  %2 = hal.tensor.export %1 : tensor<?xf32>{%dim0} -> !hal.buffer_view
   // CHECK: return %[[RET0_EXPORT]] : !hal.buffer_view
   return %2 : !hal.buffer_view
 }

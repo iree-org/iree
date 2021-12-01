@@ -42,7 +42,7 @@ HALTypeConverter::HALTypeConverter(
                               ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
     if (inputs[0].getType().isa<TensorType>()) {
-      return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputs[0]);
+      return builder.create<IREE::HAL::TensorExportOp>(loc, type, inputs[0]);
     } else if (inputs[0].getType().isa<IREE::HAL::BufferViewType>()) {
       return builder.create<IREE::HAL::BufferViewBufferOp>(loc, type,
                                                            inputs[0]);
@@ -59,7 +59,7 @@ HALTypeConverter::HALTypeConverter(
     auto inputValue = inputs[0];
     auto inputType = inputValue.getType();
     if (inputType.isa<TensorType>()) {
-      return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputValue);
+      return builder.create<IREE::HAL::TensorExportOp>(loc, type, inputValue);
     } else if (inputType.isa<IREE::HAL::BufferType>()) {
       // Look for the buffer view this buffer came from, if any.
       // If we don't have the origin buffer view then we can't know the shape

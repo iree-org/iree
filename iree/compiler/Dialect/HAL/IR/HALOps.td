@@ -58,55 +58,94 @@ def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
 
-def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-        "getTiedResult",
-        "getTiedResultOperandIndex",
-        "getTiedResultOperandIndices",
-    ]>,
-    Util_ShapeAwareOp,
-  ]> {
-  let summary = [{conversion placeholder for HAL<->tensor type conversion}];
+def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{imports a tensor from a HAL buffer view}];
   let description = [{
-    Defines a conversion from a higher-level dialect type such as `tensor` that
-    is resolved during lowering into the HAL. This can be used to interoperate
-    between levels of the stack that require specifying HAL types and those that
-    prior to lowering do not handle them.
+    Defines an import of an external HAL buffer view into a SSA-form tensor.
+    An optional semaphore timepoint can be specified indicating when the
+    buffer view is available for use. If no semaphore timepoint is provided it
+    is assumed the buffer view is immediately available.
   }];
 
   let arguments = (ins
-    AnyType:$source,
-    HAL_ShapeDynamicDims:$source_dims,
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     HAL_ShapeDynamicDims:$target_dims
   );
   let results = (outs
-    AnyType:$target
+    AnyTensor:$target
   );
 
   let assemblyFormat = [{
-    $source `:`
-    type($source) (`{` $source_dims^ `}`)? `->`
+    $source `:` type($source)
+    `->`
     type($target) (`{` $target_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+      "Value":$source
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return {}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+  }];
+
+  let hasFolder = 1;
+}
+
+def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{exports a tensor to a HAL buffer view}];
+  let description = [{
+    Defines an export of an SSA-form tensor to an external HAL buffer view.
+    An optional semaphore timepoint can be specified indicating when the
+    buffer view is available for use. If no semaphore timepoint is requested it
+    is assumed execution blocks until the buffer view is available.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$source,
+    HAL_ShapeDynamicDims:$source_dims
+  );
+  let results = (outs
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)?
+    `->`
+    type($target)
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source,
-      "ValueRange":$dynamicDims,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+      "Value":$source
+    )>,
   ];
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return {}; }
   }];
 
   let hasFolder = 1;

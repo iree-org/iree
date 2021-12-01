@@ -179,56 +179,56 @@ void ExSharedDeviceOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.tensor.cast
+// hal.tensor.import/export
 //===----------------------------------------------------------------------===//
 
-void TensorCastOp::build(OpBuilder &builder, OperationState &result,
-                         Type resultType, Value source,
-                         ArrayRef<NamedAttribute> attrs) {
+void TensorImportOp::build(OpBuilder &builder, OperationState &result,
+                           Type resultType, Value source) {
+  auto shapedType = resultType.cast<ShapedType>();
+  assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
+          shapedType.hasStaticShape()) &&
+         "can only use this constructor for buffer views when shape "
+         "information is required");
   SmallVector<Value> dynamicDims;
-  if (source.getType().isa<IREE::HAL::BufferViewType>()) {
-    auto shapedType = resultType.cast<ShapedType>();
-    for (int64_t i = 0; i < shapedType.getRank(); ++i) {
-      if (!shapedType.isDynamicDim(i)) continue;
-      dynamicDims.push_back(builder.createOrFold<IREE::HAL::BufferViewDimOp>(
-          result.location, builder.getIndexType(), source,
-          builder.getIndexAttr(i)));
-    }
-  } else {
-    dynamicDims =
-        IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
+  for (int64_t i = 0; i < shapedType.getRank(); ++i) {
+    if (!shapedType.isDynamicDim(i)) continue;
+    dynamicDims.push_back(builder.createOrFold<IREE::HAL::BufferViewDimOp>(
+        result.location, builder.getIndexType(), source,
+        builder.getIndexAttr(i)));
   }
-  build(builder, result, resultType, source, dynamicDims, attrs);
+  build(builder, result, resultType, source, dynamicDims);
 }
 
-void TensorCastOp::build(OpBuilder &builder, OperationState &result,
-                         Type resultType, Value source, ValueRange dynamicDims,
-                         ArrayRef<NamedAttribute> attrs) {
-  result.addTypes({resultType});
-  result.addOperands({source});
-  result.addOperands({dynamicDims});
-  result.addAttributes(attrs);
-  result.addAttribute(
-      "operand_segment_sizes",
-      builder.getI32VectorAttr({
-          static_cast<int32_t>(1),
-          static_cast<int32_t>(
-              source.getType().isa<TensorType>() ? dynamicDims.size() : 0),
-          static_cast<int32_t>(resultType.isa<TensorType>() ? dynamicDims.size()
-                                                            : 0),
-      }));
-}
-
-Value TensorCastOp::getTiedResult(unsigned resultIndex) {
+Value TensorImportOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
 }
 
-::llvm::Optional<unsigned> TensorCastOp::getTiedResultOperandIndex(
+::llvm::Optional<unsigned> TensorImportOp::getTiedResultOperandIndex(
     unsigned resultIndex) {
   return {0};  // source
 }
 
-SmallVector<int64_t, 4> TensorCastOp::getTiedResultOperandIndices() {
+SmallVector<int64_t, 4> TensorImportOp::getTiedResultOperandIndices() {
+  return {0};  // source
+}
+
+void TensorExportOp::build(OpBuilder &builder, OperationState &result,
+                           Type resultType, Value source) {
+  auto dynamicDims =
+      IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
+  build(builder, result, resultType, source, dynamicDims);
+}
+
+Value TensorExportOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
+}
+
+::llvm::Optional<unsigned> TensorExportOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // source
+}
+
+SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
