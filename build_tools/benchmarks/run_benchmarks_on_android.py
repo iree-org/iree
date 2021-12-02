@@ -64,6 +64,7 @@ from common.benchmark_definition import (AndroidDeviceInfo, BenchmarkInfo,
                                          BenchmarkResults, BenchmarkRun,
                                          execute_cmd,
                                          execute_cmd_and_get_output,
+                                         get_android_device_model,
                                          IREE_PRETTY_NAMES_TO_DRIVERS)
 
 # All benchmarks' relative path against root build directory.
@@ -547,12 +548,25 @@ def filter_and_run_benchmarks(
   return (benchmark_files, captures, errors)
 
 
-def set_frequency_scaling_governor(governor: str):
+def set_cpu_frequency_scaling_governor(governor: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   cpu_script = os.path.join(
       git_root, "build_tools/benchmarks/set_android_scaling_governor.sh")
-  adb_push_to_tmp_dir(cpu_script)
-  adb_execute(["su", "root", "./set_android_scaling_governor.sh", governor])
+  android_path = adb_push_to_tmp_dir(cpu_script)
+  adb_execute(["su", "root", android_path, governor])
+
+
+def set_gpu_frequency_scaling_policy(policy: str):
+  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
+  device_model = get_android_device_model()
+  if device_model == "Pixel-6":
+    gpu_script = os.path.join(
+        git_root, "build_tools/benchmarks/set_pixel6_gpu_scaling_policy.sh")
+  else:
+    raise RuntimeError(
+        f"Unsupported device '{device_model}' for setting GPU scaling policy")
+  android_path = adb_push_to_tmp_dir(gpu_script)
+  adb_execute(["su", "root", android_path, policy])
 
 
 def parse_arguments():
@@ -617,6 +631,10 @@ def parse_arguments():
       "--pin_cpu_freq",
       action="store_true",
       help="Pin CPU frequency for all cores to the maximum. Requires root")
+  parser.add_argument("--pin-gpu-freq",
+                      "--pin_gpu_freq",
+                      action="store_true",
+                      help="Pin GPU frequency to the maximum. Requires root")
   parser.add_argument(
       "--keep_going",
       "--keep-going",
@@ -658,8 +676,11 @@ def main(args):
                      "need to update the map")
 
   if args.pin_cpu_freq:
-    set_frequency_scaling_governor("performance")
-    atexit.register(set_frequency_scaling_governor, "schedutil")
+    set_cpu_frequency_scaling_governor("performance")
+    atexit.register(set_cpu_frequency_scaling_governor, "schedutil")
+  if args.pin_gpu_freq:
+    set_gpu_frequency_scaling_policy("always_on")
+    atexit.register(set_gpu_frequency_scaling_policy, "coarse_demand")
 
   previous_benchmarks = None
   previous_captures = None
