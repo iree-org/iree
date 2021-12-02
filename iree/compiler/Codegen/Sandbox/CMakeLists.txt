@@ -52,6 +52,8 @@ iree_cc_library(
     MLIRTensor
     MLIRVector
     MLIRX86VectorTransforms
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Utils
   PUBLIC
 )
 

@@ -37,7 +37,11 @@ def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
-      "Rewrite all linalg.pad_tensor ops in the function to vector form.">
+      "Rewrite all linalg.pad_tensor ops in the function to vector form.">,
+  
+    // IREE specific options
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering.config">
   ];
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
@@ -96,7 +100,11 @@ def LinalgSingleTilingExpert
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
-      "Rewrite all linalg.pad_tensor ops in the function to vector form.">
+      "Rewrite all linalg.pad_tensor ops in the function to vector form.">,
+
+    // IREE specific options
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering.config">
   ];
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",

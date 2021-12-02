@@ -4,8 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Sandbox/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -20,16 +22,72 @@
 using namespace mlir;
 using namespace mlir::linalg;
 
+//===----------------------------------------------------------------------===//
+// IREE specific functions
+//===----------------------------------------------------------------------===//
+
+/// Default method to initialize the tiling options in IREE. These could be
+/// overriden by the command line options if specified. For now the sentinel
+/// -1 is used for avoiding querying the lowering config.
+static bool getTilingOptionsFromConfig(int64_t tilingLevel,
+                                       LinalgTilingOptions &tilingOptions) {
+  if (tilingLevel != -1) {
+    tilingOptions.setTileSizeComputationFunction(
+        [tilingLevel](OpBuilder &builder,
+                      Operation *operation) -> SmallVector<Value, 4> {
+          return ::mlir::iree_compiler::getTileSizes(builder, operation,
+                                                     tilingLevel);
+        });
+    return true;
+  }
+  return false;
+}
+
+/// Default method to initialize the tiling options for fusion in IREE. These
+/// could be ovveridden by the command line options if specified.
+static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
+    FuncOp funcOp, int64_t tilingLevel) {
+  SmallVector<Operation *> computeOps;
+  SmallVector<mlir::iree_compiler::LoopTilingAndDistributionInfo> tiledLoops;
+  mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig;
+  if (tilingLevel != -1 &&
+      succeeded(getComputeOps(funcOp, computeOps, tiledLoops))) {
+    for (auto op : computeOps) {
+      if (auto currLoweringConfig = iree_compiler::getLoweringConfig(op)) {
+        if (loweringConfig) {
+          return {funcOp.emitOpError(
+              "unhandled multiple lowering configurations in compute ops")};
+        }
+        loweringConfig = currLoweringConfig;
+      }
+    }
+  }
+  if (!loweringConfig) {
+    return LinalgTilingAndFusionOptions();
+  }
+  LinalgTilingAndFusionOptions options;
+  options.tileSizes.assign(loweringConfig.getTileSizeVals(tilingLevel));
+  return options;
+}
+
+//===----------------------------------------------------------------------===//
+// From Sandbox
+//===----------------------------------------------------------------------===//
+
 namespace {
 struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
-  LinalgFusePass() = default;
+  LinalgFusePass(int64_t tilingLevel = -1) {
+    this->tilingLevel.setValue(tilingLevel);
+  }
   LinalgFusePass(const LinalgFusePass &pass) {}
   void runOnOperation() override;
 };
 
 struct LinalgSingleTilingExpertPass
     : public LinalgSingleTilingExpertBase<LinalgSingleTilingExpertPass> {
-  LinalgSingleTilingExpertPass() = default;
+  LinalgSingleTilingExpertPass(int64_t tilingLevel = -1) {
+    this->tilingLevel.setValue(tilingLevel);
+  }
   LinalgSingleTilingExpertPass(const LinalgSingleTilingExpertPass &pass) {}
 
   /// Function pass entry point.
@@ -59,13 +117,23 @@ static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
 // TODO: finer control.
 void LinalgFusePass::runOnOperation() {
   FuncOp funcOp = getOperation();
-  if (anchorOpName.empty()) return;
 
   // Set up tiling and vectorization options.
-  LinalgTilingAndFusionOptions tilingOptions;
-  tilingOptions.tileSizes = {tileSizes.begin(), tileSizes.end()};
-  tilingOptions.tileInterchange = {tileInterchange.begin(),
-                                   tileInterchange.end()};
+  FailureOr<LinalgTilingAndFusionOptions> defaultTilingOptions =
+      getTileAndFuseOptionsFromConfig(funcOp, tilingLevel);
+  if (failed(defaultTilingOptions)) {
+    return signalPassFailure();
+  }
+  LinalgTilingAndFusionOptions tilingOptions = defaultTilingOptions.getValue();
+  bool doTiling = !tilingOptions.tileSizes.empty();
+  if (!tileSizes.empty()) {
+    doTiling = true;
+    tilingOptions.tileSizes = {tileSizes.begin(), tileSizes.end()};
+  }
+  if (!tileInterchange.empty()) {
+    tilingOptions.tileInterchange = {tileInterchange.begin(),
+                                     tileInterchange.end()};
+  }
 
   // Set up padding options.
   // TODO: Replace the lambdas by either functions defined in MLIR core or even
@@ -87,7 +155,7 @@ void LinalgFusePass::runOnOperation() {
   paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
 
   CodegenStrategy strategy;
-  strategy.tileAndFuseIf(!tileSizes.empty(), anchorOpName, tilingOptions)
+  strategy.tileAndFuseIf(doTiling, anchorOpName, tilingOptions)
       .padIf(pad, "", paddingOptions)
       .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
 
@@ -100,16 +168,21 @@ void LinalgFusePass::runOnOperation() {
 
 void LinalgSingleTilingExpertPass::runOnOperation() {
   FuncOp funcOp = getOperation();
-  if (anchorOpName.empty()) return;
 
   // Set up tiling and vectorization options.
   LinalgTilingOptions tilingOptions;
-  if (!tileSizes.empty()) tilingOptions = tilingOptions.setTileSizes(tileSizes);
+  bool doTiling = getTilingOptionsFromConfig(tilingLevel, tilingOptions);
+  if (!tileSizes.empty()) {
+    doTiling = true;
+    tilingOptions = tilingOptions.setTileSizes(tileSizes);
+  }
   if (!tileInterchange.empty())
     tilingOptions = tilingOptions.setInterchange(
         SmallVector<unsigned>(tileInterchange.begin(), tileInterchange.end()));
-  if (scalarizeDynamicDims)
+  if (scalarizeDynamicDims) {
+    doTiling = true;
     tilingOptions = tilingOptions.scalarizeDynamicDims();
+  }
   tilingOptions = tilingOptions.setPeeledLoops(peeledLoops);
 
   // Set up padding options.
@@ -133,9 +206,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   CodegenStrategy strategy;
   StringRef genericOpName = GenericOp::getOperationName();
-  strategy
-      .tileIf(!tileSizes.empty() || scalarizeDynamicDims, anchorOpName,
-              tilingOptions)
+  strategy.tileIf(doTiling, anchorOpName, tilingOptions)
       .padIf(pad, anchorOpName, paddingOptions)
       .generalizeIf(generalize, anchorOpName)
       // TODO: decomposeToLowerDimIf when the need arises.
@@ -244,6 +315,23 @@ mlir::createLinalgSingleTilingExpertPass() {
 
 std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass() {
   return std::make_unique<LinalgVectorLoweringPass>();
+}
+
+//===----------------------------------------------------------------------===//
+// IREE specific pass creation methods to allow invocation from within IREEs
+// backend pipelines
+//===----------------------------------------------------------------------===//
+
+/// Creates a pass to drive transformations on Linalg on tensors.
+std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(
+    int64_t tilingLevel) {
+  return std::make_unique<LinalgSingleTilingExpertPass>(tilingLevel);
+}
+
+/// Creates a pass to drive transformations on Linalg on tensors.
+std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
+    int64_t tilingLevel) {
+  return std::make_unique<LinalgSingleTilingExpertPass>(tilingLevel);
 }
 
 namespace mlir {

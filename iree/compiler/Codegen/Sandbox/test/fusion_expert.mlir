@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="builtin.func(linalg-fuse{anchor-func=matmul anchor-op=linalg.generic tile-sizes=10,20,30 vectorize}), canonicalize, cse" -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline="builtin.func(linalg-fuse{tiling-level=0 vectorize}), canonicalize, cse" -split-input-file %s | IreeFileCheck %s
 
 func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
@@ -8,7 +8,8 @@ func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : 
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
   %0 = linalg.fill(%cst, %init) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-  %1 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
+  %1 = linalg.matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[10, 20, 30]], native_vector_size = []>}
+      ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %2 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1)-> (d0, d1)>],
@@ -40,7 +41,8 @@ func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x120xf3
   %c1 = arith.constant 1 : index
   %init = linalg.init_tensor [20, 120] : tensor<20x120xf32>
   %0 = linalg.fill(%cst, %init) : f32, tensor<20x120xf32> -> tensor<20x120xf32>
-  %1 = linalg.matmul ins(%arg0, %arg1 : tensor<20x60xf32>, tensor<60x120xf32>)
+  %1 = linalg.matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[10, 20, 30]], native_vector_size = []>}
+      ins(%arg0, %arg1 : tensor<20x60xf32>, tensor<60x120xf32>)
       outs(%0 : tensor<20x120xf32>) -> tensor<20x120xf32>
   %2 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1)-> (d0, d1)>],

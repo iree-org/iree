@@ -21,6 +21,19 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass();
 std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass();
 
 //===----------------------------------------------------------------------===//
+// IREE specific pass creation methods to allow invocation from within IREEs
+// backend pipelines
+//===----------------------------------------------------------------------===//
+
+/// Creates a pass to drive tile + fuse transformations.
+std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(
+    int64_t tilingLevel);
+
+/// Creates a pass to drive transformations on Linalg on tensors. Passing the
+std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
+    int64_t tilingLevel);
+
+//===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
 
