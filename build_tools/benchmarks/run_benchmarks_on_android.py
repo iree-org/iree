@@ -631,11 +631,10 @@ def parse_arguments():
       "--pin_cpu_freq",
       action="store_true",
       help="Pin CPU frequency for all cores to the maximum. Requires root")
-  parser.add_argument(
-      "--pin-gpu-freq",
-      "--pin_gpu_freq",
-      action="store_true",
-      help="Pin GPU frequency to the maximum. Requires root")
+  parser.add_argument("--pin-gpu-freq",
+                      "--pin_gpu_freq",
+                      action="store_true",
+                      help="Pin GPU frequency to the maximum. Requires root")
   parser.add_argument(
       "--keep_going",
       "--keep-going",
