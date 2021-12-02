@@ -418,10 +418,12 @@ def run_benchmarks_for_category(
 
       capture_filename = None
       if do_capture and benchmark_key not in skip_captures:
+        repetitions = get_benchmark_repetition_count(benchmark_info.runner)
         run_cmd = [
             "TRACY_NO_EXIT=1", "taskset",
             benchmark_info.deduce_taskset(), traced_benchmark_tool_path,
-            f"--flagfile={MODEL_FLAGFILE_NAME}"
+            f"--flagfile={MODEL_FLAGFILE_NAME}",
+            f"--benchmark_repetitions=2",
         ]
 
         # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
