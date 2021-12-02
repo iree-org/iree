@@ -41,7 +41,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getTileSizeFn);
   auto marker = Identifier::get(getTileReductionMarker(), context);
-  auto filter = linalg::LinalgTransformationFilter({marker});
+  auto filter = linalg::LinalgTransformationFilter({marker}, llvm::None);
 
   patterns.insert<linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
                   linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
