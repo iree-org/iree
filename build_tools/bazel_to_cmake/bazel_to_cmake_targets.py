@@ -105,6 +105,10 @@ EXPLICIT_TARGET_MAPPING = {
         "LmhloDialect",  # Unfortunate.
         "MhloDialect",
     ],
+    "@mlir-hlo//:map_mhlo_to_scalar_op": [
+        "tensorflow::external_mhlo_includes",
+        "MhloDialect",
+    ],
     "@mlir-hlo//:materialize_broadcasts": [
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
@@ -139,7 +143,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@cpuinfo": ["cpuinfo"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
-
 
 def _convert_mlir_target(target):
   # Default to a pattern substitution approach.
