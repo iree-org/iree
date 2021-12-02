@@ -46,11 +46,6 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     %c0 = arith.constant 0 : index
 
     // CHECK: %[[ARG0_BUFFER:.+]] = hal.buffer_view.buffer<%[[ARG0]] : !hal.buffer_view> : !hal.buffer
-    // CHECK: hal.buffer_view.assert<%[[ARG0]] : !hal.buffer_view>
-    // CHECK-SAME: message("tensor")
-    // CHECK-SAME: shape([%c4])
-    // CHECK-SAME: type(%c50331680_i32)
-    // CHECK-SAME: encoding(%c1_i32)
 
     // (annoyingly out of order)
     // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
@@ -65,11 +60,6 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     %arg0_resource = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%c16}
 
     // CHECK: %[[ARG1_BUFFER:.+]] = hal.buffer_view.buffer<%[[ARG1]] : !hal.buffer_view> : !hal.buffer
-    // CHECK: hal.buffer_view.assert<%[[ARG1]] : !hal.buffer_view>
-    // CHECK-SAME: message("tensor")
-    // CHECK-SAME: shape([%c4])
-    // CHECK-SAME: type(%c50331680_i32)
-    // CHECK-SAME: encoding(%c1_i32)
     // CHECK: hal.buffer.assert<%[[ARG1_BUFFER]] : !hal.buffer>
     // CHECK-SAME: message("tensor")
     // CHECK-SAME: allocator(%[[ALLOCATOR]] : !hal.allocator)

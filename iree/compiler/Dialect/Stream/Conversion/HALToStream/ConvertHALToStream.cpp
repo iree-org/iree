@@ -34,6 +34,21 @@ struct ConvertTensorImportOp
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
+    // Assert the shape of the buffer view matches the expected encoding
+    // shape.
+    // NOTE: we do this before the other checks as it's the most likely mistake
+    // and it's better to know of a shape mismatch than just buffer byte length
+    // difference.
+    if (auto tensorType = targetType.dyn_cast<RankedTensorType>()) {
+      // TODO(benvanik): get a name for the tensor (argument name/etc).
+      auto message = rewriter.getStringAttr("tensor");
+      if (failed(buildEncodingAssertions(op.getLoc(), adaptor.source(), message,
+                                         tensorType, op.target_dims(),
+                                         rewriter))) {
+        return rewriter.notifyMatchFailure(op, "unsupported tensor type");
+      }
+    }
+
     // Import (buffer view to stream resource).
     auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
@@ -51,6 +66,53 @@ struct ConvertTensorImportOp
         op, unknownType, newOp.result(), resultSize, resultSize,
         /*source_affinity=*/nullptr,
         /*result_affinity=*/nullptr);
+    return success();
+  }
+
+  // Inserts IR to assert that the buffer view shape and encoding matches the
+  // expected encoding we have in the program. This ensures that the user didn't
+  // pass a 4x8xf32 when they originally compiled the model for a 2x8x1xi8.
+  static LogicalResult buildEncodingAssertions(Location loc, Value bufferView,
+                                               StringAttr message,
+                                               RankedTensorType tensorType,
+                                               ValueRange dynamicDims,
+                                               OpBuilder &builder) {
+    auto elementType =
+        IREE::HAL::getElementTypeValue(tensorType.getElementType());
+    if (!elementType.hasValue()) {
+      return mlir::emitError(loc)
+             << "invalid tensor element type: " << tensorType.getElementType();
+    }
+    auto expectedElementType =
+        builder.create<arith::ConstantIntOp>(loc, elementType.getValue(), 32);
+
+    auto encodingType =
+        IREE::HAL::getEncodingTypeValue(tensorType.getEncoding());
+    if (!encodingType.hasValue()) {
+      return mlir::emitError(loc)
+             << "invalid tensor encoding: " << tensorType.getEncoding();
+    }
+    auto expectedEncodingType =
+        builder.create<arith::ConstantIntOp>(loc, encodingType.getValue(), 32);
+
+    SmallVector<Value> shapeDims;
+    if (tensorType.getRank() > 0) {
+      unsigned dynamicIdx = 0;
+      for (int64_t idx = 0; idx < tensorType.getRank(); ++idx) {
+        Value expectedDim;
+        if (tensorType.isDynamicDim(idx)) {
+          expectedDim = dynamicDims[dynamicIdx++];
+        } else {
+          expectedDim = builder.create<arith::ConstantIndexOp>(
+              loc, tensorType.getDimSize(idx));
+        }
+        shapeDims.push_back(expectedDim);
+      }
+    }
+
+    builder.create<IREE::HAL::BufferViewAssertOp>(
+        loc, bufferView, message, expectedElementType, expectedEncodingType,
+        shapeDims);
     return success();
   }
 };

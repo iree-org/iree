@@ -67,6 +67,7 @@ class WrapEntryPointsPass
       // Create the wrapper function that conforms to the IREE native ABI and
       // marshals arguments/results to the original function.
       auto wrapperFuncOp = createWrapperFunc(entryFuncOp);
+      if (!wrapperFuncOp) return signalPassFailure();
       wrapperFuncOp.setPublic();
       wrapperFuncOp.setName(
           mlir::StringAttr::get(entryFuncOp.getContext(), publicName));
@@ -131,9 +132,11 @@ class WrapEntryPointsPass
     SmallVector<Value> arguments;
     for (auto arg : llvm::enumerate(entryBlock->getArguments())) {
       auto oldType = entryFuncType.getInput(arg.index());
-      if (oldType.isa<TensorType>()) {
-        arguments.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
-            entryFuncOp.getLoc(), oldType, arg.value()));
+      if (auto tensorType = oldType.dyn_cast<RankedTensorType>()) {
+        auto argLoc = arg.value().getLoc();
+        auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
+            argLoc, oldType, arg.value());
+        arguments.push_back(importOp.target());
       } else {
         arguments.push_back(arg.value());
       }
