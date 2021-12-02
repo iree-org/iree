@@ -38,9 +38,9 @@ struct LLVMCPUSynchronizeSymbolVisibilityPass
     auto moduleOp = getOperation();
     for (auto &op : moduleOp.getOps()) {
       if (auto globalOp = dyn_cast<LLVM::GlobalOp>(op)) {
-        setVisibilityFromLinkage(globalOp, globalOp.linkage());
+        setVisibilityFromLinkage(globalOp, globalOp.getLinkage());
       } else if (auto funcOp = dyn_cast<LLVM::LLVMFuncOp>(op)) {
-        setVisibilityFromLinkage(funcOp, funcOp.linkage());
+        setVisibilityFromLinkage(funcOp, funcOp.getLinkage());
       }
     }
   }

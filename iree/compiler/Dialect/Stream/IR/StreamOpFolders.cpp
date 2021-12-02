@@ -330,10 +330,10 @@ struct SelectResourceSizeOp : public OpRewritePattern<ResourceSizeOp> {
     auto selectOp = op.operand().getDefiningOp<mlir::SelectOp>();
     if (!selectOp) return failure();
     auto trueSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
-        op.getLoc(), selectOp.true_value(), op.affinityAttr());
+        op.getLoc(), selectOp.getTrueValue(), op.affinityAttr());
     auto falseSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
-        op.getLoc(), selectOp.false_value(), op.affinityAttr());
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(op, selectOp.condition(),
+        op.getLoc(), selectOp.getFalseValue(), op.affinityAttr());
+    rewriter.replaceOpWithNewOp<mlir::SelectOp>(op, selectOp.getCondition(),
                                                 trueSize, falseSize);
     return success();
   }
@@ -516,7 +516,7 @@ struct PropagateResourcePackBaseOffset
           rewriter.create<arith::AddIOp>(op.getLoc(), baseOffset, sliceOffset);
       SmallPtrSet<Operation *, 1> exclusions;
       exclusions.insert(addOp);
-      sliceOffset.replaceAllUsesExcept(addOp.result(), exclusions);
+      sliceOffset.replaceAllUsesExcept(addOp.getResult(), exclusions);
     }
 
     return success();

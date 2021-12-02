@@ -53,11 +53,11 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
 
     auto getI8Value = [&](Value v) -> Value {
       if (auto parentOp = v.getDefiningOp<arith::ExtSIOp>()) {
-        if (parentOp.in().getType().cast<VectorType>().getElementType() !=
+        if (parentOp.getIn().getType().cast<VectorType>().getElementType() !=
             I8Type) {
           return nullptr;
         } else {
-          return parentOp.in();
+          return parentOp.getIn();
         }
       }
       return nullptr;
@@ -116,7 +116,7 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
     auto resVec =
         llvm::to_vector<4>(llvm::map_range(llvm::seq<int>(0, 4), [&](int i) {
           return rewriter.create<LLVM::ExtractValueOp>(
-              loc, int32x4VType, packedResult.res(),
+              loc, int32x4VType, packedResult.getRes(),
               rewriter.getI64ArrayAttr({i}));
         }));
 

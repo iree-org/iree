@@ -152,7 +152,7 @@ struct ConvertConstantMatrix final
     if (!vectorType || vectorType.getRank() != 2) return failure();
 
     // Only convert splat integer/float vectors.
-    auto values = op.value().dyn_cast<DenseIntOrFPElementsAttr>();
+    auto values = op.getValue().dyn_cast<DenseIntOrFPElementsAttr>();
     if (!values || !values.isSplat()) return failure();
     Attribute value = values.getSplatValue<Attribute>();
 

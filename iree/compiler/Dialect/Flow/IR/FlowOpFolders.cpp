@@ -395,7 +395,7 @@ struct ResolveShapedRank : public OpRewritePattern<RankOp> {
   using OpRewritePattern<RankOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(RankOp op,
                                 PatternRewriter &rewriter) const override {
-    auto shapedType = op.memrefOrTensor().getType().cast<ShapedType>();
+    auto shapedType = op.getMemrefOrTensor().getType().cast<ShapedType>();
     rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op,
                                                         shapedType.getRank());
     return success();

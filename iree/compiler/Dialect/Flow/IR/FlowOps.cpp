@@ -352,7 +352,7 @@ Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
 static bool canDispatchRegionContainOp(Operation *op) {
   // Inline constant operations that are splat or small constants.
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.value();
+    auto constantValueAttr = constantOp.getValue();
     auto constantType = constantOp.getType();
     if (constantValueAttr.isa<SplatElementsAttr>()) {
       return true;

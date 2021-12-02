@@ -1229,8 +1229,8 @@ class BuiltinBranchConversion : public OpConversionPattern<mlir::BranchOp> {
   LogicalResult matchAndRewrite(
       mlir::BranchOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(srcOp, srcOp.dest(),
-                                                adaptor.destOperands());
+    rewriter.replaceOpWithNewOp<mlir::BranchOp>(srcOp, srcOp.getDest(),
+                                                adaptor.getDestOperands());
     return success();
   }
 };
@@ -1242,9 +1242,9 @@ class BuiltinCondBranchConversion
       mlir::CondBranchOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
-        srcOp, adaptor.condition(), srcOp.trueDest(),
-        adaptor.trueDestOperands(), srcOp.falseDest(),
-        adaptor.falseDestOperands());
+        srcOp, adaptor.getCondition(), srcOp.getTrueDest(),
+        adaptor.getTrueDestOperands(), srcOp.getFalseDest(),
+        adaptor.getFalseDestOperands());
     return success();
   }
 };
@@ -1254,9 +1254,9 @@ class BuiltinSelectConversion : public OpConversionPattern<mlir::SelectOp> {
   LogicalResult matchAndRewrite(
       mlir::SelectOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(srcOp, adaptor.condition(),
-                                                adaptor.true_value(),
-                                                adaptor.false_value());
+    rewriter.replaceOpWithNewOp<mlir::SelectOp>(srcOp, adaptor.getCondition(),
+                                                adaptor.getTrueValue(),
+                                                adaptor.getFalseValue());
     return success();
   }
 };

@@ -39,11 +39,13 @@ struct BufferViewRankPattern : public OpConversionPattern<mlir::RankOp> {
   LogicalResult matchAndRewrite(
       mlir::RankOp rankOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.memrefOrTensor().getType().isa<IREE::HAL::BufferViewType>()) {
+    if (!adaptor.getMemrefOrTensor()
+             .getType()
+             .isa<IREE::HAL::BufferViewType>()) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewRankOp>(
-        rankOp, rankOp.getResult().getType(), adaptor.memrefOrTensor());
+        rankOp, rankOp.getResult().getType(), adaptor.getMemrefOrTensor());
     return success();
   }
 };

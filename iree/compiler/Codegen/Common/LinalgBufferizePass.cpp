@@ -843,7 +843,7 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
     return padTensorOp.emitError(
         "Converting linalg.pad_tensor with non-constant padding value");
   }
-  if (constOp.value().isa<DenseElementsAttr>()) {
+  if (constOp.getValue().isa<DenseElementsAttr>()) {
     return padTensorOp.emitError(
         "Converting linalg.pad_tensor with non-scalar constant padding "
         "value");
