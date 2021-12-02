@@ -61,7 +61,7 @@ EXPORT_FN("command_buffer.push_descriptor_set", iree_hal_module_command_buffer_p
 
 EXPORT_FN("descriptor_set.create", iree_hal_module_descriptor_set_create, rrCiriiD, r)
 
-EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_create, riCiiiD, r)
+EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_create, riCiiD, r)
 
 EXPORT_FN("device.allocator", iree_hal_module_device_allocator, r, r)
 EXPORT_FN("device.query.i32", iree_hal_module_device_query_i32, rrr, ii)

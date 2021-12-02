@@ -41,8 +41,7 @@ class SPIRVLowerExecutableTargetPass
         .insert<IREE::Codegen::IREECodegenDialect, AffineDialect,
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
                 IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-                scf::SCFDialect, ShapeDialect, spirv::SPIRVDialect,
-                vector::VectorDialect>();
+                scf::SCFDialect, spirv::SPIRVDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;

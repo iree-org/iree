@@ -36,8 +36,6 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -266,12 +264,9 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   Operation *sourceOp = sourceValue.getDefiningOp();
   SmallVector<Value, 4> dims;
   dims.reserve(rank);
-  if (auto shapeCarryOp = dyn_cast<ShapeCarryingInterface>(sourceOp)) {
-    Value shapeOp =
-        shapeCarryOp.buildResultValueRankedShape(sourceValue, builder);
-    for (int i = 0; i < rank; ++i) {
-      dims.push_back(builder.create<Shape::RankedDimOp>(loc, shapeOp, i));
-    }
+  if (auto shapeAwareOp =
+          dyn_cast<IREE::Util::ShapeAwareOpInterface>(sourceOp)) {
+    dims = shapeAwareOp.buildResultValueShape(sourceValue, builder);
   } else {
     auto getDimValues = [&](MemRefType type, ValueRange dynamicDims) {
       auto shape = type.getShape();
@@ -559,7 +554,7 @@ struct FlattenMemRefSubspanPass
   FlattenMemRefSubspanPass(const FlattenMemRefSubspanPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, memref::MemRefDialect, ShapeDialect>();
+    registry.insert<AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {
@@ -622,7 +617,10 @@ struct FlattenMemRefSubspanPass
     foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
                      FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(&context);
 
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(foldPatterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(foldPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

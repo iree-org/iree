@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
-#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -128,14 +127,17 @@ RankedTensorType DispatchTensorLoadOp::inferResultType(
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  RankedTensorType returnType, Value source,
+                                 ValueRange sourceDynamicDims,
                                  ArrayRef<NamedAttribute> attributes) {
-  build(builder, state, returnType, source, ArrayRef<Value>(),
-        ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
-        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
+  build(builder, state, returnType, source, sourceDynamicDims,
+        ArrayRef<Value>(), ArrayRef<Value>(), ArrayRef<Value>(),
+        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}),
+        builder.getI64ArrayAttr({}));
 }
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  RankedTensorType returnType, Value source,
+                                 ValueRange sourceDynamicDims,
                                  ArrayRef<OpFoldResult> mixedOffsets,
                                  ArrayRef<OpFoldResult> mixedSizes,
                                  ArrayRef<OpFoldResult> mixedStrides,
@@ -154,22 +156,52 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
   processMixedOperands(mixedStrides, strides, staticStrides,
                        ShapedType::kDynamicStrideOrOffset);
 
-  build(builder, state, returnType, source, offsets, sizes, strides,
-        builder.getI64ArrayAttr(staticOffsets),
+  build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
+        strides, builder.getI64ArrayAttr(staticOffsets),
         builder.getI64ArrayAttr(staticSizes),
         builder.getI64ArrayAttr(staticStrides));
 }
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
-                                 Value source,
+                                 Value source, ValueRange sourceDynamicDims,
                                  ArrayRef<OpFoldResult> mixedOffsets,
                                  ArrayRef<OpFoldResult> mixedSizes,
                                  ArrayRef<OpFoldResult> mixedStrides,
                                  ArrayRef<NamedAttribute> attributes) {
   auto returnType =
       inferResultType(source.getType().cast<DispatchTensorType>(), mixedSizes);
-  build(builder, state, returnType, source, mixedOffsets, mixedSizes,
-        mixedStrides);
+  build(builder, state, returnType, source, sourceDynamicDims, mixedOffsets,
+        mixedSizes, mixedStrides);
+}
+
+LogicalResult DispatchTensorLoadOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  auto mixedSizes = getMixedSizes();
+  SmallVector<Value> shape;
+  if (!mixedSizes.empty()) {
+    // Slicing out a tile; return the size sliced.
+    shape = llvm::to_vector<6>(llvm::map_range(
+        getMixedSizes(), [&](OpFoldResult valueOrAttr) -> Value {
+          if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+            return b.create<arith::ConstantOp>(getLoc(),
+                                               attr.cast<IntegerAttr>());
+          } else {
+            return valueOrAttr.dyn_cast<Value>();
+          }
+        }));
+  } else {
+    // Result size matches the source size (no slicing).
+    unsigned dynamicIdx = 0;
+    for (int64_t dim : getType().getShape()) {
+      if (dim == ShapedType::kDynamicSize) {
+        shape.push_back(source_dims()[dynamicIdx++]);
+      } else {
+        shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+      }
+    }
+  }
+  reifiedReturnShapes.push_back(shape);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -178,10 +210,12 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
 
 void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
                                   Value value, Value target,
+                                  ValueRange targetDynamicDims,
                                   ArrayRef<NamedAttribute> attributes) {
-  build(builder, state, ArrayRef<Type>(), value, target, ArrayRef<Value>(),
-        ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
-        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
+  build(builder, state, ArrayRef<Type>(), value, target, targetDynamicDims,
+        ArrayRef<Value>(), ArrayRef<Value>(), ArrayRef<Value>(),
+        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}),
+        builder.getI64ArrayAttr({}));
 }
 
 //===----------------------------------------------------------------------===//
@@ -304,18 +338,6 @@ static LogicalResult verifyDispatchWorkgroupsOp(DispatchWorkgroupsOp op) {
     return failure();
   }
   return success();
-}
-
-Value DispatchWorkgroupsOp::buildOperandRankedShape(unsigned idx,
-                                                    OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                               operand_dims(), builder);
-}
-
-Value DispatchWorkgroupsOp::buildResultRankedShape(unsigned idx,
-                                                   OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getResults(),
-                                               result_dims(), builder);
 }
 
 Operation::operand_range DispatchWorkgroupsOp::getClosureOperands() {
@@ -531,28 +553,6 @@ static LogicalResult verifyDispatchWorkgroupInfoOp(T op) {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.shape
-//===----------------------------------------------------------------------===//
-
-void DispatchShapeOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  // TODO(benvanik): since we know these are arguments, we could map them based
-  // on index (so we get arg0_shape, ret0_shape, etc).
-  setNameFn(result(), "shape");
-}
-
-LogicalResult DispatchShapeOp::inferReturnTypes(
-    MLIRContext *context, Optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, RegionRange regions,
-    SmallVectorImpl<Type> &inferredReturnTypes) {
-  auto dispatchTensorType = operands[0].getType().cast<DispatchTensorType>();
-  auto shape = dispatchTensorType.getShape();
-  auto rankedShapeType = Shape::RankedShapeType::get(shape, context);
-  inferredReturnTypes.assign({rankedShapeType});
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // flow.executable
 //===----------------------------------------------------------------------===//
 
@@ -680,16 +680,6 @@ static LogicalResult verifyDispatchOp(DispatchOp op) {
   return success();
 }
 
-Value DispatchOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                               operand_dims(), builder);
-}
-
-Value DispatchOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getResults(),
-                                               result_dims(), builder);
-}
-
 std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
   return getODSOperandIndexAndLength(1);  // $operands
 }
@@ -697,18 +687,6 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 //===----------------------------------------------------------------------===//
 // flow.tensor.reshape
 //===----------------------------------------------------------------------===//
-
-Value TensorReshapeOp::buildOperandRankedShape(unsigned idx,
-                                               OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
-                                         builder);
-}
-
-Value TensorReshapeOp::buildResultRankedShape(unsigned idx,
-                                              OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
-                                         builder);
-}
 
 Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
@@ -724,58 +702,6 @@ SmallVector<int64_t, 4> TensorReshapeOp::getTiedResultOperandIndices() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.*
-//===----------------------------------------------------------------------===//
-
-Value TensorLoadOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
-                                         builder);
-}
-
-Value TensorLoadOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return {};
-}
-
-Value TensorStoreOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), target(), target_dims(),
-                                         builder);
-}
-
-Value TensorStoreOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), target_dims(),
-                                         builder);
-}
-
-Value TensorSplatOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return {};
-}
-
-Value TensorSplatOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
-                                         builder);
-}
-
-Value TensorCloneOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), operand(), operand_dims(),
-                                         builder);
-}
-
-Value TensorCloneOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), operand_dims(),
-                                         builder);
-}
-
-Value TensorSliceOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
-                                         builder);
-}
-
-Value TensorSliceOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
-                                         builder);
-}
-
-//===----------------------------------------------------------------------===//
 // flow.tensor.update
 //===----------------------------------------------------------------------===//
 
@@ -783,9 +709,9 @@ void TensorUpdateOp::build(OpBuilder &builder, OperationState &state,
                            Value target, ValueRange startIndices,
                            Value update) {
   auto targetDims =
-      Shape::buildOrFindDynamicDimsForValue(state.location, target, builder);
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
   auto updateDims =
-      Shape::buildOrFindDynamicDimsForValue(state.location, update, builder);
+      IREE::Util::buildDynamicDimsForValue(state.location, update, builder);
   build(builder, state, target.getType(), target, targetDims, startIndices,
         update, updateDims, builder.getIndexArrayAttr({0}));
 }
@@ -796,22 +722,6 @@ static LogicalResult verifyTensorUpdateOp(TensorUpdateOp op) {
     return failure();
   }
   return success();
-}
-
-Value TensorUpdateOp::buildOperandRankedShape(unsigned idx,
-                                              OpBuilder &builder) {
-  if (idx == 0) {
-    return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                                 target_dims(), builder);
-  } else {
-    return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                                 update_dims(), builder);
-  }
-}
-
-Value TensorUpdateOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), target(), target_dims(),
-                                         builder);
 }
 
 Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {

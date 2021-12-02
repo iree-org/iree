@@ -17,7 +17,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -505,11 +504,6 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return analyseInterfaceStoreTensorOp(storeOp, plan);
-            })
-        .Case<IREE::Flow::DispatchTieShapeOp>(
-            [&](IREE::Flow::DispatchTieShapeOp tieShapeOp) {
-              return analyseSingleOperandResultOp(tieShapeOp.operand(),
-                                                  tieShapeOp.result(), plan);
             })
         .Case<IREE::HAL::InterfaceBindingSubspanOp>(
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {

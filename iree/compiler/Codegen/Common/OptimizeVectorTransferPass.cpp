@@ -97,7 +97,9 @@ struct OptimizeVectorTransferPass
     patterns.add<TransposeUnitDimToShapeCast>(&getContext());
     mlir::vector::populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
         patterns);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
     // Workaround, run loop invariant code motion before hoist redudant vector
     // transfer to workaround a bug upstream.
     // TODO(thomasraoux): Remove it once the fix is merged.

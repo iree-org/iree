@@ -5,9 +5,9 @@
 
 hal.executable private @fused_fill_batch_matmul {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @arg0, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @fused_fill_batch_matmul attributes {
@@ -21,9 +21,9 @@ hal.executable private @fused_fill_batch_matmul {
         %cst = arith.constant 0.000000e+00 : f32
         %c4 = arith.constant 4 : index
         %c1024 = arith.constant 1024 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x1024x1024xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x1024x1024xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4x1024x1024xf32>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:4x1024x1024xf32>
+        %1 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:4x1024x1024xf32>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:4x1024x1024xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -60,9 +60,9 @@ hal.executable private @fused_fill_batch_matmul {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @arg0, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

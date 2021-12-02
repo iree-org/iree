@@ -45,13 +45,13 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -632,20 +632,9 @@ static LogicalResult convertConstantOp(OpBuilder &b,
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPointAfter(constantOp);
   auto memrefType = getMemrefTypeForTensor(tensorType);
-  Value memref =
-      b.create<memref::BufferCastOp>(constantOp.getLoc(), memrefType, result);
+  Value memref = b.create<bufferization::ToMemrefOp>(constantOp.getLoc(),
+                                                     memrefType, result);
   bvm.map(result, memref);
-  return success();
-}
-
-static LogicalResult convertDispatchTieShapeOp(
-    OpBuilder &b, IREE::Flow::DispatchTieShapeOp shapeOp,
-    BlockAndValueMapping &bvm) {
-  if (Value v = bvm.lookupOrNull(shapeOp.operand())) {
-    auto tieShapeOp = b.create<Shape::TieShapeOp>(shapeOp.getLoc(), v.getType(),
-                                                  v, shapeOp.shape());
-    bvm.map(shapeOp.getResult(), tieShapeOp.getResult());
-  }
   return success();
 }
 
@@ -883,7 +872,8 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
  public:
   LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect, linalg::LinalgDialect,
+    registry.insert<mlir::bufferization::BufferizationDialect,
+                    IREE::Util::UtilDialect, linalg::LinalgDialect,
                     memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect,
                     mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
@@ -935,10 +925,6 @@ void LinalgBufferizePass::runOnOperation() {
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return convertInterfaceStoreTensorOp(b, storeOp, bvm, plan);
-            })
-        .Case<IREE::Flow::DispatchTieShapeOp>(
-            [&](IREE::Flow::DispatchTieShapeOp shapeOp) {
-              return convertDispatchTieShapeOp(b, shapeOp, bvm);
             })
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           if (failed(getOrAllocateResultBuffers(b, forOp, bvm, plan,

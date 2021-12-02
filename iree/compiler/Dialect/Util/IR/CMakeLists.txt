@@ -45,10 +45,12 @@ iree_cc_library(
     MLIRArithmetic
     MLIRControlFlowInterfaces
     MLIRIR
+    MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     MLIRTransforms
   PUBLIC
 )
@@ -89,11 +91,11 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    UtilUtilDialectDocGen
+    UtilDialectDocGen
   TD_FILE
     "UtilOps.td"
   OUTS
-    -gen-dialect-doc UtilUtilDialect.md
+    -gen-dialect-doc UtilDialect.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

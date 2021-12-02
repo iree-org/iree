@@ -240,6 +240,99 @@ static LogicalResult setDefaultLaunchConfig(
   return success();
 }
 
+/// Adjusts the workload per workgroup to be a multiple of vector size to ensure
+/// that the op vectorizes.
+static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
+                              int64_t vectorSizeVal) {
+  if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
+    return maxSize;
+  }
+  int64_t dim = ub - lb;
+  if (dim < vectorSizeVal) return vectorSizeVal;
+  for (int64_t i = std::min(maxSize, dim); i > 0; --i) {
+    if (dim % i == 0 && i % vectorSizeVal == 0) {
+      return i;
+    }
+  }
+  return maxSize;
+}
+
+static LogicalResult setX86RootConfig(FuncOp entryPointFn,
+                                      linalg::ContractionOpInterface op,
+                                      SmallVector<int64_t> workloadPerWorkgroup,
+                                      int vectorSize) {
+  setTranslationInfo(entryPointFn,
+                     getDispatchLoweringPassPipeline(entryPointFn, op),
+                     workloadPerWorkgroup,
+                     /*workgroupSize=*/ArrayRef<int64_t>{});
+
+  // Hardcoded tile sizes.
+  // L1 tile sizes are {1, 1, ..., 8, 32, 32}.
+  // Vector tile sizes are {1, ..., 1, 16, 16}
+  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
+  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
+  l1TileSizes.append(nLoops - 3, 1);
+  l1TileSizes.push_back(
+      getMaxTileSize(0, workloadPerWorkgroup[1], 8, vectorSize));
+  l1TileSizes.push_back(
+      getMaxTileSize(0, workloadPerWorkgroup[0], 32, vectorSize));
+  vectorTileSizes.append(nLoops - 2, 1);
+  vectorTileSizes.push_back(vectorSize);
+
+  // L1/vector tile size for k dimensions.
+  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  int64_t K = lhsShapedType.getShape().back();
+  l1TileSizes.push_back(getMaxTileSize(0, K, 32, vectorSize));
+  vectorTileSizes.push_back(vectorSize);
+  TileSizesListType tileSizes;
+  tileSizes.push_back({});  // Empty here since there is nothing to do in first
+                            // level tiling.
+  tileSizes.push_back(l1TileSizes);
+  tileSizes.push_back(vectorTileSizes);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes, vectorTileSizes);
+  setLoweringConfig(op, config);
+
+  return success();
+}
+
+static LogicalResult setARMRootConfig(FuncOp entryPointFn,
+                                      linalg::ContractionOpInterface op,
+                                      SmallVector<int64_t> workloadPerWorkgroup,
+                                      int vectorSize) {
+  setTranslationInfo(entryPointFn,
+                     getDispatchLoweringPassPipeline(entryPointFn, op),
+                     workloadPerWorkgroup,
+                     /*workgroupSize=*/ArrayRef<int64_t>{});
+
+  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
+  const int kDefaultL1TileSize = 32;
+  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
+  l1TileSizes.append(nLoops - 3, 1);
+  l1TileSizes.push_back(getMaxTileSize(0, workloadPerWorkgroup[1],
+                                       kDefaultL1TileSize, vectorSize));
+  l1TileSizes.push_back(getMaxTileSize(0, workloadPerWorkgroup[0],
+                                       kDefaultL1TileSize, vectorSize));
+  vectorTileSizes.append(nLoops - 3, 1);
+  vectorTileSizes.append(2, vectorSize);
+
+  // L1/vector tile size for k dimensions.
+  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  int64_t K = lhsShapedType.getShape().back();
+  l1TileSizes.push_back(getMaxTileSize(0, K, kDefaultL1TileSize, vectorSize));
+  vectorTileSizes.push_back(vectorSize);
+  TileSizesListType tileSizes;
+  tileSizes.push_back({});  // Empty here since there is nothing to do in first
+                            // level tiling.
+  tileSizes.push_back(l1TileSizes);
+  tileSizes.push_back(vectorTileSizes);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes, vectorTileSizes);
+  setLoweringConfig(op, config);
+
+  return success();
+}
+
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult setRootConfig(
@@ -249,16 +342,8 @@ static LogicalResult setRootConfig(
 
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
   // Use the default distribution for the matmul loops.
-  bool isBatchMatmul = lhsShapedType.getRank() == 3;
-  if (isBatchMatmul) {
-    if (tiledLoops.size() != 3) {
-      return contractionOp.emitOpError(
-          "expected op to be distributed along 3 dimensions");
-    }
-  } else if (tiledLoops.size() != 2) {
-    return contractionOp.emitOpError(
-        "expected op to be distributed along 2 dimensions");
-  }
+  int numBatchDims =
+      cast<linalg::LinalgOp>(contractionOp.getOperation()).getNumLoops() - 3;
 
   Type elementType = lhsShapedType.getElementType();
   if (!elementType.isIntOrFloat()) return success();
@@ -275,26 +360,9 @@ static LogicalResult setRootConfig(
   vectorSizeVals[vectorSizeVals.size() - 2] = vectorSize;
 
   SmallVector<int64_t> workloadPerWorkgroup = getDefaultWorkloadPerWorkgroup(
-      isBatchMatmul ? tiledLoops.drop_front() : tiledLoops,
-      isBatchMatmul ? ArrayRef<int64_t>(vectorSizeVals).drop_front()
-                    : vectorSizeVals);
+      tiledLoops.drop_front(numBatchDims),
+      ArrayRef<int64_t>(vectorSizeVals).drop_front(numBatchDims));
 
-  // Adjust the workload per workgroup to be a multiple of vector size to ensure
-  // that the op vectorizes.
-  auto getTileSize = [](int64_t lb, int64_t ub, int64_t maxSize,
-                        int64_t vectorSizeVal) -> int64_t {
-    if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
-      return maxSize;
-    }
-    int64_t dim = ub - lb;
-    if (dim < vectorSizeVal) return vectorSizeVal;
-    for (int64_t i = std::min(maxSize, dim); i > 0; --i) {
-      if (dim % i == 0 && i % vectorSizeVal == 0) {
-        return i;
-      }
-    }
-    return maxSize;
-  };
   for (unsigned i = tiledLoops.size() - 2; i < tiledLoops.size(); ++i) {
     if (!tiledLoops[i].untiledLowerBound.is<Attribute>() ||
         !tiledLoops[i].untiledUpperBound.is<Attribute>()) {
@@ -304,45 +372,20 @@ static LogicalResult setRootConfig(
         tiledLoops[i].untiledLowerBound.get<Attribute>().cast<IntegerAttr>();
     auto ub =
         tiledLoops[i].untiledUpperBound.get<Attribute>().cast<IntegerAttr>();
-    workloadPerWorkgroup[tiledLoops.size() - 1 - i] = getTileSize(
+    workloadPerWorkgroup[tiledLoops.size() - 1 - i] = getMaxTileSize(
         lb.getInt(), ub.getInt(),
         workloadPerWorkgroup[tiledLoops.size() - 1 - i], vectorSizeVals[i]);
   }
-  if (isBatchMatmul) {
-    workloadPerWorkgroup.push_back(1);
-  }
-  setTranslationInfo(
-      entryPointFn,
-      getDispatchLoweringPassPipeline(entryPointFn, contractionOp),
-      workloadPerWorkgroup,
-      /*workgroupSize =*/ArrayRef<int64_t>{});
+  workloadPerWorkgroup.append(numBatchDims, 1);
 
   Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
-  int64_t matmulL1TileSize = (triple && triple.getValue().isX86()) ? 16 : 32;
-
-  SmallVector<int64_t, 4> l1TileSizes, vectorTileSizes;
-  if (isBatchMatmul) {
-    l1TileSizes.push_back(1);
+  if (triple && triple.getValue().isX86()) {
+    return setX86RootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,
+                            vectorSize);
   }
-  for (unsigned i = tiledLoops.size() - 2; i < tiledLoops.size(); ++i) {
-    l1TileSizes.push_back(
-        getTileSize(0, workloadPerWorkgroup[tiledLoops.size() - 1 - i],
-                    matmulL1TileSize, vectorSizeVals[i]));
-  }
-  // L1 tile size for k dimensions.
-  int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getTileSize(0, K, matmulL1TileSize, vectorSize));
-  vectorSizeVals.push_back(vectorSize);
-  vectorTileSizes.assign(vectorSizeVals.begin(), vectorSizeVals.end());
-  TileSizesListType tileSizes;
-  tileSizes.push_back({});  // Empty here since there is nothing to do in first
-                            // level tiling.
-  tileSizes.emplace_back(std::move(l1TileSizes));
-  tileSizes.emplace_back(std::move(vectorTileSizes));
-  auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, vectorSizeVals);
-  setLoweringConfig(contractionOp, config);
-  return success();
+  // Fall back to ARM configurations.
+  return setARMRootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,
+                          vectorSize);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root

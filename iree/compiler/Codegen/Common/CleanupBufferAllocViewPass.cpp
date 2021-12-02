@@ -88,7 +88,8 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
-        reshapeOp, reshapeOp.getResultType(), newSubspanOp);
+        reshapeOp, reshapeOp.getResultType(), newSubspanOp,
+        loadOp.source_dims());
 
     return success();
   }
@@ -120,7 +121,10 @@ struct CleanupBufferAllocViewPass
         FoldReshapeIntoInterfaceTensorLoad<linalg::TensorCollapseShapeOp>,
         FoldReshapeIntoInterfaceTensorLoad<linalg::TensorExpandShapeOp>,
         RemoveDeadMemAllocs>(&getContext());
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

@@ -11,7 +11,6 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -59,56 +58,94 @@ def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
 
-def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-        "getTiedResult",
-        "getTiedResultOperandIndex",
-        "getTiedResultOperandIndices",
-    ]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-    Util_ShapeAwareOp,
-  ]> {
-  let summary = [{conversion placeholder for HAL<->tensor type conversion}];
+def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{imports a tensor from a HAL buffer view}];
   let description = [{
-    Defines a conversion from a higher-level dialect type such as `tensor` that
-    is resolved during lowering into the HAL. This can be used to interoperate
-    between levels of the stack that require specifying HAL types and those that
-    prior to lowering do not handle them.
+    Defines an import of an external HAL buffer view into a SSA-form tensor.
+    An optional semaphore timepoint can be specified indicating when the
+    buffer view is available for use. If no semaphore timepoint is provided it
+    is assumed the buffer view is immediately available.
   }];
 
   let arguments = (ins
-    AnyType:$source,
-    HAL_ShapeDynamicDims:$source_dims,
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     HAL_ShapeDynamicDims:$target_dims
   );
   let results = (outs
-    AnyType:$target
+    AnyTensor:$target
   );
 
   let assemblyFormat = [{
-    $source `:`
-    type($source) (`{` $source_dims^ `}`)? `->`
+    $source `:` type($source)
+    `->`
     type($target) (`{` $target_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+      "Value":$source
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return {}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+  }];
+
+  let hasFolder = 1;
+}
+
+def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{exports a tensor to a HAL buffer view}];
+  let description = [{
+    Defines an export of an SSA-form tensor to an external HAL buffer view.
+    An optional semaphore timepoint can be specified indicating when the
+    buffer view is available for use. If no semaphore timepoint is requested it
+    is assumed execution blocks until the buffer view is available.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$source,
+    HAL_ShapeDynamicDims:$source_dims
+  );
+  let results = (outs
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)?
+    `->`
+    type($target)
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source,
-      "ValueRange":$dynamicDims,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+      "Value":$source
+    )>,
   ];
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return {}; }
   }];
 
   let hasFolder = 1;
@@ -1772,19 +1809,17 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
     SymbolNameAttr:$sym_name,
     IndexAttr:$set,
     IndexAttr:$binding,
-    HAL_DescriptorTypeAttr:$type,
-    HAL_MemoryAccessBitfieldAttr:$access
+    HAL_DescriptorTypeAttr:$type
   );
 
   // TODO(scotttodd): enable assemblyFormat after figuring out how to keep
-  //   quotes around "type" and "access". The custom printer uses stringify*
+  //   quotes around "type". The custom printer uses stringify*
   // let assemblyFormat = [{
   //   custom<SymbolVisibility>($sym_visibility)
   //   $sym_name
   //   `,` `set` `` `=` `` $set
   //   `,` `binding` `` `=` `` $binding
   //   `,` `type` `` `=` `` $type
-  //   `,` `access` `` `=` `` $access
   //   attr-dict-with-keyword
   // }];
 
@@ -1793,16 +1828,15 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
       "StringRef":$sym_name,
       "::llvm::APInt":$set,
       "::llvm::APInt":$binding,
-      "IREE::HAL::DescriptorType":$type,
-      "IREE::HAL::MemoryAccessBitfield":$access
+      "IREE::HAL::DescriptorType":$type
     ), [{
-      build($_builder, $_state, nullptr, sym_name, set, binding, type, access);
+      build($_builder, $_state, nullptr, sym_name, set, binding, type);
     }]>
   ];
 
   let extraClassDeclaration = [{
     /// Returns a hash for the descriptor, considering the set, binding,
-    /// type, and access.
+    /// and type.
     llvm::hash_code getDescriptorHash();
   }];
 }
@@ -1922,7 +1956,6 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
 
 def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
@@ -2128,8 +2161,6 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
   }];
 }
 
-// TODO(benvanik): rework this to make it a terminator with branch targets
-// for ^success and ^fail(status).
 def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [YieldPoint]> {
   let summary = [{asynchronous semaphore wait operation}];
   let description = [{

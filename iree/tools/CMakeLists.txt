@@ -217,15 +217,13 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Bindings::Native::Transforms
       iree::compiler::Bindings::TFLite::Transforms
       iree::compiler::Codegen::Dialect::IREECodegenDialect
-      iree::compiler::Codegen::Dialect::ProcessorOpInterfaces
+      iree::compiler::Codegen::Interfaces::Interfaces
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect
       iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms
-      iree::compiler::Dialect::Shape::IR
-      iree::compiler::Dialect::Shape::Transforms
       iree::compiler::Dialect::Stream::IR
       iree::compiler::Dialect::Stream::Transforms
       iree::compiler::Dialect::Util::IR
@@ -319,7 +317,9 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_xla_dialects.h"
     DEPS
-      tensorflow::mlir_hlo
+      tensorflow::external_mhlo_includes
+      ChloDialect
+      MhloDialect
     PUBLIC
   )
 

@@ -5,22 +5,17 @@ flow.executable private @executable {
   // CHECK: stream.executable.export public @dispatch
   flow.dispatch.entry public @dispatch attributes {workgroup_rank = 3 : index}
   builtin.module {
-    // CHECK: func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: index, %arg3: index)
-    func @dispatch(%arg0: !flow.dispatch.tensor<readonly:?x4xf32>, %arg1: !flow.dispatch.tensor<writeonly:?xf32>,
-                   %arg0_dim0: index, %arg1_dim0: index) {
-      // CHECK: %[[ARG0_SHAPE:.+]] = shapex.make_ranked_shape %arg2 : (index) -> !shapex.ranked_shape<[?,4]>
-      %arg0_shape = shapex.make_ranked_shape %arg0_dim0 : (index) -> !shapex.ranked_shape<[?,4]>
-      // CHECK: %[[ARG0_DIM0:.+]] = shapex.ranked_dim %[[ARG0_SHAPE]][0] : !shapex.ranked_shape<[?,4]> -> index
-      // CHECK: %[[ARG0_SPAN:.+]] = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:?x4xf32>{%[[ARG0_DIM0]]}
-      // CHECK: = flow.dispatch.tie_shape %[[ARG0_SPAN]], %[[ARG0_SHAPE]] : (!flow.dispatch.tensor<readonly:?x4xf32>, !shapex.ranked_shape<[?,4]>) -> !flow.dispatch.tensor<readonly:?x4xf32>
-      %arg0_shaped = flow.dispatch.tie_shape %arg0, %arg0_shape : (!flow.dispatch.tensor<readonly:?x4xf32>, !shapex.ranked_shape<[?,4]>) -> !flow.dispatch.tensor<readonly:?x4xf32>
+    // CHECK: func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %[[ARG0_DIM0:.+]]: index, %[[ARG1_DIM1:.+]]: index)
+    func @dispatch(%arg0: !flow.dispatch.tensor<readonly:?x4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4x?xf32>,
+                   %arg0_dim0: index, %arg1_dim1: index) {
+      // CHECK: %[[ARG0_TENSOR:.+]] = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:?x4xf32>{%[[ARG0_DIM0]]}
+      // CHECK: %[[ARG1_TENSOR:.+]] = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4x?xf32>{%[[ARG1_DIM1]]}
 
-      // CHECK: %[[ARG1_SHAPE:.+]] = shapex.make_ranked_shape %arg3 : (index) -> !shapex.ranked_shape<[?]>
-      %arg1_shape = shapex.make_ranked_shape %arg1_dim0 : (index) -> !shapex.ranked_shape<[?]>
-      // CHECK: %[[ARG1_DIM0:.+]] = shapex.ranked_dim %[[ARG1_SHAPE]][0] : !shapex.ranked_shape<[?]> -> index
-      // CHECK: %[[ARG1_SPAN:.+]] = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xf32>{%[[ARG1_DIM0]]}
-      // CHECK: = flow.dispatch.tie_shape %[[ARG1_SPAN]], %[[ARG1_SHAPE]] : (!flow.dispatch.tensor<writeonly:?xf32>, !shapex.ranked_shape<[?]>) -> !flow.dispatch.tensor<writeonly:?xf32>
-      %arg1_shaped = flow.dispatch.tie_shape %arg1, %arg1_shape : (!flow.dispatch.tensor<writeonly:?xf32>, !shapex.ranked_shape<[?]>) -> !flow.dispatch.tensor<writeonly:?xf32>
+      // CHECK: %[[TILE:.+]] = flow.dispatch.tensor.load %[[ARG0_TENSOR]], offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x4xf32>{%[[ARG0_DIM0]]} -> tensor<?x4xf32>
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x4xf32>{%arg0_dim0} -> tensor<?x4xf32>
+
+      // CHECK: flow.dispatch.tensor.store %[[TILE]], %[[ARG1_TENSOR]], offsets = [], sizes = [], strides = [] : tensor<?x4xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>{%[[ARG1_DIM1]]}
+      flow.dispatch.tensor.store %0, %arg1, offsets = [], sizes = [], strides = [] : tensor<?x4xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>{%arg1_dim1}
 
       return
     }
@@ -34,7 +29,7 @@ func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.a
   // CHECK: %[[ARG0_SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]} : index
   // CHECK: %[[ARG0_IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[ARG0_SIZE]]}
   // CHECK: %[[ARG0_T:.+]] = stream.async.transfer %[[ARG0_IMPORT]] : !stream.resource<external>{%[[ARG0_SIZE]]} -> !stream.resource<*>{%[[ARG0_SIZE]]}
-  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%dim0}
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%dim0}
 
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -44,7 +39,7 @@ func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.a
 
   // CHECK: %[[RET0_T:.+]] = stream.async.transfer %[[RET0]] : !stream.resource<*>{%[[RET0_SIZE]]} -> !stream.resource<external>{%[[RET0_SIZE]]}
   // CHECK: %[[RET0_EXPORT:.+]] = stream.tensor.export %[[RET0_T]] : tensor<?xf32>{%[[DIM0]]} in !stream.resource<external>{%[[RET0_SIZE]]} -> !hal.buffer_view
-  %2 = hal.tensor.cast %1 : tensor<?xf32>{%dim0} -> !hal.buffer_view
+  %2 = hal.tensor.export %1 : tensor<?xf32>{%dim0} -> !hal.buffer_view
   // CHECK: return %[[RET0_EXPORT]] : !hal.buffer_view
   return %2 : !hal.buffer_view
 }

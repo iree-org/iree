@@ -27,9 +27,10 @@ to retrieve the IREE compiler.
 The model can be compiled with the following command from the IREE compiler
 build directory
 
-``` shell hl_lines="3 4 5"
+```shell
 iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
+    -iree-stream-partitioning-favor=min-peak-memory \
     -iree-hal-target-backends=dylib-llvm-aot \
     -iree-llvm-target-triple=x86_64-pc-linux-elf \
     -iree-llvm-debug-symbols=false \
@@ -40,12 +41,15 @@ iree/tools/iree-translate \
 
 In which
 
-* `iree-hal-target-backends=dylib-llvm-aot`: Build the model for the dynamic
-library CPU HAL driver
-* `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple so
-the artifact has a fixed ABI to be rendered by the
-[elf_module library](https://github.com/google/iree/tree/main/iree/hal/local/elf)
-* `iree-llvm-debug-symbols=false`: To reduce the artifact size
+*   `-iree-stream-partitioning-favor=min-peak-memory`: Optimize for minimum peak
+    memory usage at the cost of concurrency - include when targeting
+    single-threaded execution to reduce memory consumption.
+*   `iree-hal-target-backends=dylib-llvm-aot`: Build the model for the dynamic
+    library CPU HAL driver
+*   `iree-llvm-target-triple`: Use the `<arch>-pc-linux-elf` LLVM target triple
+    so the artifact has a fixed ABI to be rendered by the
+    [elf_module library](https://github.com/google/iree/tree/main/iree/hal/local/elf)
+*   `iree-llvm-debug-symbols=false`: To reduce the artifact size
 
 See [generate.sh](https://github.com/google/iree/blob/main/iree/hal/local/elf/testdata/generate.sh)
 for example command-line instructions of some common architectures

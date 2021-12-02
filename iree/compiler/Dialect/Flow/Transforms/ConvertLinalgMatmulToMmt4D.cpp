@@ -360,7 +360,10 @@ class ConvertLinalgMatmulToMmt4DPass final
       OwningRewritePatternList patterns(&getContext());
       patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(context, M0, K0,
                                                             N0);
-      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
     // Canonicalization.
     {
@@ -368,7 +371,10 @@ class ConvertLinalgMatmulToMmt4DPass final
       linalg::TensorExpandShapeOp::getCanonicalizationPatterns(patterns,
                                                                context);
       patterns.insert<FoldFillGenericOpPattern>(context);
-      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };

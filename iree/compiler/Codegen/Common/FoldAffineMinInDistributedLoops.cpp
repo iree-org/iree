@@ -179,7 +179,13 @@ struct FoldAffineMinInDistributedLoopsPass final
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateFoldAffineMinInDistributedLoopsPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      // TODO(#4759): Terrifyingly, this fails. Errors here were ignored for a
+      // long time and now tests for this pass actually fail if we propagate the
+      // failure correctly. Fix this.
+      // return signalPassFailure();
+    }
   }
 };
 }  // namespace

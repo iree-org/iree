@@ -26,7 +26,6 @@ cc_library(
         "TypeConverter.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",

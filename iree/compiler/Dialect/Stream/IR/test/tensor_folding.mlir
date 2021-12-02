@@ -1,5 +1,45 @@
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
 
+// CHECK-LABEL: @FoldTensorImportOp
+func @FoldTensorImportOp(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<external> {
+  // CHECK-NOT: stream.tensor.import
+  // CHECK-NOT: stream.tensor.export
+  // CHECK: return %arg0 : !stream.resource<external>
+  %c20 = arith.constant 20 : index
+  %0 = stream.tensor.export %arg0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
+  %1 = stream.tensor.import %0 : !hal.buffer_view -> tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  return %1 : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldTensorExportOp
+func @FoldTensorExportOp(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
+  // CHECK-NOT: stream.tensor.import
+  // CHECK-NOT: stream.tensor.export
+  // CHECK: return %arg0 : !hal.buffer_view
+  %c20 = arith.constant 20 : index
+  %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.export %0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
+  return %1 : !hal.buffer_view
+}
+
+
+// -----
+
+// CHECK-LABEL: @KeepTensorExportOpWithDifferingEncodings
+func @KeepTensorExportOpWithDifferingEncodings(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
+  // CHECK: %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  // CHECK: %1 = stream.tensor.export %0 : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
+  // CHECK: return %1 : !hal.buffer_view
+  %c20 = arith.constant 20 : index
+  %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.export %0 : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
+  return %1 : !hal.buffer_view
+}
+
+// -----
+
 // CHECK-LABEL: @TensorConstantToSplat
 func @TensorConstantToSplat() -> !stream.resource<constant> {
   // CHECK-DAG: %[[CST:.+]] = arith.constant 1.000000e+00 : f32

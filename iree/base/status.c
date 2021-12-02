@@ -645,7 +645,8 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
   *out_buffer_length = 0;
 
   // Grab storage which may have a message and zero or more payloads.
-  iree_status_storage_t* storage = iree_status_storage(status);
+  iree_status_storage_t* storage IREE_ATTRIBUTE_UNUSED =
+      iree_status_storage(status);
 
   // Prefix with source location and status code string (may be 'OK').
   iree_host_size_t buffer_length = 0;

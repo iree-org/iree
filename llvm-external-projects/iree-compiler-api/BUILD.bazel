@@ -66,6 +66,8 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/InputConversion/MHLO",
+        "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:IREEVM",
         "//iree/tools:init_targets",
         "//iree/tools:iree_translate_lib",

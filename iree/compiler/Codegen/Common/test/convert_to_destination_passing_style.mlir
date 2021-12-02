@@ -33,10 +33,10 @@ func @matmul() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer"
 }
 //      CHECK: func @matmul()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
@@ -89,9 +89,9 @@ func @matmul_fill() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
 }
 //      CHECK: func @matmul_fill()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
@@ -142,9 +142,9 @@ func @matmul_inplace() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Read|Write"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer"
 }
 //      CHECK: func @matmul_inplace()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
@@ -176,8 +176,8 @@ func @reshape_simple() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
 }
 //      CHECK: func @reshape_simple()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
@@ -211,15 +211,15 @@ func @reshape_fused_source() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
 }
 //      CHECK: func @reshape_fused_source()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //      CHECK:   %[[RESHAPE:.+]] = linalg.tensor_expand_shape %[[SOURCE]]
-//      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[RESHAPE]]
 // CHECK-SAME:       outs(%[[TARGET]]
@@ -252,17 +252,17 @@ func @reshape_fused_source_and_copyout() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
-  hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer"
 }
 //      CHECK: func @reshape_fused_source_and_copyout()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//  CHECK-DAG:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //  CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan @io::@ret1
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //      CHECK:   %[[RESHAPE:.+]] = linalg.tensor_expand_shape %[[SOURCE]]
-//      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[RESHAPE]]
 // CHECK-SAME:       outs(%[[TARGET]]
@@ -294,15 +294,15 @@ func @reshape_fused_target() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
 }
 //      CHECK: func @reshape_fused_target()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
 //  CHECK-DAG:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //  CHECK-DAG:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
-//      CHECK:   %[[RESHAPE_EXPAND:.+]] = linalg.tensor_expand_shape %[[TARGET]] {{\[}}[0, 1]{{\]}}
+//  CHECK-DAG:   %[[RESHAPE_EXPAND:.+]] = linalg.tensor_expand_shape %[[TARGET]] {{\[}}[0, 1]{{\]}}
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:       ins(%[[SOURCE]]
 // CHECK-SAME:       outs(%[[RESHAPE_EXPAND]]
@@ -347,9 +347,9 @@ func @cast_followed_by_store() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
-  hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @ret1, set=0, binding=2, type="StorageBuffer"
 }
 //      CHECK: func @cast_followed_by_store()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
@@ -423,10 +423,10 @@ func @multi_result() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  hal.interface.binding @ret1, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret1, set=0, binding=3, type="StorageBuffer"
 }
 //      CHECK: func @multi_result()
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0

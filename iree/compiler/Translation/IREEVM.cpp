@@ -59,12 +59,16 @@ static InputDialectOptions getInputDialectOptionsFromFlags() {
   static llvm::cl::opt<InputDialectOptions::Type> *typeFlag =
       new llvm::cl::opt<InputDialectOptions::Type>{
           "iree-input-type", llvm::cl::desc("IREE input type"),
-          llvm::cl::values(clEnumValN(InputDialectOptions::Type::none, "none",
-                                      "No input dialect transformation"),
-                           clEnumValN(InputDialectOptions::Type::tosa, "tosa",
-                                      "Legalize from TOSA ops"),
-                           clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
-                                      "Legalize from MHLO ops")),
+          llvm::cl::values(
+              clEnumValN(InputDialectOptions::Type::none, "none",
+                         "No input dialect transformation"),
+              clEnumValN(InputDialectOptions::Type::tosa, "tosa",
+                         "Legalize from TOSA ops"),
+              clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
+                         "Legalize from MHLO ops"),
+              clEnumValN(
+                  InputDialectOptions::Type::xla, "xla",
+                  "Legalize from MHLO ops (with XLA cleanup preprocessing)")),
           llvm::cl::init(InputDialectOptions::Type::none),
           llvm::cl::cat(inputDialectOptions)};
 
@@ -77,13 +81,10 @@ void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, OpPassManager &passManager) {
-  if (bindingOptions.native) {
-    IREE::ABI::buildTransformPassPipeline(passManager);
-  }
-  if (bindingOptions.tflite) {
-    IREE::TFLite::buildTransformPassPipeline(passManager);
-  }
-
+  // Input pipelines can result in changes to the exported functions and types
+  // and must run before generating bindings.
+  // After input processing, there should only be IREE legal types in
+  // signatures.
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;
@@ -91,11 +92,23 @@ void buildIREEVMTransformPassPipeline(
       buildTOSAInputConversionPassPipeline(passManager);
       break;
     case InputDialectOptions::Type::mhlo:
-      buildMHLOInputConversionPassPipeline(passManager);
+      MHLO::buildMHLOInputConversionPassPipeline(passManager);
+      break;
+    case InputDialectOptions::Type::xla:
+      MHLO::buildXLACleanupPassPipeline(passManager);
+      MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
   }
-
   buildCommonInputConversionPassPipeline(passManager);
+
+  // Now that inputs are legalized, generate wrapper for entry functions.
+  if (bindingOptions.native) {
+    IREE::ABI::buildTransformPassPipeline(passManager);
+  }
+  if (bindingOptions.tflite) {
+    IREE::TFLite::buildTransformPassPipeline(passManager);
+  }
+
   IREE::Flow::TransformOptions flowOptions;
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   IREE::Stream::TransformOptions streamOptions;

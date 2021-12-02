@@ -41,8 +41,8 @@ hal.executable @tensor_insert {
         return
       }
       hal.interface @io attributes {push_constants = 2 : index, sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
       }
     }
   }
@@ -159,8 +159,8 @@ hal.executable @tensor_insert {
         return
       }
       hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
       }
     }
   }
@@ -194,8 +194,8 @@ hal.executable @tensor_insert {
 
 hal.executable @avg_pool {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
@@ -253,8 +253,8 @@ hal.executable @avg_pool {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
       }
     }
   }
@@ -280,9 +280,9 @@ hal.executable @avg_pool {
 
 hal.executable @elementwise {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
@@ -334,9 +334,9 @@ hal.executable @elementwise {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

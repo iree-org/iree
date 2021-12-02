@@ -47,6 +47,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:MathDialect": ["MLIRMath"],
     "@llvm-project//mlir:ArithmeticDialect": ["MLIRArithmetic"],
+    "@llvm-project//mlir:BufferizationDialect": ["MLIRBufferization"],
     "@llvm-project//mlir:MemRefDialect": ["MLIRMemRef"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
@@ -64,6 +65,67 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
     "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
+    # MHLO.
+    # TODO: Rework this upstream so that Bazel and CMake rules match up
+    # better.
+    # All of these have to depend on tensorflow::external_mhlo_includes to
+    # ensure that include directories are inherited.
+    "@mlir-hlo//:chlo_legalize_to_hlo": [
+        "tensorflow::external_mhlo_includes",
+        "ChloPasses",
+    ],
+    "@mlir-hlo//:hlo": [
+        "tensorflow::external_mhlo_includes",
+        "ChloDialect",
+        "MhloDialect",
+        "MLIRMhloUtils",
+    ],
+    "@mlir-hlo//:legalize_control_flow": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToStandard",
+    ],
+    "@mlir-hlo//:legalize_einsum_to_dot_general": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
+    "@mlir-hlo//:legalize_gather_to_torch_index_select": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
+    "@mlir-hlo//:legalize_to_linalg": [
+        "tensorflow::external_mhlo_includes",
+        "MhloLhloToLinalg",
+    ],
+    "@mlir-hlo//:legalize_to_standard": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToStandard",
+    ],
+    "@mlir-hlo//:map_lmhlo_to_scalar_op": [
+        "tensorflow::external_mhlo_includes",
+        "LmhloDialect",  # Unfortunate.
+        "MhloDialect",
+    ],
+    "@mlir-hlo//:map_mhlo_to_scalar_op": [
+        "tensorflow::external_mhlo_includes",
+        "MhloDialect",
+    ],
+    "@mlir-hlo//:materialize_broadcasts": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
+    "@mlir-hlo//:mhlo_control_flow_to_scf": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToStandard",
+    ],
+    "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
+    "@mlir-hlo//:unfuse_batch_norm": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
+
     # Vulkan
     "@vulkan_headers": ["Vulkan::Headers"],
     # Cuda
@@ -81,7 +143,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@cpuinfo": ["cpuinfo"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
-
 
 def _convert_mlir_target(target):
   # Default to a pattern substitution approach.
@@ -130,8 +191,5 @@ def convert_target(target):
     return _convert_llvm_target(target)
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
-  if target.startswith("@mlir-hlo//"):
-    # All Bazel targets map to a single CMake target.
-    return ["tensorflow::mlir_hlo"]
 
   raise KeyError(f"No conversion found for target '{target}'")

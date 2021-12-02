@@ -21,7 +21,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/DenseSet.h"
@@ -57,23 +56,8 @@ class ConvertToDestinationPassingStylePass
 /// Returns the subview into the buffer that is supposed to be populated with
 /// the `value` of the `flow.dispatch.tensor.store` operation. This can be used
 /// to compute the results in place.
-static Value getTensorLoadOpForTensorStoreOp(OpBuilder &b, Operation *storeOp) {
-  SmallVector<Value, 4> operandsOfLoadOp;
-  auto op = cast<OffsetSizeAndStrideOpInterface>(storeOp);
-  Value target, source;
-  std::tie(source, target) =
-      TypeSwitch<Operation *, std::tuple<Value, Value>>(op)
-          .Case<IREE::Flow::DispatchTensorStoreOp>([&](auto storeOp) {
-            return std::make_tuple(storeOp.value(), storeOp.target());
-          })
-          .Case<tensor::InsertSliceOp>([&](auto storeOp) {
-            return std::make_tuple(storeOp.source(), storeOp.dest());
-          })
-          .Default([](Operation *) {
-            return std::make_tuple<Value, Value>(nullptr, nullptr);
-          });
-  if (!target) return nullptr;
-
+static Value getTensorLoadOpForTensorStoreOp(
+    OpBuilder &b, IREE::Flow::DispatchTensorStoreOp storeOp) {
   // Clone the offset, size and stride values. They will be CSE-ed later.
   Operation *parentOp = storeOp->getParentOp();
   BlockAndValueMapping indexValMap;
@@ -116,12 +100,13 @@ static Value getTensorLoadOpForTensorStoreOp(OpBuilder &b, Operation *storeOp) {
     return clonedVals;
   };
   SmallVector<OpFoldResult> loadOffsets, loadSizes, loadStrides;
-  loadOffsets = cloneIndexValues(op.getMixedOffsets());
-  loadSizes = cloneIndexValues(op.getMixedSizes());
-  loadStrides = cloneIndexValues(op.getMixedStrides());
+  loadOffsets = cloneIndexValues(storeOp.getMixedOffsets());
+  loadSizes = cloneIndexValues(storeOp.getMixedSizes());
+  loadStrides = cloneIndexValues(storeOp.getMixedStrides());
   Value tensorLoadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      op.getLoc(), source.getType().cast<RankedTensorType>(), target,
-      loadOffsets, loadSizes, loadStrides);
+      storeOp.getLoc(), storeOp.value().getType().cast<RankedTensorType>(),
+      storeOp.target(), storeOp.target_dims(), loadOffsets, loadSizes,
+      loadStrides);
   return tensorLoadOp;
 }
 
@@ -157,6 +142,15 @@ static Value getTiedResultForOperand(OpOperand &operand,
       return result;
     }
   }
+  if (auto yieldOp = dyn_cast<scf::YieldOp>(operand.getOwner())) {
+    Operation *parentOp = yieldOp->getParentOp();
+    if (isa<scf::ForOp, scf::IfOp>(parentOp)) {
+      Value result = parentOp->getResult(operand.getOperandNumber());
+      if (plan.isEquivalent(result, operand.get())) {
+        return result;
+      }
+    }
+  }
   return nullptr;
 }
 
@@ -171,9 +165,6 @@ static IREE::Flow::DispatchTensorStoreOp walkUseToGetDispatchTensorStoreOp(
     llvm::DenseSet<Value> &processed) {
   Operation *user = nullptr;
   while (value.hasOneUse()) {
-    assert(!processed.count(value) &&
-           "unexpected traversal through already traversed value during "
-           "conversion to destination passing style");
     processed.insert(value);
     OpOperand &use = *value.use_begin();
     user = use.getOwner();
@@ -228,15 +219,13 @@ static LogicalResult modifyResultToUseStoreBuffer(
         "failed walk of uses to get to flow.dispatch.tensor.store op");
   }
 
-  // For now we need to change the usage to use destination passing style only
-  // if the start of the use-def chain is an init_tensor op. Might adapt this as
-  // we go along.
-  if (!isa<linalg::InitTensorOp>(resultValueOp)) {
-    return success();
-  }
-
   OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(resultValueOp);
+  b.setInsertionPointToStart(storeOp->getBlock());
+  if (auto sourceDefiningOp = storeOp.target().getDefiningOp()) {
+    if (sourceDefiningOp->getBlock() == storeOp->getBlock()) {
+      b.setInsertionPointAfter(sourceDefiningOp);
+    }
+  }
   Value resultBuffer = getTensorLoadOpForTensorStoreOp(b, storeOp);
 
   // Now replay the instructions that are essentially doing type-conversion, in
@@ -284,9 +273,9 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
   }
 
   llvm::DenseSet<Value> processed;
-  auto walkResult =
-      funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) -> WalkResult {
-        for (auto result : op->getResults()) {
+  auto walkResult = funcOp.walk<WalkOrder::PreOrder>(
+      [&](linalg::InitTensorOp initTensorOp) -> WalkResult {
+        for (auto result : initTensorOp->getResults()) {
           if (!result.getType().isa<RankedTensorType>()) continue;
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);

@@ -41,8 +41,8 @@ int main(int argc, char **argv) {
 
   // Select IREE input passes.
   mlir::iree_compiler::registerCommonInputConversionPasses();
-  mlir::iree_compiler::registerMHLOConversionPasses();
   mlir::iree_compiler::registerTOSAConversionPasses();
+  mlir::iree_compiler::MHLO::registerMHLOConversionPasses();
 
   // TensorFlow integration passes.
   mlir::RegisterAllTensorFlowDialects(registry);

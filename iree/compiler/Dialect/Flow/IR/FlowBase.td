@@ -9,7 +9,6 @@
 
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
-include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE execution flow dialect

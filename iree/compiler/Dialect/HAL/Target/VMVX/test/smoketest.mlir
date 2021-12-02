@@ -38,9 +38,9 @@ stream.executable public @add_dispatch_0 {
 
 // CHECK-LABEL: hal.executable public @add_dispatch_0
 //  CHECK-NEXT:   hal.interface public @io
-//  CHECK-NEXT:    hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer", access="None"
-//  CHECK-NEXT:    hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer", access="None"
-//  CHECK-NEXT:    hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer", access="None"
+//  CHECK-NEXT:    hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
+//  CHECK-NEXT:    hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
+//  CHECK-NEXT:    hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 //  CHECK-NEXT:     hal.executable.entry_point public @add_dispatch_0 attributes {

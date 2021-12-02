@@ -124,16 +124,6 @@ static uint8_t* iree_hal_cuda_populate_device_info(
 // Return true if the device support all the extension required.
 static bool iree_hal_cuda_is_valid_device(iree_hal_cuda_driver_t* driver,
                                           CUdevice device) {
-  int support_concurrent_managed_access = 0;
-  iree_status_t status = CU_RESULT_TO_STATUS(
-      &driver->syms,
-      cuDeviceGetAttribute(&support_concurrent_managed_access,
-                           CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS,
-                           device),
-      "cuDeviceGetAttribute");
-  if (!iree_status_is_ok(status) || !support_concurrent_managed_access) {
-    return false;
-  }
   return true;
 }
 

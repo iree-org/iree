@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
@@ -639,7 +638,15 @@ void ResourceSubviewOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
-  // TODO(benvanik): if operand comes from export then fold.
+  // If operand comes from an export with the same affinity and size then fold.
+  // Different affinities may indicate exporting from one device or queue and
+  // importing to a different device or queue.
+  // We assume that differing encodings and shapes are compatible.
+  auto exportOp = source().getDefiningOp<TensorExportOp>();
+  if (exportOp && affinity() == exportOp.affinity() &&
+      result_size() == exportOp.source_size()) {
+    return exportOp.source();
+  }
   return {};
 }
 
@@ -653,7 +660,15 @@ void TensorImportOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
-  // TODO(benvanik): if operand comes from import then fold.
+  // If operand comes from import with the same properties then fold.
+  // These checks are conservative, since encoding changes may be meaningful.
+  auto importOp = source().getDefiningOp<TensorImportOp>();
+  if (importOp && source_encoding() == importOp.result_encoding() &&
+      source_encoding_dims() == importOp.result_encoding_dims() &&
+      source_size() == importOp.result_size() &&
+      affinity() == importOp.affinity()) {
+    return importOp.source();
+  }
   return {};
 }
 
@@ -1958,6 +1973,24 @@ void CmdConcurrentOp::getCanonicalizationPatterns(
 
 OpFoldResult TimepointImmediateOp::fold(ArrayRef<Attribute> operands) {
   return IREE::Stream::TimepointAttr::get(getContext(), getResult().getType());
+}
+
+//===----------------------------------------------------------------------===//
+// stream.timepoint.export
+//===----------------------------------------------------------------------===//
+
+LogicalResult TimepointExportOp::fold(ArrayRef<Attribute> operands,
+                                      SmallVectorImpl<OpFoldResult> &results) {
+  // If the source timepoint comes from an import op we can fold - but only if
+  // the types match.
+  if (auto importOp = dyn_cast_or_null<TimepointImportOp>(
+          await_timepoint().getDefiningOp())) {
+    if (llvm::equal(importOp.getOperandTypes(), getResultTypes())) {
+      llvm::append_range(results, importOp.operands());
+      return success();
+    }
+  }
+  return failure();
 }
 
 //===----------------------------------------------------------------------===//

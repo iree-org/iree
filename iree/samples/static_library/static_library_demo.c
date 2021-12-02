@@ -23,7 +23,8 @@ extern void print_success();
 // A function to create the HAL device from the different backend targets.
 // The HAL device is returned based on the implementation, and it must be
 // released by the caller.
-iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
+iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
+                                               iree_hal_device_t** out_device) {
   iree_status_t status = iree_ok_status();
 
   // Set paramters for the device created in the next step.
@@ -40,18 +41,27 @@ iree_status_t create_device_with_static_loader(iree_hal_device_t** device) {
   if (iree_status_is_ok(status)) {
     status = iree_hal_static_library_loader_create(
         IREE_ARRAYSIZE(libraries), libraries,
-        iree_hal_executable_import_provider_null(), iree_allocator_system(),
+        iree_hal_executable_import_provider_null(), host_allocator,
         &library_loader);
+  }
+
+  // Use the default host allocator for buffer allocations.
+  iree_string_view_t identifier = iree_make_cstring_view("sync");
+  iree_hal_allocator_t* device_allocator = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_create_heap(identifier, host_allocator,
+                                            host_allocator, &device_allocator);
   }
 
   // Create the device and release the executor and loader afterwards.
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_device_create(
-        iree_make_cstring_view("dylib"), &params, /*loader_count=*/1,
-        &library_loader, iree_allocator_system(), device);
+        identifier, &params, /*loader_count=*/1, &library_loader,
+        device_allocator, host_allocator, out_device);
   }
-  iree_hal_executable_loader_release(library_loader);
 
+  iree_hal_allocator_release(device_allocator);
+  iree_hal_executable_loader_release(library_loader);
   return status;
 }
 
@@ -73,7 +83,7 @@ iree_status_t Run() {
   // Create dylib device with static loader.
   iree_hal_device_t* device = NULL;
   if (iree_status_is_ok(status)) {
-    status = create_device_with_static_loader(&device);
+    status = create_device_with_static_loader(iree_allocator_system(), &device);
   }
 
   // Session configuration (one per loaded module to hold module state).

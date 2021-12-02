@@ -45,10 +45,13 @@ iree_cc_library(
     IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
+    MLIRAffineBufferizableOpInterfaceImpl
     MLIRAffineUtils
     MLIRAnalysis
+    MLIRArithBufferizableOpInterfaceImpl
     MLIRArithmetic
     MLIRBufferizableOpInterface
+    MLIRBufferization
     MLIRComprehensiveBufferize
     MLIRGPUOps
     MLIRIR
@@ -61,6 +64,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
+    MLIRSCFBufferizableOpInterfaceImpl
     MLIRSCFToStandard
     MLIRSideEffectInterfaces
     MLIRStandard
@@ -72,12 +76,12 @@ iree_cc_library(
     MLIRVectorBufferizableOpInterfaceImpl
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

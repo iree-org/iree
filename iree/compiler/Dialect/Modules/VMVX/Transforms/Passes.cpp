@@ -11,7 +11,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
@@ -40,9 +39,6 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Linalg -> Vectors
   // ---------------------------------------------------------------------------
 
-  nestedModulePM.addNestedPass<FuncOp>(
-      Shape::createCleanupShapePlaceholdersPass());
-
   // Tiling and distribution.
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   // TODO(#5925): This can also be modified to just use the dynamic pass
@@ -67,8 +63,6 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
 
   // Flatten and cleanup memrefs.
   nestedModulePM.addNestedPass<FuncOp>(memref::createFoldSubViewOpsPass());
-  nestedModulePM.addNestedPass<FuncOp>(
-      Shape::createFoldDimOverShapeCarryingOpPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());

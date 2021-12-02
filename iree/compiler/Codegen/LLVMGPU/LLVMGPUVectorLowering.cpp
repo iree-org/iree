@@ -34,8 +34,10 @@ struct LLVMGPUVectorLoweringPass
                                           vectorToSCFOptions);
     memref::populateFoldSubViewOpPatterns(vectorToLoopsPatterns);
     vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(vectorToLoopsPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(vectorToLoopsPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 }  // namespace

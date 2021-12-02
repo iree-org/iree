@@ -16,6 +16,7 @@
 typedef struct iree_hal_heap_allocator_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
+  iree_allocator_t data_allocator;
   iree_string_view_t identifier;
   IREE_STATISTICS(iree_hal_heap_allocator_statistics_t statistics;)
 } iree_hal_heap_allocator_t;
@@ -28,8 +29,8 @@ iree_hal_heap_allocator_t* iree_hal_heap_allocator_cast(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
-    iree_string_view_t identifier, iree_allocator_t host_allocator,
-    iree_hal_allocator_t** out_allocator) {
+    iree_string_view_t identifier, iree_allocator_t data_allocator,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -42,6 +43,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
     iree_hal_resource_initialize(&iree_hal_heap_allocator_vtable,
                                  &allocator->resource);
     allocator->host_allocator = host_allocator;
+    allocator->data_allocator = data_allocator;
     iree_string_view_append_to_buffer(
         identifier, &allocator->identifier,
         (char*)allocator + iree_sizeof_struct(*allocator));
@@ -82,9 +84,9 @@ static iree_allocator_t iree_hal_heap_allocator_host_allocator(
 static void iree_hal_heap_allocator_query_statistics(
     iree_hal_allocator_t* base_allocator,
     iree_hal_allocator_statistics_t* out_statistics) {
-  iree_hal_heap_allocator_t* allocator =
-      iree_hal_heap_allocator_cast(base_allocator);
   IREE_STATISTICS({
+    iree_hal_heap_allocator_t* allocator =
+        iree_hal_heap_allocator_cast(base_allocator);
     iree_slim_mutex_lock(&allocator->statistics.mutex);
     memcpy(out_statistics, &allocator->statistics.base,
            sizeof(*out_statistics));
@@ -158,9 +160,10 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
   // Allocate the buffer (both the wrapper and the contents).
   iree_hal_heap_allocator_statistics_t* statistics = NULL;
   IREE_STATISTICS(statistics = &allocator->statistics);
-  return iree_hal_heap_buffer_create(
-      base_allocator, statistics, memory_type, allowed_access, allowed_usage,
-      allocation_size, allocator->host_allocator, out_buffer);
+  return iree_hal_heap_buffer_create(base_allocator, statistics, memory_type,
+                                     allowed_access, allowed_usage,
+                                     allocation_size, allocator->data_allocator,
+                                     allocator->host_allocator, out_buffer);
 }
 
 static iree_status_t iree_hal_heap_allocator_wrap_buffer(

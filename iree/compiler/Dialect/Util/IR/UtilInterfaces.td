@@ -309,6 +309,23 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
   let description = [{
     An operation that is able to provide dynamic shape dimensions for all
     shaped operands and results.
+
+    This is a more fine-grained version of ReifyRankedShapedTypeOpInterface that
+    allows for querying of individual operand and result dimensions without
+    unconditionally inserting IR. The dynamic dimension queries allow us to find
+    the dynamic shape dimension SSA values in the IR in read-only mode (such as
+    during analysis), and having the queries specific to a particular operand
+    and result allows us to walk through ops along use-def edges. When combined
+    with tied operands the split queries allow for operands and results to have
+    differing dimensions (such as after reshaping/casting).
+
+    `getOperandDynamicDims` and `getResultDynamicDims` are the load-bearing
+    methods and if there was an equivalent set in an upstream dialect we could
+    switch to using that instead as the rest are just utilities built around
+    them.
+
+    `tensor.dim` and `memref.dim` will both resolve shape dimensions through
+    this interface when the dimension index is constant.
   }];
 
   let methods = [
@@ -330,6 +347,35 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
           }
         }
         return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{Returns a full shape for the given shaped operand index.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildOperandShape",
+      /*args=*/(ins "unsigned":$idx, "OpBuilder &":$builder),
+      /*defaultImplementation=*/[{
+        return IREE::Util::buildOperandShape($_self, idx, builder);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{Returns a full shape for the given shaped result index.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildResultShape",
+      /*args=*/(ins "unsigned":$idx, "OpBuilder &":$builder),
+      /*defaultImplementation=*/[{
+        return IREE::Util::buildResultShape($_self, idx, builder);
+      }]
+    >,
+    StaticInterfaceMethod<
+      /*desc=*/[{Builds a full shape for the given shaped result value.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildResultValueShape",
+      /*args=*/(ins "Value":$result, "OpBuilder &":$builder),
+      /*methodBody=*/[{
+        auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(result.getDefiningOp());
+        return shapeAwareOp.buildResultShape(
+            result.cast<mlir::OpResult>().getResultNumber(), builder);
       }]
     >,
   ];

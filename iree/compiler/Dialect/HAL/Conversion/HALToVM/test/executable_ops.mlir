@@ -4,8 +4,8 @@
 // CHECK: vm.rodata private @exe_binary2 {alignment = 16 : i64} dense<[4, 5, 6, 7]> : vector<4xi8>
 hal.executable @exe {
   hal.interface @interface {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.binary @binary1 attributes {
     data = dense<[0, 1, 2, 3]> : vector<4xi8>,
@@ -50,8 +50,8 @@ func @executableCreate(
 // CHECK: vm.rodata private @exe1_binary1 {alignment = 16 : i64} dense<[0, 1, 2, 3]> : vector<4xi8>
 hal.executable @exe1 {
   hal.interface @interface {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.binary @binary1 attributes {
     data = dense<[0, 1, 2, 3]> : vector<4xi8>,
@@ -61,8 +61,8 @@ hal.executable @exe1 {
 // CHECK: vm.rodata private @exe2_binary2 {alignment = 16 : i64} dense<[4, 5, 6, 7]> : vector<4xi8>
 hal.executable @exe2 {
   hal.interface @interface {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.binary @binary2 attributes {
     data = dense<[4, 5, 6, 7]> : vector<4xi8>,

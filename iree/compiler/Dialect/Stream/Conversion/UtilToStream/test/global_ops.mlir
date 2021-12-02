@@ -63,7 +63,7 @@ func @globalStoreFromExternal(%arg0: !hal.buffer_view) {
   // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]} : index
   // CHECK: %[[IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[SIZE]]}
   // CHECK: %[[T:.+]] = stream.async.transfer %[[IMPORT]] : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
-  %0 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%dim0}
+  %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%dim0}
   // CHECK: %[[VAR:.+]] = stream.async.transfer %[[T]] : !stream.resource<*>{%[[SIZE]]} -> !stream.resource<variable>{%[[SIZE]]}
   // CHECK: util.global.store %[[VAR]], @var_with_buffer_view_store : !stream.resource<variable>
   // CHECK: util.global.store %[[SIZE]], @var_with_buffer_view_store__size : index
@@ -80,7 +80,7 @@ func @globalStoreFromExternal(%arg0: !hal.buffer_view) {
 // util.global public mutable @var_indirect_with_buffer_view_store : tensor<i32>
 // func @globalStoreFromExternalIndirect(%arg0: !hal.buffer_view) {
 //   %0 = util.global.address @var_indirect_with_buffer_view_store : !util.ptr<tensor<i32>>
-//   %1 = hal.tensor.cast %arg0 : !hal.buffer_view -> tensor<i32>
+//   %1 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<i32>
 //   util.global.store.indirect %1, %0 : tensor<i32> -> !util.ptr<tensor<i32>>
 //   return
 // }

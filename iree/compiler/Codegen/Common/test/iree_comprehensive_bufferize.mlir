@@ -33,10 +33,10 @@ func @matmul() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer"
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
@@ -66,14 +66,13 @@ hal.interface private @io  {
 //  CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[LHS]][%[[IV0]], 0] [%[[TILESIZE_Y]], %[[K]]]
 //  CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]] [%[[K]], %[[TILESIZE_X]]]
 //  CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
-//  CHECK-DAG:       %[[ALLOC:.+]] = memref.alloc(%[[TILESIZE_Y]], %[[TILESIZE_X]]) {alignment = 128 : i64}
-//      CHECK:       %[[ALLOC_CASTED:.+]] = memref.cast %[[ALLOC]] : memref<?x?xf32> to memref<?x?xf32, #[[MAP2]]>
-//      CHECK:       memref.copy %[[INIT_TILE]], %[[ALLOC_CASTED]]
+//      CHECK:       %[[ALLOC:.+]] = memref.alloc(%[[TILESIZE_Y]], %[[TILESIZE_X]])
+//      CHECK:       linalg.copy(%[[INIT_TILE]], %[[ALLOC]])
 //      CHECK:       linalg.matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
 // CHECK-SAME:           outs(%[[ALLOC]]
 //      CHECK:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
-//      CHECK:       memref.copy %[[ALLOC_CASTED]], %[[RESULT_TILE]]
+//      CHECK:       linalg.copy(%[[ALLOC]], %[[RESULT_TILE]])
 //      CHECK:       memref.dealloc %[[ALLOC]]
 
 
@@ -113,9 +112,9 @@ func @matmul_fill() {
   return
 }
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>

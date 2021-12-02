@@ -31,7 +31,6 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/Shape/IR:td_files",
         "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
@@ -73,7 +72,6 @@ cc_library(
         ":HALOpsGen",
         ":HALStructsGen",
         ":HALTypesGen",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
@@ -95,7 +93,6 @@ cc_library(
         ":IR",
         "//iree/compiler/Dialect/HAL:hal_imports",
         "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//llvm:Support",

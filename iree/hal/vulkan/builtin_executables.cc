@@ -63,9 +63,6 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
     iree_hal_descriptor_set_layout_binding_t layout_binding;
     layout_binding.binding = 0;
     layout_binding.type = IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    layout_binding.access = i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET
-                                ? IREE_HAL_MEMORY_ACCESS_NONE
-                                : IREE_HAL_MEMORY_ACCESS_WRITE;
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_descriptor_set_layout_create(
         logical_device_,
         i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET

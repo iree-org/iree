@@ -25,7 +25,6 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/Conversion",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",

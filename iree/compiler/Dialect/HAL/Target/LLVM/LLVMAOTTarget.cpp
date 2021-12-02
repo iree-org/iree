@@ -103,10 +103,11 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
 // Verifies builtin bitcode is loaded correctly and appends it to |linker|.
 //
 // Example:
-//  if (failed(linkBuiltinLibrary(loc, linker, "libfoo", loadLibFoo(...))))
+//  if (failed(linkBuiltinLibrary(loc, linker, linkerFlag, targetMachine,
+//  "libfoo", loadLibFoo(...))))
 static LogicalResult linkBuiltinLibrary(
-    Location loc, llvm::Linker &linker, llvm::TargetMachine *targetMachine,
-    StringRef name,
+    Location loc, llvm::Linker &linker, llvm::Linker::Flags linkerFlag,
+    llvm::TargetMachine *targetMachine, StringRef name,
     llvm::Expected<std::unique_ptr<llvm::Module>> bitcodeModuleValue) {
   // Ensure the bitcode loaded correctly. It may fail if the LLVM version is
   // incompatible.
@@ -122,9 +123,7 @@ static LogicalResult linkBuiltinLibrary(
 
   // Link the bitcode into the base module. This will merge in any required
   // symbols and override declarations that may exist.
-  if (linker.linkInModule(
-          std::move(bitcodeModule),
-          llvm::Linker::OverrideFromSrc /*| llvm::Linker::LinkOnlyNeeded*/)) {
+  if (linker.linkInModule(std::move(bitcodeModule), linkerFlag)) {
     return mlir::emitError(loc) << "failed to link " << name << " bitcode";
   }
 
@@ -340,16 +339,20 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Note that if producing a static library then the symbols we add must be
     // weak such that we don't trigger ODR issues.
     llvm::Linker moduleLinker(*llvmModule);
+
+    llvm::Linker::Flags linkerFlag = llvm::Linker::OverrideFromSrc;
+    if (options_.linkStatic) linkerFlag = llvm::Linker::LinkOnlyNeeded;
+
     if (failed(linkBuiltinLibrary(
-            variantOp.getLoc(), moduleLinker, targetMachine.get(), "libdevice",
-            loadDeviceBitcode(targetMachine.get(), context)))) {
+            variantOp.getLoc(), moduleLinker, linkerFlag, targetMachine.get(),
+            "libdevice", loadDeviceBitcode(targetMachine.get(), context)))) {
       return mlir::emitError(variantOp.getLoc())
              << "failed linking in builtin library for target triple '"
              << options_.targetTriple << "'";
     }
     if (failed(linkBuiltinLibrary(
-            variantOp.getLoc(), moduleLinker, targetMachine.get(), "libmusl",
-            loadMuslBitcode(targetMachine.get(), context)))) {
+            variantOp.getLoc(), moduleLinker, linkerFlag, targetMachine.get(),
+            "libmusl", loadMuslBitcode(targetMachine.get(), context)))) {
       return mlir::emitError(variantOp.getLoc())
              << "failed linking in builtin library for target triple '"
              << options_.targetTriple << "'";

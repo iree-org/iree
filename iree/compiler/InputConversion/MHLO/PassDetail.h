@@ -11,10 +11,12 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 #define GEN_PASS_CLASSES
 #include "iree/compiler/InputConversion/MHLO/Passes.h.inc"
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir
 

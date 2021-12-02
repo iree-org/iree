@@ -414,7 +414,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_assert,  //
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
   iree_vm_buffer_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &message));
-  iree_string_view_t message_str = iree_vm_buffer_as_string(message);
+  iree_string_view_t message_str IREE_ATTRIBUTE_UNUSED =
+      iree_vm_buffer_as_string(message);
   iree_hal_allocator_t* allocator = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r2, &allocator));
   iree_vm_size_t minimum_length = (iree_vm_size_t)args->i3;
@@ -621,7 +622,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
       iree_hal_buffer_view_check_deref(args->r0, &buffer_view));
   iree_vm_buffer_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &message));
-  iree_string_view_t message_str = iree_vm_buffer_as_string(message);
+  iree_string_view_t message_str IREE_ATTRIBUTE_UNUSED =
+      iree_vm_buffer_as_string(message);
   iree_hal_element_type_t expected_element_type =
       (iree_hal_element_type_t)args->i2;
   iree_hal_encoding_type_t expected_encoding_type =
@@ -1129,7 +1131,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_create,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
                    iree_hal_module_state_t,                       //
-                   riCiiiD, r) {
+                   riCiiD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_descriptor_set_layout_usage_type_t usage_type =
@@ -1148,7 +1150,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     bindings[i].binding = (uint32_t)args->a2[i].i0;
     bindings[i].type = (iree_hal_descriptor_type_t)args->a2[i].i1;
-    bindings[i].access = (iree_hal_memory_access_t)args->a2[i].i2;
   }
 
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;

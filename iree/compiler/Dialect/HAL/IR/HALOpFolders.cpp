@@ -25,12 +25,23 @@ namespace IREE {
 namespace HAL {
 
 //===----------------------------------------------------------------------===//
-// hal.tensor.cast
+// hal.tensor.import/export
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorCastOp::fold(ArrayRef<Attribute> operands) {
-  if (source().getType() == target().getType()) {
-    return source();
+OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
+  if (auto exportOp = source().getDefiningOp<TensorExportOp>()) {
+    if (exportOp.source().getType() == target().getType()) {
+      return exportOp.source();
+    }
+  }
+  return {};
+}
+
+OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
+  if (auto importOp = source().getDefiningOp<TensorImportOp>()) {
+    if (importOp.source().getType() == target().getType()) {
+      return importOp.source();
+    }
   }
   return {};
 }

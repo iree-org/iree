@@ -1,4 +1,4 @@
-# Copyright 2020 The IREE Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -17,7 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "fold_dim_over_shape_carrying_op.mlir",
+            "abi_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

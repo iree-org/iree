@@ -5,9 +5,9 @@
 
 hal.executable private @conv_static_shape_f32 {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_static_shape_f32 attributes {
@@ -21,9 +21,9 @@ hal.executable private @conv_static_shape_f32 {
         %cst = arith.constant 0.000000e+00 : f32
         %c112 = arith.constant 112 : index
         %c16 = arith.constant 16 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x3x8x16xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:3x3x8x16xf32>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -66,9 +66,9 @@ hal.executable private @conv_static_shape_f32 {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -101,9 +101,9 @@ hal.executable private @conv_static_shape_f32 {
 
 hal.executable private @depthwise_conv_static_shape_f32 {
   hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+    hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
@@ -117,9 +117,9 @@ hal.executable private @depthwise_conv_static_shape_f32 {
         %cst = arith.constant 0.000000e+00 : f32
         %c56 = arith.constant 56 : index
         %c96 = arith.constant 96 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x113x113x96xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x3x96xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x56x56x96xf32>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x113x113x96xf32>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:3x3x96xf32>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:1x56x56x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -162,9 +162,9 @@ hal.executable private @depthwise_conv_static_shape_f32 {
         return
       }
       hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
+        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

@@ -53,9 +53,11 @@ static iree_status_t iree_hal_sync_device_check_params(
 iree_status_t iree_hal_sync_device_create(
     iree_string_view_t identifier, const iree_hal_sync_device_params_t* params,
     iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
-    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(!loader_count || loaders);
+  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -76,6 +78,8 @@ iree_status_t iree_hal_sync_device_create(
     iree_string_view_append_to_buffer(identifier, &device->identifier,
                                       (char*)device + struct_size);
     device->host_allocator = host_allocator;
+    device->device_allocator = device_allocator;
+    iree_hal_allocator_retain(device_allocator);
 
     device->loader_count = loader_count;
     for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
@@ -84,11 +88,6 @@ iree_status_t iree_hal_sync_device_create(
     }
 
     iree_hal_sync_semaphore_state_initialize(&device->semaphore_state);
-  }
-
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_create_heap(identifier, host_allocator,
-                                            &device->device_allocator);
   }
 
   if (iree_status_is_ok(status)) {

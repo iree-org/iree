@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-spirv-vectorize-load-store -canonicalize %s | IreeFileCheck %s
 
-// CHECK-LABEL: func @copy
+// CHECK-LABEL: func @alloc_copy
 //  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x1024xvector<4xf32>>
 //       CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<128x8xvector<4xf32>, 3>
 //       CHECK: %[[V:.+]] = memref.load %[[ARG0]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
@@ -8,7 +8,7 @@
 //       CHECK: %[[MAT:.+]] = vector.transfer_read %[[ARG0]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x1024xvector<4xf32>>, vector<32x8xf32>
 //       CHECK: vector.transfer_write %[[MAT]], %[[ALLOC]][%{{.*}}, %{{.*}}] : vector<32x8xf32>, memref<128x8xvector<4xf32>, 3>
 //       CHECK: memref.dealloc %[[ALLOC]] : memref<128x8xvector<4xf32>, 3>
-func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
+func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<128x32xf32, 3>
   %v = vector.transfer_read %arg0[%x, %y], %cst : memref<4096x4096xf32>, vector<1x4xf32>
@@ -22,9 +22,10 @@ func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 // -----
 
 // Test that the memref is not vectorized if used by scalar load or store.
-// CHECK-LABEL: func @copy
+
+// CHECK-LABEL: func @alloc_copy
 //  CHECK-SAME: %[[ARG0:.+]]: memref<4096x4096xf32>
-func @copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
+func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<128x32xf32, 3>
   %s = memref.load %arg0[%x, %y] : memref<4096x4096xf32>
@@ -55,8 +56,8 @@ func @resource_copy() {
 }
 
 hal.interface private @io attributes {push_constants = 5 : index} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -81,8 +82,8 @@ func @resource_copy_f16() {
 }
 
 hal.interface private @io attributes {push_constants = 5 : index} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -107,8 +108,8 @@ func @resource_copy_8xf16() {
 }
 
 hal.interface private @io attributes {push_constants = 5 : index} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -140,8 +141,8 @@ func @resource_copy_dynamic_shape() {
 }
 
 hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -161,8 +162,8 @@ func @resource_copy_dynamic_last_dim() {
 }
 
 hal.interface @io attributes {push_constants = 5 : index, sym_visibility = "private"} {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -183,8 +184,8 @@ func @do_not_vectorize_odd_vector_size() {
 }
 
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer", access="Write"
+  hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
+  hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
 }
 
 // -----
@@ -204,8 +205,8 @@ func @vectorize_binding_subspan() {
 }
 
 hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
+  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
+  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
 }
 
 // -----

@@ -25,11 +25,11 @@
 
 // Tie input0 shapes.
 //  CHECK-NEXT:   %[[IN0_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_input0_shape_dim0 : index
-//  CHECK-NEXT:   %[[IN0:.+]] = hal.tensor.cast %[[NULL]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN0_DIM0]]}
+//  CHECK-NEXT:   %[[IN0:.+]] = hal.tensor.import %[[NULL]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN0_DIM0]]}
 
 // Tie input1 shapes.
 //  CHECK-NEXT:   %[[IN1_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_input1_shape_dim0 : index
-//  CHECK-NEXT:   %[[IN1:.+]] = hal.tensor.cast %[[NULL]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN1_DIM0]]}
+//  CHECK-NEXT:   %[[IN1:.+]] = hal.tensor.import %[[NULL]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN1_DIM0]]}
 
 // The actual model code used to (eventually) compute shapes.
 //  CHECK-NEXT:   %[[OUT0:.+]] = mhlo.add %[[IN0]], %[[IN1]]
@@ -165,23 +165,23 @@
 
 // Cast input0 buffer to a shaped tensor.
 //      CHECK:   %[[IN0_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_input0_shape_dim0 : index
-// CHECK-NEXT:   %[[IN0:.+]] = hal.tensor.cast %[[IN0_BUFFER]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN0_DIM0]]}
+// CHECK-NEXT:   %[[IN0:.+]] = hal.tensor.import %[[IN0_BUFFER]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN0_DIM0]]}
 
 // Cast input1 buffer to a shaped tensor.
 //      CHECK:   %[[IN1_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_input1_shape_dim0 : index
-// CHECK-NEXT:   %[[IN1:.+]] = hal.tensor.cast %[[IN1_BUFFER]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN1_DIM0]]}
+// CHECK-NEXT:   %[[IN1:.+]] = hal.tensor.import %[[IN1_BUFFER]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN1_DIM0]]}
 
 // Call the original function with tensor arguments.
 //      CHECK:   %[[OUT:.+]]:2 = call @dynamicEntry(%[[IN0]], %[[IN1]]) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>)
 
 // Query output0 shape and get the HAL buffer to return.
 //      CHECK:   %[[OUT0_DIM0:.+]] = tensor.dim %[[OUT]]#0, %c0 : tensor<?x8x8x3xf32>
-// CHECK-NEXT:   %[[OUT0_BUFFER:.+]] = hal.tensor.cast %[[OUT]]#0 : tensor<?x8x8x3xf32>{%[[OUT0_DIM0]]} -> !hal.buffer
+// CHECK-NEXT:   %[[OUT0_BUFFER:.+]] = hal.tensor.export %[[OUT]]#0 : tensor<?x8x8x3xf32>{%[[OUT0_DIM0]]} -> !hal.buffer
 // CHECK-NEXT:   util.global.store %[[OUT0_DIM0]], @_tflite_dynamicEntry_output0_shape_dim0 : index
 
 // Query output1 shape and get the HAL buffer to return.
 //      CHECK:   %[[OUT1_DIM0:.+]] = tensor.dim %[[OUT]]#1, %c0 : tensor<?x8x8x3xf32>
-// CHECK-NEXT:   %[[OUT1_BUFFER:.+]] = hal.tensor.cast %[[OUT]]#1 : tensor<?x8x8x3xf32>{%[[OUT1_DIM0]]} -> !hal.buffer
+// CHECK-NEXT:   %[[OUT1_BUFFER:.+]] = hal.tensor.export %[[OUT]]#1 : tensor<?x8x8x3xf32>{%[[OUT1_DIM0]]} -> !hal.buffer
 // CHECK-NEXT:   util.global.store %[[OUT1_DIM0]], @_tflite_dynamicEntry_output1_shape_dim0 : index
 
 // Clear shape dirty bit as we've updated the shapes unconditionally.

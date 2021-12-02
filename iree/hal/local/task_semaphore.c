@@ -238,7 +238,7 @@ static iree_status_t iree_hal_task_semaphore_signal(
   iree_slim_mutex_lock(&semaphore->mutex);
 
   if (new_value <= semaphore->current_value) {
-    uint64_t current_value = semaphore->current_value;
+    uint64_t current_value IREE_ATTRIBUTE_UNUSED = semaphore->current_value;
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "semaphore values must be monotonically "

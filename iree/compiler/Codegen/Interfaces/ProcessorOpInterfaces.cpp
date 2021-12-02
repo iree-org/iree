@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 
 /// Include the generated interface definitions.
-#include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.cpp.inc"
+#include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.cpp.inc"
 
 namespace mlir {
 namespace iree_compiler {

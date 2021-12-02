@@ -26,7 +26,6 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/Shape/IR:td_files",
         "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
@@ -55,7 +54,6 @@ cc_library(
         ":VMVXEnumsGen",
         ":VMVXOpInterfaceGen",
         ":VMVXOpsGen",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",

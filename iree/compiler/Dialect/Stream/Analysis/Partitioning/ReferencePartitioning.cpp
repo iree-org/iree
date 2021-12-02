@@ -218,8 +218,7 @@ PartitionSet partitionRegionConcurrencyReference(
     IREE::Stream::PartitioningConfigAttr config, Block *block) {
   PartitionSet waveSet;
 
-  auto favor = config ? config.getFavor().getValue()
-                      : IREE::Stream::Favor::MinPeakMemory;
+  auto favor = config.getFavor().getValue();
   if (favor == IREE::Stream::Favor::Debug) {
     // Disable partitioning when favoring debugability.
     return waveSet;
@@ -298,7 +297,7 @@ PartitionSet partitionRegionConcurrencyReference(
     opInfo.membership.resize(builders.size(), /*t=*/false);
 
     // No consumers - if there's any candidate then we'll go into that.
-    int firstCandidateOrdinal = favor == IREE::Stream::Favor::MinPeakMemory
+    int firstCandidateOrdinal = favor == IREE::Stream::Favor::MaxConcurrency
                                     ? candidates.find_first()
                                     : candidates.find_last();
     if (firstCandidateOrdinal != -1) {

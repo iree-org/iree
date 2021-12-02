@@ -12,7 +12,6 @@
 
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
 #include "mlir/IR/Dialect.h"
 
 namespace mlir {
@@ -21,7 +20,6 @@ namespace mlir {
 inline void registerXLADialects(DialectRegistry &registry) {
   // clang-format off
   registry.insert<mlir::chlo::HloClientDialect,
-                  mlir::lmhlo::LmhloDialect,
                   mlir::mhlo::MhloDialect>();
   // clang-format on
 }

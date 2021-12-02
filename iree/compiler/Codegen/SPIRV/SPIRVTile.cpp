@@ -136,7 +136,10 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     {  // Tile reduction dimensions.
       RewritePatternSet tilingPatterns(&getContext());
       populateTilingReductionPatterns(tilingPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(tilingPatterns));
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                              std::move(tilingPatterns)))) {
+        return signalPassFailure();
+      }
 
       LLVM_DEBUG({
         llvm::dbgs() << "--- After tiling reduction dimensions  ---\n";
@@ -152,7 +155,9 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       // They work on tiled (but not distributed) loops. We only tiled reduction
       // loops previously so this should be fine.
       scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
 
       LLVM_DEBUG({
         llvm::dbgs() << "--- After tiling canonicalization  ---\n";

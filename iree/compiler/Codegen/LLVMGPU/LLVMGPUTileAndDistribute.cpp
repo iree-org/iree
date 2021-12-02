@@ -285,7 +285,10 @@ struct LLVMGPUTileAndDistributePass
       // same size.
       OwningRewritePatternList wgTilingPatterns(context);
       populateTilingReductionPatterns(wgTilingPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(wgTilingPatterns));
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                              std::move(wgTilingPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     {
@@ -293,8 +296,10 @@ struct LLVMGPUTileAndDistributePass
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       populateAffineMinSCFCanonicalizationPattern(
           wgTilingCanonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(
-          funcOp, std::move(wgTilingCanonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(wgTilingCanonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -314,7 +319,10 @@ struct LLVMGPUTileAndDistributePass
     if (flatWorkgroupSize > kWarpSize) {
       OwningRewritePatternList promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(promotionPatterns));
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                              std::move(promotionPatterns)))) {
+        return signalPassFailure();
+      }
       // Insert barriers before and after copies to workgroup memory and skip
       // insert barriers between back to back copy to workgroup memory.
       OpBuilder builder(&getContext());
@@ -337,8 +345,10 @@ struct LLVMGPUTileAndDistributePass
     {
       RewritePatternSet promotionCanonicalization =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(promotionCanonicalization));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(promotionCanonicalization)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -351,16 +361,20 @@ struct LLVMGPUTileAndDistributePass
       OwningRewritePatternList warpLevelTilingPatterns(context);
       populateTilingToWarpPatterns(warpLevelTilingPatterns, workgroupSize,
                                    workloadPerWorkgroup);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(warpLevelTilingPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(warpLevelTilingPatterns)))) {
+        return signalPassFailure();
+      }
 
     } else {
       // Apply last level of tiling and distribute to threads.
       OwningRewritePatternList threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(threadLevelTilingPatterns,
                                          workgroupSize, workloadPerWorkgroup);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(threadLevelTilingPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(threadLevelTilingPatterns)))) {
+        return signalPassFailure();
+      }
     }
     {
       // Apply canonicalization patterns.
@@ -368,8 +382,10 @@ struct LLVMGPUTileAndDistributePass
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       populateAffineMinSCFCanonicalizationPattern(
           threadTilingCanonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(
-          funcOp, std::move(threadTilingCanonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(threadTilingCanonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({

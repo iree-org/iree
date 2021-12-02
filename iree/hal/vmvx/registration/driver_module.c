@@ -41,7 +41,7 @@ static iree_status_t iree_hal_vmvx_driver_factory_enumerate(
 }
 
 static iree_status_t iree_hal_vmvx_driver_factory_try_create(
-    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t allocator,
+    void* self, iree_hal_driver_id_t driver_id, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
   if (driver_id != IREE_HAL_VMVX_DRIVER_ID) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
@@ -51,27 +51,36 @@ static iree_status_t iree_hal_vmvx_driver_factory_try_create(
   }
 
   iree_vm_instance_t* instance = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_instance_create(allocator, &instance));
+  IREE_RETURN_IF_ERROR(iree_vm_instance_create(host_allocator, &instance));
 
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
 
   iree_hal_executable_loader_t* vmvx_loader = NULL;
-  iree_status_t status =
-      iree_hal_vmvx_module_loader_create(instance, allocator, &vmvx_loader);
+  iree_status_t status = iree_hal_vmvx_module_loader_create(
+      instance, host_allocator, &vmvx_loader);
   iree_hal_executable_loader_t* loaders[1] = {vmvx_loader};
 
   iree_task_executor_t* executor = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_task_executor_create_from_flags(allocator, &executor);
+    status = iree_task_executor_create_from_flags(host_allocator, &executor);
+  }
+
+  iree_hal_allocator_t* device_allocator = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_create_heap(iree_make_cstring_view("vmvx"),
+                                            host_allocator, host_allocator,
+                                            &device_allocator);
   }
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
         iree_make_cstring_view("vmvx"), &default_params, executor,
-        IREE_ARRAYSIZE(loaders), loaders, allocator, out_driver);
+        IREE_ARRAYSIZE(loaders), loaders, device_allocator, host_allocator,
+        out_driver);
   }
 
+  iree_hal_allocator_release(device_allocator);
   iree_task_executor_release(executor);
   iree_hal_executable_loader_release(vmvx_loader);
   iree_vm_instance_release(instance);

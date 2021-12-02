@@ -45,6 +45,7 @@ iree_cc_library(
     MLIRArithmetic
     MLIRArithmeticToSPIRV
     MLIRArithmeticTransforms
+    MLIRBufferization
     MLIRGPUOps
     MLIRGPUToSPIRV
     MLIRGPUTransforms
@@ -81,10 +82,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Util::IR
-    tensorflow::mlir_hlo
   PUBLIC
 )
 

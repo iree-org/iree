@@ -44,10 +44,8 @@ TEST_P(ExecutableLayoutTest, CreateWithPushConstants) {
 TEST_P(ExecutableLayoutTest, CreateWithOneLayout) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
-      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_READ},
-      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE},
+      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
   };
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
       device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,
@@ -66,10 +64,8 @@ TEST_P(ExecutableLayoutTest, CreateWithOneLayout) {
 TEST_P(ExecutableLayoutTest, CreateWithTwoLayouts) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layouts[2];
   iree_hal_descriptor_set_layout_binding_t layout_bindings_0[] = {
-      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_READ},
-      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE},
+      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
   };
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
       device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,
@@ -77,12 +73,9 @@ TEST_P(ExecutableLayoutTest, CreateWithTwoLayouts) {
       &descriptor_set_layouts[0]));
 
   iree_hal_descriptor_set_layout_binding_t layout_bindings_1[] = {
-      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_READ},
-      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_READ},
-      {/*binding=*/2, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       /*access=*/IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE},
+      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {/*binding=*/2, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
   };
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
       device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,

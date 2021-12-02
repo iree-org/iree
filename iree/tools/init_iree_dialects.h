@@ -17,11 +17,10 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/ProcessorOpInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -38,7 +37,6 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::Flow::FlowDialect,
                   IREE::HAL::HALDialect,
                   IREE::LinalgExt::IREELinalgExtDialect,
-                  ShapeDialect,
                   IREE::Stream::StreamDialect,
                   IREE::Util::UtilDialect,
                   IREE::VM::VMDialect,
@@ -49,7 +47,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format on
 
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
-  registerProcessorOpInterfaceExternalModels(registry);
+  registerCodegenInterfaces(registry);
 }
 
 }  // namespace iree_compiler

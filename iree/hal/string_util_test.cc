@@ -386,9 +386,9 @@ struct Allocator final
   // used.
   static StatusOr<Allocator> CreateHostLocal() {
     Allocator allocator;
-    iree_status_t status =
-        iree_hal_allocator_create_heap(iree_make_cstring_view("host_local"),
-                                       iree_allocator_system(), &allocator);
+    iree_status_t status = iree_hal_allocator_create_heap(
+        iree_make_cstring_view("host_local"), iree_allocator_system(),
+        iree_allocator_system(), &allocator);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(allocator);
   }

@@ -73,7 +73,10 @@ struct SPIRVDistributePass final
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<DistributeLoop>(context);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

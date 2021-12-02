@@ -6,9 +6,9 @@
 #map4 = affine_map<(d0)[s0] -> (s0, -d0 + 128)>
 hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
     hal.interface public @io {
-      hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding public @s0b2_rw_external, set=0, binding=2, type="StorageBuffer", access="Read|Write"
+      hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+      hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+      hal.interface.binding public @s0b2_rw_external, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
       hal.executable.entry_point public @mmt4d_384x384x512_4x1x4_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
@@ -44,9 +44,9 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
           return
         }
         hal.interface private @io {
-          hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-          hal.interface.binding public @s0b2_rw_external, set=0, binding=2, type="StorageBuffer", access="Read|Write"
+          hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
+          hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
+          hal.interface.binding public @s0b2_rw_external, set=0, binding=2, type="StorageBuffer"
         }
       }
     }

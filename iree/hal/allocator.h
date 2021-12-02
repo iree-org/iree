@@ -174,9 +174,13 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
 // used in file IO or tests). Buffers allocated with this will not be compatible
 // with real device allocators and will likely incur a copy (or failure) if
 // used.
+//
+// The buffers created from the allocator will use |host_allocator| for their
+// metadata and |data_allocator| for their device storage allocations. If the
+// two are the same the buffers will be allocated in a single flat slab.
 IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
-    iree_string_view_t identifier, iree_allocator_t host_allocator,
-    iree_hal_allocator_t** out_allocator);
+    iree_string_view_t identifier, iree_allocator_t data_allocator,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_allocator_t implementation details
