@@ -87,17 +87,17 @@ func @matmul_2x128x4() {
 // Check that we can vectorize shape dimensions not divisible by 4 but divisible by 2.
 
 func @matmul_8x8x2(%lhs: tensor<8x2xf32>, %rhs: tensor<2x8xf32>, %init: tensor<8x8xf32>) -> tensor<8x8xf32> {
-  %0 = linalg.matmul ins(%lhs, %rhs: tensor<8x2xf32>, tensor<2x8xf32>) outs(%init: tensor<8x8xf32>)
+  %0 = linalg.matmul ins(%lhs, %rhs: tensor<8x2xf32>, tensor<2x8xf32>) outs(%init: tensor<8x8xf32>) -> tensor<8x8xf32>
   return %0 : tensor<8x8xf32>
 }
 
 //    CHECK-LABEL: func @matmul_8x8x2
 
-//  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x2xf32>, vector<1x2xf32>
-//  CHECK-COUNT-4: vector.transfer_read {{.*}} : tensor<2x8xf32>, vector<1x4xf32>
-// CHECK-COUNT-16: vector.transfer_read {{.*}} : tensor<8x8xf32>, vector<1x4xf32>
+//  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x2xf32>, vector<2xf32>
+//  CHECK-COUNT-4: vector.transfer_read {{.*}} : tensor<2x8xf32>, vector<4xf32>
+// CHECK-COUNT-16: vector.transfer_read {{.*}} : tensor<8x8xf32>, vector<4xf32>
 // CHECK-COUNT-16: vector.fma
-// CHECK-COUNT-16: vector.transfer_write {{.*}} : vector<1x4xf32>, tensor<8x8xf32>
+// CHECK-COUNT-16: vector.transfer_write {{.*}} : vector<4xf32>, tensor<8x8xf32>
 
 // -----
 
@@ -110,8 +110,8 @@ func @matmul_8x8x1(%lhs: tensor<8x1xf32>, %rhs: tensor<1x8xf32>, %init: tensor<8
 
 //    CHECK-LABEL: func @matmul_8x8x1
 
-//  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x1xf32>, vector<1x1xf32>
-//  CHECK-COUNT-2: vector.transfer_read {{.*}} : tensor<1x8xf32>, vector<1x4xf32>
-// CHECK-COUNT-16: vector.transfer_read {{.*}} : tensor<8x8xf32>, vector<1x4xf32>
+//  CHECK-COUNT-8: vector.transfer_read {{.*}} : tensor<8x1xf32>, vector<1xf32>
+//  CHECK-COUNT-2: vector.transfer_read {{.*}} : tensor<1x8xf32>, vector<4xf32>
+// CHECK-COUNT-16: vector.transfer_read {{.*}} : tensor<8x8xf32>, vector<4xf32>
 // CHECK-COUNT-16: vector.fma
-// CHECK-COUNT-16: vector.transfer_write {{.*}} : vector<1x4xf32>, tensor<8x8xf32>
+// CHECK-COUNT-16: vector.transfer_write {{.*}} : vector<4xf32>, tensor<8x8xf32>

@@ -47,10 +47,19 @@ func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2x4xf3
 //  CHECK-SAME: (%[[LHS:.+]]: tensor<4x2xf32>, %[[RHS:.+]]: tensor<2xf32>)
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[RINIT:.+]] = arith.constant dense<0.000000e+00> : vector<4x2xf32>
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//   CHECK-DAG:   %[[RINIT:.+]] = arith.constant dense<0.000000e+00> : vector<4x2xf32>
 //       CHECK:   %[[OINIT:.+]] = linalg.init_tensor [2, 4] : tensor<2x4xf32>
-//       CHECK:   %[[LREAD:.+]] = vector.transfer_read %[[LHS]]{{.+}} : tensor<4x2xf32>, vector<4x2xf32>
-//       CHECK:   %[[LT:.+]] = vector.transpose %[[LREAD]], [1, 0] : vector<4x2xf32> to vector<2x4xf32>
+//       CHECK:   %[[LHS0:.+]] = vector.transfer_read %[[LHS]][%[[C0]], %[[C0]]]{{.*}} : tensor<4x2xf32>, vector<2xf32>
+//       CHECK:   %[[LHS0S:.+]] = vector.insert_strided_slice %[[LHS0:.+]]{{.+}} {offsets = [0, 0], strides = [1]} : vector<2xf32> into vector<4x2xf32>
+//       CHECK:   %[[LHS1:.+]] = vector.transfer_read %[[LHS]][%[[C1]], %[[C0]]]{{.*}} : tensor<4x2xf32>, vector<2xf32>
+//       CHECK:   %[[LHS1S:.+]] = vector.insert_strided_slice %[[LHS1:.+]], %[[LHS0S:.+]] {offsets = [1, 0], strides = [1]} : vector<2xf32> into vector<4x2xf32>
+//       CHECK:   %[[LHS2:.+]] = vector.transfer_read %[[LHS]][%[[C2]], %[[C0]]]{{.*}} : tensor<4x2xf32>, vector<2xf32>
+//       CHECK:   %[[LHS2S:.+]] = vector.insert_strided_slice %[[LHS2:.+]], %[[LHS1S:.+]] {offsets = [2, 0], strides = [1]} : vector<2xf32> into vector<4x2xf32>
+//       CHECK:   %[[LHS3:.+]] = vector.transfer_read %[[LHS]][%[[C3]], %[[C0]]]{{.*}} : tensor<4x2xf32>, vector<2xf32>
+//       CHECK:   %[[LHS3S:.+]] = vector.insert_strided_slice %[[LHS3:.+]], %[[LHS2S:.+]] {offsets = [3, 0], strides = [1]} : vector<2xf32> into vector<4x2xf32>
+//       CHECK:   %[[LT:.+]] = vector.transpose %[[LHS3S]], [1, 0] : vector<4x2xf32> to vector<2x4xf32>
 //       CHECK:   %[[READ:.+]] = vector.transfer_read %[[RHS]]{{.+}} : tensor<2xf32>, vector<2xf32>
 //       CHECK:   %[[INSERT0:.+]] = vector.insert %[[READ]], %[[RINIT]] [0] : vector<2xf32> into vector<4x2xf32>
 //       CHECK:   %[[INSERT1:.+]] = vector.insert %[[READ]], %[[INSERT0]] [1] : vector<2xf32> into vector<4x2xf32>
