@@ -1,12 +1,12 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile-and-distribute,iree-spirv-vectorize))))' -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile,iree-spirv-vectorize))))' %s | IreeFileCheck %s
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
-hal.executable private @matmul_static_shape_f16  {
-  hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
+hal.executable private @matmul_static_shape_f16 {
+  hal.interface public @io {
+    hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul_static_shape_f16 attributes {
@@ -14,14 +14,14 @@ hal.executable private @matmul_static_shape_f16  {
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = #translation
     }
-    builtin.module {
+    builtin.module  {
       func @matmul_static_shape_f16() {
-        %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
         %c4096 = arith.constant 4096 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<4096x4096xf16>
-        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<4096x4096xf16>
-        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<4096x4096xf16>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf16>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf16>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:4096x4096xf16>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -35,44 +35,47 @@ hal.executable private @matmul_static_shape_f16  {
           %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
           scf.for %arg1 = %5 to %c4096 step %6 {
             %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4096)>(%arg0)[%workgroup_size_y]
-            %8 = memref.subview %0[%arg0, 0] [%7, 4096] [1, 1] : memref<4096x4096xf16> to memref<?x4096xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
+            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf16> -> tensor<?x4096xf16>
             %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4096)>(%arg1)[%workgroup_size_x]
-            %10 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<4096x4096xf16> to memref<?x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            %11 = memref.subview %1[0, %arg1] [4096, %9] [1, 1] : memref<4096x4096xf16> to memref<4096x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            linalg.fill(%cst, %10) {lowering.config = #config} : f16, memref<?x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            linalg.matmul {lowering.config = #config} ins(%8, %11 : memref<?x4096xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<4096x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>) outs(%10 : memref<?x?xf16, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
+            %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [4096, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf16> -> tensor<4096x?xf16>
+            %11 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg0)[%workgroup_size_y]
+            %12 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
+            %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf16>
+            %14 = linalg.fill(%cst, %13) : f16, tensor<?x?xf16> -> tensor<?x?xf16>
+            %15 = linalg.matmul {lowering.config = #config} ins(%8, %10 : tensor<?x4096xf16>, tensor<4096x?xf16>) outs(%14 : tensor<?x?xf16>) -> tensor<?x?xf16>
+            flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf16> -> !flow.dispatch.tensor<writeonly:4096x4096xf16>
           }
         }
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
+      hal.interface private @io {
+        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
 }
 
 //    CHECK-LABEL: func @matmul_static_shape_f16
-//  CHECK-COUNT-8:   vector.transfer_write
-//  CHECK-COUNT-8:   vector.transfer_read
-//          CHECK:   %[[FOR_RES:.+]]:8 = scf.for
+//      CHECK-NOT:   vector.transfer
+//          CHECK:   %{{.+}}:8 = scf.for
 // CHECK-COUNT-12:     vector.transfer_read
 // CHECK-COUNT-32:     vector.fma
 //      CHECK:         scf.yield
-//  CHECK-COUNT-8:    vector.transfer_write %[[FOR_RES]]
+//  CHECK-COUNT-8:    vector.transfer_write
 //          CHECK:    return
 
 // -----
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
-hal.executable private @matmul_static_shape_f32  {
-  hal.interface private @io  {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
+
+hal.executable private @matmul_static_shape_f32 {
+  hal.interface public @io {
+    hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul_static_shape_f32 attributes {
@@ -80,14 +83,14 @@ hal.executable private @matmul_static_shape_f32  {
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = #translation
     }
-    builtin.module {
+    builtin.module  {
       func @matmul_static_shape_f32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c4096 = arith.constant 4096 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<4096x4096xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<4096x4096xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<4096x4096xf32>
+        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf32>
+        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf32>
+        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:4096x4096xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -101,31 +104,33 @@ hal.executable private @matmul_static_shape_f32  {
           %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
           scf.for %arg1 = %5 to %c4096 step %6 {
             %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4096)>(%arg0)[%workgroup_size_y]
-            %8 = memref.subview %0[%arg0, 0] [%7, 4096] [1, 1] : memref<4096x4096xf32> to memref<?x4096xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
+            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf32> -> tensor<?x4096xf32>
             %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4096)>(%arg1)[%workgroup_size_x]
-            %10 = memref.subview %1[0, %arg1] [4096, %9] [1, 1] : memref<4096x4096xf32> to memref<4096x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<4096x4096xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            linalg.fill(%cst, %11) {lowering.config = #config}: f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>
-            linalg.matmul {lowering.config = #config} ins(%8, %10 : memref<?x4096xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>, memref<4096x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>>)
+            %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [4096, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf32> -> tensor<4096x?xf32>
+            %11 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg0)[%workgroup_size_y]
+            %12 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
+            %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf32>
+            %14 = linalg.fill(%cst, %13) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %15 = linalg.matmul {lowering.config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>
           }
         }
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
+      hal.interface private @io {
+        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
 }
 
 //    CHECK-LABEL: func @matmul_static_shape_f32
-//  CHECK-COUNT-8:   vector.transfer_write
-//  CHECK-COUNT-8:   vector.transfer_read
-//          CHECK:   %[[FOR_RES:.+]]:8 = scf.for
+//      CHECK-NOT:   vector.transfer
+//          CHECK:   %{{.+}}:8 = scf.for
 // CHECK-COUNT-12:     vector.transfer_read
 // CHECK-COUNT-32:     vector.fma
 //      CHECK:         scf.yield
-//  CHECK-COUNT-8:    vector.transfer_write %[[FOR_RES]]
+//  CHECK-COUNT-8:    vector.transfer_write
 //          CHECK:    return

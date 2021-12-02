@@ -278,6 +278,12 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables with workgroup tiled and
+/// distributed copies (via flow.dispatch.tensor.load/store pairs) to SPIR-V
+/// scalar code. Additionally performs distribution to threads without
+/// vectorization.
+void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm);
+
+/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
 /// distributed Linalg ops to SPIR-V scalar and vector code. Additionally
 /// performs distribution to threads with vectorization.
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
@@ -303,6 +309,10 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
 
+/// Initializes CodeGen configuration for the given dispatch region.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSPIRVInitConfigPass();
+
 /// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
 
@@ -317,6 +327,12 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToCooperativeOpsPass();
 
 /// Pass to lower linalg.copy for copying data to workgroup memory.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVCopyToWorkgroupMemoryPass();
+
+/// Pass to tile Linalg ops with tensor semantics to invocations.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVTilePass();
+
+/// Pass to distribute tiled loop nests to invocations.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVDistributePass();
 
 /// Pass to vectorize Linalg ops with buffer semantics.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorizePass();

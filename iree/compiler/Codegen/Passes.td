@@ -226,7 +226,6 @@ def LLVMGPUPipelining :
 // SPIR-V
 //------------------------------------------------------------------------------
 
-// TODO: Rename argument to be fully qualified.
 def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   let summary = "Perform the final conversion to SPIR-V dialect";
   let constructor = "mlir::iree_compiler::createConvertToSPIRVPass()";
@@ -241,7 +240,23 @@ def SPIRVLowerExecutableTarget :
       "mlir::iree_compiler::createSPIRVLowerExecutableTargetPass()";
 }
 
-// TODO: Rename argument to be fully qualified.
+def SPIRVInitConfig :
+    Pass<"iree-spirv-init-config-pass",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Initialize CodeGen configuration for a given dispatch region";
+  let constructor = "mlir::iree_compiler::createSPIRVInitConfigPass()";
+}
+
+def SPIRVTile : Pass<"iree-spirv-tile", "FuncOp"> {
+  let summary = "Tile Linalg ops with tensor semantics to invocations";
+  let constructor = "mlir::iree_compiler::createSPIRVTilePass()";
+}
+
+def SPIRVDistribute : Pass<"iree-spirv-distribute", "FuncOp"> {
+  let summary = "Distribute tiled loop nests to invocations";
+  let constructor = "mlir::iree_compiler::createSPIRVDistributePass()";
+}
+
 def SPIRVTileAndDistribute : Pass<"iree-spirv-tile-and-distribute", "FuncOp"> {
   let summary = "Tile and distribute Linalg ops with buffer semantics to "
                 "invocations";
@@ -269,14 +284,12 @@ def SPIRVVectorToCooperativeOps :
       "mlir::iree_compiler::createSPIRVVectorToCooperativeOpsPass()";
 }
 
-// TODO: Rename argument to be fully qualified.
 def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
 }
 
-// TODO: Rename argument to be fully qualified.
 def SPIRVCopyToWorkgroupMemory :
     Pass<"iree-spirv-copy-to-workgroup-memory", "FuncOp"> {
   let summary = "Lower linalg.copy for copying data to workgroup memory";
