@@ -27,25 +27,75 @@ extern "C" {
 //    iree/compiler/Dialect/HAL/IR/HALTypes.cpp
 
 enum iree_hal_numerical_type_bits_t {
+  // Opaque or unknown - bytes cannot be interpreted. Indexing is still allowed
+  // so long as the bit width of the elements is known.
   IREE_HAL_NUMERICAL_TYPE_UNKNOWN = 0x00u,
-  IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED = 0x01u,
-  IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED = 0x02u,
-  // TODO(benvanik): specialize with semantics from APFloat.
-  IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE = 0x03u,
+
+  // Signless integer-like.
+  IREE_HAL_NUMERICAL_TYPE_INTEGER = 0x10u,
+  // Signed integer.
+  IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED =
+      IREE_HAL_NUMERICAL_TYPE_INTEGER | 0x01u,
+  // Unsigned integer.
+  IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED =
+      IREE_HAL_NUMERICAL_TYPE_INTEGER | 0x02u,
+
+  // Float-like.
+  IREE_HAL_NUMERICAL_TYPE_FLOAT = 0x20,
+  // IEEE754-compatible floating point semantics.
+  IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE = IREE_HAL_NUMERICAL_TYPE_FLOAT | 0x01u,
+  // 'Brain' floating point semantics (currently only bf16).
+  IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN = IREE_HAL_NUMERICAL_TYPE_FLOAT | 0x02u,
 };
 typedef uint8_t iree_hal_numerical_type_t;
 
 #define IREE_HAL_ELEMENT_TYPE_VALUE(numerical_type, bit_count) \
   (((uint32_t)(numerical_type) << 24) | (uint32_t)(bit_count))
 
+// Composes an iree_hal_element_type_t value with the given attributes.
 #define iree_hal_make_element_type(numerical_type, bit_count) \
   (iree_hal_element_type_t)(                                  \
       IREE_HAL_ELEMENT_TYPE_VALUE(numerical_type, bit_count))
+
+// Returns the numerical type of the element, if known and not opaque.
 #define iree_hal_element_numerical_type(element_type) \
   (iree_hal_numerical_type_t)((uint32_t)(element_type) >> 24)
+
+// Returns true if |element_type| is opaque and cannot be interpreted.
+#define iree_hal_element_numerical_type_is_opaque(element_type) \
+  (iree_hal_element_numerical_type(element_type) ==             \
+   IREE_HAL_NUMERICAL_TYPE_UNKNOWN)
+
+// Returns true if |element_type| is an integer of some width and semantics.
+#define iree_hal_element_numerical_type_is_integer(element_type)   \
+  iree_all_bits_set(iree_hal_element_numerical_type(element_type), \
+                    IREE_HAL_NUMERICAL_TYPE_INTEGER)
+
+// Returns true if |element_type| is a float of some width and semantics.
+#define iree_hal_element_numerical_type_is_float(element_type)     \
+  iree_all_bits_set(iree_hal_element_numerical_type(element_type), \
+                    IREE_HAL_NUMERICAL_TYPE_FLOAT)
+
+// Returns the bit width of each element.
 #define iree_hal_element_bit_count(element_type) (size_t)((element_type)&0xFF)
-#define iree_hal_element_byte_count(element_type) \
+
+// Returns true if the element is byte-aligned.
+// Sub-byte aligned types such as i4 require user handling of the packing.
+#define iree_hal_element_is_byte_aligned(element_type) \
+  (iree_hal_element_bit_count(element_type) % 8 == 0)
+
+// Returns the number of bytes each |element_type| consumes in memory.
+// This is only valid when the encoding type is dense as sub-byte bit widths
+// may be packed in various forms (for example, i4 may be stored as nibbles
+// where each byte in memory contains two elements).
+#define iree_hal_element_dense_byte_count(element_type) \
   ((iree_hal_element_bit_count(element_type) + 8 - 1) / 8)
+
+// Returns true if the given |element_type| represents an integer of exactly
+// |bit_width|. This ignores the signedness of the integer type.
+#define iree_hal_element_type_is_integer(element_type, bit_width) \
+  (iree_hal_element_numerical_type_is_integer(element_type) &&    \
+   iree_hal_element_bit_count(element_type) == (bit_width))
 
 // Defines the element type of a buffer in a standard format.
 //
@@ -62,17 +112,25 @@ enum iree_hal_element_types_t {
   IREE_HAL_ELEMENT_TYPE_OPAQUE_16        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            16),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_32        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            32),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_OPAQUE_64        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_INT_4            = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER,             4),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_4           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,      4),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_4           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,    4),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_INT_8            = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER,             8),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_SINT_8           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,      8),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_UINT_8           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,    8),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_INT_16           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER,            16),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_SINT_16          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     16),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_UINT_16          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_INT_32           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER,            32),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_SINT_32          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     32),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_UINT_32          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_INT_64           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER,            64),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_SINT_64          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     64),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_UINT_64          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   64),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_FLOAT_16         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         16),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_FLOAT_32         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         32),  // NOLINT
   IREE_HAL_ELEMENT_TYPE_FLOAT_64         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_BFLOAT_16        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN,        16),  // NOLINT
 };
 typedef uint32_t iree_hal_element_type_t;
 // clang-format on
@@ -280,11 +338,13 @@ IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view);
 
 // Calculates a byte offset into the |buffer_view| at the given indices.
+// Requires that the encoding and element type support indexing.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_offset(
     const iree_hal_buffer_view_t* buffer_view, const iree_hal_dim_t* indices,
     iree_host_size_t indices_count, iree_device_size_t* out_offset);
 
 // Calculates a byte range into the |buffer_view| of the given contiguous range.
+// Requires that the encoding and element type support indexing.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
     const iree_hal_buffer_view_t* buffer_view,
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,

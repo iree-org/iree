@@ -35,17 +35,20 @@ struct ConvertTensorImportOp
     }
 
     // Assert the shape of the buffer view matches the expected encoding
-    // shape.
-    // NOTE: we do this before the other checks as it's the most likely mistake
-    // and it's better to know of a shape mismatch than just buffer byte length
-    // difference.
-    if (auto tensorType = targetType.dyn_cast<RankedTensorType>()) {
-      // TODO(benvanik): get a name for the tensor (argument name/etc).
-      auto message = rewriter.getStringAttr("tensor");
-      if (failed(buildEncodingAssertions(op.getLoc(), adaptor.source(), message,
-                                         tensorType, op.target_dims(),
-                                         rewriter))) {
-        return rewriter.notifyMatchFailure(op, "unsupported tensor type");
+    // shape. We can only do this when we are importing a buffer view as that's
+    // what carries the information we need to validate.
+    if (sourceType.isa<IREE::HAL::BufferViewType>()) {
+      // NOTE: we do this before the other checks as it's the most likely
+      // mistake and it's better to know of a shape mismatch than just buffer
+      // byte length difference.
+      if (auto tensorType = targetType.dyn_cast<RankedTensorType>()) {
+        // TODO(benvanik): get a name for the tensor (argument name/etc).
+        auto message = rewriter.getStringAttr("tensor");
+        if (failed(buildEncodingAssertions(op.getLoc(), adaptor.source(),
+                                           message, tensorType,
+                                           op.target_dims(), rewriter))) {
+          return rewriter.notifyMatchFailure(op, "unsupported tensor type");
+        }
       }
     }
 

@@ -130,7 +130,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK: %[[RESULT_VIEW:.+]] = hal.buffer_view.create
     // CHECK-SAME: buffer(%[[RESULT_BUFFER]] : !hal.buffer)
     // CHECK-SAME: shape([%c4])
-    // CHECK-SAME: type(%c50331680_i32)
+    // CHECK-SAME: type(%c553648160_i32)
     // CHECK-SAME: encoding(%c1_i32)
     %result_view = stream.tensor.export %result_ready : tensor<4xf32> in !stream.resource<external>{%c16} -> !hal.buffer_view
     // CHECK: return
