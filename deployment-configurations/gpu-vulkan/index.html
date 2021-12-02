@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/deployment-configurations/gpu-vulkan/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.0.2">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.0.3">
     
     
       
@@ -19,7 +19,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.816931ca.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.62128196.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.9204c3b2.min.css">
@@ -41,7 +41,6 @@
     <script>function __md_scope(e,t,_){return new URL(_||(t===localStorage?"../..":"../.."),location).pathname+"."+e}function __md_get(e,t=localStorage,_){return JSON.parse(t.getItem(__md_scope(e,t,_)))}function __md_set(e,t,_=localStorage,o){try{_.setItem(__md_scope(e,_,o),JSON.stringify(t))}catch(e){}}</script>
     
       
-
 
     
     
@@ -1226,11 +1225,13 @@ made over time for specific vendors and architectures.</p>
 <p>In order to use Vulkan to drive the GPU, you need to have a functional Vulkan
 environment. IREE requires Vulkan 1.1 on Android and 1.2 elsewhere. It can be
 verified by the following steps:</p>
-<div class="tabbed-set" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Android</label><div class="tabbed-content">
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Android</label><label for="__tabbed_1_2">Linux</label><label for="__tabbed_1_3">Windows</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <p>Android mandates Vulkan 1.1 support since Android 10. You just need to
 make sure the device's Android version is 10 or higher.</p>
 </div>
-<input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><label for="__tabbed_1_2">Linux</label><div class="tabbed-content">
+<div class="tabbed-block">
 <p>Run the following command in a shell:</p>
 <div class="highlight"><pre><span></span><code>vulkaninfo <span class="p">|</span> grep apiVersion
 </code></pre></div>
@@ -1241,7 +1242,7 @@ system paths so it's easy to discover.</p>
 <p>If the showed version is lower than Vulkan 1.2, you will need to update the
 driver for your GPU.</p>
 </div>
-<input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><label for="__tabbed_1_3">Windows</label><div class="tabbed-content">
+<div class="tabbed-block">
 <p>Run the following command in a shell:</p>
 <div class="highlight"><pre><span></span><code>vulkaninfo <span class="p">|</span> grep apiVersion
 </code></pre></div>
@@ -1249,6 +1250,7 @@ driver for your GPU.</p>
 SDK</a>.</p>
 <p>If the showed version is lower than Vulkan 1.2, you will need to update the
 driver for your GPU.</p>
+</div>
 </div>
 </div>
 <h2 id="get-runtime-and-compiler">Get runtime and compiler<a class="headerlink" href="#get-runtime-and-compiler" title="Permanent link">&para;</a></h2>
@@ -1452,7 +1454,7 @@ limits, etc. So the target triple is just an approximation for usage.&#160;<a cl
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../assets/javascripts/workers/search.01824240.min.js"}</script>
     
     
-      <script src="../../assets/javascripts/bundle.ff0eccb3.min.js"></script>
+      <script src="../../assets/javascripts/bundle.e0abf5b0.min.js"></script>
       
     
   </body>

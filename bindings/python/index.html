@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/bindings/python/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.0.2">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.0.3">
     
     
       
@@ -19,7 +19,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.816931ca.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.62128196.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.9204c3b2.min.css">
@@ -41,7 +41,6 @@
     <script>function __md_scope(e,t,_){return new URL(_||(t===localStorage?"../..":"../.."),location).pathname+"."+e}function __md_get(e,t=localStorage,_){return JSON.parse(t.getItem(__md_scope(e,t,_)))}function __md_set(e,t,_=localStorage,o){try{_.setItem(__md_scope(e,_,o),JSON.stringify(t))}catch(e){}}</script>
     
       
-
 
     
     
@@ -1090,15 +1089,18 @@ available on Linux and macOS. They are not available on Windows yet (see
 through <code>venv</code>
 (<a href="https://docs.python.org/3/library/venv.html">about</a>,
 <a href="https://docs.python.org/3/tutorial/venv.html">tutorial</a>):</p>
-<div class="tabbed-set" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux and MacOS</label><div class="tabbed-content">
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Linux and MacOS</label><label for="__tabbed_1_2">Windows</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>python -m venv .venv
 <span class="nb">source</span> .venv/bin/activate
 </code></pre></div>
 </div>
-<input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><label for="__tabbed_1_2">Windows</label><div class="tabbed-content">
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="n">python</span> <span class="n">-m</span> <span class="n">venv</span> <span class="p">.</span><span class="n">venv</span>
 <span class="p">.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">activate</span><span class="p">.</span><span class="n">bat</span>
 </code></pre></div>
+</div>
 </div>
 </div>
 <p>When done, run <code>deactivate</code>.</p>
@@ -1113,7 +1115,9 @@ python -m pip install numpy absl-py
 <h3 id="prebuilt-packages">Prebuilt packages<a class="headerlink" href="#prebuilt-packages" title="Permanent link">&para;</a></h3>
 <p>For now, packages can be installed from our
 <a href="https://github.com/google/iree/releases">GitHub releases</a>:</p>
-<div class="tabbed-set" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><label for="__tabbed_2_1">Minimal</label><div class="tabbed-content">
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Minimal</label><label for="__tabbed_2_2">All packages</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <p>To install just the core IREE packages:</p>
 <div class="highlight"><pre><span></span><code>python -m pip install <span class="se">\</span>
   iree-compiler-snapshot <span class="se">\</span>
@@ -1121,7 +1125,7 @@ python -m pip install numpy absl-py
   --find-links https://github.com/google/iree/releases
 </code></pre></div>
 </div>
-<input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><label for="__tabbed_2_2">All packages</label><div class="tabbed-content">
+<div class="tabbed-block">
 <p>To install IREE packages with tools for all frontends:</p>
 <div class="highlight"><pre><span></span><code>python -m pip install <span class="se">\</span>
   iree-compiler-snapshot <span class="se">\</span>
@@ -1131,6 +1135,7 @@ python -m pip install numpy absl-py
   iree-tools-xla-snapshot <span class="se">\</span>
   --find-links https://github.com/google/iree/releases
 </code></pre></div>
+</div>
 </div>
 </div>
 <div class="admonition info">
@@ -1221,7 +1226,7 @@ using the Python APIs.</p>
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../assets/javascripts/workers/search.01824240.min.js"}</script>
     
     
-      <script src="../../assets/javascripts/bundle.ff0eccb3.min.js"></script>
+      <script src="../../assets/javascripts/bundle.e0abf5b0.min.js"></script>
       
     
   </body>

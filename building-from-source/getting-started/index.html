@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/building-from-source/getting-started/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.0.2">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.0.3">
     
     
       
@@ -19,7 +19,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.816931ca.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.62128196.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.9204c3b2.min.css">
@@ -41,7 +41,6 @@
     <script>function __md_scope(e,t,_){return new URL(_||(t===localStorage?"../..":"../.."),location).pathname+"."+e}function __md_get(e,t=localStorage,_){return JSON.parse(t.getItem(__md_scope(e,t,_)))}function __md_set(e,t,_=localStorage,o){try{_.setItem(__md_scope(e,_,o),JSON.stringify(t))}catch(e){}}</script>
     
       
-
 
     
     
@@ -1014,7 +1013,9 @@ effort". Additionally, compilation on macOS is "best effort" as well, though
 we generally expect it to work due to its similarity with Linux. Patches to
 improve support for these are always welcome.</p>
 </details>
-<div class="tabbed-set" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><label for="__tabbed_1_1">Linux and macOS</label><div class="tabbed-content">
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Linux and macOS</label><label for="__tabbed_1_2">Windows</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <ol>
 <li>
 <p>Install a compiler/linker (typically "clang" and "lld" package)</p>
@@ -1031,7 +1032,7 @@ improve support for these are always welcome.</p>
 <div class="highlight"><pre><span></span><code>sudo apt install cmake ninja-build clang lld
 </code></pre></div>
 </div>
-<input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><label for="__tabbed_1_2">Windows</label><div class="tabbed-content">
+<div class="tabbed-block">
 <ol>
 <li>
 <p>Install MSVC from Visual Studio or "Tools for Visual Studio" on the
@@ -1055,6 +1056,7 @@ for details.</p>
 </div>
 </div>
 </div>
+</div>
 <h2 id="clone-and-build">Clone and build<a class="headerlink" href="#clone-and-build" title="Permanent link">&para;</a></h2>
 <p>Use <a href="https://git-scm.com/">Git</a> to clone the IREE repository and initialize its
 submodules:</p>
@@ -1064,7 +1066,9 @@ git submodule update --init
 </code></pre></div>
 <p>Configure then build all targets using CMake:</p>
 <p>Configure CMake:</p>
-<div class="tabbed-set" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><label for="__tabbed_2_1">Linux and MacOS</label><div class="tabbed-content">
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Linux and MacOS</label><label for="__tabbed_2_2">Windows</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="c1"># Recommended for simple development using clang and lld:</span>
 cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
     -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
@@ -1081,11 +1085,12 @@ cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
 <span class="c1">#   -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache</span>
 </code></pre></div>
 </div>
-<input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><label for="__tabbed_2_2">Windows</label><div class="tabbed-content">
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>cmake -GNinja -B ../iree-build/ -S . <span class="se">\</span>
     -DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo <span class="se">\</span>
     -DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON
 </code></pre></div>
+</div>
 </div>
 </div>
 <p>Build:</p>
@@ -1187,7 +1192,7 @@ ctest --output-on-failure
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../assets/javascripts/workers/search.01824240.min.js"}</script>
     
     
-      <script src="../../assets/javascripts/bundle.ff0eccb3.min.js"></script>
+      <script src="../../assets/javascripts/bundle.e0abf5b0.min.js"></script>
       
     
   </body>
