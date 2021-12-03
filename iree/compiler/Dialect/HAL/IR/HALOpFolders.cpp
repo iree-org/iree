@@ -30,7 +30,8 @@ namespace HAL {
 
 OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
   if (auto exportOp = source().getDefiningOp<TensorExportOp>()) {
-    if (exportOp.source().getType() == target().getType()) {
+    if (exportOp.source().getType() == target().getType() &&
+        exportOp.source_encoding() == target_encoding()) {
       return exportOp.source();
     }
   }
@@ -39,7 +40,8 @@ OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
 
 OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
   if (auto importOp = source().getDefiningOp<TensorImportOp>()) {
-    if (importOp.source().getType() == target().getType()) {
+    if (importOp.source().getType() == target().getType() &&
+        importOp.target_encoding() == source_encoding()) {
       return importOp.source();
     }
   }

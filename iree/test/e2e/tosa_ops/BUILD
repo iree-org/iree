@@ -42,6 +42,7 @@ LLVM_SRCS = enforce_glob(
         "log.mlir",
         "logical_left_shift.mlir",
         "logical_right_shift.mlir",
+        "matmul.mlir",
         "max_pool.mlir",
         "maximum.mlir",
         "minimum.mlir",
@@ -62,9 +63,6 @@ LLVM_SRCS = enforce_glob(
         "while.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        "matmul.mlir",  # TOSA matmul is being refactored to be batched
-    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -98,6 +96,7 @@ VMVX_SRCS = enforce_glob(
         "log.mlir",
         "logical_left_shift.mlir",
         "logical_right_shift.mlir",
+        "matmul.mlir",
         "max_pool.mlir",
         "maximum.mlir",
         "minimum.mlir",
@@ -118,7 +117,6 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "matmul.mlir",  # TOSA matmul is being refactored to be batched
         "reduce.mlir",  # Currently flakey https://github.com/google/iree/issues/5885
     ],
 )
@@ -149,6 +147,7 @@ VULKAN_SRCS = enforce_glob(
         "bitwise_xor.mlir",
         "ceil.mlir",
         "clamp.mlir",
+        "clz.mlir",
         "const.mlir",
         "equal.mlir",
         "exp.mlir",
@@ -161,6 +160,7 @@ VULKAN_SRCS = enforce_glob(
         "log.mlir",
         "logical_left_shift.mlir",
         "logical_right_shift.mlir",
+        "matmul.mlir",
         "max_pool.mlir",
         "maximum.mlir",
         "minimum.mlir",
@@ -181,10 +181,6 @@ VULKAN_SRCS = enforce_glob(
         "while.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        "matmul.mlir",  # TOSA matmul is being refactored to be batched
-        "clz.mlir",  # Currently failing on vulkan.
-    ],
 )
 
 iree_check_single_backend_test_suite(

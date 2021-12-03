@@ -441,24 +441,28 @@ py::object VmVariantList::GetAsNdarray(int index) {
   // TODO: Handle dtypes that do not map to a code (i.e. fp16).
   const char* dtype_code;
   switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
       dtype_code = "b";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
       dtype_code = "B";
       break;
+    case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
       dtype_code = "h";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
       dtype_code = "H";
       break;
+    case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
       dtype_code = "i";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
       dtype_code = "I";
       break;
+    case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
       dtype_code = "l";
       break;
@@ -471,7 +475,7 @@ py::object VmVariantList::GetAsNdarray(int index) {
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       dtype_code = "d";
       break;
-    case IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1):
+    case IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER, 1):
       // Due to layering issues it is not uncommon to get i1 buffer views
       // and we just silently promote them to i8 since that is what they are.
       // Really i1 should not exist at this boundary.

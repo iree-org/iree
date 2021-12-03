@@ -196,7 +196,8 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         result.location, builder.getIndexType(), source,
         builder.getIndexAttr(i)));
   }
-  build(builder, result, resultType, source, dynamicDims);
+  build(builder, result, resultType, source, TypeAttr::get(shapedType),
+        dynamicDims);
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
@@ -212,11 +213,63 @@ SmallVector<int64_t, 4> TensorImportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
+static LogicalResult verifyTypeStorageCompatibility(Operation *op,
+                                                    Type encodingType,
+                                                    Type storageType) {
+  if (encodingType == storageType) return success();
+  auto encodingShapedType = encodingType.dyn_cast<ShapedType>();
+  auto storageShapedType = storageType.dyn_cast<ShapedType>();
+  if (!encodingShapedType || !storageShapedType) return success();
+
+  if (IREE::Util::getRoundedElementByteWidth(
+          encodingShapedType.getElementType()) !=
+      IREE::Util::getRoundedElementByteWidth(
+          storageShapedType.getElementType())) {
+    // TODO(benvanik): more sophisticated logic here. There are a lot of valid
+    // cases that are difficult to account for here statically; for example,
+    // packing 8xi1 into 1xi8 or complex<f32> into 2xf32. We could try to guess
+    // the element count (at least the static part of it) and ensure the scaling
+    // matches but that wouldn't account for user variance. Really with this op
+    // we are letting the _user_ control the bitcasting and type reflection and
+    // purposefully don't want to mess with it (users should be able to put
+    // custom types here, etc).
+    //
+    // NOTE: we round to bytes first as the base type (such as i1) may not be
+    // representable in an external form.
+    // return op->emitOpError() << "encoding and storage types must be "
+    //                             "bitcastable; adjusted encoding bit width "
+    //                             "of "
+    //                          << encodingShapedType.getElementTypeBitWidth()
+    //                          << " != adjusted storage bit width of "
+    //                          << storageShapedType.getElementTypeBitWidth();
+  }
+
+  if (encodingShapedType.getNumDynamicDims() !=
+      storageShapedType.getNumDynamicDims()) {
+    // NOTE: we implicitly require that the dimensions are equivalent but
+    // dont actually care about their order. For example, tensor<?x1xf32> is
+    // compatible with tensor<?xf32>.
+    return op->emitOpError()
+           << "encoding and storage types must have the same "
+              "dynamic dimension values; encoding shape "
+           << encodingShapedType << " incompatible with storage shape "
+           << storageShapedType;
+  }
+
+  return success();
+}
+
+static LogicalResult verifyTensorImportOp(TensorImportOp op) {
+  return verifyTypeStorageCompatibility(op, op.target_encoding(),
+                                        op.target().getType());
+}
+
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
-  build(builder, result, resultType, source, dynamicDims);
+  build(builder, result, resultType, source, TypeAttr::get(source.getType()),
+        dynamicDims);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
@@ -230,6 +283,11 @@ Value TensorExportOp::getTiedResult(unsigned resultIndex) {
 
 SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
   return {0};  // source
+}
+
+static LogicalResult verifyTensorExportOp(TensorExportOp op) {
+  return verifyTypeStorageCompatibility(op, op.source_encoding(),
+                                        op.source().getType());
 }
 
 //===----------------------------------------------------------------------===//
