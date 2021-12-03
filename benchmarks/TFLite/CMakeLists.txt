@@ -369,7 +369,7 @@ iree_benchmark_suite(
     "dylib-sync"
 )
 
-# CPU, Dylib, 1-thread, big/little-core, full-inference
+# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
@@ -396,7 +396,6 @@ iree_benchmark_suite(
     "--task_topology_group_count=1"
 )
 
-# CPU, Dylib, 2 through 4-thread, little-core, full-inference
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
