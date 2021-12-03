@@ -60,6 +60,20 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
                      Attribute attr);
 
 //===----------------------------------------------------------------------===//
+// custom<TypeAlias>($encoding_type, $storage_type)
+//===----------------------------------------------------------------------===//
+// some.op custom<TypeAlias>($encoding_type, $storage_type)
+// ->
+// some.op tensor<4xf32>
+// some.op tensor<4xf32> as tensor<2xf64>
+// some.op tensor<4xf32> as tensor<?xf32>{...}
+
+ParseResult parseTypeAlias(OpAsmParser &parser, TypeAttr &encodingTypeAttr,
+                           Type &storageType);
+void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
+                    Type storageType);
+
+//===----------------------------------------------------------------------===//
 // custom<SizeAwareType>
 //===----------------------------------------------------------------------===//
 // type{%size}

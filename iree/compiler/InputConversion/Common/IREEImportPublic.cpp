@@ -93,7 +93,8 @@ class BufferViewToTensorPattern
     Type resultType = typeConverter->convertType(srcOp.target().getType());
     if (!resultType) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
-        srcOp, resultType, adaptor.source(), adaptor.target_dims());
+        srcOp, resultType, adaptor.source(), TypeAttr::get(resultType),
+        adaptor.target_dims());
     return success();
   }
 };
@@ -108,7 +109,8 @@ class TensorToBufferViewPattern
     Type resultType = typeConverter->convertType(srcOp.target().getType());
     if (!resultType) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
-        srcOp, resultType, adaptor.source(), adaptor.source_dims());
+        srcOp, resultType, adaptor.source(),
+        TypeAttr::get(adaptor.source().getType()), adaptor.source_dims());
     return success();
   }
 };

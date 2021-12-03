@@ -120,6 +120,33 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<TypeAlias>($encoding_type, $storage_type)
+//===----------------------------------------------------------------------===//
+// tensor<4xf32>
+// tensor<4xf32> as tensor<2xf64>
+
+ParseResult parseTypeAlias(OpAsmParser &parser, TypeAttr &encodingTypeAttr,
+                           Type &storageType) {
+  Type encodingType;
+  if (failed(parser.parseType(encodingType))) return failure();
+  storageType = encodingType;
+  if (succeeded(parser.parseOptionalKeyword("as"))) {
+    if (failed(parser.parseType(storageType))) return failure();
+  }
+  encodingTypeAttr = TypeAttr::get(encodingType);
+  return success();
+}
+
+void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
+                    Type storageType) {
+  if (encodingTypeAttr.getValue() != storageType) {
+    p.printType(encodingTypeAttr.getValue());
+    p << " as ";
+  }
+  p.printType(storageType);
+}
+
+//===----------------------------------------------------------------------===//
 // custom<RangeList>($offsets, $lengths)
 //===----------------------------------------------------------------------===//
 // [%offset for %length], [%offset for %length], ...

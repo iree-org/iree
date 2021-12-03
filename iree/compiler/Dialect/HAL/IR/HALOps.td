@@ -72,10 +72,18 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     An optional semaphore timepoint can be specified indicating when the
     buffer view is available for use. If no semaphore timepoint is provided it
     is assumed the buffer view is immediately available.
+
+    The provided `target_encoding`, if different from the `target` type,
+    indicates that the ABI-facing type may differ from the internal
+    representation. The types must be bitcastable (same storage size) and
+    dynamically shaped values must have the same number of dynamic dimensions.
+    This allows for casting between rank-0 and rank-N types, different element
+    types, etc.
   }];
 
   let arguments = (ins
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
+    TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims
   );
   let results = (outs
@@ -85,7 +93,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   let assemblyFormat = [{
     $source `:` type($source)
     `->`
-    type($target) (`{` $target_dims^ `}`)?
+    custom<TypeAlias>($target_encoding, type($target)) (`{` $target_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
@@ -100,6 +108,8 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     ValueRange getOperandDynamicDims(unsigned idx) { return {}; }
     ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
   }];
+
+  let verifier = [{ return verifyTensorImportOp(*this); }];
 
   let hasFolder = 1;
 }
@@ -118,10 +128,18 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     An optional semaphore timepoint can be specified indicating when the
     buffer view is available for use. If no semaphore timepoint is requested it
     is assumed execution blocks until the buffer view is available.
+
+    The provided `source_encoding`, if different from the `source` type,
+    indicates that the ABI-facing type may differ from the internal
+    representation. The types must be bitcastable (same storage size) and
+    dynamically shaped values must have the same number of dynamic dimensions.
+    This allows for casting between rank-0 and rank-N types, different element
+    types, etc.
   }];
 
   let arguments = (ins
     AnyTensor:$source,
+    TypeAttr:$source_encoding,
     HAL_ShapeDynamicDims:$source_dims
   );
   let results = (outs
@@ -130,7 +148,7 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
 
   let assemblyFormat = [{
     $source `:`
-    type($source) (`{` $source_dims^ `}`)?
+    custom<TypeAlias>($source_encoding, type($source)) (`{` $source_dims^ `}`)?
     `->`
     type($target)
     attr-dict-with-keyword
@@ -147,6 +165,8 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return {}; }
   }];
+
+  let verifier = [{ return verifyTensorExportOp(*this); }];
 
   let hasFolder = 1;
 }

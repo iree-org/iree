@@ -226,7 +226,8 @@ class WrapEntryPointsPass
           recalculateBuilder.createOrFold<IREE::Util::NullOp>(loc, bufferType);
       auto dynamicDims = inputDynamicDims.loadDynamicDims(recalculateBuilder);
       auto castOp = recalculateBuilder.create<IREE::HAL::TensorImportOp>(
-          loc, inputValue.getType(), inputPlaceholder, dynamicDims);
+          loc, inputValue.getType(), inputPlaceholder, inputValue.getType(),
+          dynamicDims);
       inputValue.replaceAllUsesWith(castOp.target());
     }
     while (entryBlock.getNumArguments() > 0) {
@@ -524,7 +525,8 @@ class WrapEntryPointsPass
             arg.getLoc(), globalOp));
       }
       callOperands.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
-          arg.getLoc(), inputDynamicDims.tensorType, arg, dynamicDims));
+          arg.getLoc(), inputDynamicDims.tensorType, arg,
+          TypeAttr::get(inputDynamicDims.tensorType), dynamicDims));
     }
     auto callOp = entryBuilder.create<mlir::CallOp>(entryFuncOp.getLoc(),
                                                     entryFuncOp, callOperands);
@@ -540,7 +542,8 @@ class WrapEntryPointsPass
         }
       }
       callResults.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
-          result.getLoc(), bufferType, result, dynamicDims));
+          result.getLoc(), bufferType, result, outputDynamicDims.tensorType,
+          dynamicDims));
       for (auto it : llvm::zip(dynamicDims, outputDynamicDims.globalOps)) {
         auto dynamicDim = std::get<0>(it);
         auto globalOp = std::get<1>(it);

@@ -58,7 +58,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     buffer_view->element_type = element_type;
     buffer_view->encoding_type = encoding_type;
     buffer_view->byte_length =
-        iree_hal_element_byte_count(buffer_view->element_type);
+        iree_hal_element_dense_byte_count(buffer_view->element_type);
     buffer_view->shape_rank = shape_rank;
     for (iree_host_size_t i = 0; i < shape_rank; ++i) {
       buffer_view->shape[i] = shape[i];
@@ -322,7 +322,7 @@ iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view) {
 IREE_API_EXPORT iree_host_size_t
 iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer_view);
-  return iree_hal_element_byte_count(buffer_view->element_type);
+  return iree_hal_element_dense_byte_count(buffer_view->element_type);
 }
 
 IREE_API_EXPORT iree_hal_encoding_type_t
@@ -370,12 +370,19 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
   iree_device_size_t byte_length = 0;
 
   switch (encoding_type) {
-    case IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR:
-      byte_length = iree_hal_element_byte_count(element_type);
+    case IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR: {
+      if (IREE_UNLIKELY(iree_hal_element_bit_count(element_type) == 0) ||
+          IREE_UNLIKELY(!iree_hal_element_is_byte_aligned(element_type))) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "opaque and sub-byte aligned element types cannot be indexed");
+      }
+      byte_length = iree_hal_element_dense_byte_count(element_type);
       for (iree_host_size_t i = 0; i < shape_rank; ++i) {
         byte_length *= shape[i];
       }
       break;
+    }
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "unimplemented encoding type size calculation");
@@ -394,12 +401,16 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
   IREE_ASSERT_ARGUMENT(indices);
   IREE_ASSERT_ARGUMENT(out_offset);
   *out_offset = 0;
-  if (encoding_type != IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
+  if (IREE_UNLIKELY(encoding_type != IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "only dense encodings support view range computation");
-  }
-  if (IREE_UNLIKELY(shape_rank != indices_count)) {
+  } else if (IREE_UNLIKELY(iree_hal_element_bit_count(element_type) == 0) ||
+             IREE_UNLIKELY(!iree_hal_element_is_byte_aligned(element_type))) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "opaque and sub-byte aligned element types cannot be indexed");
+  } else if (IREE_UNLIKELY(shape_rank != indices_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "shape rank/indices mismatch: %zu != %zu",
                             shape_rank, indices_count);
@@ -418,7 +429,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
     }
     offset += axis_offset;
   }
-  offset *= iree_hal_element_byte_count(element_type);
+  offset *= iree_hal_element_dense_byte_count(element_type);
 
   *out_offset = offset;
   return iree_ok_status();
@@ -438,17 +449,20 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
   IREE_ASSERT_ARGUMENT(out_length);
   *out_start_offset = 0;
   *out_length = 0;
-  if (encoding_type != IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
+  if (IREE_UNLIKELY(encoding_type != IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "only dense encodings support view range computation");
-  }
-  if (IREE_UNLIKELY(indices_count != lengths_count)) {
+  } else if (IREE_UNLIKELY(iree_hal_element_bit_count(element_type) == 0) ||
+             IREE_UNLIKELY(!iree_hal_element_is_byte_aligned(element_type))) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "opaque and sub-byte aligned element types cannot be indexed");
+  } else if (IREE_UNLIKELY(indices_count != lengths_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "indices/lengths mismatch: %zu != %zu",
                             indices_count, lengths_count);
-  }
-  if (IREE_UNLIKELY(shape_rank != indices_count)) {
+  } else if (IREE_UNLIKELY(shape_rank != indices_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "shape rank/indices mismatch: %zu != %zu",
                             shape_rank, indices_count);
@@ -456,7 +470,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
 
   iree_hal_dim_t* end_indices =
       iree_alloca(shape_rank * sizeof(iree_hal_dim_t));
-  iree_device_size_t element_size = iree_hal_element_byte_count(element_type);
+  iree_device_size_t element_size =
+      iree_hal_element_dense_byte_count(element_type);
   iree_device_size_t subspan_length = element_size;
   for (iree_host_size_t i = 0; i < lengths_count; ++i) {
     subspan_length *= lengths[i];
