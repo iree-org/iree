@@ -167,7 +167,7 @@ iree_benchmark_suite(
     "dylib-sync"
 )
 
-# CPU, Dylib, 1-thread, big/little-core, full-inference.
+# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
@@ -192,7 +192,6 @@ iree_benchmark_suite(
     "--task_topology_group_count=1"
 )
 
-# CPU, Dylib, 2 through 4-thread, little-core, full-inference
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
@@ -203,6 +202,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
+    "2-thread,big-core,full-inference,default-flags"
     "2-thread,little-core,full-inference,default-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -226,6 +226,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
+    "3-thread,big-core,full-inference,default-flags"
     "3-thread,little-core,full-inference,default-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -249,6 +250,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
+    "4-thread,big-core,full-inference,default-flags"
     "4-thread,little-core,full-inference,default-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -367,7 +369,7 @@ iree_benchmark_suite(
     "dylib-sync"
 )
 
-# CPU, Dylib, 1-thread, big/little-core, full-inference
+# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
@@ -394,7 +396,6 @@ iree_benchmark_suite(
     "--task_topology_group_count=1"
 )
 
-# CPU, Dylib, 2 through 4-thread, little-core, full-inference
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
@@ -405,6 +406,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
+    "2-thread,big-core,full-inference,experimental-flags"
     "2-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -430,6 +432,7 @@ iree_benchmark_suite(
   "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
+    "3-thread,big-core,full-inference,experimental-flags"
     "3-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -455,6 +458,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
+    "4-thread,big-core,full-inference,experimental-flags"
     "4-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "dylib-llvm-aot"
@@ -471,7 +475,7 @@ iree_benchmark_suite(
 )
 
 
-# CPU, VMVX, 4-thread, little-core, full-inference
+# CPU, VMVX, 4-thread, big-core, full-inference
 # VMVX is slow and we're not optimizing perf yet. Leaving in a single max-thread
 # benchmark because it's useful to keep an eye on and helps disambiguate where a
 # performance change may be coming from (e.g. if it's in vmvx as well, it's
@@ -482,7 +486,7 @@ iree_benchmark_suite(
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
-    "4-thread,little-core,full-inference,experimental-flags"
+    "4-thread,big-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "vmvx"
   TARGET_ARCHITECTURE
