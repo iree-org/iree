@@ -82,10 +82,6 @@ class WasmLinkerTool : public LinkerTool {
         // entry symbol not defined (pass --no-entry to suppress): _start
         "--no-entry",
 
-        // Allow undefined symbols, provided by the runtime environment (?)
-        // TODO(scotttodd): figure out how to avoid this.
-        "--allow-undefined",
-
         // Treat warnings as errors.
         "--fatal-warnings",
 
