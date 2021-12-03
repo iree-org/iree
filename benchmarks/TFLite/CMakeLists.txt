@@ -475,7 +475,7 @@ iree_benchmark_suite(
 )
 
 
-# CPU, VMVX, 4-thread, little-core, full-inference
+# CPU, VMVX, 4-thread, big-core, full-inference
 # VMVX is slow and we're not optimizing perf yet. Leaving in a single max-thread
 # benchmark because it's useful to keep an eye on and helps disambiguate where a
 # performance change may be coming from (e.g. if it's in vmvx as well, it's
@@ -487,7 +487,6 @@ iree_benchmark_suite(
 
   BENCHMARK_MODES
     "4-thread,big-core,full-inference,experimental-flags"
-    "4-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
     "vmvx"
   TARGET_ARCHITECTURE
