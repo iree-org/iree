@@ -162,13 +162,15 @@ static std::string findToolAtPath(
 LogicalResult LinkerTool::runLinkCommand(std::string commandLine,
                                          StringRef env) {
   LLVM_DEBUG(llvm::dbgs() << "Running linker command:\n"
-                          << env << " " << commandLine);
+                          << env << " " << commandLine << "\n");
   if (!env.empty()) {
 #if defined(_MSC_VER)
     commandLine = ("set " + env + " && " + commandLine).str();
 #else
     commandLine = (env + " " + commandLine).str();
 #endif  // _MSC_VER
+  } else {
+    commandLine = escapeCommandLineComponent(commandLine);
   }
   int exitCode = system(commandLine.c_str());
   if (exitCode == 0) return success();
