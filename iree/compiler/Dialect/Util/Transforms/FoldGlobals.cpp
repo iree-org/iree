@@ -246,6 +246,22 @@ static bool updateGlobalImmutability(GlobalTable &globalTable) {
   });
 }
 
+// Tries to materialize a constant op for |attr| of |type|.
+// Returns nullptr if the attribute could not be materialized as a constant.
+static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
+                                    OpBuilder &builder) {
+  if (arith::ConstantOp::isBuildableWith(attr, type)) {
+    // Common case fast-path.
+    return builder.create<arith::ConstantOp>(loc, type, attr);
+  } else if (mlir::ConstantOp::isBuildableWith(attr, type)) {
+    return builder.create<mlir::ConstantOp>(loc, type, attr);
+  }
+  // Fallback that asks a dialect to materialize things. This may fail!
+  auto *op = attr.getDialect().materializeConstant(builder, attr, type, loc);
+  if (!op) return nullptr;
+  return op->getResult(0);
+}
+
 // Inlines constant global values that are known to not change.
 static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
@@ -263,10 +279,17 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
     // Inline initial value into all loads.
     for (auto loadOp : global.loadOps) {
       OpBuilder builder(loadOp);
-      auto constantOp = builder.create<arith::ConstantOp>(
-          loadOp.getLoc(), loadOp.result().getType(),
-          global.op.initial_valueAttr());
-      loadOp.replaceAllUsesWith(constantOp.getResult());
+      auto constantValue =
+          tryMaterializeConstant(loadOp.getLoc(), loadOp.result().getType(),
+                                 global.op.initial_valueAttr(), builder);
+      if (!constantValue) {
+        // Failed to materialize the constant. This is going to fail for all the
+        // others as well so we bail here. This may be intentional for example
+        // if some value-type has no default value (similar to a deleted default
+        // constructor in C++) - in which case the global is preserved as-is.
+        return GlobalAction::PRESERVE;
+      }
+      loadOp.replaceAllUsesWith(constantValue);
       loadOp.erase();
     }
     global.loadOps.clear();
