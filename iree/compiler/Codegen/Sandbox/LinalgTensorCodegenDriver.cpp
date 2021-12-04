@@ -76,8 +76,9 @@ static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
 
 namespace {
 struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
-  LinalgFusePass(int64_t tilingLevel = -1) {
+  LinalgFusePass(int64_t tilingLevel = -1, bool vectorize = false) {
     this->tilingLevel.setValue(tilingLevel);
+    this->vectorize.setValue(vectorize);
   }
   LinalgFusePass(const LinalgFusePass &pass) {}
   void runOnOperation() override;
@@ -85,8 +86,10 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
 
 struct LinalgSingleTilingExpertPass
     : public LinalgSingleTilingExpertBase<LinalgSingleTilingExpertPass> {
-  LinalgSingleTilingExpertPass(int64_t tilingLevel = -1) {
+  LinalgSingleTilingExpertPass(int64_t tilingLevel = -1,
+                               bool vectorize = false) {
     this->tilingLevel.setValue(tilingLevel);
+    this->vectorize.setValue(vectorize);
   }
   LinalgSingleTilingExpertPass(const LinalgSingleTilingExpertPass &pass) {}
 
@@ -96,7 +99,9 @@ struct LinalgSingleTilingExpertPass
 
 struct LinalgVectorLoweringPass
     : public LinalgVectorLoweringBase<LinalgVectorLoweringPass> {
-  LinalgVectorLoweringPass() = default;
+  LinalgVectorLoweringPass(int64_t vectorLoweringStage = 0) {
+    this->vectorLoweringStage.setValue(vectorLoweringStage);
+  }
   LinalgVectorLoweringPass(const LinalgVectorLoweringPass &pass) {}
 
   void runOnOperation() override;
@@ -313,8 +318,23 @@ mlir::createLinalgSingleTilingExpertPass() {
   return std::make_unique<LinalgSingleTilingExpertPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass() {
-  return std::make_unique<LinalgVectorLoweringPass>();
+std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass(
+    int64_t vectorLoweringStage) {
+  return std::make_unique<LinalgVectorLoweringPass>(vectorLoweringStage);
+}
+
+//===----------------------------------------------------------------------===//
+// Transforms
+//===----------------------------------------------------------------------===//
+
+void mlir::addLowerToVectorTransforms(OpPassManager &passManager) {
+  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(0));
+  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(1));
+  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(2));
+  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(3));
+  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(4));
+  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(5));
+  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(6));
 }
 
 //===----------------------------------------------------------------------===//
@@ -323,15 +343,16 @@ std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass() {
 //===----------------------------------------------------------------------===//
 
 /// Creates a pass to drive transformations on Linalg on tensors.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(
-    int64_t tilingLevel) {
-  return std::make_unique<LinalgSingleTilingExpertPass>(tilingLevel);
+std::unique_ptr<OperationPass<FuncOp>>
+mlir::iree_compiler::createLinalgFusePass(int64_t tilingLevel, bool vectorize) {
+  return std::make_unique<LinalgSingleTilingExpertPass>(tilingLevel, vectorize);
 }
 
 /// Creates a pass to drive transformations on Linalg on tensors.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
-    int64_t tilingLevel) {
-  return std::make_unique<LinalgSingleTilingExpertPass>(tilingLevel);
+std::unique_ptr<OperationPass<FuncOp>>
+mlir::iree_compiler::createLinalgSingleTilingExpertPass(int64_t tilingLevel,
+                                                        bool vectorize) {
+  return std::make_unique<LinalgSingleTilingExpertPass>(tilingLevel, vectorize);
 }
 
 namespace mlir {

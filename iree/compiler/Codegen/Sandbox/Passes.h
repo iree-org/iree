@@ -14,32 +14,40 @@ namespace mlir {
 /// Creates a pass to drive tile + fuse transformations.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass();
 
-/// Creates a pass to drive transformations on Linalg on tensors.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass();
 
 /// Creates a pass to driver the lowering of vector operations.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass();
+std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
+    int64_t vectorLoweringStage = 0);
+
+//===----------------------------------------------------------------------===//
+// Transforms that tie together individual drivers.
+//===----------------------------------------------------------------------===//
+
+/// Add staged lowering of vector ops. `passManager` is expected to be a
+/// `builtin.func` op pass manager.
+void addLowerToVectorTransforms(OpPassManager &passManager);
 
 //===----------------------------------------------------------------------===//
 // IREE specific pass creation methods to allow invocation from within IREEs
 // backend pipelines
 //===----------------------------------------------------------------------===//
 
+namespace iree_compiler {
 /// Creates a pass to drive tile + fuse transformations.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(
-    int64_t tilingLevel);
+std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(int64_t tilingLevel,
+                                                            bool vectorize);
 
 /// Creates a pass to drive transformations on Linalg on tensors. Passing the
 std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
-    int64_t tilingLevel);
+    int64_t tilingLevel, bool vectorize);
 
 //===----------------------------------------------------------------------===//
 // Registration
 //===----------------------------------------------------------------------===//
 
-namespace iree_compiler {
 void registerSandboxPasses();
-}
+}  // namespace iree_compiler
 
 }  // namespace mlir
 #endif  // IREE_CODEGEN_SANDBOX_PASSES_H_
