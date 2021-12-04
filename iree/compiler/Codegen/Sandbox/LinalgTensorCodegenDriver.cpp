@@ -342,13 +342,11 @@ void mlir::addLowerToVectorTransforms(OpPassManager &passManager) {
 // backend pipelines
 //===----------------------------------------------------------------------===//
 
-/// Creates a pass to drive transformations on Linalg on tensors.
 std::unique_ptr<OperationPass<FuncOp>>
 mlir::iree_compiler::createLinalgFusePass(int64_t tilingLevel, bool vectorize) {
   return std::make_unique<LinalgSingleTilingExpertPass>(tilingLevel, vectorize);
 }
 
-/// Creates a pass to drive transformations on Linalg on tensors.
 std::unique_ptr<OperationPass<FuncOp>>
 mlir::iree_compiler::createLinalgSingleTilingExpertPass(int64_t tilingLevel,
                                                         bool vectorize) {

@@ -11,12 +11,14 @@
 
 namespace mlir {
 
-/// Creates a pass to drive tile + fuse transformations.
+/// Creates a pass to drive tile + fuse transformations of `LinalgOp`s.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass();
 
+/// Creates a pass to drive one level tiling + vectorization of `LinalgOp`s.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass();
 
-/// Creates a pass to driver the lowering of vector operations.
+/// Creates a pass to drive the lowering of vector operations in a staged
+/// manner.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
     int64_t vectorLoweringStage = 0);
 
@@ -34,11 +36,15 @@ void addLowerToVectorTransforms(OpPassManager &passManager);
 //===----------------------------------------------------------------------===//
 
 namespace iree_compiler {
-/// Creates a pass to drive tile + fuse transformations.
+/// Creates a pass to drive tile + fuse transformations of `LinalgOp`s with
+/// additional parameters that allow controlling the value of the pass options
+/// when building the pipeline.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(int64_t tilingLevel,
                                                             bool vectorize);
 
-/// Creates a pass to drive transformations on Linalg on tensors. Passing the
+/// Creates a pass to drive one level tiling + vectorization of `LinalgOp`s with
+/// additional parameters that allow controlling the value of the pass options
+/// when building the pipeline.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
     int64_t tilingLevel, bool vectorize);
 
