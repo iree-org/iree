@@ -163,3 +163,18 @@ func @while_test() {
   check.expect_eq(%1, %cst) : tensor<i32>
   return
 }
+
+// -----
+
+// Tests that generic ops that may rely on unrealized_conversion_cast reroute
+// correctly to the original values.
+
+// CHECK-LABEL: unrealizedCastCleanup
+// CHECK-SAME: (%[[COND:.+]]: i1, %[[LHS:.+]]: !stream.resource<*>, %[[LHS_SIZE:.+]]: index, %[[RHS:.+]]: !stream.resource<*>, %[[RHS_SIZE:.+]]: index) -> (!stream.resource<*>, index)
+func @unrealizedCastCleanup(%cond: i1, %lhs: tensor<1024xf32>, %rhs: tensor<1024xf32>) -> tensor<1024xf32> {
+  // CHECK-DAG: %[[RET:.+]] = select %[[COND]], %[[LHS]], %[[RHS]] : !stream.resource<*>
+  // CHECK-DAG: %[[RET_SIZE:.+]] = select %[[COND]], %[[LHS_SIZE]], %[[RHS_SIZE]] : index
+  %0 = select %cond, %lhs, %rhs : tensor<1024xf32>
+  // CHECK: return %[[RET]], %[[RET_SIZE]]
+  return %0 : tensor<1024xf32>
+}
