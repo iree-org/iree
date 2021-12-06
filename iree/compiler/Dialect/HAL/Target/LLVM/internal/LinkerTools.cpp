@@ -18,8 +18,6 @@ std::unique_ptr<LinkerTool> createAndroidLinkerTool(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createEmbeddedLinkerTool(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
-std::unique_ptr<LinkerTool> createRiscvLinkerTool(
-    llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createUnixLinkerTool(
     llvm::Triple &targetTriple, LLVMTargetOptions &targetOptions);
 std::unique_ptr<LinkerTool> createWasmLinkerTool(
@@ -39,8 +37,6 @@ std::unique_ptr<LinkerTool> LinkerTool::getForTarget(
     return createWindowsLinkerTool(targetTriple, targetOptions);
   } else if (targetTriple.isWasm()) {
     return createWasmLinkerTool(targetTriple, targetOptions);
-  } else if (targetTriple.isRISCV()) {
-    return createRiscvLinkerTool(targetTriple, targetOptions);
   }
   return createUnixLinkerTool(targetTriple, targetOptions);
 }
