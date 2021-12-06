@@ -177,3 +177,16 @@ func @FoldResourceSubviewOps(%arg0: !stream.resource<*>, %arg1: index) -> !strea
   // CHECK-NEXT: return %[[RET]]
   return %2 : !stream.resource<*>
 }
+
+// -----
+
+// Tests that unrealized_conversion_casts on resources are properly cleaned up.
+
+// CHECK-LABEL: unrealizedCastCleanup
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<transient>, %[[ARG1:.+]]: index)
+func @unrealizedCastCleanup(%arg0: !stream.resource<transient>, %arg1: index) -> (!stream.resource<transient>, index) {
+  %0 = builtin.unrealized_conversion_cast %arg0, %arg1 : !stream.resource<transient>, index to !stream.resource<transient>
+  %1 = stream.resource.size %0 : !stream.resource<transient>
+  // CHECK-NEXT: return %[[ARG0]], %[[ARG1]]
+  return %0, %1 : !stream.resource<transient>, index
+}

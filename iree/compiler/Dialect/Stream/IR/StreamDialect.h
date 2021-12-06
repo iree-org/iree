@@ -21,6 +21,8 @@ class StreamDialect : public Dialect {
   explicit StreamDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "stream"; }
 
+  void getCanonicalizationPatterns(RewritePatternSet &results) const override;
+
   Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
                                  Location loc) override;
 
@@ -29,11 +31,6 @@ class StreamDialect : public Dialect {
 
   Type parseType(DialectAsmParser &parser) const override;
   void printType(Type type, DialectAsmPrinter &p) const override;
-
-  static bool isDialectOp(Operation *op) {
-    return op && op->getDialect() &&
-           op->getDialect()->getNamespace() == getDialectNamespace();
-  }
 
  private:
   void registerAttributes();
