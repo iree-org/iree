@@ -71,14 +71,15 @@ struct ConcatenateOpConversion
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0; i < rank; ++i) {
       offsets.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
-      sizes.push_back(
-          rewriter.create<tensor::DimOp>(loc, adaptor.getOperands()[0], i));
+      sizes.push_back(rewriter.createOrFold<tensor::DimOp>(
+          loc, adaptor.getOperands()[0], i));
       strides.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
     }
     Value resultDimSize = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     for (auto arg : adaptor.getOperands()) {
-      auto size = rewriter.create<tensor::DimOp>(loc, arg, dim);
-      resultDimSize = rewriter.create<arith::AddIOp>(loc, resultDimSize, size);
+      auto size = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
+      resultDimSize =
+          rewriter.createOrFold<arith::AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
     auto initTensor = rewriter.create<linalg::InitTensorOp>(
@@ -88,12 +89,21 @@ struct ConcatenateOpConversion
     Value result =
         rewriter.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
+    auto toOpFoldResult = [](Value v) -> OpFoldResult {
+      auto op = v.getDefiningOp<arith::ConstantIndexOp>();
+      if (!op) return v;
+      return op.getValue();
+    };
+
     Value accBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     for (auto arg : adaptor.getOperands()) {
       offsets[dim] = accBound;
-      sizes[dim] = rewriter.create<tensor::DimOp>(loc, arg, dim);
-      result = rewriter.create<tensor::InsertSliceOp>(loc, arg, result, offsets,
-                                                      sizes, strides);
+      sizes[dim] = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
+      result = rewriter.create<tensor::InsertSliceOp>(
+          loc, arg, result,
+          llvm::to_vector(llvm::map_range(offsets, toOpFoldResult)),
+          llvm::to_vector(llvm::map_range(sizes, toOpFoldResult)),
+          llvm::to_vector(llvm::map_range(strides, toOpFoldResult)));
       accBound = rewriter.create<arith::AddIOp>(loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);
