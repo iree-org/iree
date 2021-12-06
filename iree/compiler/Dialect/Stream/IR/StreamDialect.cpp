@@ -60,6 +60,10 @@ struct StreamFolderInterface : public DialectFoldInterface {
 // Tries to fold away unrealized_conversion_cast ops if the downstream consumers
 // don't need the extra information. These are inserted during conversion or
 // transforms that may interop with external dialects.
+//
+// Specifically matches:
+//   %0 = builtin.unrealized_conversion_cast %arg0, %arg1 :
+//        !stream.resource<transient>, index to !stream.resource<transient>
 struct StripResourceConversionCastPattern
     : public OpRewritePattern<UnrealizedConversionCastOp> {
   using OpRewritePattern::OpRewritePattern;
